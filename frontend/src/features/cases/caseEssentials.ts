@@ -1,4 +1,5 @@
 import type { AssignmentDetail, RelocationProfile } from '../../types';
+import { getCountryName } from '../../utils/countries';
 
 /**
  * Case Essentials: field resolution for HR case summary.
@@ -68,11 +69,15 @@ export function deriveCaseEssentials(a: AssignmentDetail): CaseEssentialsVM {
 
   const familyStatus = formatFamilyStatus(p);
 
+  // Normalize to display names — destination is often stored as an ISO code
+  // ("NO") while origin is a full name ("France"), so a raw corridor reads
+  // "France → NO". getCountryName passes through unknown/free-text values.
   const origin =
-    nonEmpty(p?.movePlan?.origin) ?? nonEmpty(a.caseOriginHint) ?? NOT_PROVIDED;
+    getCountryName(nonEmpty(p?.movePlan?.origin) ?? nonEmpty(a.caseOriginHint)) || NOT_PROVIDED;
 
   const destination =
-    nonEmpty(p?.movePlan?.destination) ?? nonEmpty(a.caseDestinationHint) ?? NOT_PROVIDED;
+    getCountryName(nonEmpty(p?.movePlan?.destination) ?? nonEmpty(a.caseDestinationHint)) ||
+    NOT_PROVIDED;
 
   return { fullName, email, familyStatus, origin, destination };
 }

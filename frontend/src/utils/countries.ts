@@ -53,6 +53,23 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
   { code: 'ZA', name: 'South Africa', cities: ['Bloemfontein', 'Cape Town', 'Durban', 'East London', 'Johannesburg', 'Pietermaritzburg', 'Port Elizabeth', 'Pretoria'] },
 ];
 
+/**
+ * Normalize a country value to its display name.
+ *
+ * Relocation data is inconsistent at the source: intake stores the origin as a
+ * full name ("France") but the destination as an ISO code ("NO"), so raw
+ * corridor strings read "France → NO". This resolves an ISO code (case-
+ * insensitive) to its name and passes through values that are already names or
+ * unknown free text unchanged, so it's always safe to wrap a corridor field.
+ */
+export function getCountryName(codeOrName: string | null | undefined): string {
+  const v = (codeOrName ?? '').trim();
+  if (!v) return '';
+  const byCode = COUNTRY_OPTIONS.find((c) => c.code.toLowerCase() === v.toLowerCase());
+  if (byCode) return byCode.name;
+  return v;
+}
+
 /** Get cities for a country by name */
 export function getCitiesForCountry(countryName: string): string[] {
   const country = COUNTRY_OPTIONS.find((c) => c.name === countryName);
