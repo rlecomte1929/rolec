@@ -2057,6 +2057,10 @@ class AdminCreatePersonRequest(BaseModel):
     full_name: Optional[str] = None
     role: Optional[str] = None
     company_id: Optional[str] = None
+    # B2: optional initial password. When set, the created account gets a
+    # loginable ReloPass `users` row immediately (no email-invite round-trip
+    # needed). When omitted, behaviour is unchanged (Supabase invite only).
+    password: Optional[str] = None
 
 
 class AdminUpdatePersonRequest(BaseModel):
@@ -2084,6 +2088,10 @@ def create_person(
     email = (body.email or "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="email required")
+    # B2: validate the optional initial password up front, before any DB writes.
+    initial_password = (body.password or "").strip()
+    if initial_password and len(initial_password) < 8:
+        raise HTTPException(status_code=400, detail="Initial password must be at least 8 characters")
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     person_id = str(uuid.uuid4())
     # profiles.full_name has a NOT NULL constraint; derive a default from the email if omitted
@@ -2161,7 +2169,33 @@ def create_person(
     # AIQ-535: relay the failure reason as invite_error so the Add Person modal
     # can tell the admin why the invite did not go out. Only set on a genuine
     # failure — benign no-ops report invite_sent=True with no error.
-    resp = {"person": profile, "invite_sent": invite.sent}
+    # B2: if the admin set an initial password, create a loginable ReloPass
+    # `users` row (id = the profile id, so HR/employee company resolution
+    # matches). Without it the account has only a `profiles` row + Supabase
+    # invite, and /api/auth/login — which authenticates against `users` — can
+    # never find it. The users row carries the password; the Supabase invite
+    # still goes out (bonus, for RLS / a future self-set password).
+    login_ready = False
+    if initial_password:
+        try:
+            from passlib.context import CryptContext
+            _pwd_ctx = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+            db.create_user(
+                user_id=person_id,
+                username=None,
+                email=email,
+                password_hash=_pwd_ctx.hash(initial_password),
+                role=role,
+                name=full_name,
+            )
+            login_ready = True
+        except Exception:
+            log.exception(
+                "admin_create_person: failed to create loginable users row request_id=%s email=%s",
+                request_id, email,
+            )
+
+    resp = {"person": profile, "invite_sent": invite.sent, "login_ready": login_ready}
     if not invite.sent and invite.error:
         resp["invite_error"] = invite.error
     return resp

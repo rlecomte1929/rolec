@@ -390,6 +390,9 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
   const [full_name, setFullName] = useState('');
   const [role, setRole] = useState('EMPLOYEE');
   const [company_id, setCompanyId] = useState('');
+  // B2: optional initial password. When set, the account can log in immediately
+  // (no email-invite round-trip). Blank = invite email only (previous behaviour).
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // AIQ-535: when the person is created but the invite email failed, keep the
@@ -403,6 +406,11 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
       setError('Email is required');
       return;
     }
+    const pw = password.trim();
+    if (pw && pw.length < 8) {
+      setError('Initial password must be at least 8 characters');
+      return;
+    }
     setError(null);
     setInviteFailure(null);
     setSubmitting(true);
@@ -412,12 +420,16 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
         full_name: full_name.trim() || undefined,
         role,
         company_id: company_id || undefined,
+        password: pw || undefined,
       });
       // B2 fix / AIQ-535: the person is created either way — refresh the list,
       // then branch on whether the invite email was dispatched.
       onRefresh();
+      // The account is usable if EITHER an initial password was set
+      // (login_ready) OR the Supabase invite email went out.
+      const loginReady = result?.login_ready === true;
       const inviteSent = result?.invite_sent !== false;
-      if (inviteSent) {
+      if (loginReady || inviteSent) {
         // Success → parent shows a green toast and closes the modal.
         onInviteSuccess(trimmed);
       } else {
@@ -467,6 +479,11 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#374151] mb-1">Initial password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Min 8 chars — leave blank to send an invite email" autoComplete="new-password" />
+            <p className="mt-1 text-xs text-[#6b7280]">Set a password so they can log in immediately, or leave blank to email them a set-password invite.</p>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}
           {inviteFailure && (

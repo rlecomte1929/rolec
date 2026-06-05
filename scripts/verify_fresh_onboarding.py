@@ -124,24 +124,27 @@ def main():
         s, p = call("POST", "/api/admin/people", admin, {
             "email": ADMIN_HR_EMAIL, "full_name": "Probe Admin-HR",
             "role": "HR", "company_id": _ctx["admin_company_id"],
+            "password": PW,  # B2: initial password -> loginable users row
         })
         ok = s in (200, 201)
-        _ctx["admin_hr_id"] = (p or {}).get("id") if isinstance(p, dict) else None
-        record("N3 admin creates HR (+company link)", "PASS" if ok else "FAIL", f"HTTP {s}")
+        person = (p or {}).get("person") if isinstance(p, dict) else None
+        _ctx["admin_hr_id"] = person.get("id") if isinstance(person, dict) else None
+        _ctx["admin_hr_login_ready"] = (p or {}).get("login_ready") if isinstance(p, dict) else None
+        record("N3 admin creates HR (+initial password)", "PASS" if ok else "FAIL",
+               f"HTTP {s} login_ready={_ctx.get('admin_hr_login_ready')}")
     else:
-        record("N3 admin creates HR (+company link)", "BLOCKED", "no admin/company")
+        record("N3 admin creates HR (+initial password)", "BLOCKED", "no admin/company")
 
-    # ── N4: B2 — can the admin-created HR actually log in? ────────────────────
-    # Admin-create sends a Supabase invite email (no password set, no legacy
-    # users row). An automated login is expected to FAIL — that's the honest
-    # finding: the admin->HR handoff cannot complete without the email link.
+    # ── N4: B2 — the admin-created HR logs in with the initial password ───────
+    # With an initial password, admin-create now writes a loginable `users` row,
+    # so the admin->HR handoff completes without the email link.
     if _ctx.get("admin_hr_id") is not None or admin:
         s, p = call("POST", "/api/auth/login", body={"identifier": ADMIN_HR_EMAIL, "password": PW})
         if token_of(p):
             record("N4 admin-created HR can log in (B2)", "PASS", f"HTTP {s} (B2 closed)")
         else:
             record("N4 admin-created HR can log in (B2)", "FAIL",
-                   f"HTTP {s} — invite-email only, no automatable credential")
+                   f"HTTP {s} — admin-created HR still not loginable")
     else:
         record("N4 admin-created HR can log in (B2)", "BLOCKED", "N3 failed")
 
@@ -273,8 +276,8 @@ def main():
     print(f"  Tenant stamp: {STAMP}  (HR={HR_EMAIL}, EMP={EMP_EMAIL})")
     print("  Teardown: run scripts/fresh_onboarding_teardown.sql via the Supabase MCP")
     print("  (scoped by 'Probe %' / @probe.test — cleans every probe run's tenant).")
-    # Exit non-zero if any hard FAIL on a functional node (B2/N4 fail is expected/known).
-    hard = [n for (n, v, _d) in _results if v == "FAIL" and not n.startswith("N4")]
+    # Exit non-zero if any node FAILs (B2/N4 is now fixed, so it counts too).
+    hard = [n for (n, v, _d) in _results if v == "FAIL"]
     sys.exit(1 if hard else 0)
 
 
