@@ -316,6 +316,14 @@ def update_household(
         }
         flags = {"hasDependents": basics.get("hasDependents")}
         crud.update_case(db, case, draft, derived, flags)
+        # Sync family -> case_dependents and re-fire the trigger so the
+        # family-reunion forms generate from the household step (the basics PATCH
+        # can't, because the family isn't known yet at that point).
+        try:
+            main_db.apply_wizard_patch_side_effects(case_id, draft, derived)
+        except Exception:
+            logger.exception("update_household: side-effects failed case_id=%s", case_id)
+        fire_roadmap_events(case_id, draft, derived)
         invalidate_relocation_plan_cache(case_id=case_id)
 
     _audit_case(

@@ -170,5 +170,46 @@ class CanonicalCaseBridgeCompanyFallbackGuardTests(unittest.TestCase):
         self.assertIn("hr_user_id", body)
 
 
+class CaseDependentsBridgeGuardTests(unittest.TestCase):
+    """Source guard for the family -> case_dependents sync. The trigger reads
+    case_dependents for has_spouse/has_children, which gate the family-reunion
+    forms; the household intake writes only the wizard draft, so without this
+    sync no family form is ever generated. Behavior is verified live."""
+
+    def _src(self, marker: str, path_parts) -> str:
+        import os
+        path = os.path.join(_REPO_ROOT, *path_parts)
+        with open(path, "r", encoding="utf-8") as fh:
+            src = fh.read()
+        start = src.index(marker)
+        end = src.index("\n    def ", start + 1)
+        return src[start:end]
+
+    def test_sync_writes_case_dependents_with_relationships(self) -> None:
+        body = self._src("def _sync_case_dependents_from_draft", ("backend", "database.py"))
+        self.assertIn("case_dependents", body)
+        self.assertIn("familyMembers", body)
+        self.assertIn('"spouse"', body)
+        self.assertIn('"child"', body)
+        # insert-if-absent (no churn of dependent ids that case_forms reference)
+        self.assertIn("INSERT INTO", body)
+
+    def test_side_effects_calls_dependents_sync(self) -> None:
+        body = self._src("def apply_wizard_patch_side_effects", ("backend", "database.py"))
+        self.assertIn("_sync_case_dependents_from_draft", body)
+
+    def test_household_endpoint_fires_trigger(self) -> None:
+        # Saving the household must re-fire the trigger so family forms generate.
+        import os
+        path = os.path.join(_REPO_ROOT, "backend", "app", "routers", "cases_write.py")
+        with open(path, "r", encoding="utf-8") as fh:
+            src = fh.read()
+        start = src.index("def update_household")
+        end = src.index("\n@router.", start + 1)
+        body = src[start:end]
+        self.assertIn("apply_wizard_patch_side_effects", body)
+        self.assertIn("fire_roadmap_events", body)
+
+
 if __name__ == "__main__":
     unittest.main()
