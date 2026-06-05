@@ -1,9 +1,12 @@
 name: CI
 
 on:
+  # PRs only. The post-merge push:[main] re-run was ~164 runs/week of pure
+  # duplication — the PR already validated the same commit, and CI does not gate
+  # the Render deploy (it builds on push regardless). Direct pushes to main are
+  # still covered by the local pre-push hook (.githooks/pre-push runs the build).
+  # Re-add `push: { branches: [main] }` here if you want a post-merge safety net.
   pull_request:
-  push:
-    branches: [main]
 
 # Cancel in-flight runs when new commits land on the same ref.
 concurrency:
