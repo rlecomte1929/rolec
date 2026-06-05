@@ -202,67 +202,66 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
         logger.exception("dossier: failed to query cases for access check id=%s", case_id)
         row = None  # fall through to assignment lookup rather than 500
 
-    # --- fallback: resolve assignment_id → relocation_cases ---
-    if not row:
-        asgn = None
+    # --- assignment-based access (authoritative employee↔case link) ---
+    # case_assignments carries the caller's (possibly legacy non-UUID)
+    # employee_user_id and links the case via case_id / canonical_case_id. This
+    # is the correct ownership signal even when public.cases.employee_id holds a
+    # different (contact) UUID, or when there is no public.cases row at all.
+    # Resolve by case_id / canonical_case_id (the value case-scoped routes pass)
+    # AND by assignment id (legacy callers that pass an assignment_id).
+    # Returns True (granted), False (assignment found, no access), None (none).
+    def _assignment_access() -> Optional[bool]:
         try:
             with main_db.engine.connect() as conn:
-                asgn = conn.execute(
+                a = conn.execute(
                     _sql_text(
                         f"SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
                         f"FROM {_pg_table('case_assignments')} ca "
                         f"LEFT JOIN {_pg_table('relocation_cases')} rc "
                         f"  ON CAST(rc.id AS TEXT) = CAST(ca.canonical_case_id AS TEXT) "
-                        f"WHERE CAST(ca.id AS TEXT) = :id"
+                        f"WHERE CAST(ca.id AS TEXT) = :id "
+                        f"   OR CAST(ca.canonical_case_id AS TEXT) = :id "
+                        f"   OR CAST(ca.case_id AS TEXT) = :id"
                     ),
                     {"id": case_id},
                 ).mappings().first()
         except Exception:
-            logger.exception("dossier: failed to resolve assignment_id id=%s", case_id)
-            asgn = None
+            logger.exception("dossier: failed to resolve assignment for case id=%s", case_id)
+            return None
+        if a is None:
+            return None
+        if _owns(a.get("employee_user_id")) or _owns(a.get("hr_user_id")) or is_admin:
+            return True
+        if role == "HR":
+            try:
+                with main_db.engine.connect() as conn:
+                    prof = conn.execute(
+                        _sql_text(
+                            f"SELECT company_id FROM {_pg_table('profiles')} WHERE CAST(id AS TEXT) = :id"
+                        ),
+                        {"id": str(auth_uuid or user_id or "")},
+                    ).mappings().first()
+                if prof and str(prof.get("company_id") or "") == str(a.get("company_id") or ""):
+                    return True
+            except Exception:
+                logger.exception("dossier: HR profile lookup failed id=%s", user_id)
+        return False
 
-        if asgn is not None:
-            # Employee owns the assignment
-            if _owns(asgn.get("employee_user_id")):
-                return
-            # HR owns the assignment
-            if _owns(asgn.get("hr_user_id")):
-                return
-            # Admin always allowed
-            if is_admin:
-                return
-            # HR company match
-            if role == "HR":
-                try:
-                    with main_db.engine.connect() as conn:
-                        prof = conn.execute(
-                            _sql_text(
-                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE CAST(id AS TEXT) = :id"
-                            ),
-                            # AUTH-ID-2: profiles.id is the Supabase UUID. Prefer the
-                            # canonical auth_uuid, fall back to the raw id (UUID-native
-                            # callers without auth_uuid still match; legacy text ids
-                            # simply don't match — graceful).
-                            {"id": str(auth_uuid or user_id or "")},
-                        ).mappings().first()
-                    if prof and str(prof.get("company_id") or "") == str(asgn.get("company_id") or ""):
-                        return
-                except Exception:
-                    logger.exception("dossier: HR profile lookup failed id=%s", user_id)
+    if not row:
+        granted = _assignment_access()
+        if granted:
+            return
+        if granted is False:
             raise HTTPException(status_code=403, detail="Not authorised for this case")
-
         raise HTTPException(status_code=404, detail="Case not found")
 
-    # Employee owns the case
+    # public.cases row found — direct ownership on the row first…
     if _owns(row.get("employee_id")):
         return
-    # HR owns the case
     if _owns(row.get("hr_owner_id")):
         return
-    # Admin always allowed
     if is_admin:
         return
-    # HR users with company match — read user's company from profiles
     if role == "HR":
         try:
             with main_db.engine.connect() as conn:
@@ -271,9 +270,6 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                         f"SELECT company_id FROM {_pg_table('profiles')} "
                         f"WHERE id = :id"
                     ),
-                    # AUTH-ID-2: prefer canonical auth_uuid, fall back to raw id.
-                    # A legacy text id here hits the uuid-cast DataError path,
-                    # which is already caught below (graceful no-match).
                     {"id": auth_uuid or user_id},
                 ).mappings().first()
             if prof and str(prof.get("company_id") or "") == str(row.get("company_id") or ""):
@@ -281,6 +277,10 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
         except Exception:
             logger.exception("dossier: failed to look up HR profile company_id id=%s", user_id)
 
+    # …then the authoritative assignment link (handles contact-UUID employee_id
+    # and HR-created cases whose public.cases ownership columns differ).
+    if _assignment_access():
+        return
     raise HTTPException(status_code=403, detail="Not authorised for this case")
 
 

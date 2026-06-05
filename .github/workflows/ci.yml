@@ -251,7 +251,8 @@ jobs:
             backend/tests/test_policy_propagation.py \
             backend/tests/test_policy_canonical_chunking.py \
             backend/tests/test_corridor_persistence.py \
-            backend/tests/test_hr_no_company_policy_graceful.py
+            backend/tests/test_hr_no_company_policy_graceful.py \
+            backend/tests/test_case_engine_bridge.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
