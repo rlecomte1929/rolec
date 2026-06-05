@@ -146,3 +146,4 @@ AIQ-727:backend/app/services/processing_time_estimate.py  # SHIPPED (verified gi
 AIQ-727:backend/tests/test_processing_time_estimate.py  # SHIPPED (verified git-history): 52419e3a feat(predictions): P2-04a processingTimeEstimate() service with official fallback (AIQ-727) (#338)
 AIQ-729:frontend/src/components/ProcessingTimeBadge.tsx  # SHIPPED (verified git-history): 7c785fac feat(predictions): P2-04c <ProcessingTimeBadge> component (AIQ-729) (#342)
 AIQ-729:frontend/src/components/__tests__/ProcessingTimeBadge.test.tsx  # SHIPPED (verified git-history): 7c785fac feat(predictions): P2-04c <ProcessingTimeBadge> component (AIQ-729) (#342)
+AIQ-832:backend/app/routers/immigration.py  # NOT A LEAK (verified): the dead duplicate was already removed on main by AUDIT-B9-imm-6; F1 (PR #399, squash 49c7b0ab) correctly shipped only immigration_intake_consent.py + tests. The immigration.py edit was dropped during rebase because the file no longer exists on main.

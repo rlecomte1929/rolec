@@ -46,6 +46,7 @@ import type {
   DossierSearchSuggestionsResponse,
 } from '../types';
 import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryResponse } from '../types/policyAssistant';
+import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
 import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
 import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
 
@@ -777,14 +778,15 @@ export const hrAPI = {
     message: string,
     documentId?: string | null
   ): Promise<HrPolicyAssistantQueryResponse> => {
-    const body: { policy_id: string; message: string; document_id?: string } = {
-      policy_id: policyId,
-      message,
-    };
-    const d = documentId?.trim();
-    if (d) body.document_id = d;
-    const response = await api.post('/api/hr/policy-assistant/query', body, { timeout: 120_000 });
-    return response.data;
+    // AIQ-833 / F2: cut over to the constrained RAG engine. Company scoping is
+    // server-derived from the authenticated user — policy_id/document_id are no
+    // longer sent (kept on the signature + response for shape compatibility).
+    const response = await api.post(
+      '/api/policy-assistant/rag-query',
+      { question: message },
+      { timeout: 120_000 }
+    );
+    return ragResponseToHrResponse(response.data, policyId, documentId);
   },
 
   // ── Quote requests (AIQ-65) ──────────────────────────────────────────────
@@ -2596,11 +2598,14 @@ export const employeeAPI = {
     assignmentId: string,
     message: string
   ): Promise<EmployeePolicyAssistantQueryResponse> => {
-    const response = await api.post('/api/employee/policy-assistant/query', {
-      assignment_id: assignmentId,
-      message,
-    }, { timeout: 120_000 });
-    return response.data;
+    // AIQ-833 / F2: cut over to the constrained RAG engine (company scoping is
+    // server-derived). assignment_id is kept on the signature + response shape.
+    const response = await api.post(
+      '/api/policy-assistant/rag-query',
+      { question: message },
+      { timeout: 120_000 }
+    );
+    return ragResponseToEmployeeResponse(response.data, assignmentId);
   },
 
   // ── Quote requests (AIQ-65) ──────────────────────────────────────────────
