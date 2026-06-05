@@ -7032,6 +7032,11 @@ class Database:
         assignment = self.get_assignment_by_case_id(cid)
         if not assignment:
             return
+        # Bridge the wizard intake into the canonical public.cases row that the
+        # Case Engine (trigger_engine) reads. The wizard writes wizard_cases; the
+        # trigger reads public.cases — without this row no CaseForms (hence no
+        # roadmap/dossier) are ever generated. Fail-safe (skips on any gap).
+        self._ensure_canonical_case_from_wizard(cid, derived, assignment)
         st = (assignment.get("status") or "").strip().lower()
         if st not in ("created", "assigned"):
             return
@@ -7039,6 +7044,74 @@ class Database:
         if not any((str(basics.get(k) or "").strip()) for k in ("destCountry", "destCity", "originCountry", "originCity")):
             return
         self.update_assignment_status(assignment["id"], "awaiting_intake")
+
+    def _ensure_canonical_case_from_wizard(
+        self, case_id: str, derived: Dict[str, Any], assignment: Dict[str, Any]
+    ) -> None:
+        """Upsert the canonical ``public.cases`` row the Case Engine reads.
+
+        The intake wizard writes ``wizard_cases``; the trigger engine + case-access
+        guard read ``public.cases``. Without this bridge, no wizard-created case
+        ever appears to the trigger, so no CaseForms (and hence no roadmap/dossier)
+        are generated. We populate the canonical row from the wizard draft + the
+        ``case_assignments`` link: ``employee_contact_id`` supplies the UUID that
+        ``public.cases.employee_id`` / ``case_forms.person_id`` require (the
+        assignment's ``employee_user_id`` may be a legacy non-UUID text id).
+
+        Fail-safe: every NOT NULL column must resolve, else we skip — never insert
+        a partial/invalid row. Caller (apply_wizard_patch_side_effects) is itself
+        wrapped in try/except by the PATCH handler, so a failure can't break intake.
+        """
+        dest = (derived.get("dest_country") or "").strip()
+        employee_uuid = str(assignment.get("employee_contact_id") or "").strip()
+        if not dest or not employee_uuid:
+            return  # trigger needs a destination; public.cases needs a uuid employee_id
+        canonical = str(assignment.get("canonical_case_id") or case_id).strip()
+        company_id = None
+        try:
+            with self.engine.connect() as conn:
+                r = conn.execute(
+                    text("SELECT company_id FROM relocation_cases WHERE CAST(id AS TEXT) = :id"),
+                    {"id": canonical},
+                ).mappings().first()
+            company_id = str(r["company_id"]).strip() if r and r.get("company_id") else None
+        except Exception:
+            log.exception("canonical-case bridge: company lookup failed case=%s", case_id)
+            return
+        if not company_id:
+            return
+        origin = (derived.get("origin_country") or "").strip()
+        purpose = (derived.get("purpose") or "").strip() or "relocation"
+        dest_city = (derived.get("dest_city") or "").strip() or None
+        move = (derived.get("target_move_date") or "") or ""
+        params = {
+            "id": case_id, "company": company_id, "emp": employee_uuid,
+            "origin": origin, "dest": dest, "dest_city": dest_city,
+            "purpose": purpose, "move": move,
+        }
+        if self.engine.dialect.name == "postgresql":
+            sql = (
+                "INSERT INTO cases "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, created_at, updated_at) "
+                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'created', 'intake', CAST(NULLIF(:move,'') AS date), now(), now()) "
+                "ON CONFLICT (id) DO UPDATE SET "
+                "dest_country_code = EXCLUDED.dest_country_code, origin_country_code = EXCLUDED.origin_country_code, "
+                "dest_city = EXCLUDED.dest_city, purpose = EXCLUDED.purpose, employee_id = EXCLUDED.employee_id, updated_at = now()"
+            )
+        else:
+            sql = (
+                "INSERT INTO cases "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date) "
+                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'created', 'intake', NULLIF(:move,'')) "
+                "ON CONFLICT (id) DO UPDATE SET dest_country_code=excluded.dest_country_code, "
+                "origin_country_code=excluded.origin_country_code, dest_city=excluded.dest_city, "
+                "purpose=excluded.purpose, employee_id=excluded.employee_id"
+            )
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text(sql), params)
+        except Exception:
+            log.exception("canonical-case bridge: upsert failed case=%s", case_id)
 
     def next_open_milestone_deadlines_for_cases(
         self, relocation_case_ids: List[str], request_id: Optional[str] = None
