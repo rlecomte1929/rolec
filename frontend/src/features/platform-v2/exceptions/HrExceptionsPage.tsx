@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { AIRecommendationCard } from '../../ai-oversight/AIRecommendationCard';
+import { getCountryName } from '../../../utils/countries';
 import {
   getExceptionAuditTrail,
   listExceptionRequestsForCompany,
@@ -580,7 +581,7 @@ function roleSubtitle(req: ExceptionRequest): string {
   const roleLabel = role === 'hr' ? 'HR' : role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : '';
   const corridor =
     req.origin_country && req.destination_country
-      ? `${req.origin_country} → ${req.destination_country}`
+      ? `${getCountryName(req.origin_country)} → ${getCountryName(req.destination_country)}`
       : '';
   return [roleLabel, corridor].filter(Boolean).join(' · ');
 }
