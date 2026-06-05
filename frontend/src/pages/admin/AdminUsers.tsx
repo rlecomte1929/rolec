@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { Card, Button, Badge } from '../../components/antigravity';
+import { Card, Button, Badge, Alert } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
@@ -29,6 +29,14 @@ export const AdminUsers: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
+  const [inviteToast, setInviteToast] = useState<string | null>(null);
+
+  // AIQ-535: green success toast persists ≥3s then auto-dismisses; also dismissible via the close button.
+  useEffect(() => {
+    if (!inviteToast) return;
+    const timer = setTimeout(() => setInviteToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [inviteToast]);
 
   const loadPeople = async () => {
     setLoading(true);
@@ -264,11 +272,28 @@ export const AdminUsers: React.FC = () => {
         <AddPersonModal
           companies={companies}
           onClose={() => setAddOpen(false)}
-          onCreated={() => {
+          onRefresh={() => loadPeople()}
+          onInviteSuccess={(targetEmail) => {
             setAddOpen(false);
-            loadPeople();
+            setInviteToast(`Person created. Invite email sent to ${targetEmail}.`);
           }}
         />
+      )}
+
+      {inviteToast && (
+        <div className="fixed top-4 right-4 z-[60] max-w-sm">
+          <Alert variant="success" className="shadow-lg flex items-start gap-2">
+            <span className="flex-1">{inviteToast}</span>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setInviteToast(null)}
+              className="text-[#1f8e8b] hover:opacity-70 leading-none"
+            >
+              ✕
+            </button>
+          </Alert>
+        </div>
       )}
     </AdminLayout>
   );
@@ -356,17 +381,20 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
 interface AddPersonModalProps {
   companies: AdminCompany[];
   onClose: () => void;
-  onCreated: () => void;
+  onRefresh: () => void;
+  onInviteSuccess: (email: string) => void;
 }
 
-const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onCreated }) => {
+const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onRefresh, onInviteSuccess }) => {
   const [email, setEmail] = useState('');
   const [full_name, setFullName] = useState('');
   const [role, setRole] = useState('EMPLOYEE');
   const [company_id, setCompanyId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  // AIQ-535: when the person is created but the invite email failed, keep the
+  // modal open and surface a red banner so the admin can share the link manually.
+  const [inviteFailure, setInviteFailure] = useState<{ error: string | null } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,7 +404,7 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
       return;
     }
     setError(null);
-    setSuccess(null);
+    setInviteFailure(null);
     setSubmitting(true);
     try {
       const result = await adminAPI.createPerson({
@@ -385,14 +413,17 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
         role,
         company_id: company_id || undefined,
       });
-      // B2 fix: surface whether the invite email was dispatched.
+      // B2 fix / AIQ-535: the person is created either way — refresh the list,
+      // then branch on whether the invite email was dispatched.
+      onRefresh();
       const inviteSent = result?.invite_sent !== false;
-      setSuccess(
-        inviteSent
-          ? 'Person created. An invite email has been sent so they can set their password.'
-          : 'Person created. No invite email sent — check Supabase email configuration.'
-      );
-      onCreated();
+      if (inviteSent) {
+        // Success → parent shows a green toast and closes the modal.
+        onInviteSuccess(trimmed);
+      } else {
+        // Failure → keep the modal open with a red banner the admin can act on.
+        setInviteFailure({ error: result?.invite_error || null });
+      }
     } catch (err: any) {
       const detail = err?.response?.data;
       let message = err?.message || 'Failed to create person';
@@ -438,10 +469,17 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
             </select>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}
-          {success && <div className="text-sm text-green-600">{success}</div>}
+          {inviteFailure && (
+            <Alert variant="error">
+              Person created. Invite email could NOT be sent
+              {inviteFailure.error ? ` (${inviteFailure.error})` : ''}. Share the magic link manually.
+            </Alert>
+          )}
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create'}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              {inviteFailure ? 'Close' : 'Cancel'}
+            </Button>
+            <Button type="submit" variant="primary" disabled={submitting || !!inviteFailure}>{submitting ? 'Creating…' : 'Create'}</Button>
           </div>
         </form>
       </div>
