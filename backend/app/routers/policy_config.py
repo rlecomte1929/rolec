@@ -180,13 +180,23 @@ def hr_get_policy_config(
     effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    cid = _policy_matrix_company_hr(user, companyId)
     try:
         at = validate_optional_query_assignment_type(assignmentType)
         fs = validate_optional_query_family_status(familyStatus)
         el = validate_optional_query_employee_level(employeeLevel)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    # Graceful onboarding: an HR not yet linked to a company gets a read-only
+    # empty scaffold (company_setup_required) instead of a 400 — a missing
+    # precondition must degrade gracefully (see SKILL.md Phase 0.5).
+    if not user.get("is_admin") and not _get_hr_company_id(user):
+        return policy_config_matrix_svc.empty_onboarding_payload(
+            assignment_type=at,
+            family_status=fs,
+            employee_level=el,
+            effective_rows_only=effectiveRowsOnly,
+        )
+    cid = _policy_matrix_company_hr(user, companyId)
     return policy_config_matrix_svc.get_working_payload(
         cid,
         assignment_type=at,
@@ -332,6 +342,9 @@ def hr_get_policy_config_diff(
     Draft vs Live snapshot for the HR Policy "Draft vs Live" section.
     See PolicyConfigMatrixService.compute_diff for the response shape.
     """
+    # Graceful onboarding: HR not yet linked to a company gets an empty diff.
+    if not user.get("is_admin") and not _get_hr_company_id(user):
+        return policy_config_matrix_svc.empty_diff()
     cid = _policy_matrix_company_hr(user, companyId)
     return policy_config_matrix_svc.compute_diff(cid)
 
