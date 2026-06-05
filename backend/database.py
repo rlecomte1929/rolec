@@ -7089,11 +7089,17 @@ class Database:
             "origin": origin, "dest": dest, "dest_city": dest_city,
             "purpose": purpose, "move": move,
         }
+        # public.cases enforces CHECK constraints — status in (draft, active,
+        # on_hold, completed, cancelled), stage in (discovery, dossier, roadmap,
+        # in_progress, closing, closed) — and FK employee_id -> profiles. We seed
+        # status='active', stage='discovery'; employee_contact_id must already be
+        # a profiles row (real employees have one). The whole upsert is
+        # try/except-wrapped, so a constraint miss skips rather than breaking intake.
         if self.engine.dialect.name == "postgresql":
             sql = (
                 "INSERT INTO cases "
                 "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, created_at, updated_at) "
-                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'created', 'intake', CAST(NULLIF(:move,'') AS date), now(), now()) "
+                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'active', 'discovery', CAST(NULLIF(:move,'') AS date), now(), now()) "
                 "ON CONFLICT (id) DO UPDATE SET "
                 "dest_country_code = EXCLUDED.dest_country_code, origin_country_code = EXCLUDED.origin_country_code, "
                 "dest_city = EXCLUDED.dest_city, purpose = EXCLUDED.purpose, employee_id = EXCLUDED.employee_id, updated_at = now()"
@@ -7102,7 +7108,7 @@ class Database:
             sql = (
                 "INSERT INTO cases "
                 "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date) "
-                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'created', 'intake', NULLIF(:move,'')) "
+                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'active', 'discovery', NULLIF(:move,'')) "
                 "ON CONFLICT (id) DO UPDATE SET dest_country_code=excluded.dest_country_code, "
                 "origin_country_code=excluded.origin_country_code, dest_city=excluded.dest_city, "
                 "purpose=excluded.purpose, employee_id=excluded.employee_id"
