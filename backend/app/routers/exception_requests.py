@@ -245,11 +245,24 @@ def _attach_precedent_insight(conn, row: Dict[str, Any]) -> Dict[str, Any]:
 _EXCEPTION_SELECT_WITH_JOINS = """
 SELECT
     pcr.*,
-    rp.full_name  AS requested_by_name,
-    rp.role       AS requested_by_role,
-    rsp.full_name AS resolved_by_name,
-    mc.origin_country,
-    mc.destination_country
+    -- Requester/resolver names: the direct profiles join only matches UUID-native
+    -- ids. Legacy ids (e.g. "seed-emp-testingapril") are LOGIN ids, so fall back
+    -- to the users.email -> profiles.email bridge (same path the canonical-case
+    -- bridge uses). Correlated subqueries (LIMIT 1) so a duplicate email can't
+    -- fan the row out.
+    COALESCE(rp.full_name, (
+        SELECT p.full_name FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
+        WHERE u.id = pcr.requested_by_user_id LIMIT 1)) AS requested_by_name,
+    COALESCE(rp.role, (
+        SELECT p.role FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
+        WHERE u.id = pcr.requested_by_user_id LIMIT 1)) AS requested_by_role,
+    COALESCE(rsp.full_name, (
+        SELECT p.full_name FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
+        WHERE u.id = pcr.resolved_by_user_id LIMIT 1)) AS resolved_by_name,
+    -- Corridor: mobility_cases covers HR-create cases; wizard/bridged cases
+    -- (the employee-intake demo spine) carry it on wizard_cases instead.
+    COALESCE(mc.origin_country, wc.origin_country)      AS origin_country,
+    COALESCE(mc.destination_country, wc.dest_country)   AS destination_country
 -- policy_cap_requests stores id/case_id/*_user_id as TEXT (legacy non-UUID
 -- ids like "seed-emp-testingapril" live here), while profiles.id and
 -- mobility_cases.id are UUID. Comparing uuid = text fails to plan, so the
@@ -259,6 +272,7 @@ FROM policy_cap_requests pcr
 LEFT JOIN profiles       rp  ON rp.id::text  = pcr.requested_by_user_id
 LEFT JOIN profiles       rsp ON rsp.id::text = pcr.resolved_by_user_id
 LEFT JOIN mobility_cases mc  ON mc.id::text  = pcr.case_id
+LEFT JOIN wizard_cases   wc  ON wc.id::text  = pcr.case_id
 """
 
 
