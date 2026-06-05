@@ -408,6 +408,17 @@ class ExceptionSelectJoinGuardTests(unittest.TestCase):
         self.assertNotIn("rp.id  = pcr.requested_by_user_id", sql)
         self.assertNotIn("mc.id  = pcr.case_id", sql)
 
+    def test_enrichment_resolves_legacy_ids_and_wizard_corridor(self) -> None:
+        """Requester/resolver names fall back to the users.email->profiles.email
+        bridge for legacy login ids, and the corridor falls back to wizard_cases
+        for wizard/bridged cases (mobility_cases only covers HR-create cases)."""
+        sql = router_module._EXCEPTION_SELECT_WITH_JOINS
+        self.assertIn("lower(p.email) = lower(u.email)", sql)
+        self.assertIn("u.id = pcr.requested_by_user_id", sql)
+        self.assertIn("LEFT JOIN wizard_cases   wc  ON wc.id::text  = pcr.case_id", sql)
+        self.assertIn("COALESCE(mc.origin_country, wc.origin_country)", sql)
+        self.assertIn("COALESCE(mc.destination_country, wc.dest_country)", sql)
+
 
 if __name__ == "__main__":
     unittest.main()
