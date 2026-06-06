@@ -110,6 +110,10 @@ class TraceSession:
         # this request. Both None when the registry is absent (literal fallback).
         self.prompt_version_id: Optional[str] = prompt_version_id
         self.canary_arm: Optional[str] = canary_arm
+        # W3/AIQ-837: chunk ids cited in the final answer. Persisted on the trace
+        # so feedback (ai_human_feedback.trace_session_id -> traces.id) can be
+        # joined back to the chunks that produced the answer.
+        self.cited_chunk_ids: List[str] = []
 
     def set_prompt_attribution(
         self, prompt_version_id: Optional[str], canary_arm: Optional[str]
@@ -117,6 +121,10 @@ class TraceSession:
         """Record which prompt version/arm served this request (Parker Step D)."""
         self.prompt_version_id = prompt_version_id
         self.canary_arm = canary_arm
+
+    def record_citations(self, chunk_ids: Optional[List[str]]) -> None:
+        """Record the chunk ids cited in the final answer (W3/AIQ-837)."""
+        self.cited_chunk_ids = [str(c) for c in (chunk_ids or [])]
 
     # ── Recording helpers ── #
 
@@ -189,6 +197,7 @@ class TraceSession:
                 "customer_id": self.customer_id,
                 "prompt_version_id": self.prompt_version_id,
                 "canary_arm": self.canary_arm,
+                "cited_chunk_ids": self.cited_chunk_ids,
                 **econ,
             }
             # 1. Structured JSON log — always on, zero extra deps.
@@ -273,6 +282,7 @@ def _write_to_db(payload: Dict[str, Any], company_id: str) -> None:
                 co2e_grams_estimated=payload.get("co2e_grams_estimated"),
                 prompt_version_id=payload.get("prompt_version_id"),
                 canary_arm=payload.get("canary_arm"),
+                cited_chunk_ids=payload.get("cited_chunk_ids"),
             )
     except Exception:
         log.debug("ai_trace db write failed", exc_info=True)
