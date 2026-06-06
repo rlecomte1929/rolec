@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -30,6 +32,10 @@ from ...database import db
 from .policy_assistant_embedder import Embedder, cosine_similarity, get_default_embedder
 
 log = logging.getLogger(__name__)
+
+# N3/AIQ-842 retrieval quality gates.
+_IMMIGRATION_MIN_SIMILARITY = float(os.getenv("IMMIGRATION_MIN_SIMILARITY", "0.25"))
+_TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
 
 # Synthetic corpus owner: immigration rules are corridor-scoped, not
 # company-scoped, but policy_chunk_retriever requires a company_id. The
@@ -80,17 +86,20 @@ def retrieve_for_profile(
     source_type: str = IMMIGRATION_SOURCE_TYPE,        # accepted for back-compat; unused
     embedder: Optional[Embedder] = None,
     engine=None,
+    min_similarity_score: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieve the immigration-rule chunks for this profile's corridor, ranked by
-    relevance, from immigration_corpus_chunks (N2/AIQ-841). Corridor-scoped only.
+    relevance, from immigration_corpus_chunks (N2/AIQ-841) with the N3/AIQ-842
+    quality gates applied (similarity floor + trust_tier boost + freshness decay +
+    corridor hard-filter). Corridor-scoped only.
 
     Returns an empty list when the profile is incomplete or the corridor is
-    uncovered (no chunks) — never cross-corridor substitutes.
+    uncovered/below the floor — never cross-corridor substitutes.
 
-    Return shape per chunk is backward-compatible with the prior retriever:
-    id, source_type, source_ref, chunk_text, chunk_metadata, score (+ corridor,
-    trust_tier, fetched_at, source_url).
+    Return shape per chunk: id, source_type, source_ref, source_url, chunk_text,
+    chunk_metadata, corridor, trust_tier, fetched_at, score, raw_score,
+    adjusted_score, is_stale.
     """
     if not profile.origin_country or not profile.destination_country:
         return []
@@ -107,17 +116,86 @@ def retrieve_for_profile(
     q_emb = embedder.embed(query)
     engine = engine or db.engine
     k = int(max(1, min(top_k, 50)))
+    # Over-fetch a little so the tier/freshness re-rank can promote within-floor chunks.
+    fetch_k = min(50, max(k, k * 3))
 
     if engine.dialect.name == "sqlite":
-        result = _retrieve_corpus_sqlite(engine, corridor_db, q_emb, k)
+        raw = _retrieve_corpus_sqlite(engine, corridor_db, q_emb, fetch_k)
     else:
-        result = _retrieve_corpus_postgres(engine, corridor_db, q_emb, k)
+        raw = _retrieve_corpus_postgres(engine, corridor_db, q_emb, fetch_k)
+
+    # Corridor hard-filter (belt-and-suspenders; the query already scopes corridor).
+    raw = [c for c in raw if c.get("corridor") == corridor_db]
+    min_sim = _IMMIGRATION_MIN_SIMILARITY if min_similarity_score is None else min_similarity_score
+    result = _apply_quality_gates(raw, min_similarity=min_sim, top_k=k)
 
     log.info(
-        "immigration_retriever corridor=%s pathway=%s returned=%d",
-        corridor, classification.pathway_type, len(result),
+        "immigration_retriever corridor=%s pathway=%s returned=%d min_sim=%.2f",
+        corridor, classification.pathway_type, len(result), min_sim,
     )
     return result
+
+
+def retrieve_with_staleness(
+    *,
+    profile: UserProfile,
+    classification: PathClassification,
+    top_k: int = 10,
+    embedder: Optional[Embedder] = None,
+    engine=None,
+    min_similarity_score: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    N3/AIQ-842 staleness-aware wrapper for the answer generator (N4): same
+    retrieval as retrieve_for_profile, but returns
+    {chunks, all_stale_warning, oldest_fetched_at}. Kept separate so the
+    list-returning retrieve_for_profile contract (W1 endpoint + rag_roadmap
+    pipeline) is unchanged.
+    """
+    chunks = retrieve_for_profile(
+        profile=profile, classification=classification, top_k=top_k,
+        embedder=embedder, engine=engine, min_similarity_score=min_similarity_score,
+    )
+    all_stale = bool(chunks) and all(c.get("is_stale") for c in chunks)
+    fetched = [c.get("fetched_at") for c in chunks if c.get("fetched_at")]
+    # ISO-8601 strings sort chronologically.
+    oldest = min(fetched) if fetched else None
+    return {"chunks": chunks, "all_stale_warning": all_stale, "oldest_fetched_at": oldest}
+
+
+def _days_old(fetched_at: Any, now: datetime) -> int:
+    if not fetched_at:
+        return 0
+    try:
+        dt = datetime.fromisoformat(str(fetched_at).replace("Z", "+00:00")) if isinstance(fetched_at, str) else fetched_at
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return max(0, (now - dt).days)
+    except Exception:
+        return 0
+
+
+def _apply_quality_gates(
+    chunks: List[Dict[str, Any]], *, min_similarity: float, top_k: int, now: Optional[datetime] = None
+) -> List[Dict[str, Any]]:
+    """Similarity floor + trust_tier boost + freshness decay; re-sort by adjusted_score."""
+    now = now or datetime.now(timezone.utc)
+    out: List[Dict[str, Any]] = []
+    for c in chunks:
+        raw = float(c.get("score") or 0.0)
+        if min_similarity > 0.0 and raw < min_similarity:
+            continue
+        tier = c.get("trust_tier")
+        try:
+            tier = int(tier) if tier is not None and str(tier).strip() != "" else None
+        except (ValueError, TypeError):
+            tier = None
+        boost = _TIER_BOOST.get(tier, 1.0)
+        days = _days_old(c.get("fetched_at"), now)
+        freshness = 0.70 if days > 180 else (0.85 if days > 90 else 1.0)
+        out.append({**c, "raw_score": raw, "adjusted_score": raw * boost * freshness, "is_stale": days > 180})
+    out.sort(key=lambda x: x["adjusted_score"], reverse=True)
+    return out[: max(1, top_k)]
 
 
 def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, fetched_at, score) -> Dict[str, Any]:
