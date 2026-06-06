@@ -141,18 +141,20 @@ class BuildTypedInputsTests(unittest.TestCase):
 
 
 _SCHEMA = """
-CREATE TABLE policy_assistant_chunks (
+CREATE TABLE immigration_corpus_chunks (
     id TEXT PRIMARY KEY,
-    company_id TEXT NOT NULL,
-    policy_version_id TEXT,
-    source_type TEXT NOT NULL,
-    source_ref TEXT NOT NULL,
+    corridor TEXT NOT NULL,
+    source_doc_id TEXT,
+    source_url TEXT NOT NULL,
     chunk_text TEXT NOT NULL,
-    chunk_metadata TEXT NOT NULL DEFAULT '{}',
+    chunk_index INTEGER NOT NULL DEFAULT 0,
+    chunk_metadata TEXT DEFAULT '{}',
+    trust_tier INTEGER NOT NULL DEFAULT 2,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     embedding TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id, source_type, source_ref)
+    content_hash TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT
 );
 """
 
@@ -163,23 +165,25 @@ class _FakeDb:
 
 
 def _seed(conn, embedder, *, chunk_id, corridor, pathway_type, body):
+    # N2: corridor stored underscore form; retriever normalizes arrow->underscore.
     meta = {"corridor": corridor, "pathway_type": pathway_type}
     emb = embedder.embed(body)
     conn.execute(
         text(
-            "INSERT INTO policy_assistant_chunks "
-            "(id, company_id, source_type, source_ref, chunk_text, "
-            " chunk_metadata, embedding) "
-            "VALUES (:id, :co, :st, :ref, :body, :meta, :emb)"
+            "INSERT INTO immigration_corpus_chunks "
+            "(id, corridor, source_url, chunk_text, chunk_index, chunk_metadata, "
+            " trust_tier, fetched_at, embedding, content_hash, is_active) "
+            "VALUES (:id, :cor, :ref, :body, 0, :meta, 1, :f, :emb, :h, 1)"
         ),
         {
             "id": chunk_id,
-            "co": immigration_retriever.IMMIGRATION_CORPUS_COMPANY_ID,
-            "st": immigration_retriever.IMMIGRATION_SOURCE_TYPE,
-            "ref": f"immigration_rule.{chunk_id}",
+            "cor": corridor,
+            "ref": f"https://gov.example/immigration_rule/{chunk_id}",
             "body": body,
             "meta": json.dumps(meta),
+            "f": "2026-06-06T00:00:00+00:00",
             "emb": json.dumps(emb),
+            "h": chunk_id,
         },
     )
 
@@ -210,12 +214,12 @@ class ContextPrecisionIntegrationTests(unittest.TestCase):
             ):
                 _seed(
                     conn, emb,
-                    chunk_id=cid, corridor="IN→DE",
+                    chunk_id=cid, corridor="IN_DE",
                     pathway_type="blue_card",
                     body=f"India Germany Blue Card chunk {cid} passport degree contract",
                 )
 
-        self._patch = mock.patch.object(policy_chunk_retriever, "db", _FakeDb(self.engine))
+        self._patch = mock.patch.object(immigration_retriever, "db", _FakeDb(self.engine))
         self._patch.start()
         self.addCleanup(self._patch.stop)
 
