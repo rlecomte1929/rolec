@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/antigravity';
@@ -461,8 +462,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                     style={{ userSelect: 'none' }}
                   >
                     {i === 0 ? (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={allPageSelected}
                         onChange={toggleAll}
                         className="w-3.5 h-3.5 accent-[#1D9E75] cursor-pointer"
@@ -506,8 +506,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                       >
                         {/* checkbox */}
                         <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={isSelected}
                             onChange={() => toggleRow(emp.id)}
                             className="w-3.5 h-3.5 accent-[#1D9E75] cursor-pointer"

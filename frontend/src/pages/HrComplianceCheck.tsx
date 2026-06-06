@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
@@ -344,8 +345,7 @@ export const HrComplianceCheck: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-[#6b7280]">
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={showBlockingOnly}
                 onChange={(event) => setShowBlockingOnly(event.target.checked)}
               />

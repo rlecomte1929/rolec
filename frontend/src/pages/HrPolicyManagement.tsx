@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
+import { FileInput } from '../components/antigravity/FileInput';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Alert, Input } from '../components/antigravity';
@@ -241,8 +243,7 @@ export const HrPolicyManagement: React.FC = () => {
             JSON or YAML with the full policy shape. Used to drive employee-side rules and wizard defaults.
           </p>
           <div className="border-2 border-dashed border-[#e2e8f0] rounded-lg p-8 text-center">
-            <input
-              type="file"
+            <FileInput
               accept=".json,.yaml,.yml"
               onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
               className="hidden"
@@ -304,8 +305,7 @@ export const HrPolicyManagement: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {['Long-Term', 'Permanent', 'Short-Term'].map((t) => (
                     <label key={t} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={(form.assignmentTypes || []).includes(t)}
                         onChange={(e) => {
                           const arr = [...(form.assignmentTypes || [])];
@@ -349,8 +349,7 @@ export const HrPolicyManagement: React.FC = () => {
                       <tr key={key} className="border-b border-[#e2e8f0]">
                         <td className="py-2 pr-4 font-medium">{BENEFIT_LABELS[key] || key}</td>
                         <td className="py-2 pr-4">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={!!b.allowed}
                             onChange={(e) => setBenefit(key, 'allowed', e.target.checked)}
                           />
@@ -392,8 +391,7 @@ export const HrPolicyManagement: React.FC = () => {
                           />
                         </td>
                         <td className="py-2 pl-4">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={!!b.preApprovalRequired}
                             onChange={(e) => setBenefit(key, 'preApprovalRequired', e.target.checked)}
                             disabled={!b.allowed}

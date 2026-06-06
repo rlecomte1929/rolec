@@ -10,6 +10,7 @@
  * - List: all uploaded documents with a signed download link + delete.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
 import { formDocumentsAPI, type FormDocument } from '../../../api/dossier';
 import { logger } from '../../../lib/logger';
@@ -120,9 +121,8 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
   return (
     <div className="rounded border border-slate-200 px-3 py-2">
       {/* Single hidden input, reused for every upload affordance. */}
-      <input
+      <FileInput
         ref={inputRef}
-        type="file"
         className="hidden"
         onChange={(e) => void handleFile(e)}
         disabled={busy}

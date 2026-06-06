@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { AdminLayout } from './AdminLayout';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import {
@@ -320,8 +321,7 @@ export const AdminProspects: React.FC = () => {
         />
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <label className="flex items-center gap-2 text-sm text-[#374151] cursor-pointer">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={enableWebSearch}
               onChange={(e) => setEnableWebSearch(e.target.checked)}
               className="h-4 w-4"

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
@@ -1523,7 +1524,7 @@ export function EmployeeIntakePage() {
                 )}
                 <CaseMessagesPanel caseId={caseIdRef.current} />
                 <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
-                  <input type="checkbox" checked={data.consent} id="consent-cb"
+                  <Checkbox checked={data.consent} id="consent-cb"
                     onChange={(e) => setField('consent', e.target.checked)}
                     className="mt-0.5 accent-accent-600" />
                   <label htmlFor="consent-cb" className="cursor-pointer">

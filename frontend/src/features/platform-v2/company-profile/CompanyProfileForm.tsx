@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
@@ -578,9 +579,8 @@ export function CompanyProfileForm({
                   PNG, JPG or SVG · max 2 MB · square 512×512 recommended for best quality.
                 </p>
               </div>
-              <input
+              <FileInput
                 ref={fileInputRef}
-                type="file"
                 accept={LOGO_ACCEPT}
                 className="hidden"
                 onChange={(e) => {

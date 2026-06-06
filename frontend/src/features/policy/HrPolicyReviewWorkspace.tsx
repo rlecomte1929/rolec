@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../api/client';
 import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
@@ -926,8 +927,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                       {showApproval && (
                         <td className="py-2 px-2">
                           {isEditing ? (
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={!!(editingRule?.metadata_json ? meta(editingRule, 'approval_required', false) : approvalReq)}
                               onChange={(e) => {
                                 const m = editingRule?.metadata_json || r?.metadata_json || {};
@@ -942,8 +942,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                       {showEvidence && (
                         <td className="py-2 px-2">
                           {isEditing ? (
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={!!(editingRule?.metadata_json ? meta(editingRule, 'evidence_required', false) : evidenceReq)}
                               onChange={(e) => {
                                 const m = editingRule?.metadata_json || r?.metadata_json || {};

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { adminAPI } from '../../../api/client';
@@ -561,8 +562,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             ))}
           </select>
           <label className="flex items-center gap-1.5 text-sm text-slate-700">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={filters.issuesOnly}
               onChange={(e) => setFilters((f) => ({ ...f, issuesOnly: e.target.checked }))}
               className="h-4 w-4 rounded border-slate-300"

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams, Link } from 'react-router-dom';
@@ -258,16 +259,14 @@ export const AdminReviewQueuePage: React.FC = () => {
             ))}
           </select>
           <label className="flex items-center gap-1 text-sm">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={overdueOnly}
               onChange={(e) => updateFilter('overdue', e.target.checked ? '1' : undefined)}
             />
             Overdue only
           </label>
           <label className="flex items-center gap-1 text-sm">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={unassignedOnly}
               onChange={(e) => updateFilter('unassigned', e.target.checked ? '1' : undefined)}
             />
@@ -312,8 +311,7 @@ export const AdminReviewQueuePage: React.FC = () => {
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={items.length > 0 && selectedIds.size === items.length}
                       onChange={toggleSelectAll}
                     />
@@ -340,8 +338,7 @@ export const AdminReviewQueuePage: React.FC = () => {
                   items.map((it) => (
                     <tr key={it.id} className="hover:bg-slate-50">
                       <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedIds.has(it.id)}
                           onChange={() => toggleSelect(it.id)}
                         />

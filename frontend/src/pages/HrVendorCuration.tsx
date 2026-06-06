@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card } from '../components/antigravity';
@@ -695,8 +696,7 @@ export const HrVendorCuration: React.FC = () => {
               return (
                 <li key={row.master_item_id || row.name} className="p-3 flex items-center justify-between gap-3">
                   <label className="flex items-center gap-3 min-w-0 cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selected}
                       onChange={() => row.master_item_id && togglePending(row.master_item_id, row.selected)}
                       className="h-4 w-4 shrink-0"

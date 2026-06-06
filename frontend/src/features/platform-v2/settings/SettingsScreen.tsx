@@ -4,6 +4,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { Avatar, Pill } from '../shared';
@@ -199,7 +200,7 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
           <p style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{form.full_name}</p>
           <Pill variant="info" size="sm">{ROLE_LABEL[form.role]}</Pill>
         </div>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
+        <FileInput ref={fileRef} accept="image/*" style={{ display: 'none' }} onChange={e => {
           const f = e.target.files?.[0];
           if (f) set('avatar_url', URL.createObjectURL(f));
         }} />

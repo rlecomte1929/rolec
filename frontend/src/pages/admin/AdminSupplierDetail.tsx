@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
@@ -429,8 +430,7 @@ export const AdminSupplierDetail: React.FC = () => {
               <dt className="text-[#6b7280]">Verified</dt>
               <dd>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={display.verified}
                     onChange={(e) => updateField('verified', e.target.checked)}
                   />
@@ -612,24 +612,21 @@ export const AdminSupplierDetail: React.FC = () => {
               </div>
               <div className="flex gap-4 mt-2">
                 <label className="flex items-center gap-1 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={newCap.family_support}
                     onChange={(e) => setNewCap((c) => ({ ...c, family_support: e.target.checked }))}
                   />
                   Family
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={newCap.corporate_clients}
                     onChange={(e) => setNewCap((c) => ({ ...c, corporate_clients: e.target.checked }))}
                   />
                   Corporate
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={newCap.remote_support}
                     onChange={(e) => setNewCap((c) => ({ ...c, remote_support: e.target.checked }))}
                   />
@@ -807,16 +804,14 @@ function ScoringEditor({
           <dt className="text-[#6b7280]">Flags</dt>
           <dd className="flex gap-4">
             <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={local.preferred_partner}
                 onChange={(e) => setLocal((l) => ({ ...l, preferred_partner: e.target.checked }))}
               />
               <span>Preferred</span>
             </label>
             <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={local.premium_partner}
                 onChange={(e) => setLocal((l) => ({ ...l, premium_partner: e.target.checked }))}
               />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Checkbox } from './antigravity/Checkbox';
 import { Card, Button, Input } from './antigravity';
 import type { Question } from '../types';
 
@@ -114,8 +115,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                   key={option.value}
                   className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedOptions.includes(option.value)}
                     onChange={() => handleQuickOption(option.value)}
                     className="w-4 h-4 text-accent-600 focus:ring-accent-500 border-gray-300 rounded"

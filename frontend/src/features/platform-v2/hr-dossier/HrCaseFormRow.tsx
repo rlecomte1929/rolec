@@ -7,6 +7,8 @@
  * Patterned on CaseFormCard.tsx but with HR-specific actions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { Badge, Card } from '../../../components/antigravity';
@@ -557,8 +559,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
                 >
                   {replacingPdf ? 'Uploading…' : 'Replace PDF'}
-                  <input
-                    type="file"
+                  <FileInput
                     accept="application/pdf"
                     className="hidden"
                     disabled={replacingPdf}
@@ -742,8 +743,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
               />
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={reopenForCorrection}
                 onChange={(e) => setReopenForCorrection(e.target.checked)}
                 className="rounded border-slate-300 text-[#0b2b43] focus:ring-[#0b2b43]"

@@ -12,6 +12,7 @@
  * without making the whole bucket public.
  */
 import React, { useCallback, useState } from 'react';
+import { FileInput } from '../../../../components/antigravity/FileInput';
 import { supabase } from '../../../../api/supabase';
 
 const MAX_BYTES = 10 * 1024 * 1024;   // 10 MB
@@ -142,9 +143,8 @@ export const PdfUploadField: React.FC<PdfUploadFieldProps> = ({
             : 'border-slate-200 bg-slate-50 hover:border-slate-300'
         }`}
       >
-        <input
+        <FileInput
           id={inputId}
-          type="file"
           accept="application/pdf"
           onChange={onFileSelect}
           className="sr-only"

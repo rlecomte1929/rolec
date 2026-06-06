@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
+import { FileInput } from '../components/antigravity/FileInput';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -969,9 +971,8 @@ export function PolicyDocumentIntakeSection({
       )}
 
       <div className="flex flex-wrap items-center gap-3 mt-4">
-        <input
+        <FileInput
           ref={fileInputRef}
-          type="file"
           accept=".docx,.pdf"
           onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
           className="sr-only"
@@ -1011,8 +1012,7 @@ export function PolicyDocumentIntakeSection({
               >
                 {selectionMode && (
                   <div className="flex items-center pl-3 border-r border-[#e2e8f0] bg-[#f8fafc]">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="h-4 w-4 rounded border-[#cbd5e1]"
                       checked={selectedDocIds.has(doc.id)}
                       onChange={(e) => {

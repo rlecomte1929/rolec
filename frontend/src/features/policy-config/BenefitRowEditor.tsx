@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input, Select } from '../../components/antigravity';
 import type { PolicyConfigBenefitRow } from './types';
 import { POLICY_CURRENCY_OPTIONS, normalizeCurrencyCode } from './currencyOptions';
@@ -179,8 +180,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
             )}
           </div>
           <label className="flex items-center gap-2 text-sm font-medium text-[#374151] shrink-0">
-            <input
-              type="checkbox"
+            <Checkbox
               className="rounded border-[#cbd5e1]"
               checked={covered}
               onChange={(e) => onChange({ ...row, covered: e.target.checked })}
@@ -211,8 +211,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
               <div className="space-y-2">
                 {POLICY_ASSIGNMENT_TYPE_OPTIONS.map((opt) => (
                   <label key={opt.value} className="flex items-start gap-2 text-sm text-[#374151] cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="rounded border-[#cbd5e1] mt-0.5"
                       checked={assignmentSelected.includes(opt.value)}
                       onChange={(e) => toggleAssignment(opt.value, e.target.checked)}
@@ -234,8 +233,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
               <div className="space-y-2">
                 {POLICY_FAMILY_STATUS_OPTIONS.map((opt) => (
                   <label key={opt.value} className="flex items-start gap-2 text-sm text-[#374151] cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="rounded border-[#cbd5e1] mt-0.5"
                       checked={familySelected.includes(opt.value)}
                       onChange={(e) => toggleFamily(opt.value, e.target.checked)}
@@ -256,8 +254,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {POLICY_EMPLOYEE_LEVEL_OPTIONS.map((opt) => (
                   <label key={opt.value} className="flex items-start gap-2 text-sm text-[#374151] cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="rounded border-[#cbd5e1] mt-0.5"
                       checked={levelSelected.includes(opt.value)}
                       onChange={(e) => toggleLevel(opt.value, e.target.checked)}

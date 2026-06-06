@@ -8,6 +8,7 @@
  *         optional PDF upload, notes textarea.
  */
 import React, { useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity';
 import { adhocFormsAPI } from '../../../api/dossier';
@@ -132,8 +133,7 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">PDF (optional)</label>
-            <input
-              type="file"
+            <FileInput
               accept="application/pdf"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="w-full text-sm text-slate-600 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"

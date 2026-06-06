@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
@@ -313,8 +314,7 @@ export const AdminEventEditor: React.FC = () => {
               <label className="block text-sm text-slate-600 mb-1">Price / Free</label>
               <div className="flex gap-4 items-center">
                 <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={!!form.is_free}
                     onChange={(e) => update('is_free', e.target.checked)}
                   />
@@ -329,8 +329,7 @@ export const AdminEventEditor: React.FC = () => {
               </div>
             </div>
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={!!form.is_family_friendly}
                 onChange={(e) => update('is_family_friendly', e.target.checked)}
               />

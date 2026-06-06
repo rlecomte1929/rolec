@@ -9,6 +9,7 @@
  *   textarea for everything else.
  */
 import React, { useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import type { FieldValueItem } from '../../../api/formEditor';
@@ -115,8 +116,7 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
   if (field.field_type === 'boolean') {
     return (
       <label className="inline-flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={value === 'true'}
           onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
           className="w-4 h-4 rounded border-slate-300 text-[#0b2b43] focus:ring-[#0b2b43]"

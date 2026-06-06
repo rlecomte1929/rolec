@@ -1,5 +1,6 @@
 // HrPolicyBuilderV2Page.tsx — Policy Builder canvas + benefit matrix
 import React, { useState, useEffect, useMemo } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import {
   Sparkles, Check, Eye, Clock, Plus, Filter,
@@ -791,7 +792,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
                     <label key={v}
                       className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${on ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
                       onClick={() => toggle(axis, v)}>
-                      <input type="checkbox" readOnly checked={on} className="accent-blue-600"/>
+                      <Checkbox readOnly checked={on} className="accent-blue-600"/>
                       <span className={`text-[12.5px] ${on ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>{l}</span>
                     </label>
                   );

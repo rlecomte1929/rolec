@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -515,8 +516,7 @@ export const HrDashboard: React.FC = () => {
                   >
                     {isManageMode && (
                       <div className="flex items-center justify-center">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={isSelected}
                           onChange={() => toggleSelection(assignment.id)}
                           onClick={(e) => e.stopPropagation()}

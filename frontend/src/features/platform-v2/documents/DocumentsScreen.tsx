@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState } from '../shared';
 import type { DocStatus } from '../../../types/relopass-api-contracts';
@@ -252,7 +253,7 @@ function UploadZone({ category, onUpload }: UploadZoneProps) {
         </p>
         <p style={{ margin: 0, fontSize: '11px', color: C.textMuted }}>PDF, JPEG, PNG or DOCX · max 25 MB</p>
       </div>
-      <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.docx" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+      <FileInput ref={inputRef} accept=".pdf,.jpg,.jpeg,.png,.docx" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
       {progress !== null && <div style={{ marginTop: '8px' }}><ProgressBar value={progress} label="Uploading…" height={6} /></div>}
       {error && <p style={{ margin: '6px 0 0', fontSize: '12px', color: C.danger }}>{error}</p>}
     </div>

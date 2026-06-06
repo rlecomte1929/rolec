@@ -13,6 +13,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../antigravity/Checkbox';
 import { useParams } from 'react-router-dom';
 import { AppShell } from '../AppShell';
 import { Alert, Badge, Button, Card } from '../antigravity';
@@ -475,8 +476,7 @@ export const MyImmigrationData: React.FC = () => {
                 within 30 days as required by GDPR.
               </p>
               <label className="flex items-start gap-2 mt-4 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={deleteConfirmed}
                   onChange={(e) => setDeleteConfirmed(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-[#94a3b8] text-[#7a2a2a] focus:ring-[#7a2a2a]"

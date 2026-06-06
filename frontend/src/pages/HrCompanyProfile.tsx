@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { FileInput } from '../components/antigravity/FileInput';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert } from '../components/antigravity';
 import { hrAPI } from '../api/client';
@@ -251,8 +252,7 @@ export const HrCompanyProfile: React.FC = () => {
                 onDragLeave={onDragLeave}
                 className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragOver ? 'border-[#1d4ed8] bg-[#eff6ff]' : 'border-[#e2e8f0] bg-[#f8fafc]'}`}
               >
-                <input
-                  type="file"
+                <FileInput
                   accept={ACCEPT_TYPES}
                   className="hidden"
                   id="logo-upload"

@@ -8,6 +8,7 @@
  * Drag-and-drop uses @dnd-kit/sortable (same package as DataTable).
  */
 import React, { useCallback, useMemo } from 'react';
+import { Checkbox } from '../../../../components/antigravity/Checkbox';
 import { Input } from '../../../../components/antigravity/Input';
 import {
   DndContext,
@@ -245,8 +246,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
         ))}
       </select>
       <label className="col-span-1 flex items-center justify-center">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={field.required}
           onChange={(e) => onChange({ required: e.target.checked })}
           disabled={disabled}
@@ -261,8 +261,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
         className="col-span-2 rounded border border-slate-200 px-2 py-1 text-xs font-mono"
       />
       <label className="col-span-1 flex items-center justify-center">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={field.requires_original ?? false}
           onChange={(e) => onChange({ requires_original: e.target.checked })}
           disabled={disabled}

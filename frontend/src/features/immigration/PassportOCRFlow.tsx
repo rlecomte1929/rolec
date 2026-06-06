@@ -24,6 +24,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
+import { FileInput } from '../../components/antigravity/FileInput';
 import { Alert, Button, Card, LoadingButton } from '../../components/antigravity';
 import api from '../../api/client';
 
@@ -311,9 +312,8 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded, onSkip }) =
           dragOver ? 'border-[#0b2b43] bg-[#f0f4f8]' : 'border-[#cbd5e1] bg-[#f8fafc] hover:border-[#94a3b8]'
         }`}
       >
-        <input
+        <FileInput
           ref={fileRef}
-          type="file"
           accept="image/jpeg,image/png,image/webp"
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}

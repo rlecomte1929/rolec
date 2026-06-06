@@ -1,4 +1,5 @@
 import React, { Fragment } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Button } from '../../components/antigravity/Button';
 import type { Conversation } from './types';
 
@@ -59,8 +60,7 @@ function renderConversationRow(
     >
       {editMode && (
         <label className="flex items-center pl-3 pr-1 cursor-pointer shrink-0">
-          <input
-            type="checkbox"
+          <Checkbox
             className="rounded border-[#cbd5e1] text-[#1d4ed8] focus:ring-[#1d4ed8]"
             checked={selected}
             onChange={() => onToggleSelectAssignment?.(conv.assignment_id)}

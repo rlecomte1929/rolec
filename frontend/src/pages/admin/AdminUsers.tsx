@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { Card, Button, Badge, Alert } from '../../components/antigravity';
@@ -208,8 +209,7 @@ export const AdminUsers: React.FC = () => {
             <div key={p.id} className="flex flex-wrap items-center justify-between border-b border-[#e2e8f0] py-3 gap-3">
               <div className="flex items-start gap-3">
                 {selectionMode && (
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
                     checked={checked}
                     onChange={(e) => {

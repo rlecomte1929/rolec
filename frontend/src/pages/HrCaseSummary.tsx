@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -471,8 +472,7 @@ export const HrCaseSummary: React.FC = () => {
                     const checked = requestedSections.includes(label);
                     return (
                       <label key={label} className="flex items-center gap-2 text-sm text-[#0b2b43]">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
                           onChange={(event) => {
                             setRequestedSections((prev) => {

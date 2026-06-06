@@ -16,6 +16,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import { Radio } from '../../../components/antigravity/Radio';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
@@ -402,7 +403,7 @@ function RequestCountryModal({
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {['Permanent hire', 'Secondment', 'Contractor', 'Intra-company transfer', 'Short-term assignment'].map((ct) => (
                 <label key={ct} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${contractType === ct ? T : '#e2e8f0'}`, background: contractType === ct ? TL : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: contractType === ct ? T : '#374151', transition: 'all .14s' }}>
-                  <input type="radio" name="contractTypePlan" value={ct} checked={contractType === ct} onChange={() => setContractType(ct)} style={{ display: 'none' }} />
+                  <Radio name="contractTypePlan" value={ct} checked={contractType === ct} onChange={() => setContractType(ct)} style={{ display: 'none' }} />
                   {ct}
                 </label>
               ))}

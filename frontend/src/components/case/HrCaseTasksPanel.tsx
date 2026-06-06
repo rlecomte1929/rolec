@@ -10,6 +10,7 @@
  * the whole page (reduced from original 60s to match demo UX requirements).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Checkbox } from '../antigravity/Checkbox';
 import { Input } from '../antigravity/Input';
 import { hrAPI } from '../../api/client';
 import type { EmployeeTask, EmployeeTaskListResponse, TaskType } from '../../api/client';
@@ -297,8 +298,7 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
       </div>
 
       <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={requireFile}
           onChange={(e) => setRequireFile(e.target.checked)}
           className="rounded border-[#e2e8f0]"

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Alert, Input, Select } from '../../../components/antigravity';
 import { buildRoute } from '../../../navigation/routes';
@@ -515,8 +516,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
                         const checked = current.includes(opt);
                         return (
                           <label key={opt} className="flex items-center gap-2 text-sm text-[#4b5563]">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={checked}
                               onChange={(event) => {
                                 const next = event.target.checked
@@ -584,8 +584,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
 
       <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
         <label className="flex items-start gap-3 text-sm text-[#0b2b43]">
-          <input
-            type="checkbox"
+          <Checkbox
             className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
             checked={consented}
             onChange={(e) => setConsented(e.target.checked)}

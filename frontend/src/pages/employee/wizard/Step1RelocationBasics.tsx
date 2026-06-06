@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
@@ -203,8 +204,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
         </div>
 
         <label className="text-sm text-[#0b2b43] flex items-center gap-2">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={Boolean(local.hasDependents)}
             onChange={(event) => update('hasDependents', event.target.checked)}
           />

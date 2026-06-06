@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
@@ -200,8 +201,7 @@ export const AdminSupplierNew: React.FC = () => {
             </div>
             <div className="flex items-end gap-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={form.verified}
                   onChange={(e) => updateForm({ verified: e.target.checked })}
                 />
@@ -294,16 +294,14 @@ export const AdminSupplierNew: React.FC = () => {
               </div>
               <div className="flex items-end gap-4">
                 <label className="flex items-center gap-1 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={form.scoring.preferred_partner}
                     onChange={(e) => updateForm({ scoring: { ...form.scoring, preferred_partner: e.target.checked } })}
                   />
                   <span className="text-sm">Preferred</span>
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={form.scoring.premium_partner}
                     onChange={(e) => updateForm({ scoring: { ...form.scoring, premium_partner: e.target.checked } })}
                   />
@@ -416,24 +414,21 @@ export const AdminSupplierNew: React.FC = () => {
                     </div>
                     <div className="flex gap-4 mt-2">
                       <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={cap.family_support}
                           onChange={(e) => updateCapability(idx, { family_support: e.target.checked })}
                         />
                         Family
                       </label>
                       <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={cap.corporate_clients}
                           onChange={(e) => updateCapability(idx, { corporate_clients: e.target.checked })}
                         />
                         Corporate
                       </label>
                       <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={cap.remote_support}
                           onChange={(e) => updateCapability(idx, { remote_support: e.target.checked })}
                         />

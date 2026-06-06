@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
@@ -68,8 +69,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
           Upload a passport copy to populate identity details automatically.
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <input
-            type="file"
+          <FileInput
             accept="image/*,.pdf"
             onChange={(event) => {
               const file = event.target.files?.[0];

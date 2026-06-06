@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
 
@@ -438,8 +439,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                       )}
                       {m.body_hr && <div className="text-xs text-[#64748b] ml-6 mt-0.5">{m.body_hr}</div>}
                       <label className="ml-6 mt-1 flex items-center gap-2 text-xs cursor-pointer">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={!!m.completed_at}
                           disabled={actionBusy === `ms-${m.id}`}
                           onChange={(e) => patchMilestone(m.id, e.target.checked)}

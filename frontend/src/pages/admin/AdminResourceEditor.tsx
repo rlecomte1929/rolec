@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
@@ -339,16 +340,14 @@ export const AdminResourceEditor: React.FC = () => {
             </div>
             <div className="flex gap-4">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!!form.is_family_friendly}
                   onChange={(e) => update('is_family_friendly', e.target.checked)}
                 />
                 <span className="text-sm">Family friendly</span>
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!!form.is_featured}
                   onChange={(e) => update('is_featured', e.target.checked)}
                 />
@@ -396,8 +395,7 @@ export const AdminResourceEditor: React.FC = () => {
                   const checked = ids.includes(t.id);
                   return (
                     <label key={t.id} className="flex items-center gap-1 text-sm">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={checked}
                         onChange={(e) => {
                           if (e.target.checked) {

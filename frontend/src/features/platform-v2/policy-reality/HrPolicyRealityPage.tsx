@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 
@@ -374,8 +375,7 @@ export function HrPolicyRealityPage() {
         </div>
         <div className="flex-1" />
         <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={privacy}
             onChange={(e) => setPrivacy(e.target.checked)}
             className="rounded"

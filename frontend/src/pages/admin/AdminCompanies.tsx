@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -369,8 +370,7 @@ export const AdminCompanies: React.FC = () => {
                 <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280] font-medium">
                   {selectionMode && (
                     <th className="py-2 pr-2 align-bottom w-8">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         className="h-4 w-4 rounded border-[#cbd5e1]"
                         aria-label="Select all"
                         checked={filteredAndSorted.length > 0 && filteredAndSorted.every((c) => selectedIds.has(c.id))}
@@ -588,8 +588,7 @@ export const AdminCompanies: React.FC = () => {
                   <tr key={c.id} className="border-b border-[#e2e8f0]">
                     {selectionMode && (
                       <td className="py-3 pr-2">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           className="h-4 w-4 rounded border-[#cbd5e1]"
                           checked={selectedIds.has(c.id)}
                           onChange={(e) => {

@@ -6,6 +6,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { Pill, FilterChips, Avatar, DateFormatter, EmptyState, LoadingSpinner } from '../shared';
@@ -154,8 +155,7 @@ function EditCompanySlideOver({
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={form.status === 'active'}
               onChange={e => field('status', e.target.checked ? 'active' : 'suspended')}
               style={{ width: '16px', height: '16px', accentColor: 'var(--accent)', cursor: 'pointer' }}

@@ -17,6 +17,7 @@
  * FieldSelector and the PDF canvas stay in sync without prop-drilling.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../../../../components/antigravity/Checkbox';
 import { Button } from '../../../../components/antigravity/Button';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -322,8 +323,7 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
 
         {/* Preview toggle */}
         <label className="flex items-center gap-1 ml-auto cursor-pointer select-none">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={previewMode}
             onChange={(e) => setPreviewMode(e.target.checked)}
             className="accent-[#0b2b43] focus:ring-2 focus:ring-[#0b2b43]"

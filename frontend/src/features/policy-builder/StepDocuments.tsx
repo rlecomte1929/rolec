@@ -3,6 +3,7 @@
  * HR selects which documents must be uploaded for each visa/permit category.
  */
 import React, { useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
 import type { PolicyDocuments } from '../../types/relocationPolicy';
 import { Button } from '../../components/antigravity';
@@ -176,8 +177,7 @@ export const StepDocuments: React.FC<Props> = ({
                           key={doc.key}
                           className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer hover:text-[#0b2b43] transition-colors"
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={checked}
                             onChange={() => toggleDoc(visa.key, doc.key)}
                             className="w-4 h-4 accent-[#0b2b43] cursor-pointer"

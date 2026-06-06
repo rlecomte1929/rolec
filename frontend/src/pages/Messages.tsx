@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { Button } from '../components/antigravity/Button';
 import axios from 'axios';
@@ -454,8 +455,7 @@ export const Messages: React.FC = () => {
           <option value="all">All</option>
         </select>
         <label className="flex items-center gap-2 text-sm text-[#475569] whitespace-nowrap cursor-pointer">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={unreadOnly}
             onChange={(e) => setUnreadOnly(e.target.checked)}
             className="rounded border-[#cbd5e1] text-[#1d4ed8]"
