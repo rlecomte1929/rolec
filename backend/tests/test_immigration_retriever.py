@@ -1,24 +1,16 @@
 """
-Integration tests for the immigration RAG retriever (P1-01a / AIQ-626).
+Tests for the immigration RAG retriever (P1-01a / AIQ-626), updated for N2/AIQ-841.
 
-`immigration_retriever` is a thin wrapper over the company-scoped
-`policy_chunk_retriever`. It takes a classified UserProfile + PathClassification,
-derives the corridor (e.g. FR→NO) and pathway_type, and returns only the
-chunks that apply to that corridor/pathway.
+The retriever now reads immigration_corpus_chunks (corridor-scoped) directly,
+not the policy_assistant_chunks namespace. corridor is stored in the underscore
+key form ('FR_NO'); the retriever converts the arrow form ('FR→NO') used by
+corridor_key/UI when querying.
 
-The FR→NO immigration corpus does not exist in the repo yet (blocked on the
-real corridor-ingestion task), so this test seeds its own deterministic
-fixture chunks into an in-memory SQLite mirror with the HashEmbedder — the
-same pattern as test_policy_assistant_rag_a.py. No network, no OpenAI key.
+Seeds a deterministic in-memory SQLite mirror with the HashEmbedder (engine is
+injected via the new `engine` param) — no network, no OpenAI key.
 
-Asserts:
-  - Marc Bouchard (FR→NO, EEA) gets ≥10 chunks, ALL from the FR→NO corridor,
-    each with a numeric relevance score. Chunk ids are pinned.
-  - Chunks from other corridors (IN→DE) never leak into a FR→NO query.
-  - pathway_type narrows results within a corridor.
-  - An uncovered corridor (JP→NO) returns an empty list (no hallucinated
-    cross-corridor matches — the retriever-side basis for RULE_NOT_FOUND).
-  - An incomplete profile returns an empty list.
+Asserts: corridor scoping (no cross-corridor leak), relevance scores present,
+arrow→underscore normalization, uncovered corridor empty, incomplete profile empty.
 """
 from __future__ import annotations
 
@@ -26,183 +18,101 @@ import json
 import os
 import sys
 import unittest
-from unittest import mock
-
-from sqlalchemy import create_engine, text
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-# Force the hash embedder so the test never tries to call OpenAI.
-os.environ["POLICY_ASSISTANT_EMBEDDER"] = "hash"
+os.environ["POLICY_ASSISTANT_EMBEDDER"] = "hash"  # query embedder = hash, matches seeded chunks
 
-from backend.app.services import immigration_retriever  # noqa: E402
-from backend.app.services import policy_chunk_retriever  # noqa: E402
-from backend.app.services.immigration_retriever import (  # noqa: E402
-    PathClassification,
-    UserProfile,
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import StaticPool
+
+from backend.app.services import immigration_retriever
+from backend.app.services.immigration_retriever import PathClassification, UserProfile
+from backend.app.services.policy_assistant_embedder import HashEmbedder
+
+_FR_NO_IDS = [f"fr-no-{i:02d}" for i in range(1, 13)]
+_IN_DE_IDS = ["in-de-01", "in-de-02"]
+
+_SCHEMA = (
+    "CREATE TABLE immigration_corpus_chunks ("
+    "id TEXT PRIMARY KEY, corridor TEXT NOT NULL, source_doc_id TEXT, source_url TEXT NOT NULL, "
+    "chunk_text TEXT NOT NULL, chunk_index INTEGER NOT NULL, chunk_metadata TEXT DEFAULT '{}', "
+    "trust_tier INTEGER NOT NULL DEFAULT 2, fetched_at TEXT NOT NULL, embedding TEXT, "
+    "content_hash TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_at TEXT)"
 )
-from backend.app.services.policy_assistant_embedder import HashEmbedder  # noqa: E402
 
 
-SCHEMA = """
-CREATE TABLE policy_assistant_chunks (
-    id TEXT PRIMARY KEY,
-    company_id TEXT NOT NULL,
-    policy_version_id TEXT,
-    source_type TEXT NOT NULL,
-    source_ref TEXT NOT NULL,
-    chunk_text TEXT NOT NULL,
-    chunk_metadata TEXT NOT NULL DEFAULT '{}',
-    embedding TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id, source_type, source_ref)
-);
-"""
+def _engine_with_seed():
+    eng = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    emb = HashEmbedder()
+    with eng.begin() as c:
+        c.execute(text(_SCHEMA))
 
+        def seed(cid, corridor_db, body):
+            c.execute(text(
+                "INSERT INTO immigration_corpus_chunks "
+                "(id, corridor, source_url, chunk_text, chunk_index, chunk_metadata, trust_tier, "
+                " fetched_at, embedding, content_hash, is_active) VALUES "
+                "(:id,:cor,:u,:t,:i,:m,:tt,:f,:e,:h,1)"),
+                {"id": cid, "cor": corridor_db, "u": f"https://gov.example/{cid}", "t": body,
+                 "i": 0, "m": json.dumps({"corridor": corridor_db}), "tt": 1,
+                 "f": "2026-06-06T00:00:00+00:00", "e": json.dumps(emb.embed(body)), "h": cid})
 
-class _FakeDb:
-    """Minimal stub exposing only the `.engine` the retriever path uses."""
-
-    def __init__(self, engine):
-        self.engine = engine
-
-
-# FR→NO corridor: 12 chambers of the EU free-movement pathway + 1 non-EEA
-# pathway chunk used to prove pathway_type narrowing.
-_FR_NO_EEA_IDS = [f"fr-no-eea-{i:02d}" for i in range(1, 13)]
-_FR_NO_NONEEA_ID = "fr-no-noneea-01"
-# IN→DE corridor: must never leak into a FR→NO query.
-_IN_DE_IDS = ["in-de-bluecard-01", "in-de-bluecard-02"]
-
-
-def _seed_chunk(conn, embedder, *, chunk_id, corridor, pathway_type, text_body):
-    meta = {"corridor": corridor, "pathway_type": pathway_type}
-    emb = embedder.embed(text_body)
-    conn.execute(
-        text(
-            "INSERT INTO policy_assistant_chunks "
-            "(id, company_id, source_type, source_ref, chunk_text, "
-            " chunk_metadata, embedding) "
-            "VALUES (:id, :co, :st, :ref, :body, :meta, :emb)"
-        ),
-        {
-            "id": chunk_id,
-            "co": immigration_retriever.IMMIGRATION_CORPUS_COMPANY_ID,
-            "st": immigration_retriever.IMMIGRATION_SOURCE_TYPE,
-            "ref": f"immigration_rule.{chunk_id}",
-            "body": text_body,
-            "meta": json.dumps(meta),
-            "emb": json.dumps(emb),
-        },
-    )
+        for cid in _FR_NO_IDS:
+            seed(cid, "FR_NO", f"France to Norway residence registration rule {cid}")
+        for cid in _IN_DE_IDS:
+            seed(cid, "IN_DE", f"India to Germany Blue Card rule {cid}")
+    return eng
 
 
 class ImmigrationRetrieverTests(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine(
-            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        self.engine = _engine_with_seed()
+        self.marc = UserProfile(nationality="FR", origin_country="FR", destination_country="NO", is_eea=True)
+        self.path = PathClassification(pathway_type="eu_free_movement")
+
+    def _retrieve(self, profile, classification, top_k=12):
+        return immigration_retriever.retrieve_for_profile(
+            profile=profile, classification=classification, top_k=top_k, engine=self.engine,
         )
-        with self.engine.begin() as conn:
-            for stmt in SCHEMA.split(";"):
-                s = stmt.strip()
-                if s:
-                    conn.execute(text(s))
 
-        embedder = HashEmbedder()
-        with self.engine.begin() as conn:
-            for cid in _FR_NO_EEA_IDS:
-                _seed_chunk(
-                    conn, embedder,
-                    chunk_id=cid, corridor="FR→NO",
-                    pathway_type="eu_free_movement",
-                    text_body=f"France to Norway EEA residence registration rule {cid}",
-                )
-            _seed_chunk(
-                conn, embedder,
-                chunk_id=_FR_NO_NONEEA_ID, corridor="FR→NO",
-                pathway_type="skilled_worker_permit",
-                text_body="France to Norway non-EEA skilled worker permit rule",
-            )
-            for cid in _IN_DE_IDS:
-                _seed_chunk(
-                    conn, embedder,
-                    chunk_id=cid, corridor="IN→DE",
-                    pathway_type="eu_blue_card",
-                    text_body=f"India to Germany EU Blue Card rule {cid}",
-                )
-
-        self.fake_db = _FakeDb(self.engine)
-        p = mock.patch.object(policy_chunk_retriever, "db", self.fake_db)
-        p.start()
-        self.addCleanup(p.stop)
-
-        # Marc Bouchard: French national, France → Norway, EEA.
-        self.marc = UserProfile(
-            nationality="FR", origin_country="FR",
-            destination_country="NO", is_eea=True,
-        )
-        self.marc_path = PathClassification(pathway_type="eu_free_movement")
-
-    def test_returns_at_least_ten_chunks_all_from_fr_no_corridor(self):
-        chunks = immigration_retriever.retrieve_for_profile(
-            profile=self.marc, classification=self.marc_path, top_k=12,
-        )
-        self.assertGreaterEqual(len(chunks), 10)
+    def test_corridor_scoped_no_cross_corridor_leak(self):
+        chunks = self._retrieve(self.marc, self.path, top_k=20)
+        ids = {c["id"] for c in chunks}
+        self.assertEqual(ids, set(_FR_NO_IDS))            # all FR_NO returned
+        for leaked in _IN_DE_IDS:
+            self.assertNotIn(leaked, ids)                  # no IN_DE leak
         for c in chunks:
-            self.assertEqual(c["chunk_metadata"]["corridor"], "FR→NO")
+            self.assertEqual(c["corridor"], "FR_NO")
+            self.assertEqual(c["source_type"], "immigration_rule")
 
     def test_relevance_scores_present(self):
-        chunks = immigration_retriever.retrieve_for_profile(
-            profile=self.marc, classification=self.marc_path, top_k=12,
-        )
-        for c in chunks:
+        for c in self._retrieve(self.marc, self.path):
             self.assertIn("score", c)
             self.assertIsInstance(c["score"], float)
 
-    def test_pinned_chunk_ids_and_no_cross_corridor_leak(self):
-        chunks = immigration_retriever.retrieve_for_profile(
-            profile=self.marc, classification=self.marc_path, top_k=20,
-        )
-        returned_ids = {c["id"] for c in chunks}
-        # All EEA FR→NO chunks present; no IN→DE leak; non-EEA pathway excluded.
-        self.assertEqual(returned_ids, set(_FR_NO_EEA_IDS))
-        for leaked in _IN_DE_IDS:
-            self.assertNotIn(leaked, returned_ids)
-        self.assertNotIn(_FR_NO_NONEEA_ID, returned_ids)
+    def test_top_k_respected(self):
+        self.assertLessEqual(len(self._retrieve(self.marc, self.path, top_k=5)), 5)
 
-    def test_pathway_type_narrows_within_corridor(self):
-        non_eea = immigration_retriever.retrieve_for_profile(
-            profile=UserProfile(
-                nationality="US", origin_country="FR",
-                destination_country="NO", is_eea=False,
-            ),
-            classification=PathClassification(pathway_type="skilled_worker_permit"),
-            top_k=20,
-        )
-        returned_ids = {c["id"] for c in non_eea}
-        self.assertEqual(returned_ids, {_FR_NO_NONEEA_ID})
+    def test_corridor_arrow_to_underscore_normalization(self):
+        # classification.corridor supplied in arrow form must match underscore rows.
+        chunks = self._retrieve(self.marc, PathClassification(pathway_type="x", corridor="FR→NO"))
+        self.assertTrue(chunks)
+        self.assertTrue(all(c["corridor"] == "FR_NO" for c in chunks))
 
     def test_uncovered_corridor_returns_empty(self):
-        chunks = immigration_retriever.retrieve_for_profile(
-            profile=UserProfile(
-                nationality="JP", origin_country="JP",
-                destination_country="NO", is_eea=False,
-            ),
-            classification=PathClassification(pathway_type="skilled_worker_permit"),
-            top_k=12,
+        chunks = self._retrieve(
+            UserProfile(nationality="JP", origin_country="JP", destination_country="NO", is_eea=False),
+            PathClassification(pathway_type="skilled_worker_permit"),
         )
         self.assertEqual(chunks, [])
 
     def test_incomplete_profile_returns_empty(self):
-        chunks = immigration_retriever.retrieve_for_profile(
-            profile=UserProfile(
-                nationality="FR", origin_country="",
-                destination_country="NO", is_eea=True,
-            ),
-            classification=self.marc_path, top_k=12,
+        chunks = self._retrieve(
+            UserProfile(nationality="FR", origin_country="", destination_country="NO", is_eea=True),
+            self.path,
         )
         self.assertEqual(chunks, [])
 

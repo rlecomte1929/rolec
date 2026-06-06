@@ -50,18 +50,20 @@ def _load(path):
 
 
 SCHEMA = """
-CREATE TABLE policy_assistant_chunks (
+CREATE TABLE immigration_corpus_chunks (
     id TEXT PRIMARY KEY,
-    company_id TEXT NOT NULL,
-    policy_version_id TEXT,
-    source_type TEXT NOT NULL,
-    source_ref TEXT NOT NULL,
+    corridor TEXT NOT NULL,
+    source_doc_id TEXT,
+    source_url TEXT NOT NULL,
     chunk_text TEXT NOT NULL,
-    chunk_metadata TEXT NOT NULL DEFAULT '{}',
+    chunk_index INTEGER NOT NULL DEFAULT 0,
+    chunk_metadata TEXT DEFAULT '{}',
+    trust_tier INTEGER NOT NULL DEFAULT 2,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     embedding TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id, source_type, source_ref)
+    content_hash TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT
 );
 """
 
@@ -135,24 +137,26 @@ class RetrieverEndToEndTests(unittest.TestCase):
                 for c, emb in zip(chunks, embs):
                     conn.execute(
                         text(
-                            "INSERT INTO policy_assistant_chunks "
-                            "(id, company_id, source_type, source_ref, chunk_text, "
-                            " chunk_metadata, embedding) "
-                            "VALUES (:id, :co, :st, :ref, :body, :meta, :emb)"
+                            "INSERT INTO immigration_corpus_chunks "
+                            "(id, corridor, source_url, chunk_text, chunk_index, chunk_metadata, "
+                            " trust_tier, fetched_at, embedding, content_hash, is_active) "
+                            "VALUES (:id, :cor, :ref, :body, 0, :meta, 2, :f, :emb, :h, 1)"
                         ),
                         {
                             "id": c["source_ref"],
-                            "co": immigration_retriever.IMMIGRATION_CORPUS_COMPANY_ID,
-                            "st": immigration_retriever.IMMIGRATION_SOURCE_TYPE,
+                            # column = underscore key form; metadata keeps the arrow form.
+                            "cor": c["corridor"].replace("→", "_"),
                             "ref": c["source_ref"],
                             "body": c["chunk_text"],
                             "meta": json.dumps(c["metadata"], ensure_ascii=False),
+                            "f": "2026-06-06T00:00:00+00:00",
                             "emb": json.dumps(emb),
+                            "h": c["source_ref"],
                         },
                     )
 
         self.fake_db = _FakeDb(self.engine)
-        p = mock.patch.object(policy_chunk_retriever, "db", self.fake_db)
+        p = mock.patch.object(immigration_retriever, "db", self.fake_db)
         p.start()
         self.addCleanup(p.stop)
 
@@ -168,8 +172,7 @@ class RetrieverEndToEndTests(unittest.TestCase):
         self.assertGreaterEqual(len(chunks), 1)  # No RULE_NOT_FOUND.
         for c in chunks:
             self.assertEqual(c["chunk_metadata"]["corridor"], "US→FR")
-            # Only long_stay_visa or corridor-wide (null) chunks — no leakage.
-            self.assertIn(c["chunk_metadata"].get("pathway_type"), ("long_stay_visa", None))
+            # N2: corridor-scoped retrieval (all pathways for the corridor, ranked).
 
     def test_in_de_blue_card_profile_gets_grounded_rules(self):
         chunks = immigration_retriever.retrieve_for_profile(
@@ -183,7 +186,6 @@ class RetrieverEndToEndTests(unittest.TestCase):
         self.assertGreaterEqual(len(chunks), 1)  # No RULE_NOT_FOUND.
         for c in chunks:
             self.assertEqual(c["chunk_metadata"]["corridor"], "IN→DE")
-            self.assertIn(c["chunk_metadata"].get("pathway_type"), ("blue_card", None))
 
     def test_no_cross_corridor_leak(self):
         chunks = immigration_retriever.retrieve_for_profile(
