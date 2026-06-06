@@ -137,6 +137,11 @@ class _DossierFormTemplate(BaseModel):
     source_url: Optional[str] = None
     # [P1-05d] When the source URL was last fetched/verified (source_pages.last_fetched_at).
     source_last_verified: Optional[str] = None
+    # [WS1] Content-maturity flag: 'representative' (default scaffolding, not yet
+    # human-verified), 'draft' (under review), or 'verified' (ops/legal confirmed).
+    # Drives the "indicative guidance — confirm with the authority" notice so the
+    # dossier never implies unverified immigration content is authoritative.
+    verification_status: Optional[str] = None
     # [P1-05 checklist] Required supporting documents, derived from the template
     # fields that carry requires_original=true. Each item: {"key","label"}.
     required_documents: List[Dict[str, str]] = []
@@ -377,6 +382,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             fields_total=fields_total,
             source_url=row.get("template_source_url"),  # [P1-05]
             source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
+            verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
             required_documents=required_documents,  # [P1-05 checklist]
         )
 
@@ -1108,6 +1114,7 @@ def _load_case_form_summaries(
           ft.version AS template_version,
           ft.fields  AS template_fields,
           ft.source_url AS template_source_url,
+          ft.verification_status AS template_verification_status,
           sp.last_fetched_at AS source_last_verified,
           rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,

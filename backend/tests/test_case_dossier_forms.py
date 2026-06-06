@@ -56,7 +56,8 @@ CREATE TABLE form_templates (
   version         TEXT NOT NULL DEFAULT '1.0.0',
   fields          TEXT NOT NULL DEFAULT '[]',
   trigger_rules   TEXT NOT NULL DEFAULT '[]',
-  source_url      TEXT
+  source_url      TEXT,
+  verification_status TEXT DEFAULT 'representative'
 );
 CREATE TABLE roadmap_steps (
   id       TEXT PRIMARY KEY,

@@ -62,6 +62,7 @@ function makeForm(overrides: Partial<CaseFormSummary> = {}): CaseFormSummary {
       source_url: 'https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/',
       source_last_verified: '2026-06-04T10:00:00Z',
       required_documents: [],
+      verification_status: 'representative',
     },
     person: { kind: 'employee', name: 'Marc Bouchard', dependent_id: null, profile_id: 'p1' },
     fields_summary: { total: 5, filled_by_ai: 2, filled_by_human: 0, reviewed: 0, overridden: 0, missing_required: 3 },
@@ -110,5 +111,24 @@ describe('CaseFormCard — official source link + roadmap step', () => {
 
     expect(screen.queryByRole('link', { name: /official source/i })).toBeNull();
     expect(screen.queryByText(/Roadmap step:/i)).toBeNull();
+  });
+});
+
+describe('CaseFormCard — [WS1] content-honesty notice', () => {
+  it('shows the indicative-guidance notice (naming the authority) for representative content', () => {
+    renderCard(makeForm()); // template.verification_status === 'representative'
+    fireEvent.click(screen.getByText('D-number application'));
+
+    expect(screen.getByText(/Indicative guidance/i)).toBeInTheDocument();
+    expect(screen.getByText('Norwegian Tax Administration')).toBeInTheDocument();
+  });
+
+  it('hides the notice once the content is verified', () => {
+    renderCard(
+      makeForm({ template: { ...makeForm().template, verification_status: 'verified' } }),
+    );
+    fireEvent.click(screen.getByText('D-number application'));
+
+    expect(screen.queryByText(/Indicative guidance/i)).toBeNull();
   });
 });

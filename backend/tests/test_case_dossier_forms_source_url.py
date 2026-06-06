@@ -42,7 +42,8 @@ CREATE TABLE form_templates (
   id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, country TEXT NOT NULL,
   authority_code TEXT, authority_name TEXT, category TEXT,
   version TEXT NOT NULL DEFAULT '1.0.0', fields TEXT NOT NULL DEFAULT '[]',
-  trigger_rules TEXT NOT NULL DEFAULT '[]', source_url TEXT
+  trigger_rules TEXT NOT NULL DEFAULT '[]', source_url TEXT,
+  verification_status TEXT DEFAULT 'representative'
 );
 CREATE TABLE roadmap_steps (
   id TEXT PRIMARY KEY, case_id TEXT, title TEXT
