@@ -47,7 +47,7 @@
 -- Table
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.roadmap_audit_log (
+CREATE TABLE IF NOT EXISTS rce.roadmap_audit_log (
   roadmap_audit_log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- The case whose roadmap decision this row records. CASCADE: an audit row is
   -- meaningless without its case.
@@ -78,12 +78,12 @@ CREATE TABLE rce.roadmap_audit_log (
 );
 
 -- Per-case read pattern: "show the full audit trail for this case, newest first".
-CREATE INDEX roadmap_audit_log_by_case
+CREATE INDEX IF NOT EXISTS roadmap_audit_log_by_case
   ON rce.roadmap_audit_log (case_id, generated_at DESC);
 
 -- Rule-change-notification read pattern (P1-08d): "which cases were generated
 -- against rule_version X" — when X changes, flag those cases.
-CREATE INDEX roadmap_audit_log_by_version
+CREATE INDEX IF NOT EXISTS roadmap_audit_log_by_version
   ON rce.roadmap_audit_log (rule_version_id);
 
 -- ─────────────────────────────────────────────────────────────────────────────

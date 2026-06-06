@@ -19,7 +19,7 @@ begin;
 -- Enable pgvector. Idempotent; no-op if already enabled.
 create extension if not exists vector;
 
-create table public.policy_assistant_chunks (
+create table if not exists public.policy_assistant_chunks (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null,
   -- Optional: when chunk is matrix-derived, this is the published
@@ -53,14 +53,14 @@ create table public.policy_assistant_chunks (
 -- Hot path: retrieval filters by company_id then orders by embedding
 -- distance. The (company_id, source_type) composite index covers the
 -- typical query; pgvector's IVFFlat handles the nearest-neighbor part.
-create index idx_pac_company on public.policy_assistant_chunks (company_id);
-create index idx_pac_company_type
+create index if not exists idx_pac_company on public.policy_assistant_chunks (company_id);
+create index if not exists idx_pac_company_type
   on public.policy_assistant_chunks (company_id, source_type);
 
 -- IVFFlat with 100 lists is the supabase-recommended default for tables
 -- in the 1k-100k-row range. Tune later if any single company crosses
 -- 50k chunks (unlikely; expect <500/company).
-create index idx_pac_embedding
+create index if not exists idx_pac_embedding
   on public.policy_assistant_chunks
   using ivfflat (embedding vector_cosine_ops) with (lists = 100);
 

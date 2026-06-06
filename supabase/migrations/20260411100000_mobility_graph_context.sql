@@ -12,7 +12,7 @@ begin
 end;
 $$;
 
-create table public.mobility_cases (
+create table if not exists public.mobility_cases (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null,
   employee_user_id uuid not null,
@@ -20,7 +20,7 @@ create table public.mobility_cases (
   updated_at timestamptz not null default now()
 );
 
-create table public.case_people (
+create table if not exists public.case_people (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.mobility_cases (id) on delete cascade,
   role text not null
@@ -35,7 +35,7 @@ create table public.case_people (
   updated_at timestamptz not null default now()
 );
 
-create table public.case_documents (
+create table if not exists public.case_documents (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.mobility_cases (id) on delete cascade,
   person_id uuid references public.case_people (id) on delete set null,
@@ -53,7 +53,7 @@ create table public.case_documents (
   updated_at timestamptz not null default now()
 );
 
-create table public.requirements_catalog (
+create table if not exists public.requirements_catalog (
   id uuid primary key default gen_random_uuid(),
   requirement_code text not null,
   created_at timestamptz not null default now(),
@@ -61,7 +61,7 @@ create table public.requirements_catalog (
   constraint requirements_catalog_requirement_code_key unique (requirement_code)
 );
 
-create table public.policy_rules (
+create table if not exists public.policy_rules (
   id uuid primary key default gen_random_uuid(),
   rule_code text not null,
   created_at timestamptz not null default now(),
@@ -69,7 +69,7 @@ create table public.policy_rules (
   constraint policy_rules_rule_code_key unique (rule_code)
 );
 
-create table public.case_requirement_evaluations (
+create table if not exists public.case_requirement_evaluations (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.mobility_cases (id) on delete cascade,
   person_id uuid references public.case_people (id) on delete set null,
@@ -88,13 +88,13 @@ create table public.case_requirement_evaluations (
   updated_at timestamptz not null default now()
 );
 
-create index idx_mobility_cases_company_id on public.mobility_cases (company_id);
-create index idx_mobility_cases_employee_user_id on public.mobility_cases (employee_user_id);
-create index idx_case_people_case_id on public.case_people (case_id);
-create index idx_case_documents_case_id on public.case_documents (case_id);
-create index idx_case_documents_person_id on public.case_documents (person_id);
-create index idx_case_requirement_evaluations_case_id on public.case_requirement_evaluations (case_id);
-create index idx_case_requirement_evaluations_requirement_id on public.case_requirement_evaluations (requirement_id);
+create index if not exists idx_mobility_cases_company_id on public.mobility_cases (company_id);
+create index if not exists idx_mobility_cases_employee_user_id on public.mobility_cases (employee_user_id);
+create index if not exists idx_case_people_case_id on public.case_people (case_id);
+create index if not exists idx_case_documents_case_id on public.case_documents (case_id);
+create index if not exists idx_case_documents_person_id on public.case_documents (person_id);
+create index if not exists idx_case_requirement_evaluations_case_id on public.case_requirement_evaluations (case_id);
+create index if not exists idx_case_requirement_evaluations_requirement_id on public.case_requirement_evaluations (requirement_id);
 
 drop trigger if exists trg_mobility_cases_updated on public.mobility_cases;
 create trigger trg_mobility_cases_updated

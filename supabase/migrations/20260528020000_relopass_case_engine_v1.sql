@@ -23,7 +23,7 @@ GRANT USAGE ON SCHEMA rce TO authenticated, service_role;
 -- Foundation entities (no FK dependencies)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.canonical_entities (
+CREATE TABLE IF NOT EXISTS rce.canonical_entities (
   canonical_entity_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_type TEXT NOT NULL CHECK (entity_type IN ('PERSON','EMPLOYER','ADDRESS','AUTHORITY')),
   canonical_form JSONB NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE rce.canonical_entities (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.employers (
+CREATE TABLE IF NOT EXISTS rce.employers (
   employer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   legal_name TEXT NOT NULL,
   registry_id TEXT,
@@ -41,7 +41,7 @@ CREATE TABLE rce.employers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.authorities (
+CREATE TABLE IF NOT EXISTS rce.authorities (
   authority_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   country_iso3 TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE rce.authorities (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.addresses (
+CREATE TABLE IF NOT EXISTS rce.addresses (
   address_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   country_iso3 TEXT,
   postal_code TEXT,
@@ -64,7 +64,7 @@ CREATE TABLE rce.addresses (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.document_types (
+CREATE TABLE IF NOT EXISTS rce.document_types (
   document_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT NOT NULL UNIQUE,
   expected_fields_json JSONB,
@@ -73,7 +73,7 @@ CREATE TABLE rce.document_types (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.rules (
+CREATE TABLE IF NOT EXISTS rce.rules (
   rule_id TEXT PRIMARY KEY,
   corridor_scope TEXT[],
   legal_reference TEXT NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE rce.rules (
 -- Employees (FK → canonical_entities)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.employees (
+CREATE TABLE IF NOT EXISTS rce.employees (
   employee_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   canonical_entity_id UUID REFERENCES rce.canonical_entities(canonical_entity_id) ON DELETE SET NULL,
   current_residence_country TEXT,
@@ -100,7 +100,7 @@ CREATE TABLE rce.employees (
 -- Cases (FK → employers, employees) + PF-1 columns
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.cases (
+CREATE TABLE IF NOT EXISTS rce.cases (
   case_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   corridor_id TEXT,
   employer_id UUID REFERENCES rce.employers(employer_id) ON DELETE SET NULL,
@@ -119,7 +119,7 @@ CREATE TABLE rce.cases (
 -- Case-scoped entities
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.family_members (
+CREATE TABLE IF NOT EXISTS rce.family_members (
   family_member_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id UUID NOT NULL REFERENCES rce.cases(case_id) ON DELETE CASCADE,
   relationship_type TEXT NOT NULL
@@ -129,7 +129,7 @@ CREATE TABLE rce.family_members (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.documents (
+CREATE TABLE IF NOT EXISTS rce.documents (
   document_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id UUID NOT NULL REFERENCES rce.cases(case_id) ON DELETE CASCADE,
   mime_type TEXT,
@@ -143,7 +143,7 @@ CREATE TABLE rce.documents (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.agent_runs (
+CREATE TABLE IF NOT EXISTS rce.agent_runs (
   agent_run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id TEXT,
   agent_version TEXT,
@@ -159,7 +159,7 @@ CREATE TABLE rce.agent_runs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.extracted_fields (
+CREATE TABLE IF NOT EXISTS rce.extracted_fields (
   extracted_field_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id UUID NOT NULL REFERENCES rce.documents(document_id) ON DELETE CASCADE,
   field_key TEXT NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE rce.extracted_fields (
   )
 );
 
-CREATE TABLE rce.entity_links (
+CREATE TABLE IF NOT EXISTS rce.entity_links (
   entity_link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   extracted_field_id UUID NOT NULL REFERENCES rce.extracted_fields(extracted_field_id) ON DELETE CASCADE,
   canonical_entity_id UUID NOT NULL REFERENCES rce.canonical_entities(canonical_entity_id) ON DELETE CASCADE,
@@ -199,7 +199,7 @@ CREATE TABLE rce.entity_links (
 -- Rule versions, steps, deadlines, costs
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.rule_versions (
+CREATE TABLE IF NOT EXISTS rce.rule_versions (
   rule_version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   rule_id TEXT NOT NULL REFERENCES rce.rules(rule_id) ON DELETE CASCADE,
   version_label TEXT,
@@ -214,7 +214,7 @@ CREATE TABLE rce.rule_versions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.steps (
+CREATE TABLE IF NOT EXISTS rce.steps (
   step_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   corridor_id TEXT,
   name TEXT NOT NULL,
@@ -229,7 +229,7 @@ CREATE TABLE rce.steps (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.deadlines (
+CREATE TABLE IF NOT EXISTS rce.deadlines (
   deadline_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id UUID NOT NULL REFERENCES rce.cases(case_id) ON DELETE CASCADE,
   step_id UUID REFERENCES rce.steps(step_id) ON DELETE SET NULL,
@@ -243,7 +243,7 @@ CREATE TABLE rce.deadlines (
 -- HR policies & clauses
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.hr_policies (
+CREATE TABLE IF NOT EXISTS rce.hr_policies (
   hr_policy_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employer_id UUID NOT NULL REFERENCES rce.employers(employer_id) ON DELETE CASCADE,
   version_label TEXT,
@@ -253,7 +253,7 @@ CREATE TABLE rce.hr_policies (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.policy_clauses (
+CREATE TABLE IF NOT EXISTS rce.policy_clauses (
   policy_clause_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   hr_policy_id UUID NOT NULL REFERENCES rce.hr_policies(hr_policy_id) ON DELETE CASCADE,
   clause_type TEXT NOT NULL,  -- FK to policy_clause_types catalog (Notion-seeded; C1-01b)
@@ -267,7 +267,7 @@ CREATE TABLE rce.policy_clauses (
 -- Costs (FK → cases, policy_clauses) + PF-1 category
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.costs (
+CREATE TABLE IF NOT EXISTS rce.costs (
   cost_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id UUID NOT NULL REFERENCES rce.cases(case_id) ON DELETE CASCADE,
   amount NUMERIC,
@@ -288,7 +288,7 @@ CREATE TABLE rce.costs (
 -- Corrections (auditable change-log feeding training set)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.corrections (
+CREATE TABLE IF NOT EXISTS rce.corrections (
   correction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id UUID REFERENCES rce.cases(case_id) ON DELETE SET NULL,
   target_table TEXT NOT NULL,
@@ -313,17 +313,17 @@ CREATE TABLE rce.corrections (
 -- Indexes
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE INDEX canonical_entities_embedding_hnsw
+CREATE INDEX IF NOT EXISTS canonical_entities_embedding_hnsw
   ON rce.canonical_entities USING hnsw (embedding vector_cosine_ops);
 
-CREATE INDEX canonical_entities_person_dob
+CREATE INDEX IF NOT EXISTS canonical_entities_person_dob
   ON rce.canonical_entities ((canonical_form->>'normalized_surname'), (canonical_form->>'dob'))
   WHERE entity_type = 'PERSON';
 
-CREATE INDEX cases_by_arrival ON rce.cases(target_arrival_date);
-CREATE INDEX extracted_fields_by_doc ON rce.extracted_fields(document_id);
-CREATE INDEX corrections_by_target ON rce.corrections(target_table, target_id);
-CREATE INDEX agent_runs_by_case ON rce.agent_runs(case_id, started_at);
+CREATE INDEX IF NOT EXISTS cases_by_arrival ON rce.cases(target_arrival_date);
+CREATE INDEX IF NOT EXISTS extracted_fields_by_doc ON rce.extracted_fields(document_id);
+CREATE INDEX IF NOT EXISTS corrections_by_target ON rce.corrections(target_table, target_id);
+CREATE INDEX IF NOT EXISTS agent_runs_by_case ON rce.agent_runs(case_id, started_at);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- RLS skeleton — permissive defaults; C1-01a hardens with tenant scoping.
