@@ -73,6 +73,31 @@ if (
 
 DATABASE_URL: str = _raw_url
 
+# ---------------------------------------------------------------------------
+# F3/AIQ-834: optional dedicated least-privilege connection for request-path
+# queries (the non-superuser `relopass_api` role). When RELOPASS_API_DATABASE_URL
+# is unset, the request path reuses DATABASE_URL (the existing superuser pool) —
+# i.e. behaviour is UNCHANGED until a human provisions the role and sets this env
+# var. Only the scheme/SSL transforms are applied (the URL must already carry the
+# pooler-qualified username, e.g. relopass_api.<project_ref>, when it points at
+# the Supabase transaction pooler).
+# ---------------------------------------------------------------------------
+_request_raw = os.getenv("RELOPASS_API_DATABASE_URL", "").strip()
+if _request_raw:
+    if _request_raw.startswith("postgres://"):
+        _request_raw = _request_raw.replace("postgres://", "postgresql://", 1)
+    if (
+        _request_raw.startswith("postgresql://")
+        and "pooler.supabase.com" in _request_raw
+        and "sslmode=" not in _request_raw.lower()
+    ):
+        _request_raw = _request_raw + ("&" if "?" in _request_raw else "?") + "sslmode=require"
+    REQUEST_DATABASE_URL: str = _request_raw
+    REQUEST_DB_IS_DEDICATED: bool = True
+else:
+    REQUEST_DATABASE_URL = DATABASE_URL
+    REQUEST_DB_IS_DEDICATED = False
+
 
 def sqlalchemy_engine_kwargs(database_url: str) -> Dict[str, Any]:
     """

@@ -110,7 +110,17 @@ def _retrieve_postgres(
         + where_extra
         + " ORDER BY embedding <=> CAST(:q AS vector) ASC LIMIT :k"
     )
-    with db.engine.connect() as conn:
+    # F3/AIQ-834: set the request-scoped company GUC the RLS second-barrier
+    # policy reads, then run the similarity query in the SAME transaction.
+    # set_config(..., is_local=true) is transaction-local and survives the
+    # Supabase transaction-mode pooler (unlike a session-level SET). Harmless
+    # when connected as the superuser (RLS bypassed); load-bearing once the
+    # backend connects as the non-superuser relopass_api role.
+    with db.request_engine.begin() as conn:
+        conn.execute(
+            text("SELECT set_config('app.current_company_id', :co, true)"),
+            {"co": company_id},
+        )
         rows = conn.execute(text(sql), params).mappings().all()
     out: List[Dict[str, Any]] = []
     for r in rows:
