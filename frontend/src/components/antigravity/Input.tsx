@@ -21,6 +21,29 @@ interface InputProps {
   name?: string;
   /** When true, the input is required (announced by screen readers via aria-required). */
   required?: boolean;
+  /**
+   * Extra classes. In the default (styled) mode these are appended after the
+   * design-system classes; with `unstyled` they are the ONLY classes applied.
+   */
+  className?: string;
+  /**
+   * Render a bare <input> with no wrapper/label/error and no design-system
+   * styling — only the passed `className`, plus type/value/onChange/disabled
+   * and the a11y attributes. For bespoke inputs embedded in a custom layout
+   * (e.g. the intake wizard) whose appearance the default Input would fight.
+   * Lets every text input route through this one primitive without imposing a
+   * visual opinion. Prefer the styled mode (label/error/focus) whenever it fits.
+   */
+  unstyled?: boolean;
+  /** Native min/max/step — for number/date inputs. */
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Native tooltip. */
+  title?: string;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -36,6 +59,15 @@ export const Input: React.FC<InputProps> = ({
   id,
   name,
   required = false,
+  className = '',
+  unstyled = false,
+  min,
+  max,
+  step,
+  onFocus,
+  onBlur,
+  onKeyDown,
+  title,
 }) => {
   // AUDIT-A6 / A11Y-1: generate a stable id when none provided so the label and
   // input are always associated. React.useId() guarantees uniqueness across
@@ -43,6 +75,35 @@ export const Input: React.FC<InputProps> = ({
   const autoId = React.useId();
   const inputId = id ?? `input-${autoId}`;
   const errorId = error ? `${inputId}-error` : undefined;
+
+  // Shared native props so the styled and unstyled paths stay behaviourally
+  // identical (same controlled value, same a11y wiring).
+  const nativeProps = {
+    id: inputId,
+    name,
+    type,
+    value,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value),
+    placeholder,
+    autoComplete,
+    disabled,
+    required,
+    min,
+    max,
+    step,
+    onFocus,
+    onBlur,
+    onKeyDown,
+    title,
+    'aria-required': required || undefined,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': errorId,
+  } as const;
+
+  // [AUDIT-B2.2b] Bare input for bespoke layouts — caller owns the appearance.
+  if (unstyled) {
+    return <input {...nativeProps} className={className} />;
+  }
 
   const widthClass = fullWidth ? 'w-full' : '';
   const errorClass = error ? 'border-[#7a2a2a] focus:ring-[#7a2a2a]' : 'border-[#d1d5db] focus:ring-[#0b2b43]';
@@ -55,21 +116,10 @@ export const Input: React.FC<InputProps> = ({
         </label>
       )}
       <input
-        id={inputId}
-        name={name}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        disabled={disabled}
-        required={required}
-        aria-required={required || undefined}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={errorId}
+        {...nativeProps}
         className={`px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all ${widthClass} ${errorClass} ${
           disabled ? 'bg-[#f3f4f6] cursor-not-allowed' : 'bg-white'
-        }`}
+        } ${className}`}
       />
       {error && (
         <p id={errorId} className="text-sm text-[#7a2a2a] mt-1" role="alert">

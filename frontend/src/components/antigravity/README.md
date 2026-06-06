@@ -45,6 +45,31 @@ visual opinion.
 Prefer a real `variant` whenever one fits. `unstyled` is for the cases where it
 genuinely doesn't.
 
+## Input
+
+```tsx
+import { Input } from '../components/antigravity/Input';
+
+<Input label="Email" type="email" value={email} onChange={setEmail} required />
+```
+
+`onChange` receives the **value** (not the event): `(value: string) => void`.
+
+Key props: `label`, `error`, `placeholder`, `type`, `disabled`, `required`,
+`min` / `max` / `step` (number/date), `onFocus` / `onBlur` / `onKeyDown`, `title`.
+
+### `unstyled`
+
+Like `Button`'s — renders a bare `<input>` with **no wrapper/label and no
+design-system styling**, only your `className` plus the controlled value +
+a11y wiring. For bespoke inputs in a custom layout (e.g. the intake wizard)
+whose appearance the default Input would fight. Prefer the styled mode
+(`label` + `error` + focus ring) whenever it fits.
+
+```tsx
+<Input unstyled className={inputCls(locked)} type="date" value={v} onChange={setV} />
+```
+
 ## Brand colours
 
 Source of truth: `design/system/tokens.css`. Exposed as Tailwind scales in
