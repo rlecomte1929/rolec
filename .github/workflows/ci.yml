@@ -256,7 +256,8 @@ jobs:
             backend/tests/test_admin_create_person_password.py \
             backend/tests/test_hr_assign_tenant_scope.py \
             backend/tests/test_hr_mutation_tenant_scope.py \
-            backend/tests/test_tenant_isolation_behavioral.py
+            backend/tests/test_tenant_isolation_behavioral.py \
+            backend/tests/test_hr_vendors_corridors.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
