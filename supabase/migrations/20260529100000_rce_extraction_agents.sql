@@ -27,7 +27,7 @@
 -- policy + REVOKE FROM anon + GRANT to authenticated / service_role. C1-01a
 -- will tighten the policies to tenant-scoped ones.
 
-CREATE TABLE rce.extraction_agents (
+CREATE TABLE IF NOT EXISTS rce.extraction_agents (
   agent_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- Stable human-readable identifier (e.g. "passport_td3.surname", "payslip.gross_salary").
   -- Names are scoped per document_type via the dot-prefix convention.
@@ -40,7 +40,7 @@ CREATE TABLE rce.extraction_agents (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rce.agent_versions (
+CREATE TABLE IF NOT EXISTS rce.agent_versions (
   agent_version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id UUID NOT NULL REFERENCES rce.extraction_agents(agent_id) ON DELETE CASCADE,
   -- Monotonically increasing per agent_id. The registry computes the next value
@@ -82,18 +82,18 @@ ALTER TABLE rce.extraction_agents
   ON DELETE SET NULL
   DEFERRABLE INITIALLY DEFERRED;
 
-CREATE INDEX agent_versions_by_agent
+CREATE INDEX IF NOT EXISTS agent_versions_by_agent
   ON rce.agent_versions(agent_id, version_number DESC);
 
-CREATE INDEX agent_versions_by_hash
+CREATE INDEX IF NOT EXISTS agent_versions_by_hash
   ON rce.agent_versions(agent_id, version_hash);
 
 -- Connect agent_runs (C1-01) to agent_versions so cost analysis by version is
 -- a single join instead of two text-column lookups.
 ALTER TABLE rce.agent_runs
-  ADD COLUMN agent_version_ref UUID REFERENCES rce.agent_versions(agent_version_id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS agent_version_ref UUID REFERENCES rce.agent_versions(agent_version_id) ON DELETE SET NULL;
 
-CREATE INDEX agent_runs_by_version_ref
+CREATE INDEX IF NOT EXISTS agent_runs_by_version_ref
   ON rce.agent_runs(agent_version_ref, started_at);
 
 -- ─────────────────────────────────────────────────────────────────────────────

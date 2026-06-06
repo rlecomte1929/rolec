@@ -12,7 +12,7 @@
 
 begin;
 
-create table public.catalog_destination_allowlist (
+create table if not exists public.catalog_destination_allowlist (
   city text not null,
   country text not null,
   approved_by uuid,
@@ -24,7 +24,7 @@ create table public.catalog_destination_allowlist (
 comment on table public.catalog_destination_allowlist is
   'Admin-curated list of (city, country) pairs where HR is allowed to fire the LLM catalog scraper. Anything off this list opens a ticket in catalog_destination_requests.';
 
-create table public.catalog_scrape_quota (
+create table if not exists public.catalog_scrape_quota (
   company_id uuid not null,
   day date not null,
   calls_made integer not null default 0,
@@ -34,7 +34,7 @@ create table public.catalog_scrape_quota (
 comment on table public.catalog_scrape_quota is
   'Per-company per-day quota counter for HR-initiated catalog scrapes. Default cap = 20. Resets at midnight UTC.';
 
-create table public.catalog_destination_requests (
+create table if not exists public.catalog_destination_requests (
   id uuid primary key default gen_random_uuid(),
   city text not null,
   country text not null,
@@ -53,8 +53,8 @@ create table public.catalog_destination_requests (
 comment on table public.catalog_destination_requests is
   'Tickets opened by HR when they ask the scraper to populate a destination not on the allowlist. Admin reviews + approves → row added to allowlist + the original (category) scrape auto-fires.';
 
-create index idx_cdr_status on public.catalog_destination_requests (status, created_at desc);
-create index idx_cdr_company on public.catalog_destination_requests (company_id, created_at desc);
+create index if not exists idx_cdr_status on public.catalog_destination_requests (status, created_at desc);
+create index if not exists idx_cdr_company on public.catalog_destination_requests (company_id, created_at desc);
 
 create or replace function public.cdr_set_updated_at()
 returns trigger

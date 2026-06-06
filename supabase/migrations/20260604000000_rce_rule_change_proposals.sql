@@ -30,7 +30,7 @@
 -- Table
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.rule_change_proposals (
+CREATE TABLE IF NOT EXISTS rce.rule_change_proposals (
   proposal_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- The rule this proposal would affect, if matched. Nullable so a brand-new
   -- regulation page (no existing rule) can still raise a proposal for triage.
@@ -61,10 +61,10 @@ CREATE TABLE rce.rule_change_proposals (
 );
 
 -- Review-queue read pattern: "show me all pending proposals, newest first".
-CREATE INDEX rule_change_proposals_pending
+CREATE INDEX IF NOT EXISTS rule_change_proposals_pending
   ON rce.rule_change_proposals (status, captured_at DESC);
 
-CREATE INDEX rule_change_proposals_by_rule
+CREATE INDEX IF NOT EXISTS rule_change_proposals_by_rule
   ON rce.rule_change_proposals (rule_id, captured_at DESC);
 
 -- ─────────────────────────────────────────────────────────────────────────────

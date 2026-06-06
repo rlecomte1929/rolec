@@ -8,7 +8,7 @@
 
 begin;
 
-create table public.service_catalog_items (
+create table if not exists public.service_catalog_items (
   id uuid primary key default gen_random_uuid(),
   category text not null,
   -- Canonical city name as used by the recommendation plugins
@@ -37,9 +37,9 @@ create table public.service_catalog_items (
 comment on table public.service_catalog_items is
   'Admin-owned master catalog. Scraper writes here in Phase 2c. HR reads via company_vendor_selections (Phase 2d); employees never see this table directly.';
 
-create index idx_service_catalog_items_cat_city on public.service_catalog_items (category, city) where active;
-create index idx_service_catalog_items_cat_country on public.service_catalog_items (category, country) where active;
-create index idx_service_catalog_items_source on public.service_catalog_items (source);
+create index if not exists idx_service_catalog_items_cat_city on public.service_catalog_items (category, city) where active;
+create index if not exists idx_service_catalog_items_cat_country on public.service_catalog_items (category, country) where active;
+create index if not exists idx_service_catalog_items_source on public.service_catalog_items (source);
 
 create or replace function public.service_catalog_items_set_updated_at()
 returns trigger

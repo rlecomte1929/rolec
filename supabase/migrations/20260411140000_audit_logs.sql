@@ -2,7 +2,7 @@
 
 begin;
 
-create table public.audit_logs (
+create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   entity_type text not null,
   entity_id uuid not null,
@@ -22,9 +22,9 @@ comment on table public.audit_logs is 'MVP audit trail: mobility_cases, case_peo
 comment on column public.audit_logs.entity_type is 'Logical table name e.g. mobility_cases, case_people.';
 comment on column public.audit_logs.actor_type is 'system = default DB trigger; human = set session vars from API; service = automation job.';
 
-create index idx_audit_logs_entity on public.audit_logs (entity_type, entity_id);
-create index idx_audit_logs_created_at on public.audit_logs (created_at desc);
-create index idx_audit_logs_actor on public.audit_logs (actor_type, created_at desc);
+create index if not exists idx_audit_logs_entity on public.audit_logs (entity_type, entity_id);
+create index if not exists idx_audit_logs_created_at on public.audit_logs (created_at desc);
+create index if not exists idx_audit_logs_actor on public.audit_logs (actor_type, created_at desc);
 
 -- Session vars (optional): SET LOCAL relopass.audit_actor_type = 'human'; SET LOCAL relopass.audit_actor_id = '<uuid>';
 create or replace function public.relopass_audit_row()

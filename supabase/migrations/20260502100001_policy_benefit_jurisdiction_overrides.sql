@@ -24,7 +24,7 @@
 
 begin;
 
-create table public.policy_benefit_jurisdiction_overrides (
+create table if not exists public.policy_benefit_jurisdiction_overrides (
   id uuid primary key default gen_random_uuid(),
   benefit_row_id uuid not null
     references public.policy_config_benefits (id) on delete cascade,
@@ -55,9 +55,9 @@ create table public.policy_benefit_jurisdiction_overrides (
 
 -- Hot path: resolver queries by benefit_row_id, then array-contains for
 -- the employee's country.
-create index idx_pbjo_benefit
+create index if not exists idx_pbjo_benefit
   on public.policy_benefit_jurisdiction_overrides (benefit_row_id);
-create index idx_pbjo_countries
+create index if not exists idx_pbjo_countries
   on public.policy_benefit_jurisdiction_overrides
   using gin (jurisdiction_countries);
 

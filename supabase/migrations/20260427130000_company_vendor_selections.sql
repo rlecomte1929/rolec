@@ -11,7 +11,7 @@
 
 begin;
 
-create table public.company_vendor_selections (
+create table if not exists public.company_vendor_selections (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null,
   category text not null,
@@ -37,10 +37,10 @@ create table public.company_vendor_selections (
 comment on table public.company_vendor_selections is
   'HR per-company curation: which admin master vendors are visible to their employees, plus HR-added custom vendors. Employees never see the raw master.';
 
-create index idx_cvs_company_cat_city
+create index if not exists idx_cvs_company_cat_city
   on public.company_vendor_selections (company_id, category, destination_city)
   where selected;
-create index idx_cvs_master_item
+create index if not exists idx_cvs_master_item
   on public.company_vendor_selections (master_item_id)
   where master_item_id is not null;
 
