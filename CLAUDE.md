@@ -121,7 +121,7 @@ Backend:
 
 - **Frontend**: Render Static Site. Build: `npm --prefix frontend ci && npm --prefix frontend run build`. Publish dir: `frontend/dist`.
 - **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4 --proxy-headers`. Python 3.11.
-- **Database changes**: Apply Supabase migrations via `supabase db push` or the MCP (`apply_migration`). Never alter schema through the Supabase dashboard SQL editor directly — always commit migration files.
+- **Database changes**: Commit a migration file and let the main-push workflow apply it on merge — see **Migration discipline (MANDATORY)** below. Never apply schema changes via MCP `apply_migration` or the Supabase dashboard SQL editor directly; always commit migration files.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
 
 ## Database Migrations — Security Rules (Hard Gates)
@@ -149,23 +149,37 @@ Every migration that creates a new table in the `public` schema **must** include
 
 **If you are writing or reviewing a migration and a new table is missing any of the above, stop and add it before proceeding.** This is a hard review gate, not a soft suggestion.
 
-## Migration ledger discipline (AIQ-756)
+## Migration discipline (MANDATORY)
 
-`supabase` tracks applied migrations by `version` in `supabase_migrations.schema_migrations`, and **records the version from how the migration was applied** — so the two apply paths drift apart:
+NEVER apply a migration to production via MCP `apply_migration` or by manually
+inserting into `supabase_migrations.schema_migrations`.
 
-- ✅ **Commit the migration file, then let the main-push migration workflow apply it.** It records the migration at its **repo filename version**, so prod and repo agree.
-- ❌ **Do NOT pre-apply a repo-tracked migration via MCP `apply_migration`.** That stamps an **apply-time** version (e.g. `20260604153503`) which will not match your committed forward-timestamp file (e.g. `20260608100000`). Every such row makes a fresh `supabase db push` / Supabase Preview abort with `Remote migration versions not found in local migrations directory`, reddening **every** PR's Preview until someone reconciles by hand. (MCP `apply_migration` is fine for a genuine one-off — but then also commit a matching migration file at that **same** version.)
+The ONLY permitted workflow for schema changes:
+  1. Create `supabase/migrations/<timestamp>_<name>.sql` with idempotent DDL.
+  2. Commit and push to a feature branch.
+  3. Open a PR. The main-push migration workflow applies the file to production
+     on merge and records the repo file's timestamp as the version.
 
-CI guards this: the **Migration ledger drift check** job (`scripts/check_migration_drift.py`) fails a PR when prod has an applied version with no repo file. It is gated on `vars.RLS_COVERAGE_DATABASE_URL_SET` (reuses the read-only `RLS_COVERAGE_DATABASE_URL` secret) and is a no-op where that secret isn't configured.
+Legitimate use of `execute_sql` (MCP): read-only queries and one-time data
+backfills that carry no schema change. If you run a hotfix DDL via `execute_sql`,
+you MUST immediately commit a matching migration file with the same timestamp
+to reconcile the ledger — see "Ledger reconciliation" below.
 
-**Reconciliation runbook** (if drift slips through — this is what AIQ-756 did by hand). For each drifted row whose migration *name* already exists in the repo at a different version, relabel the ledger (collision-check the target version is absent first):
+CI enforces this: the **Migration ledger drift check** job (`scripts/check_migration_drift.py`)
+fails a PR when prod has an applied version with no repo file (gated on the read-only
+`RLS_COVERAGE_DATABASE_URL` secret; a no-op where that secret isn't configured).
 
-```sql
-UPDATE supabase_migrations.schema_migrations SET version='<repo_version>'
-  WHERE version='<prod_apply_time_version>' AND name='<name>';
-```
-
-If a drifted row has **no** repo file by that name, commit a prod-as-oracle migration (real DDL, idempotent — or a stub) at the prod version so the repo reproduces prod.
+## Ledger reconciliation (hotfix only)
+If a migration was applied to prod out-of-band:
+  1. Note the exact version string recorded in `supabase_migrations.schema_migrations`.
+  2. Check for a duplicate/orphan row:
+       SELECT version, name FROM supabase_migrations.schema_migrations
+       WHERE name = '<migration_name>'
+       ORDER BY version;
+  3. If two rows exist for the same name, DELETE the older/mismatched one.
+  4. Create `supabase/migrations/<version>_<name>.sql` in the repo that matches
+     exactly what was applied (idempotent DDL).
+  5. Commit as:  chore(migrations): reconcile ledger for <name>
 
 ## Build hygiene (pre-push hook + CI)
 
