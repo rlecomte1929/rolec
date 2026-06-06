@@ -195,7 +195,7 @@ const OWNER_CHIP: Record<string, { label: string; chipClass: string }> = {
   employee: { label: 'Employee', chipClass: 'bg-amber-50 text-amber-800 border border-amber-200' },
   hr: { label: 'HR', chipClass: 'bg-sky-50 text-sky-800 border border-sky-200' },
   joint: { label: 'Joint', chipClass: 'bg-slate-100 text-slate-600 border border-slate-200' },
-  provider: { label: 'Provider', chipClass: 'bg-violet-50 text-violet-700 border border-violet-200' },
+  provider: { label: 'Provider', chipClass: 'bg-accent-50 text-accent-700 border border-accent-200' },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

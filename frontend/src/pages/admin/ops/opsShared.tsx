@@ -123,7 +123,7 @@ export function Kpi({ label, value, sub, tone = 'default', onHold = false }: Kpi
     default: 'text-slate-900',
     success: 'text-emerald-700',
     warning: 'text-amber-700',
-    accent: 'text-indigo-700',
+    accent: 'text-accent-700',
     danger: 'text-rose-700',
     teal: 'text-teal-700',
   };
@@ -131,7 +131,7 @@ export function Kpi({ label, value, sub, tone = 'default', onHold = false }: Kpi
     default: 'bg-slate-200',
     success: 'bg-emerald-500',
     warning: 'bg-amber-500',
-    accent: 'bg-indigo-500',
+    accent: 'bg-accent-500',
     danger: 'bg-rose-500',
     teal: 'bg-teal-500',
   };
@@ -170,7 +170,7 @@ export function MiniStat({ label, value, tone = 'default' }: { label: string; va
     success: 'text-emerald-700',
     warning: 'text-amber-700',
     danger: 'text-rose-700',
-    accent: 'text-indigo-700',
+    accent: 'text-accent-700',
   };
   return (
     <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
@@ -183,12 +183,12 @@ export function MiniStat({ label, value, tone = 'default' }: { label: string; va
 // ── Avatar helpers ─────────────────────────────────────────────────────────
 
 const OWNER_TONES = [
-  'bg-indigo-100 text-indigo-700',
+  'bg-accent-100 text-accent-700',
   'bg-emerald-100 text-emerald-700',
   'bg-amber-100 text-amber-700',
   'bg-sky-100 text-sky-700',
   'bg-rose-100 text-rose-700',
-  'bg-violet-100 text-violet-700',
+  'bg-accent-100 text-accent-700',
 ];
 
 export function ownerTone(userId: string): string {

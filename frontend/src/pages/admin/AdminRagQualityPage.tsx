@@ -10,7 +10,7 @@ import type { RagEvalDashboard, RagEvalMetric } from '../../api/ragEval';
 // committed eval reports; falls back to a flagged mock series until real
 // reports land (see backend rag_eval_reports.build_dashboard).
 
-const SERIES_COLOR = '#4f46e5'; // indigo-600
+const SERIES_COLOR = '#1f4870'; // accent-600
 
 const ALERT_LABEL: Record<string, { variant: 'success' | 'warning' | 'error' | 'info'; text: string }> = {
   below_threshold: { variant: 'error', text: 'Below threshold' },

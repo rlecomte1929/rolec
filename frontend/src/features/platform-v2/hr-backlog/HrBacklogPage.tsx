@@ -41,14 +41,14 @@ function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
     default: 'text-slate-900',
     success: 'text-emerald-700',
     warning: 'text-rose-700',
-    accent: 'text-indigo-700',
+    accent: 'text-accent-700',
     danger: 'text-rose-700',
   };
   const dot: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'bg-slate-200',
     success: 'bg-emerald-500',
     warning: 'bg-rose-500',
-    accent: 'bg-indigo-500',
+    accent: 'bg-accent-500',
     danger: 'bg-rose-500',
   };
   return (
@@ -70,7 +70,7 @@ const STATUS_PILL: Record<string, string> = {
 
 // STATUS_LABEL removed — replaced by the shared statusLabel() utility (AUDIT-A5)
 
-const OWNER_TONES = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-violet-100 text-violet-700'];
+const OWNER_TONES = ['bg-accent-100 text-accent-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-accent-100 text-accent-700'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -309,13 +309,13 @@ export function HrBacklogPage() {
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Employee backlog</h1>
-            <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
+            <Pill className="bg-accent-50 text-accent-700 ring-accent-200">v2 preview</Pill>
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => void load()}
                 disabled={loading}
-                className="text-xs font-medium text-indigo-600 underline-offset-2 hover:underline disabled:opacity-50"
+                className="text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50"
               >
                 {loading ? 'Refreshing…' : 'Refresh'}
               </button>

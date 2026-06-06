@@ -124,7 +124,7 @@ export const AdminOpsSlaPage: React.FC = () => {
               </ul>
             )}
             {breaches.length > 0 && (
-              <Link to={`${buildRoute('adminReviewQueue')}?overdue=1`} className="mt-2 inline-block text-[12px] text-indigo-700 underline">
+              <Link to={`${buildRoute('adminReviewQueue')}?overdue=1`} className="mt-2 inline-block text-[12px] text-accent-700 underline">
                 View all overdue →
               </Link>
             )}

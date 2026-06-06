@@ -150,13 +150,13 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
               <button
                 type="button"
                 onClick={changeDecision}
-                className="text-[11px] font-medium text-violet-600 hover:text-violet-800 underline-offset-2 hover:underline"
+                className="text-[11px] font-medium text-accent-600 hover:text-accent-800 underline-offset-2 hover:underline"
               >
                 Change decision
               </button>
               <Link
                 to={`/hr/ai-decisions?recommendation_id=${encodeURIComponent(recommendationId)}`}
-                className="text-[11px] font-medium text-violet-600 hover:text-violet-800 underline-offset-2 hover:underline"
+                className="text-[11px] font-medium text-accent-600 hover:text-accent-800 underline-offset-2 hover:underline"
               >
                 View in audit
               </Link>
@@ -168,20 +168,20 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
   }
 
   return (
-    <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
+    <div className="rounded-lg border border-accent-200 bg-accent-50 px-4 py-3">
       <div className="flex gap-3">
-        <svg className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-accent-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-xs font-semibold text-violet-700 uppercase tracking-wider">{title}</span>
+            <span className="text-xs font-semibold text-accent-700 uppercase tracking-wider">{title}</span>
             {typeof confidence === 'number' && (
-              <span className="text-[10px] text-violet-500">{Math.round(confidence * 100)}% confidence</span>
+              <span className="text-[10px] text-accent-500">{Math.round(confidence * 100)}% confidence</span>
             )}
           </div>
-          <div className="text-sm text-violet-800 leading-relaxed">{rationale}</div>
-          <p className="text-[11px] text-violet-500 mt-1">AI-generated · your decision is required and will be logged</p>
+          <div className="text-sm text-accent-800 leading-relaxed">{rationale}</div>
+          <p className="text-[11px] text-accent-500 mt-1">AI-generated · your decision is required and will be logged</p>
 
           {priorDecision && (
             <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -203,7 +203,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   pendingAction === action
                     ? ACTION_CONFIG[action].pill
-                    : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-100'
+                    : 'bg-white text-accent-700 border border-accent-200 hover:bg-accent-100'
                 }`}
               >
                 {ACTION_CONFIG[action].label}
@@ -229,7 +229,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
                       ? 'Optional context for the audit trail.'
                       : 'Explain why the AI recommendation does not fit this case.'
                   }
-                  className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-200 resize-none bg-white"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-200 resize-none bg-white"
                 />
               </label>
               {error && <p className="text-xs text-rose-600">{error}</p>}

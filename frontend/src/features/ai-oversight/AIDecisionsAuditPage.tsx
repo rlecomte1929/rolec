@@ -222,14 +222,14 @@ export function AIDecisionsAuditPage() {
           </select>
         </label>
         {recommendationIdFilter && (
-          <span className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-violet-50 text-xs text-violet-700 ring-1 ring-violet-200">
+          <span className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-accent-50 text-xs text-accent-700 ring-1 ring-accent-200">
             <span>
               recommendation_id: <span className="font-mono">{recommendationIdFilter}</span>
             </span>
             <button
               type="button"
               onClick={clearRecommendationFilter}
-              className="text-violet-500 hover:text-violet-700"
+              className="text-accent-500 hover:text-accent-700"
               aria-label="Clear recommendation_id filter"
             >
               ×
@@ -288,7 +288,7 @@ export function AIDecisionsAuditPage() {
                               title={priorLoaded ? 'Scroll to prior decision' : 'Prior decision is outside the current view'}
                               className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 transition-colors ${
                                 priorLoaded
-                                  ? 'bg-violet-50 text-violet-700 ring-violet-200 hover:bg-violet-100 cursor-pointer'
+                                  ? 'bg-accent-50 text-accent-700 ring-accent-200 hover:bg-accent-100 cursor-pointer'
                                   : 'bg-slate-50 text-slate-400 ring-slate-200 cursor-not-allowed'
                               }`}
                             >

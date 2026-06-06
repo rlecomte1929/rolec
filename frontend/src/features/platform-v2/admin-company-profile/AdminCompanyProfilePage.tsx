@@ -76,11 +76,11 @@ export function AdminCompanyProfilePage() {
         backLabel="Back to tenant"
         topSlot={
           <nav className="mb-3 flex items-center gap-2 text-[12px] text-slate-500">
-            <Link to="/admin/companies-v2" className="text-indigo-600 hover:underline">
+            <Link to="/admin/companies-v2" className="text-accent-600 hover:underline">
               ← Companies
             </Link>
             <span className="text-slate-300">/</span>
-            <Link to={`/admin/companies/${companyId}`} className="text-indigo-600 hover:underline">
+            <Link to={`/admin/companies/${companyId}`} className="text-accent-600 hover:underline">
               {tenantName}
             </Link>
             <span className="text-slate-300">/</span>

@@ -64,7 +64,7 @@ function statusColor(status: string): string {
   if (status === 'ready' || status === 'approved') return 'text-emerald-600 bg-emerald-50 border-emerald-200';
   if (status === 'submitted') return 'text-blue-600 bg-blue-50 border-blue-200';
   if (status === 'rejected') return 'text-red-600 bg-red-50 border-red-200';
-  if (status === 'auto_filled') return 'text-violet-600 bg-violet-50 border-violet-200';
+  if (status === 'auto_filled') return 'text-accent-600 bg-accent-50 border-accent-200';
   return 'text-slate-500 bg-slate-50 border-slate-200';
 }
 

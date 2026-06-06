@@ -360,7 +360,7 @@ export function CompanyProfileForm({
         <div className="mt-1.5 flex items-baseline gap-3">
           <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{title}</h1>
           {badge && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-700 ring-1 ring-inset ring-accent-200">
               {badge}
             </span>
           )}
@@ -677,10 +677,10 @@ export function CompanyProfileForm({
 // ── Visual primitives ──────────────────────────────────────────────────────
 
 const inputCx =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100';
 
 const selectCx =
-  'w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+  'w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100';
 
 function SectionCard({
   title,
@@ -767,8 +767,8 @@ function Field({
 
 function InfoBanner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-2 inline-flex w-full items-start gap-1.5 rounded-md bg-indigo-50/70 px-2.5 py-1.5 text-[11.5px] text-indigo-900 ring-1 ring-inset ring-indigo-100">
-      <InfoIcon className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500" />
+    <div className="mt-2 inline-flex w-full items-start gap-1.5 rounded-md bg-accent-50/70 px-2.5 py-1.5 text-[11.5px] text-accent-900 ring-1 ring-inset ring-accent-100">
+      <InfoIcon className="mt-0.5 h-3 w-3 shrink-0 text-accent-500" />
       <span>{children}</span>
     </div>
   );

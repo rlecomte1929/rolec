@@ -33,7 +33,7 @@ const STATUS_LABELS: Record<FeedbackStatus, string> = {
 
 const CATEGORY_STYLES: Record<FeedbackCategory, string> = {
   bug:   'bg-red-50 text-red-600',
-  idea:  'bg-purple-50 text-purple-600',
+  idea:  'bg-accent-50 text-accent-600',
   other: 'bg-gray-100 text-gray-500',
 };
 
