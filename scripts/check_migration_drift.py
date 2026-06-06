@@ -74,6 +74,18 @@ def repo_versions_by_name(migrations_dir: Path) -> Dict[str, str]:
     return out
 
 
+def repo_files_by_version(migrations_dir: Path) -> Dict[str, str]:
+    """Map repo version -> migration name, for the Direction-B (repo-not-on-prod) check."""
+    out: Dict[str, str] = {}
+    if not migrations_dir.exists():
+        return out
+    for p in migrations_dir.glob("*.sql"):
+        m = _FILENAME_RE.match(p.name)
+        if m:
+            out[m.group(1)] = m.group(2)
+    return out
+
+
 def find_drift(applied: Dict[str, str], repo_vers: Set[str]) -> List[Dict[str, str]]:
     """
     Return the prod-applied (version, name) rows whose version has no repo file.
@@ -86,6 +98,23 @@ def find_drift(applied: Dict[str, str], repo_vers: Set[str]) -> List[Dict[str, s
         if ver not in repo_vers
     ]
     return sorted(drift, key=lambda d: d["version"])
+
+
+def find_repo_only(applied: Dict[str, str], repo_by_version: Dict[str, str]) -> List[Dict[str, str]]:
+    """
+    Direction B (warning): repo migration files whose version has no prod row.
+
+    `applied` maps prod version -> name; `repo_by_version` maps repo version -> name.
+    This is legitimate for undeployed work on a PR branch, but it makes
+    `db push` / Supabase Branching fail with 'local migration files not found in
+    remote database' — so it's surfaced as a WARNING, not a hard failure.
+    """
+    repo_only = [
+        {"version": ver, "name": name}
+        for ver, name in repo_by_version.items()
+        if ver not in applied
+    ]
+    return sorted(repo_only, key=lambda d: d["version"])
 
 
 # ---------------------------------------------------------------------------
@@ -134,8 +163,10 @@ def main() -> int:
 
     applied = query_applied_versions(db_url)
     repo_vers = repo_versions(MIGRATIONS_DIR)
+    repo_by_ver = repo_files_by_version(MIGRATIONS_DIR)
     by_name = repo_versions_by_name(MIGRATIONS_DIR)
-    drift = find_drift(applied, repo_vers)
+    drift = find_drift(applied, repo_vers)          # Direction A — prod not in repo (hard fail)
+    repo_only = find_repo_only(applied, repo_by_ver)  # Direction B — repo not on prod (warning)
 
     # Annotate each drift row with a suggested reconciliation target if the same
     # migration NAME exists in the repo at a different version (the common case:
@@ -145,13 +176,14 @@ def main() -> int:
         d["suggested_repo_version"] = repo_ver if repo_ver and repo_ver != d["version"] else None
 
     if args.json:
-        print(json.dumps({"drift": drift, "count": len(drift)}, indent=2))
-    if not drift:
-        if not args.json:
-            print(f"✅  Migration-drift check passed — all {len(applied)} applied versions have a repo file.")
-        return 0
+        print(json.dumps(
+            {"drift": drift, "count": len(drift),
+             "repo_only": repo_only, "warn_count": len(repo_only)},
+            indent=2,
+        ))
 
-    if not args.json:
+    # Direction A — prod version with no repo file. This is the ONLY hard failure.
+    if drift and not args.json:
         print(f"❌  Migration-drift check FAILED — {len(drift)} prod version(s) have NO repo file:")
         print("    (this is what makes `db push` / Supabase Preview fail with")
         print("     'Remote migration versions not found in local migrations directory')\n")
@@ -166,7 +198,24 @@ def main() -> int:
                       f"migration at version {d['version']} (real DDL or stub).")
         print("\n  Prevention: don't pre-apply repo-tracked migrations via MCP apply_migration — commit the")
         print("  file and let the main-push migration workflow apply it (it records the repo version). See CLAUDE.md.")
-    return 1
+
+    # Direction B — repo file with no prod row. WARNING only (exit 0): legitimate for
+    # undeployed work on a PR branch, but it breaks `db push` / Supabase Branching.
+    if repo_only and not args.json:
+        print(f"\n⚠  WARN — {len(repo_only)} repo migration file(s) have no matching prod row:")
+        for r in repo_only:
+            print(f"  • {r['version']}_{r['name']}.sql has no matching prod row.")
+        print("     Apply the migration or delete the file if it was committed by mistake.")
+        print("     This will cause `db push` / Supabase Branching to fail with")
+        print("     'local migration files not found in remote database'.")
+
+    # Summary line — always printed.
+    if not args.json:
+        mark = "❌" if drift else ("⚠ " if repo_only else "✅")
+        print(f"{mark}  Migration ledger: {len(applied)} prod rows, {len(repo_by_ver)} repo files, "
+              f"{len(drift)} mismatch(es), {len(repo_only)} repo-ahead warning(s).")
+
+    return 1 if drift else 0
 
 
 if __name__ == "__main__":
