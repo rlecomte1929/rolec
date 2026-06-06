@@ -120,20 +120,22 @@ def get_vendor(
     """
     company_id = _require_hr(user)
 
+    # Schema note: the live `vendors` table uses is_active / corridor_codes /
+    # email / countries_served and has no org_id (vendors are global). Alias the
+    # renamed columns so _row_to_vendor + the frontend keep their field names.
     with db.engine.begin() as conn:
         row = conn.execute(
             text(
                 """
-                SELECT id, name, service_types, countries, corridors,
-                       contact_email, status, is_approved, org_id, created_at
+                SELECT id, name, service_types,
+                       countries_served AS countries, corridor_codes AS corridors,
+                       email AS contact_email, is_active, category, is_preferred, created_at
                 FROM vendors
                 WHERE id = :id
-                  AND status = 'active'
-                  AND is_approved = true
-                  AND (org_id IS NULL OR org_id = :company)
+                  AND is_active = true
                 """
             ),
-            {"id": vendor_id, "company": company_id},
+            {"id": vendor_id},
         ).mappings().first()
 
     if not row:
@@ -166,22 +168,17 @@ def list_vendors(
     Returns:
       { vendors: [...], total: N, corridor: ..., category: ... }
     """
-    company_id = _require_hr(user)
+    _require_hr(user)  # authorise (HR/Admin); vendors are global, not org-scoped
 
-    # Build WHERE clauses
-    conditions = [
-        "v.status = 'active'",
-        "v.is_approved = true",
-        "(v.org_id IS NULL OR v.org_id = :company)",
-    ]
-    params: Dict[str, Any] = {"company": company_id}
+    # Schema note: the live `vendors` table uses is_active / corridor_codes /
+    # service_types / countries_served / email — no status/is_approved/org_id.
+    conditions = ["v.is_active = true"]
+    params: Dict[str, Any] = {}
 
     if corridor:
-        # Match vendors that either:
-        #   (a) explicitly list this corridor in their corridors array, OR
-        #   (b) have an empty corridors array (treated as global coverage)
+        # Match vendors that list this corridor OR have empty/global coverage.
         conditions.append(
-            "(:corridor = ANY(v.corridors) OR array_length(v.corridors, 1) IS NULL OR array_length(v.corridors, 1) = 0)"
+            "(:corridor = ANY(v.corridor_codes) OR array_length(v.corridor_codes, 1) IS NULL OR array_length(v.corridor_codes, 1) = 0)"
         )
         params["corridor"] = corridor
 
@@ -192,8 +189,9 @@ def list_vendors(
     where_sql = " AND ".join(conditions)
 
     sql = f"""
-        SELECT v.id, v.name, v.service_types, v.countries, v.corridors,
-               v.contact_email, v.status, v.is_approved, v.org_id, v.created_at
+        SELECT v.id, v.name, v.service_types,
+               v.countries_served AS countries, v.corridor_codes AS corridors,
+               v.email AS contact_email, v.is_active, v.category, v.is_preferred, v.created_at
         FROM vendors v
         WHERE {where_sql}
         ORDER BY v.name ASC
