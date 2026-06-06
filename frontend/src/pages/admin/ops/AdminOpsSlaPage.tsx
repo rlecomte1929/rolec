@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
 import { AdminOpsLayout } from './AdminOpsLayout';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
@@ -73,9 +74,9 @@ export const AdminOpsSlaPage: React.FC = () => {
       {error && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <span>{error}</span>
-          <button type="button" onClick={() => void load()} className="text-amber-700 hover:underline">
+          <Button unstyled type="button" onClick={() => void load()} className="text-amber-700 hover:underline">
             Retry
-          </button>
+          </Button>
         </div>
       )}
 

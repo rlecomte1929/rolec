@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useTheme } from '../../../contexts/ThemeProvider';
 import type { UserRole, PlanTier } from '../../../types/relopass-api-contracts';
 
@@ -107,7 +108,7 @@ function Breadcrumbs({
                 {item.label}
               </span>
             ) : item.route ? (
-              <button
+              <Button unstyled
                 onClick={() => onNavigate(item.route!)}
                 style={{
                   fontSize: '14px',
@@ -125,7 +126,7 @@ function Breadcrumbs({
                 onMouseLeave={e => ((e.target as HTMLElement).style.color = 'var(--text-secondary)')}
               >
                 {item.label}
-              </button>
+              </Button>
             ) : (
               <span
                 style={{
@@ -149,7 +150,7 @@ function Breadcrumbs({
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
   return (
-    <button
+    <Button unstyled
       onClick={toggle}
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -195,13 +196,13 @@ function ThemeToggle() {
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       )}
-    </button>
+    </Button>
   );
 }
 
 function NotificationBell({ count, onClick }: { count: number; onClick: () => void }) {
   return (
-    <button
+    <Button unstyled
       onClick={onClick}
       aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'}
       title="Notifications"
@@ -258,14 +259,14 @@ function NotificationBell({ count, onClick }: { count: number; onClick: () => vo
           {count > 99 ? '99+' : count}
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 
 function AIToggle({ open, onClick, hasSuggestion }: { open: boolean; onClick: () => void; hasSuggestion?: boolean }) {
   const modKey = isMac() ? '⌘' : 'Ctrl';
   return (
-    <button
+    <Button unstyled
       onClick={onClick}
       aria-label={open ? 'Close AI Assistant' : 'Open AI Assistant'}
       aria-pressed={open}
@@ -321,7 +322,7 @@ function AIToggle({ open, onClick, hasSuggestion }: { open: boolean; onClick: ()
           }}
         />
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -363,7 +364,7 @@ function AvatarDropdown({ user, onNavigate, onSignOut }: AvatarDropdownProps) {
 
   return (
     <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
-      <button
+      <Button unstyled
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="true"
@@ -442,7 +443,7 @@ function AvatarDropdown({ user, onNavigate, onSignOut }: AvatarDropdownProps) {
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -480,7 +481,7 @@ function AvatarDropdown({ user, onNavigate, onSignOut }: AvatarDropdownProps) {
             { label: 'My Profile', route: '/profile', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
             { label: 'Settings', route: '/settings', icon: 'M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z' },
           ].map(item => (
-            <button
+            <Button unstyled
               key={item.route}
               role="menuitem"
               onClick={() => { onNavigate(item.route); setOpen(false); }}
@@ -511,11 +512,11 @@ function AvatarDropdown({ user, onNavigate, onSignOut }: AvatarDropdownProps) {
                 <path d={item.icon} />
               </svg>
               {item.label}
-            </button>
+            </Button>
           ))}
 
           <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
-            <button
+            <Button unstyled
               role="menuitem"
               onClick={() => { onSignOut(); setOpen(false); }}
               style={{
@@ -542,7 +543,7 @@ function AvatarDropdown({ user, onNavigate, onSignOut }: AvatarDropdownProps) {
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
               Sign out
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -610,7 +611,7 @@ export function TopBar({
       {/* Right: actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)', flexShrink: 0 }}>
         {/* Search ⌘K */}
-        <button
+        <Button unstyled
           aria-label="Search (⌘K)"
           title={`Search (${isMac() ? '⌘' : 'Ctrl'}K)`}
           style={{
@@ -643,7 +644,7 @@ export function TopBar({
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-        </button>
+        </Button>
 
         {/* AI Panel toggle ⌘J */}
         <AIToggle open={aiPanelOpen} onClick={onToggleAIPanel} />

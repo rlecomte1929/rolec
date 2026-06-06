@@ -101,13 +101,13 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({
             <Button variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <button
+            <Button unstyled
               type="submit"
               disabled={saving}
               className="px-4 py-2 rounded-lg bg-[#0b2b43] text-white text-sm font-semibold hover:bg-[#1a3d5c] disabled:opacity-50 transition-colors"
             >
               {saving ? 'Creating…' : 'Create task'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

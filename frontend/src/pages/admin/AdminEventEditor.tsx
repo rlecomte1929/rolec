@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
+import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -217,26 +219,26 @@ export const AdminEventEditor: React.FC = () => {
           <div className="space-y-3">
             <div>
               <label className="block text-sm text-slate-600 mb-1">Title *</label>
-              <input
+              <Input unstyled
                 value={(form.title as string) || ''}
-                onChange={(e) => update('title', e.target.value)}
+                onChange={(v) => update('title', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Country</label>
-                <input
+                <Input unstyled
                   value={(form.country_code as string) || ''}
-                  onChange={(e) => update('country_code', e.target.value.toUpperCase())}
+                  onChange={(v) => update('country_code', v.toUpperCase())}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                 />
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">City</label>
-                <input
+                <Input unstyled
                   value={(form.city_name as string) || ''}
-                  onChange={(e) => update('city_name', e.target.value)}
+                  onChange={(v) => update('city_name', v)}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                 />
               </div>
@@ -266,44 +268,44 @@ export const AdminEventEditor: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm text-slate-600 mb-1">Venue</label>
-              <input
+              <Input unstyled
                 value={(form.venue_name as string) || ''}
-                onChange={(e) => update('venue_name', e.target.value)}
+                onChange={(v) => update('venue_name', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>
             <div>
               <label className="block text-sm text-slate-600 mb-1">Address</label>
-              <input
+              <Input unstyled
                 value={(form.address as string) || ''}
-                onChange={(e) => update('address', e.target.value)}
+                onChange={(v) => update('address', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Start (ISO)</label>
-                <input
+                <Input unstyled
                   type="datetime-local"
                   value={
                     form.start_datetime
                       ? toISO(new Date(form.start_datetime as string))
                       : toISO(new Date())
                   }
-                  onChange={(e) => update('start_datetime', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  onChange={(v) => update('start_datetime', v ? new Date(v).toISOString() : null)}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                 />
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">End (ISO)</label>
-                <input
+                <Input unstyled
                   type="datetime-local"
                   value={
                     form.end_datetime
                       ? toISO(new Date(form.end_datetime as string))
                       : ''
                   }
-                  onChange={(e) => update('end_datetime', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  onChange={(v) => update('end_datetime', v ? new Date(v).toISOString() : null)}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                 />
               </div>
@@ -312,24 +314,22 @@ export const AdminEventEditor: React.FC = () => {
               <label className="block text-sm text-slate-600 mb-1">Price / Free</label>
               <div className="flex gap-4 items-center">
                 <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={!!form.is_free}
                     onChange={(e) => update('is_free', e.target.checked)}
                   />
                   <span className="text-sm">Free</span>
                 </label>
-                <input
+                <Input unstyled
                   value={(form.price_text as string) || ''}
-                  onChange={(e) => update('price_text', e.target.value)}
+                  onChange={(v) => update('price_text', v)}
                   placeholder="Price text"
                   className="rounded border border-slate-200 px-3 py-2 flex-1"
                 />
               </div>
             </div>
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={!!form.is_family_friendly}
                 onChange={(e) => update('is_family_friendly', e.target.checked)}
               />
@@ -337,9 +337,9 @@ export const AdminEventEditor: React.FC = () => {
             </label>
             <div>
               <label className="block text-sm text-slate-600 mb-1">External URL</label>
-              <input
+              <Input unstyled
                 value={(form.external_url as string) || ''}
-                onChange={(e) => update('external_url', e.target.value)}
+                onChange={(v) => update('external_url', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '../antigravity/Input';
+import { Button } from '../antigravity/Button';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { submitDemoBooking } from '../../api/demoBooking';
 import { track } from '../../analytics';
@@ -175,7 +177,7 @@ export const BookDemoModal: React.FC = () => {
               See how HR teams coordinate relocation end-to-end.
             </p>
           </div>
-          <button
+          <Button unstyled
             type="button"
             onClick={requestClose}
             className="ml-4 rounded-md p-1 text-marketing-text-subtle hover:text-marketing-primary focus:outline-none focus:ring-2 focus:ring-marketing-accent"
@@ -184,7 +186,7 @@ export const BookDemoModal: React.FC = () => {
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {state === 'success' ? (
@@ -256,21 +258,21 @@ export const BookDemoModal: React.FC = () => {
             )}
 
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={requestClose}
                 disabled={state === 'submitting'}
                 className="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium text-marketing-text-muted hover:text-marketing-primary disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="submit"
                 disabled={state === 'submitting'}
                 className="inline-flex items-center justify-center rounded-lg bg-marketing-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {state === 'submitting' ? 'Sending…' : 'Schedule the demo'}
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -310,12 +312,12 @@ const Field: React.FC<FieldProps> = ({
       <label htmlFor={id} className="block text-sm font-medium text-marketing-primary">
         {label}
       </label>
-      <input
+      <Input unstyled
         ref={inputRef}
         id={id}
         type={type}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         autoComplete={autoComplete}
         disabled={disabled}
         aria-invalid={error ? 'true' : 'false'}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../../antigravity/Button';
 import { adminReviewQueueAPI } from '../../../api/client';
 
 type User = { id: string; email?: string; full_name?: string };
@@ -118,7 +119,7 @@ export const MentionAutocomplete: React.FC<Props> = ({
           className="absolute z-10 mt-0.5 max-h-40 w-full overflow-auto rounded border border-slate-200 bg-white py-1 shadow-lg"
         >
           {filtered.map((u, i) => (
-            <button
+            <Button unstyled
               key={u.id}
               type="button"
               className={`block w-full px-2 py-1 text-left text-sm hover:bg-slate-100 ${
@@ -130,7 +131,7 @@ export const MentionAutocomplete: React.FC<Props> = ({
               }}
             >
               {u.full_name || u.email || u.id}
-            </button>
+            </Button>
           ))}
         </div>
       )}

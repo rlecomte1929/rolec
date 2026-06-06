@@ -117,12 +117,12 @@ export const Journey: React.FC = () => {
               />
 
               <div className="text-center">
-                <button
+                <Button unstyled
                   onClick={handleFinishLater}
                   className="text-sm text-slate-600 hover:text-slate-900 underline"
                 >
                   Save and finish later
-                </button>
+                </Button>
               </div>
             </div>
           ) : (

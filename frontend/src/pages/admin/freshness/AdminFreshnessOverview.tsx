@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../../api/client';
@@ -80,9 +81,9 @@ export const AdminFreshnessOverview: React.FC = () => {
     return (
       <AdminFreshnessLayout title="Freshness" subtitle="Content freshness monitoring">
         <div className="rounded-lg bg-red-50 p-4 text-red-700">{error}</div>
-        <button onClick={load} className="mt-2 rounded bg-red-100 px-3 py-1 text-sm hover:bg-red-200">
+        <Button unstyled onClick={load} className="mt-2 rounded bg-red-100 px-3 py-1 text-sm hover:bg-red-200">
           Retry
-        </button>
+        </Button>
       </AdminFreshnessLayout>
     );
   }
@@ -92,13 +93,13 @@ export const AdminFreshnessOverview: React.FC = () => {
   return (
     <AdminFreshnessLayout title="Freshness" subtitle="Content freshness monitoring">
       <div className="mb-4 flex justify-end">
-        <button
+        <Button unstyled
           onClick={handleRefresh}
           disabled={refreshing}
           className="rounded bg-[#0b2b43] px-3 py-1.5 text-sm text-white hover:bg-[#0d3a5c] disabled:opacity-50"
         >
           {refreshing ? 'Refreshing...' : 'Refresh metrics'}
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-6">

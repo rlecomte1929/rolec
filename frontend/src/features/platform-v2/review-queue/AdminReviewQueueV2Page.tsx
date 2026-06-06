@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../../pages/admin/AdminLayout';
 import { adminReviewQueueAPI } from '../../../api/client';
@@ -322,7 +323,7 @@ export function AdminReviewQueueV2Page() {
         unmovable: true,
         cellClassName: 'text-right',
         cell: (it) => (
-          <button
+          <Button unstyled
             type="button"
             onClick={(e) => {
               e.stopPropagation();
@@ -331,7 +332,7 @@ export function AdminReviewQueueV2Page() {
             className="rounded border border-slate-300 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 hover:bg-slate-50"
           >
             Open
-          </button>
+          </Button>
         ),
       },
     ],
@@ -351,27 +352,27 @@ export function AdminReviewQueueV2Page() {
             <Pill className="bg-accent-50 text-accent-700 ring-accent-200">v2 preview</Pill>
             <div className="ml-auto flex items-center gap-2">
               {/* Stubs — wire to real handlers in a follow-up commit. */}
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => alert('Filters drawer — not yet wired')}
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 ⏷ Filters
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => alert('Assign batch — not yet wired')}
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 ⊕ Assign batch
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => alert('New review item — not yet wired')}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
               >
                 + New review item
-              </button>
+              </Button>
             </div>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
@@ -396,13 +397,13 @@ export function AdminReviewQueueV2Page() {
               (likely the Supabase <code>review_queue_items</code> table isn't populated). Page renders
               the layout but no rows. Backfill from signals from the legacy page once you wire seed data.
             </span>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => void load()}
               className="text-amber-700 hover:underline"
             >
               Retry
-            </button>
+            </Button>
           </div>
         )}
 

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
+import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -253,27 +255,27 @@ export const AdminResourceEditor: React.FC = () => {
           <div className="space-y-3">
             <div>
               <label className="block text-sm text-slate-600 mb-1">Title *</label>
-              <input
+              <Input unstyled
                 value={(form.title as string) || ''}
-                onChange={(e) => update('title', e.target.value)}
+                onChange={(v) => update('title', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Country</label>
-                <input
+                <Input unstyled
                   value={(form.country_code as string) || ''}
-                  onChange={(e) => update('country_code', e.target.value.toUpperCase())}
+                  onChange={(v) => update('country_code', v.toUpperCase())}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                   placeholder="NO"
                 />
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">City</label>
-                <input
+                <Input unstyled
                   value={(form.city_name as string) || ''}
-                  onChange={(e) => update('city_name', e.target.value)}
+                  onChange={(v) => update('city_name', v)}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                 />
               </div>
@@ -338,16 +340,14 @@ export const AdminResourceEditor: React.FC = () => {
             </div>
             <div className="flex gap-4">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!!form.is_family_friendly}
                   onChange={(e) => update('is_family_friendly', e.target.checked)}
                 />
                 <span className="text-sm">Family friendly</span>
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!!form.is_featured}
                   onChange={(e) => update('is_featured', e.target.checked)}
                 />
@@ -380,9 +380,9 @@ export const AdminResourceEditor: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm text-slate-600 mb-1">External URL</label>
-              <input
+              <Input unstyled
                 value={(form.external_url as string) || ''}
-                onChange={(e) => update('external_url', e.target.value)}
+                onChange={(v) => update('external_url', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
                 placeholder="https://"
               />
@@ -395,8 +395,7 @@ export const AdminResourceEditor: React.FC = () => {
                   const checked = ids.includes(t.id);
                   return (
                     <label key={t.id} className="flex items-center gap-1 text-sm">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={checked}
                         onChange={(e) => {
                           if (e.target.checked) {

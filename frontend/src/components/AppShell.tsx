@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from './antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
 import { Breadcrumb } from './Breadcrumb';
 import { ChangelogBell } from './ChangelogBell';
@@ -34,7 +35,7 @@ function sidebarRole(role: string | null | undefined): SidebarRole {
 const LogoutButton: React.FC = () => {
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   return (
-    <button
+    <Button unstyled
       onClick={async () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
@@ -49,7 +50,7 @@ const LogoutButton: React.FC = () => {
       className="text-xs text-slate-500 hover:text-slate-800 disabled:opacity-60"
     >
       {isLoggingOut ? 'Logging out…' : 'Log out'}
-    </button>
+    </Button>
   );
 };
 
@@ -186,7 +187,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
               View-as mode: {adminContext.impersonation.mode.toUpperCase()} ·{' '}
               {adminContext.impersonation.target_user_id}
             </span>
-            <button
+            <Button unstyled
               onClick={async () => {
                 await adminAPI.stopImpersonation();
                 refreshAdminContext();
@@ -194,7 +195,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
               className="text-xs px-3 py-1 rounded-full bg-amber-100 hover:bg-amber-200"
             >
               Stop view-as
-            </button>
+            </Button>
           </div>
         )}
 

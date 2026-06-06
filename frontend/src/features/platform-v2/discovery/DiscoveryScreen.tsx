@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import type {
   Requirement,
   CaseDiscoveryRun,
@@ -115,7 +116,7 @@ function UploadPanel({ requirement, onClose, onUpload }: UploadPanelProps) {
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>
             Upload Document
           </h2>
-          <button
+          <Button unstyled
             onClick={onClose}
             aria-label="Close panel"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}
@@ -123,7 +124,7 @@ function UploadPanel({ requirement, onClose, onUpload }: UploadPanelProps) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md, 8px)' }}>
@@ -234,7 +235,7 @@ function TimelineTab({ requirements, onRowClick }: TimelineTabProps) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {reqs.map(req => (
-              <button
+              <Button unstyled
                 key={req.id}
                 onClick={() => onRowClick(req)}
                 style={{
@@ -285,7 +286,7 @@ function TimelineTab({ requirements, onRowClick }: TimelineTabProps) {
                     <path d="M9 18l6-6-6-6" />
                   </svg>
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         </section>
@@ -410,7 +411,7 @@ export function DiscoveryScreen({ discoveryRun, requirements, sources, onUpload 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border)', marginBottom: '24px' }}>
             {tabs.map(t => (
-              <button
+              <Button unstyled
                 key={t.id}
                 onClick={() => setTab(t.id as 'timeline' | 'sources')}
                 style={{
@@ -445,7 +446,7 @@ export function DiscoveryScreen({ discoveryRun, requirements, sources, onUpload 
                 }}>
                   {t.count}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
 

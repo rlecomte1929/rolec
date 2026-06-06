@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { AdminLayout } from './AdminLayout';
 import { Card, Button } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
@@ -201,11 +202,11 @@ export const AdminResearch: React.FC = () => {
         <div className="text-xs text-[#6b7280] mb-2">Ingest batch: ingest the URLs you paste below (one per line).</div>
         <div className="text-xs text-[#6b7280] mb-2">Ingest core set: ingest a predefined official starter set for the selected destination.</div>
         <div className="flex items-center gap-2">
-          <input
+          <Input unstyled
             className="flex-1 border border-[#e2e8f0] rounded-md px-3 py-2 text-sm"
             placeholder="https://www.uscis.gov/..."
             value={manualUrl}
-            onChange={(e) => setManualUrl(e.target.value)}
+            onChange={(v) => setManualUrl(v)}
           />
           <select
             value={domainArea}
@@ -368,14 +369,14 @@ https://www.uscis.gov/..."
         <div className="flex gap-4">
           <div className="w-1/3 space-y-2">
             {entities.map((e) => (
-              <button
+              <Button unstyled
                 key={e.id}
                 className={`w-full text-left border rounded-lg p-2 ${activeEntityId === e.id ? 'border-[#0b2b43] bg-[#eef4f8]' : 'border-[#e2e8f0]'}`}
                 onClick={() => setActiveEntityId(e.id)}
               >
                 <div className="text-sm font-semibold text-[#0b2b43]">{e.title}</div>
                 <div className="text-xs text-[#6b7280]">{e.domain_area} · {e.topic_key}</div>
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex-1">

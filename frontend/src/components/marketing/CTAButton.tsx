@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../antigravity/Button';
 import { Link } from 'react-router-dom';
 
 type CTAVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
@@ -95,8 +96,8 @@ export const CTAButton: React.FC<CTAButtonProps> = ({
 
   const { type = 'button', onClick } = rest as CTAButtonAsButton;
   return (
-    <button type={type} onClick={onClick} className={classes}>
+    <Button unstyled type={type} onClick={onClick} className={classes}>
       {children}
-    </button>
+    </Button>
   );
 };

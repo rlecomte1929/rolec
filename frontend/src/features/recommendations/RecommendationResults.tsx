@@ -235,12 +235,12 @@ function RecCard({
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button unstyled
             onClick={() => setExpanded(!expanded)}
             className="text-sm text-[#0b2b43] hover:underline"
           >
             {expanded ? 'Hide details' : 'Why this? ▼'}
-          </button>
+          </Button>
           {showMapActions && (
             <>
               <a
@@ -296,22 +296,22 @@ function RecCard({
           <div className="mt-2 flex items-center justify-between gap-3">
             <p className="text-[11px] text-accent-500">Logged for human oversight audit · EU AI Act Art. 14</p>
             <div className="flex items-center gap-2">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={onCancelPick}
                 disabled={pendingConfirmSubmitting}
                 className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 transition-colors disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => onConfirmPick(overrideReason.trim())}
                 disabled={pendingConfirmSubmitting || reasonMissing}
                 className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {pendingConfirmSubmitting ? 'Recording…' : 'Confirm pick'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -495,15 +495,15 @@ export const RecommendationResults: React.FC<Props> = ({
               View package ({packageCount}) →
             </Button>
           )}
-          <button onClick={onStartOver} className="text-sm text-[#0b2b43] hover:underline">
+          <Button unstyled onClick={onStartOver} className="text-sm text-[#0b2b43] hover:underline">
             Start over
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-[#e2e8f0] pb-4">
         {entries.map(([category, res]) => (
-          <button
+          <Button unstyled
             key={category}
             onClick={() => setActiveTab(category)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -516,7 +516,7 @@ export const RecommendationResults: React.FC<Props> = ({
             <span className="ml-1.5 text-xs opacity-80">
               ({res.recommendations.length})
             </span>
-          </button>
+          </Button>
         ))}
       </div>
 

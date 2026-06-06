@@ -8,6 +8,7 @@
  * the new Phase 1 admin/employee surfaces.
  */
 import React, { useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Card, StalenessBadge, isSourceStale } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
@@ -208,7 +209,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
 
   return (
     <Card padding="lg" className="hover:shadow-sm transition-shadow">
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
@@ -267,7 +268,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
-      </button>
+      </Button>
 
       {expanded && (
         <div className="mt-4 grid gap-3">
@@ -343,7 +344,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
           <div className="flex items-center gap-3 flex-wrap">
             {/* [P2-3] Open form editor — disabled for blocked/submitted/approved */}
             {dStatus === 'blocked' || dStatus === 'submitted' || dStatus === 'approved' ? (
-              <button
+              <Button unstyled
                 type="button"
                 disabled
                 title={
@@ -354,9 +355,9 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                 className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-40 cursor-not-allowed"
               >
                 Open form
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() =>
                   navigate(buildRoute('employeeCaseFormEditor', { caseId: form.case_id, formId: form.id }))
@@ -364,12 +365,12 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                 className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white hover:bg-[#0e3a5c] transition-colors"
               >
                 Open form
-              </button>
+              </Button>
             )}
             {/* [P3-3] Download filled PDF */}
             {canDownloadPdf ? (
               <div className="flex flex-col items-start">
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => void handleDownloadPdf()}
                   disabled={isDownloadingPdf}
@@ -386,7 +387,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                   ) : (
                     'Download PDF'
                   )}
-                </button>
+                </Button>
                 {form.draft_pdf_url && !isDownloadingPdf && (
                   <span className="text-[10px] text-slate-400 mt-0.5">
                     Last generated: {new Date(form.updated_at).toLocaleString()}
@@ -395,13 +396,13 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
               </div>
             ) : null}
             {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL */}
-            <button
+            <Button unstyled
               type="button"
               onClick={() => setShowOriginal(true)}
               className="text-sm text-[#0b2b43] hover:underline"
             >
               View original PDF
-            </button>
+            </Button>
             <span className="text-xs text-slate-400 ml-auto">
               v{form.template.version} · updated{' '}
               {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}

@@ -1,4 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
+import { Input } from '../components/antigravity/Input';
+import { Button } from '../components/antigravity/Button';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -402,13 +405,13 @@ export const Messages: React.FC = () => {
           ? 'Check your internet and try again.'
           : 'This is on our side, not yours. Hit refresh, or try again in a moment.'}
       </p>
-      <button
+      <Button unstyled
         type="button"
         onClick={reloadEmployeeInbox}
         className="mt-5 rounded-lg bg-[#0f172a] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e293b]"
       >
         {kind === 'offline' ? 'Try again' : 'Refresh inbox'}
-      </button>
+      </Button>
     </div>
   );
 
@@ -418,24 +421,24 @@ export const Messages: React.FC = () => {
         <strong className="font-semibold">Your unread count looks out of sync.</strong>{' '}
         Reload to refresh — if it keeps happening, let us know.
       </span>
-      <button
+      <Button unstyled
         type="button"
         onClick={reloadEmployeeInbox}
         className="ml-auto font-medium underline hover:no-underline"
       >
         Reload
-      </button>
+      </Button>
     </div>
   );
 
   const hrListHeader = isHrLike && (
     <div className="border-b border-[#e2e8f0] p-3 space-y-2 bg-[#fafbfc] shrink-0">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
-        <input
+        <Input unstyled
           type="search"
           placeholder="Search name, email, case id…"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
+          onChange={(v) => setSearchInput(v)}
           className="flex-1 min-w-[160px] rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm text-[#1A1A1A] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]/30"
           aria-label="Search conversations"
         />
@@ -452,21 +455,20 @@ export const Messages: React.FC = () => {
           <option value="all">All</option>
         </select>
         <label className="flex items-center gap-2 text-sm text-[#475569] whitespace-nowrap cursor-pointer">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={unreadOnly}
             onChange={(e) => setUnreadOnly(e.target.checked)}
             className="rounded border-[#cbd5e1] text-[#1d4ed8]"
           />
           Unread only
         </label>
-        <button
+        <Button unstyled
           type="button"
           onClick={() => (editMode ? exitEditMode() : setEditMode(true))}
           className="ml-auto sm:ml-0 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] hover:bg-[#f8fafc]"
         >
           {editMode ? 'Done' : 'Edit'}
-        </button>
+        </Button>
       </div>
       {listError && <p className="text-sm text-red-600">{listError}</p>}
       {editMode && (
@@ -474,22 +476,22 @@ export const Messages: React.FC = () => {
           <p className="text-xs text-[#64748b] w-full sm:w-auto sm:mr-2 sm:self-center">
             Select conversations, then archive (hides from Active) or restore from Archived view.
           </p>
-          <button
+          <Button unstyled
             type="button"
             disabled={selectedList.length === 0 || archiveBusy}
             onClick={() => applyArchive(true)}
             className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
             Archive selected
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             type="button"
             disabled={selectedList.length === 0 || archiveBusy}
             onClick={() => applyArchive(false)}
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] disabled:opacity-40"
           >
             Restore selected
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -545,7 +547,7 @@ export const Messages: React.FC = () => {
               {activeId ? (
                 <>
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e2e8f0] bg-white shrink-0">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => setActiveId(null)}
                       className="p-2 -ml-2 rounded-lg text-[#6b7280] hover:bg-[#f5f7fa] hover:text-[#1A1A1A] transition-colors"
@@ -554,7 +556,7 @@ export const Messages: React.FC = () => {
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
-                    </button>
+                    </Button>
                     <div className="min-w-0 flex-1">
                       <span className="font-semibold text-[#1A1A1A] truncate block">
                         {activeConversation?.other_participant_name || 'Conversation'}

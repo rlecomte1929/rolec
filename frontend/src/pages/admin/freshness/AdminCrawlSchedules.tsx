@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../../api/client';
 
@@ -111,13 +112,13 @@ export const AdminCrawlSchedules: React.FC = () => {
   return (
     <AdminFreshnessLayout title="Crawl schedules" subtitle="Schedule management">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
+        <Button unstyled
           onClick={handleProcessDue}
           disabled={!!actioning}
           className="rounded bg-[#0b2b43] px-3 py-1.5 text-sm text-white hover:bg-[#0d3a5c] disabled:opacity-50"
         >
           {actioning === 'process-due' ? 'Processing...' : 'Process due schedules'}
-        </button>
+        </Button>
         <select
           value={activeOnly === null ? '' : activeOnly ? 'active' : 'inactive'}
           onChange={(e) => {
@@ -166,29 +167,29 @@ export const AdminCrawlSchedules: React.FC = () => {
                   {s.next_run_at ? new Date(s.next_run_at).toLocaleString() : '-'}
                 </td>
                 <td className="px-4 py-2 flex gap-1">
-                  <button
+                  <Button unstyled
                     onClick={() => handleTrigger(s.id)}
                     disabled={!!actioning}
                     className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800 hover:bg-blue-200 disabled:opacity-50"
                   >
                     Trigger
-                  </button>
+                  </Button>
                   {s.is_active ? (
-                    <button
+                    <Button unstyled
                       onClick={() => handlePause(s.id)}
                       disabled={!!actioning}
                       className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 hover:bg-amber-200 disabled:opacity-50"
                     >
                       Pause
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button unstyled
                       onClick={() => handleResume(s.id)}
                       disabled={!!actioning}
                       className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800 hover:bg-green-200 disabled:opacity-50"
                     >
                       Resume
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>

@@ -10,6 +10,7 @@
  * per row when they come back.
  */
 import React from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { Input, Select } from '../../components/antigravity';
 import type { PolicyJurisdictionOverride } from './types';
 import {
@@ -88,13 +89,13 @@ export const JurisdictionOverridesEditor: React.FC<Props> = ({
           </p>
         </div>
         {!disabled && (
-          <button
+          <Button unstyled
             type="button"
             onClick={add}
             className="text-sm font-medium text-[#0b2b43] hover:underline"
           >
             + Add override
-          </button>
+          </Button>
         )}
       </div>
 
@@ -124,13 +125,13 @@ export const JurisdictionOverridesEditor: React.FC<Props> = ({
                     )}
                   </span>
                   {!disabled && (
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => removeAt(i)}
                       className="text-xs text-[#dc2626] hover:underline"
                     >
                       Remove
-                    </button>
+                    </Button>
                   )}
                 </div>
 

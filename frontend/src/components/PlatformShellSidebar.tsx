@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from './antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
 import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
@@ -300,7 +301,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
             />
             <span className="text-sm font-semibold text-slate-900">ReloPass</span>
             <span className="text-slate-400 text-sm">/ Platform</span>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => setCollapsed(true)}
               aria-label="Collapse sidebar"
@@ -308,11 +309,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
               className="ml-auto grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
               <PanelLeftClose size={14} />
-            </button>
+            </Button>
           </>
         )}
         {collapsed && (
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setCollapsed(false)}
             aria-label="Expand sidebar"
@@ -320,7 +321,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
             className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
           >
             <PanelLeftOpen size={15} />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -432,9 +433,9 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
                 <p className="text-[10px] text-slate-400 truncate">{user?.role ?? role.toLowerCase()}</p>
               </div>
-              <button className="text-slate-400 hover:text-slate-600 shrink-0">
+              <Button unstyled className="text-slate-400 hover:text-slate-600 shrink-0">
                 <ChevronRight size={14} />
-              </button>
+              </Button>
             </>
           )}
         </div>

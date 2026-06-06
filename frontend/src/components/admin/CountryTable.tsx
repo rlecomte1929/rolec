@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../antigravity/Button';
 import type { CountryListDTO } from '../../types';
 
 interface CountryTableProps {
@@ -17,7 +18,7 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
         <div>Top domains</div>
       </div>
       {data.countries.map((country) => (
-        <button
+        <Button unstyled
           key={country.countryCode}
           onClick={() => onSelect(country.countryCode)}
           className="grid grid-cols-[1.2fr,1fr,1fr,1fr,1.2fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] text-left hover:bg-[#f8fafc]"
@@ -29,7 +30,7 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
           <div className="text-sm text-[#0b2b43]">{country.requirementsCount}</div>
           <div className="text-sm text-[#0b2b43]">{country.confidenceScore ?? '-'}</div>
           <div className="text-xs text-[#6b7280]">{country.topDomains.join(', ')}</div>
-        </button>
+        </Button>
       ))}
     </div>
   );

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
+import { Input } from '../../components/antigravity/Input';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { Card, Button, Badge, Alert } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -109,9 +111,9 @@ export const AdminUsers: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-medium text-[#6b7280] mb-0.5">Search</label>
-            <input
+            <Input unstyled
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(v) => setQuery(v)}
               placeholder="Name or email"
               className="rounded-lg border border-[#d1d5db] px-3 py-2 text-sm w-48"
             />
@@ -207,8 +209,7 @@ export const AdminUsers: React.FC = () => {
             <div key={p.id} className="flex flex-wrap items-center justify-between border-b border-[#e2e8f0] py-3 gap-3">
               <div className="flex items-start gap-3">
                 {selectionMode && (
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
                     checked={checked}
                     onChange={(e) => {
@@ -284,14 +285,14 @@ export const AdminUsers: React.FC = () => {
         <div className="fixed top-4 right-4 z-[60] max-w-sm">
           <Alert variant="success" className="shadow-lg flex items-start gap-2">
             <span className="flex-1">{inviteToast}</span>
-            <button
+            <Button unstyled
               type="button"
               aria-label="Dismiss"
               onClick={() => setInviteToast(null)}
               className="text-[#1f8e8b] hover:opacity-70 leading-none"
             >
               ✕
-            </button>
+            </Button>
           </Alert>
         </div>
       )}
@@ -338,13 +339,13 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Email</label>
-            <input value={person.email ?? ''} readOnly className="w-full rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm text-[#6b7280]" />
+            <Input unstyled value={person.email ?? ''} readOnly className="w-full rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm text-[#6b7280]" />
           </div>
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Name</label>
-            <input
+            <Input unstyled
               value={full_name}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(v) => setFullName(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
               placeholder="Full name"
             />
@@ -457,11 +458,11 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Email *</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="email@example.com" required />
+            <Input unstyled type="email" value={email} onChange={(v) => setEmail(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="email@example.com" required />
           </div>
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Name</label>
-            <input value={full_name} onChange={(e) => setFullName(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Full name" />
+            <Input unstyled value={full_name} onChange={(v) => setFullName(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Full name" />
           </div>
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Role</label>
@@ -482,7 +483,7 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
           </div>
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Initial password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Min 8 chars — leave blank to send an invite email" autoComplete="new-password" />
+            <Input unstyled type="password" value={password} onChange={(v) => setPassword(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Min 8 chars — leave blank to send an invite email" autoComplete="new-password" />
             <p className="mt-1 text-xs text-[#6b7280]">Set a password so they can log in immediately, or leave blank to email them a set-password invite.</p>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}

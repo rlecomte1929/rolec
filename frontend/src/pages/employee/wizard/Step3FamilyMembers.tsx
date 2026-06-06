@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
@@ -85,9 +86,9 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             <label className="text-sm text-[#0b2b43]">
               Full name{isRequired(requiredFields, 'familyMembers.spouse.fullName') && ' *'}
-              <input
+              <Input unstyled
                 value={local.spouse?.fullName || ''}
-                onChange={(event) => update('spouse', { ...local.spouse, fullName: event.target.value })}
+                onChange={(event) => update('spouse', { ...local.spouse, fullName: event })}
                 className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
               />
             </label>
@@ -109,22 +110,22 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
           <div className="text-sm font-semibold text-[#0b2b43]">Children</div>
           {children.map((child, index) => (
             <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr,1fr,1fr,auto] gap-3 mt-3 items-center">
-              <input
+              <Input unstyled
                 placeholder="Full name"
                 value={child.fullName || ''}
-                onChange={(event) => updateChild(index, 'fullName', event.target.value)}
+                onChange={(event) => updateChild(index, 'fullName', event)}
                 className="rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
               />
-              <input
+              <Input unstyled
                 type="date"
                 value={child.dateOfBirth || ''}
-                onChange={(event) => updateChild(index, 'dateOfBirth', event.target.value)}
+                onChange={(event) => updateChild(index, 'dateOfBirth', event)}
                 className="rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
               />
-              <input
+              <Input unstyled
                 placeholder="Nationality"
                 value={child.nationality || ''}
-                onChange={(event) => updateChild(index, 'nationality', event.target.value)}
+                onChange={(event) => updateChild(index, 'nationality', event)}
                 className="rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
               />
               <Button

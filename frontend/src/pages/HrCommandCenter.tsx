@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '../components/antigravity/Button';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
@@ -187,20 +188,20 @@ export const HrCommandCenter: React.FC = () => {
           )}
           {cases.length >= 25 && (
             <div className="mt-4 flex justify-center gap-2">
-              <button
+              <Button unstyled
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
                 className="rounded-lg border border-[#e2e8f0] px-3 py-1 text-sm disabled:opacity-50"
               >
                 Previous
-              </button>
+              </Button>
               <span className="py-1 text-sm text-[#6b7280]">Page {page}</span>
-              <button
+              <Button unstyled
                 onClick={() => setPage((p) => p + 1)}
                 className="rounded-lg border border-[#e2e8f0] px-3 py-1 text-sm"
               >
                 Next
-              </button>
+              </Button>
             </div>
           )}
         </Card>

@@ -1,5 +1,7 @@
 // HrPolicyBuilderV2Page.tsx — Policy Builder canvas + benefit matrix
 import React, { useState, useEffect, useMemo } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
+import { Input } from '../../../components/antigravity/Input';
 import {
   Sparkles, Check, Eye, Clock, Plus, Filter,
   ChevronDown, ChevronRight, Info, Users, X, Upload,
@@ -573,7 +575,7 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
            style={{ borderTop: `3px solid ${tier.color}` }}>
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tier.color }}/>
-          <input value={tier.name} onChange={e => onRename(e.target.value)}
+          <Input unstyled value={tier.name} onChange={v => onRename(v)}
             className="flex-1 min-w-0 text-[13px] font-semibold text-gray-900 bg-transparent border-none outline-none"/>
           <Button unstyled className="text-gray-400 hover:text-gray-600 text-lg leading-none">⋯</Button>
         </div>
@@ -600,7 +602,7 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
         {isLump && (
           <div className="flex items-center gap-2 mt-2 text-[11.5px]">
             <span className="text-gray-500">Budget</span>
-            <input type="number" value={tier.lump} onChange={e => onLumpChange(Number(e.target.value))}
+            <Input unstyled type="number" value={tier.lump} onChange={v => onLumpChange(Number(v))}
               className="w-20 border border-gray-200 rounded px-1.5 py-0.5 text-[11.5px] focus:outline-none focus:border-blue-400"/>
             <span className="text-gray-400">{cur}/yr</span>
           </div>
@@ -686,7 +688,7 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
           {v.value_type === 'currency' && (
             <>
               <div className="flex items-center gap-0.5">
-                <input type="number" value={v.amount} onChange={e => onChange({ amount: Number(e.target.value) })}
+                <Input unstyled type="number" value={v.amount} onChange={v => onChange({ amount: Number(v) })}
                   className="w-14 text-[11px] border border-gray-200 rounded px-1 py-0 focus:outline-none focus:border-blue-400"/>
                 <span className="text-[10px] text-gray-400">{cur}</span>
               </div>
@@ -698,14 +700,14 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
           )}
           {v.value_type === 'percentage' && (
             <div className="flex items-center gap-0.5">
-              <input type="number" value={v.amount} onChange={e => onChange({ amount: Number(e.target.value) })}
+              <Input unstyled type="number" value={v.amount} onChange={v => onChange({ amount: Number(v) })}
                 className="w-10 text-[11px] border border-gray-200 rounded px-1 py-0 focus:outline-none focus:border-blue-400"/>
               <span className="text-[10px] text-gray-400">%</span>
             </div>
           )}
           {v.value_type === 'text' && (
             <div className="flex items-center gap-0.5">
-              <input type="number" value={v.amount} onChange={e => onChange({ amount: Number(e.target.value) })}
+              <Input unstyled type="number" value={v.amount} onChange={v => onChange({ amount: Number(v) })}
                 className="w-8 text-[11px] border border-gray-200 rounded px-1 py-0 focus:outline-none focus:border-blue-400"/>
               <span className="text-[9.5px] text-gray-400">days</span>
             </div>
@@ -790,7 +792,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
                     <label key={v}
                       className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${on ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
                       onClick={() => toggle(axis, v)}>
-                      <input type="checkbox" readOnly checked={on} className="accent-blue-600"/>
+                      <Checkbox readOnly checked={on} className="accent-blue-600"/>
                       <span className={`text-[12.5px] ${on ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>{l}</span>
                     </label>
                   );

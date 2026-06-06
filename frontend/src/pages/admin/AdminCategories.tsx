@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -90,28 +91,28 @@ export const AdminCategories: React.FC = () => {
       <Card padding="lg" className="mb-4">
         <h3 className="font-semibold mb-3">New Category</h3>
         <div className="flex gap-2 flex-wrap items-center">
-          <input
+          <Input unstyled
             value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
+            onChange={(v) => setNewKey(v)}
             placeholder="Key (e.g. schools)"
             className="rounded border border-slate-200 px-3 py-2 w-40"
           />
-          <input
+          <Input unstyled
             value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
+            onChange={(v) => setNewLabel(v)}
             placeholder="Label (e.g. Schools)"
             className="rounded border border-slate-200 px-3 py-2 w-40"
           />
-          <input
+          <Input unstyled
             value={newIcon}
-            onChange={(e) => setNewIcon(e.target.value)}
+            onChange={(v) => setNewIcon(v)}
             placeholder="Icon name"
             className="rounded border border-slate-200 px-3 py-2 w-32"
           />
-          <input
+          <Input unstyled
             type="number"
             value={newSortOrder}
-            onChange={(e) => setNewSortOrder(parseInt(e.target.value, 10) || 0)}
+            onChange={(v) => setNewSortOrder(parseInt(v, 10) || 0)}
             placeholder="Sort order"
             className="rounded border border-slate-200 px-3 py-2 w-24"
           />
@@ -140,7 +141,7 @@ export const AdminCategories: React.FC = () => {
                 <tr key={c.id} className={`border-b border-slate-100 py-2 ${c.is_active === false ? 'opacity-60' : ''}`}>
                   <td className="py-2 pr-4">
                     {editing === c.id ? (
-                      <input
+                      <Input unstyled
                         className="rounded border border-slate-200 px-2 py-1 w-32"
                         defaultValue={c.label}
                         id={`edit-label-${c.id}`}
@@ -151,7 +152,7 @@ export const AdminCategories: React.FC = () => {
                   </td>
                   <td className="py-2 pr-4 text-slate-500">{c.key}</td>
                   <td className="py-2 pr-4">{editing === c.id ? (
-                    <input
+                    <Input unstyled
                       className="rounded border border-slate-200 px-2 py-1 w-24"
                       defaultValue={c.icon_name || ''}
                       id={`edit-icon-${c.id}`}
@@ -160,7 +161,7 @@ export const AdminCategories: React.FC = () => {
                     c.icon_name || '-'
                   )}</td>
                   <td className="py-2 pr-4">{editing === c.id ? (
-                    <input
+                    <Input unstyled
                       type="number"
                       className="rounded border border-slate-200 px-2 py-1 w-16"
                       defaultValue={c.sort_order ?? 0}

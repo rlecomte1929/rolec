@@ -9,6 +9,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
+import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card } from '../components/antigravity';
 import {
@@ -596,22 +598,22 @@ export const HrVendorCuration: React.FC = () => {
             </p>
             <label className="mt-4 block text-sm font-medium text-[#0b2b43]">
               City
-              <input
+              <Input unstyled
                 type="text"
                 className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
                 value={newCity}
-                onChange={(e) => setNewCity(e.target.value)}
+                onChange={(v) => setNewCity(v)}
                 placeholder="e.g. Tokyo"
                 disabled={requesting}
               />
             </label>
             <label className="mt-3 block text-sm font-medium text-[#0b2b43]">
               Country
-              <input
+              <Input unstyled
                 type="text"
                 className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
                 value={newCountry}
-                onChange={(e) => setNewCountry(e.target.value)}
+                onChange={(v) => setNewCountry(v)}
                 placeholder="e.g. Japan"
                 disabled={requesting}
               />
@@ -694,8 +696,7 @@ export const HrVendorCuration: React.FC = () => {
               return (
                 <li key={row.master_item_id || row.name} className="p-3 flex items-center justify-between gap-3">
                   <label className="flex items-center gap-3 min-w-0 cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selected}
                       onChange={() => row.master_item_id && togglePending(row.master_item_id, row.selected)}
                       className="h-4 w-4 shrink-0"
@@ -748,18 +749,18 @@ export const HrVendorCuration: React.FC = () => {
         )}
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[2fr,3fr] gap-3">
-          <input
+          <Input unstyled
             type="text"
             placeholder="Vendor name (e.g. ABC Movers Munich)"
             value={customName}
-            onChange={(e) => setCustomName(e.target.value)}
+            onChange={(v) => setCustomName(v)}
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           />
-          <input
+          <Input unstyled
             type="text"
             placeholder="Notes for the employee (optional)"
             value={customNotes}
-            onChange={(e) => setCustomNotes(e.target.value)}
+            onChange={(v) => setCustomNotes(v)}
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           />
         </div>

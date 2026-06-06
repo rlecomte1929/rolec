@@ -13,6 +13,7 @@
  */
 
 import { GlobeCanvas } from '../auth/GlobeCanvas';
+import { Button } from '../../../components/antigravity/Button';
 import {
   Avatar,
   CountryFlag,
@@ -164,7 +165,7 @@ function CaseAttentionCard({
       </div>
 
       {/* CTA */}
-      <button
+      <Button unstyled
         onClick={onView}
         style={{
           marginTop: 'auto',
@@ -203,7 +204,7 @@ function CaseAttentionCard({
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
         </svg>
-      </button>
+      </Button>
     </div>
   );
 }
@@ -228,7 +229,7 @@ function SectionHeader({
         <Pill variant={count > 0 ? 'danger' : 'muted'} size="sm">{count}</Pill>
       )}
       {action && (
-        <button
+        <Button unstyled
           onClick={action.onClick}
           style={{
             marginLeft: 'auto',
@@ -247,7 +248,7 @@ function SectionHeader({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -491,7 +492,7 @@ export function DashboardScreen({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.45 }}>
                     <strong>{item.actor_name}</strong> {item.action}{' '}
-                    <button
+                    <Button unstyled
                       onClick={() => onViewCase(item.case_id)}
                       style={{
                         background: 'none',
@@ -504,7 +505,7 @@ export function DashboardScreen({
                       }}
                     >
                       {item.case_employee}'s case
-                    </button>
+                    </Button>
                   </p>
                 </div>
                 <DateFormatter
@@ -560,7 +561,7 @@ export function DashboardScreen({
                       <span style={{ color: 'var(--text-tertiary)' }}>{ex.justification.slice(0, 60)}{ex.justification.length > 60 ? '…' : ''}</span>
                     </p>
                   </div>
-                  <button
+                  <Button unstyled
                     onClick={() => onReviewException(ex.id, ex.case_id)}
                     style={{
                       flexShrink: 0,
@@ -586,7 +587,7 @@ export function DashboardScreen({
                     }}
                   >
                     Review
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

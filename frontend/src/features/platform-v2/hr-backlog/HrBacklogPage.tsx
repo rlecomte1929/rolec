@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { hrAPI, type HrBacklogTask } from '../../../api/client';
@@ -278,7 +279,7 @@ export function HrBacklogPage() {
         unmovable: true,
         cellClassName: 'text-right',
         cell: (t) => (
-          <button
+          <Button unstyled
             type="button"
             onClick={(e) => {
               e.stopPropagation();
@@ -292,7 +293,7 @@ export function HrBacklogPage() {
             title={t.case_id ? 'Open the case to act on this task' : 'No case linked'}
           >
             Open
-          </button>
+          </Button>
         ),
       },
     ],
@@ -311,14 +312,14 @@ export function HrBacklogPage() {
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Employee backlog</h1>
             <Pill className="bg-accent-50 text-accent-700 ring-accent-200">v2 preview</Pill>
             <div className="ml-auto flex items-center gap-2">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => void load()}
                 disabled={loading}
                 className="text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50"
               >
                 {loading ? 'Refreshing…' : 'Refresh'}
-              </button>
+              </Button>
             </div>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
@@ -345,13 +346,13 @@ export function HrBacklogPage() {
         {error && (
           <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span>{error}</span>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => void load()}
               className="text-amber-700 hover:underline"
             >
               Retry
-            </button>
+            </Button>
           </div>
         )}
 

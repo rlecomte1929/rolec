@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { Button } from '../antigravity/Button';
 import { supabase } from '../../api/supabase';
 
 type FeedbackStatus   = 'new' | 'reviewed' | 'acted_on';
@@ -109,7 +110,7 @@ export function FeedbackTab() {
     return (
       <div className="flex flex-col items-center gap-3 py-20">
         <p className="text-sm text-red-600">{error}</p>
-        <button onClick={load} className="text-sm text-gray-500 underline">Retry</button>
+        <Button unstyled onClick={load} className="text-sm text-gray-500 underline">Retry</Button>
       </div>
     );
   }
@@ -124,15 +125,15 @@ export function FeedbackTab() {
             {counts.new} unreviewed — {counts.acted_on} acted on
           </p>
         </div>
-        <button onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
+        <Button unstyled onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Filter bar */}
       <div className="flex gap-2 border-b border-gray-200 pb-2">
         {(['all', 'new', 'reviewed', 'acted_on'] as const).map((f) => (
-          <button
+          <Button unstyled
             key={f}
             onClick={() => setFilter(f)}
             className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
@@ -143,7 +144,7 @@ export function FeedbackTab() {
           >
             {f === 'all' ? 'All' : STATUS_LABELS[f as FeedbackStatus]}
             <span className="ml-1.5 opacity-60">{counts[f]}</span>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -184,7 +185,7 @@ export function FeedbackTab() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-gray-400">Status:</span>
                 {(['new', 'reviewed', 'acted_on'] as FeedbackStatus[]).map((s) => (
-                  <button
+                  <Button unstyled
                     key={s}
                     onClick={() => updateStatus(row, s)}
                     disabled={row.status === s || savingId === row.id}
@@ -195,7 +196,7 @@ export function FeedbackTab() {
                     }`}
                   >
                     {STATUS_LABELS[s]}
-                  </button>
+                  </Button>
                 ))}
                 {savingId === row.id && (
                   <span className="text-xs text-gray-300">Saving...</span>

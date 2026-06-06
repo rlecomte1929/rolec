@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
 import { createAIDecision } from '../../api/aiDecisions';
 import type { AIDecisionAction, AIDecisionRecord } from '../../api/aiDecisions';
@@ -147,13 +148,13 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
             )}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <p className="text-[11px] text-slate-400">Logged for human oversight audit · EU AI Act Art. 14</p>
-              <button
+              <Button unstyled
                 type="button"
                 onClick={changeDecision}
                 className="text-[11px] font-medium text-accent-600 hover:text-accent-800 underline-offset-2 hover:underline"
               >
                 Change decision
-              </button>
+              </Button>
               <Link
                 to={`/hr/ai-decisions?recommendation_id=${encodeURIComponent(recommendationId)}`}
                 className="text-[11px] font-medium text-accent-600 hover:text-accent-800 underline-offset-2 hover:underline"
@@ -196,7 +197,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
 
           <div className="mt-3 flex flex-wrap gap-2">
             {(Object.keys(ACTION_CONFIG) as AIDecisionAction[]).map((action) => (
-              <button
+              <Button unstyled
                 key={action}
                 type="button"
                 onClick={() => setPendingAction(action)}
@@ -207,7 +208,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
                 }`}
               >
                 {ACTION_CONFIG[action].label}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -234,22 +235,22 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
               </label>
               {error && <p className="text-xs text-rose-600">{error}</p>}
               <div className="flex items-center gap-2">
-                <button
+                <Button unstyled
                   type="button"
                   onClick={reset}
                   className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 transition-colors"
                   disabled={submitting}
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button unstyled
                   type="button"
                   onClick={submit}
                   disabled={submitting || reasonMissing}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-white disabled:opacity-40 disabled:cursor-not-allowed ${ACTION_CONFIG[pendingAction].pill}`}
                 >
                   {submitting ? 'Recording…' : `Confirm ${pendingAction}`}
-                </button>
+                </Button>
               </div>
             </div>
           )}

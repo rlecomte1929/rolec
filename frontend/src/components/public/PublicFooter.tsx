@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../antigravity/Button';
 import { Link } from 'react-router-dom';
 import { Container } from '../antigravity';
 import { ROUTE_DEFS } from '../../navigation/routes';
@@ -56,13 +57,13 @@ export const PublicFooter: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => openDemoBooking('public-footer')}
                   className="text-sm text-marketing-text-muted hover:text-marketing-primary transition-colors"
                 >
                   Book a demo
-                </button>
+                </Button>
               </li>
               <li className="pt-2">
                 <a

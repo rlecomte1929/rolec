@@ -1,4 +1,5 @@
 import React from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input, Select } from '../../components/antigravity';
 import { TermHelpIcon } from './TermHelpIcon';
 import type { BenefitHelperKind } from './benefitRowRegistry';
@@ -252,8 +253,7 @@ export const BenefitRowHelperFields: React.FC<Props> = ({ row, helper, disabled,
       <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-3 space-y-3">
         {sectionTitle('Transfers')}
         <label className="flex items-center gap-2 text-sm text-[#374151]">
-          <input
-            type="checkbox"
+          <Checkbox
             disabled={disabled}
             checked={checked}
             onChange={(e) =>

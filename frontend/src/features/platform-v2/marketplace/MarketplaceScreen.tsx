@@ -4,6 +4,8 @@
  */
 
 import { useState, useMemo } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import {
   Avatar,
   CountryFlag,
@@ -216,7 +218,7 @@ function VendorCard({ vendor, onView }: VendorCardProps) {
       </p>
 
       {/* CTA */}
-      <button
+      <Button unstyled
         onClick={onView}
         style={{
           marginTop: 'auto',
@@ -232,7 +234,7 @@ function VendorCard({ vendor, onView }: VendorCardProps) {
         }}
       >
         View details →
-      </button>
+      </Button>
     </div>
   );
 }
@@ -278,7 +280,7 @@ function VendorSlideOver({ vendor, onClose, onAssign }: VendorSlideOverProps) {
             <p style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>{vendor.name}</p>
             <Pill variant={SERVICE_TYPE_VARIANT[vendor.service_type]} size="sm">{vendor.service_type}</Pill>
           </div>
-          <button
+          <Button unstyled
             onClick={onClose}
             aria-label="Close"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}
@@ -286,7 +288,7 @@ function VendorSlideOver({ vendor, onClose, onAssign }: VendorSlideOverProps) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -327,7 +329,7 @@ function VendorSlideOver({ vendor, onClose, onAssign }: VendorSlideOverProps) {
 
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)' }}>
-          <button
+          <Button unstyled
             onClick={() => onAssign(vendor.id)}
             style={{
               width: '100%',
@@ -342,7 +344,7 @@ function VendorSlideOver({ vendor, onClose, onAssign }: VendorSlideOverProps) {
             }}
           >
             Assign to my case
-          </button>
+          </Button>
         </div>
       </div>
     </>
@@ -380,11 +382,11 @@ export function MarketplaceScreen({ vendors = MOCK_VENDORS, onAssign }: Marketpl
           >
             <path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
-          <input
+          <Input unstyled
             type="search"
             placeholder="Search vendors…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={v => setSearch(v)}
             style={{
               width: '100%',
               padding: '8px 12px 8px 34px',

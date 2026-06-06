@@ -322,10 +322,10 @@ export const PersonioSettingsSection: React.FC = () => {
                           {personioField}
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input unstyled
                             type="text"
                             value={relopassField}
-                            onChange={(e) => handleMappingChange(personioField, e.target.value)}
+                            onChange={(v) => handleMappingChange(personioField, v)}
                             className="w-full px-2 py-1 text-xs border border-[#d1d5db] rounded focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
                           />
                         </td>

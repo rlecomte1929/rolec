@@ -7,6 +7,7 @@
  * and never fabricates numbers (see benefitComparisonModel).
  */
 import React, { useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { Badge, Card } from '../../components/antigravity';
 import type { EffectiveServiceComparisonRow } from '../../types';
 import { RequestExceptionModal } from '../exceptions/RequestExceptionModal';
@@ -186,13 +187,13 @@ export const BenefitComparisonDashboard: React.FC<{
                         requested.has(row.serviceKey) ? (
                           <span className="text-xs text-[#1f8e8b]">Request sent</span>
                         ) : (
-                          <button
+                          <Button unstyled
                             type="button"
                             onClick={() => setExceptionFor(row)}
                             className="rounded-md border border-[#0b2b43] px-3 py-1.5 text-xs font-medium text-[#0b2b43] transition-colors hover:bg-[#0b2b43] hover:text-white"
                           >
                             Request exception
-                          </button>
+                          </Button>
                         )
                       ) : (
                         <span className="text-xs text-[#cbd5e1]">—</span>

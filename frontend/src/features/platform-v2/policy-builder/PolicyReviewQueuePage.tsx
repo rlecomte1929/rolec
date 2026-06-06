@@ -14,6 +14,8 @@
  *   - Conflict flag (red ⚠) blocks the category until resolved
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import {
   policyBuilderPipelineAPI,
@@ -123,28 +125,28 @@ const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject
       <td className="py-3 px-4 align-top w-48">
         {editMode ? (
           <div className="flex items-center gap-1.5">
-            <input
+            <Input unstyled
               type="text"
               value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
+              onChange={(v) => setEditValue(v)}
               className="w-24 rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
               autoFocus
             />
-            <button
+            <Button unstyled
               type="button"
               onClick={handleSaveEdit}
               disabled={loading || !editValue.trim()}
               className="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="button"
               onClick={() => setEditMode(false)}
               className="px-2 py-1 rounded text-xs text-slate-500 hover:text-slate-700"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         ) : (
           <span className="text-sm text-slate-900 font-medium">{formatValue(item)}</span>
@@ -218,26 +220,26 @@ const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject
                   className="w-full rounded border border-rose-200 px-2 py-1 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-rose-200"
                 />
                 <div className="flex gap-1">
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={handleReject}
                     disabled={loading}
                     className="px-2 py-1 rounded text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
                   >
                     Confirm reject
-                  </button>
-                  <button
+                  </Button>
+                  <Button unstyled
                     type="button"
                     onClick={() => setRejectMode(false)}
                     className="px-2 py-1 rounded text-xs text-slate-500 hover:text-slate-700"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
               <div className="flex gap-1.5 flex-wrap">
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => onApprove(item.id)}
                   disabled={loading || hasConflicts}
@@ -245,23 +247,23 @@ const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject
                   className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Approve
-                </button>
-                <button
+                </Button>
+                <Button unstyled
                   type="button"
                   onClick={() => setEditMode(true)}
                   disabled={loading}
                   className="px-2.5 py-1 rounded text-xs font-semibold border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 transition-colors"
                 >
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button unstyled
                   type="button"
                   onClick={() => setRejectMode(true)}
                   disabled={loading}
                   className="px-2.5 py-1 rounded text-xs font-semibold border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-40 transition-colors"
                 >
                   Reject
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -409,7 +411,7 @@ export function PolicyReviewQueuePage() {
                     )}
                   </div>
                 </div>
-                <button
+                <Button unstyled
                   type="button"
                   disabled={!canPublish}
                   title={
@@ -427,7 +429,7 @@ export function PolicyReviewQueuePage() {
                   ].join(' ')}
                 >
                   Publish to knowledge base
-                </button>
+                </Button>
               </div>
               {/* Progress bar */}
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">

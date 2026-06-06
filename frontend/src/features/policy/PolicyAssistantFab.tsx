@@ -19,6 +19,7 @@
  */
 import React from 'react';
 
+import { Button } from '../../components/antigravity/Button';
 export type PolicyAssistantFabProps = {
   /** Click handler — should toggle the docked shell's open state on
    *  the parent page. */
@@ -51,7 +52,7 @@ export const PolicyAssistantFab: React.FC<PolicyAssistantFabProps> = ({
   const hideClass = isPanelOpen && hideOnPanelOpenLg ? 'lg:hidden' : '';
 
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={onClick}
       aria-label={label}
@@ -64,6 +65,6 @@ export const PolicyAssistantFab: React.FC<PolicyAssistantFabProps> = ({
       data-testid="policy-assistant-fab"
     >
       <span aria-hidden>💬</span>
-    </button>
+    </Button>
   );
 };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
@@ -511,27 +512,27 @@ export function MobilityControlCenterV2Page() {
           <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility control center</h1>
             <div className="ml-auto flex items-center gap-2">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => alert('Corridor filter — wire in follow-up')}
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 ⏷ All corridors
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => alert('Time period filter — wire in follow-up')}
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 📅 Current quarter
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => navigate('/employees/new')}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
               >
                 New case
-              </button>
+              </Button>
             </div>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
@@ -583,7 +584,7 @@ export function MobilityControlCenterV2Page() {
             <span>
               Some data couldn't load — showing partial results. Refresh to try again.
             </span>
-            <button type="button" onClick={() => void load()} className="text-amber-700 hover:underline">Retry</button>
+            <Button unstyled type="button" onClick={() => void load()} className="text-amber-700 hover:underline">Retry</Button>
           </div>
         )}
 
@@ -684,13 +685,13 @@ export function MobilityControlCenterV2Page() {
                             : (a.reason || 'awaiting decision')}
                         </div>
                       </div>
-                      <button
+                      <Button unstyled
                         type="button"
                         onClick={() => navigate(`/hr/cases/${a.case_id ?? ''}`)}
                         className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Review
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>

@@ -5,12 +5,13 @@
  * visible on a roadmap step (no click required) and pairs a color with a
  * distinct icon + text label so color is never the only signal.
  *
- * Accessibility: the badge is a <button> (tabbable by default) that toggles a
+ * Accessibility: the badge is a <Button unstyled> (tabbable by default) that toggles a
  * keyboard-accessible tooltip — Enter/Space toggle, Escape closes, click-outside
  * closes. The tooltip text is also folded into the aria-label so screen-reader
  * users get the full explanation without opening it.
  */
 import { useEffect, useId, useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { CONFIDENCE_TOKENS, type ConfidenceLevel } from './confidence.tokens';
 
 export interface ConfidenceBadgeProps {
@@ -60,7 +61,7 @@ export function ConfidenceBadge({ level, size = 'sm', score, forceTooltipOpen = 
 
   return (
     <span ref={wrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-label={ariaLabel}
@@ -83,7 +84,7 @@ export function ConfidenceBadge({ level, size = 'sm', score, forceTooltipOpen = 
       >
         <Icon size={dims.icon} aria-hidden="true" style={{ flexShrink: 0 }} />
         {token.label}
-      </button>
+      </Button>
 
       {isOpen && (
         <span

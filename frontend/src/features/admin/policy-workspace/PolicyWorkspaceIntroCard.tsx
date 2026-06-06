@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { Card } from '../../../components/antigravity';
 
 const STORAGE_KEY = 'policyWorkspace.introExpanded';
@@ -29,7 +30,7 @@ export const PolicyWorkspaceIntroCard: React.FC = () => {
 
   return (
     <Card padding="sm" className="mb-3 border-[#e2e8f0] bg-white">
-      <button
+      <Button unstyled
         type="button"
         onClick={toggle}
         className="flex w-full items-center justify-between gap-3 text-left py-0.5"
@@ -37,7 +38,7 @@ export const PolicyWorkspaceIntroCard: React.FC = () => {
       >
         <span className="text-sm font-semibold text-[#0b2b43]">How to use this workspace</span>
         <span className="text-xs font-medium text-[#64748b] shrink-0">{open ? 'Hide' : 'Show'}</span>
-      </button>
+      </Button>
       {open && (
         <div className="mt-2 pt-2 border-t border-[#f1f5f9]">
           <ul className="text-xs sm:text-sm text-[#475569] space-y-1 list-disc list-inside leading-snug">

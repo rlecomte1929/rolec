@@ -13,6 +13,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../antigravity/Checkbox';
 import { useParams } from 'react-router-dom';
 import { AppShell } from '../AppShell';
 import { Alert, Badge, Button, Card } from '../antigravity';
@@ -332,14 +333,14 @@ export const MyImmigrationData: React.FC = () => {
                           <span className="break-words">
                             {displayValue}
                             {isPassport && (
-                              <button
+                              <Button unstyled
                                 type="button"
                                 onClick={() => setShowFullPassport((s) => !s)}
                                 className="ml-2 text-xs font-medium text-[#0b2b43] underline hover:text-[#1f8e8b]"
                                 aria-label={showFullPassport ? 'Hide full passport number' : 'Show full passport number'}
                               >
                                 {showFullPassport ? 'Hide' : 'Show full'}
-                              </button>
+                              </Button>
                             )}
                           </span>
                           {source && (
@@ -475,8 +476,7 @@ export const MyImmigrationData: React.FC = () => {
                 within 30 days as required by GDPR.
               </p>
               <label className="flex items-start gap-2 mt-4 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={deleteConfirmed}
                   onChange={(e) => setDeleteConfirmed(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-[#94a3b8] text-[#7a2a2a] focus:ring-[#7a2a2a]"

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
+import { Input } from '../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { Card, Button, Alert } from '../../components/antigravity';
@@ -167,10 +169,10 @@ export const AdminSupplierNew: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Name *</label>
-              <input
+              <Input unstyled
                 type="text"
                 value={form.name}
-                onChange={(e) => updateForm({ name: e.target.value })}
+                onChange={(v) => updateForm({ name: v })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
                 placeholder="Supplier display name"
                 required
@@ -178,10 +180,10 @@ export const AdminSupplierNew: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Legal name</label>
-              <input
+              <Input unstyled
                 type="text"
                 value={form.legal_name}
-                onChange={(e) => updateForm({ legal_name: e.target.value })}
+                onChange={(v) => updateForm({ legal_name: v })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
               />
             </div>
@@ -199,8 +201,7 @@ export const AdminSupplierNew: React.FC = () => {
             </div>
             <div className="flex items-end gap-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={form.verified}
                   onChange={(e) => updateForm({ verified: e.target.checked })}
                 />
@@ -218,37 +219,37 @@ export const AdminSupplierNew: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Website</label>
-              <input
+              <Input unstyled
                 type="url"
                 value={form.website}
-                onChange={(e) => updateForm({ website: e.target.value })}
+                onChange={(v) => updateForm({ website: v })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Contact email</label>
-              <input
+              <Input unstyled
                 type="email"
                 value={form.contact_email}
-                onChange={(e) => updateForm({ contact_email: e.target.value })}
+                onChange={(v) => updateForm({ contact_email: v })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Contact phone</label>
-              <input
+              <Input unstyled
                 type="text"
                 value={form.contact_phone}
-                onChange={(e) => updateForm({ contact_phone: e.target.value })}
+                onChange={(v) => updateForm({ contact_phone: v })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Languages (comma-separated)</label>
-              <input
+              <Input unstyled
                 type="text"
                 value={form.languages_supported}
-                onChange={(e) => updateForm({ languages_supported: e.target.value })}
+                onChange={(v) => updateForm({ languages_supported: v })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
                 placeholder="en, no, de"
               />
@@ -260,49 +261,47 @@ export const AdminSupplierNew: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm text-[#6b7280] mb-1">Rating</label>
-                <input
+                <Input unstyled
                   type="number"
                   step="0.1"
                   min="0"
                   max="5"
                   value={form.scoring.average_rating}
-                  onChange={(e) => updateForm({ scoring: { ...form.scoring, average_rating: e.target.value } })}
+                  onChange={(v) => updateForm({ scoring: { ...form.scoring, average_rating: v } })}
                   className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
                   placeholder="4.0"
                 />
               </div>
               <div>
                 <label className="block text-sm text-[#6b7280] mb-1">Review count</label>
-                <input
+                <Input unstyled
                   type="number"
                   min="0"
                   value={form.scoring.review_count}
-                  onChange={(e) => updateForm({ scoring: { ...form.scoring, review_count: e.target.value } })}
+                  onChange={(v) => updateForm({ scoring: { ...form.scoring, review_count: v } })}
                   className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
                 />
               </div>
               <div>
                 <label className="block text-sm text-[#6b7280] mb-1">SLA (hours)</label>
-                <input
+                <Input unstyled
                   type="number"
                   min="0"
                   value={form.scoring.response_sla_hours}
-                  onChange={(e) => updateForm({ scoring: { ...form.scoring, response_sla_hours: e.target.value } })}
+                  onChange={(v) => updateForm({ scoring: { ...form.scoring, response_sla_hours: v } })}
                   className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
                 />
               </div>
               <div className="flex items-end gap-4">
                 <label className="flex items-center gap-1 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={form.scoring.preferred_partner}
                     onChange={(e) => updateForm({ scoring: { ...form.scoring, preferred_partner: e.target.checked } })}
                   />
                   <span className="text-sm">Preferred</span>
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={form.scoring.premium_partner}
                     onChange={(e) => updateForm({ scoring: { ...form.scoring, premium_partner: e.target.checked } })}
                   />
@@ -363,10 +362,10 @@ export const AdminSupplierNew: React.FC = () => {
                       {cap.coverage_scope_type !== 'global' && (
                         <div>
                           <label className="block text-xs text-[#6b7280] mb-0.5">Country (2-letter)</label>
-                          <input
+                          <Input unstyled
                             type="text"
                             value={cap.country_code}
-                            onChange={(e) => updateCapability(idx, { country_code: e.target.value.toUpperCase().slice(0, 2) })}
+                            onChange={(v) => updateCapability(idx, { country_code: v.toUpperCase().slice(0, 2) })}
                             className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                             placeholder="NO"
                           />
@@ -375,10 +374,10 @@ export const AdminSupplierNew: React.FC = () => {
                       {cap.coverage_scope_type === 'city' && (
                         <div>
                           <label className="block text-xs text-[#6b7280] mb-0.5">City</label>
-                          <input
+                          <Input unstyled
                             type="text"
                             value={cap.city_name}
-                            onChange={(e) => updateCapability(idx, { city_name: e.target.value })}
+                            onChange={(v) => updateCapability(idx, { city_name: v })}
                             className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                             placeholder="Oslo"
                           />
@@ -386,28 +385,28 @@ export const AdminSupplierNew: React.FC = () => {
                       )}
                       <div>
                         <label className="block text-xs text-[#6b7280] mb-0.5">Min budget</label>
-                        <input
+                        <Input unstyled
                           type="number"
                           value={cap.min_budget}
-                          onChange={(e) => updateCapability(idx, { min_budget: e.target.value })}
+                          onChange={(v) => updateCapability(idx, { min_budget: v })}
                           className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-[#6b7280] mb-0.5">Max budget</label>
-                        <input
+                        <Input unstyled
                           type="number"
                           value={cap.max_budget}
-                          onChange={(e) => updateCapability(idx, { max_budget: e.target.value })}
+                          onChange={(v) => updateCapability(idx, { max_budget: v })}
                           className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                         />
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-xs text-[#6b7280] mb-0.5">Tags (comma-separated)</label>
-                        <input
+                        <Input unstyled
                           type="text"
                           value={cap.specialization_tags}
-                          onChange={(e) => updateCapability(idx, { specialization_tags: e.target.value })}
+                          onChange={(v) => updateCapability(idx, { specialization_tags: v })}
                           className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                           placeholder="international, premium"
                         />
@@ -415,24 +414,21 @@ export const AdminSupplierNew: React.FC = () => {
                     </div>
                     <div className="flex gap-4 mt-2">
                       <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={cap.family_support}
                           onChange={(e) => updateCapability(idx, { family_support: e.target.checked })}
                         />
                         Family
                       </label>
                       <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={cap.corporate_clients}
                           onChange={(e) => updateCapability(idx, { corporate_clients: e.target.checked })}
                         />
                         Corporate
                       </label>
                       <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={cap.remote_support}
                           onChange={(e) => updateCapability(idx, { remote_support: e.target.checked })}
                         />

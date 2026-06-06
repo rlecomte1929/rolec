@@ -12,6 +12,7 @@
  * "Save draft" button; saving does NOT require navigating through all steps.
  */
 import React, { useCallback } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
 import { WizardStepIndicator } from './WizardStepIndicator';
 import { StepTiers } from './StepTiers';
@@ -95,10 +96,10 @@ export const PolicyBuilderWizard: React.FC = () => {
         <label className="text-sm font-medium text-slate-600 whitespace-nowrap">
           Policy label:
         </label>
-        <input
+        <Input unstyled
           type="text"
           value={draft.label}
-          onChange={(e) => draft.setLabel(e.target.value)}
+          onChange={(v) => draft.setLabel(v)}
           placeholder='e.g. "2026-Q3 relocation policy"'
           className="flex-1 max-w-xs border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-1"
         />

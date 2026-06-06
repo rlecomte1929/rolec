@@ -5,6 +5,7 @@
 
 import type React from 'react';
 
+import { Button } from '../../../components/antigravity/Button';
 // ── Country helpers ────────────────────────────────────────────────────────
 
 export const COUNTRY_NAMES: Record<string, string> = {
@@ -215,13 +216,13 @@ export function OpsPageActions({ days, onDaysChange, onExport }: { days: number;
         <option value={30}>Last 30 days</option>
         <option value={90}>Last 90 days</option>
       </select>
-      <button
+      <Button unstyled
         type="button"
         onClick={onExport ?? (() => alert('Export — not yet wired'))}
         className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
       >
         ⇣ Export
-      </button>
+      </Button>
     </div>
   );
 }

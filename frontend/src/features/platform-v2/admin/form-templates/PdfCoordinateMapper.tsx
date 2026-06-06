@@ -17,6 +17,8 @@
  * FieldSelector and the PDF canvas stay in sync without prop-drilling.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../../../../components/antigravity/Checkbox';
+import { Button } from '../../../../components/antigravity/Button';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -261,7 +263,7 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
       <div className="flex items-center gap-3 flex-wrap rounded border border-slate-200 bg-white px-3 py-2 text-xs">
         {/* Zoom */}
         <div className="flex items-center gap-1" role="group" aria-label="Zoom">
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setZoom((z) => Math.max(MIN_ZOOM, Math.round((z - ZOOM_STEP) * 100) / 100))}
             disabled={zoom <= MIN_ZOOM}
@@ -269,11 +271,11 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
             aria-label="Zoom out"
           >
             −
-          </button>
+          </Button>
           <span className="tabular-nums w-12 text-center text-slate-600" aria-live="polite">
             {Math.round(zoom * 100)}%
           </span>
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setZoom((z) => Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 100) / 100))}
             disabled={zoom >= MAX_ZOOM}
@@ -281,21 +283,21 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
             aria-label="Zoom in"
           >
             +
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             type="button"
             onClick={() => setZoom(1)}
             className="ml-1 rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
             aria-label="Reset zoom to 100%"
           >
             Fit
-          </button>
+          </Button>
         </div>
 
         {/* Page nav */}
         {numPages > 1 && (
           <div className="flex items-center gap-1 ml-2" role="group" aria-label="Page navigation">
-            <button
+            <Button unstyled
               type="button"
               disabled={currentPage <= 1}
               onClick={() => setCurrentPage((p) => p - 1)}
@@ -303,11 +305,11 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
               aria-label="Previous page"
             >
               ←
-            </button>
+            </Button>
             <span className="text-slate-600 tabular-nums">
               Page {currentPage}/{numPages}
             </span>
-            <button
+            <Button unstyled
               type="button"
               disabled={currentPage >= numPages}
               onClick={() => setCurrentPage((p) => p + 1)}
@@ -315,14 +317,13 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
               aria-label="Next page"
             >
               →
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Preview toggle */}
         <label className="flex items-center gap-1 ml-auto cursor-pointer select-none">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={previewMode}
             onChange={(e) => setPreviewMode(e.target.checked)}
             className="accent-[#0b2b43] focus:ring-2 focus:ring-[#0b2b43]"
@@ -347,13 +348,13 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
           <span className="font-medium">Click on the PDF</span>
           <span>to place</span>
           <span className="font-semibold">{activeField.label || activeField.id}</span>
-          <button
+          <Button unstyled
             type="button"
             onClick={() => onActiveFieldIdChange(null)}
             className="ml-auto text-xs text-slate-500 hover:text-slate-700 focus:outline-none focus:underline"
           >
             Cancel (Esc)
-          </button>
+          </Button>
         </div>
       )}
 
@@ -423,7 +424,7 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
                 }
 
                 return (
-                  <button
+                  <Button unstyled
                     key={f.id}
                     type="button"
                     data-pdf-pin
@@ -523,7 +524,7 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
 
             <div className="flex items-center gap-1 flex-shrink-0">
               {hasCoords && (
-                <button
+                <Button unstyled
                   type="button"
                   disabled={disabled}
                   onClick={() => onClear(f.id)}
@@ -531,9 +532,9 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
                   className="text-[11px] text-rose-500 hover:text-rose-700 disabled:opacity-40 focus:outline-none focus:underline"
                 >
                   Clear
-                </button>
+                </Button>
               )}
-              <button
+              <Button unstyled
                 type="button"
                 disabled={disabled}
                 onClick={() => onActivate(f.id)}
@@ -553,7 +554,7 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
                 }`}
               >
                 {isActive ? 'Placing…' : hasCoords ? 'Move' : 'Assign'}
-              </button>
+              </Button>
             </div>
           </div>
         );

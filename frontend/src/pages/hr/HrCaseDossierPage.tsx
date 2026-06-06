@@ -13,6 +13,7 @@
  * Uses AppShell + max-w-5xl consistent with other HR pages.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
@@ -137,20 +138,20 @@ export const HrCaseDossierPage: React.FC = () => {
               </div>
             )}
             <div className="flex gap-2">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => caseId && navigate(buildRoute('hrCaseSummary', { caseId }))}
                 className="px-3 py-1.5 rounded text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50"
               >
                 ← Case summary
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => setShowAddDocument(true)}
                 className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white hover:bg-[#0e3a5c]"
               >
                 + Add document
-              </button>
+              </Button>
             </div>
           </div>
         </header>
@@ -160,7 +161,7 @@ export const HrCaseDossierPage: React.FC = () => {
           {FILTER_TABS.map((tab) => {
             const isActive = filter === tab.key;
             return (
-              <button
+              <Button unstyled
                 key={tab.key}
                 type="button"
                 onClick={() => setFilter(tab.key)}
@@ -177,7 +178,7 @@ export const HrCaseDossierPage: React.FC = () => {
                   {counts[tab.key]}
                 </span>
                 {isActive && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#0b2b43]" />}
-              </button>
+              </Button>
             );
           })}
         </div>

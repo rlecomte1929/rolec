@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -103,15 +104,15 @@ export const AdminEvents: React.FC = () => {
   return (
     <AdminLayout title="Events" subtitle="Manage country events">
       <div className="flex flex-wrap gap-2 mb-4">
-        <input
+        <Input unstyled
           value={filters.country_code}
-          onChange={(e) => setFilters((f) => ({ ...f, country_code: e.target.value }))}
+          onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))}
           placeholder="Country"
           className="rounded border border-slate-200 px-3 py-2 text-sm w-24"
         />
-        <input
+        <Input unstyled
           value={filters.city}
-          onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}
+          onChange={(v) => setFilters((f) => ({ ...f, city: v }))}
           placeholder="City"
           className="rounded border border-slate-200 px-3 py-2 text-sm w-32"
         />

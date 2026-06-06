@@ -13,6 +13,7 @@
  *     place instead of every page rolling their own
  */
 import React from 'react';
+import { Button } from '../antigravity/Button';
 import { Link } from 'react-router-dom';
 
 type Props = {
@@ -80,14 +81,14 @@ export const EmployeeNextActionBar: React.FC<Props> = ({
               {primaryLabel}
             </Link>
           ) : (
-            <button
+            <Button unstyled
               type="button"
               onClick={onPrimaryClick}
               disabled={disabled}
               className={primaryClass}
             >
               {primaryLabel}
-            </button>
+            </Button>
           )}
         </div>
       </div>

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../../api/client';
@@ -55,17 +57,17 @@ export const AdminFreshnessCities: React.FC = () => {
     <AdminFreshnessLayout title="Freshness by city" subtitle="City-level freshness">
       <div className="mb-4 flex items-center gap-2">
         <label className="text-sm text-slate-600">Country:</label>
-        <input
+        <Input unstyled
           type="text"
           placeholder="e.g. NO"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(v) => setFilter(v)}
           onKeyDown={(e) => e.key === 'Enter' && applyFilter()}
           className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
         />
-        <button onClick={applyFilter} className="rounded bg-slate-200 px-2 py-1 text-sm hover:bg-slate-300">
+        <Button unstyled onClick={applyFilter} className="rounded bg-slate-200 px-2 py-1 text-sm hover:bg-slate-300">
           Filter
-        </button>
+        </Button>
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="min-w-full text-sm">

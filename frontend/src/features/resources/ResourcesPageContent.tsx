@@ -223,7 +223,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
               ? [{ label: 'Schools', icon: '🎓', sectionId: 'schools' }]
               : [{ label: 'Community', icon: '🤝', sectionId: 'community' }]),
           ].map(({ label, icon, sectionId }) => (
-            <button
+            <Button unstyled
               key={label}
               type="button"
               onClick={() => scrollToSection(sectionId)}
@@ -231,7 +231,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
             >
               <span aria-hidden>{icon}</span>
               {label}
-            </button>
+            </Button>
           ))}
         </div>
       </section>
@@ -402,7 +402,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         aria-label="Resource sections"
       >
         {SECTIONS.map((s) => (
-          <button
+          <Button unstyled
             key={s.id}
             type="button"
             onClick={() => scrollToSection(s.id)}
@@ -416,7 +416,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
               {s.icon}
             </span>
             {s.label}
-          </button>
+          </Button>
         ))}
       </nav>
 

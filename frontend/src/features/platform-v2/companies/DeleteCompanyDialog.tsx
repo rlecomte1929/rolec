@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { adminAPI } from '../../../api/client';
 import type { CompanyV2 } from './adapter';
 
@@ -91,10 +93,10 @@ export function DeleteCompanyDialog({ company, onClose, onDeleted }: DeleteCompa
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
               Type <span className="font-mono text-slate-900">{company.name}</span> to confirm
             </div>
-            <input
+            <Input unstyled
               ref={inputRef}
               value={typed}
-              onChange={(e) => setTyped(e.target.value)}
+              onChange={(v) => setTyped(v)}
               placeholder={company.name}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
               autoComplete="off"
@@ -110,22 +112,22 @@ export function DeleteCompanyDialog({ company, onClose, onDeleted }: DeleteCompa
         </div>
 
         <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-3">
-          <button
+          <Button unstyled
             type="button"
             onClick={onClose}
             disabled={submitting}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             type="button"
             onClick={() => void handleConfirm()}
             disabled={!canConfirm}
             className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
           >
             {submitting ? 'Deleting…' : 'Delete permanently'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

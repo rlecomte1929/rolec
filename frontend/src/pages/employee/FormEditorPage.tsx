@@ -29,6 +29,7 @@ import React, {
   useState,
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
 import { logger } from '../../lib/logger';
 import { buildRoute } from '../../navigation/routes';
@@ -392,7 +393,7 @@ export const FormEditorPage: React.FC = () => {
           <div className="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {loadError}
           </div>
-          <button
+          <Button unstyled
             type="button"
             onClick={() =>
               caseId &&
@@ -401,7 +402,7 @@ export const FormEditorPage: React.FC = () => {
             className="mt-4 text-sm text-[#0b2b43] hover:underline"
           >
             ← Back to dossier
-          </button>
+          </Button>
         </div>
       </AppShell>
     );
@@ -412,7 +413,7 @@ export const FormEditorPage: React.FC = () => {
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <button
+          <Button unstyled
             type="button"
             onClick={() =>
               caseId &&
@@ -424,7 +425,7 @@ export const FormEditorPage: React.FC = () => {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-          </button>
+          </Button>
           <div className="min-w-0">
             <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase leading-none mb-0.5">
               ReloPass · Dossier & Forms
@@ -468,7 +469,7 @@ export const FormEditorPage: React.FC = () => {
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
               Original form
             </span>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => setShowOriginal(true)}
               className="inline-flex items-center gap-1 text-xs text-[#0b2b43] hover:underline"
@@ -478,7 +479,7 @@ export const FormEditorPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
               Open in panel
-            </button>
+            </Button>
           </div>
           <div className="flex-1 overflow-hidden p-4">
             <PdfPanel
@@ -507,13 +508,13 @@ export const FormEditorPage: React.FC = () => {
                       {section}
                     </h2>
                     {aiFieldsInSection.length > 0 && (
-                      <button
+                      <Button unstyled
                         type="button"
                         onClick={() => void handleMarkSectionReviewed(sectionFields)}
                         className="text-xs font-medium text-[#0b2b43] hover:underline"
                       >
                         Mark all reviewed ({aiFieldsInSection.length})
-                      </button>
+                      </Button>
                     )}
                   </div>
 

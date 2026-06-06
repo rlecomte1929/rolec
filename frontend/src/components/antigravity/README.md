@@ -71,6 +71,23 @@ whose appearance the default Input would fight. Prefer the styled mode
 <Input unstyled className={inputCls(locked)} type="date" value={v} onChange={setV} />
 ```
 
+## Checkbox / Radio / FileInput
+
+Thin `forwardRef` wrappers over native `<input type="checkbox|radio|file">` so
+every input routes through the design system. They pass all native props through
+(`checked`, event-based `onChange`, `name`, `accept`, `className`, …) — drop-in
+replacements for the raw elements:
+
+```tsx
+import { Checkbox, Radio, FileInput } from '../components/antigravity';
+
+<Checkbox checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+<FileInput accept=".pdf" onChange={(e) => upload(e.target.files)} />
+```
+
+Unlike `Input` (value-based `onChange`), these keep the **native event** onChange
+— their values (`checked` / `files`) don't fit the value-string contract.
+
 ## Brand colours
 
 Source of truth: `design/system/tokens.css`. Exposed as Tailwind scales in

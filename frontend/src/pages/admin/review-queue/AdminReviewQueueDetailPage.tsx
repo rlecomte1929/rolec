@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AdminReviewQueueLayout } from './AdminReviewQueueLayout';
 import { ReviewQueuePriorityBadge } from '../../../components/admin/review-queue/ReviewQueuePriorityBadge';
@@ -267,14 +269,14 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
             value={notesEdit}
             onChange={(e) => setNotesEdit(e.target.value)}
           />
-          <button
+          <Button unstyled
             type="button"
             onClick={handleSaveNotes}
             disabled={actionLoading}
             className="mt-2 rounded bg-slate-200 px-2 py-1 text-sm hover:bg-slate-300 disabled:opacity-50"
           >
             Save notes
-          </button>
+          </Button>
         </div>
 
         {/* Actions */}
@@ -282,14 +284,14 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
           <h3 className="mb-3 text-sm font-semibold text-slate-700">Actions</h3>
           <div className="flex flex-wrap gap-2">
             {canClaim && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleClaim}
                 disabled={actionLoading}
                 className="rounded bg-[#0b2b43] px-3 py-1 text-sm text-white hover:bg-[#0d3552] disabled:opacity-50"
               >
                 Claim
-              </button>
+              </Button>
             )}
             {canAssign && assignees.length > 0 && (
               <select
@@ -308,131 +310,131 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
               </select>
             )}
             {item.assigned_to_user_id && canAssign && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleUnassign}
                 disabled={actionLoading}
                 className="rounded bg-slate-200 px-2 py-1 text-sm hover:bg-slate-300 disabled:opacity-50"
               >
                 Unassign
-              </button>
+              </Button>
             )}
             {canChangeStatus && (
               <>
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => setStatusModal('in_progress')}
                   disabled={actionLoading}
                   className="rounded bg-amber-100 px-2 py-1 text-sm text-amber-800 hover:bg-amber-200 disabled:opacity-50"
                 >
                   Set in progress
-                </button>
-                <button
+                </Button>
+                <Button unstyled
                   type="button"
                   onClick={() => setStatusModal('blocked')}
                   disabled={actionLoading}
                   className="rounded bg-red-100 px-2 py-1 text-sm text-red-800 hover:bg-red-200 disabled:opacity-50"
                 >
                   Block
-                </button>
-                <button
+                </Button>
+                <Button unstyled
                   type="button"
                   onClick={() => setStatusModal('waiting')}
                   disabled={actionLoading}
                   className="rounded bg-amber-50 px-2 py-1 text-sm text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                 >
                   Waiting
-                </button>
+                </Button>
               </>
             )}
             {canResolve && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal('resolve')}
                 disabled={actionLoading}
                 className="rounded bg-green-100 px-2 py-1 text-sm text-green-800 hover:bg-green-200 disabled:opacity-50"
               >
                 Resolve
-              </button>
+              </Button>
             )}
             {canChangeStatus && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal('defer')}
                 disabled={actionLoading}
                 className="rounded bg-slate-200 px-2 py-1 text-sm hover:bg-slate-300 disabled:opacity-50"
               >
                 Defer
-              </button>
+              </Button>
             )}
             {canReopen && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleReopen}
                 disabled={actionLoading}
                 className="rounded bg-blue-100 px-2 py-1 text-sm text-blue-800 hover:bg-blue-200 disabled:opacity-50"
               >
                 Reopen
-              </button>
+              </Button>
             )}
           </div>
 
           {/* Status modal content inline */}
           {statusModal === 'in_progress' && (
             <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => handleSetStatus('in_progress')}
                 disabled={actionLoading}
                 className="rounded bg-amber-600 px-2 py-1 text-sm text-white"
               >
                 Confirm in progress
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal(null)}
                 className="ml-2 rounded bg-slate-200 px-2 py-1 text-sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
           {statusModal === 'blocked' && (
             <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => handleSetStatus('blocked')}
                 disabled={actionLoading}
                 className="rounded bg-red-600 px-2 py-1 text-sm text-white"
               >
                 Confirm blocked
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal(null)}
                 className="ml-2 rounded bg-slate-200 px-2 py-1 text-sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
           {statusModal === 'waiting' && (
             <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => handleSetStatus('waiting')}
                 disabled={actionLoading}
                 className="rounded bg-amber-600 px-2 py-1 text-sm text-white"
               >
                 Confirm waiting
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal(null)}
                 className="ml-2 rounded bg-slate-200 px-2 py-1 text-sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
           {statusModal === 'resolve' && (
@@ -444,46 +446,46 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
                 value={resolveNote}
                 onChange={(e) => setResolveNote(e.target.value)}
               />
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleResolve}
                 disabled={actionLoading}
                 className="rounded bg-green-600 px-2 py-1 text-sm text-white"
               >
                 Confirm resolve
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal(null)}
                 className="ml-2 rounded bg-slate-200 px-2 py-1 text-sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
           {statusModal === 'defer' && (
             <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
-              <input
+              <Input unstyled
                 type="date"
                 className="mb-2 rounded border border-slate-300 px-2 py-1 text-sm"
                 value={deferDate}
-                onChange={(e) => setDeferDate(e.target.value)}
+                onChange={(v) => setDeferDate(v)}
               />
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleDefer}
                 disabled={actionLoading}
                 className="ml-2 rounded bg-slate-600 px-2 py-1 text-sm text-white"
               >
                 Confirm defer
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={() => setStatusModal(null)}
                 className="ml-2 rounded bg-slate-200 px-2 py-1 text-sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { BenefitRowEditor } from './BenefitRowEditor';
 import type { PolicyConfigBenefitRow, PolicyConfigCategoryBlock } from './types';
 import { rowMatchesTargetingPreview } from './policyTargeting';
@@ -35,7 +36,7 @@ export const PolicyCategorySection: React.FC<Props> = ({
 
   return (
     <div className="border border-[#e2e8f0] rounded-xl bg-[#fafbfc] overflow-hidden">
-      <button
+      <Button unstyled
         type="button"
         className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-white hover:bg-[#f8fafc] border-b border-[#e2e8f0]"
         onClick={() => setOpen((o) => !o)}
@@ -46,7 +47,7 @@ export const PolicyCategorySection: React.FC<Props> = ({
           {hasPreviewFilter ? ` · ${matchingCount} match preview` : ''}
           {open ? ' ▲' : ' ▼'}
         </span>
-      </button>
+      </Button>
       {open && (
         <div className="p-4 space-y-4">
           {rows.length === 0 ? (

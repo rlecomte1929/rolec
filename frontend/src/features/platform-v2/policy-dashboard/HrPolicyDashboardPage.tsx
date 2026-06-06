@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { companyPolicyAPI, hrAPI } from '../../../api/client';
@@ -272,9 +273,9 @@ export function HrPolicyDashboardPage() {
                 <p className="text-sm font-medium text-slate-700">{nextReview ?? '—'}</p>
               </div>
               <div className="flex-1" />
-              <button className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              <Button unstyled className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
                 Update policy
-              </button>
+              </Button>
             </div>
           </div>
         </section>
@@ -370,20 +371,20 @@ export function HrPolicyDashboardPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button
+                          <Button unstyled
                             disabled={deciding === e.id}
                             onClick={() => handleDecide(e.id, 'approved')}
                             className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                           >
                             Approve
-                          </button>
-                          <button
+                          </Button>
+                          <Button unstyled
                             disabled={deciding === e.id}
                             onClick={() => handleDecide(e.id, 'rejected')}
                             className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
                           >
                             Reject
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from './antigravity/Button';
 import { ErrorBoundary } from 'react-error-boundary';
 import { reportError } from '../lib/errorTracking';
 
@@ -17,12 +18,12 @@ function DefaultFallback() {
       <p className="text-sm text-marketing-text-subtle mb-6">
         Reload the page to try again.
       </p>
-      <button
+      <Button unstyled
         onClick={() => window.location.reload()}
         className="text-sm font-medium text-marketing-accent underline"
       >
         Reload
-      </button>
+      </Button>
     </div>
   );
 }

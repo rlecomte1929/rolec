@@ -50,7 +50,7 @@ export const StarterPolicyOnboardingCard: React.FC<StarterPolicyOnboardingCardPr
             const selected = selectedKey === opt.key;
             const busy = busyTemplateKey === opt.key;
             return (
-              <button
+              <Button unstyled
                 key={opt.key}
                 type="button"
                 onClick={() => setSelectedKey(opt.key)}
@@ -71,7 +71,7 @@ export const StarterPolicyOnboardingCard: React.FC<StarterPolicyOnboardingCardPr
                   <span className="font-semibold text-[#0b2b43]">{opt.label}</span>
                 </div>
                 <p className="text-xs text-[#6b7280] mt-2 leading-snug">{opt.description}</p>
-              </button>
+              </Button>
             );
           })}
         </div>

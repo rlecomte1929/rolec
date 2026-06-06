@@ -12,6 +12,7 @@
  * sections aren't worth a click. Larger sections stay collapsed.
  */
 import React, { useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { POLICY_CONFIG_CATEGORIES } from '../policy-config/constants';
 
 const CATEGORY_LABEL = new Map(POLICY_CONFIG_CATEGORIES.map((c) => [c.key, c.label]));
@@ -95,7 +96,7 @@ export function CollapsibleCategory<T>({
       className={`rounded-md border border-slate-200 bg-white ${accentClassName ?? ''}`}
       data-testid={testId}
     >
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -108,7 +109,7 @@ export function CollapsibleCategory<T>({
           <span className="text-sm font-medium text-[#0b2b43] truncate">{group.label}</span>
           <span className="text-xs text-slate-500">({group.rows.length})</span>
         </span>
-      </button>
+      </Button>
       {open && (
         <ul className="space-y-2 px-3 pb-3 pt-1">
           {group.rows.map((row, i) => (

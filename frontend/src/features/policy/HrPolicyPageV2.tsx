@@ -221,13 +221,13 @@ const BuildNextVersionSection: React.FC<{
         <Button onClick={onTemplateClick} data-testid="start-from-template-card">
           Start from a template
         </Button>
-        <button
+        <Button unstyled
           type="button"
           onClick={onImportClick}
           className="ml-3 text-sm text-slate-600 hover:text-[#0b2b43] underline"
         >
           Or import a document instead →
-        </button>
+        </Button>
         <p className="text-xs text-slate-500 mt-2">
           Templates pre-fill the matrix with level-tiered caps
           (Entry&nbsp;Level / Manager / Director / VP / C-suite). Importing a PDF
@@ -244,13 +244,13 @@ const BuildNextVersionSection: React.FC<{
       )}
 
       <div className="mt-5">
-        <button
+        <Button unstyled
           type="button"
           onClick={() => setDocsOpen((v) => !v)}
           className="text-sm font-medium text-[#0b2b43] hover:underline"
         >
           {docsOpen ? '▾' : '▸'} Uploaded documents ({documents.length})
-        </button>
+        </Button>
         {docsOpen && (
           <div className="mt-3 border border-slate-200 rounded-lg">
             {documents.length === 0 ? (
@@ -306,7 +306,7 @@ const VersionHistorySection: React.FC<{
   if (rows.length === 0) return null;
   return (
     <Card padding="lg">
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center justify-between w-full"
@@ -315,7 +315,7 @@ const VersionHistorySection: React.FC<{
           Version history ({rows.length})
         </h2>
         <span className="text-slate-500">{open ? '▾' : '▸'}</span>
-      </button>
+      </Button>
       {open && (
         <table className="mt-3 w-full text-sm">
           <thead>
@@ -660,7 +660,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       {/* Keeps refresh bump wired so the Detailed review's internal actions
           (publish / unpublish / re-normalize) reload the top-level status. */}
       <div aria-hidden className="hidden">
-        <button type="button" onClick={bump} />
+        <Button unstyled type="button" onClick={bump} />
       </div>
     </div>
     </PolicyAssistantDockedShell>

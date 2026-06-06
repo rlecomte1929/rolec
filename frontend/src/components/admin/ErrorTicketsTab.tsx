@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { Button } from '../antigravity/Button';
 import { supabase } from '../../api/supabase';
 
 // ---------------------------------------------------------------------------
@@ -243,12 +244,12 @@ export function ErrorTicketsTab() {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button unstyled
           onClick={load}
           className="text-sm text-gray-500 underline"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -263,18 +264,18 @@ export function ErrorTicketsTab() {
             Grouped by fingerprint — {counts.open} open, {counts.in_progress} in progress
           </p>
         </div>
-        <button
+        <Button unstyled
           onClick={load}
           className="text-xs text-gray-400 hover:text-gray-600 underline"
         >
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Filter tabs */}
       <div className="flex gap-2 border-b border-gray-200 pb-2">
         {(['all', 'open', 'in_progress', 'resolved'] as const).map((f) => (
-          <button
+          <Button unstyled
             key={f}
             onClick={() => setFilter(f)}
             className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
@@ -285,7 +286,7 @@ export function ErrorTicketsTab() {
           >
             {f === 'all' ? 'All' : STATUS_LABELS[f as TicketStatus]}
             <span className="ml-1.5 opacity-60">{counts[f]}</span>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -313,7 +314,7 @@ export function ErrorTicketsTab() {
                 {/* Row */}
                 <div className="flex items-start gap-4 px-4 py-4">
                   {/* Expand toggle */}
-                  <button
+                  <Button unstyled
                     onClick={() => setExpandedId(isExpanded ? null : ticket.id)}
                     className="mt-0.5 text-gray-300 hover:text-gray-500 flex-shrink-0"
                     aria-label={isExpanded ? 'Collapse' : 'Expand'}
@@ -324,7 +325,7 @@ export function ErrorTicketsTab() {
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                  </button>
+                  </Button>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0 space-y-2">
@@ -350,7 +351,7 @@ export function ErrorTicketsTab() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-400">Status:</span>
                       {(['open', 'in_progress', 'resolved'] as TicketStatus[]).map((s) => (
-                        <button
+                        <Button unstyled
                           key={s}
                           onClick={() => updateStatus(ticket, s)}
                           disabled={ticket.status === s || isSaving}
@@ -361,7 +362,7 @@ export function ErrorTicketsTab() {
                           }`}
                         >
                           {STATUS_LABELS[s]}
-                        </button>
+                        </Button>
                       ))}
                       {isSaving && (
                         <span className="text-xs text-gray-300">Saving...</span>

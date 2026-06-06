@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Breadcrumb } from '../../components/Breadcrumb';
@@ -180,14 +181,14 @@ export function AIDecisionsAuditPage() {
           <span className="text-xs text-slate-500">
             {counts.total} decisions · {counts.accept} accepted · {counts.override} overridden · {counts.reject} rejected
           </span>
-          <button
+          <Button unstyled
             type="button"
             onClick={handleExport}
             disabled={visibleRecords.length === 0}
             className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Export CSV
-          </button>
+          </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500 leading-relaxed">
           Every accept, override, or reject your team recorded on an AI-generated recommendation. Append-only — required by EU AI Act Art. 14(4)(c).
@@ -226,14 +227,14 @@ export function AIDecisionsAuditPage() {
             <span>
               recommendation_id: <span className="font-mono">{recommendationIdFilter}</span>
             </span>
-            <button
+            <Button unstyled
               type="button"
               onClick={clearRecommendationFilter}
               className="text-accent-500 hover:text-accent-700"
               aria-label="Clear recommendation_id filter"
             >
               ×
-            </button>
+            </Button>
           </span>
         )}
       </div>
@@ -281,7 +282,7 @@ export function AIDecisionsAuditPage() {
                         <div className="flex items-center gap-2">
                           <span className="truncate">{r.recommendation_id}</span>
                           {priorId && (
-                            <button
+                            <Button unstyled
                               type="button"
                               onClick={() => priorLoaded && handlePriorClick(priorId)}
                               disabled={!priorLoaded}
@@ -293,7 +294,7 @@ export function AIDecisionsAuditPage() {
                               }`}
                             >
                               ← prior
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { AIRecommendationCard } from '../../ai-oversight/AIRecommendationCard';
@@ -108,7 +109,7 @@ function AuditDot({ kind }: { kind: AuditKind }) {
 
 function ExcRow({ r, active, onClick }: { r: ExcRequest; active: boolean; onClick: () => void }) {
   return (
-    <button
+    <Button unstyled
       onClick={onClick}
       className={`w-full text-left px-4 py-3.5 flex gap-3 transition-colors border-b border-slate-100 last:border-b-0 ${
         active ? 'bg-slate-50' : 'hover:bg-slate-50/60'
@@ -140,7 +141,7 @@ function ExcRow({ r, active, onClick }: { r: ExcRequest; active: boolean; onClic
         <span className="text-xs text-slate-400">{r.submittedAgo}</span>
         <StatusBadge status={r.status} />
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -273,7 +274,7 @@ function ExcDetail({
           <section>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Your decision</h3>
             <div className="flex gap-3 mb-4">
-              <button
+              <Button unstyled
                 onClick={() => setIntent('approve')}
                 className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all text-left ${
                   intent === 'approve'
@@ -290,9 +291,9 @@ function ExcDetail({
                   <p className={`text-sm font-semibold ${intent === 'approve' ? 'text-emerald-800' : 'text-slate-700'}`}>Approve</p>
                   <p className="text-xs text-slate-400">Grant the requested change</p>
                 </div>
-              </button>
+              </Button>
 
-              <button
+              <Button unstyled
                 onClick={() => setIntent('reject')}
                 className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all text-left ${
                   intent === 'reject'
@@ -309,7 +310,7 @@ function ExcDetail({
                   <p className={`text-sm font-semibold ${intent === 'reject' ? 'text-rose-800' : 'text-slate-700'}`}>Reject</p>
                   <p className="text-xs text-slate-400">Keep current policy as-is</p>
                 </div>
-              </button>
+              </Button>
             </div>
 
             {intent && (
@@ -335,13 +336,13 @@ function ExcDetail({
                 </label>
                 <div className="flex items-center gap-3">
                   <p className="text-xs text-slate-400 flex-1">{firstName} will be notified via in-app + email.</p>
-                  <button
+                  <Button unstyled
                     onClick={() => { setIntent(null); setNote(''); }}
                     className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button unstyled
                     onClick={handleConfirm}
                     disabled={intent === 'reject' && !note.trim()}
                     className={`px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -349,7 +350,7 @@ function ExcDetail({
                     }`}
                   >
                     {intent === 'approve' ? 'Confirm approval' : 'Confirm rejection'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -680,12 +681,12 @@ export function HrExceptionsPage() {
               {counts.pending} pending
             </span>
           )}
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+          <Button unstyled className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Export
-          </button>
+          </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500 leading-relaxed">
           Employees requested deviations from their assigned policy. Review each request, approve or reject with a note, and the decision flows back to their relocation plan.
@@ -709,7 +710,7 @@ export function HrExceptionsPage() {
             <p className="text-xs text-slate-400 mb-3">Across {counts.all} cases · live</p>
             <div className="flex gap-1 -mb-px">
               {TABS.map((tab) => (
-                <button
+                <Button unstyled
                   key={tab.key}
                   onClick={() => setFilter(tab.key)}
                   className={`px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-colors ${
@@ -722,7 +723,7 @@ export function HrExceptionsPage() {
                   <span className={`ml-1.5 text-[10px] ${filter === tab.key ? 'text-slate-500' : 'text-slate-300'}`}>
                     {counts[tab.key]}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
           </div>

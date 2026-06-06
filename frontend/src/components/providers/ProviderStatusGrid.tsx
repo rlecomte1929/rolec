@@ -12,6 +12,7 @@
  *  - Horizontally scrollable on narrow viewports (≥ 768 px reads clean)
  */
 import React, { useState, useCallback } from 'react';
+import { Button } from '../antigravity/Button';
 import { ProviderStatusCell } from './ProviderStatusCell';
 import type { ProviderGridRow, CoordinationStatus } from '../../api/client';
 
@@ -123,7 +124,7 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
             : `${rows.length} case${rows.length !== 1 ? 's' : ''}`}
           {refreshedStr && <span> · Updated {refreshedStr}</span>}
         </p>
-        <button
+        <Button unstyled
           onClick={onRefresh}
           disabled={loading}
           style={{
@@ -145,7 +146,7 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
             ↻
           </span>
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Empty state */}

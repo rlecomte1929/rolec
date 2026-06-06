@@ -6,6 +6,8 @@
  */
 
 import { useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import {
   StatCard,
   Pill,
@@ -136,9 +138,9 @@ function NewCompanySlideOver({
         {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>New company</h2>
-          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+          <Button unstyled onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          </button>
+          </Button>
         </div>
 
         {/* Form */}
@@ -150,12 +152,12 @@ function NewCompanySlideOver({
           ] as const).map(({ id, label, type, placeholder }) => (
             <label key={id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
               {label}
-              <input
+              <Input unstyled
                 type={type}
                 required
                 placeholder={placeholder}
                 value={form[id]}
-                onChange={e => field(id, e.target.value)}
+                onChange={v => field(id, v)}
                 style={{ height: 'var(--input-h)', padding: '0 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '14px' }}
               />
             </label>
@@ -175,16 +177,16 @@ function NewCompanySlideOver({
           </label>
 
           <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button type="button" onClick={onClose} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
+            <Button unstyled type="button" onClick={onClose} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="submit"
               disabled={saving}
               style={{ padding: '8px 20px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
             >
               {saving ? 'Creating…' : 'Create company'}
-            </button>
+            </Button>
           </div>
         </form>
       </aside>
@@ -218,13 +220,13 @@ export function AdminDashboard({
           <h1 style={{ margin: 0, fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text)' }}>Admin dashboard</h1>
           <p style={{ margin: '4px 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>Platform-wide metrics and operations</p>
         </div>
-        <button
+        <Button unstyled
           onClick={() => setSlideOver(true)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0 18px', height: 'var(--btn-h-md)', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
           New company
-        </button>
+        </Button>
       </div>
 
       {/* Stat cards */}

@@ -362,12 +362,12 @@ export const ServicesQuestions: React.FC = () => {
 
       <Card padding="lg" className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <button
+          <Button unstyled
             onClick={() => navigate({ pathname: buildRoute('services'), search: location.search })}
             className="text-sm text-[#0b2b43] hover:underline"
           >
             ← Change services
-          </button>
+          </Button>
           {questionsLoading ? (
             <span className="text-sm text-[#6b7280]">Loading questions…</span>
           ) : (

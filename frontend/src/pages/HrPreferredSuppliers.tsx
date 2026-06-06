@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Input } from '../components/antigravity/Input';
+import { Button } from '../components/antigravity/Button';
 import { Container } from '../components/antigravity';
 import { hrPreferredSuppliersAPI } from '../api/client';
 import { suppliersAPI } from '../api/client';
@@ -138,13 +140,13 @@ export const HrPreferredSuppliers: React.FC = () => {
                 </option>
               ))}
             </select>
-            <button
+            <Button unstyled
               type="button"
               onClick={openAddModal}
               className="px-4 py-2 rounded-lg bg-[#0b2b43] text-white font-medium hover:bg-[#1e3a5f]"
             >
               Add preferred supplier
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -186,23 +188,23 @@ export const HrPreferredSuppliers: React.FC = () => {
                       removeConfirm?.service_category === (p.service_category ?? null) ? (
                         <span className="flex items-center justify-end gap-2">
                           <span className="text-sm text-[#6b7280]">Remove?</span>
-                          <button
+                          <Button unstyled
                             type="button"
                             onClick={() => handleRemove(p.supplier_id, p.service_category)}
                             className="text-sm text-red-600 hover:underline"
                           >
                             Yes
-                          </button>
-                          <button
+                          </Button>
+                          <Button unstyled
                             type="button"
                             onClick={() => setRemoveConfirm(null)}
                             className="text-sm text-[#6b7280] hover:underline"
                           >
                             No
-                          </button>
+                          </Button>
                         </span>
                       ) : (
-                        <button
+                        <Button unstyled
                           type="button"
                           onClick={() =>
                             setRemoveConfirm({
@@ -213,7 +215,7 @@ export const HrPreferredSuppliers: React.FC = () => {
                           className="text-sm text-red-600 hover:underline"
                         >
                           Remove
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -261,10 +263,10 @@ export const HrPreferredSuppliers: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#4b5563] mb-1">Priority (lower = higher)</label>
-                <input
+                <Input unstyled
                   type="number"
                   value={addPriorityRank}
-                  onChange={(e) => setAddPriorityRank(parseInt(e.target.value, 10) || 0)}
+                  onChange={(v) => setAddPriorityRank(parseInt(v, 10) || 0)}
                   className="w-full px-3 py-2 border border-[#e2e8f0] rounded-lg"
                 />
               </div>
@@ -279,21 +281,21 @@ export const HrPreferredSuppliers: React.FC = () => {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => setAddModalOpen(false)}
                 className="px-4 py-2 rounded-lg border border-[#e2e8f0] text-[#4b5563] hover:bg-[#f5f7fa]"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={handleAdd}
                 disabled={!addSupplierId.trim() || addSaving}
                 className="px-4 py-2 rounded-lg bg-[#0b2b43] text-white font-medium hover:bg-[#1e3a5f] disabled:opacity-50"
               >
                 {addSaving ? 'Adding…' : 'Add'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input } from '../components/antigravity/Input';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
@@ -346,14 +347,14 @@ export const HrAssignmentReview: React.FC = () => {
                   </div>
                   <div className="max-h-64 overflow-auto">
                     {assignments.map((item) => (
-                      <button
+                      <Button unstyled
                         key={item.id}
                         onClick={() => handleSelectCase(item.id)}
                         className="w-full text-left px-4 py-3 hover:bg-[#f8fafc] text-sm text-[#0b2b43]"
                       >
                         <div className="font-medium">{item.employeeIdentifier}</div>
                         <div className="text-xs text-[#6b7280]">Case ID: {item.id}</div>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -399,14 +400,14 @@ export const HrAssignmentReview: React.FC = () => {
                         <span>Specialist Required</span>
                         <Badge variant="warning">High Risk</Badge>
                       </div>
-                      <button
+                      <Button unstyled
                         className="text-[11px] text-[#0b2b43] mt-2 underline"
                         onClick={() =>
                           navigate(`${buildRoute('hrComplianceIndex')}?caseId=${assignment.id}`)
                         }
                       >
                         View details →
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -439,7 +440,7 @@ export const HrAssignmentReview: React.FC = () => {
                 <div className="border-b border-[#e2e8f0] mt-6" />
                 <div className="flex flex-wrap gap-6 text-sm text-[#6b7280] mt-3">
                   {(['timeline', 'intake', 'documents', 'providers', 'messages'] as TabKey[]).map((tab) => (
-                    <button
+                    <Button unstyled
                       key={tab}
                       onClick={() => setActiveTab(tab)}
                       className={`capitalize ${
@@ -447,7 +448,7 @@ export const HrAssignmentReview: React.FC = () => {
                       }`}
                     >
                       {tab === 'providers' ? 'Services' : tab}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </Card>
@@ -593,9 +594,9 @@ export const HrAssignmentReview: React.FC = () => {
                     ))}
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <input
+                    <Input unstyled
                       value={messageInput}
-                      onChange={(event) => setMessageInput(event.target.value)}
+                      onChange={(event) => setMessageInput(event)}
                       placeholder="Write a message..."
                       className="flex-1 rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
                     />
@@ -664,7 +665,7 @@ export const HrAssignmentReview: React.FC = () => {
                     <div className="text-sm font-semibold text-[#0b2b43]">ReloPass Assistant</div>
                     <div className="text-xs text-[#6b7280]">AI Guidance</div>
                   </div>
-                  <button aria-label="More options" className="text-[#94a3b8] hover:text-[#0b2b43]">⋯</button>
+                  <Button unstyled aria-label="More options" className="text-[#94a3b8] hover:text-[#0b2b43]">⋯</Button>
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-[#4b5563]">
                   <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
@@ -681,9 +682,9 @@ export const HrAssignmentReview: React.FC = () => {
                   </Button>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <input
+                  <Input unstyled
                     value={assistantInput}
-                    onChange={(event) => setAssistantInput(event.target.value)}
+                    onChange={(event) => setAssistantInput(event)}
                     placeholder="Ask about this case..."
                     className="flex-1 rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
                   />
@@ -706,12 +707,12 @@ export const HrAssignmentReview: React.FC = () => {
           <Card padding="lg" className="w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm font-semibold text-[#0b2b43]">Send nudge</div>
-              <button
+              <Button unstyled
                 onClick={() => setIsNudgeOpen(false)}
                 className="text-sm text-[#6b7280] hover:text-[#0b2b43]"
               >
                 Close
-              </button>
+              </Button>
             </div>
             <textarea
               value={nudgeMessage}

@@ -297,7 +297,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               <div className="text-sm font-semibold text-[#0b2b43]">Vendor quote requests</div>
               <p className="text-xs text-[#94a3b8] mt-0.5">RFQs you've sent to vendors for this case</p>
             </div>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => { setVendorPanelInitialCategory(''); setVendorPanelOpen(true); }}
               className="flex items-center gap-1.5 rounded-lg border border-[#0b2b43] bg-white px-3 py-1.5 text-xs font-medium text-[#0b2b43] hover:bg-[#f8fafc] transition-colors"
@@ -306,7 +306,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               Find a vendor
-            </button>
+            </Button>
           </div>
           <PendingRfqsPanel key={rfqListKey} caseId={detail.id} />
         </Card>
@@ -366,7 +366,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                       </p>
                     </div>
                     {qr.status === 'pending' && (
-                      <button
+                      <Button unstyled
                         type="button"
                         disabled={updatingQrId === qr.id}
                         onClick={() => handleQuoteStatusUpdate(qr.id, 'acknowledged')}
@@ -376,10 +376,10 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                         className="shrink-0 rounded-lg border border-[#2563eb] bg-white px-3 py-1.5 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50 transition-colors"
                       >
                         {updatingQrId === qr.id ? '…' : 'Acknowledge'}
-                      </button>
+                      </Button>
                     )}
                     {qr.status === 'acknowledged' && (
-                      <button
+                      <Button unstyled
                         type="button"
                         disabled={updatingQrId === qr.id}
                         onClick={() => handleQuoteStatusUpdate(qr.id, 'fulfilled')}
@@ -387,7 +387,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                         className="shrink-0 rounded-lg border border-[#16a34a] bg-white px-3 py-1.5 text-xs font-medium text-[#16a34a] hover:bg-[#f0fdf4] disabled:opacity-50 transition-colors"
                       >
                         {updatingQrId === qr.id ? '…' : 'Mark fulfilled'}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </li>
@@ -419,7 +419,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       {rfqSuccessMsg && (
         <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
           ✓ {rfqSuccessMsg}
-          <button type="button" aria-label="Dismiss notification" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</button>
+          <Button unstyled type="button" aria-label="Dismiss notification" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</Button>
         </div>
       )}
       <RfqModal

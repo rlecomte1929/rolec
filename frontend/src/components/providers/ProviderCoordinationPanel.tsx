@@ -13,6 +13,7 @@
  *  - Polling fallback when realtime is unavailable
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { listCaseProviders, listProviderTasks } from '../../api/providers';
 import type { ProviderItem, ProviderTaskItem } from '../../api/providers';
 import { useProviderRealtime } from '../../hooks/useProviderRealtime';
@@ -110,12 +111,12 @@ export const ProviderCoordinationPanel: React.FC<ProviderCoordinationPanelProps>
               </p>
             )}
           </div>
-          <button
+          <Button unstyled
             onClick={() => setShowInviteNew(true)}
             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#0b2b43] text-white hover:bg-[#1a3d5c] transition-colors shrink-0"
           >
             + Invite provider
-          </button>
+          </Button>
         </div>
 
         {/* Error banner */}

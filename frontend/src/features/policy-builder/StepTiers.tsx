@@ -103,14 +103,14 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
                 Tier {idx + 1}
               </span>
               {tiers.length > 1 && (
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => removeTier(idx)}
                   className="text-xs text-red-500 hover:text-red-700 transition-colors"
                   aria-label={`Remove tier ${idx + 1}`}
                 >
                   Remove
-                </button>
+                </Button>
               )}
             </div>
 
@@ -154,7 +154,7 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
                 {EMPLOYEE_LEVELS.map((lvl) => {
                   const selected = tier.qualifying_levels.includes(lvl.value);
                   return (
-                    <button
+                    <Button unstyled
                       key={lvl.value}
                       type="button"
                       onClick={() => toggleLevel(idx, lvl.value)}
@@ -167,7 +167,7 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
                       aria-pressed={selected}
                     >
                       {lvl.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

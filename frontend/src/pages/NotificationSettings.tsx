@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { AppShell } from '../components/AppShell';
 import { Card } from '../components/antigravity';
 import { NOTIFICATION_TYPES } from '../constants/notificationTypes';
@@ -115,8 +116,7 @@ export const NotificationSettings: React.FC = () => {
                     <div className="font-medium text-[#0b2b43]">{label}</div>
                     <div className="flex items-center gap-6">
                       <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={p.in_app}
                           disabled={isSaving}
                           onChange={(e) => updatePref(type, 'in_app', e.target.checked)}
@@ -125,8 +125,7 @@ export const NotificationSettings: React.FC = () => {
                         In-app
                       </label>
                       <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={p.email}
                           disabled={isSaving}
                           onChange={(e) => updatePref(type, 'email', e.target.checked)}

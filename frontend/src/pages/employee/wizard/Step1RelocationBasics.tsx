@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
+import { Input } from '../../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
@@ -108,9 +110,9 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               <option value="Other">Other</option>
             </select>
             {showOriginOtherInput && (
-              <input
+              <Input unstyled
                 value={local.originCity || ''}
-                onChange={(event) => update('originCity', event.target.value)}
+                onChange={(event) => update('originCity', event)}
                 className="mt-2 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
                 placeholder="Enter city name"
               />
@@ -155,9 +157,9 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               <option value="Other">Other</option>
             </select>
             {showDestOtherInput && (
-              <input
+              <Input unstyled
                 value={local.destCity || ''}
-                onChange={(event) => update('destCity', event.target.value)}
+                onChange={(event) => update('destCity', event)}
                 className="mt-2 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
                 placeholder="Enter city name"
               />
@@ -183,27 +185,26 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm text-[#0b2b43]">
             Target Move Date{missing.targetMoveDate && <span className="text-red-600"> *</span>}
-            <input
+            <Input unstyled
               type="date"
               value={local.targetMoveDate || ''}
-              onChange={(event) => update('targetMoveDate', event.target.value)}
+              onChange={(event) => update('targetMoveDate', event)}
               className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             />
           </label>
           <label className="text-sm text-[#0b2b43]">
             Duration (months)
-            <input
+            <Input unstyled
               type="number"
               value={local.durationMonths || ''}
-              onChange={(event) => update('durationMonths', Number(event.target.value))}
+              onChange={(event) => update('durationMonths', Number(event))}
               className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             />
           </label>
         </div>
 
         <label className="text-sm text-[#0b2b43] flex items-center gap-2">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={Boolean(local.hasDependents)}
             onChange={(event) => update('hasDependents', event.target.checked)}
           />

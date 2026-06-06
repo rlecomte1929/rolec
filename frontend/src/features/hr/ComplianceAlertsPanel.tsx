@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { Input } from '../../components/antigravity/Input';
 import { Badge, Button, Card } from '../../components/antigravity';
 import {
   AlertSeverity,
@@ -147,30 +148,30 @@ export const ComplianceAlertsPanel: React.FC = () => {
         <div className="grid gap-2 sm:grid-cols-3">
           <label className="text-xs text-[#0b2b43]">
             Case ID
-            <input
+            <Input unstyled
               type="text"
               value={fieldsCaseId}
-              onChange={(e) => setFieldsCaseId(e.target.value)}
+              onChange={(v) => setFieldsCaseId(v)}
               placeholder="UUID"
               className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
             />
           </label>
           <label className="text-xs text-[#0b2b43]">
             Employer registration number
-            <input
+            <Input unstyled
               type="text"
               value={fieldsEmployerReg}
-              onChange={(e) => setFieldsEmployerReg(e.target.value)}
+              onChange={(v) => setFieldsEmployerReg(v)}
               placeholder="e.g. DE-HRB-12345"
               className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
             />
           </label>
           <label className="text-xs text-[#0b2b43]">
             Expected start date
-            <input
+            <Input unstyled
               type="date"
               value={fieldsExpectedStart}
-              onChange={(e) => setFieldsExpectedStart(e.target.value)}
+              onChange={(v) => setFieldsExpectedStart(v)}
               className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
             />
           </label>
