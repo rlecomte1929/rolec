@@ -145,3 +145,31 @@ def index_immigration_corpus(
         "chunks_skipped": skipped,
         "embedder": embedder.name,
     }
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    """
+    CLI entry point for the post-merge prod ingest (N2/AIQ-841).
+
+        python -m backend.app.services.immigration_chunk_indexer --corridor FR_NO
+
+    Run on Render (where OPENAI_API_KEY exists) so chunks are embedded with the
+    same model the prod retriever queries with. Idempotent — safe to re-run.
+    """
+    import argparse
+
+    logging.basicConfig(level=logging.INFO)
+    ap = argparse.ArgumentParser(description="Immigration corpus chunk/embed/ingest (N2/AIQ-841)")
+    ap.add_argument("--corridor", default=None, help="Corridor key, e.g. FR_NO (default: all corridors)")
+    args = ap.parse_args(argv)
+    res = index_immigration_corpus(corridor=args.corridor)
+    print(json.dumps(res))
+    if res.get("embedder") == "hash":
+        log.warning(
+            "Indexed with HashEmbedder (no OPENAI_API_KEY) — these embeddings will NOT "
+            "match the prod retriever's OpenAI vectors. Run where the key is set."
+        )
+
+
+if __name__ == "__main__":
+    main()
