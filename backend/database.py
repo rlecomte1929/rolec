@@ -2462,6 +2462,7 @@ class Database:
                     feature_key TEXT,
                     prompt_version_id TEXT,
                     canary_arm TEXT,
+                    cited_chunk_ids TEXT NOT NULL DEFAULT '[]',
                     created_at TEXT NOT NULL
                 )
             """))
@@ -2474,6 +2475,8 @@ class Database:
                 ("tokens_out", "INTEGER", "INTEGER"),
                 ("customer_id", "TEXT", "TEXT"),
                 ("feature_key", "TEXT", "TEXT"),
+                # W3/AIQ-837: cited chunk ids (jsonb in pg, JSON-text in sqlite).
+                ("cited_chunk_ids", "TEXT", "JSONB"),
             )
             if _is_sqlite:
                 try:
@@ -14536,6 +14539,7 @@ class Database:
         co2e_grams_estimated: Optional[float] = None,
         prompt_version_id: Optional[str] = None,
         canary_arm: Optional[str] = None,
+        cited_chunk_ids: Optional[List[str]] = None,
     ) -> None:
         """
         Persist one trace row. Called by ai_trace_logger._write_to_db().
@@ -14557,10 +14561,10 @@ class Database:
                      total_latency_ms, fallback_triggered,
                      feature_key, customer_id, tokens_in, tokens_out,
                      cost_usd_estimated, co2e_grams_estimated,
-                     prompt_version_id, canary_arm, created_at)
+                     prompt_version_id, canary_arm, cited_chunk_ids, created_at)
                     VALUES (:id, :sid, :qh, :cid, :sj, :lms, :fb,
                             :fk, :cust, :tin, :tout, :cost, :co2e,
-                            :pvid, :arm, :now)
+                            :pvid, :arm, :cc, :now)
                     ON CONFLICT(id) DO NOTHING
                     """
                 ),
@@ -14580,6 +14584,7 @@ class Database:
                     "co2e": float(co2e_grams_estimated) if co2e_grams_estimated is not None else None,
                     "pvid": prompt_version_id,
                     "arm": canary_arm,
+                    "cc": json.dumps(list(cited_chunk_ids or [])),
                     "now": now,
                 },
             )
