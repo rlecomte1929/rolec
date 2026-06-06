@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Input, Select } from '../../components/antigravity';
 
 export type DynamicQuestionType = 'text' | 'number' | 'select' | 'multiselect' | 'checkbox' | 'date' | 'range';
@@ -151,8 +152,7 @@ export const DynamicServicesQuestionnaire: React.FC<{
 
                   {q.type === 'checkbox' && (
                     <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={Boolean(val)}
                         onChange={(e) => setValue(id, e.target.checked)}
                       />

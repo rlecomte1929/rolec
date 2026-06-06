@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { Button } from '../../../components/antigravity/Button';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001' as const;
@@ -493,7 +494,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
           </span>
 
           {/* Close */}
-          <button
+          <Button unstyled
             onClick={onClose}
             aria-label="Close AI Assistant"
             style={{
@@ -522,7 +523,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* ── Context strip ── */}
@@ -581,7 +582,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
             }}
           >
             {routeCtx.chips.map(chip => (
-              <button
+              <Button unstyled
                 key={chip}
                 onClick={() => sendMessage(chip)}
                 style={{
@@ -609,7 +610,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
                 }}
               >
                 {chip}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -666,7 +667,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
                 overflowY: 'auto',
               }}
             />
-            <button
+            <Button unstyled
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
               aria-label="Send message"
@@ -690,12 +691,12 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
                 <line x1="12" y1="19" x2="12" y2="5" />
                 <polyline points="5 12 12 5 19 12" />
               </svg>
-            </button>
+            </Button>
           </div>
 
           {/* Clear conversation */}
           {messages.length > 0 && (
-            <button
+            <Button unstyled
               onClick={clearConversation}
               style={{
                 alignSelf: 'center',
@@ -712,7 +713,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
               onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)')}
             >
               Clear conversation
-            </button>
+            </Button>
           )}
         </div>
       </aside>

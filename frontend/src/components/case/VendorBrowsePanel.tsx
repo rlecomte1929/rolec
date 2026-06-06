@@ -15,6 +15,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import type { ImmigrationContext } from './immigrationContext';
 
@@ -112,7 +113,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
               Select a vendor to send them a quote request
             </p>
           </div>
-          <button
+          <Button unstyled
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-[#94a3b8] hover:bg-[#f1f5f9] transition-colors"
@@ -121,7 +122,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* IMM-15: immigration case context hint */}
@@ -202,13 +203,13 @@ export const VendorBrowsePanel: React.FC<Props> = ({
               <p className="text-sm font-medium text-[#374151]">No vendors found</p>
               <p className="text-xs text-[#94a3b8] mt-1">
                 Try removing a filter or{' '}
-                <button
+                <Button unstyled
                   type="button"
                   className="text-[#2563eb] underline"
                   onClick={() => { setSelectedCategory(''); setSelectedCorridor(''); }}
                 >
                   clear all
-                </button>
+                </Button>
               </p>
             </div>
           )}
@@ -251,13 +252,13 @@ export const VendorBrowsePanel: React.FC<Props> = ({
                       )}
                     </div>
 
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => onRequestQuote(vendor)}
                       className="shrink-0 rounded-lg bg-[#0b2b43] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1e4d6b] transition-colors whitespace-nowrap"
                     >
                       Request quote
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}

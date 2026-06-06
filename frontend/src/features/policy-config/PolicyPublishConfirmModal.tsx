@@ -27,7 +27,7 @@ export const PolicyPublishConfirmModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <button
+      <Button unstyled
         type="button"
         className="absolute inset-0 bg-black/40"
         aria-label="Close publish dialog"

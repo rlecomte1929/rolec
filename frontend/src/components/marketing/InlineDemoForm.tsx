@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Input } from '../antigravity/Input';
+import { Button } from '../antigravity/Button';
 import { submitDemoBooking } from '../../api/demoBooking';
 import { track } from '../../analytics';
 import { accessContent } from '../../pages/public/accessContent';
@@ -155,13 +157,13 @@ export const InlineDemoForm: React.FC = () => {
       </div>
 
       <div className="mt-6">
-        <button
+        <Button unstyled
           type="submit"
           disabled={state === 'submitting'}
           className="inline-flex w-full items-center justify-center rounded-lg bg-marketing-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {state === 'submitting' ? 'Sending…' : c.submitLabel}
-        </button>
+        </Button>
 
         {formError ? (
           <p className="mt-3 text-center text-sm text-[#7a2a2a]">
@@ -229,11 +231,11 @@ const Field: React.FC<FieldProps> = ({
       {label}
       {required && <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>}
     </label>
-    <input
+    <Input unstyled
       id={id}
       type={type}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(v) => onChange(v)}
       placeholder={placeholder}
       autoComplete={autoComplete}
       disabled={disabled}

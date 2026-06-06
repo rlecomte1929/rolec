@@ -20,6 +20,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Alert, Badge, Button, Card, LoadingButton } from '../../components/antigravity';
 import api from '../../api/client';
 
@@ -114,20 +115,20 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       {label && <div className="text-xs font-medium text-[#64748b] uppercase tracking-wide">{label}</div>}
       <div>
         <label className="block text-xs font-medium text-[#374151] mb-1">Address line 1</label>
-        <input
+        <Input unstyled
           type="text"
           value={value.line1 || ''}
-          onChange={(e) => upd('line1', e.target.value)}
+          onChange={(v) => upd('line1', v)}
           className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
           placeholder="Street address"
         />
       </div>
       <div>
         <label className="block text-xs font-medium text-[#374151] mb-1">Address line 2</label>
-        <input
+        <Input unstyled
           type="text"
           value={value.line2 || ''}
-          onChange={(e) => upd('line2', e.target.value)}
+          onChange={(v) => upd('line2', v)}
           className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
           placeholder="Apartment, suite, etc. (optional)"
         />
@@ -135,20 +136,20 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-[#374151] mb-1">City</label>
-          <input
+          <Input unstyled
             type="text"
             value={value.city || ''}
-            onChange={(e) => upd('city', e.target.value)}
+            onChange={(v) => upd('city', v)}
             className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
             placeholder="City"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-[#374151] mb-1">Postcode / ZIP</label>
-          <input
+          <Input unstyled
             type="text"
             value={value.postcode || ''}
-            onChange={(e) => upd('postcode', e.target.value)}
+            onChange={(v) => upd('postcode', v)}
             className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
             placeholder="Postcode"
           />
@@ -156,10 +157,10 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       </div>
       <div>
         <label className="block text-xs font-medium text-[#374151] mb-1">Country</label>
-        <input
+        <Input unstyled
           type="text"
           value={value.country || ''}
-          onChange={(e) => upd('country', e.target.value)}
+          onChange={(v) => upd('country', v)}
           className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
           placeholder="Country (e.g. France, United Kingdom)"
         />
@@ -168,19 +169,19 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-[#374151] mb-1">Lived here from</label>
-            <input
+            <Input unstyled
               type="date"
               value={value.from_date || ''}
-              onChange={(e) => upd('from_date', e.target.value)}
+              onChange={(v) => upd('from_date', v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-[#374151] mb-1">To (leave blank if current)</label>
-            <input
+            <Input unstyled
               type="date"
               value={value.to_date || ''}
-              onChange={(e) => upd('to_date', e.target.value)}
+              onChange={(v) => upd('to_date', v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
             />
           </div>
@@ -219,23 +220,23 @@ const AddressListEditor: React.FC<AddressListEditorProps> = ({ value, onChange }
             label={`Address ${i + 1}`}
           />
           {value.length > 1 && (
-            <button
+            <Button unstyled
               type="button"
               onClick={() => removeEntry(i)}
               className="absolute top-2 right-2 text-xs text-red-500 hover:text-red-700"
             >
               Remove
-            </button>
+            </Button>
           )}
         </div>
       ))}
-      <button
+      <Button unstyled
         type="button"
         onClick={addEntry}
         className="text-sm font-medium text-[#0b2b43] hover:text-[#1a3f5e] flex items-center gap-1"
       >
         <span className="text-lg leading-none">+</span> Add another address
-      </button>
+      </Button>
     </div>
   );
 };
@@ -275,10 +276,10 @@ const DependentListEditor: React.FC<DependentListEditorProps> = ({ value, onChan
               <label className="block text-xs font-medium text-[#374151] mb-1">
                 {field === 'full_name' ? 'Full legal name' : 'Nationality'}
               </label>
-              <input
+              <Input unstyled
                 type="text"
                 value={dep[field] || ''}
-                onChange={(e) => upd(i, field, e.target.value)}
+                onChange={(v) => upd(i, field, v)}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
               />
             </div>
@@ -286,10 +287,10 @@ const DependentListEditor: React.FC<DependentListEditorProps> = ({ value, onChan
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-[#374151] mb-1">Date of birth</label>
-              <input
+              <Input unstyled
                 type="date"
                 value={dep.date_of_birth || ''}
-                onChange={(e) => upd(i, 'date_of_birth', e.target.value)}
+                onChange={(v) => upd(i, 'date_of_birth', v)}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
               />
             </div>
@@ -310,19 +311,19 @@ const DependentListEditor: React.FC<DependentListEditorProps> = ({ value, onChan
             </div>
           </div>
           {value.length > 1 && (
-            <button type="button" onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-700">
+            <Button unstyled type="button" onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-700">
               Remove
-            </button>
+            </Button>
           )}
         </div>
       ))}
-      <button
+      <Button unstyled
         type="button"
         onClick={add}
         className="text-sm font-medium text-[#0b2b43] hover:text-[#1a3f5e] flex items-center gap-1"
       >
         <span className="text-lg leading-none">+</span> Add dependent
-      </button>
+      </Button>
     </div>
   );
 };
@@ -346,10 +347,10 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
   switch (question.type) {
     case 'text':
       return (
-        <input
+        <Input unstyled
           type="text"
           value={(value as string) || ''}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
           className={baseInputClass}
           placeholder="Type your answer…"
         />
@@ -357,10 +358,10 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
 
     case 'date':
       return (
-        <input
+        <Input unstyled
           type="date"
           value={(value as string) || ''}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
           className={baseInputClass}
         />
       );
@@ -369,7 +370,7 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
       return (
         <div className="flex gap-3">
           {(['true', 'false'] as const).map((opt) => (
-            <button
+            <Button unstyled
               key={opt}
               type="button"
               onClick={() => onChange(opt)}
@@ -380,7 +381,7 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
               }`}
             >
               {opt === 'true' ? 'Yes' : 'No'}
-            </button>
+            </Button>
           ))}
         </div>
       );
@@ -391,7 +392,7 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
       return (
         <div className="space-y-2">
           {opts.map((opt) => (
-            <button
+            <Button unstyled
               key={opt}
               type="button"
               onClick={() => onChange(opt)}
@@ -405,7 +406,7 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
                 value === opt ? 'border-[#0b2b43] bg-[#0b2b43]' : 'border-[#94a3b8] bg-white'
               }`} />
               {labels[opt] || opt}
-            </button>
+            </Button>
           ))}
         </div>
       );
@@ -455,23 +456,23 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
               'File upload not available in this step.'
             )}
           </div>
-          <button
+          <Button unstyled
             type="button"
             onClick={() => onChange('__uploaded__')}
             className="mt-3 text-sm font-medium text-[#0b2b43] hover:underline"
           >
             Mark as uploaded
-          </button>
+          </Button>
         </div>
       );
     }
 
     default:
       return (
-        <input
+        <Input unstyled
           type="text"
           value={(value as string) || ''}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
           className={baseInputClass}
           placeholder="Type your answer…"
         />
@@ -699,20 +700,20 @@ export const ImmigrationInterviewShell: React.FC<ImmigrationInterviewShellProps>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={() => { setPrefillConfirmed(true); setValue(question.existing_value); }}
                     className="text-xs font-medium bg-[#1d4ed8] text-white rounded-lg px-3 py-1.5 hover:bg-[#1e40af]"
                   >
                     Confirm
-                  </button>
-                  <button
+                  </Button>
+                  <Button unstyled
                     type="button"
                     onClick={() => { setPrefillConfirmed(true); setValue(null); }}
                     className="text-xs font-medium bg-white border border-[#bfdbfe] text-[#1e40af] rounded-lg px-3 py-1.5 hover:bg-[#dbeafe]"
                   >
                     Edit
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

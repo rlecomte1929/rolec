@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from '../AdminLayout';
 import { adminStagingAPI, adminCollaborationAPI } from '../../../api/client';
@@ -98,11 +99,11 @@ export const AdminStagingResources: React.FC = () => {
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <Input unstyled
             type="text"
             placeholder="Search title..."
             value={filters.search}
-            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+            onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
             className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
           <select
@@ -120,18 +121,18 @@ export const AdminStagingResources: React.FC = () => {
             <option value="ignored">ignored</option>
             <option value="error">error</option>
           </select>
-          <input
+          <Input unstyled
             type="text"
             placeholder="Country code"
             value={filters.country_code}
-            onChange={(e) => setFilters((f) => ({ ...f, country_code: e.target.value }))}
+            onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))}
             className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
           />
-          <input
+          <Input unstyled
             type="text"
             placeholder="City"
             value={filters.city_name}
-            onChange={(e) => setFilters((f) => ({ ...f, city_name: e.target.value }))}
+            onChange={(v) => setFilters((f) => ({ ...f, city_name: v }))}
             className="w-32 rounded border border-slate-300 px-2 py-1 text-sm"
           />
           <Link

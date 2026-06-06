@@ -144,7 +144,7 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
               <p className="text-xs text-[#78350f] mb-2">
                 Copy this magic link to test the provider portal:
               </p>
-              <input
+              <Input unstyled
                 readOnly
                 value={inviteDevLink}
                 className="w-full text-xs rounded border border-[#fcd34d] bg-white px-2 py-1.5 font-mono"
@@ -168,7 +168,7 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
             {/* Toggle */}
             <div className="flex gap-0 mb-4 rounded-lg border border-[#e2e8f0] overflow-hidden w-fit">
               {(['existing', 'new'] as const).map((m) => (
-                <button
+                <Button unstyled
                   key={m}
                   onClick={() => { setMode(m); setError(''); }}
                   className={`px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -178,7 +178,7 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
                   }`}
                 >
                   {m === 'existing' ? 'Existing provider' : 'New provider'}
-                </button>
+                </Button>
               ))}
             </div>
 
@@ -197,7 +197,7 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
                     <p className="text-sm text-[#94a3b8] py-4 text-center">No providers found.</p>
                   ) : (
                     filteredProviders.map((p) => (
-                      <button
+                      <Button unstyled
                         key={p.id}
                         onClick={() => handlePickExisting(p)}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#e2e8f0] hover:border-[#93c5fd] hover:bg-[#eff6ff] text-left transition-colors"
@@ -211,7 +211,7 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
                             <div className="text-xs text-[#6b7280]">{p.service_type}</div>
                           )}
                         </div>
-                      </button>
+                      </Button>
                     ))
                   )}
                 </div>
@@ -254,13 +254,13 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
                 {error && <p className="text-sm text-[#dc2626]">{error}</p>}
                 <div className="flex justify-end gap-3 pt-1">
                   <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-                  <button
+                  <Button unstyled
                     onClick={handleCreateAndProceed}
                     disabled={saving}
                     className="px-4 py-2 rounded-lg bg-[#0b2b43] text-white text-sm font-semibold hover:bg-[#1a3d5c] disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Creating…' : 'Create & continue'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -313,23 +313,23 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
 
               <div className="flex justify-between gap-3 pt-1">
                 {!preselectedProvider && (
-                  <button
+                  <Button unstyled
                     onClick={() => { setStep('pick'); setError(''); }}
                     className="text-sm text-[#6b7280] hover:text-[#374151]"
                     disabled={saving}
                   >
                     ← Back
-                  </button>
+                  </Button>
                 )}
                 <div className="flex gap-3 ml-auto">
                   <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-                  <button
+                  <Button unstyled
                     onClick={handleSendInvite}
                     disabled={saving}
                     className="px-4 py-2 rounded-lg bg-[#0b2b43] text-white text-sm font-semibold hover:bg-[#1a3d5c] disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Sending…' : 'Send invite'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

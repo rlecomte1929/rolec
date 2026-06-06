@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '../components/antigravity/Input';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Alert } from '../components/antigravity';
@@ -290,12 +291,12 @@ export const HrResourcesPreview: React.FC = () => {
             <label htmlFor="hr-pv-city" className="block text-xs font-medium text-[#374151] mb-1">
               City (optional)
             </label>
-            <input
+            <Input unstyled
               id="hr-pv-city"
               type="text"
               value={city}
               placeholder="e.g. Oslo"
-              onChange={(e) => updateDestination({ city: e.target.value })}
+              onChange={(v) => updateDestination({ city: v })}
               className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white w-40"
             />
           </div>

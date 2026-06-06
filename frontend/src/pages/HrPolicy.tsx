@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
+import { FileInput } from '../components/antigravity/FileInput';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -175,7 +177,7 @@ function PolicyTabButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={onClick}
       className={[
@@ -186,7 +188,7 @@ function PolicyTabButton({
       ].join(' ')}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -969,9 +971,8 @@ export function PolicyDocumentIntakeSection({
       )}
 
       <div className="flex flex-wrap items-center gap-3 mt-4">
-        <input
+        <FileInput
           ref={fileInputRef}
-          type="file"
           accept=".docx,.pdf"
           onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
           className="sr-only"
@@ -1011,8 +1012,7 @@ export function PolicyDocumentIntakeSection({
               >
                 {selectionMode && (
                   <div className="flex items-center pl-3 border-r border-[#e2e8f0] bg-[#f8fafc]">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="h-4 w-4 rounded border-[#cbd5e1]"
                       checked={selectedDocIds.has(doc.id)}
                       onChange={(e) => {
@@ -1030,7 +1030,7 @@ export function PolicyDocumentIntakeSection({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => !selectionMode && setExpandedId(isExpanded ? null : doc.id)}
                   className="w-full text-left px-4 py-3 flex items-center justify-between gap-4 hover:bg-[#f8fafc]"
@@ -1058,24 +1058,24 @@ export function PolicyDocumentIntakeSection({
                     </div>
                   </div>
                   <span className="text-[#6b7280]">{isExpanded ? '▼' : '▶'}</span>
-                </button>
+                </Button>
                 {isExpanded && (
                   <div className="border-t border-[#e2e8f0] bg-[#f8fafc]">
                     <div className="flex border-b border-[#e2e8f0]">
-                      <button
+                      <Button unstyled
                         type="button"
                         onClick={() => setExpandedTab('metadata')}
                         className={`px-4 py-2 text-sm font-medium ${expandedTab === 'metadata' ? 'bg-white border-b-2 border-[#0b2b43] text-[#0b2b43]' : 'text-[#6b7280] hover:text-[#0b2b43]'}`}
                       >
                         Metadata
-                      </button>
-                      <button
+                      </Button>
+                      <Button unstyled
                         type="button"
                         onClick={() => setExpandedTab('structure')}
                         className={`px-4 py-2 text-sm font-medium ${expandedTab === 'structure' ? 'bg-white border-b-2 border-[#0b2b43] text-[#0b2b43]' : 'text-[#6b7280] hover:text-[#0b2b43]'}`}
                       >
                         Document structure
-                      </button>
+                      </Button>
                     </div>
                     <div className="px-4 py-3 space-y-4">
                       {expandedTab === 'metadata' && (

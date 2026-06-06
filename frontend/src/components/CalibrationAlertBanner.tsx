@@ -8,6 +8,7 @@
  * disappears.
  */
 import React, { useEffect, useState, useCallback } from 'react';
+import { Button } from './antigravity/Button';
 import { hrAPI, type CalibrationAlert } from '../api/client';
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ const AlertRow: React.FC<AlertRowProps> = ({ alert, onDismiss, dismissingId }) =
           avg {pct}% over cap. Consider revising this benefit's policy cap.
         </span>
       </div>
-      <button
+      <Button unstyled
         type="button"
         aria-label={`Dismiss alert for ${alert.category}`}
         disabled={isDismissing}
@@ -74,7 +75,7 @@ const AlertRow: React.FC<AlertRowProps> = ({ alert, onDismiss, dismissingId }) =
         className="flex-shrink-0 p-1 rounded hover:bg-amber-200 transition-colors disabled:opacity-40"
       >
         <XMarkIcon className="w-4 h-4 text-amber-700" />
-      </button>
+      </Button>
     </div>
   );
 };
@@ -136,7 +137,7 @@ export const CalibrationAlertBanner: React.FC = () => {
             — Benefit caps that may need adjustment based on recent exception patterns
           </span>
         </div>
-        <button
+        <Button unstyled
           type="button"
           aria-expanded={!collapsed}
           aria-label={collapsed ? 'Expand calibration alerts' : 'Collapse calibration alerts'}
@@ -144,7 +145,7 @@ export const CalibrationAlertBanner: React.FC = () => {
           className="text-xs text-amber-700 underline hover:text-amber-900 flex-shrink-0"
         >
           {collapsed ? 'Show' : 'Hide'}
-        </button>
+        </Button>
       </div>
 
       {/* Alert rows */}

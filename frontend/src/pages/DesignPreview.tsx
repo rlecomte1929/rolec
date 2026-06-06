@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 
 type PreviewEntry = {
@@ -63,7 +64,7 @@ export function DesignPreview() {
           title={selected.label}
           style={{ width: '100%', height: '100%', border: 'none' }}
         />
-        <button
+        <Button unstyled
           type="button"
           onClick={() => setChromeHidden(false)}
           style={{
@@ -81,7 +82,7 @@ export function DesignPreview() {
           }}
         >
           Show chrome
-        </button>
+        </Button>
       </div>
     );
   }
@@ -139,7 +140,7 @@ export function DesignPreview() {
         >
           Open in new tab ↗
         </a>
-        <button
+        <Button unstyled
           type="button"
           onClick={() => setChromeHidden(true)}
           style={{
@@ -152,7 +153,7 @@ export function DesignPreview() {
           }}
         >
           Fullscreen
-        </button>
+        </Button>
       </header>
       <p
         style={{

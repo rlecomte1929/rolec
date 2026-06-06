@@ -24,6 +24,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
+import { FileInput } from '../../components/antigravity/FileInput';
 import { Alert, Button, Card, LoadingButton } from '../../components/antigravity';
 import api from '../../api/client';
 
@@ -200,13 +201,13 @@ const OcrErrorCard: React.FC<OcrErrorCardProps> = ({ error, onSkip }) => {
 
       {/* Skip action */}
       <div className="pl-9 pt-1">
-        <button
+        <Button unstyled
           type="button"
           onClick={onSkip}
           className="text-xs font-medium text-[#0b2b43] underline underline-offset-2 hover:no-underline"
         >
           Skip scan — I'll enter my details manually →
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -311,9 +312,8 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded, onSkip }) =
           dragOver ? 'border-[#0b2b43] bg-[#f0f4f8]' : 'border-[#cbd5e1] bg-[#f8fafc] hover:border-[#94a3b8]'
         }`}
       >
-        <input
+        <FileInput
           ref={fileRef}
-          type="file"
           accept="image/jpeg,image/png,image/webp"
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
@@ -527,13 +527,13 @@ export const PassportOCRFlow: React.FC<PassportOCRFlowProps> = ({ caseId, onComp
           <>
             <UploadStep caseId={caseId} onUploaded={handleUploaded} onSkip={onSkip} />
             <div className="mt-4 border-t border-[#e2e8f0] pt-4 flex justify-center">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={onSkip}
                 className="text-sm text-[#64748b] hover:text-[#0b2b43] font-medium"
               >
                 Skip — I'll enter details manually
-              </button>
+              </Button>
             </div>
           </>
         )}

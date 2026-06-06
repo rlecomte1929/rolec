@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import {
   Archive,
@@ -453,7 +455,7 @@ export function InboxV2Page() {
                 const active = mailbox === m.key;
                 const Icon = m.icon;
                 return (
-                  <button
+                  <Button unstyled
                     key={m.key}
                     type="button"
                     onClick={() => setMailbox(m.key)}
@@ -476,7 +478,7 @@ export function InboxV2Page() {
                         {count}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </nav>
@@ -489,7 +491,7 @@ export function InboxV2Page() {
                 <div className="px-3 py-3 text-xs text-slate-400">No people yet.</div>
               ) : (
                 stakeholders.map((s) => (
-                  <button
+                  <Button unstyled
                     key={s.conversationId + s.name}
                     type="button"
                     onClick={() => setActiveId(s.conversationId)}
@@ -502,7 +504,7 @@ export function InboxV2Page() {
                       <span className="block truncate font-medium">{s.name}</span>
                       <span className="block truncate text-[11px] text-slate-400">{s.subtitle}</span>
                     </span>
-                  </button>
+                  </Button>
                 ))
               )}
             </div>
@@ -519,7 +521,7 @@ export function InboxV2Page() {
                   {filteredConversations.length} thread{filteredConversations.length === 1 ? '' : 's'}
                 </span>
               </div>
-              <button
+              <Button unstyled
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
@@ -527,13 +529,13 @@ export function InboxV2Page() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 New
-              </button>
+              </Button>
             </div>
             <div className="px-3 py-2">
-              <input
+              <Input unstyled
                 type="search"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(v) => setSearch(v)}
                 placeholder="Search threads…"
                 className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none"
               />
@@ -552,7 +554,7 @@ export function InboxV2Page() {
                   const subject = deriveSubject(c);
                   const unread = (c.unread_count || 0) > 0;
                   return (
-                    <button
+                    <Button unstyled
                       key={c.id}
                       type="button"
                       onClick={() => setActiveId(c.id)}
@@ -587,7 +589,7 @@ export function InboxV2Page() {
                       <p className="mt-1 line-clamp-2 text-[12.5px] text-slate-500">
                         {c.last_message_preview || 'No preview available.'}
                       </p>
-                    </button>
+                    </Button>
                   );
                 })
               )}
@@ -621,7 +623,7 @@ export function InboxV2Page() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={toggleStar}
                       aria-pressed={starred.has(activeConversation.id)}
@@ -633,9 +635,9 @@ export function InboxV2Page() {
                       }`}
                     >
                       <Star className="h-4 w-4" fill={starred.has(activeConversation.id) ? 'currentColor' : 'none'} />
-                    </button>
+                    </Button>
                     {isHrLike && (
-                      <button
+                      <Button unstyled
                         type="button"
                         onClick={handleArchive}
                         disabled={archiving}
@@ -643,9 +645,9 @@ export function InboxV2Page() {
                       >
                         <Archive className="h-4 w-4" />
                         {mailbox === 'archive' ? 'Restore' : 'Archive'}
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => {
                         const ta = document.getElementById('inbox-v2-composer') as HTMLTextAreaElement | null;
@@ -655,7 +657,7 @@ export function InboxV2Page() {
                     >
                       <Send className="h-4 w-4" />
                       Reply
-                    </button>
+                    </Button>
                   </div>
                 </header>
 
@@ -685,14 +687,14 @@ export function InboxV2Page() {
                     <p className="text-xs text-slate-500">
                       Reply to <span className="font-medium text-slate-700">{activeConversation.other_participant_name}</span>
                     </p>
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={handleDraftWithAi}
                       className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
                       <Sparkles className="h-3.5 w-3.5 text-blue-500" />
                       Draft with AI
-                    </button>
+                    </Button>
                   </div>
                   <textarea
                     id="inbox-v2-composer"
@@ -709,14 +711,14 @@ export function InboxV2Page() {
                     className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
                   />
                   <div className="mt-2 flex items-center justify-between">
-                    <button
+                    <Button unstyled
                       type="button"
                       className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
                       <Paperclip className="h-3.5 w-3.5" />
                       Attach
-                    </button>
-                    <button
+                    </Button>
+                    <Button unstyled
                       type="button"
                       onClick={handleSend}
                       disabled={!draft.trim() || sending}
@@ -724,7 +726,7 @@ export function InboxV2Page() {
                     >
                       <Send className="h-3.5 w-3.5" />
                       {sending ? 'Sending…' : 'Send'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </>

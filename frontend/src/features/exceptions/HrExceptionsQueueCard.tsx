@@ -94,14 +94,14 @@ export const HrExceptionsQueueCard: React.FC = () => {
             their Estimate Review page.
           </p>
         </div>
-        <button
+        <Button unstyled
           type="button"
           onClick={() => void load()}
           disabled={loading}
           className="text-sm text-[#0b2b43] hover:underline disabled:opacity-50"
         >
           {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        </Button>
       </div>
 
       {error && (

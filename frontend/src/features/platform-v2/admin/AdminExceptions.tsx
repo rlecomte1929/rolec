@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import {
   Pill,
   Avatar,
@@ -218,18 +219,18 @@ export function AdminExceptions({
                     <td style={{ padding: '12px 14px' }}>
                       {ex.status === 'pending' ? (
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
+                          <Button unstyled
                             onClick={() => openDialog('approve', ex.id)}
                             style={{ padding: '5px 10px', fontSize: '12px', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--pill-success-border)', background: 'var(--pill-success-bg)', color: 'var(--pill-success-text)', cursor: 'pointer' }}
                           >
                             Approve
-                          </button>
-                          <button
+                          </Button>
+                          <Button unstyled
                             onClick={() => openDialog('deny', ex.id)}
                             style={{ padding: '5px 10px', fontSize: '12px', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--pill-danger-border)', background: 'var(--pill-danger-bg)', color: 'var(--pill-danger-text)', cursor: 'pointer' }}
                           >
                             Deny
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <span style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>—</span>
@@ -272,10 +273,10 @@ export function AdminExceptions({
               />
             </label>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setDialog(d => ({ ...d, open: false }))} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
+              <Button unstyled onClick={() => setDialog(d => ({ ...d, open: false }))} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 onClick={handleConfirm}
                 disabled={saving}
                 style={{
@@ -286,7 +287,7 @@ export function AdminExceptions({
                 }}
               >
                 {saving ? 'Saving…' : dialog.kind === 'approve' ? 'Approve' : 'Deny'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

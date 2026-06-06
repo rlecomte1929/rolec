@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import type { PlanTier } from '../../../types/relopass-api-contracts';
 
 // ─── Nav data (from design-tokens.json nav_items) ─────────────────────────────
@@ -159,7 +160,7 @@ function NavItemRow({ item, isActive, collapsed, badges, onClick }: NavItemProps
   const badgeValue = item.badge_key ? (badges?.[item.badge_key] ?? 0) : 0;
 
   return (
-    <button
+    <Button unstyled
       type="button"
       title={collapsed ? item.label : undefined}
       aria-current={isActive ? 'page' : undefined}
@@ -211,7 +212,7 @@ function NavItemRow({ item, isActive, collapsed, badges, onClick }: NavItemProps
           background: 'var(--danger)',
         }} />
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -308,7 +309,7 @@ export function Sidebar({
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
       }}>
-        <button
+        <Button unstyled
           type="button"
           onClick={() => onNavigate(planTier === 'basic' ? '/my-move' : '/dashboard')}
           style={{
@@ -340,7 +341,7 @@ export function Sidebar({
             flexShrink: 0,
           }}>R</span>
           {!collapsed && <span>ReloPass</span>}
-        </button>
+        </Button>
       </div>
 
       {/* Nav sections */}
@@ -388,7 +389,7 @@ export function Sidebar({
 
       {/* AI Panel toggle */}
       <div style={{ padding: '8px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-        <button
+        <Button unstyled
           type="button"
           onClick={onToggleAIPanel}
           title={collapsed ? 'AI Assistant' : undefined}
@@ -430,13 +431,13 @@ export function Sidebar({
             )}
           </span>
           {!collapsed && <span>AI Assistant</span>}
-        </button>
+        </Button>
       </div>
 
       {/* User row */}
       {user && (
         <div style={{ padding: '8px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-          <button
+          <Button unstyled
             type="button"
             onClick={() => onNavigate('/profile')}
             title={collapsed ? user.name : undefined}
@@ -486,13 +487,13 @@ export function Sidebar({
                 </span>
               </span>
             )}
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Collapse toggle */}
       <div style={{ padding: '8px', flexShrink: 0 }}>
-        <button
+        <Button unstyled
           type="button"
           onClick={toggleCollapse}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -514,7 +515,7 @@ export function Sidebar({
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         >
           <Icon name={collapsed ? 'ChevronRight' : 'ChevronLeft'} size={14} />
-        </button>
+        </Button>
       </div>
     </nav>
   );

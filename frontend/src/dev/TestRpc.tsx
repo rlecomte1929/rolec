@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Input } from '../components/antigravity/Input';
+import { Button } from '../components/antigravity/Button';
 import { supabase } from "../api/supabase";
 
 const ASSIGNMENT_ID = "4a68496d-031a-4f82-9862-96122ad68323";
@@ -58,30 +60,30 @@ export default function TestRpc() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input
+        <Input unstyled
           style={{ padding: 8, width: 240 }}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(v) => setEmail(v)}
           placeholder="email"
         />
-        <input
+        <Input unstyled
           style={{ padding: 8, width: 240 }}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(v) => setPassword(v)}
           type="password"
           placeholder="password"
         />
-        <button onClick={signIn} style={{ padding: "8px 12px" }}>
+        <Button unstyled onClick={signIn} style={{ padding: "8px 12px" }}>
           Sign in
-        </button>
-        <button onClick={signOut} style={{ padding: "8px 12px" }}>
+        </Button>
+        <Button unstyled onClick={signOut} style={{ padding: "8px 12px" }}>
           Sign out
-        </button>
+        </Button>
       </div>
 
-      <button onClick={runRpc} style={{ padding: "10px 14px" }}>
+      <Button unstyled onClick={runRpc} style={{ padding: "10px 14px" }}>
         Run transition_assignment(EMPLOYEE_UNSUBMIT)
-      </button>
+      </Button>
 
       <div style={{ marginTop: 16, whiteSpace: "pre-wrap" }}>{status}</div>
     </div>

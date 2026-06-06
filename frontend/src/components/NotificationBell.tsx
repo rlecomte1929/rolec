@@ -5,6 +5,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from './antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import {
   getUnreadMessageCount,
@@ -99,7 +100,7 @@ export const NotificationBell: React.FC = () => {
 
   return (
     <div className="relative" ref={panelRef}>
-      <button
+      <Button unstyled
         type="button"
         onClick={() => {
           setOpen((o) => !o);
@@ -128,7 +129,7 @@ export const NotificationBell: React.FC = () => {
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
-      </button>
+      </Button>
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto rounded-xl border border-[#e2e8f0] bg-white shadow-lg z-50">
           <div className="px-4 py-3 border-b border-[#e2e8f0] font-semibold text-sm text-[#0b2b43]">
@@ -145,7 +146,7 @@ export const NotificationBell: React.FC = () => {
                   key={n.message_id}
                   className="flex items-start gap-2 px-4 py-3 hover:bg-[#f8fafc] border-b border-[#f1f5f9] last:border-b-0 group"
                 >
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={() => handleItemClick(n)}
                     className="flex-1 text-left min-w-0"
@@ -160,8 +161,8 @@ export const NotificationBell: React.FC = () => {
                     >
                       {formatRelative(n.created_at)}
                     </div>
-                  </button>
-                  <button
+                  </Button>
+                  <Button unstyled
                     type="button"
                     onClick={(e) => handleDismiss(e, n)}
                     className="shrink-0 p-1 rounded hover:bg-[#e2e8f0] text-[#6b7280] opacity-0 group-hover:opacity-100 transition-opacity"
@@ -170,7 +171,7 @@ export const NotificationBell: React.FC = () => {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                  </button>
+                  </Button>
                 </div>
               ))
             )}

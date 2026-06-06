@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
@@ -75,18 +76,18 @@ export const AdminFreshnessStaleContent: React.FC = () => {
   return (
     <AdminFreshnessLayout title="Stale content" subtitle="Live resources and events needing review">
       <div className="mb-4 flex gap-2">
-        <button
+        <Button unstyled
           onClick={() => setTab('resources')}
           className={`rounded px-3 py-1.5 text-sm ${tab === 'resources' ? 'bg-[#0b2b43] text-white' : 'bg-slate-200 text-slate-700'}`}
         >
           Resources ({resources.length})
-        </button>
-        <button
+        </Button>
+        <Button unstyled
           onClick={() => setTab('events')}
           className={`rounded px-3 py-1.5 text-sm ${tab === 'events' ? 'bg-[#0b2b43] text-white' : 'bg-slate-200 text-slate-700'}`}
         >
           Events ({events.length})
-        </button>
+        </Button>
       </div>
 
       {tab === 'resources' && (

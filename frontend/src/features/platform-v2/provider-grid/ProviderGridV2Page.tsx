@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { ProviderStatusGrid } from '../../../components/providers/ProviderStatusGrid';
@@ -76,14 +77,14 @@ export function ProviderGridV2Page() {
         <div className="mb-5">
           <div className="flex items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Provider status</h1>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => void fetchGrid()}
               disabled={loading}
               className="ml-auto text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50"
             >
               {loading ? 'Refreshing…' : 'Refresh'}
-            </button>
+            </Button>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
             Live status for each provider across active relocations. Click a cell to view the case.

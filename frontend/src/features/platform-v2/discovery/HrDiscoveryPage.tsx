@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -161,12 +162,12 @@ function RequirementsTab({
           <span className="ml-2 text-xs text-gray-400">{REQUIREMENTS.length} nodes · cross-referenced from 6 official sources</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button unstyled
             onClick={onShowSources}
             className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             View sources
-          </button>
+          </Button>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-700 text-[10px] font-medium">
             ✦ Live
           </span>
@@ -370,12 +371,12 @@ export function HrDiscoveryPage() {
           <div className="flex items-end justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Requirements</h1>
             <div className="flex items-center gap-2">
-              <button className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <Button unstyled className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 ⚡ Corridor: <strong>FR → NO</strong>
-              </button>
-              <button className="px-3 py-2 text-sm font-medium bg-navy-800 text-white rounded-lg hover:bg-navy-900 transition-colors">
+              </Button>
+              <Button unstyled className="px-3 py-2 text-sm font-medium bg-navy-800 text-white rounded-lg hover:bg-navy-900 transition-colors">
                 ✦ Re-run discovery
-              </button>
+              </Button>
             </div>
           </div>
           <p className="mt-2 text-sm text-gray-500 max-w-3xl">
@@ -390,7 +391,7 @@ export function HrDiscoveryPage() {
         <div className="flex items-center gap-2 mb-5">
           <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 bg-gray-50">
             {TABS.map(({ id, label }) => (
-              <button
+              <Button unstyled
                 key={id}
                 onClick={() => setTab(id)}
                 className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -400,7 +401,7 @@ export function HrDiscoveryPage() {
                 }`}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex-1" />

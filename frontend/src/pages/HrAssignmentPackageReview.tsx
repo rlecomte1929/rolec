@@ -154,13 +154,13 @@ export const HrAssignmentPackageReview: React.FC = () => {
                     <span>Remaining: {formatCurrency(remaining)}</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
-                    <button className="text-[#0b2b43]" onClick={() => safeNavigate(navigate, 'hrPolicy')}>
+                    <Button unstyled className="text-[#0b2b43]" onClick={() => safeNavigate(navigate, 'hrPolicy')}>
                       View rules
-                    </button>
+                    </Button>
                     {item.status === 'over_limit' && (
-                      <button className="text-[#7a2a2a]" onClick={() => safeNavigate(navigate, 'hrPolicy')}>
+                      <Button unstyled className="text-[#7a2a2a]" onClick={() => safeNavigate(navigate, 'hrPolicy')}>
                         Request exception
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </Card>

@@ -346,9 +346,9 @@ export const PackageSummary: React.FC<Props> = ({
           <Button variant="outline" onClick={onBack}>
             ← Edit selections
           </Button>
-          <button onClick={onStartOver} className="text-sm text-[#0b2b43] hover:underline">
+          <Button unstyled onClick={onStartOver} className="text-sm text-[#0b2b43] hover:underline">
             Start over
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -356,13 +356,13 @@ export const PackageSummary: React.FC<Props> = ({
         <Card padding="lg">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-[#0b2b43]">Your exception requests</h3>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => setExceptionsRefreshNonce((n) => n + 1)}
               className="text-xs text-[#0b2b43] hover:underline"
             >
               Refresh
-            </button>
+            </Button>
           </div>
           <p className="text-sm text-[#6b7280] mb-3">
             Saved with your case. The decision shows here even if you re-build your shortlist.
@@ -560,7 +560,7 @@ export const PackageSummary: React.FC<Props> = ({
                           }
                           if (isEmployeeViewer && c.status === 'over' && assignmentId) {
                             return (
-                              <button
+                              <Button unstyled
                                 type="button"
                                 onClick={() =>
                                   setModalState({
@@ -573,7 +573,7 @@ export const PackageSummary: React.FC<Props> = ({
                                 className="ml-auto inline-flex items-center rounded-md border border-[#0b2b43] bg-white px-2 py-1 text-xs font-medium text-[#0b2b43] hover:bg-[#eef4f8]"
                               >
                                 Request exception
-                              </button>
+                              </Button>
                             );
                           }
                           if (isHrViewer) {

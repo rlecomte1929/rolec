@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
@@ -51,7 +52,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <label className="text-sm text-[#0b2b43]">
           Employer name <span className="text-[#6b7280] font-normal">(from company profile)</span>
-          <input
+          <Input unstyled
             value={local.employerName || ''}
             readOnly
             placeholder="-"
@@ -60,7 +61,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Employer country <span className="text-[#6b7280] font-normal">(from company profile)</span>
-          <input
+          <Input unstyled
             value={local.employerCountry || ''}
             readOnly
             placeholder="-"
@@ -72,9 +73,9 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
           {(isRequired(requiredFields, 'assignmentContext.jobTitle') || true) && jobTitleMissing && (
             <span className="text-red-600"> *</span>
           )}
-          <input
+          <Input unstyled
             value={local.jobTitle || ''}
-            onChange={(event) => update('jobTitle', event.target.value)}
+            onChange={(event) => update('jobTitle', event)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
           />
         </label>
@@ -83,10 +84,10 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
           {(isRequired(requiredFields, 'assignmentContext.contractStartDate') || true) && contractStartMissing && (
             <span className="text-red-600"> *</span>
           )}
-          <input
+          <Input unstyled
             type="date"
             value={local.contractStartDate || ''}
-            onChange={(event) => update('contractStartDate', event.target.value)}
+            onChange={(event) => update('contractStartDate', event)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
           />
         </label>

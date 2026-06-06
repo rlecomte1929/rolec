@@ -4,6 +4,8 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
+import { Button } from '../../../components/antigravity/Button';
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState } from '../shared';
 import type { DocStatus } from '../../../types/relopass-api-contracts';
 
@@ -251,7 +253,7 @@ function UploadZone({ category, onUpload }: UploadZoneProps) {
         </p>
         <p style={{ margin: 0, fontSize: '11px', color: C.textMuted }}>PDF, JPEG, PNG or DOCX · max 25 MB</p>
       </div>
-      <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.docx" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+      <FileInput ref={inputRef} accept=".pdf,.jpg,.jpeg,.png,.docx" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
       {progress !== null && <div style={{ marginTop: '8px' }}><ProgressBar value={progress} label="Uploading…" height={6} /></div>}
       {error && <p style={{ margin: '6px 0 0', fontSize: '12px', color: C.danger }}>{error}</p>}
     </div>
@@ -285,7 +287,7 @@ function RejectionBanner({ doc, onReupload }: RejectionBannerProps) {
           {doc.filename} was rejected
         </p>
         <p style={{ margin: '0 0 8px', fontSize: '13px', color: C.dangerText }}>{doc.rejection_reason}</p>
-        <button
+        <Button unstyled
           onClick={onReupload}
           style={{
             padding: '5px 12px', borderRadius: C.radMd, border: 'none',
@@ -293,7 +295,7 @@ function RejectionBanner({ doc, onReupload }: RejectionBannerProps) {
           }}
         >
           Re-upload
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -387,15 +389,15 @@ function DocRow({ doc, onPreview, onDownload, onDelete }: DocRowProps) {
       <StatusBadge type="doc" status={doc.status} />
       {/* Actions */}
       <div style={{ display: 'flex', gap: '2px' }}>
-        <button onClick={onPreview} title="Preview" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+        <Button unstyled onClick={onPreview} title="Preview" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-        </button>
-        <button onClick={onDownload} title="Download" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+        </Button>
+        <Button unstyled onClick={onDownload} title="Download" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-        </button>
-        <button onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.danger, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+        </Button>
+        <Button unstyled onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.danger, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -432,7 +434,7 @@ function ReminderSettingsPanel() {
       background: C.surface, border: `1px solid ${C.border}`,
       borderRadius: C.radLg, marginTop: '16px', overflow: 'hidden',
     }}>
-      <button
+      <Button unstyled
         onClick={() => setOpen(o => !o)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
@@ -448,7 +450,7 @@ function ReminderSettingsPanel() {
           style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
           <path d="M6 9l6 6 6-6" />
         </svg>
-      </button>
+      </Button>
 
       {open && (
         <div style={{ padding: '4px 16px 16px' }}>
@@ -594,7 +596,7 @@ function AlertRow({ doc, label, days, tier, onRemind }: AlertRowProps) {
             Reminder sent ✓
           </span>
         ) : (
-          <button
+          <Button unstyled
             onClick={() => { setSent(true); onRemind(); }}
             style={{
               fontSize: '11px', padding: '4px 10px', borderRadius: C.radMd, cursor: 'pointer',
@@ -603,7 +605,7 @@ function AlertRow({ doc, label, days, tier, onRemind }: AlertRowProps) {
             }}
           >
             Remind employee
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -700,7 +702,7 @@ function CollapsibleUpload({ category, onUpload }: CollapsibleUploadProps) {
   return (
     <div style={{ borderTop: `1px solid ${C.border}` }}>
       {!open ? (
-        <button
+        <Button unstyled
           onClick={() => setOpen(true)}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: '6px',
@@ -715,19 +717,19 @@ function CollapsibleUpload({ category, onUpload }: CollapsibleUploadProps) {
             <path d="M12 5v14M5 12h14" />
           </svg>
           Add document
-        </button>
+        </Button>
       ) : (
         <div style={{ padding: '12px 16px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: C.textSec }}>Upload to {category}</span>
-            <button
+            <Button unstyled
               onClick={() => setOpen(false)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '2px', lineHeight: 0 }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
-            </button>
+            </Button>
           </div>
           <UploadZone category={category} onUpload={async (file, cat) => { await onUpload(file, cat); setOpen(false); }} />
         </div>
@@ -775,7 +777,7 @@ function CategorySection({
       borderRadius: C.radLg, overflow: 'hidden', marginBottom: '10px',
     }}>
       {/* Header row */}
-      <button
+      <Button unstyled
         onClick={onToggle}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
@@ -810,7 +812,7 @@ function CategorySection({
           style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
           <path d="M6 9l6 6 6-6" />
         </svg>
-      </button>
+      </Button>
 
       {/* Body */}
       {isOpen && (
@@ -879,7 +881,7 @@ function FilterChips({ active, onChange, counts }: FilterChipsProps) {
       {chips.map(({ key, label, dot }) => {
         const isActive = active === key;
         return (
-          <button
+          <Button unstyled
             key={key}
             onClick={() => onChange(key)}
             style={{
@@ -896,7 +898,7 @@ function FilterChips({ active, onChange, counts }: FilterChipsProps) {
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dot, flexShrink: 0 }} />
             )}
             {label}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -968,7 +970,7 @@ export function DocumentsScreen({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <button
+          <Button unstyled
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '7px 14px', borderRadius: C.radMd,
@@ -980,8 +982,8 @@ export function DocumentsScreen({
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
             </svg>
             Export all
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             onClick={() => {/* future: open upload modal */}}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -994,7 +996,7 @@ export function DocumentsScreen({
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
             </svg>
             Upload
-          </button>
+          </Button>
         </div>
       </div>
 

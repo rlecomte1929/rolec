@@ -426,22 +426,22 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
                 ))}
               </ul>
               {resolved.highlightIssues.length > 3 && (
-                <button
+                <Button unstyled
                   type="button"
                   className="text-xs text-[#059669] hover:underline mt-2"
                   onClick={() => setShowAllIssues(!showAllIssues)}
                 >
                   {showAllIssues ? 'Show fewer' : `Show all (${resolved.highlightIssues.length})`}
-                </button>
+                </Button>
               )}
               {onScrollToDraftReviewPanel && (
-                <button
+                <Button unstyled
                   type="button"
                   className="block text-xs text-[#0b2b43] font-medium hover:underline mt-2"
                   onClick={onScrollToDraftReviewPanel}
                 >
                   Open full draft review ↓
-                </button>
+                </Button>
               )}
             </div>
           )}

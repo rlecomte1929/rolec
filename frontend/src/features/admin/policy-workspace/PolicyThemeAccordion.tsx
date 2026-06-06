@@ -77,7 +77,7 @@ export const PolicyThemeAccordion: React.FC<Props> = ({
   return (
     <div className="border border-[#e2e8f0] rounded-lg bg-white overflow-hidden">
       <div className="flex items-stretch gap-0">
-        <button
+        <Button unstyled
           type="button"
           onClick={onToggle}
           className="flex-1 min-w-0 flex flex-wrap items-start gap-2 px-3 py-2.5 text-left hover:bg-[#f8fafc] transition-colors"
@@ -108,7 +108,7 @@ export const PolicyThemeAccordion: React.FC<Props> = ({
               </span>
             </div>
           </div>
-        </button>
+        </Button>
       </div>
 
       {open && (

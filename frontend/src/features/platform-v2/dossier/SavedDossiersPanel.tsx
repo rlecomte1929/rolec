@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AlertTriangle, Download, FileText, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { dossierPackageAPI, type DossierPackageDetail } from '../../../api/dossier';
 
@@ -198,7 +199,7 @@ export function SavedDossiersPanel({ caseId, onChanged }: SavedDossiersPanelProp
               </a>
 
               {/* Regenerate */}
-              <button
+              <Button unstyled
                 type="button"
                 data-testid="regenerate-button"
                 disabled={isRegen || isDel}
@@ -211,10 +212,10 @@ export function SavedDossiersPanel({ caseId, onChanged }: SavedDossiersPanelProp
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
                 {isRegen ? 'Regenerating…' : 'Regenerate'}
-              </button>
+              </Button>
 
               {/* Delete */}
-              <button
+              <Button unstyled
                 type="button"
                 data-testid="delete-button"
                 disabled={isRegen || isDel}
@@ -227,7 +228,7 @@ export function SavedDossiersPanel({ caseId, onChanged }: SavedDossiersPanelProp
                   <Trash2 className="h-3.5 w-3.5" />
                 )}
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
         );

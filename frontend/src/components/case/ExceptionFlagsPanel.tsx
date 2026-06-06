@@ -16,6 +16,7 @@
  * HR has an audit trail without the action buttons cluttering the view.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { fetchCaseExceptions, updateCaseException } from '../../api/cases';
 import type { ExceptionResolutionStatus } from '../../api/cases';
 import type { CaseExceptionsResponse, ExceptionFlag } from '../../types';
@@ -106,20 +107,20 @@ const ActionWidget: React.FC<ActionWidgetProps> = ({ flag, caseId, onResolved, i
         />
         {error && <div className="text-xs text-[#dc2626] mt-1">{error}</div>}
         <div className="flex gap-2 mt-2">
-          <button
+          <Button unstyled
             onClick={handleConfirm}
             disabled={saving}
             className="text-xs font-semibold px-3 py-1.5 rounded bg-[#0b2b43] text-white hover:bg-[#1a3d5c] disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Confirm'}
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             onClick={() => { setChosen(null); setNotes(''); setError(''); }}
             disabled={saving}
             className="text-xs px-3 py-1.5 rounded border border-[#d1d5db] text-[#374151] hover:bg-[#f9fafb] disabled:opacity-50"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -127,32 +128,32 @@ const ActionWidget: React.FC<ActionWidgetProps> = ({ flag, caseId, onResolved, i
 
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
-      <button
+      <Button unstyled
         onClick={() => setChosen('approved')}
         className="text-xs font-medium px-2.5 py-1 rounded border border-[#86efac] bg-[#f0fdf4] text-[#166534] hover:bg-[#dcfce7]"
       >
         ✓ Approve
-      </button>
+      </Button>
       {isBlocker && (
-        <button
+        <Button unstyled
           onClick={() => setChosen('escalated')}
           className="text-xs font-medium px-2.5 py-1 rounded border border-[#fde68a] bg-[#fefce8] text-[#854d0e] hover:bg-[#fef08a]"
         >
           ↑ Escalate
-        </button>
+        </Button>
       )}
-      <button
+      <Button unstyled
         onClick={() => setChosen('denied')}
         className="text-xs font-medium px-2.5 py-1 rounded border border-[#fca5a5] bg-[#fef2f2] text-[#991b1b] hover:bg-[#fee2e2]"
       >
         ✕ Deny
-      </button>
-      <button
+      </Button>
+      <Button unstyled
         onClick={() => setChosen('withdrawn')}
         className="text-xs font-medium px-2.5 py-1 rounded border border-[#e2e8f0] bg-white text-[#6b7280] hover:bg-[#f9fafb]"
       >
         Withdraw
-      </button>
+      </Button>
     </div>
   );
 };

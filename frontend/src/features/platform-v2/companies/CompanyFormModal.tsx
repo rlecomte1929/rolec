@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { adminAPI } from '../../../api/client';
 import type { CompanyV2, CompanyV2PlanTier, CompanyV2Status } from './adapter';
 
@@ -174,14 +176,14 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
           <h2 className="text-base font-semibold text-slate-900">
             {mode === 'create' ? 'Add tenant' : `Edit ${initial?.name ?? 'company'}`}
           </h2>
-          <button
+          <Button unstyled
             type="button"
             onClick={onClose}
             aria-label="Close"
             className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             ✕
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
@@ -192,9 +194,9 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
           )}
 
           <Field label="Name" required>
-            <input
+            <Input unstyled
               value={form.name}
-              onChange={(e) => setField('name', e.target.value)}
+              onChange={(v) => setField('name', v)}
               placeholder="Company name"
               autoFocus
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
@@ -202,18 +204,18 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
           </Field>
 
           <Field label="Country">
-            <input
+            <Input unstyled
               value={form.country}
-              onChange={(e) => setField('country', e.target.value)}
+              onChange={(v) => setField('country', v)}
               placeholder="e.g. Norway"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 
           <Field label="Size band">
-            <input
+            <Input unstyled
               value={form.size_band}
-              onChange={(e) => setField('size_band', e.target.value)}
+              onChange={(v) => setField('size_band', v)}
               placeholder="e.g. 50–200"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
@@ -246,21 +248,21 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="HR seat limit">
-              <input
+              <Input unstyled
                 type="number"
                 min={0}
                 value={form.hr_seat_limit}
-                onChange={(e) => setField('hr_seat_limit', e.target.value)}
+                onChange={(v) => setField('hr_seat_limit', v)}
                 placeholder="—"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </Field>
             <Field label="Employee seat limit">
-              <input
+              <Input unstyled
                 type="number"
                 min={0}
                 value={form.employee_seat_limit}
-                onChange={(e) => setField('employee_seat_limit', e.target.value)}
+                onChange={(v) => setField('employee_seat_limit', v)}
                 placeholder="—"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
@@ -268,9 +270,9 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
           </div>
 
           <Field label="Address">
-            <input
+            <Input unstyled
               value={form.address}
-              onChange={(e) => setField('address', e.target.value)}
+              onChange={(v) => setField('address', v)}
               placeholder="Street, city, postcode"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
@@ -278,17 +280,17 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone">
-              <input
+              <Input unstyled
                 value={form.phone}
-                onChange={(e) => setField('phone', e.target.value)}
+                onChange={(v) => setField('phone', v)}
                 placeholder="+33 …"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </Field>
             <Field label="HR contact email">
-              <input
+              <Input unstyled
                 value={form.hr_contact}
-                onChange={(e) => setField('hr_contact', e.target.value)}
+                onChange={(v) => setField('hr_contact', v)}
                 placeholder="hr@company.com"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
@@ -296,30 +298,30 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
           </div>
 
           <Field label="Support email">
-            <input
+            <Input unstyled
               value={form.support_email}
-              onChange={(e) => setField('support_email', e.target.value)}
+              onChange={(v) => setField('support_email', v)}
               placeholder="support@company.com"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button
+            <Button unstyled
               type="button"
               onClick={onClose}
               disabled={submitting}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="submit"
               disabled={submitting}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {submitting ? 'Saving…' : mode === 'create' ? 'Add tenant' : 'Save changes'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

@@ -18,6 +18,7 @@
  *   5. Removes the modal on success; shows error inline on failure
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { supabase } from '../../api/supabase';
 
 const APPROVE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-ai-request`;
@@ -155,14 +156,14 @@ export function ApprovalModal() {
 
         {/* Actions */}
         <div className="flex gap-3">
-          <button
+          <Button unstyled
             onClick={() => handleDecision(false)}
             disabled={processing}
             className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Reject
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             onClick={() => handleDecision(true)}
             disabled={processing}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -173,7 +174,7 @@ export function ApprovalModal() {
                 Running…
               </>
             ) : 'Approve & Run'}
-          </button>
+          </Button>
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-3">

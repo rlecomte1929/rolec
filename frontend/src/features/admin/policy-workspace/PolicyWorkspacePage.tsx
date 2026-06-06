@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Button } from '../../../components/antigravity';
 import { AdminLayout } from '../../../pages/admin/AdminLayout';
@@ -172,11 +173,11 @@ export const PolicyWorkspacePage: React.FC = () => {
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[#374151] mb-1">Effective date (required)</label>
-              <input
+              <Input unstyled
                 type="date"
                 className="w-full border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm"
                 value={publishEffectiveDate}
-                onChange={(e) => setPublishEffectiveDate(e.target.value)}
+                onChange={(v) => setPublishEffectiveDate(v)}
               />
             </div>
             {publishModalError ? (

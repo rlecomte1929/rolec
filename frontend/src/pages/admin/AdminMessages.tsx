@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { logger } from '../../lib/logger';
@@ -317,20 +318,20 @@ export const AdminMessages: React.FC = () => {
             </select>
           </div>
           <div className="flex gap-2 pt-6">
-            <button
+            <Button unstyled
               type="button"
               onClick={() => setActiveTab('conversations')}
               className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'conversations' ? 'bg-[#0b2b43] text-white' : 'bg-[#f1f5f9] text-[#4b5563] hover:bg-[#e2e8f0]'}`}
             >
               Conversations
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="button"
               onClick={() => setActiveTab('tickets')}
               className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'tickets' ? 'bg-[#0b2b43] text-white' : 'bg-[#f1f5f9] text-[#4b5563] hover:bg-[#e2e8f0]'}`}
             >
               Tickets
-            </button>
+            </Button>
           </div>
         </div>
       </Card>
@@ -465,10 +466,10 @@ export const AdminMessages: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#374151] mb-1">Assignee (profile ID)</label>
-                <input
+                <Input unstyled
                   type="text"
                   value={ticketPatchForm.assignee_id}
-                  onChange={(e) => setTicketPatchForm((f) => ({ ...f, assignee_id: e.target.value }))}
+                  onChange={(v) => setTicketPatchForm((f) => ({ ...f, assignee_id: v }))}
                   placeholder="Leave empty to unassign"
                   className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
                 />
@@ -550,7 +551,7 @@ export const AdminMessages: React.FC = () => {
                       const expanded = isGroupExpanded(groupKey);
                       return (
                         <div key={groupKey} className="rounded-lg border border-[#e5e7eb] overflow-hidden">
-                          <button
+                          <Button unstyled
                             type="button"
                             onClick={() => toggleGroup(groupKey)}
                             className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-[#f8fafc] hover:bg-[#f1f5f9] text-left text-sm font-medium text-[#0b2b43]"
@@ -560,7 +561,7 @@ export const AdminMessages: React.FC = () => {
                               {group.threads.length} thread{group.threads.length !== 1 ? 's' : ''}
                             </span>
                             <span className="text-[#6b7280] shrink-0">{expanded ? '▼' : '▶'}</span>
-                          </button>
+                          </Button>
                           {expanded && (
                             <div className="divide-y divide-[#e5e7eb]">
                               {group.threads.map((t) => (

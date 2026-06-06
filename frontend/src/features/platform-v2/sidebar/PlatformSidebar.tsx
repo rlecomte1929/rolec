@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Search,
@@ -148,7 +150,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
       className={`${width} relative h-screen sticky top-0 shrink-0 border-r border-slate-200 bg-white text-slate-700 flex flex-col transition-[width] duration-200 ease-out`}
     >
       {/* Collapse toggle — floats over the right edge */}
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setCollapsed((c) => !c)}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -156,7 +158,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
         className="absolute -right-3 top-5 z-30 grid h-6 w-6 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-500 hover:text-blue-600 hover:ring-4 hover:ring-blue-100"
       >
         {collapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
-      </button>
+      </Button>
 
       {/* Brand */}
       <div className={`flex items-center gap-2.5 border-b border-slate-100 px-3 pb-3 pt-3.5 ${collapsed ? 'justify-center' : ''}`}>
@@ -190,7 +192,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
         <Search size={13} />
         {!collapsed && (
           <>
-            <input
+            <Input unstyled
               type="text"
               placeholder="Search cases, vendors…"
               className="min-w-0 flex-1 border-0 bg-transparent text-[12.5px] text-slate-800 outline-none placeholder:text-slate-400"

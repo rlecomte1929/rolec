@@ -146,7 +146,7 @@ export const PolicyTopicSummaryList: React.FC<Props> = ({
           const isOpen = openKeys.has(t.key);
           return (
             <li key={t.key} className="py-1">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => toggle(t.key)}
                 aria-expanded={isOpen}
@@ -172,7 +172,7 @@ export const PolicyTopicSummaryList: React.FC<Props> = ({
                     </span>
                   )}
                 </span>
-              </button>
+              </Button>
               {isOpen && (
                 <div
                   id={`topic-panel-${t.key}`}

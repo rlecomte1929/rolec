@@ -9,6 +9,7 @@
  */
 import React from 'react';
 
+import { Button } from '../../../components/antigravity/Button';
 interface ActionBarProps {
   missingCount: number;
   completionPct: number;
@@ -59,13 +60,13 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       {markReadySuccess && (
         <div className="px-6 py-2 bg-emerald-50 border-b border-emerald-200 text-sm text-emerald-700 flex items-center justify-between">
           <span>Form marked as ready to submit.</span>
-          <button
+          <Button unstyled
             type="button"
             onClick={onBack}
             className="text-sm font-medium text-emerald-700 hover:underline"
           >
             Back to dossier →
-          </button>
+          </Button>
         </div>
       )}
       <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
@@ -95,7 +96,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           {/* [P3-3] Download PDF */}
           {onDownloadPdf && (
             <div className="flex flex-col items-end">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={onDownloadPdf}
                 disabled={isDownloadingPdf}
@@ -109,7 +110,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
                 ) : (
                   'Download PDF'
                 )}
-              </button>
+              </Button>
               {draftPdfGeneratedAt && !isDownloadingPdf && (
                 <span className="text-[10px] text-slate-400 mt-0.5">
                   Last generated: {new Date(draftPdfGeneratedAt).toLocaleString()}
@@ -118,7 +119,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             </div>
           )}
 
-          <button
+          <Button unstyled
             type="button"
             onClick={onSaveDraft}
             disabled={isSaving}
@@ -132,8 +133,8 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             ) : (
               'Save draft'
             )}
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             type="button"
             onClick={onMarkReady}
             disabled={isMarkingReady || markReadySuccess}
@@ -150,7 +151,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             ) : (
               'Mark ready'
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

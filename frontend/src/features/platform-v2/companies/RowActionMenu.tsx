@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { createPortal } from 'react-dom';
 
 interface RowActionMenuProps {
@@ -103,7 +104,7 @@ export function RowActionMenu({
 
   return (
     <>
-      <button
+      <Button unstyled
         ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
@@ -116,7 +117,7 @@ export function RowActionMenu({
         className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
       >
         ⋯
-      </button>
+      </Button>
 
       {open && panelStyle && portalRoot && createPortal(
         <div
@@ -132,33 +133,33 @@ export function RowActionMenu({
           className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black/5"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
+          <Button unstyled
             type="button"
             role="menuitem"
             onClick={pick(onEdit)}
             className="block w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
           >
             Edit
-          </button>
+          </Button>
           {!disableArchive && (
-            <button
+            <Button unstyled
               type="button"
               role="menuitem"
               onClick={pick(onArchive)}
               className="block w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
             >
               Archive
-            </button>
+            </Button>
           )}
           <div className="h-px bg-slate-100" />
-          <button
+          <Button unstyled
             type="button"
             role="menuitem"
             onClick={pick(onDelete)}
             className="block w-full px-3 py-2 text-left text-[13px] text-rose-700 hover:bg-rose-50"
           >
             Delete…
-          </button>
+          </Button>
         </div>,
         portalRoot,
       )}

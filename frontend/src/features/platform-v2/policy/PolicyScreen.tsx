@@ -4,6 +4,8 @@
  */
 
 import { useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import type {
   PolicyTier,
   PolicyBenefit,
@@ -164,10 +166,10 @@ function ExceptionForm({ benefits, onSubmit, onCancel }: ExceptionFormProps) {
         <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
           Requested value
         </label>
-        <input
+        <Input unstyled
           type="text"
           value={requestedValue}
-          onChange={e => setRequestedValue(e.target.value)}
+          onChange={v => setRequestedValue(v)}
           placeholder="e.g. 90 days, €5000"
           required
           style={inputStyle}
@@ -187,16 +189,16 @@ function ExceptionForm({ benefits, onSubmit, onCancel }: ExceptionFormProps) {
         />
       </div>
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-        <button type="button" onClick={onCancel} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
+        <Button unstyled type="button" onClick={onCancel} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button unstyled
           type="submit"
           disabled={submitting || !benefitName || !requestedValue || !justification}
           style={{ padding: '8px 16px', borderRadius: 'var(--radius-md, 8px)', border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: '14px', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1 }}
         >
           {submitting ? 'Submitting…' : 'Submit request'}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -275,12 +277,12 @@ export function PolicyScreen({ tier, benefits, exceptions, onRequestException }:
               Exception Requests
             </h2>
             {!showForm && (
-              <button
+              <Button unstyled
                 onClick={() => setShowForm(true)}
                 style={{ padding: '6px 12px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: '12px', border: 'none', cursor: 'pointer' }}
               >
                 + Request exception
-              </button>
+              </Button>
             )}
           </div>
 

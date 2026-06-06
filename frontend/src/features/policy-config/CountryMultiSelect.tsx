@@ -13,6 +13,8 @@
  *   - Disabled state mirrors the rest of the editor (read-only review).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
+import { Button } from '../../components/antigravity/Button';
 import { COUNTRY_OPTIONS, countryName } from './countryList';
 
 type Props = {
@@ -99,7 +101,7 @@ export const CountryMultiSelect: React.FC<Props> = ({
             <span className="font-medium">{code.toUpperCase()}</span>
             <span className="text-[#64748b]">{countryName(code.toUpperCase())}</span>
             {!disabled && (
-              <button
+              <Button unstyled
                 type="button"
                 aria-label={`Remove ${countryName(code.toUpperCase())}`}
                 onClick={(e) => {
@@ -109,16 +111,16 @@ export const CountryMultiSelect: React.FC<Props> = ({
                 className="ml-0.5 text-[#64748b] hover:text-[#dc2626]"
               >
                 ×
-              </button>
+              </Button>
             )}
           </span>
         ))}
         {!disabled && (
-          <input
+          <Input unstyled
             type="text"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
+            onChange={(v) => {
+              setQuery(v);
               if (!open) setOpen(true);
             }}
             onFocus={() => setOpen(true)}
@@ -137,7 +139,7 @@ export const CountryMultiSelect: React.FC<Props> = ({
             filtered.map((c) => {
               const checked = selectedSet.has(c.code);
               return (
-                <button
+                <Button unstyled
                   key={c.code}
                   type="button"
                   onClick={() => toggle(c.code)}
@@ -150,7 +152,7 @@ export const CountryMultiSelect: React.FC<Props> = ({
                     {c.name}
                   </span>
                   {checked && <span aria-hidden>✓</span>}
-                </button>
+                </Button>
               );
             })
           )}

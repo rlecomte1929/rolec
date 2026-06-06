@@ -10,6 +10,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { Input } from '../components/antigravity/Input';
+import { Button } from '../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import { Card } from '../components/antigravity';
 import { getAssignmentById } from '../api/assignmentDebug';
@@ -74,7 +76,7 @@ export const AssignmentDebugPanel: React.FC<AssignmentDebugPanelProps> = ({ assi
 
   return (
     <Card padding="md" className="mt-6 border border-amber-200 bg-amber-50/30">
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between text-left"
@@ -84,7 +86,7 @@ export const AssignmentDebugPanel: React.FC<AssignmentDebugPanelProps> = ({ assi
           🛠 DEV ONLY — Assignment debug (RLS check)
         </span>
         <span className="text-xs text-amber-700">{open ? '▾ collapse' : '▸ expand'}</span>
-      </button>
+      </Button>
       {!open && (
         <p className="mt-1 text-[11px] text-amber-700/80">
           Hidden in production builds. This panel verifies RLS visibility for the active assignment.
@@ -96,20 +98,20 @@ export const AssignmentDebugPanel: React.FC<AssignmentDebugPanelProps> = ({ assi
             Verify case_assignments visibility under RLS. Dev only.
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <input
+            <Input unstyled
               type="text"
               value={assignmentId}
-              onChange={(e) => setAssignmentId(e.target.value)}
+              onChange={(v) => setAssignmentId(v)}
               placeholder="Assignment ID"
               className="flex-1 min-w-[200px] rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             />
-            <button
+            <Button unstyled
               onClick={handleCheck}
               disabled={loading || !assignmentId.trim()}
               className="px-4 py-2 bg-[#0b2b43] text-white text-sm rounded-lg hover:bg-[#123651] disabled:opacity-50"
             >
               {loading ? 'Checking...' : 'Check as current user'}
-            </button>
+            </Button>
           </div>
           {(authUid || result?.current_user_id) && (
             <div className="text-xs text-[#6b7280] mb-2">

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import {
   flexRender,
   getCoreRowModel,
@@ -419,7 +420,7 @@ function DataRow<T>({ row, columns, onClick, isActive }: DataRowProps<T>) {
 
 export function ResetColumnsLink({ tableId, onReset }: { tableId: string; onReset?: () => void }) {
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={() => {
         resetLayout(tableId);
@@ -432,7 +433,7 @@ export function ResetColumnsLink({ tableId, onReset }: { tableId: string; onRese
       className="text-[11px] text-slate-500 underline-offset-2 hover:underline"
     >
       Reset column layout
-    </button>
+    </Button>
   );
 }
 

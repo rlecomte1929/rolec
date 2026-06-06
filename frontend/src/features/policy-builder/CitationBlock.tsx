@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useCallback, useId } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -247,14 +248,14 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
               return (
                 <sup key={i}>
                   {hasCitation ? (
-                    <button
+                    <Button unstyled
                       onClick={(e) => handleCiteClick(citeIndex, e)}
                       className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded bg-[#eaf1f7] text-[#0b2b43] text-[10px] font-bold hover:bg-[#d4e4f0] transition-colors cursor-pointer ml-0.5"
                       aria-label={`Source ${citeIndex}`}
                       type="button"
                     >
                       {citeIndex}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="text-[#9ca3af] text-[10px] ml-0.5">[{citeIndex}]</span>
                   )}
@@ -268,7 +269,7 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
         {displayedCitations.length > 0 && (
           <div className="border-t border-[#e2e8f0]">
             {/* Toggle button */}
-            <button
+            <Button unstyled
               onClick={toggleSources}
               className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-[#6b7280] hover:text-[#1f2937] hover:bg-[#f9fafb] transition-colors rounded-b-xl"
               aria-expanded={sourcesOpen}
@@ -286,7 +287,7 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
               ) : (
                 <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
               )}
-            </button>
+            </Button>
 
             {/* Citation list */}
             {sourcesOpen && (

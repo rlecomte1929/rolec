@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
@@ -331,21 +332,20 @@ export const HrComplianceCheck: React.FC = () => {
           <div className="border-b border-[#e2e8f0]">
             <div className="flex gap-6 text-sm text-[#6b7280]">
               {(['requirements', 'verification', 'risk'] as TabId[]).map((tab) => (
-                <button
+                <Button unstyled
                   key={tab}
                   className={`pb-3 ${activeTab === tab ? 'text-[#0b2b43] font-semibold border-b-2 border-[#0b2b43]' : ''}`}
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab === 'requirements' ? 'Requirements' : tab === 'verification' ? 'Verification Checks' : 'Risk & Guidance'}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-[#6b7280]">
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={showBlockingOnly}
                 onChange={(event) => setShowBlockingOnly(event.target.checked)}
               />

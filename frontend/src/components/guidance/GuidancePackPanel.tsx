@@ -183,12 +183,12 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
             {pack.pack_hash && (
               <span>
                 Pack hash: {pack.pack_hash.slice(0, 8)}...
-                <button
+                <Button unstyled
                   className="text-[#1d4ed8] underline ml-1"
                   onClick={() => navigator.clipboard?.writeText(pack.pack_hash || '')}
                 >
                   Copy
-                </button>
+                </Button>
               </span>
             )}
             {typeof pack.coverage?.score === 'number' && (
@@ -218,13 +218,13 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
 
           <div className="flex items-center gap-2 text-sm mb-3">
             {(['plan', 'checklist', 'sources', 'guide', 'explain'] as const).map((t) => (
-              <button
+              <Button unstyled
                 key={t}
                 onClick={() => setTab(t)}
                 className={`px-3 py-1 rounded-full border ${tab === t ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]' : 'border-transparent text-[#6b7280]'}`}
               >
                 {t === 'plan' ? 'Plan' : t === 'checklist' ? 'Checklist' : t === 'sources' ? 'Sources' : t === 'guide' ? 'Full Guide' : 'Explain'}
-              </button>
+              </Button>
             ))}
           </div>
 

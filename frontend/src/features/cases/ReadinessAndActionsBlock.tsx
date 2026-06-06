@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { Badge, Card } from '../../components/antigravity';
 import type { AssignmentDetail } from '../../types';
 import { scrollToPlanTask } from './CaseOperationalSection';
@@ -15,13 +16,13 @@ function statusBadgeVariant(
 
 function PlanJumpLink({ milestoneType, label }: { milestoneType: string; label: string }) {
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={() => scrollToPlanTask(milestoneType)}
       className="ml-2 text-xs font-medium text-[#1d4ed8] hover:underline whitespace-nowrap"
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -110,14 +111,14 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
       <p className="text-xs text-[#64748b] mt-4 border-t border-[#e2e8f0] pt-3 leading-relaxed">{ui.trust_banner}</p>
 
       <div className="mt-4">
-        <button
+        <Button unstyled
           type="button"
           onClick={() => setShowIntakeDetail((v) => !v)}
           className="text-sm font-medium text-[#1d4ed8] hover:underline"
         >
           {showIntakeDetail ? 'Hide' : 'Show'} intake checkpoint detail ({intake.filter((i) => i.satisfied).length}/
           {intake.length} satisfied)
-        </button>
+        </Button>
         {showIntakeDetail && intake.length > 0 && (
           <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             {intake.map((row) => (

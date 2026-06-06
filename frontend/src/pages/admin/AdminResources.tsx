@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -127,15 +128,15 @@ export const AdminResources: React.FC = () => {
         </div>
         <Card padding="lg">
           <div className="flex flex-wrap gap-2 mb-4">
-            <input
+            <Input unstyled
               value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
               placeholder="Search title"
               className="rounded border border-slate-200 px-3 py-2 text-sm w-48"
             />
-            <input
+            <Input unstyled
               value={filters.country_code}
-              onChange={(e) => setFilters((f) => ({ ...f, country_code: e.target.value }))}
+              onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))}
               placeholder="Country"
               className="rounded border border-slate-200 px-3 py-2 text-sm w-24"
             />

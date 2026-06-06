@@ -10,6 +10,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { Button } from './antigravity/Button';
 /** How long before the banner auto-hides if not dismissed (ms). */
 const AUTO_HIDE_MS = 30_000;
 
@@ -49,19 +50,19 @@ export const GlobalApiErrorBanner: React.FC = () => {
         <strong>Cannot reach the server.</strong> Check your connection or try again.
       </span>
       <div className="flex items-center gap-3 shrink-0">
-        <button
+        <Button unstyled
           onClick={() => window.location.reload()}
           className="px-3 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-900 font-medium text-xs transition-colors"
         >
           Try again
-        </button>
-        <button
+        </Button>
+        <Button unstyled
           onClick={dismiss}
           aria-label="Dismiss"
           className="text-rose-400 hover:text-rose-700 transition-colors"
         >
           ✕
-        </button>
+        </Button>
       </div>
     </div>
   );

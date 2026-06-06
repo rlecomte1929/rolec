@@ -1,3 +1,5 @@
+import { Button } from './antigravity/Button';
+import { Input } from './antigravity/Input';
 /// <reference types="vite/client" />
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@supabase/supabase-js"
@@ -189,7 +191,7 @@ function ProviderRow({ provider, onUpdated }: ProviderRowProps) {
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 shadow-sm">
       {/* Header */}
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400"
@@ -236,7 +238,7 @@ function ProviderRow({ provider, onUpdated }: ProviderRowProps) {
           )}
           <span className="text-gray-400 text-sm">{expanded ? "▲" : "▼"}</span>
         </div>
-      </button>
+      </Button>
 
       {/* Mobile task count bar */}
       {total > 0 && (
@@ -360,14 +362,14 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
           <h2 id="assign-task-title" className="text-lg font-semibold text-gray-800">
             Assign Task
           </h2>
-          <button
+          <Button unstyled
             type="button"
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-xl leading-none focus:outline-none"
             aria-label="Close modal"
           >
             ×
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
@@ -396,11 +398,11 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
             <label htmlFor="at-title" className="text-sm font-medium text-gray-700">
               Task title <span className="text-red-500">*</span>
             </label>
-            <input
+            <Input unstyled
               id="at-title"
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(v) => setTitle(v)}
               placeholder="e.g. Confirm lease agreement"
               required
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -427,11 +429,11 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
             <label htmlFor="at-due" className="text-sm font-medium text-gray-700">
               Due date <span className="text-gray-400 font-normal">(optional)</span>
             </label>
-            <input
+            <Input unstyled
               id="at-due"
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(v) => setDueDate(v)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
@@ -443,20 +445,20 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
           )}
 
           <div className="flex justify-end gap-3 pt-1">
-            <button
+            <Button unstyled
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="submit"
               disabled={submitting}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {submitting ? "Assigning…" : "Assign Task"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -549,13 +551,13 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
       <div className="flex items-center justify-between mb-4 px-1">
         <h1 className="text-xl font-bold text-gray-900">Provider Coordination</h1>
         {!loading && providers.length > 0 && (
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <span aria-hidden>+</span> Assign Task
-          </button>
+          </Button>
         )}
       </div>
 
@@ -563,13 +565,13 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
       {fetchError && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
           {fetchError}
-          <button
+          <Button unstyled
             type="button"
             onClick={fetchProviders}
             className="ml-3 underline hover:no-underline font-medium"
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -610,13 +612,13 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
       {/* Floating assign button (visible when scrolled down on mobile) */}
       {!loading && providers.length > 0 && (
         <div className="fixed bottom-6 right-4 sm:hidden z-40">
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-full shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <span aria-hidden>+</span> Assign Task
-          </button>
+          </Button>
         </div>
       )}
 

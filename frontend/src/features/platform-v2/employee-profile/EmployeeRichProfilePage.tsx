@@ -1,4 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -199,7 +201,7 @@ function MultiChip({ value, onChange, options }: { value: string[]; onChange: (v
   return (
     <div className="flex flex-wrap gap-1.5 mt-1">
       {options.map((o) => (
-        <button
+        <Button unstyled
           key={o}
           type="button"
           onClick={() => toggle(o)}
@@ -210,7 +212,7 @@ function MultiChip({ value, onChange, options }: { value: string[]; onChange: (v
           }`}
         >
           {o}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -220,14 +222,14 @@ function StarRating({ value, onChange, max = 5 }: { value: number; onChange: (v:
   return (
     <span className="flex gap-0.5">
       {Array.from({ length: max }).map((_, i) => (
-        <button
+        <Button unstyled
           key={i}
           type="button"
           onClick={() => onChange(i + 1)}
           className={`text-base leading-none transition-colors ${i < value ? 'text-accent-500' : 'text-gray-200'}`}
         >
           ★
-        </button>
+        </Button>
       ))}
     </span>
   );
@@ -255,13 +257,13 @@ function FieldWrap({
         {label}
         {optional && <span className="text-gray-400 font-normal">(optional)</span>}
         {why && (
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setWhyOpen((o) => !o)}
             className="text-accent-500 text-[10px] font-medium hover:text-accent-700"
           >
             Why?
-          </button>
+          </Button>
         )}
       </label>
       {children}
@@ -308,9 +310,9 @@ function TierGate({ tier, required, label, children }: { tier: Tier; required: T
             <span className="px-1.5 py-0.5 rounded bg-accent-100 text-accent-700 text-xs font-bold">{LABEL[required]}</span>
           </div>
           <div className="text-xs text-gray-500 mt-1">Ask your HR team to upgrade your ReloPass plan to unlock {label}.</div>
-          <button className="mt-3 px-4 py-1.5 rounded-lg bg-navy-800 text-white text-xs font-semibold hover:bg-navy-900 transition-colors">
+          <Button unstyled className="mt-3 px-4 py-1.5 rounded-lg bg-navy-800 text-white text-xs font-semibold hover:bg-navy-900 transition-colors">
             Request upgrade
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -370,7 +372,7 @@ function SectionCard({
       } ${state === 'complete' ? 'bg-green-50/30' : 'bg-white'}`}
     >
       {/* Header */}
-      <button
+      <Button unstyled
         type="button"
         onClick={onToggle}
         className="w-full flex items-start gap-4 px-5 py-4 text-left hover:bg-gray-50/50 transition-colors"
@@ -409,7 +411,7 @@ function SectionCard({
           </span>
           <span className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
         </div>
-      </button>
+      </Button>
 
       {/* Body */}
       {expanded && <div className="px-5 pb-5 border-t border-gray-100">{children}</div>}
@@ -501,9 +503,9 @@ export function EmployeeRichProfilePage() {
           </div>
           <div className="flex items-end justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Your profile &amp; preferences</h1>
-            <button className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Button unstyled className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
               ↓ Export data
-            </button>
+            </Button>
           </div>
           <p className="mt-2 text-sm text-gray-500 max-w-2xl">
             Each completed section unlocks smarter recommendations and adds milestones to your roadmap. None of this blocks your case.
@@ -525,7 +527,7 @@ export function EmployeeRichProfilePage() {
               <span>Start: Within 6 weeks</span>
             </div>
           </div>
-          <button className="text-xs text-accent-600 font-medium hover:text-accent-800">Edit →</button>
+          <Button unstyled className="text-xs text-accent-600 font-medium hover:text-accent-800">Edit →</Button>
         </div>
 
         {/* Two-column layout: side + main */}
@@ -551,7 +553,7 @@ export function EmployeeRichProfilePage() {
               {SECTIONS.map((s) => {
                 const st = sectionCompletionState(s.id, profile, MEMBERS);
                 return (
-                  <button
+                  <Button unstyled
                     key={s.id}
                     type="button"
                     onClick={() => focusSection(s.id)}
@@ -566,7 +568,7 @@ export function EmployeeRichProfilePage() {
                     />
                     <span className="font-medium truncate">{s.title}</span>
                     <span className="ml-auto text-gray-300 text-[10px]">{s.marker}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -594,8 +596,8 @@ export function EmployeeRichProfilePage() {
                     {profile.origin_housing_status === 'Renting' && (
                       <>
                         <FieldWrap label="Lease end date">
-                          <input type="date" value={profile.lease_end_date}
-                            onChange={(e) => set('lease_end_date', e.target.value)}
+                          <Input unstyled type="date" value={profile.lease_end_date}
+                            onChange={(v) => set('lease_end_date', v)}
                             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                         </FieldWrap>
                         <FieldWrap label="Break clause in your lease?">
@@ -612,8 +614,8 @@ export function EmployeeRichProfilePage() {
                         </FieldWrap>
                         {profile.is_selling === 'Yes' && (
                           <FieldWrap label="Expected sale completion" optional>
-                            <input type="date" value={profile.sale_date}
-                              onChange={(e) => set('sale_date', e.target.value)}
+                            <Input unstyled type="date" value={profile.sale_date}
+                              onChange={(v) => set('sale_date', v)}
                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                           </FieldWrap>
                         )}
@@ -656,18 +658,18 @@ export function EmployeeRichProfilePage() {
                       options={['Apartment', 'House', 'Either']} />
                   </FieldWrap>
                   <FieldWrap label="Bedrooms" hint={`Auto-suggested ${children.length + 1} based on your household.`}>
-                    <input type="number" min={1} max={8} value={profile.bedrooms_needed}
-                      onChange={(e) => set('bedrooms_needed', Number(e.target.value))}
+                    <Input unstyled type="number" min={1} max={8} value={profile.bedrooms_needed}
+                      onChange={(v) => set('bedrooms_needed', Number(v))}
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                   </FieldWrap>
                   <FieldWrap label="Monthly housing budget (€/mo)">
                     <div className="flex items-center gap-2">
-                      <input type="number" placeholder="min" value={profile.monthly_budget_min}
-                        onChange={(e) => set('monthly_budget_min', e.target.value === '' ? '' : Number(e.target.value))}
+                      <Input unstyled type="number" placeholder="min" value={profile.monthly_budget_min}
+                        onChange={(v) => set('monthly_budget_min', v === '' ? '' : Number(v))}
                         className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                       <span className="text-gray-400 text-sm">—</span>
-                      <input type="number" placeholder="max" value={profile.monthly_budget_max}
-                        onChange={(e) => set('monthly_budget_max', e.target.value === '' ? '' : Number(e.target.value))}
+                      <Input unstyled type="number" placeholder="max" value={profile.monthly_budget_max}
+                        onChange={(v) => set('monthly_budget_max', v === '' ? '' : Number(v))}
                         className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                     </div>
                     {profile.policy_cap && (
@@ -849,12 +851,12 @@ export function EmployeeRichProfilePage() {
                         </div>
                         <Grid>
                           <FieldWrap label="Name" optional>
-                            <input value={extra.name ?? ''} onChange={(e) => setExtra('name', e.target.value)} placeholder="e.g. Hugo"
+                            <Input unstyled value={extra.name ?? ''} onChange={(v) => setExtra('name', v)} placeholder="e.g. Hugo"
                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                           </FieldWrap>
                           <FieldWrap label="Age (years)">
-                            <input type="number" min={0} max={25} value={extra.age ?? ''}
-                              onChange={(e) => setExtra('age', Number(e.target.value))}
+                            <Input unstyled type="number" min={0} max={25} value={extra.age ?? ''}
+                              onChange={(v) => setExtra('age', Number(v))}
                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                           </FieldWrap>
                           <FieldWrap label="Vaccinations up to date?">

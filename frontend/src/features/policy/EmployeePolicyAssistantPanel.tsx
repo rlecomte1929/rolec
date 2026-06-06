@@ -193,7 +193,7 @@ function AnswerResultCard({
           propagation (copy button). The chevron is the visual
           affordance for keyboard + screen reader users. role=button
           on the wrapping div + aria-expanded + Enter/Space handler
-          keeps a11y intact without needing nested <button>s. */}
+          keeps a11y intact without needing nested <Button unstyled>s. */}
       <div
         role="button"
         tabIndex={0}
@@ -228,7 +228,7 @@ function AnswerResultCard({
             </span>
           ) : null}
           <div className="flex items-center gap-1">
-            <button
+            <Button unstyled
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -238,7 +238,7 @@ function AnswerResultCard({
             >
               <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
               {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
-            </button>
+            </Button>
             <span
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500"
               aria-hidden
@@ -316,7 +316,7 @@ function AnswerResultCard({
                     }
                     return (
                       <li key={i}>
-                        <button
+                        <Button unstyled
                           type="button"
                           onClick={handleScroll}
                           aria-label={`Show ${headline} on the policy page`}
@@ -338,7 +338,7 @@ function AnswerResultCard({
                           {showExtraAttribution ? (
                             <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
                           ) : null}
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}
@@ -368,7 +368,7 @@ function AnswerResultCard({
                 <ul className="flex flex-wrap gap-2">
                   {answer.follow_up_options.map((opt, i) => (
                     <li key={i}>
-                      <button
+                      <Button unstyled
                         type="button"
                         className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50"
                         onClick={() =>
@@ -382,7 +382,7 @@ function AnswerResultCard({
                         }
                       >
                         {opt.label}
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -631,7 +631,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
             <ul className="flex flex-col gap-2">
               {shortcuts.map((s) => (
                 <li key={s}>
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={() => applySuggestion(s)}
                     disabled={submitting}
@@ -639,7 +639,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
                   >
                     <span className="min-w-0 leading-snug">{s}</span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -729,7 +729,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
             <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
             <div className="flex flex-wrap gap-2">
               {shortcuts.map((s) => (
-                <button
+                <Button unstyled
                   key={s}
                   type="button"
                   onClick={() => applySuggestion(s)}
@@ -737,7 +737,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
                   className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
                 >
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
           </section>

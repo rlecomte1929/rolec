@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { isSignificant } from '../../lib/stats';
 
 // ─── Types (mirror AnalysisPayload from friction-analysis edge function) ───────
@@ -277,22 +278,22 @@ export const AbTestExperimentCard: React.FC<Props> = ({
 
       {/* Actions */}
       <div className="px-5 py-3 flex items-center gap-3 border-t border-slate-100">
-        <button
+        <Button unstyled
           onClick={handlePromote}
           disabled={promoting || rollingBack || status !== 'significant_winner'}
           className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title={status !== 'significant_winner' ? 'Only available when experiment shows a significant winner' : 'Set variant to 100% traffic'}
         >
           {promoting ? 'Promoting…' : 'Promote Winner'}
-        </button>
-        <button
+        </Button>
+        <Button unstyled
           onClick={handleRollback}
           disabled={promoting || rollingBack || !flag.enabled}
           className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title={!flag.enabled ? 'Flag is already disabled' : 'Reset to 100% control'}
         >
           {rollingBack ? 'Rolling back…' : 'Rollback'}
-        </button>
+        </Button>
         {actionMsg && (
           <p className="text-xs text-slate-600 ml-1">{actionMsg}</p>
         )}

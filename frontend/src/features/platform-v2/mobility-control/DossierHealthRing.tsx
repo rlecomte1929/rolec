@@ -4,6 +4,7 @@
  */
 import React from 'react';
 
+import { Button } from '../../../components/antigravity/Button';
 export type DossierRingStatus = 'green' | 'amber' | 'red' | 'empty';
 
 export interface DossierHealthRingProps {
@@ -46,7 +47,7 @@ export const DossierHealthRing: React.FC<DossierHealthRingProps> = ({
     : `${readyCount} ready · ${actionCount} in progress · ${blockedCount} blocked`;
 
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={onClick}
       disabled={disabled || totalForms === 0}
@@ -79,6 +80,6 @@ export const DossierHealthRing: React.FC<DossierHealthRingProps> = ({
           {totalForms === 0 ? '—' : `${pct}%`}
         </text>
       </svg>
-    </button>
+    </Button>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { Link, useParams } from 'react-router-dom';
 import { AdminLayout } from '../AdminLayout';
 import { adminStagingAPI } from '../../../api/client';
@@ -338,13 +339,13 @@ export const AdminStagingEventDetail: React.FC = () => {
                 rows={2}
               />
               <div className="space-y-2">
-                <button
+                <Button unstyled
                   onClick={handleApproveNew}
                   disabled={actionLoading}
                   className="block w-full rounded bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700 disabled:opacity-50"
                 >
                   Approve as new live draft
-                </button>
+                </Button>
                 {matches.length > 0 && (
                   <>
                     <div className="border-t border-slate-100 pt-2">
@@ -366,46 +367,46 @@ export const AdminStagingEventDetail: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <button
+                      <Button unstyled
                         onClick={handleMerge}
                         disabled={!mergeTargetId || actionLoading}
                         className="mt-2 block w-full rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
                       >
                         Merge into selected
-                      </button>
+                      </Button>
                     </div>
-                    <button
+                    <Button unstyled
                       onClick={handleMarkDuplicate}
                       disabled={!mergeTargetId || actionLoading}
                       className="block w-full rounded bg-slate-600 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
                     >
                       Mark as duplicate of selected
-                    </button>
+                    </Button>
                   </>
                 )}
-                <button
+                <Button unstyled
                   onClick={handleReject}
                   disabled={actionLoading}
                   className="block w-full rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-50"
                 >
                   Reject
-                </button>
-                <button
+                </Button>
+                <Button unstyled
                   onClick={handleIgnore}
                   disabled={actionLoading}
                   className="block w-full rounded border border-slate-400 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 >
                   Ignore
-                </button>
+                </Button>
               </div>
               {canRestore && (
-                <button
+                <Button unstyled
                   onClick={handleRestore}
                   disabled={actionLoading}
                   className="mt-3 block w-full rounded border border-amber-500 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50"
                 >
                   Restore to needs review
-                </button>
+                </Button>
               )}
             </div>
           )}

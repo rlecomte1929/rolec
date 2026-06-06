@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { Button } from './antigravity/Button';
 interface Props {
   children: React.ReactNode;
 }
@@ -38,13 +39,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
               </pre>
             )}
             <div className="flex items-center justify-center gap-3 pt-2">
-              <button
+              <Button unstyled
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-[#0b2b43] text-white text-sm rounded-lg hover:bg-[#0a2236]"
               >
                 Reload page
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 onClick={() => {
                   this.setState({ hasError: false, error: null });
                   window.location.href = '/';
@@ -52,7 +53,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 className="px-4 py-2 border border-[#e2e8f0] text-[#4b5563] text-sm rounded-lg hover:bg-[#f8fafc]"
               >
                 Go to home
-              </button>
+              </Button>
             </div>
           </div>
         </div>

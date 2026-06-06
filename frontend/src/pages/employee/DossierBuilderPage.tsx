@@ -10,6 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   DndContext,
@@ -94,7 +95,7 @@ function SortableFormRow({ form, index }: SortableFormRowProps) {
       className={`flex items-center gap-3 p-3 rounded-lg border bg-white ${isDragging ? 'shadow-lg border-[#0b2b43]/30' : 'border-slate-200 shadow-sm'}`}
     >
       {/* Drag handle */}
-      <button
+      <Button unstyled
         type="button"
         {...attributes}
         {...listeners}
@@ -102,7 +103,7 @@ function SortableFormRow({ form, index }: SortableFormRowProps) {
         aria-label="Drag to reorder"
       >
         <GripVertical className="h-4 w-4" />
-      </button>
+      </Button>
 
       {/* Position index */}
       <span className="flex-none w-5 text-center text-xs font-semibold text-slate-400">{index + 1}</span>
@@ -186,7 +187,7 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
         {STEP1_FILTER_TABS.map((tab) => {
           const isActive = filterTab === tab.key;
           return (
-            <button
+            <Button unstyled
               key={tab.key}
               type="button"
               onClick={() => setFilterTab(tab.key)}
@@ -203,7 +204,7 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
                 {tabCounts[tab.key]}
               </span>
               {isActive && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#0b2b43]" />}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -228,7 +229,7 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
           {filteredForms.map((form) => {
             const selected = selectedIds.has(form.id);
             return (
-              <button
+              <Button unstyled
                 key={form.id}
                 type="button"
                 onClick={() => onToggle(form.id)}
@@ -271,7 +272,7 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border flex-none ${statusColor(form.status)}`}>
                   {statusLabel(form.status)}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -334,7 +335,7 @@ function Step2({ orderedForms, onReorder, coverPage, onCoverPageChange }: Step2P
         {/* Cover page toggle */}
         <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
           <label className="flex items-center gap-3 cursor-pointer">
-            <button
+            <Button unstyled
               type="button"
               role="checkbox"
               aria-checked={coverPage}
@@ -346,7 +347,7 @@ function Step2({ orderedForms, onReorder, coverPage, onCoverPageChange }: Step2P
               ) : (
                 <Square className="h-5 w-5 text-slate-300" />
               )}
-            </button>
+            </Button>
             <div>
               <div className="text-sm font-medium text-slate-800">Include cover page</div>
               <div className="text-xs text-slate-500 mt-0.5">
@@ -455,13 +456,13 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
 
       {/* Build button (shown when not yet built) */}
       {!result && !building && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => void build()}
           className="inline-flex items-center gap-2 rounded-lg bg-[#0b2b43] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08213a] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/50"
         >
           Build dossier
-        </button>
+        </Button>
       )}
 
       {/* Building state */}
@@ -476,13 +477,13 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
           {error}
-          <button
+          <Button unstyled
             type="button"
             onClick={() => void build()}
             className="ml-3 underline font-medium"
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -502,7 +503,7 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
 
           {/* Prominent download / print buttons */}
           <div className="flex flex-wrap gap-3">
-            <button
+            <Button unstyled
               type="button"
               onClick={handleDownloadPdf}
               disabled={!result.pdf_url}
@@ -510,9 +511,9 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
             >
               <Download className="h-4 w-4" />
               Download PDF
-            </button>
+            </Button>
 
-            <button
+            <Button unstyled
               type="button"
               onClick={() => void handleDownloadZip()}
               data-testid="download-zip-btn"
@@ -520,9 +521,9 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
             >
               <Download className="h-4 w-4" />
               Download ZIP
-            </button>
+            </Button>
 
-            <button
+            <Button unstyled
               type="button"
               onClick={handlePrint}
               disabled={!result.pdf_url}
@@ -534,18 +535,18 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
                 <rect x="6" y="14" width="12" height="8" />
               </svg>
               Print
-            </button>
+            </Button>
           </div>
 
           {/* Done link */}
           <div className="pt-1">
-            <button
+            <Button unstyled
               type="button"
               onClick={onDone}
               className="text-sm text-slate-500 hover:text-slate-700 underline"
             >
               Back to my dossier
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -640,14 +641,14 @@ export const DossierBuilderPage: React.FC = () => {
               Select forms, arrange them, and download a ZIP of PDFs.
             </p>
           </div>
-          <button
+          <Button unstyled
             type="button"
             onClick={handleDone}
             aria-label="Close builder"
             className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Step indicator */}
@@ -736,27 +737,27 @@ export const DossierBuilderPage: React.FC = () => {
           <div className="flex items-center justify-between mt-5">
             {/* Back */}
             {step === 1 ? (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleDone}
                 className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Cancel
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={step === 2 ? backToStep1 : backToStep2}
                 className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Back
-              </button>
+              </Button>
             )}
 
             {/* Next */}
-            <button
+            <Button unstyled
               type="button"
               disabled={step === 1 ? !canAdvanceStep1 : !canAdvanceStep2}
               onClick={step === 1 ? goToStep2 : goToStep3}
@@ -764,7 +765,7 @@ export const DossierBuilderPage: React.FC = () => {
             >
               {step === 1 ? 'Order & preview' : 'Export'}
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         )}
       </div>

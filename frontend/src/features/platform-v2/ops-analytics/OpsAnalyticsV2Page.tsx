@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AdminOpsLayout } from '../../../pages/admin/ops/AdminOpsLayout';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
 import {
@@ -238,9 +239,9 @@ export function OpsAnalyticsV2Page() {
             All ops analytics endpoints failed in this environment (likely the Supabase
             <code className="mx-1">review_queue_items</code> and related tables aren't populated).
           </span>
-          <button type="button" onClick={() => void load()} className="text-amber-700 hover:underline">
+          <Button unstyled type="button" onClick={() => void load()} className="text-amber-700 hover:underline">
             Retry
-          </button>
+          </Button>
         </div>
       )}
       {!backendUnavailable && degraded.length > 0 && (

@@ -15,6 +15,7 @@
  *                                 preserving the old; we redirect to its editor
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Button, Card } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -306,7 +307,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
               const isActive = tab === t.key;
               const isDisabled = isNew && t.key !== 'basic';
               return (
-                <button
+                <Button unstyled
                   key={t.key}
                   type="button"
                   onClick={() => !isDisabled && setTab(t.key)}
@@ -324,7 +325,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
                   {isActive && (
                     <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#0b2b43]" />
                   )}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -337,9 +338,9 @@ export const AdminFormTemplateEditor: React.FC = () => {
                 </h2>
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Code" required hint="e.g. UTL-2011">
-                    <input
+                    <Input unstyled
                       value={form.code}
-                      onChange={(e) => update('code', e.target.value)}
+                      onChange={(v) => update('code', v)}
                       className="w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
                       placeholder="UTL-2011"
                       autoFocus={isNew}
@@ -347,18 +348,18 @@ export const AdminFormTemplateEditor: React.FC = () => {
                   </Field>
 
                   <Field label="Version" required hint='Bump to create a new revision (e.g. "2.0.0")'>
-                    <input
+                    <Input unstyled
                       value={form.version}
-                      onChange={(e) => update('version', e.target.value)}
+                      onChange={(v) => update('version', v)}
                       className="w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
                       placeholder="1.0.0"
                     />
                   </Field>
 
                   <Field label="Name" required className="col-span-2">
-                    <input
+                    <Input unstyled
                       value={form.name}
-                      onChange={(e) => update('name', e.target.value)}
+                      onChange={(v) => update('name', v)}
                       className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
                       placeholder="Notification of move (NO)"
                     />
@@ -394,18 +395,18 @@ export const AdminFormTemplateEditor: React.FC = () => {
                   </Field>
 
                   <Field label="Authority code" hint="e.g. UDI, OFII">
-                    <input
+                    <Input unstyled
                       value={form.authority_code}
-                      onChange={(e) => update('authority_code', e.target.value)}
+                      onChange={(v) => update('authority_code', v)}
                       className="w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
                       placeholder="UDI"
                     />
                   </Field>
 
                   <Field label="Authority name">
-                    <input
+                    <Input unstyled
                       value={form.authority_name}
-                      onChange={(e) => update('authority_name', e.target.value)}
+                      onChange={(v) => update('authority_name', v)}
                       className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
                       placeholder="Norwegian Directorate of Immigration"
                     />

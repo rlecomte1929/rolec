@@ -4,6 +4,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import type { PolicyTier, PolicyBenefit, BenefitValueType } from '../../../types/relopass-api-contracts';
 import { EmptyState } from '../shared';
 
@@ -88,10 +90,10 @@ function BenefitRow({ benefit, onSave, onSaved }: BenefitRowProps) {
 
       {/* Name */}
       <td style={{ padding: '10px 8px' }}>
-        <input
+        <Input unstyled
           type="text"
           value={local.name}
-          onChange={e => update('name', e.target.value)}
+          onChange={v => update('name', v)}
           onBlur={handleBlur}
           style={cellInput}
           onFocus={e => (e.target.style.borderBottomColor = 'var(--accent)')}
@@ -129,10 +131,10 @@ function BenefitRow({ benefit, onSave, onSaved }: BenefitRowProps) {
             <option value="false">No</option>
           </select>
         ) : (
-          <input
+          <Input unstyled
             type={local.value_type === 'days' ? 'number' : 'text'}
             value={local.benefit_value}
-            onChange={e => update('benefit_value', e.target.value)}
+            onChange={v => update('benefit_value', v)}
             onBlur={handleBlur}
             style={cellInput}
             onFocus={e => (e.target.style.borderBottomColor = 'var(--accent)')}
@@ -143,7 +145,7 @@ function BenefitRow({ benefit, onSave, onSaved }: BenefitRowProps) {
 
       {/* Mandatory toggle */}
       <td style={{ padding: '10px 12px', textAlign: 'center', width: '90px' }}>
-        <button
+        <Button unstyled
           role="switch"
           aria-checked={false}
           onClick={handleBlur}
@@ -155,7 +157,7 @@ function BenefitRow({ benefit, onSave, onSaved }: BenefitRowProps) {
           title="Toggle mandatory"
         >
           <span style={{ position: 'absolute', top: '2px', left: '2px', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--text-muted)', transition: 'transform 0.2s' }} />
-        </button>
+        </Button>
       </td>
     </tr>
   );
@@ -233,13 +235,13 @@ export function PolicyBuilder({ tiers, benefits, onSaveTier: _onSaveTier, onCrea
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg, 12px)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)' }}>Tiers</span>
-            <button
+            <Button unstyled
               onClick={handleCreateTier}
               disabled={creatingTier}
               style={{ padding: '5px 10px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: '12px', border: 'none', cursor: creatingTier ? 'not-allowed' : 'pointer', opacity: creatingTier ? 0.7 : 1 }}
             >
               {creatingTier ? '…' : '+ New tier'}
-            </button>
+            </Button>
           </div>
 
           {tiers.length === 0 ? (
@@ -305,13 +307,13 @@ export function PolicyBuilder({ tiers, benefits, onSaveTier: _onSaveTier, onCrea
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{selectedTier.description}</p>
                   )}
                 </div>
-                <button
+                <Button unstyled
                   onClick={handleAddBenefit}
                   disabled={addingBenefit}
                   style={{ padding: '7px 14px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--surface-hover)', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', border: '1px solid var(--border)', cursor: addingBenefit ? 'not-allowed' : 'pointer', opacity: addingBenefit ? 0.7 : 1 }}
                 >
                   {addingBenefit ? 'Adding…' : '+ Add benefit'}
-                </button>
+                </Button>
               </div>
 
               {tierBenefits.length === 0 ? (

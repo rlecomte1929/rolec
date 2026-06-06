@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { logger } from '../../lib/logger';
@@ -567,7 +568,7 @@ export const CaseWizardPage: React.FC = () => {
             {hrRequestedSections.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {hrRequestedSections.map((section) => (
-                  <button
+                  <Button unstyled
                     key={section}
                     className="rounded-full border border-[#f59e0b] bg-white px-3 py-1 text-[11px] font-semibold text-[#92400e]"
                     onClick={() => {
@@ -582,7 +583,7 @@ export const CaseWizardPage: React.FC = () => {
                     }}
                   >
                     Fix: {section}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -638,13 +639,13 @@ export const CaseWizardPage: React.FC = () => {
                   Complete these items to keep your case moving.
                 </div>
               </div>
-              <button
+              <Button unstyled
                 onClick={handleClassify}
                 disabled={isClassifying}
                 className="rounded-full border border-[#0b2b43] px-3 py-1 text-xs font-semibold text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-60"
               >
                 {isClassifying ? 'Generating...' : 'Generate next steps'}
-              </button>
+              </Button>
             </div>
             <ul className="mt-3 space-y-2 text-sm text-[#1f2937]">
               {nextActions.length > 0 ? (
@@ -679,17 +680,17 @@ export const CaseWizardPage: React.FC = () => {
             <Card padding="md">
               <div className="text-sm font-semibold text-[#0b2b43]">Need help?</div>
               <div className="text-xs text-[#6b7280] mt-1">Our team can guide you through the wizard.</div>
-              <button className="mt-3 text-xs text-[#0b2b43] underline">Contact support</button>
+              <Button unstyled className="mt-3 text-xs text-[#0b2b43] underline">Contact support</Button>
               {enableTestFill && (
                 <div className="mt-4 border-t border-[#e2e8f0] pt-3">
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={handleFillForTest}
                     title="Demo only — fills the wizard with deterministic answers."
                     className="text-xs text-[#94a3b8] hover:text-[#0b2b43] hover:underline"
                   >
                     Fill for test (demo)
-                  </button>
+                  </Button>
                 </div>
               )}
             </Card>

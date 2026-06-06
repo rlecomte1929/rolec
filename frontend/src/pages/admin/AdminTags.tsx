@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -85,15 +86,15 @@ export const AdminTags: React.FC = () => {
       <Card padding="lg" className="mb-4">
         <h3 className="font-semibold mb-3">New Tag</h3>
         <div className="flex gap-2 flex-wrap items-center">
-          <input
+          <Input unstyled
             value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
+            onChange={(v) => setNewKey(v)}
             placeholder="Key (e.g. family_friendly)"
             className="rounded border border-slate-200 px-3 py-2 w-40"
           />
-          <input
+          <Input unstyled
             value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
+            onChange={(v) => setNewLabel(v)}
             placeholder="Label (e.g. Family Friendly)"
             className="rounded border border-slate-200 px-3 py-2 w-40"
           />
@@ -127,9 +128,9 @@ export const AdminTags: React.FC = () => {
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
-          <input
+          <Input unstyled
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(v) => setSearch(v)}
             placeholder="Search by label/key"
             className="rounded border border-slate-200 px-2 py-1 text-sm w-48"
           />
@@ -145,13 +146,13 @@ export const AdminTags: React.FC = () => {
               </div>
               {editing === t.id ? (
                 <div className="flex gap-2 flex-wrap">
-                  <input
+                  <Input unstyled
                     className="rounded border border-slate-200 px-2 py-1 text-sm w-28"
                     defaultValue={t.label}
                     id={`edit-label-${t.id}`}
                     placeholder="Label"
                   />
-                  <input
+                  <Input unstyled
                     className="rounded border border-slate-200 px-2 py-1 text-sm w-28"
                     defaultValue={t.key}
                     id={`edit-key-${t.id}`}

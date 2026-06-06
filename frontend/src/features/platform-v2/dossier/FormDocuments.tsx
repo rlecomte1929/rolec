@@ -10,6 +10,8 @@
  * - List: all uploaded documents with a signed download link + delete.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FileInput } from '../../../components/antigravity/FileInput';
+import { Button } from '../../../components/antigravity/Button';
 import { formDocumentsAPI, type FormDocument } from '../../../api/dossier';
 import { logger } from '../../../lib/logger';
 
@@ -119,9 +121,8 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
   return (
     <div className="rounded border border-slate-200 px-3 py-2">
       {/* Single hidden input, reused for every upload affordance. */}
-      <input
+      <FileInput
         ref={inputRef}
-        type="file"
         className="hidden"
         onChange={(e) => void handleFile(e)}
         disabled={busy}
@@ -132,14 +133,14 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Supporting documents
         </span>
-        <button
+        <Button unstyled
           type="button"
           onClick={() => pickFile(null)}
           disabled={busy}
           className={`text-sm font-medium text-[#0b2b43] hover:underline ${busy ? 'opacity-50' : ''}`}
         >
           {busy ? 'Working…' : '+ Upload'}
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -165,14 +166,14 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
                 </span>
                 <span className={provided ? 'text-slate-700' : 'text-slate-600'}>{req.label}</span>
                 {!provided && (
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={() => pickFile(req.key)}
                     disabled={busy}
                     className="ml-auto shrink-0 text-xs text-[#0b2b43] hover:underline disabled:opacity-50"
                   >
                     Upload
-                  </button>
+                  </Button>
                 )}
               </li>
             );
@@ -209,7 +210,7 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
               {d.size_bytes != null && (
                 <span className="text-[11px] text-slate-400 shrink-0">{formatSize(d.size_bytes)}</span>
               )}
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => void handleDelete(d.id)}
                 disabled={busy}
@@ -217,7 +218,7 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
                 aria-label={`Delete ${d.file_name}`}
               >
                 Remove
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

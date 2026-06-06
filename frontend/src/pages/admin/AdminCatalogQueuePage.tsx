@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { AdminLayout } from './AdminLayout';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
@@ -136,7 +137,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-1">
             {STATUS_TABS.map((s) => (
-              <button
+              <Button unstyled
                 key={s.value}
                 onClick={() => setTab(s.value)}
                 className={`px-3 py-1 rounded-full border text-sm ${
@@ -146,7 +147,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                 }`}
               >
                 {s.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -227,25 +228,25 @@ export const AdminCatalogQueuePage: React.FC = () => {
           Adding a row here is the same as approving a pending ticket.
         </p>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[2fr,2fr,3fr,auto] gap-3 items-end">
-          <input
+          <Input unstyled
             type="text"
             placeholder="City (e.g. Munich)"
             value={newCity}
-            onChange={(e) => setNewCity(e.target.value)}
+            onChange={(v) => setNewCity(v)}
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           />
-          <input
+          <Input unstyled
             type="text"
             placeholder="Country (e.g. Germany)"
             value={newCountry}
-            onChange={(e) => setNewCountry(e.target.value)}
+            onChange={(v) => setNewCountry(v)}
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           />
-          <input
+          <Input unstyled
             type="text"
             placeholder="Notes (optional)"
             value={newNotes}
-            onChange={(e) => setNewNotes(e.target.value)}
+            onChange={(v) => setNewNotes(v)}
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           />
           <Button onClick={() => void addEntry()} disabled={adding || !newCity.trim() || !newCountry.trim()}>

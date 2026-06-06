@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
@@ -292,13 +293,13 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
               <label htmlFor="imm-partner" className={labelClass}>
                 Immigration partner
               </label>
-              <input
+              <Input unstyled
                 id="imm-partner"
                 type="text"
                 placeholder="e.g. Fragomen, KPMG Law"
                 value={form.partnerName}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, partnerName: e.target.value }))
+                onChange={(v) =>
+                  setForm((f) => ({ ...f, partnerName: v }))
                 }
                 className={fieldClass}
                 aria-label="Immigration partner name"
@@ -311,12 +312,12 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
                 <label htmlFor="imm-submission-date" className={labelClass}>
                   Expected submission
                 </label>
-                <input
+                <Input unstyled
                   id="imm-submission-date"
                   type="date"
                   value={form.expectedSubmissionDate}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, expectedSubmissionDate: e.target.value }))
+                  onChange={(v) =>
+                    setForm((f) => ({ ...f, expectedSubmissionDate: v }))
                   }
                   className={fieldClass}
                   aria-label="Expected submission date"
@@ -326,12 +327,12 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
                 <label htmlFor="imm-grant-date" className={labelClass}>
                   Expected grant
                 </label>
-                <input
+                <Input unstyled
                   id="imm-grant-date"
                   type="date"
                   value={form.expectedGrantDate}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, expectedGrantDate: e.target.value }))
+                  onChange={(v) =>
+                    setForm((f) => ({ ...f, expectedGrantDate: v }))
                   }
                   className={fieldClass}
                   aria-label="Expected permit grant date"

@@ -515,10 +515,10 @@ export const Auth: React.FC = () => {
                 <label htmlFor="auth-login-identifier" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Email or username
                 </label>
-                <input
+                <Input unstyled
                   id="auth-login-identifier"
                   type="text" value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  onChange={(v) => setIdentifier(v)}
                   placeholder="you@company.com" autoComplete="username"
                   className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
                 />
@@ -532,10 +532,10 @@ export const Auth: React.FC = () => {
                   </Button>
                 </div>
                 <div className="relative">
-                  <input
+                  <Input unstyled
                     id="auth-login-password"
                     type={showPassword ? 'text' : 'password'} value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(v) => setPassword(v)}
                     placeholder="••••••••" autoComplete="current-password"
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
                   />

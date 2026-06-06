@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import type { DocStatus, StepStatus, FormStatus } from '../../../types/relopass-api-contracts';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ export function FilterChips({ chips, selected, onSelect }: FilterChipsProps) {
       {chips.map(chip => {
         const active = chip.id === selected;
         return (
-          <button
+          <Button unstyled
             key={chip.id}
             onClick={() => onSelect(chip.id)}
             aria-pressed={active}
@@ -231,7 +232,7 @@ export function FilterChips({ chips, selected, onSelect }: FilterChipsProps) {
                 {chip.count}
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -464,7 +465,7 @@ export function ConfirmDialog({
           </p>
         )}
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <button
+          <Button unstyled
             onClick={onCancel}
             style={{
               padding: '8px 16px',
@@ -477,8 +478,8 @@ export function ConfirmDialog({
             }}
           >
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             ref={confirmRef}
             onClick={onConfirm}
             style={{
@@ -493,7 +494,7 @@ export function ConfirmDialog({
             }}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -553,7 +554,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         </p>
       )}
       {action && (
-        <button
+        <Button unstyled
           onClick={action.onClick}
           style={{
             marginTop: '4px',
@@ -568,7 +569,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
           }}
         >
           {action.label}
-        </button>
+        </Button>
       )}
     </div>
   );

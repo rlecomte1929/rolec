@@ -15,6 +15,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../antigravity/Button';
 import {
   listAssignmentExceptions,
   resolveAssignmentException,
@@ -115,14 +116,14 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
             Benefit-level exceptions flagged for this assignment
           </p>
         </div>
-        <button
+        <Button unstyled
           type="button"
           onClick={() => void load()}
           disabled={loading}
           className="text-xs text-[#0b2b43] hover:underline disabled:opacity-50"
         >
           {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        </Button>
       </div>
 
       {/* Action-level error (e.g. a failed Approve/Reject) — shown above the list, never replaces it. */}
@@ -133,13 +134,13 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
       {loadError ? (
         <div className="px-5 py-8 text-center">
           <p className="text-sm text-[#475569]">{loadError}</p>
-          <button
+          <Button unstyled
             type="button"
             onClick={() => void load()}
             className="mt-3 rounded-lg bg-[#0b2b43] px-4 py-2 text-xs font-medium text-white hover:bg-[#0f3858] transition-colors"
           >
             Refresh exceptions
-          </button>
+          </Button>
         </div>
       ) : loading && rows.length === 0 ? (
         longWait ? (
@@ -239,22 +240,22 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
                       className="w-full rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs text-[#0b2b43] focus:border-[#0b2b43] focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
                     />
                     <div className="flex gap-2 justify-end">
-                      <button
+                      <Button unstyled
                         type="button"
                         onClick={() => void resolve(row, 'rejected')}
                         disabled={isSaving}
                         className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-medium text-[#374151] hover:bg-[#f8fafc] disabled:opacity-50 transition-colors"
                       >
                         Reject
-                      </button>
-                      <button
+                      </Button>
+                      <Button unstyled
                         type="button"
                         onClick={() => void resolve(row, 'approved')}
                         disabled={isSaving}
                         className="rounded-lg bg-[#0b2b43] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#0f3858] disabled:opacity-50 transition-colors"
                       >
                         {isSaving ? 'Saving…' : 'Approve'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -262,7 +263,7 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
                 {/* Audit trail toggle */}
                 {Array.isArray(row.audit_events) && row.audit_events.length > 0 && (
                   <div>
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() =>
                         setExpandedAudit((prev) => ({ ...prev, [row.id]: !prev[row.id] }))
@@ -270,7 +271,7 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
                       className="text-xs text-[#6b7280] hover:text-[#0b2b43] transition-colors"
                     >
                       {showAudit ? '▲ Hide' : '▼ Show'} audit trail ({row.audit_events.length})
-                    </button>
+                    </Button>
                     {showAudit && (
                       <ol className="mt-2 space-y-1 pl-3 border-l-2 border-[#e2e8f0]">
                         {row.audit_events.map((ev, i) => (

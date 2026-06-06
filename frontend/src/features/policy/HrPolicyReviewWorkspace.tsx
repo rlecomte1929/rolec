@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../api/client';
 import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
@@ -809,9 +810,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         <Card padding="lg" id="hr-policy-benefit-matrix">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-[#0b2b43]">Benefit rules by topic</div>
-            <button type="button" onClick={handleExpandAll} className="text-xs text-[#059669] hover:underline">
+            <Button unstyled type="button" onClick={handleExpandAll} className="text-xs text-[#059669] hover:underline">
               {expandAll ? 'Collapse all' : 'Expand all'}
-            </button>
+            </Button>
           </div>
           {groupedBenefits.length === 0 ? (
             <div className="text-sm text-[#6b7280] py-4">
@@ -830,13 +831,13 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               const showEvidence = ruleList.some((r: any) => meta(r, 'evidence_required', false));
               return (
                 <div key={cat} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
-                  <button type="button" onClick={() => toggleTopic(cat)} className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#f8fafc]">
+                  <Button unstyled type="button" onClick={() => toggleTopic(cat)} className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#f8fafc]">
                     <div className="flex items-center gap-2">
                       <span className="text-[#6b7280]">{isExpanded ? '▼' : '▶'}</span>
                       <span className="font-medium text-[#0b2b43]">{label}</span>
                       <span className="text-xs text-[#6b7280]">{rules.length} rule{rules.length !== 1 ? 's' : ''}{autoCount > 0 ? ` · ${autoCount} auto` : ''}{manualCount > 0 ? ` · ${manualCount} manual` : ''}</span>
                     </div>
-                  </button>
+                  </Button>
                   {isExpanded && (
                   <div className="border-t border-[#e2e8f0] bg-white">
           <div className="overflow-x-auto">
@@ -926,8 +927,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                       {showApproval && (
                         <td className="py-2 px-2">
                           {isEditing ? (
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={!!(editingRule?.metadata_json ? meta(editingRule, 'approval_required', false) : approvalReq)}
                               onChange={(e) => {
                                 const m = editingRule?.metadata_json || r?.metadata_json || {};
@@ -942,8 +942,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                       {showEvidence && (
                         <td className="py-2 px-2">
                           {isEditing ? (
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={!!(editingRule?.metadata_json ? meta(editingRule, 'evidence_required', false) : evidenceReq)}
                               onChange={(e) => {
                                 const m = editingRule?.metadata_json || r?.metadata_json || {};
@@ -958,13 +957,13 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                       <td className="py-2 px-2 align-top">
                         <div className="flex flex-col gap-1">
                           {link ? (
-                            <button
+                            <Button unstyled
                               type="button"
                               onClick={() => openSourceClause(link.clause_id)}
                               className="text-xs text-[#059669] hover:underline text-left"
                             >
                               p.{link.source_page_start ?? '?'}
-                            </button>
+                            </Button>
                           ) : (
                             <span className="text-xs text-[#9ca3af]">-</span>
                           )}
@@ -1116,7 +1115,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             <Card padding="lg" className="max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-3">
               <div className="text-sm font-semibold text-[#0b2b43]">View source</div>
-              <button type="button" onClick={(): void => setSourceClause(null)} className="text-[#6b7280] hover:text-[#0b2b43]">Close</button>
+              <Button unstyled type="button" onClick={(): void => setSourceClause(null)} className="text-[#6b7280] hover:text-[#0b2b43]">Close</Button>
             </div>
             <div className="text-xs text-[#6b7280] mb-2">
               Page {sourceClause.source_page_start != null ? sourceClause.source_page_start : '?'}

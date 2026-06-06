@@ -12,6 +12,8 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../antigravity/Input';
+import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 
 type Rfq = {
@@ -202,7 +204,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
               <div className="flex flex-col gap-1.5 shrink-0">
                 {rfq.status === 'sent' && !isReceiving && (
                   <>
-                    <button
+                    <Button unstyled
                       type="button"
                       disabled={isActing}
                       onClick={() => {
@@ -212,35 +214,35 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                       className="rounded-lg border border-[#2563eb] bg-white px-3 py-1.5 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50 transition-colors whitespace-nowrap"
                     >
                       Mark quote received
-                    </button>
-                    <button
+                    </Button>
+                    <Button unstyled
                       type="button"
                       disabled={isActing}
                       onClick={() => handleCancel(rfq)}
                       className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#f8fafc] disabled:opacity-50 transition-colors"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 )}
                 {rfq.status === 'quote_received' && (
                   <>
-                    <button
+                    <Button unstyled
                       type="button"
                       disabled={isActing}
                       onClick={() => handleAccept(rfq)}
                       className="rounded-lg bg-[#16a34a] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#15803d] disabled:opacity-50 transition-colors whitespace-nowrap"
                     >
                       {isActing ? 'Accepting…' : 'Accept quote'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button unstyled
                       type="button"
                       disabled={isActing}
                       onClick={() => handleCancel(rfq)}
                       className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#f8fafc] disabled:opacity-50 transition-colors"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 )}
                 {rfq.status === 'accepted' && (
@@ -258,12 +260,12 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                     <label className="block text-xs text-[#64748b] mb-1">
                       Amount <span className="text-[#ef4444]">*</span>
                     </label>
-                    <input
+                    <Input unstyled
                       type="number"
                       min="0"
                       step="0.01"
                       value={quoteForm.quote_amount}
-                      onChange={(e) => setQuoteForm((f) => ({ ...f, quote_amount: e.target.value }))}
+                      onChange={(v) => setQuoteForm((f) => ({ ...f, quote_amount: v }))}
                       placeholder="e.g. 2500"
                       className="w-full rounded-lg border border-[#d1d5db] px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
                     />
@@ -282,19 +284,19 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                   </div>
                   <div>
                     <label className="block text-xs text-[#64748b] mb-1">Deadline</label>
-                    <input
+                    <Input unstyled
                       type="date"
                       value={quoteForm.quote_deadline}
-                      onChange={(e) => setQuoteForm((f) => ({ ...f, quote_deadline: e.target.value }))}
+                      onChange={(v) => setQuoteForm((f) => ({ ...f, quote_deadline: v }))}
                       className="w-full rounded-lg border border-[#d1d5db] px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
                     />
                   </div>
                   <div>
                     <label className="block text-xs text-[#64748b] mb-1">Deliverable</label>
-                    <input
+                    <Input unstyled
                       type="text"
                       value={quoteForm.quote_deliverable}
-                      onChange={(e) => setQuoteForm((f) => ({ ...f, quote_deliverable: e.target.value }))}
+                      onChange={(v) => setQuoteForm((f) => ({ ...f, quote_deliverable: v }))}
                       placeholder="e.g. 3 housing options"
                       maxLength={100}
                       className="w-full rounded-lg border border-[#d1d5db] px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
@@ -302,21 +304,21 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <Button unstyled
                     type="button"
                     disabled={isActing}
                     onClick={() => handleMarkReceived(rfq)}
                     className="rounded-lg bg-[#0b2b43] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#1e4d6b] disabled:opacity-50 transition-colors"
                   >
                     {isActing ? 'Saving…' : 'Save quote details'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button unstyled
                     type="button"
                     onClick={() => { setReceivingId(null); setError(''); }}
                     className="rounded-lg border border-[#e2e8f0] px-4 py-1.5 text-xs text-[#6b7280] hover:bg-[#f8fafc] transition-colors"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

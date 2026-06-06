@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Badge, Input, Select } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { logger } from '../../lib/logger';
@@ -396,8 +397,7 @@ export const AdminAssignments: React.FC = () => {
                     >
                       {selectionMode && (
                         <td className="py-2 pr-2">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             className="h-4 w-4 rounded border-[#cbd5e1]"
                             checked={selectedIds.has(a.id)}
                             onChange={(e) => {

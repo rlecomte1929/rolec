@@ -24,6 +24,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import {
   AlertTriangle,
   Ban,
@@ -298,7 +299,7 @@ function NextFocusCallout({
     // role="alert" must NOT be on interactive elements — removed. The callout is
     // announced on first render via the surrounding aria-live="polite" region in
     // the loading state; here it is a standard button.
-    <button
+    <Button unstyled
       type="button"
       onClick={onSelect}
       className={`w-full text-left rounded-xl px-4 py-3 flex gap-3 items-start ${bg} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-2`}
@@ -313,7 +314,7 @@ function NextFocusCallout({
           {[dueLine, ownerText, phaseTitle].filter(Boolean).join(' · ')}
         </p>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -486,7 +487,7 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
             >
               Due date
             </label>
-            <input
+            <Input unstyled
               id={`${idPrefix}-date`}
               type="date"
               defaultValue={task.due_date ?? ''}
@@ -683,14 +684,14 @@ function BottomSheet({ open, task, caseId, role, onClose, onSaved }: BottomSheet
         {/* Drag handle + close */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
           <div className="mx-auto w-10 h-1 rounded-full bg-slate-300" aria-hidden />
-          <button
+          <Button unstyled
             type="button"
             onClick={onClose}
             className="absolute right-4 top-3 p-2 rounded-lg text-slate-500 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]"
             aria-label="Close task details"
           >
             <X className="size-5" aria-hidden />
-          </button>
+          </Button>
         </div>
 
         {/* Scrollable content */}
@@ -745,7 +746,7 @@ function TaskRow({
         <TimelineDot status={visual} />
       </span>
 
-      <button
+      <Button unstyled
         type="button"
         onClick={onSelect}
         aria-pressed={selected}
@@ -777,7 +778,7 @@ function TaskRow({
         {visual === 'blocked' && (
           <p className="text-xs text-amber-800 mt-0.5">Blocked</p>
         )}
-      </button>
+      </Button>
     </li>
   );
 }
@@ -880,7 +881,7 @@ function FilterTabs({ active, counts, onChange }: FilterTabsProps) {
         const isActive = active === tab.key;
         const count = counts[tab.key];
         return (
-          <button
+          <Button unstyled
             key={tab.key}
             role="tab"
             aria-selected={isActive}
@@ -899,7 +900,7 @@ function FilterTabs({ active, counts, onChange }: FilterTabsProps) {
             >
               {count}
             </span>
-          </button>
+          </Button>
         );
       })}
     </div>

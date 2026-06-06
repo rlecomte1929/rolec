@@ -14,6 +14,7 @@
  */
 
 import React, { useState } from 'react';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Alert, Card, LoadingButton } from '../../components/antigravity';
 import api from '../../api/client';
 
@@ -121,8 +122,7 @@ export const ImmigrationConsentScreen: React.FC<ImmigrationConsentScreenProps> =
           {/* Required consent */}
           <label className="flex items-start gap-3 cursor-pointer group">
             <div className="mt-0.5">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={requiredChecked}
                 onChange={(e) => setRequiredChecked(e.target.checked)}
                 className="h-4 w-4 rounded border-[#94a3b8] text-[#0b2b43] focus:ring-[#0b2b43]"
@@ -145,8 +145,7 @@ export const ImmigrationConsentScreen: React.FC<ImmigrationConsentScreenProps> =
           {/* Optional consent */}
           <label className="flex items-start gap-3 cursor-pointer group">
             <div className="mt-0.5">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={optionalChecked}
                 onChange={(e) => setOptionalChecked(e.target.checked)}
                 className="h-4 w-4 rounded border-[#94a3b8] text-[#0b2b43] focus:ring-[#0b2b43]"

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
@@ -289,13 +290,13 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
     <div ref={ref} className="relative">
       <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
         <span className="px-3 text-base">{selected ? selected.flag : '🔍'}</span>
-        <input
+        <Input unstyled
           type="text"
           className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
           value={open ? query : selected ? selected.name : ''}
           placeholder={placeholder}
           disabled={disabled}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onChange={(v) => { setQuery(v); setOpen(true); }}
           onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
           autoComplete="off"
         />
@@ -786,12 +787,12 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
         <div ref={bottomRef} />
       </div>
       <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
-        <input
+        <Input unstyled
           type="text"
           className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
           placeholder="Write a message…"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(v) => setInput(v)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           disabled={sending}
         />
@@ -1401,8 +1402,8 @@ export function EmployeeIntakePage() {
                     <div className="flex flex-col gap-4">
                       <FieldWrap label="Maximum commute you'd accept">
                         <div className="flex items-center gap-3">
-                          <input type="range" min={15} max={75} step={5} value={data.commute_mins}
-                            onChange={(e) => setField('commute_mins', Number(e.target.value))}
+                          <Input unstyled type="range" min={15} max={75} step={5} value={data.commute_mins}
+                            onChange={(v) => setField('commute_mins', Number(v))}
                             className="flex-1 accent-accent-600" />
                           <span className="text-sm font-bold text-accent-700 w-12 text-right">{data.commute_mins}min</span>
                         </div>
@@ -1523,7 +1524,7 @@ export function EmployeeIntakePage() {
                 )}
                 <CaseMessagesPanel caseId={caseIdRef.current} />
                 <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
-                  <input type="checkbox" checked={data.consent} id="consent-cb"
+                  <Checkbox checked={data.consent} id="consent-cb"
                     onChange={(e) => setField('consent', e.target.checked)}
                     className="mt-0.5 accent-accent-600" />
                   <label htmlFor="consent-cb" className="cursor-pointer">

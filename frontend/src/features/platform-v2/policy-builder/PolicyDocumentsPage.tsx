@@ -8,6 +8,7 @@
  * Route: /hr/policy-builder/documents
  */
 import { useEffect, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import {
@@ -132,14 +133,14 @@ function DiffView({
             <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">+{addedCount} added</span>
             <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-700">−{removedCount} removed</span>
             <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700">~{modifiedCount} changed</span>
-            <button
+            <Button unstyled
               type="button"
               onClick={onClose}
               className="ml-2 text-slate-400 hover:text-slate-700 text-xl font-bold"
               aria-label="Close diff view"
             >
               ×
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -215,7 +216,7 @@ function DocumentRow({
       <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
         {/* Expand toggle + filename */}
         <td className="py-3 px-4">
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setExpanded((v) => !v)}
             className="flex items-center gap-2 text-left w-full group"
@@ -236,7 +237,7 @@ function DocumentRow({
                 </div>
               )}
             </div>
-          </button>
+          </Button>
         </td>
 
         {/* Uploaded by */}
@@ -266,14 +267,14 @@ function DocumentRow({
 
         {/* Actions */}
         <td className="py-3 px-4">
-          <button
+          <Button unstyled
             type="button"
             onClick={() => onCompare(doc)}
             disabled={!doc.snapshot_id}
             className="text-xs font-medium text-[#0b2b43] hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Compare with previous
-          </button>
+          </Button>
         </td>
       </tr>
 
@@ -396,13 +397,13 @@ export function PolicyDocumentsPage() {
                 Upload history, pipeline status, and version diff for all ingested policy documents.
               </p>
             </div>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => navigate('/hr/policy-builder/review')}
               className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#0b2b43] text-white hover:bg-[#0e3a5c] transition-colors"
             >
               Go to review queue →
-            </button>
+            </Button>
           </div>
 
           {loading && (

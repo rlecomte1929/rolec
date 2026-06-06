@@ -58,64 +58,64 @@ export const ResourceRowActions: React.FC<ResourceRowActionsProps> = ({
         Preview
       </Link>
       {actions.includes('submit') && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => handle('submit')}
           disabled={disabled || working}
           className="text-xs text-amber-700 hover:underline disabled:opacity-50"
         >
           Submit
-        </button>
+        </Button>
       )}
       {actions.includes('approve') && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => setShowApproveModal(true)}
           disabled={disabled || working}
           className="text-xs text-blue-700 hover:underline disabled:opacity-50"
         >
           Approve
-        </button>
+        </Button>
       )}
       {actions.includes('publish') && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => handle('publish')}
           disabled={disabled || working}
           className="text-xs text-green-700 hover:underline disabled:opacity-50"
         >
           Publish
-        </button>
+        </Button>
       )}
       {actions.includes('unpublish') && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => handle('unpublish')}
           disabled={disabled || working}
           className="text-xs text-slate-600 hover:underline disabled:opacity-50"
         >
           Unpublish
-        </button>
+        </Button>
       )}
       {actions.includes('archive') && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => handle('archive')}
           disabled={disabled || working}
           className="text-xs text-slate-600 hover:underline disabled:opacity-50"
         >
           Archive
-        </button>
+        </Button>
       )}
       {actions.includes('restore') && (
-        <button
+        <Button unstyled
           type="button"
           onClick={() => handle('restore')}
           disabled={disabled || working}
           className="text-xs text-blue-700 hover:underline disabled:opacity-50"
         >
           Restore
-        </button>
+        </Button>
       )}
 
       {showApproveModal && (
