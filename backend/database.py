@@ -16,7 +16,12 @@ from datetime import datetime
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
-from .db_config import DATABASE_URL as _raw_url, sqlalchemy_engine_kwargs
+from .db_config import (
+    DATABASE_URL as _raw_url,
+    REQUEST_DATABASE_URL as _request_url,
+    REQUEST_DB_IS_DEDICATED as _request_db_is_dedicated,
+    sqlalchemy_engine_kwargs,
+)
 from .identity_normalize import email_normalized_from_identifier, normalize_invite_key
 from .identity_observability import identity_event
 
@@ -34,6 +39,17 @@ log = logging.getLogger(__name__)
 # Engine setup (shared logic with backend/app/db.py)
 # ---------------------------------------------------------------------------
 _engine = create_engine(_raw_url, **sqlalchemy_engine_kwargs(_raw_url))
+
+# F3/AIQ-834: a dedicated least-privilege engine for the request path (the
+# non-superuser relopass_api role, where the RLS second barrier actually bites).
+# Falls back to the same superuser engine when RELOPASS_API_DATABASE_URL is unset
+# — so this is a no-op until the role is provisioned. Scoped use: only the
+# policy_assistant_chunks retriever routes through it for now (task scope).
+_request_engine = (
+    create_engine(_request_url, **sqlalchemy_engine_kwargs(_request_url))
+    if _request_db_is_dedicated
+    else _engine
+)
 
 _is_sqlite = _raw_url.startswith("sqlite")
 # Postgres-only jsonb cast suffix; empty string on SQLite (TEXT columns used there).
@@ -394,6 +410,11 @@ def _auto_id_col() -> str:
 class Database:
     def __init__(self) -> None:
         self.engine = _engine
+        # F3/AIQ-834: least-privilege request-path engine (relopass_api when
+        # provisioned, else the same engine). Use for request queries that must
+        # honour the RLS second barrier; currently the policy_assistant_chunks
+        # retriever only.
+        self.request_engine = _request_engine
         # None = unknown; False = readiness_templates not available (migration not applied / wrong DB)
         self._readiness_store_cache: Optional[bool] = None
         self._init_lock = Lock()
