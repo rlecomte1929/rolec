@@ -13,6 +13,8 @@ interface ButtonProps {
   title?: string;
   /** Accessible name for icon-only buttons (passed through to the native element) */
   'aria-label'?: string;
+  /** Inline styles — for dynamic values (e.g. a data-driven background colour). */
+  style?: React.CSSProperties;
   /**
    * Render the semantic <button> with NO design-system styling — only the
    * passed `className`, plus type/onClick/disabled/title/aria-label. For
@@ -36,6 +38,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   title,
   'aria-label': ariaLabel,
+  style,
   unstyled = false,
 }) => {
   const baseStyles = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
@@ -69,6 +72,7 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled}
       title={title}
       aria-label={ariaLabel}
+      style={style}
       className={composedClassName}
     >
       {children}
