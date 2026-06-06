@@ -5,7 +5,7 @@ create sequence "public"."answers_id_seq";
 create sequence "public"."employee_answers_id_seq";
 
 
-  create table "public"."admin_allowlist" (
+  create table if not exists "public"."admin_allowlist" (
     "email" text not null,
     "enabled" integer not null default 1,
     "added_by_user_id" text,
@@ -14,7 +14,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."admin_sessions" (
+  create table if not exists "public"."admin_sessions" (
     "token" text not null,
     "actor_user_id" text not null,
     "target_user_id" text not null,
@@ -24,7 +24,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."answers" (
+  create table if not exists "public"."answers" (
     "id" integer not null default nextval('public.answers_id_seq'::regclass),
     "user_id" text not null,
     "question_id" text not null,
@@ -35,7 +35,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."assignment_invites" (
+  create table if not exists "public"."assignment_invites" (
     "id" text not null,
     "case_id" text not null,
     "hr_user_id" text not null,
@@ -47,7 +47,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."audit_log" (
+  create table if not exists "public"."audit_log" (
     "id" text not null,
     "actor_user_id" text not null,
     "action_type" text not null,
@@ -60,7 +60,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."case_assignments" (
+  create table if not exists "public"."case_assignments" (
     "id" text not null,
     "case_id" text not null,
     "hr_user_id" text not null,
@@ -76,7 +76,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."case_requirements_snapshots" (
+  create table if not exists "public"."case_requirements_snapshots" (
     "id" character varying not null,
     "case_id" character varying,
     "dest_country" character varying not null,
@@ -88,7 +88,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."companies" (
+  create table if not exists "public"."companies" (
     "id" text not null,
     "name" text not null,
     "country" text,
@@ -101,7 +101,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."compliance_actions" (
+  create table if not exists "public"."compliance_actions" (
     "id" text not null,
     "assignment_id" text not null,
     "check_id" text not null,
@@ -113,7 +113,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."compliance_reports" (
+  create table if not exists "public"."compliance_reports" (
     "id" text not null,
     "assignment_id" text not null,
     "report_json" text not null,
@@ -122,7 +122,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."compliance_runs" (
+  create table if not exists "public"."compliance_runs" (
     "id" text not null,
     "assignment_id" text not null,
     "report_json" text not null,
@@ -131,7 +131,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."country_profiles" (
+  create table if not exists "public"."country_profiles" (
     "id" character varying not null,
     "country_code" character varying,
     "last_updated_at" timestamp without time zone,
@@ -141,7 +141,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."eligibility_overrides" (
+  create table if not exists "public"."eligibility_overrides" (
     "id" text not null,
     "assignment_id" text not null,
     "category" text not null,
@@ -154,7 +154,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."employee_answers" (
+  create table if not exists "public"."employee_answers" (
     "id" integer not null default nextval('public.employee_answers_id_seq'::regclass),
     "assignment_id" text not null,
     "question_id" text not null,
@@ -164,7 +164,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."employee_profiles" (
+  create table if not exists "public"."employee_profiles" (
     "assignment_id" text not null,
     "profile_json" text not null,
     "updated_at" text not null
@@ -172,7 +172,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."employees" (
+  create table if not exists "public"."employees" (
     "id" text not null,
     "company_id" text not null,
     "profile_id" text not null,
@@ -185,7 +185,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."hr_policies" (
+  create table if not exists "public"."hr_policies" (
     "id" text not null,
     "policy_json" text not null,
     "status" text not null default 'draft'::text,
@@ -199,7 +199,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."hr_users" (
+  create table if not exists "public"."hr_users" (
     "id" text not null,
     "company_id" text not null,
     "profile_id" text not null,
@@ -209,7 +209,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."messages" (
+  create table if not exists "public"."messages" (
     "id" text not null,
     "assignment_id" text,
     "hr_user_id" text,
@@ -222,7 +222,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."policy_exceptions" (
+  create table if not exists "public"."policy_exceptions" (
     "id" text not null,
     "assignment_id" text not null,
     "category" text not null,
@@ -236,7 +236,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."profile_state" (
+  create table if not exists "public"."profile_state" (
     "user_id" text not null,
     "profile_json" text not null,
     "updated_at" text not null
@@ -244,7 +244,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."profiles" (
+  create table if not exists "public"."profiles" (
     "id" text not null,
     "role" text not null,
     "email" text,
@@ -255,7 +255,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."relocation_cases" (
+  create table if not exists "public"."relocation_cases" (
     "id" text not null,
     "hr_user_id" text not null,
     "profile_json" text not null,
@@ -271,7 +271,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."requirement_items" (
+  create table if not exists "public"."requirement_items" (
     "id" character varying not null,
     "country_code" character varying,
     "purpose" character varying not null,
@@ -287,7 +287,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."rp_debug_kv" (
+  create table if not exists "public"."rp_debug_kv" (
     "id" text not null,
     "key" text not null,
     "value" text not null,
@@ -296,7 +296,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."sessions" (
+  create table if not exists "public"."sessions" (
     "token" text not null,
     "user_id" text not null,
     "created_at" text not null
@@ -304,7 +304,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."source_records" (
+  create table if not exists "public"."source_records" (
     "id" character varying not null,
     "country_code" character varying,
     "url" character varying not null,
@@ -317,7 +317,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."support_case_notes" (
+  create table if not exists "public"."support_case_notes" (
     "id" text not null,
     "support_case_id" text not null,
     "author_user_id" text not null,
@@ -327,7 +327,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."support_cases" (
+  create table if not exists "public"."support_cases" (
     "id" text not null,
     "company_id" text not null,
     "created_by_profile_id" text not null,
@@ -345,7 +345,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."users" (
+  create table if not exists "public"."users" (
     "id" text not null,
     "username" text,
     "email" text,
@@ -357,7 +357,7 @@ create sequence "public"."employee_answers_id_seq";
 
 
 
-  create table "public"."wizard_cases" (
+  create table if not exists "public"."wizard_cases" (
     "id" character varying not null,
     "draft_json" text not null,
     "created_at" timestamp without time zone not null default now(),
@@ -378,103 +378,103 @@ alter sequence "public"."answers_id_seq" owned by "public"."answers"."id";
 
 alter sequence "public"."employee_answers_id_seq" owned by "public"."employee_answers"."id";
 
-CREATE UNIQUE INDEX admin_allowlist_pkey ON public.admin_allowlist USING btree (email);
+CREATE UNIQUE INDEX IF NOT EXISTS admin_allowlist_pkey ON public.admin_allowlist USING btree (email);
 
-CREATE UNIQUE INDEX admin_sessions_pkey ON public.admin_sessions USING btree (token);
+CREATE UNIQUE INDEX IF NOT EXISTS admin_sessions_pkey ON public.admin_sessions USING btree (token);
 
-CREATE UNIQUE INDEX answers_pkey ON public.answers USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS answers_pkey ON public.answers USING btree (id);
 
-CREATE UNIQUE INDEX assignment_invites_pkey ON public.assignment_invites USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS assignment_invites_pkey ON public.assignment_invites USING btree (id);
 
-CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS audit_log_pkey ON public.audit_log USING btree (id);
 
-CREATE UNIQUE INDEX case_assignments_pkey ON public.case_assignments USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS case_assignments_pkey ON public.case_assignments USING btree (id);
 
-CREATE UNIQUE INDEX case_requirements_snapshots_pkey ON public.case_requirements_snapshots USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS case_requirements_snapshots_pkey ON public.case_requirements_snapshots USING btree (id);
 
-CREATE UNIQUE INDEX companies_pkey ON public.companies USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS companies_pkey ON public.companies USING btree (id);
 
-CREATE UNIQUE INDEX compliance_actions_pkey ON public.compliance_actions USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS compliance_actions_pkey ON public.compliance_actions USING btree (id);
 
-CREATE UNIQUE INDEX compliance_reports_pkey ON public.compliance_reports USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS compliance_reports_pkey ON public.compliance_reports USING btree (id);
 
-CREATE UNIQUE INDEX compliance_runs_pkey ON public.compliance_runs USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS compliance_runs_pkey ON public.compliance_runs USING btree (id);
 
-CREATE UNIQUE INDEX country_profiles_pkey ON public.country_profiles USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS country_profiles_pkey ON public.country_profiles USING btree (id);
 
-CREATE UNIQUE INDEX eligibility_overrides_pkey ON public.eligibility_overrides USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS eligibility_overrides_pkey ON public.eligibility_overrides USING btree (id);
 
-CREATE UNIQUE INDEX employee_answers_pkey ON public.employee_answers USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS employee_answers_pkey ON public.employee_answers USING btree (id);
 
-CREATE UNIQUE INDEX employee_profiles_pkey ON public.employee_profiles USING btree (assignment_id);
+CREATE UNIQUE INDEX IF NOT EXISTS employee_profiles_pkey ON public.employee_profiles USING btree (assignment_id);
 
-CREATE UNIQUE INDEX employees_pkey ON public.employees USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS employees_pkey ON public.employees USING btree (id);
 
-CREATE UNIQUE INDEX hr_policies_pkey ON public.hr_policies USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS hr_policies_pkey ON public.hr_policies USING btree (id);
 
-CREATE UNIQUE INDEX hr_users_pkey ON public.hr_users USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS hr_users_pkey ON public.hr_users USING btree (id);
 
-CREATE INDEX idx_companies_name ON public.companies USING btree (name);
+CREATE INDEX IF NOT EXISTS idx_companies_name ON public.companies USING btree (name);
 
-CREATE INDEX idx_profiles_email ON public.profiles USING btree (email);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles USING btree (email);
 
-CREATE INDEX idx_relocation_cases_status ON public.relocation_cases USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_relocation_cases_status ON public.relocation_cases USING btree (status);
 
-CREATE INDEX idx_support_cases_severity ON public.support_cases USING btree (severity);
+CREATE INDEX IF NOT EXISTS idx_support_cases_severity ON public.support_cases USING btree (severity);
 
-CREATE INDEX idx_support_cases_status ON public.support_cases USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_support_cases_status ON public.support_cases USING btree (status);
 
-CREATE INDEX ix_case_requirements_snapshots_case_id ON public.case_requirements_snapshots USING btree (case_id);
+CREATE INDEX IF NOT EXISTS ix_case_requirements_snapshots_case_id ON public.case_requirements_snapshots USING btree (case_id);
 
-CREATE INDEX ix_case_requirements_snapshots_id ON public.case_requirements_snapshots USING btree (id);
+CREATE INDEX IF NOT EXISTS ix_case_requirements_snapshots_id ON public.case_requirements_snapshots USING btree (id);
 
-CREATE INDEX ix_country_profiles_country_code ON public.country_profiles USING btree (country_code);
+CREATE INDEX IF NOT EXISTS ix_country_profiles_country_code ON public.country_profiles USING btree (country_code);
 
-CREATE INDEX ix_country_profiles_id ON public.country_profiles USING btree (id);
+CREATE INDEX IF NOT EXISTS ix_country_profiles_id ON public.country_profiles USING btree (id);
 
-CREATE INDEX ix_requirement_items_country_code ON public.requirement_items USING btree (country_code);
+CREATE INDEX IF NOT EXISTS ix_requirement_items_country_code ON public.requirement_items USING btree (country_code);
 
-CREATE INDEX ix_requirement_items_id ON public.requirement_items USING btree (id);
+CREATE INDEX IF NOT EXISTS ix_requirement_items_id ON public.requirement_items USING btree (id);
 
-CREATE INDEX ix_source_records_country_code ON public.source_records USING btree (country_code);
+CREATE INDEX IF NOT EXISTS ix_source_records_country_code ON public.source_records USING btree (country_code);
 
-CREATE INDEX ix_source_records_id ON public.source_records USING btree (id);
+CREATE INDEX IF NOT EXISTS ix_source_records_id ON public.source_records USING btree (id);
 
-CREATE INDEX ix_wizard_cases_id ON public.wizard_cases USING btree (id);
+CREATE INDEX IF NOT EXISTS ix_wizard_cases_id ON public.wizard_cases USING btree (id);
 
-CREATE UNIQUE INDEX messages_pkey ON public.messages USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS messages_pkey ON public.messages USING btree (id);
 
-CREATE UNIQUE INDEX policy_exceptions_pkey ON public.policy_exceptions USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS policy_exceptions_pkey ON public.policy_exceptions USING btree (id);
 
-CREATE UNIQUE INDEX profile_state_pkey ON public.profile_state USING btree (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS profile_state_pkey ON public.profile_state USING btree (user_id);
 
-CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_pkey ON public.profiles USING btree (id);
 
-CREATE UNIQUE INDEX relocation_cases_pkey ON public.relocation_cases USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS relocation_cases_pkey ON public.relocation_cases USING btree (id);
 
-CREATE UNIQUE INDEX requirement_items_pkey ON public.requirement_items USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS requirement_items_pkey ON public.requirement_items USING btree (id);
 
-CREATE UNIQUE INDEX rp_debug_kv_key_key ON public.rp_debug_kv USING btree (key);
+CREATE UNIQUE INDEX IF NOT EXISTS rp_debug_kv_key_key ON public.rp_debug_kv USING btree (key);
 
-CREATE UNIQUE INDEX rp_debug_kv_pkey ON public.rp_debug_kv USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS rp_debug_kv_pkey ON public.rp_debug_kv USING btree (id);
 
-CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (token);
+CREATE UNIQUE INDEX IF NOT EXISTS sessions_pkey ON public.sessions USING btree (token);
 
-CREATE UNIQUE INDEX source_records_content_hash_key ON public.source_records USING btree (content_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS source_records_content_hash_key ON public.source_records USING btree (content_hash);
 
-CREATE UNIQUE INDEX source_records_pkey ON public.source_records USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS source_records_pkey ON public.source_records USING btree (id);
 
-CREATE UNIQUE INDEX support_case_notes_pkey ON public.support_case_notes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS support_case_notes_pkey ON public.support_case_notes USING btree (id);
 
-CREATE UNIQUE INDEX support_cases_pkey ON public.support_cases USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS support_cases_pkey ON public.support_cases USING btree (id);
 
-CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email);
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON public.users USING btree (email);
 
-CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS users_pkey ON public.users USING btree (id);
 
-CREATE UNIQUE INDEX users_username_key ON public.users USING btree (username);
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_key ON public.users USING btree (username);
 
-CREATE UNIQUE INDEX wizard_cases_pkey ON public.wizard_cases USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS wizard_cases_pkey ON public.wizard_cases USING btree (id);
 
 alter table "public"."admin_allowlist" add constraint "admin_allowlist_pkey" PRIMARY KEY using index "admin_allowlist_pkey";
 

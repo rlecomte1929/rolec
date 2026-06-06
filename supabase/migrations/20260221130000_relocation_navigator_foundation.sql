@@ -2,7 +2,7 @@
 
 create schema if not exists relocation_navigator;
 
-create table relocation_navigator.relocation_cases (
+create table if not exists relocation_navigator.relocation_cases (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -20,16 +20,16 @@ create table relocation_navigator.relocation_cases (
   missing_fields jsonb not null default '[]'::jsonb
 );
 
-create index relocation_cases_user_id_idx
+create index if not exists relocation_cases_user_id_idx
   on relocation_navigator.relocation_cases (user_id);
 
-create index relocation_cases_org_id_idx
+create index if not exists relocation_cases_org_id_idx
   on relocation_navigator.relocation_cases (org_id);
 
-create index relocation_cases_status_idx
+create index if not exists relocation_cases_status_idx
   on relocation_navigator.relocation_cases (status);
 
-create table relocation_navigator.relocation_runs (
+create table if not exists relocation_navigator.relocation_runs (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   case_id uuid not null references relocation_navigator.relocation_cases (id) on delete cascade,
@@ -44,13 +44,13 @@ create table relocation_navigator.relocation_runs (
   error text null
 );
 
-create index relocation_runs_case_id_created_at_idx
+create index if not exists relocation_runs_case_id_created_at_idx
   on relocation_navigator.relocation_runs (case_id, created_at desc);
 
-create index relocation_runs_run_type_idx
+create index if not exists relocation_runs_run_type_idx
   on relocation_navigator.relocation_runs (run_type);
 
-create table relocation_navigator.relocation_sources (
+create table if not exists relocation_navigator.relocation_sources (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   case_id uuid not null references relocation_navigator.relocation_cases (id) on delete cascade,
@@ -61,10 +61,10 @@ create table relocation_navigator.relocation_sources (
   unique (case_id, url)
 );
 
-create index relocation_sources_case_id_idx
+create index if not exists relocation_sources_case_id_idx
   on relocation_navigator.relocation_sources (case_id);
 
-create table relocation_navigator.relocation_artifacts (
+create table if not exists relocation_navigator.relocation_artifacts (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   case_id uuid not null references relocation_navigator.relocation_cases (id) on delete cascade,
@@ -74,7 +74,7 @@ create table relocation_navigator.relocation_artifacts (
   content_text text null
 );
 
-create index relocation_artifacts_case_id_type_version_idx
+create index if not exists relocation_artifacts_case_id_type_version_idx
   on relocation_navigator.relocation_artifacts (case_id, artifact_type, version);
 
 create or replace function relocation_navigator.set_updated_at()

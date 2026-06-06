@@ -8,7 +8,7 @@
 
 begin;
 
-create table public.catalog_employee_demand (
+create table if not exists public.catalog_employee_demand (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null,
   category text not null,
@@ -29,7 +29,7 @@ create table public.catalog_employee_demand (
 comment on table public.catalog_employee_demand is
   'Demand signal — when an employee hits the "HR is finalizing" empty state, we upsert here. HR Vendors page reads this to show what employees are waiting on.';
 
-create index idx_ced_company on public.catalog_employee_demand (company_id, last_seen_at desc);
+create index if not exists idx_ced_company on public.catalog_employee_demand (company_id, last_seen_at desc);
 
 create or replace function public.ced_set_updated_at()
 returns trigger language plpgsql as $$

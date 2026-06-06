@@ -6,7 +6,7 @@ begin;
 alter table public.mobility_cases
   alter column employee_user_id drop not null;
 
-create table public.assignment_mobility_links (
+create table if not exists public.assignment_mobility_links (
   id uuid primary key default gen_random_uuid(),
   assignment_id text not null
     references public.case_assignments (id) on delete cascade,
@@ -18,7 +18,7 @@ create table public.assignment_mobility_links (
   constraint assignment_mobility_links_mobility_case_id_key unique (mobility_case_id)
 );
 
-create index idx_assignment_mobility_links_assignment_id
+create index if not exists idx_assignment_mobility_links_assignment_id
   on public.assignment_mobility_links (assignment_id);
 
 comment on table public.assignment_mobility_links is

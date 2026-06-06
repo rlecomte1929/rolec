@@ -42,7 +42,7 @@
 -- Table
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE rce.rule_citations (
+CREATE TABLE IF NOT EXISTS rce.rule_citations (
   rule_citation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- The case whose output this citation justifies. CASCADE: citations are
   -- meaningless without their case.
@@ -66,11 +66,11 @@ CREATE TABLE rce.rule_citations (
 );
 
 -- C2-05 "rule impact" read pattern: "which cases cite rule_version X".
-CREATE INDEX rule_citations_by_version
+CREATE INDEX IF NOT EXISTS rule_citations_by_version
   ON rce.rule_citations (rule_version_id);
 
 -- Per-case read pattern: "show all citations for this case, newest first".
-CREATE INDEX rule_citations_by_case
+CREATE INDEX IF NOT EXISTS rule_citations_by_case
   ON rce.rule_citations (case_id, created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────────────────────
