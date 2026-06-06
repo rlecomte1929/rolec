@@ -46,9 +46,27 @@ With the backend connected as `relopass_api`, a query that omits the WHERE claus
 - The policy predicate semantics were proven live: company-A row visible to A,
   company-B row blocked for A, and an unset/blank GUC **fails closed** (zero
   rows, never "all rows").
-- Full `SET ROLE relopass_api` enforcement could not be exercised through the
-  Supabase MCP (its transaction-mode pooler rejects `SET ROLE`); it is covered by
-  `test_rls_second_barrier.py` over a session-mode connection.
+- **RLS enforcement proven live (rolled back) against the production database:**
+  a non-`BYPASSRLS` role with the GUC policy, querying with **no WHERE clause**,
+  returned only company A's rows (2), and zero rows when the GUC was unset, while
+  the bypass path saw all 4. Reproduce with `python scripts/verify_rls_guc_barrier.py`
+  or `RELOPASS_RLS_TEST_DB_URL=<session-url> pytest backend/tests/test_rls_second_barrier.py`.
+
+### Connection notes (why the proof uses `authenticated`, not `relopass_api`)
+
+The Supabase **transaction-mode** pooler (port 6543, used by the app and the MCP)
+rejects session commands like `SET ROLE`. The **session-mode** pooler (same host,
+**port 5432**) supports them. But the pooler also rejects granting role membership
+to its own login user (`GRANT <role> TO current_user` drops the connection), so
+`relopass_api` cannot be entered via `SET ROLE` over the pooler, and the direct
+(non-pooler) endpoint is not DNS-resolvable for this project.
+
+The barrier is a property of the RLS machinery on **any** non-`BYPASSRLS` role +
+the GUC policy, so the live proof exercises it via the built-in `authenticated`
+role using the **identical** USING expression. The `relopass_api` policy is the
+same expression bound to the production role (its predicate is separately proven,
+and the migration DDL validated). On a true direct/CI Postgres (superuser), the
+same test can target `relopass_api` directly.
 
 ## Activation runbook (human — required to make the barrier load-bearing)
 
