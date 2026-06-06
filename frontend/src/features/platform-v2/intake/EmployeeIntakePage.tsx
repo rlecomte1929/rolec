@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
+import { Input } from '../../../components/antigravity/Input';
 import { patchCase } from '../../../api/cases';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
@@ -332,9 +333,9 @@ function CityCombo({ country, value, onChange }: { country: string; value: strin
     <div ref={ref} className="relative">
       <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
         <span className="px-3 text-gray-400 text-sm">📍</span>
-        <input type="text" value={value} placeholder="Select or type a city" autoComplete="off"
+        <Input unstyled type="text" value={value} placeholder="Select or type a city" autoComplete="off"
           className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
           onFocus={() => setOpen(true)} />
         <span className="px-2 text-gray-400 text-xs">▾</span>
       </div>
@@ -443,8 +444,8 @@ function PartnerCard({ m, onChange, onRemove, international, expanded, onToggle 
       expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
       <Grid>
         <FieldWrap label="Full name" required>
-          <input className={inputCls()} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
-            onChange={(e) => onChange({ ...m, name: e.target.value })} />
+          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
+            onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Employment status">
           <select className={selectCls()} value={m.employment ?? ''} onChange={(e) => onChange({ ...m, employment: e.target.value })}>
@@ -484,12 +485,12 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
       status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
       <Grid>
         <FieldWrap label="First name" required>
-          <input className={inputCls()} value={m.name ?? ''} placeholder="e.g. Léo"
-            onChange={(e) => onChange({ ...m, name: e.target.value })} />
+          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Léo"
+            onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Date of birth" required why="We compute age automatically for school search and enrollment timing.">
-          <input type="date" className={inputCls()} value={m.dob ?? ''}
-            onChange={(e) => onChange({ ...m, dob: e.target.value })} />
+          <Input unstyled type="date" className={inputCls()} value={m.dob ?? ''}
+            onChange={(v) => onChange({ ...m, dob: v })} />
           {age != null && (
             <div className="text-[10px] text-accent-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
           )}
@@ -533,8 +534,8 @@ function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
 
       <Grid>
         <FieldWrap label="Pet name">
-          <input className={inputCls()} value={m.name ?? ''} placeholder="e.g. Luna"
-            onChange={(e) => onChange({ ...m, name: e.target.value })} />
+          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Luna"
+            onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Species" required>
           <select className={selectCls()} value={m.pet_type ?? ''}
@@ -548,24 +549,24 @@ function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
           </select>
         </FieldWrap>
         <FieldWrap label="Breed">
-          <input className={inputCls()} value={m.breed ?? ''} placeholder="e.g. Labrador"
-            onChange={(e) => onChange({ ...m, breed: e.target.value })} />
+          <Input unstyled className={inputCls()} value={m.breed ?? ''} placeholder="e.g. Labrador"
+            onChange={(v) => onChange({ ...m, breed: v })} />
         </FieldWrap>
         <FieldWrap label="Microchip number" why="Required by most countries — usually a 15-digit ISO chip.">
-          <input className={inputCls()} value={m.microchip_number ?? ''} placeholder="e.g. 985112345678901"
-            onChange={(e) => onChange({ ...m, microchip_number: e.target.value })} />
+          <Input unstyled className={inputCls()} value={m.microchip_number ?? ''} placeholder="e.g. 985112345678901"
+            onChange={(v) => onChange({ ...m, microchip_number: v })} />
         </FieldWrap>
         <FieldWrap label="Date of birth">
-          <input type="date" className={inputCls()} value={m.date_of_birth ?? ''}
-            onChange={(e) => onChange({ ...m, date_of_birth: e.target.value })} />
+          <Input unstyled type="date" className={inputCls()} value={m.date_of_birth ?? ''}
+            onChange={(v) => onChange({ ...m, date_of_birth: v })} />
         </FieldWrap>
         <FieldWrap label="Passport / pet book number">
-          <input className={inputCls()} value={m.passport_number ?? ''} placeholder="e.g. 900123456"
-            onChange={(e) => onChange({ ...m, passport_number: e.target.value })} />
+          <Input unstyled className={inputCls()} value={m.passport_number ?? ''} placeholder="e.g. 900123456"
+            onChange={(v) => onChange({ ...m, passport_number: v })} />
         </FieldWrap>
         <FieldWrap label="Health cert expiry" why="Many countries require a cert issued within 10 days of travel.">
-          <input type="date" className={inputCls()} value={m.health_cert_expiry ?? ''}
-            onChange={(e) => onChange({ ...m, health_cert_expiry: e.target.value })} />
+          <Input unstyled type="date" className={inputCls()} value={m.health_cert_expiry ?? ''}
+            onChange={(v) => onChange({ ...m, health_cert_expiry: v })} />
         </FieldWrap>
       </Grid>
 
@@ -576,14 +577,14 @@ function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
           <div className="space-y-2 mb-2">
             {vaccinations.map((vax, i) => (
               <div key={i} className="flex gap-2 items-center">
-                <input className={`${inputCls()} flex-1`} value={vax.vax_name} placeholder="Vaccine name"
-                  onChange={(e) => updateVax(i, 'vax_name', e.target.value)} />
-                <input type="date" className={`${inputCls()} flex-1`} value={vax.vax_date}
+                <Input unstyled className={`${inputCls()} flex-1`} value={vax.vax_name} placeholder="Vaccine name"
+                  onChange={(v) => updateVax(i, 'vax_name', v)} />
+                <Input unstyled type="date" className={`${inputCls()} flex-1`} value={vax.vax_date}
                   title="Date given"
-                  onChange={(e) => updateVax(i, 'vax_date', e.target.value)} />
-                <input type="date" className={`${inputCls()} flex-1`} value={vax.vax_expiry}
+                  onChange={(v) => updateVax(i, 'vax_date', v)} />
+                <Input unstyled type="date" className={`${inputCls()} flex-1`} value={vax.vax_expiry}
                   title="Expiry date"
-                  onChange={(e) => updateVax(i, 'vax_expiry', e.target.value)} />
+                  onChange={(v) => updateVax(i, 'vax_expiry', v)} />
                 <Button unstyled type="button" onClick={() => removeVax(i)}
                   className="text-gray-300 hover:text-red-400 text-sm font-bold flex-shrink-0">✕</Button>
               </div>
@@ -601,12 +602,12 @@ function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
         <div className="text-xs font-semibold text-gray-600 mb-2">Vet information</div>
         <Grid>
           <FieldWrap label="Vet name">
-            <input className={inputCls()} value={m.vet_name ?? ''} placeholder="e.g. Dr. Smith"
-              onChange={(e) => onChange({ ...m, vet_name: e.target.value })} />
+            <Input unstyled className={inputCls()} value={m.vet_name ?? ''} placeholder="e.g. Dr. Smith"
+              onChange={(v) => onChange({ ...m, vet_name: v })} />
           </FieldWrap>
           <FieldWrap label="Vet phone">
-            <input className={inputCls()} value={m.vet_phone ?? ''} placeholder="+33 6 12 34 56 78"
-              onChange={(e) => onChange({ ...m, vet_phone: e.target.value })} />
+            <Input unstyled className={inputCls()} value={m.vet_phone ?? ''} placeholder="+33 6 12 34 56 78"
+              onChange={(v) => onChange({ ...m, vet_phone: v })} />
           </FieldWrap>
           <FieldWrap label="Vet country">
             <select className={selectCls()} value={m.vet_country ?? ''}
@@ -682,9 +683,9 @@ function QuoteRequestPanel({ caseId, services }: { caseId: string; services: str
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-600">Budget range <span className="text-gray-400 font-normal">(optional)</span></label>
-          <input type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
+          <Input unstyled type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
             placeholder="e.g. 5 000–10 000 €"
-            value={budgetRange} onChange={(e) => setBudgetRange(e.target.value)} />
+            value={budgetRange} onChange={(v) => setBudgetRange(v)} />
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
         <Button unstyled type="button" onClick={handleSend} disabled={sending}
@@ -1220,8 +1221,8 @@ export function EmployeeIntakePage() {
                     <CityCombo country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} />
                   </FieldWrap>
                   <FieldWrap label="Target move date" required>
-                    <input type="date" className={inputCls()} value={data.target_date}
-                      onChange={(e) => setField('target_date', e.target.value)} />
+                    <Input unstyled type="date" className={inputCls()} value={data.target_date}
+                      onChange={(v) => setField('target_date', v)} />
                   </FieldWrap>
                   <FieldWrap label="Purpose of relocation" required>
                     <select className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
@@ -1243,12 +1244,12 @@ export function EmployeeIntakePage() {
                 <StepHd title="A bit about you" sub="Your passport details kick off the immigration track." />
                 <Grid>
                   <FieldWrap label="Full name" required>
-                    <input className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
-                      onChange={(e) => setField('full_name', e.target.value)} />
+                    <Input unstyled className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
+                      onChange={(v) => setField('full_name', v)} />
                   </FieldWrap>
                   <FieldWrap label="Email" required prefill={locks.email} onUnlock={() => unlock('email')}>
-                    <input type="email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
-                      onChange={(e) => setField('email', e.target.value)} />
+                    <Input unstyled type="email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
+                      onChange={(v) => setField('email', v)} />
                   </FieldWrap>
                   <FieldWrap label="Nationality" required>
                     <CountryCombo value={data.nationality} onChange={(v) => setField('nationality', v)} />
@@ -1257,8 +1258,8 @@ export function EmployeeIntakePage() {
                     <CountryCombo value={data.passport_country} onChange={(v) => setField('passport_country', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport expiry" required>
-                    <input type="date" className={inputCls()} value={data.passport_expiry}
-                      onChange={(e) => setField('passport_expiry', e.target.value)} />
+                    <Input unstyled type="date" className={inputCls()} value={data.passport_expiry}
+                      onChange={(v) => setField('passport_expiry', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
                     <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-accent-300 hover:text-accent-500 transition-colors">
@@ -1358,8 +1359,8 @@ export function EmployeeIntakePage() {
                 <StepHd title="Your work & commute" sub="Most of this is pre-filled by your HR team — confirm or update. Commute settings drive your housing pre-filter." required />
                 <Grid>
                   <FieldWrap label="Job title" required prefill={locks.job} onUnlock={() => unlock('job')}>
-                    <input className={inputCls(locks.job)} value={data.job_title} disabled={locks.job} placeholder="e.g. Senior Engineer"
-                      onChange={(e) => setField('job_title', e.target.value)} />
+                    <Input unstyled className={inputCls(locks.job)} value={data.job_title} disabled={locks.job} placeholder="e.g. Senior Engineer"
+                      onChange={(v) => setField('job_title', v)} />
                   </FieldWrap>
                   <FieldWrap label="Contract type" required prefill={locks.contractType} onUnlock={() => unlock('contractType')}>
                     <select className={selectCls(locks.contractType)} value={data.contract_type} disabled={locks.contractType}
@@ -1368,8 +1369,8 @@ export function EmployeeIntakePage() {
                     </select>
                   </FieldWrap>
                   <FieldWrap label="Contract start date" required prefill={locks.contractStart} onUnlock={() => unlock('contractStart')}>
-                    <input type="date" className={inputCls(locks.contractStart)} value={data.contract_start} disabled={locks.contractStart}
-                      onChange={(e) => setField('contract_start', e.target.value)} />
+                    <Input unstyled type="date" className={inputCls(locks.contractStart)} value={data.contract_start} disabled={locks.contractStart}
+                      onChange={(v) => setField('contract_start', v)} />
                   </FieldWrap>
                   <FieldWrap label="Salary band" required prefill={locks.salary} onUnlock={() => unlock('salary')} hint="Used to confirm visa salary thresholds.">
                     <select className={selectCls(locks.salary)} value={data.salary_band} disabled={locks.salary}
@@ -1380,8 +1381,8 @@ export function EmployeeIntakePage() {
                   </FieldWrap>
                   <FieldWrap label="Office address at destination" required className="sm:col-span-2" prefill={locks.office} onUnlock={() => unlock('office')}
                     why="Anchors commute analysis. We'll show neighborhoods within your time radius.">
-                    <input className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
-                      placeholder="Start typing…" onChange={(e) => setField('office_address', e.target.value)} />
+                    <Input unstyled className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
+                      placeholder="Start typing…" onChange={(v) => setField('office_address', v)} />
                     {data.office_address && (
                       <div className="flex items-center gap-2 mt-1 px-2.5 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500">
                         📍 <span className="flex-1">{data.office_address}</span>
@@ -1470,14 +1471,14 @@ export function EmployeeIntakePage() {
                         </select>
                       </FieldWrap>
                       <FieldWrap label="Bedrooms needed">
-                        <input type="number" min={1} max={6} className={inputCls()} placeholder="e.g. 2"
+                        <Input unstyled type="number" min={1} max={6} className={inputCls()} placeholder="e.g. 2"
                           value={data.housing_prefs.bedrooms ?? ''}
-                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, bedrooms: e.target.value === '' ? '' : Number(e.target.value) })} />
+                          onChange={(v) => setField('housing_prefs', { ...data.housing_prefs, bedrooms: v === '' ? '' : Number(v) })} />
                       </FieldWrap>
                       <FieldWrap label="Monthly budget (€)" className="sm:col-span-2">
-                        <input type="number" className={inputCls()} placeholder="e.g. 2500"
+                        <Input unstyled type="number" className={inputCls()} placeholder="e.g. 2500"
                           value={data.housing_prefs.budget ?? ''}
-                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, budget: e.target.value === '' ? '' : Number(e.target.value) })} />
+                          onChange={(v) => setField('housing_prefs', { ...data.housing_prefs, budget: v === '' ? '' : Number(v) })} />
                       </FieldWrap>
                     </Grid>
                   </div>
@@ -1500,8 +1501,8 @@ export function EmployeeIntakePage() {
                         </select>
                       </FieldWrap>
                       <FieldWrap label="Expected school start date" className="sm:col-span-2" hint="Defaults to your move date; adjust if kids start later.">
-                        <input type="date" className={inputCls()} value={data.housing_prefs.school_start ?? data.target_date}
-                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, school_start: e.target.value })} />
+                        <Input unstyled type="date" className={inputCls()} value={data.housing_prefs.school_start ?? data.target_date}
+                          onChange={(v) => setField('housing_prefs', { ...data.housing_prefs, school_start: v })} />
                       </FieldWrap>
                     </Grid>
                   </div>
