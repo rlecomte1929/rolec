@@ -3,17 +3,16 @@ AIQ-40-A · HR vendor directory
 
 GET  /api/hr/vendors            — list vendors, filterable by corridor + category
 GET  /api/hr/vendors/{id}       — single vendor detail
-GET  /api/hr/vendors/corridors  — return known corridor codes for the filter UI
+GET  /api/hr/vendors/corridors  — corridor codes for the filter UI (live-derived)
 
 Corridor format: "{origin_iso2}-{dest_iso2}"  e.g. "FR-DE"
 Service categories:
   housing | immigration | moving | school_search | destination
 
 Visibility:
-  - Global vendors  (org_id IS NULL)  are visible to all authenticated HR users.
-  - Org-scoped vendors (org_id = company_id) are visible only to that org.
-  - RLS on the vendors table enforces this at DB level; the router re-applies
-    the filter in Python for defence-in-depth.
+  - Vendors are global: the live `vendors` table has no org_id column. Every
+    active vendor is visible to all authenticated HR/Admin users. (The earlier
+    org-scoped model was never built; see the schema-alignment fix in #405.)
 """
 from __future__ import annotations
 
@@ -34,6 +33,9 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
+# Fallback only — the live dropdown is derived from vendors.corridor_codes in
+# list_corridors(). This static list is used solely when that query fails, so
+# the filter is never empty.
 KNOWN_CORRIDORS = [
     "FR-DE",   # France → Germany
     "DE-US",   # Germany → United States
@@ -103,9 +105,33 @@ def list_corridors(
     _user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    Return the set of known corridor codes.
-    Used by the frontend to populate the corridor filter dropdown.
+    Return the corridor codes for the vendor filter dropdown.
+
+    Derived from the live `vendors.corridor_codes` so the list stays in sync as
+    vendor coverage changes — the old hardcoded KNOWN_CORRIDORS went stale the
+    moment new corridors shipped (it listed only EU↔US pairs we no longer lead
+    with). Wildcard coverage markers (e.g. "GB-*", "*") are excluded; only
+    concrete ISO2 pairs are offered. Falls back to KNOWN_CORRIDORS if the query
+    fails so the dropdown is never empty.
     """
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT DISTINCT c AS corridor
+                    FROM vendors v, unnest(coalesce(v.corridor_codes, '{}')) AS c
+                    WHERE v.is_active = true
+                      AND c ~ '^[A-Z]{2}-[A-Z]{2}$'
+                    ORDER BY corridor
+                    """
+                )
+            ).scalars().all()
+        corridors = [str(r) for r in rows]
+        if corridors:
+            return {"corridors": corridors}
+    except Exception:
+        logger.exception("list_corridors: query failed, falling back to static list")
     return {"corridors": KNOWN_CORRIDORS}
 
 
