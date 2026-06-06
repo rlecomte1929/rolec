@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
@@ -29,7 +30,11 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
 
 from backend.app.services import immigration_retriever
-from backend.app.services.immigration_retriever import PathClassification, UserProfile
+from backend.app.services.immigration_retriever import (
+    PathClassification,
+    UserProfile,
+    _apply_quality_gates,
+)
 from backend.app.services.policy_assistant_embedder import HashEmbedder
 
 _FR_NO_IDS = [f"fr-no-{i:02d}" for i in range(1, 13)]
@@ -74,8 +79,11 @@ class ImmigrationRetrieverTests(unittest.TestCase):
         self.path = PathClassification(pathway_type="eu_free_movement")
 
     def _retrieve(self, profile, classification, top_k=12):
+        # min_similarity_score=0.0 isolates corridor-scoping from the N3 floor
+        # (the floor is tested separately in QualityGatesTests).
         return immigration_retriever.retrieve_for_profile(
-            profile=profile, classification=classification, top_k=top_k, engine=self.engine,
+            profile=profile, classification=classification, top_k=top_k,
+            engine=self.engine, min_similarity_score=0.0,
         )
 
     def test_corridor_scoped_no_cross_corridor_leak(self):
@@ -115,6 +123,70 @@ class ImmigrationRetrieverTests(unittest.TestCase):
             self.path,
         )
         self.assertEqual(chunks, [])
+
+
+_NOW = datetime(2026, 6, 6, tzinfo=timezone.utc)
+
+
+def _gc(score, *, tier=None, fetched="2026-06-06T00:00:00+00:00", cid="x"):
+    return {"id": cid, "score": score, "trust_tier": tier, "fetched_at": fetched, "corridor": "FR_NO"}
+
+
+class QualityGatesTests(unittest.TestCase):
+    """N3/AIQ-842 floor + trust_tier boost + freshness decay (pure helper)."""
+
+    def test_floor_excludes_below_min(self):
+        out = _apply_quality_gates([_gc(0.20, cid="lo"), _gc(0.30, cid="hi")],
+                                   min_similarity=0.25, top_k=10, now=_NOW)
+        self.assertEqual([c["id"] for c in out], ["hi"])
+
+    def test_floor_disabled_with_zero(self):
+        out = _apply_quality_gates([_gc(0.10)], min_similarity=0.0, top_k=10, now=_NOW)
+        self.assertEqual(len(out), 1)
+
+    def test_tier1_outranks_tier3(self):
+        out = _apply_quality_gates([_gc(0.82, tier=3, cid="t3"), _gc(0.80, tier=1, cid="t1")],
+                                   min_similarity=0.0, top_k=10, now=_NOW)
+        self.assertEqual(out[0]["id"], "t1")
+        self.assertAlmostEqual(out[0]["adjusted_score"], 0.80, places=3)
+        self.assertAlmostEqual(
+            next(c for c in out if c["id"] == "t3")["adjusted_score"], 0.615, places=3)
+
+    def test_stale_flag_and_decay(self):
+        old = (_NOW - timedelta(days=200)).isoformat()
+        out = _apply_quality_gates([_gc(0.9, tier=1, fetched=old)], min_similarity=0.0, top_k=10, now=_NOW)
+        self.assertTrue(out[0]["is_stale"])
+        self.assertAlmostEqual(out[0]["adjusted_score"], 0.9 * 0.70, places=3)
+
+    def test_fresh_not_stale(self):
+        out = _apply_quality_gates([_gc(0.9, tier=1)], min_similarity=0.0, top_k=10, now=_NOW)
+        self.assertFalse(out[0]["is_stale"])
+        self.assertAlmostEqual(out[0]["adjusted_score"], 0.9, places=3)
+
+
+class StalenessWrapperTests(unittest.TestCase):
+    """retrieve_with_staleness returns the {chunks, all_stale_warning, oldest_fetched_at} dict."""
+
+    def setUp(self):
+        self.engine = _engine_with_seed()
+        self.marc = UserProfile(nationality="FR", origin_country="FR", destination_country="NO", is_eea=True)
+        self.path = PathClassification(pathway_type="eu_free_movement")
+
+    def test_dict_shape_fresh_corpus(self):
+        payload = immigration_retriever.retrieve_with_staleness(
+            profile=self.marc, classification=self.path, engine=self.engine, min_similarity_score=0.0)
+        self.assertEqual(set(payload), {"chunks", "all_stale_warning", "oldest_fetched_at"})
+        self.assertTrue(payload["chunks"])
+        self.assertFalse(payload["all_stale_warning"])         # seeded fresh
+        self.assertIsNotNone(payload["oldest_fetched_at"])
+
+    def test_uncovered_corridor_empty_payload(self):
+        payload = immigration_retriever.retrieve_with_staleness(
+            profile=UserProfile(nationality="JP", origin_country="JP", destination_country="NO", is_eea=False),
+            classification=PathClassification(pathway_type="x"), engine=self.engine)
+        self.assertEqual(payload["chunks"], [])
+        self.assertFalse(payload["all_stale_warning"])         # empty -> not "all stale"
+        self.assertIsNone(payload["oldest_fetched_at"])
 
 
 if __name__ == "__main__":
