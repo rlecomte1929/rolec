@@ -722,7 +722,7 @@ export function InboxV2Page() {
                       type="button"
                       onClick={handleSend}
                       disabled={!draft.trim() || sending}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-navy-900 disabled:opacity-50"
                     >
                       <Send className="h-3.5 w-3.5" />
                       {sending ? 'Sending…' : 'Send'}

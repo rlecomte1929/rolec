@@ -114,7 +114,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, token, onUpdate }) => {
           <Button unstyled
             onClick={markInProgress}
             disabled={saving}
-            className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="px-3 py-1.5 rounded bg-navy-800 text-white text-xs font-medium hover:bg-navy-900 disabled:opacity-50"
           >
             Mark in progress
           </Button>

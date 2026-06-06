@@ -350,7 +350,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
                       <Button unstyled
                         onClick={handleMerge}
                         disabled={!mergeTargetId || actionLoading}
-                        className="mt-2 block w-full rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                        className="mt-2 block w-full rounded bg-navy-800 px-3 py-1.5 text-sm text-white hover:bg-navy-900 disabled:opacity-50"
                       >
                         Merge into selected
                       </Button>
