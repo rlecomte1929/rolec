@@ -31,6 +31,14 @@ export interface DossierFormTemplate {
   source_last_verified: string | null;
   /** [P1-05 checklist] Required supporting documents (derived from requires_original fields). */
   required_documents: Array<{ key: string; label: string }>;
+  /**
+   * [WS1] Content-maturity flag. 'representative' (default scaffolding, not yet
+   * human-verified), 'draft' (under review), or 'verified' (ops/legal confirmed
+   * against the issuing authority). Anything other than 'verified' surfaces an
+   * "indicative — confirm with the authority" notice so we never imply the
+   * content is authoritative.
+   */
+  verification_status: 'verified' | 'draft' | 'representative' | null;
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';
