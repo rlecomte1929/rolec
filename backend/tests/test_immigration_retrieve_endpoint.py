@@ -94,6 +94,30 @@ class TestImmigrationRetrieveEndpoint(unittest.TestCase):
         self.assertEqual(body["corridor"], "ZZ→XX")
         self.assertTrue(body["trace_id"])
 
+    def test_answer_happy_path_returns_cited_answer(self):
+        from backend.app.services.policy_assistant_llm_client import MockClient
+        url = "https://www.udi.no/en/want-to-apply/"
+        payload = {
+            "chunks": [{"source_url": url, "source_ref": url, "chunk_text": "A permit is required.",
+                        "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00", "corridor": "FR_NO"}],
+            "all_stale_warning": False, "oldest_fetched_at": "2026-06-06T00:00:00+00:00",
+        }
+        mockc = MockClient(default_response=f"You need a residence permit [source: {url}].")
+        with patch("backend.app.services.immigration_retriever.retrieve_with_staleness", return_value=payload), \
+             patch("backend.app.services.immigration_answer_engine.get_default_client", return_value=mockc), \
+             patch("backend.app.services.ai_trace_logger._write_to_db"):
+            resp = self.client.post("/api/immigration/answer", json={
+                "corridor_from": "FR", "corridor_to": "NO", "nationality": "French",
+                "permit_type": "work_permit", "is_eea": True, "query": "What documents are required?",
+            })
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["answer_kind"], "answer")
+        self.assertEqual(body["model"], "claude-sonnet-4-6")
+        self.assertGreaterEqual(len(body["cited_sources"]), 1)
+        self.assertEqual(body["cited_sources"][0]["source_url"], url)
+        self.assertTrue(body["trace_id"])
+
     def test_requires_authentication(self):
         app.dependency_overrides.pop(get_current_user, None)
         try:
