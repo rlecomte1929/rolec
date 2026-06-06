@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import text
@@ -52,15 +53,21 @@ def retrieve(
     top_k: int = 8,
     source_types: Optional[Sequence[str]] = None,
     embedder: Optional[Embedder] = None,
+    min_similarity_score: float = 0.25,
 ) -> List[Dict[str, Any]]:
     """
     Top-K retrieval. Returns at most `top_k` chunks for `company_id`,
-    ordered by descending similarity to the query embedding.
+    ranked by an adjusted score: raw cosine similarity, with a quality floor
+    (`min_similarity_score`, default 0.25; pass 0.0 to disable), a trust_tier
+    boost, and a fetched_at freshness decay (W2/AIQ-836).
+
+    Each returned chunk carries `raw_score`, `adjusted_score`, `trust_tier`,
+    `fetched_at`, and `is_stale`.
 
     Empty list when:
       - company_id missing
       - query empty / whitespace-only
-      - company has no indexed chunks yet
+      - company has no indexed chunks yet (or all fall below the floor)
     """
     if not company_id:
         return []
@@ -70,10 +77,100 @@ def retrieve(
     embedder = embedder or get_default_embedder()
     q_emb = embedder.embed(query)
 
+    # Over-fetch a candidate pool so the floor + trust/freshness rerank have
+    # headroom to reorder before we trim to top_k.
+    candidate_k = min(50, max(top_k * 4, top_k))
     dialect = db.engine.dialect.name
     if dialect == "sqlite":
-        return _retrieve_sqlite(company_id, q_emb, top_k, source_types)
-    return _retrieve_postgres(company_id, q_emb, top_k, source_types)
+        raw = _retrieve_sqlite(company_id, q_emb, candidate_k, source_types)
+    else:
+        raw = _retrieve_postgres(company_id, q_emb, candidate_k, source_types)
+    return _rank_and_trim(raw, min_similarity_score=min_similarity_score, top_k=top_k)
+
+
+# --- Ranking: similarity floor + trust_tier boost + freshness decay (W2) ----
+
+_TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
+
+
+def _coerce_trust_tier(value: Any) -> Optional[int]:
+    """Coerce a trust_tier signal (int or numeric string) to 1/2/3, else None."""
+    if value is None:
+        return None
+    try:
+        t = int(value)
+    except (TypeError, ValueError):
+        return None
+    return t if t in (1, 2, 3) else None
+
+
+def _coerce_fetched_at(value: Any) -> Optional[datetime]:
+    """Coerce a fetched_at signal (ISO string or datetime) to an aware UTC dt."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _rank_and_trim(
+    chunks: List[Dict[str, Any]],
+    *,
+    min_similarity_score: float,
+    top_k: int,
+) -> List[Dict[str, Any]]:
+    """
+    Apply the quality floor + provenance-aware reranking (W2/AIQ-836).
+
+    - Floor: drop chunks whose raw cosine score < min_similarity_score
+      (pass 0.0 to disable).
+    - trust_tier boost (x1.0 / x0.9 / x0.75 for tier 1/2/3; neutral when absent).
+    - fetched_at freshness decay (x0.85 if >90d old, x0.70 if >180d; neutral when null).
+    Boost/decay affect RANKING only; the raw score is preserved.
+
+    Premise note: policy_assistant_chunks has NO trust_tier / fetched_at columns —
+    these signals are read from `chunk_metadata` when present (e.g. web-ingested
+    corpora). Matrix-derived policy chunks carry neither today, so for them this is
+    effectively the similarity floor until provenance is added to the metadata.
+    """
+    now = datetime.now(timezone.utc)
+    out: List[Dict[str, Any]] = []
+    for c in chunks:
+        raw = float(c.get("score", 0.0))
+        if min_similarity_score > 0 and raw < min_similarity_score:
+            continue
+        meta = c.get("chunk_metadata") or {}
+        tier = _coerce_trust_tier(meta.get("trust_tier"))
+        fetched_at = _coerce_fetched_at(meta.get("fetched_at"))
+        tier_boost = _TIER_BOOST.get(tier, 1.0)
+        if fetched_at is None:
+            freshness, is_stale = 1.0, False
+        else:
+            days_old = (now - fetched_at).days
+            if days_old > 180:
+                freshness, is_stale = 0.70, True
+            elif days_old > 90:
+                freshness, is_stale = 0.85, False
+            else:
+                freshness, is_stale = 1.0, False
+        enriched = dict(c)
+        enriched["raw_score"] = raw
+        enriched["adjusted_score"] = raw * tier_boost * freshness
+        enriched["trust_tier"] = tier
+        enriched["fetched_at"] = fetched_at.isoformat() if fetched_at else None
+        enriched["is_stale"] = is_stale
+        out.append(enriched)
+    out.sort(key=lambda c: c["adjusted_score"], reverse=True)
+    return out[: max(1, top_k)]
 
 
 # --- Postgres (pgvector) ---------------------------------------------------
