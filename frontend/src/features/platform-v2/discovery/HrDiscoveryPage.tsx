@@ -92,7 +92,7 @@ const TIMELINE_PHASES: TimelinePhase[] = [
 // ─── Category colour map ──────────────────────────────────────────────────────
 
 const CAT_COLORS: Record<string, string> = {
-  Visa:    'bg-violet-100 text-violet-700',
+  Visa:    'bg-accent-100 text-accent-700',
   Civil:   'bg-blue-100 text-blue-700',
   Housing: 'bg-amber-100 text-amber-700',
   Health:  'bg-green-100 text-green-700',
@@ -104,12 +104,12 @@ const CAT_COLORS: Record<string, string> = {
 
 function DiscoveryBanner() {
   return (
-    <div className="flex items-start gap-4 rounded-xl border border-violet-200 bg-violet-50 px-5 py-4 mb-5">
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-sm">✦</div>
+    <div className="flex items-start gap-4 rounded-xl border border-accent-200 bg-accent-50 px-5 py-4 mb-5">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-600 flex items-center justify-center text-white text-sm">✦</div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-gray-900">
-          Compiling requirement plan for <span className="text-violet-700">Marc Bouchard</span> ·{' '}
-          <span className="text-violet-700">France → Norway</span> · Skilled Worker Residence Permit
+          Compiling requirement plan for <span className="text-accent-700">Marc Bouchard</span> ·{' '}
+          <span className="text-accent-700">France → Norway</span> · Skilled Worker Residence Permit
         </div>
         <div className="text-xs text-gray-500 mt-0.5">
           Sponsored by Aurora Energy AS. Plan derived from 4 authorities across 2 jurisdictions.
@@ -167,7 +167,7 @@ function RequirementsTab({
           >
             View sources
           </button>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-medium">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-700 text-[10px] font-medium">
             ✦ Live
           </span>
         </div>
@@ -184,7 +184,7 @@ function RequirementsTab({
               onClick={() => setActiveId(isActive ? null : r.id)}
               className={`flex items-start gap-4 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
                 isActive
-                  ? 'border-violet-400 bg-violet-50'
+                  ? 'border-accent-400 bg-accent-50'
                   : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -231,7 +231,7 @@ function RequirementsTab({
 
 function TimelineTab() {
   const COLOR_MAP: Record<string, string> = {
-    accent:  'bg-violet-500',
+    accent:  'bg-accent-500',
     teal:    'bg-teal-500',
     warning: 'bg-amber-400',
     success: 'bg-green-500',
@@ -291,8 +291,8 @@ function SourcesTab() {
                   <div>
                     <div className="text-xs font-semibold text-gray-900 leading-tight">{s.name}</div>
                     {s.live && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-violet-600 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500 inline-block animate-pulse" />
+                      <span className="inline-flex items-center gap-1 text-[10px] text-accent-600 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent-500 inline-block animate-pulse" />
                         Live
                       </span>
                     )}
@@ -334,7 +334,7 @@ function ActivityLog() {
           <span>
             {entry.msg.map((part, j) => {
               if (typeof part === 'string') return <span key={j}>{part}</span>;
-              if (part.h)    return <span key={j} className="text-violet-400 font-semibold">{part.h}</span>;
+              if (part.h)    return <span key={j} className="text-accent-400 font-semibold">{part.h}</span>;
               if (part.ok)   return <span key={j} className="text-green-400 font-semibold">{part.ok}</span>;
               if (part.warn) return <span key={j} className="text-amber-400 font-semibold">{part.warn}</span>;
               return null;
@@ -366,14 +366,14 @@ export function HrDiscoveryPage() {
       <div className="mx-auto max-w-6xl px-6 py-8">
         {/* Page header */}
         <div className="mb-6">
-          <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">AI Engine</div>
+          <div className="text-xs font-semibold text-accent-600 uppercase tracking-widest mb-1">AI Engine</div>
           <div className="flex items-end justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Requirements</h1>
             <div className="flex items-center gap-2">
               <button className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 ⚡ Corridor: <strong>FR → NO</strong>
               </button>
-              <button className="px-3 py-2 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors">
+              <button className="px-3 py-2 text-sm font-medium bg-navy-800 text-white rounded-lg hover:bg-navy-900 transition-colors">
                 ✦ Re-run discovery
               </button>
             </div>

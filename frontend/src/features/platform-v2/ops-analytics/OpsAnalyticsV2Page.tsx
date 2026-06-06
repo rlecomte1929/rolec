@@ -112,7 +112,7 @@ function SlaBars({ rate }: { rate: number | undefined }) {
           className="flex-1 rounded-t-[2px] opacity-90"
           style={{
             height: `${v}%`,
-            background: v >= 95 ? '#10b981' : v >= 85 ? '#6366f1' : '#f59e0b',
+            background: v >= 95 ? '#10b981' : v >= 85 ? '#1f4870' : '#f59e0b',
           }}
         />
       ))}

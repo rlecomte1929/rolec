@@ -70,7 +70,7 @@ const PRIORITY_PILL: Record<string, string> = {
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-const OWNER_TONES = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-violet-100 text-violet-700'];
+const OWNER_TONES = ['bg-accent-100 text-accent-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-accent-100 text-accent-700'];
 
 /**
  * The queue's "open" universe: canonical granular statuses + synthetic item
@@ -348,7 +348,7 @@ export function AdminReviewQueueV2Page() {
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Review queue</h1>
-            <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
+            <Pill className="bg-accent-50 text-accent-700 ring-accent-200">v2 preview</Pill>
             <div className="ml-auto flex items-center gap-2">
               {/* Stubs — wire to real handlers in a follow-up commit. */}
               <button

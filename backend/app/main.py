@@ -34,6 +34,7 @@ from .routers import (
     immigration_intake_consent,
     immigration_intake_interview,
     immigration_intake_profile,
+    immigration_retrieve,
     immigration_status,
     marketplace,
     mobility_context,
@@ -121,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_status.router)
     app.include_router(immigration_gdpr.router)
     app.include_router(immigration_forms.router)  # IMM-11 — form library + PDF pre-fill
+    app.include_router(immigration_retrieve.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
     app.include_router(exception_requests.router)
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)

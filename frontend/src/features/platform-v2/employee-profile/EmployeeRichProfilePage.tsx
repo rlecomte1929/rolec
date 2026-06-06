@@ -205,7 +205,7 @@ function MultiChip({ value, onChange, options }: { value: string[]; onChange: (v
           onClick={() => toggle(o)}
           className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
             value.includes(o)
-              ? 'bg-violet-600 text-white border-violet-600'
+              ? 'bg-accent-600 text-white border-accent-600'
               : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
           }`}
         >
@@ -224,7 +224,7 @@ function StarRating({ value, onChange, max = 5 }: { value: number; onChange: (v:
           key={i}
           type="button"
           onClick={() => onChange(i + 1)}
-          className={`text-base leading-none transition-colors ${i < value ? 'text-violet-500' : 'text-gray-200'}`}
+          className={`text-base leading-none transition-colors ${i < value ? 'text-accent-500' : 'text-gray-200'}`}
         >
           ★
         </button>
@@ -258,7 +258,7 @@ function FieldWrap({
           <button
             type="button"
             onClick={() => setWhyOpen((o) => !o)}
-            className="text-violet-500 text-[10px] font-medium hover:text-violet-700"
+            className="text-accent-500 text-[10px] font-medium hover:text-accent-700"
           >
             Why?
           </button>
@@ -266,7 +266,7 @@ function FieldWrap({
       </label>
       {children}
       {whyOpen && why && (
-        <div className="text-xs text-gray-500 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">{why}</div>
+        <div className="text-xs text-gray-500 bg-accent-50 border border-accent-100 rounded-lg px-3 py-2">{why}</div>
       )}
       {hint && <div className="text-xs text-gray-400">{hint}</div>}
     </div>
@@ -278,7 +278,7 @@ function SelectField({ value, onChange, options }: { value: string; onChange: (v
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
+      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 bg-white"
     >
       {options.map((o) => {
         const optValue = o === '' ? '' : o;
@@ -305,10 +305,10 @@ function TierGate({ tier, required, label, children }: { tier: Tier; required: T
           <div className="text-2xl mb-2">🔒</div>
           <div className="text-sm font-semibold text-gray-900">
             Available on{' '}
-            <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-xs font-bold">{LABEL[required]}</span>
+            <span className="px-1.5 py-0.5 rounded bg-accent-100 text-accent-700 text-xs font-bold">{LABEL[required]}</span>
           </div>
           <div className="text-xs text-gray-500 mt-1">Ask your HR team to upgrade your ReloPass plan to unlock {label}.</div>
-          <button className="mt-3 px-4 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors">
+          <button className="mt-3 px-4 py-1.5 rounded-lg bg-navy-800 text-white text-xs font-semibold hover:bg-navy-900 transition-colors">
             Request upgrade
           </button>
         </div>
@@ -366,7 +366,7 @@ function SectionCard({
       ref={cardRef}
       id={`rp-${id}`}
       className={`border rounded-xl overflow-hidden transition-all ${
-        urgent ? 'border-amber-300' : expanded ? 'border-violet-200' : 'border-gray-100'
+        urgent ? 'border-amber-300' : expanded ? 'border-accent-200' : 'border-gray-100'
       } ${state === 'complete' ? 'bg-green-50/30' : 'bg-white'}`}
     >
       {/* Header */}
@@ -381,7 +381,7 @@ function SectionCard({
               ? 'bg-green-500 text-white'
               : urgent
               ? 'bg-amber-400 text-white'
-              : 'bg-violet-100 text-violet-700'
+              : 'bg-accent-100 text-accent-700'
           }`}
         >
           {state === 'complete' ? '✓' : marker}
@@ -397,7 +397,7 @@ function SectionCard({
           </div>
           <div className="text-xs text-gray-500 mt-0.5">{sub}</div>
           {!expanded && unlocks && (
-            <div className="text-[10px] text-violet-600 mt-1">
+            <div className="text-[10px] text-accent-600 mt-1">
               <span className="mr-1">✦</span>Unlocks: <strong>{unlocks}</strong>
             </div>
           )}
@@ -432,7 +432,7 @@ function CompletionRing({ pct, size = 72 }: { pct: number; size?: number }) {
         cy={size / 2}
         r={r}
         strokeWidth={stroke}
-        stroke="#7c3aed"
+        stroke="#1f8e8b"
         fill="none"
         strokeDasharray={c}
         strokeDashoffset={off}
@@ -496,7 +496,7 @@ export function EmployeeRichProfilePage() {
       <div className="mx-auto max-w-5xl px-6 py-8">
         {/* Header */}
         <div className="mb-6">
-          <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">
+          <div className="text-xs font-semibold text-accent-600 uppercase tracking-widest mb-1">
             Employee · Profile &amp; Preferences
           </div>
           <div className="flex items-end justify-between gap-4">
@@ -525,7 +525,7 @@ export function EmployeeRichProfilePage() {
               <span>Start: Within 6 weeks</span>
             </div>
           </div>
-          <button className="text-xs text-violet-600 font-medium hover:text-violet-800">Edit →</button>
+          <button className="text-xs text-accent-600 font-medium hover:text-accent-800">Edit →</button>
         </div>
 
         {/* Two-column layout: side + main */}
@@ -556,7 +556,7 @@ export function EmployeeRichProfilePage() {
                     type="button"
                     onClick={() => focusSection(s.id)}
                     className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors text-xs ${
-                      expanded[s.id] ? 'bg-violet-50 text-violet-700' : 'text-gray-600 hover:bg-gray-50'
+                      expanded[s.id] ? 'bg-accent-50 text-accent-700' : 'text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     <span
@@ -596,7 +596,7 @@ export function EmployeeRichProfilePage() {
                         <FieldWrap label="Lease end date">
                           <input type="date" value={profile.lease_end_date}
                             onChange={(e) => set('lease_end_date', e.target.value)}
-                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                         </FieldWrap>
                         <FieldWrap label="Break clause in your lease?">
                           <SelectField value={profile.has_break_clause} onChange={(v) => set('has_break_clause', v)}
@@ -614,7 +614,7 @@ export function EmployeeRichProfilePage() {
                           <FieldWrap label="Expected sale completion" optional>
                             <input type="date" value={profile.sale_date}
                               onChange={(e) => set('sale_date', e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                           </FieldWrap>
                         )}
                       </>
@@ -658,20 +658,20 @@ export function EmployeeRichProfilePage() {
                   <FieldWrap label="Bedrooms" hint={`Auto-suggested ${children.length + 1} based on your household.`}>
                     <input type="number" min={1} max={8} value={profile.bedrooms_needed}
                       onChange={(e) => set('bedrooms_needed', Number(e.target.value))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                   </FieldWrap>
                   <FieldWrap label="Monthly housing budget (€/mo)">
                     <div className="flex items-center gap-2">
                       <input type="number" placeholder="min" value={profile.monthly_budget_min}
                         onChange={(e) => set('monthly_budget_min', e.target.value === '' ? '' : Number(e.target.value))}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                       <span className="text-gray-400 text-sm">—</span>
                       <input type="number" placeholder="max" value={profile.monthly_budget_max}
                         onChange={(e) => set('monthly_budget_max', e.target.value === '' ? '' : Number(e.target.value))}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                     </div>
                     {profile.policy_cap && (
-                      <div className="text-xs text-violet-700 bg-violet-50 rounded-lg px-3 py-1.5 mt-1">
+                      <div className="text-xs text-accent-700 bg-accent-50 rounded-lg px-3 py-1.5 mt-1">
                         ℹ <strong>Your company covers up to €{profile.policy_cap.toLocaleString()}/month.</strong>
                       </div>
                     )}
@@ -850,12 +850,12 @@ export function EmployeeRichProfilePage() {
                         <Grid>
                           <FieldWrap label="Name" optional>
                             <input value={extra.name ?? ''} onChange={(e) => setExtra('name', e.target.value)} placeholder="e.g. Hugo"
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                           </FieldWrap>
                           <FieldWrap label="Age (years)">
                             <input type="number" min={0} max={25} value={extra.age ?? ''}
                               onChange={(e) => setExtra('age', Number(e.target.value))}
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300" />
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
                           </FieldWrap>
                           <FieldWrap label="Vaccinations up to date?">
                             <SelectField value={extra.vaccinations_uptodate ?? ''} onChange={(v) => setExtra('vaccinations_uptodate', v)}
@@ -865,7 +865,7 @@ export function EmployeeRichProfilePage() {
                             <select
                               value={extra.eu_pet_passport ?? ''}
                               onChange={(e) => setExtra('eu_pet_passport', e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 bg-white"
                             >
                               <option value="">Select…</option>
                               <option value="have">Has one</option>

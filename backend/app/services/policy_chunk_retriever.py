@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import text
@@ -44,6 +45,83 @@ from .policy_assistant_embedder import (
 
 log = logging.getLogger(__name__)
 
+# W2/AIQ-836 retrieval quality gates.
+#
+# NOTE on schema reality: policy_assistant_chunks has NO `trust_tier` or
+# `fetched_at` column (the original task brief assumed they existed). The
+# trust signal lives in chunk_metadata->>'source_tier' (string "1"/"2", and
+# NULL for HR matrix_benefit chunks, which is correct — tiering is an
+# official-source concept), and the freshness signal uses the `created_at`
+# column. A null/absent tier maps to a neutral 1.0 boost so HR chunks are
+# unaffected.
+_DEFAULT_MIN_SIMILARITY = 0.25
+_TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
+
+
+def _parse_tier(value: Any) -> Optional[int]:
+    """source_tier arrives as a string ('1'/'2') or None. Coerce to int or None."""
+    if value is None:
+        return None
+    try:
+        s = str(value).strip()
+        return int(s) if s else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _days_old(created: Any, now: datetime) -> int:
+    """Age in days from a timestamptz/ISO string. Missing/unparseable -> 0 (neutral)."""
+    if not created:
+        return 0
+    try:
+        if isinstance(created, str):
+            created = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return max(0, (now - created).days)
+    except Exception:
+        return 0
+
+
+def _apply_quality_gates(
+    chunks: List[Dict[str, Any]],
+    *,
+    min_similarity_score: float,
+    top_k: int,
+    now: Optional[datetime] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Apply the W2 quality gates to already-fetched chunks:
+      1. Similarity floor — drop chunks whose raw similarity < min_similarity_score
+         (pass min_similarity_score=0.0 to disable).
+      2. Trust-tier boost — x1.0 / x0.9 / x0.75 for tier 1 / 2 / 3; neutral (x1.0)
+         when source_tier is null/absent.
+      3. Freshness decay — x0.85 when >90 days old, x0.70 when >180 days old.
+    Re-sorts by adjusted_score DESC and returns the top_k. Pure function — no DB.
+    Each chunk's existing `score` is preserved; raw_score, adjusted_score,
+    source_tier, and is_stale are added.
+    """
+    now = now or datetime.now(timezone.utc)
+    scored: List[Dict[str, Any]] = []
+    for c in chunks:
+        raw = float(c.get("score") or 0.0)
+        if min_similarity_score > 0.0 and raw < min_similarity_score:
+            continue
+        meta = c.get("chunk_metadata") or {}
+        tier = _parse_tier(meta.get("source_tier") if isinstance(meta, dict) else None)
+        tier_boost = _TIER_BOOST.get(tier, 1.0)
+        days_old = _days_old(c.get("created_at"), now)
+        freshness = 0.70 if days_old > 180 else (0.85 if days_old > 90 else 1.0)
+        scored.append({
+            **c,
+            "raw_score": raw,
+            "source_tier": tier,
+            "adjusted_score": raw * tier_boost * freshness,
+            "is_stale": days_old > 180,
+        })
+    scored.sort(key=lambda c: c["adjusted_score"], reverse=True)
+    return scored[: max(1, top_k)]
+
 
 def retrieve(
     *,
@@ -52,15 +130,22 @@ def retrieve(
     top_k: int = 8,
     source_types: Optional[Sequence[str]] = None,
     embedder: Optional[Embedder] = None,
+    min_similarity_score: float = _DEFAULT_MIN_SIMILARITY,
 ) -> List[Dict[str, Any]]:
     """
     Top-K retrieval. Returns at most `top_k` chunks for `company_id`,
-    ordered by descending similarity to the query embedding.
+    ordered by descending *adjusted* similarity (W2 quality gates applied).
+
+    Each returned chunk gains: raw_score, adjusted_score, source_tier, is_stale
+    (the legacy `score` field is preserved unchanged).
+
+    `min_similarity_score` (default 0.25) drops low-similarity chunks; pass 0.0
+    to disable the floor entirely.
 
     Empty list when:
       - company_id missing
       - query empty / whitespace-only
-      - company has no indexed chunks yet
+      - company has no indexed chunks yet (or all below the floor)
     """
     if not company_id:
         return []
@@ -72,8 +157,8 @@ def retrieve(
 
     dialect = db.engine.dialect.name
     if dialect == "sqlite":
-        return _retrieve_sqlite(company_id, q_emb, top_k, source_types)
-    return _retrieve_postgres(company_id, q_emb, top_k, source_types)
+        return _retrieve_sqlite(company_id, q_emb, top_k, source_types, min_similarity_score)
+    return _retrieve_postgres(company_id, q_emb, top_k, source_types, min_similarity_score)
 
 
 # --- Postgres (pgvector) ---------------------------------------------------
@@ -83,6 +168,7 @@ def _retrieve_postgres(
     query_embedding: List[float],
     top_k: int,
     source_types: Optional[Sequence[str]],
+    min_similarity_score: float = _DEFAULT_MIN_SIMILARITY,
 ) -> List[Dict[str, Any]]:
     """
     Uses pgvector's cosine distance operator (<=>). Distance is in
@@ -103,7 +189,7 @@ def _retrieve_postgres(
     # cast. Easiest: pass as text and CAST inside the query.
     params["q"] = "[" + ",".join(f"{x:.6f}" for x in query_embedding) + "]"
     sql = (
-        "SELECT id, source_type, source_ref, chunk_text, chunk_metadata, "
+        "SELECT id, source_type, source_ref, chunk_text, chunk_metadata, created_at, "
         "       (embedding <=> CAST(:q AS vector)) AS distance "
         "FROM policy_assistant_chunks "
         "WHERE company_id = :co"
@@ -136,7 +222,9 @@ def _retrieve_postgres(
         dist = float(d.pop("distance", 1.0))
         d["score"] = max(0.0, min(1.0, 1.0 - (dist / 2.0)))
         out.append(d)
-    return out
+    return _apply_quality_gates(
+        out, min_similarity_score=min_similarity_score, top_k=top_k
+    )
 
 
 # --- SQLite fallback (in-Python cosine) ------------------------------------
@@ -146,6 +234,7 @@ def _retrieve_sqlite(
     query_embedding: List[float],
     top_k: int,
     source_types: Optional[Sequence[str]],
+    min_similarity_score: float = _DEFAULT_MIN_SIMILARITY,
 ) -> List[Dict[str, Any]]:
     """
     Pulls all chunks for the company, computes cosine similarity in
@@ -194,5 +283,8 @@ def _retrieve_sqlite(
             "chunk_metadata": meta,
             "score": sim,
         })
-    scored.sort(key=lambda x: x["score"], reverse=True)
-    return scored[: max(1, min(top_k, 50))]
+    # W2 quality gates (floor + tier boost + freshness). The dev SQLite schema
+    # has no created_at, so freshness is neutral here — acceptable for dev/tests.
+    return _apply_quality_gates(
+        scored, min_similarity_score=min_similarity_score, top_k=min(top_k, 50)
+    )

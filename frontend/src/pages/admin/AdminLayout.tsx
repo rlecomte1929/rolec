@@ -115,8 +115,8 @@ function toneFromId(id: string): string {
   let hash = 5381;
   for (let i = 0; i < id.length; i++) hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0;
   const palette = [
-    'bg-indigo-600', 'bg-emerald-600', 'bg-amber-600',
-    'bg-sky-600', 'bg-rose-600', 'bg-violet-600',
+    'bg-accent-600', 'bg-emerald-600', 'bg-amber-600',
+    'bg-sky-600', 'bg-rose-600', 'bg-accent-600',
   ];
   return palette[Math.abs(hash) % palette.length]!;
 }
@@ -206,7 +206,7 @@ const CompanySwitcher: React.FC = () => {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               autoFocus
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </div>
           {filtered.length === 0 ? (
@@ -219,7 +219,7 @@ const CompanySwitcher: React.FC = () => {
                   key={c.id}
                   type="button"
                   onClick={() => handlePick(c)}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 ${isSelected ? 'bg-indigo-50' : ''}`}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 ${isSelected ? 'bg-accent-50' : ''}`}
                 >
                   <div className={`w-5 h-5 rounded ${toneFromId(c.id)} flex items-center justify-center text-[9px] font-bold text-white shrink-0`}>
                     {logoInitials(c.name)}
@@ -229,7 +229,7 @@ const CompanySwitcher: React.FC = () => {
                     <span className="text-[10px] text-slate-400">{c.country}</span>
                   )}
                   {isSelected && (
-                    <span className="text-indigo-600 text-[11px]" aria-label="selected">✓</span>
+                    <span className="text-accent-600 text-[11px]" aria-label="selected">✓</span>
                   )}
                 </button>
               );

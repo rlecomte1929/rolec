@@ -289,6 +289,7 @@ def answer_policy_question(
                 latency_ms=latency_ms,
             )
             tracer.set_prompt_attribution(prompt_version_id, canary_arm)
+            tracer.record_citations(cited_ids)  # W3/AIQ-837 — persist on the trace
         except Exception:  # noqa: BLE001 — tracing must never break the assistant
             log.debug("policy_assistant tracer record failed", exc_info=True)
 

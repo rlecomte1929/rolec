@@ -80,7 +80,7 @@ export function ProviderGridV2Page() {
               type="button"
               onClick={() => void fetchGrid()}
               disabled={loading}
-              className="ml-auto text-xs font-medium text-indigo-600 underline-offset-2 hover:underline disabled:opacity-50"
+              className="ml-auto text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50"
             >
               {loading ? 'Refreshing…' : 'Refresh'}
             </button>
@@ -143,14 +143,14 @@ function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
     success: 'text-emerald-700',
     warning: 'text-amber-700',
     danger: 'text-rose-700',
-    accent: 'text-indigo-700',
+    accent: 'text-accent-700',
   };
   const dot: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'bg-slate-200',
     success: 'bg-emerald-500',
     warning: 'bg-amber-500',
     danger: 'bg-rose-500',
-    accent: 'bg-indigo-500',
+    accent: 'bg-accent-500',
   };
   return (
     <div className="relative rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300">

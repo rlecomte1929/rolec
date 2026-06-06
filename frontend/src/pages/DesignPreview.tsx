@@ -135,7 +135,7 @@ export function DesignPreview() {
           href={src}
           target="_blank"
           rel="noreferrer"
-          style={{ fontSize: 12, color: '#4f46e5', textDecoration: 'none' }}
+          style={{ fontSize: 12, color: '#1f4870', textDecoration: 'none' }}
         >
           Open in new tab ↗
         </a>

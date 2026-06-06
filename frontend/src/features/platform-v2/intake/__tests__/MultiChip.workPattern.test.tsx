@@ -26,7 +26,7 @@ function WorkPatternHarness({ binding }: { binding: 'old' | 'fixed' }) {
 }
 
 const isSelected = (label: string) =>
-  screen.getByRole('button', { name: label }).className.includes('bg-violet-600');
+  screen.getByRole('button', { name: label }).className.includes('bg-accent-600');
 
 describe('Work pattern selector (single-select on MultiChip)', () => {
   it('OLD binding: clicking never sets the value (reproduces the blocker)', () => {

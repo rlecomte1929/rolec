@@ -27,7 +27,7 @@ export const ProgressHeader: React.FC<ProgressHeaderProps> = ({
             </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-indigo-600">{Math.round(percentComplete)}%</div>
+            <div className="text-2xl font-bold text-accent-600">{Math.round(percentComplete)}%</div>
             <div className="text-xs text-gray-500">Complete</div>
           </div>
         </div>

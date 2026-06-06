@@ -105,9 +105,9 @@ const STATUS_PILL: Record<string, string> = {
   done: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   visa_submitted: 'bg-sky-50 text-sky-700 ring-sky-200',
-  housing: 'bg-violet-50 text-violet-700 ring-violet-200',
-  dossier: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
-  roadmap: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  housing: 'bg-accent-50 text-accent-700 ring-accent-200',
+  dossier: 'bg-accent-50 text-accent-700 ring-accent-200',
+  roadmap: 'bg-accent-50 text-accent-700 ring-accent-200',
   discovery: 'bg-amber-50 text-amber-700 ring-amber-200',
   awaiting_intake: 'bg-amber-50 text-amber-700 ring-amber-200',
   submitted: 'bg-sky-50 text-sky-700 ring-sky-200',
@@ -129,12 +129,12 @@ function statusTone(raw: string, risk: string): string {
 
 // ── Owner tones (deterministic colour bucket by string) ─────────────────────
 const OWNER_TONES = [
-  'bg-indigo-100 text-indigo-700',
+  'bg-accent-100 text-accent-700',
   'bg-emerald-100 text-emerald-700',
   'bg-amber-100 text-amber-700',
   'bg-sky-100 text-sky-700',
   'bg-rose-100 text-rose-700',
-  'bg-violet-100 text-violet-700',
+  'bg-accent-100 text-accent-700',
 ];
 function ownerTone(seed: string): string {
   let hash = 5381;
@@ -220,14 +220,14 @@ function Kpi({ label, value, sub, tone = 'default', progress }: KpiProps) {
     default: 'text-slate-900',
     success: 'text-emerald-700',
     warning: 'text-rose-700',
-    accent: 'text-indigo-700',
+    accent: 'text-accent-700',
     danger: 'text-rose-700',
   };
   const bar: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'bg-slate-400',
     success: 'bg-emerald-500',
     warning: 'bg-rose-500',
-    accent: 'bg-indigo-500',
+    accent: 'bg-accent-500',
     danger: 'bg-rose-500',
   };
   const pct = Math.max(0, Math.min(100, progress ?? 100));
@@ -260,7 +260,7 @@ function SidebarCard({ eyebrow, children }: { eyebrow: string; children: React.R
 
 function ProgressBar({ value, risk }: { value: number; risk: string }) {
   const v = Math.max(0, Math.min(100, value));
-  const tone = risk === 'red' ? 'bg-rose-500' : risk === 'yellow' ? 'bg-amber-500' : v >= 99 ? 'bg-emerald-500' : 'bg-indigo-500';
+  const tone = risk === 'red' ? 'bg-rose-500' : risk === 'yellow' ? 'bg-amber-500' : v >= 99 ? 'bg-emerald-500' : 'bg-accent-500';
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">

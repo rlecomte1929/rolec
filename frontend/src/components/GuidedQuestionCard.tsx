@@ -80,8 +80,8 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
         </div>
 
         {/* Why This Matters */}
-        <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded">
-          <p className="text-sm text-indigo-900">
+        <div className="bg-accent-50 border-l-4 border-accent-500 p-4 rounded">
+          <p className="text-sm text-accent-900">
             <span className="font-semibold">Why we ask this: </span>
             {question.whyThisMatters}
           </p>
@@ -97,8 +97,8 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                   onClick={() => handleQuickOption(option.value)}
                   className={`p-4 border-2 rounded-lg text-left transition-all ${
                     answer === option.value
-                      ? 'border-indigo-600 bg-indigo-50'
-                      : 'border-gray-300 hover:border-indigo-400'
+                      ? 'border-accent-600 bg-accent-50'
+                      : 'border-gray-300 hover:border-accent-400'
                   }`}
                 >
                   <div className="font-medium text-gray-900">{option.label}</div>
@@ -118,7 +118,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                     type="checkbox"
                     checked={selectedOptions.includes(option.value)}
                     onChange={() => handleQuickOption(option.value)}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    className="w-4 h-4 text-accent-600 focus:ring-accent-500 border-gray-300 rounded"
                   />
                   <span className="ml-3 text-gray-900">{option.label}</span>
                 </label>
@@ -161,8 +161,8 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                 onClick={() => setAnswer('true')}
                 className={`flex-1 p-4 border-2 rounded-lg transition-all ${
                   answer === 'true'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-300 hover:border-indigo-400'
+                    ? 'border-accent-600 bg-accent-50'
+                    : 'border-gray-300 hover:border-accent-400'
                 }`}
               >
                 <div className="font-medium text-gray-900">Yes</div>
@@ -171,8 +171,8 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                 onClick={() => setAnswer('false')}
                 className={`flex-1 p-4 border-2 rounded-lg transition-all ${
                   answer === 'false'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-300 hover:border-indigo-400'
+                    ? 'border-accent-600 bg-accent-50'
+                    : 'border-gray-300 hover:border-accent-400'
                 }`}
               >
                 <div className="font-medium text-gray-900">No</div>

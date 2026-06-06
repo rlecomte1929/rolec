@@ -269,7 +269,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
   return (
     <div className="relative rounded-xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 320 }}>
       {/* Live badge */}
-      <div className="absolute top-2 right-2 z-[1000] flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-medium shadow">
+      <div className="absolute top-2 right-2 z-[1000] flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-600 text-white text-[10px] font-medium shadow">
         <span className="w-1.5 h-1.5 rounded-full bg-green-300 animate-pulse inline-block" />
         live
       </div>
@@ -277,7 +277,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
       {/* Legend */}
       <div className="absolute bottom-2 left-2 z-[1000] flex flex-col gap-1 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-2 text-[10px] shadow">
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-violet-500 opacity-30 border border-violet-500 inline-block" />
+          <span className="w-3 h-3 rounded-full bg-accent-500 opacity-30 border border-accent-500 inline-block" />
           <span className="text-gray-600">{commuteMins}min radius ({(radiusM / 1000).toFixed(1)} km)</span>
         </div>
         {hasChildren && schoolCount > 0 && (
@@ -326,14 +326,14 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
         <Circle
           center={[center.lat, center.lng]}
           radius={radiusM}
-          pathOptions={{ color: '#7c3aed', fillColor: '#7c3aed', fillOpacity: 0.08, weight: 1.5 }}
+          pathOptions={{ color: '#1f8e8b', fillColor: '#1f8e8b', fillOpacity: 0.08, weight: 1.5 }}
         />
 
         {/* Office marker */}
         <Marker position={[center.lat, center.lng]} icon={officeIcon}>
           <Popup>
             <div className="text-xs">
-              <div className="font-semibold text-violet-700 mb-0.5">📍 Your office</div>
+              <div className="font-semibold text-accent-700 mb-0.5">📍 Your office</div>
               <div className="text-gray-600">{officeAddress}</div>
             </div>
           </Popup>
