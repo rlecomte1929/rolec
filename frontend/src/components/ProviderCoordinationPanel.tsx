@@ -455,7 +455,7 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
             <Button unstyled
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="px-4 py-2 text-sm font-medium text-white bg-navy-800 hover:bg-navy-900 disabled:opacity-60 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {submitting ? "Assigning…" : "Assign Task"}
             </Button>
@@ -554,7 +554,7 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
           <Button unstyled
             type="button"
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="flex items-center gap-1.5 px-4 py-2 bg-navy-800 hover:bg-navy-900 text-white text-sm font-medium rounded-xl shadow transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <span aria-hidden>+</span> Assign Task
           </Button>
@@ -615,7 +615,7 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
           <Button unstyled
             type="button"
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-full shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="flex items-center gap-1.5 px-5 py-3 bg-navy-800 hover:bg-navy-900 text-white text-sm font-semibold rounded-full shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <span aria-hidden>+</span> Assign Task
           </Button>

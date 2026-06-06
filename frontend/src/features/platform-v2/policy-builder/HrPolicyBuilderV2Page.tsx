@@ -333,7 +333,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <Button unstyled className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Save draft</Button>
           <Button unstyled className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"><Eye size={12}/> Preview</Button>
           <Button unstyled disabled={tiers.length === 0}
-            className="text-[12px] px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-40 flex items-center gap-1.5">
+            className="text-[12px] px-3 py-1.5 rounded-lg bg-navy-800 text-white font-semibold hover:bg-navy-900 disabled:opacity-40 flex items-center gap-1.5">
             <Check size={12}/> Publish
           </Button>
         </div>
@@ -346,7 +346,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <p className="text-sm text-gray-500 max-w-sm">Start from a template to get set up in minutes, or build a custom tier structure from scratch.</p>
           <div className="flex gap-3 mt-2">
             <Button unstyled onClick={() => setTemplateOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+              className="flex items-center gap-2 px-4 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900">
               <Sparkles size={14}/> Start from a template
             </Button>
             <Button unstyled onClick={addTier}
@@ -369,7 +369,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <p className="text-sm text-gray-500 max-w-sm">PDF or Word. Our AI extracts benefits, caps, and conditions, then you review and apply to the canvas.</p>
           <div className="flex gap-3 mt-2">
             <Button unstyled onClick={() => setImportOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+              className="flex items-center gap-2 px-4 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900">
               <Upload size={14}/> Choose file
             </Button>
             <Button unstyled onClick={() => setMode('template')}
@@ -812,7 +812,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
         <div className="flex items-center gap-3 p-4 border-t border-gray-200">
           <Button unstyled onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</Button>
           <Button unstyled onClick={() => { onChange(local); onClose(); }}
-            className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+            className="flex-1 py-2 rounded-lg bg-navy-800 text-white text-sm font-semibold hover:bg-navy-900">
             Save rules
           </Button>
         </div>
@@ -1105,7 +1105,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
           <div className="flex-1"/>
           {step === 1 && (
             <Button unstyled disabled={!file} onClick={() => setStep(2)}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
+              className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
               Start extraction →
             </Button>
           )}
@@ -1115,7 +1115,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
               <Button unstyled onClick={() => { acceptAll(); setStep(4); }}
                 className="text-[13px] text-gray-500 hover:text-gray-700">Skip review — apply all</Button>
               <Button unstyled disabled={accepted.length === 0} onClick={() => setStep(4)}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
+                className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
                 Continue to mapping →
               </Button>
             </>
@@ -1123,7 +1123,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
           {step === 4 && (
             <Button unstyled disabled={accepted.filter(r => r.assign_to.length > 0).length === 0}
               onClick={() => onApply(accepted.filter(r => r.assign_to.length > 0))}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
+              className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
               Apply to canvas →
             </Button>
           )}

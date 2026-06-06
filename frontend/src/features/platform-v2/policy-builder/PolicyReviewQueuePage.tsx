@@ -136,7 +136,7 @@ const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject
               type="button"
               onClick={handleSaveEdit}
               disabled={loading || !editValue.trim()}
-              className="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              className="px-2 py-1 rounded text-xs font-semibold bg-navy-800 text-white hover:bg-navy-900 disabled:opacity-50"
             >
               Save
             </Button>

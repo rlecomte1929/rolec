@@ -492,7 +492,7 @@ function ProgressStepper({
               title={isNavigable ? `Go to ${label}` : undefined}
               className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all focus:outline-none ${
                 isCompleted
-                  ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700 hover:border-blue-700 cursor-pointer'
+                  ? 'bg-navy-800 border-navy-800 text-white hover:bg-navy-900 hover:border-navy-900 cursor-pointer'
                   : isActive
                     ? 'bg-white border-blue-500 text-blue-600 cursor-default'
                     : isNavigable
@@ -989,7 +989,7 @@ export function RelocatePlanIntakePage() {
                   <Button unstyled
                     type="button"
                     onClick={() => navigate('/employee/intake/detailed')}
-                    className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+                    className="px-5 py-2.5 bg-navy-800 text-white text-sm font-semibold rounded-xl hover:bg-navy-900 transition-colors"
                   >
                     Continue to detailed intake →
                   </Button>
