@@ -266,9 +266,9 @@ export const HrPolicyManagement: React.FC = () => {
       {(view === 'create' || view === 'edit') && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <button type="button" onClick={() => setView('list')} className="text-sm text-[#0b2b43] hover:underline">
+            <Button unstyled type="button" onClick={() => setView('list')} className="text-sm text-[#0b2b43] hover:underline">
               Back to list
-            </button>
+            </Button>
           </div>
 
           <Card padding="lg">
@@ -356,37 +356,37 @@ export const HrPolicyManagement: React.FC = () => {
                           />
                         </td>
                         <td className="py-2 px-2">
-                          <input
+                          <Input unstyled
                             type="number"
                             value={ma.min ?? 0}
-                            onChange={(e) => setBenefit(key, 'maxAllowed.min', e.target.value)}
+                            onChange={(v) => setBenefit(key, 'maxAllowed.min', v)}
                             disabled={!b.allowed}
                             className="w-20 px-2 py-1 border rounded"
                           />
                         </td>
                         <td className="py-2 px-2">
-                          <input
+                          <Input unstyled
                             type="number"
                             value={ma.medium ?? 0}
-                            onChange={(e) => setBenefit(key, 'maxAllowed.medium', e.target.value)}
+                            onChange={(v) => setBenefit(key, 'maxAllowed.medium', v)}
                             disabled={!b.allowed}
                             className="w-20 px-2 py-1 border rounded"
                           />
                         </td>
                         <td className="py-2 px-2">
-                          <input
+                          <Input unstyled
                             type="number"
                             value={ma.extensive ?? 0}
-                            onChange={(e) => setBenefit(key, 'maxAllowed.extensive', e.target.value)}
+                            onChange={(v) => setBenefit(key, 'maxAllowed.extensive', v)}
                             disabled={!b.allowed}
                             className="w-20 px-2 py-1 border rounded"
                           />
                         </td>
                         <td className="py-2 px-2">
-                          <input
+                          <Input unstyled
                             type="number"
                             value={ma.premium ?? 0}
-                            onChange={(e) => setBenefit(key, 'maxAllowed.premium', e.target.value)}
+                            onChange={(v) => setBenefit(key, 'maxAllowed.premium', v)}
                             disabled={!b.allowed}
                             className="w-20 px-2 py-1 border rounded"
                           />

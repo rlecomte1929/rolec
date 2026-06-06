@@ -9,6 +9,7 @@
  * the ProviderCoordinationPanel lives.
  */
 import React from 'react';
+import { Button } from '../antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import type { GridCellStatus } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
@@ -69,7 +70,7 @@ export const ProviderStatusCell: React.FC<ProviderStatusCellProps> = ({
   };
 
   return (
-    <button
+    <Button unstyled
       onClick={handleClick}
       title={`${providerType}: ${cfg.label}`}
       style={{
@@ -101,6 +102,6 @@ export const ProviderStatusCell: React.FC<ProviderStatusCellProps> = ({
         }}
       />
       {cfg.label}
-    </button>
+    </Button>
   );
 };

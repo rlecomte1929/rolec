@@ -9,6 +9,7 @@
  * This page intentionally does NOT use AppShell (no HR/employee nav needed).
  */
 import React, { useEffect, useState } from 'react';
+import { Button } from '../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import {
   storeProviderToken,
@@ -110,31 +111,31 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, token, onUpdate }) => {
 
       <div className="flex gap-2 flex-wrap">
         {task.status === 'pending' && (
-          <button
+          <Button unstyled
             onClick={markInProgress}
             disabled={saving}
             className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
           >
             Mark in progress
-          </button>
+          </Button>
         )}
         {task.status !== 'completed' && (
-          <button
+          <Button unstyled
             onClick={markComplete}
             disabled={saving}
             className="px-3 py-1.5 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 disabled:opacity-50"
           >
             Mark complete
-          </button>
+          </Button>
         )}
         {note !== (task.provider_note ?? '') && (
-          <button
+          <Button unstyled
             onClick={saveNote}
             disabled={saving}
             className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-medium hover:bg-slate-800 disabled:opacity-50"
           >
             Save note
-          </button>
+          </Button>
         )}
       </div>
     </div>

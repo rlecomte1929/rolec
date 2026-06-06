@@ -50,34 +50,34 @@ export const EventRowActions: React.FC<EventRowActionsProps> = ({
         Edit
       </Link>
       {actions.includes('submit') && (
-        <button type="button" onClick={() => handle('submit')} disabled={disabled || working} className="text-xs text-amber-700 hover:underline">
+        <Button unstyled type="button" onClick={() => handle('submit')} disabled={disabled || working} className="text-xs text-amber-700 hover:underline">
           Submit
-        </button>
+        </Button>
       )}
       {actions.includes('approve') && (
-        <button type="button" onClick={() => setShowApproveModal(true)} disabled={disabled || working} className="text-xs text-blue-700 hover:underline">
+        <Button unstyled type="button" onClick={() => setShowApproveModal(true)} disabled={disabled || working} className="text-xs text-blue-700 hover:underline">
           Approve
-        </button>
+        </Button>
       )}
       {actions.includes('publish') && (
-        <button type="button" onClick={() => handle('publish')} disabled={disabled || working} className="text-xs text-green-700 hover:underline">
+        <Button unstyled type="button" onClick={() => handle('publish')} disabled={disabled || working} className="text-xs text-green-700 hover:underline">
           Publish
-        </button>
+        </Button>
       )}
       {actions.includes('unpublish') && (
-        <button type="button" onClick={() => handle('unpublish')} disabled={disabled || working} className="text-xs text-slate-600 hover:underline">
+        <Button unstyled type="button" onClick={() => handle('unpublish')} disabled={disabled || working} className="text-xs text-slate-600 hover:underline">
           Unpublish
-        </button>
+        </Button>
       )}
       {actions.includes('archive') && (
-        <button type="button" onClick={() => handle('archive')} disabled={disabled || working} className="text-xs text-slate-600 hover:underline">
+        <Button unstyled type="button" onClick={() => handle('archive')} disabled={disabled || working} className="text-xs text-slate-600 hover:underline">
           Archive
-        </button>
+        </Button>
       )}
       {actions.includes('restore') && (
-        <button type="button" onClick={() => handle('restore')} disabled={disabled || working} className="text-xs text-blue-700 hover:underline">
+        <Button unstyled type="button" onClick={() => handle('restore')} disabled={disabled || working} className="text-xs text-blue-700 hover:underline">
           Restore
-        </button>
+        </Button>
       )}
 
       {showApproveModal && (

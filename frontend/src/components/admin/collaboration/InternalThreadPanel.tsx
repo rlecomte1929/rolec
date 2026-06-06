@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../antigravity/Button';
 import { adminCollaborationAPI } from '../../../api/client';
 import { MentionAutocomplete } from './MentionAutocomplete';
 
@@ -213,14 +214,14 @@ export const InternalThreadPanel: React.FC<Props> = ({
             placeholder="Add a comment... Type @ to mention someone."
             rows={3}
           />
-          <button
+          <Button unstyled
             type="button"
             onClick={handleStartDiscussion}
             disabled={!newBody.trim() || submitting}
             className="rounded bg-[#0b2b43] px-3 py-1 text-sm text-white hover:bg-[#0d3552] disabled:opacity-50"
           >
             Start discussion
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -246,21 +247,21 @@ export const InternalThreadPanel: React.FC<Props> = ({
                             onChange={(e) => setEditBody(e.target.value)}
                           />
                           <div className="mt-1 flex gap-1">
-                            <button
+                            <Button unstyled
                               type="button"
                               onClick={handleEdit}
                               disabled={submitting}
                               className="rounded bg-slate-200 px-2 py-0.5 text-xs"
                             >
                               Save
-                            </button>
-                            <button
+                            </Button>
+                            <Button unstyled
                               type="button"
                               onClick={() => setEditId(null)}
                               className="rounded bg-slate-100 px-2 py-0.5 text-xs"
                             >
                               Cancel
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ) : (
@@ -269,7 +270,7 @@ export const InternalThreadPanel: React.FC<Props> = ({
                     </div>
                     {editId !== c.id && c.can_edit && (
                       <div className="flex shrink-0 gap-1">
-                        <button
+                        <Button unstyled
                           type="button"
                           onClick={() => {
                             setEditId(c.id);
@@ -278,24 +279,24 @@ export const InternalThreadPanel: React.FC<Props> = ({
                           className="text-xs text-slate-500 hover:text-slate-700"
                         >
                           Edit
-                        </button>
+                        </Button>
                         {c.can_delete && (
-                          <button
+                          <Button unstyled
                             type="button"
                             onClick={() => handleDelete(c.id)}
                             className="text-xs text-red-500 hover:text-red-700"
                           >
                             Delete
-                          </button>
+                          </Button>
                         )}
                         {thread.status === 'open' && (
-                          <button
+                          <Button unstyled
                             type="button"
                             onClick={() => setReplyTo(c.id)}
                             className="text-xs text-slate-500 hover:text-slate-700"
                           >
                             Reply
-                          </button>
+                          </Button>
                         )}
                       </div>
                     )}
@@ -319,21 +320,21 @@ export const InternalThreadPanel: React.FC<Props> = ({
                         onChange={(e) => setReplyBody(e.target.value)}
                       />
                       <div className="mt-1 flex gap-1">
-                        <button
+                        <Button unstyled
                           type="button"
                           onClick={handleAddComment}
                           disabled={!replyBody.trim() || submitting}
                           className="rounded bg-slate-200 px-2 py-0.5 text-xs"
                         >
                           Post reply
-                        </button>
-                        <button
+                        </Button>
+                        <Button unstyled
                           type="button"
                           onClick={() => setReplyTo(null)}
                           className="rounded bg-slate-100 px-2 py-0.5 text-xs"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -353,37 +354,37 @@ export const InternalThreadPanel: React.FC<Props> = ({
                 placeholder="Add a comment... Type @ to mention someone."
                 rows={2}
               />
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleAddComment}
                 disabled={!newBody.trim() || submitting}
                 className="rounded bg-[#0b2b43] px-3 py-1 text-sm text-white hover:bg-[#0d3552] disabled:opacity-50"
               >
                 Add comment
-              </button>
+              </Button>
             </div>
           )}
 
           <div className="flex gap-2 pt-2 border-t border-slate-200">
             {thread.status === 'open' && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleResolve}
                 disabled={submitting}
                 className="rounded bg-green-100 px-2 py-1 text-xs text-green-800 hover:bg-green-200"
               >
                 Resolve discussion
-              </button>
+              </Button>
             )}
             {(thread.status === 'resolved' || thread.status === 'closed') && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={handleReopen}
                 disabled={submitting}
                 className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 hover:bg-blue-200"
               >
                 Reopen discussion
-              </button>
+              </Button>
             )}
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
@@ -107,9 +108,9 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Full name
           {requiredMissing.fullName && <span className="text-red-600"> *</span>}
-          <input
+          <Input unstyled
             value={local.fullName || ''}
-            onChange={(event) => update('fullName', event.target.value)}
+            onChange={(event) => update('fullName', event)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
           />
         </label>
@@ -148,10 +149,10 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Passport expiry
           {requiredMissing.passportExpiry && <span className="text-red-600"> *</span>}
-          <input
+          <Input unstyled
             type="date"
             value={local.passportExpiry || ''}
-            onChange={(event) => update('passportExpiry', event.target.value)}
+            onChange={(event) => update('passportExpiry', event)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
           />
         </label>
@@ -175,10 +176,10 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Email
           {requiredMissing.email && <span className="text-red-600"> *</span>}
-          <input
+          <Input unstyled
             type="email"
             value={local.email || ''}
-            onChange={(event) => update('email', event.target.value)}
+            onChange={(event) => update('email', event)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
           />
         </label>

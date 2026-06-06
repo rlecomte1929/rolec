@@ -268,10 +268,10 @@ export const HrDashboard: React.FC = () => {
         )}
 
         <div className="flex flex-wrap items-center gap-3 mb-2">
-          <input
+          <Input unstyled
             id="hr-search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => setSearch(event)}
             placeholder="Search employees..."
             className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
           />
@@ -437,13 +437,13 @@ export const HrDashboard: React.FC = () => {
                 This action cannot be undone.
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <Button unstyled
                   onClick={handleRemoveSelected}
                   disabled={isDeleting}
                   className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
                 >
                   {isDeleting ? 'Removing...' : 'Confirm removal'}
-                </button>
+                </Button>
                 <Button variant="outline" onClick={() => setIsConfirmingRemoval(false)} disabled={isDeleting}>
                   Go back
                 </Button>
@@ -565,12 +565,12 @@ export const HrDashboard: React.FC = () => {
           <Card padding="lg" className="w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm font-semibold text-[#0b2b43]">Filter cases</div>
-              <button
+              <Button unstyled
                 onClick={() => setIsFilterOpen(false)}
                 className="text-sm text-[#6b7280] hover:text-[#0b2b43]"
               >
                 Close
-              </button>
+              </Button>
             </div>
             <div className="space-y-4">
               <div>
@@ -592,9 +592,9 @@ export const HrDashboard: React.FC = () => {
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-[#6b7280] mb-2">Destination</div>
-                <input
+                <Input unstyled
                   value={destinationFilter}
-                  onChange={(event) => setDestinationFilter(event.target.value)}
+                  onChange={(event) => setDestinationFilter(event)}
                   placeholder="Singapore, New York, etc."
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 />

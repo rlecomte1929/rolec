@@ -18,6 +18,7 @@
  */
 import React, { useMemo, useState } from 'react';
 
+import { Button } from '../../components/antigravity/Button';
 type Props = {
   label: string;
   value: string | null | undefined;
@@ -79,13 +80,13 @@ export const MarkdownTextarea: React.FC<Props> = ({
       <div className="flex items-center justify-between mb-1">
         <label className="block text-xs font-medium text-[#374151]">{label}</label>
         {!disabled && text.trim() && (
-          <button
+          <Button unstyled
             type="button"
             onClick={() => setPreviewing((p) => !p)}
             className="text-xs text-[#0b2b43] hover:underline"
           >
             {previewing ? 'Edit' : 'Preview'}
-          </button>
+          </Button>
         )}
       </div>
       {previewing ? (

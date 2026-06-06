@@ -4,6 +4,8 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
+import { Button } from '../../components/antigravity/Button';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { Card } from '../../components/antigravity';
@@ -143,18 +145,18 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
             }}
           >
             <label className="block text-sm font-medium text-[#0b2b43]">Mobility case UUID</label>
-            <input
+            <Input unstyled
               className="w-full border border-[#cbd5e1] rounded-md px-3 py-2 text-sm font-mono"
               placeholder="33333333-3333-4333-8333-333333333301"
               value={manualId}
-              onChange={(e) => setManualId(e.target.value)}
+              onChange={(v) => setManualId(v)}
             />
-            <button
+            <Button unstyled
               type="submit"
               className="px-4 py-2 rounded-md bg-[#0b2b43] text-white text-sm font-medium hover:opacity-90"
             >
               Open case
-            </button>
+            </Button>
           </form>
           <p className="text-xs text-[#64748b] mt-4">
             Admin session required. Uses{' '}
@@ -177,14 +179,14 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
         >
           ← Choose another case
         </Link>
-        <button
+        <Button unstyled
           type="button"
           className="text-sm px-3 py-1 border border-[#cbd5e1] rounded-md hover:bg-[#f8fafc]"
           disabled={loading}
           onClick={() => void load(caseId)}
         >
           Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -271,7 +273,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
               <p className="text-xs text-[#64748b] mb-3">
                 Runs the controlled evaluator for the linked assignment (does not run automatically on load).
               </p>
-              <button
+              <Button unstyled
                 type="button"
                 className="px-4 py-2 rounded-md bg-[#0b2b43] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!canEvaluate || evalSubmitting || loading}
@@ -279,7 +281,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
                 title={!canEvaluate ? 'Link an assignment to this mobility case first.' : undefined}
               >
                 {evalSubmitting ? 'Running…' : 'Run requirement evaluation'}
-              </button>
+              </Button>
               {!canEvaluate && (
                 <p className="text-xs text-[#64748b] mt-2">Disabled: no assignment_id for this mobility case.</p>
               )}

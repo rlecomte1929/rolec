@@ -1,4 +1,5 @@
 import { Badge, Button } from '../../../components/antigravity';
+import { Input } from '../../../components/antigravity/Input';
 import {
   REASON_CODE_OPTIONS,
   ReasonCode,
@@ -85,11 +86,11 @@ export function RoadmapStepDiff({ step, value, onChange }: Props) {
                 : 'font-semibold'
             }
           >
-            <input
+            <Input unstyled
               aria-label="Edited title"
               className="w-full bg-transparent outline-none"
               value={edited.title}
-              onChange={(e) => setEdited({ title: e.target.value })}
+              onChange={(v) => setEdited({ title: v })}
             />
           </h4>
           <textarea

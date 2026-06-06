@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+import { Button } from '../antigravity/Button';
 const SCROLL_THRESHOLD_RATIO = 0.3;
 
 const DEFAULT_BOTTOM = 32; // 8 in tailwind units (2rem)
@@ -46,7 +47,7 @@ export const BackToTop: React.FC = () => {
   if (!visible) return null;
 
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={scrollToTop}
       aria-label="Back to top"
@@ -68,6 +69,6 @@ export const BackToTop: React.FC = () => {
         />
       </svg>
       <span>Back to top</span>
-    </button>
+    </Button>
   );
 };

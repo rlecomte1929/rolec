@@ -150,13 +150,13 @@ export const ImmigrationPage: React.FC = () => {
       {/* GDPR data-management entry point — available throughout the journey */}
       {stage !== 'loading' && stage !== 'error' && caseId && (
         <div className="mt-8 border-t border-[#e2e8f0] pt-4 text-center">
-          <button
+          <Button unstyled
             type="button"
             onClick={() => navigate(buildRoute('employeeCaseMyData', { caseId }))}
             className="text-sm font-medium text-[#0b2b43] underline hover:text-[#1f8e8b]"
           >
             Manage my data
-          </button>
+          </Button>
           <p className="text-xs text-[#94a3b8] mt-1">
             View, download, or request deletion of the data we hold for you.
           </p>
@@ -183,13 +183,13 @@ export const ImmigrationPage: React.FC = () => {
               <Button variant="primary" onClick={() => navigate(casePlanHref)}>
                 Back to my relocation plan
               </Button>
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => setStage('interview')}
                 className="text-sm text-[#64748b] hover:text-[#0b2b43]"
               >
                 Review / edit my answers
-              </button>
+              </Button>
             </div>
           </Card>
         </div>

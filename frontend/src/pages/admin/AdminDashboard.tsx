@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { Card } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
@@ -61,7 +62,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="text-sm text-amber-900 mb-4">
           Purge inactive cases and related data. This keeps only active, registered cases.
         </div>
-        <button
+        <Button unstyled
           onClick={async () => {
             const confirmText = window.prompt('Type PURGE to confirm:');
             if (confirmText !== 'PURGE') return;
@@ -84,7 +85,7 @@ export const AdminDashboard: React.FC = () => {
           disabled={purging}
         >
           {purging ? 'Purging…' : 'Purge inactive cases'}
-        </button>
+        </Button>
       </Card>
     </AdminLayout>
   );

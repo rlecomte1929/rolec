@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { Button } from '../antigravity/Button';
 interface WizardSidebarProps {
   currentStep: number;
   completedSteps: number[];
@@ -24,7 +25,7 @@ export const WizardSidebar: React.FC<WizardSidebarProps> = ({ currentStep, compl
           const isCurrent = stepNumber === currentStep;
           const isDone = completedSteps.includes(stepNumber);
           return (
-            <button
+            <Button unstyled
               key={label}
               onClick={() => onSelect(stepNumber)}
               className={`w-full text-left px-3 py-2 rounded-lg border ${
@@ -48,7 +49,7 @@ export const WizardSidebar: React.FC<WizardSidebarProps> = ({ currentStep, compl
                   {isCurrent && <div className="text-xs text-[#1f8e8b]">In progress</div>}
                 </div>
               </div>
-            </button>
+            </Button>
           );
         })}
       </div>

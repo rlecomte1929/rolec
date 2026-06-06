@@ -4,6 +4,8 @@
  */
 
 import { useState, useMemo } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import {
   StatCard,
   FilterChips,
@@ -123,11 +125,11 @@ function NewCaseModal({ open, onClose, onSubmit }: NewCaseModalProps) {
   const field = (label: string, key: keyof NewCaseData, type = 'text', placeholder = '') => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
-      <input
+      <Input unstyled
         type={type}
         placeholder={placeholder}
         value={form[key]}
-        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+        onChange={v => setForm(f => ({ ...f, [key]: v }))}
         required
         style={{
           padding: '8px 12px',
@@ -161,9 +163,9 @@ function NewCaseModal({ open, onClose, onSubmit }: NewCaseModalProps) {
       >
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>New case</h2>
-          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <Button unstyled onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          </button>
+          </Button>
         </div>
         <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {field('Employee email', 'employee_email', 'email', 'employee@company.com')}
@@ -171,12 +173,12 @@ function NewCaseModal({ open, onClose, onSubmit }: NewCaseModalProps) {
           {field('Destination country (ISO-2)', 'dest_country', 'text', 'e.g. DE')}
           {field('Target start date', 'target_date', 'date')}
           <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
-            <button
+            <Button unstyled
               type="submit"
               style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
             >
               Create case
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -214,13 +216,13 @@ export function HRControlPanel({ cases = MOCK_CASES, onViewCase, onCreateCase }:
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>HR Control Panel</h1>
-        <button
+        <Button unstyled
           onClick={() => setModalOpen(true)}
           style={{ padding: '9px 16px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
           New case
-        </button>
+        </Button>
       </div>
 
       {/* Stat cards */}
@@ -285,12 +287,12 @@ export function HRControlPanel({ cases = MOCK_CASES, onViewCase, onCreateCase }:
                         )}
                         {col.id === 'target_date' && <DateFormatter date={row.target_date} format="absolute" />}
                         {col.id === 'actions' && (
-                          <button
+                          <Button unstyled
                             onClick={() => onViewCase?.(row.id)}
                             style={{ padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--accent)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                           >
                             View
-                          </button>
+                          </Button>
                         )}
                       </td>
                     ))}

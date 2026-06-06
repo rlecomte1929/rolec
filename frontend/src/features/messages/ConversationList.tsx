@@ -1,4 +1,5 @@
 import React, { Fragment } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import type { Conversation } from './types';
 
 function formatTime(iso: string): string {
@@ -68,7 +69,7 @@ function renderConversationRow(
           />
         </label>
       )}
-      <button
+      <Button unstyled
         type="button"
         onClick={() => onSelect(conv.id)}
         className="flex-1 flex items-start gap-3 px-4 py-3 text-left min-w-0"
@@ -131,7 +132,7 @@ function renderConversationRow(
             )}
           </div>
         </div>
-      </button>
+      </Button>
     </div>
   );
 }

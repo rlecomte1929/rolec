@@ -9,6 +9,8 @@
  *   textarea for everything else.
  */
 import React, { useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import type { FieldValueItem } from '../../../api/formEditor';
 
 interface FieldRowProps {
@@ -54,7 +56,7 @@ function AiBadge({
 
   return (
     <span className="relative inline-block">
-      <button
+      <Button unstyled
         type="button"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
@@ -64,7 +66,7 @@ function AiBadge({
         aria-label={`AI pre-filled${pct !== null ? ` · ${pct}% confidence` : ''}${sourceLabel ? ` · from ${sourceLabel}` : ''}`}
       >
         AI
-      </button>
+      </Button>
       {open && (
         <div className="absolute z-10 bottom-full mb-1.5 left-1/2 -translate-x-1/2 rounded bg-slate-800 text-white text-xs px-2.5 py-1.5 shadow-lg pointer-events-none min-w-max max-w-[220px]">
           <div className="font-medium">Pre-filled by AI</div>
@@ -143,10 +145,10 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
 
   if (field.field_type === 'date') {
     return (
-      <input
+      <Input unstyled
         type="date"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         className={cls}
       />
     );
@@ -154,10 +156,10 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
 
   if (field.field_type === 'number') {
     return (
-      <input
+      <Input unstyled
         type="number"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         className={cls}
       />
     );
@@ -165,10 +167,10 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
 
   // Default: text
   return (
-    <input
+    <Input unstyled
       type="text"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(v) => onChange(v)}
       placeholder={field.required ? 'Required' : 'Optional'}
       className={cls}
     />

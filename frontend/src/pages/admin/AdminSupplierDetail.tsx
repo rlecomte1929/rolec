@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { Card, Button, Alert } from '../../components/antigravity';
@@ -386,7 +387,7 @@ export const AdminSupplierDetail: React.FC = () => {
             <span className="text-sm font-medium text-[#6b7280]">Status:</span>
             <div className="flex gap-1">
               {(['active', 'inactive', 'draft'] as const).map((s) => (
-                <button
+                <Button unstyled
                   key={s}
                   type="button"
                   onClick={() => setStatus(s)}
@@ -396,7 +397,7 @@ export const AdminSupplierDetail: React.FC = () => {
                   }`}
                 >
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -405,10 +406,10 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Name</dt>
               <dd>
-                <input
+                <Input unstyled
                   type="text"
                   value={display.name}
-                  onChange={(e) => updateField('name', e.target.value)}
+                  onChange={(v) => updateField('name', v)}
                   className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
                 />
               </dd>
@@ -416,10 +417,10 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Legal name</dt>
               <dd>
-                <input
+                <Input unstyled
                   type="text"
                   value={display.legal_name || ''}
-                  onChange={(e) => updateField('legal_name', e.target.value)}
+                  onChange={(v) => updateField('legal_name', v)}
                   className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
                 />
               </dd>
@@ -440,10 +441,10 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Website</dt>
               <dd>
-                <input
+                <Input unstyled
                   type="url"
                   value={display.website || ''}
-                  onChange={(e) => updateField('website', e.target.value)}
+                  onChange={(v) => updateField('website', v)}
                   className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
                 />
               </dd>
@@ -451,10 +452,10 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Email</dt>
               <dd>
-                <input
+                <Input unstyled
                   type="email"
                   value={display.contact_email || ''}
-                  onChange={(e) => updateField('contact_email', e.target.value)}
+                  onChange={(v) => updateField('contact_email', v)}
                   className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
                 />
               </dd>
@@ -462,10 +463,10 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Phone</dt>
               <dd>
-                <input
+                <Input unstyled
                   type="text"
                   value={display.contact_phone || ''}
-                  onChange={(e) => updateField('contact_phone', e.target.value)}
+                  onChange={(v) => updateField('contact_phone', v)}
                   className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
                 />
               </dd>
@@ -473,10 +474,10 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Languages (comma-separated)</dt>
               <dd>
-                <input
+                <Input unstyled
                   type="text"
                   value={(display.languages_supported || []).join(', ')}
-                  onChange={(e) => updateField('languages_supported', e.target.value.split(/[,\s]+/).filter(Boolean))}
+                  onChange={(v) => updateField('languages_supported', v.split(/[,\s]+/).filter(Boolean))}
                   className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
                 />
               </dd>
@@ -569,10 +570,10 @@ export const AdminSupplierDetail: React.FC = () => {
                 {newCap.coverage_scope_type !== 'global' && (
                   <div>
                     <label className="block text-xs text-[#6b7280] mb-0.5">Country</label>
-                    <input
+                    <Input unstyled
                       type="text"
                       value={newCap.country_code}
-                      onChange={(e) => setNewCap((c) => ({ ...c, country_code: e.target.value.toUpperCase().slice(0, 2) }))}
+                      onChange={(v) => setNewCap((c) => ({ ...c, country_code: v.toUpperCase().slice(0, 2) }))}
                       className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                       placeholder="NO"
                     />
@@ -581,10 +582,10 @@ export const AdminSupplierDetail: React.FC = () => {
                 {newCap.coverage_scope_type === 'city' && (
                   <div>
                     <label className="block text-xs text-[#6b7280] mb-0.5">City</label>
-                    <input
+                    <Input unstyled
                       type="text"
                       value={newCap.city_name}
-                      onChange={(e) => setNewCap((c) => ({ ...c, city_name: e.target.value }))}
+                      onChange={(v) => setNewCap((c) => ({ ...c, city_name: v }))}
                       className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                       placeholder="Oslo"
                     />
@@ -592,19 +593,19 @@ export const AdminSupplierDetail: React.FC = () => {
                 )}
                 <div>
                   <label className="block text-xs text-[#6b7280] mb-0.5">Min budget</label>
-                  <input
+                  <Input unstyled
                     type="number"
                     value={newCap.min_budget ?? ''}
-                    onChange={(e) => setNewCap((c) => ({ ...c, min_budget: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                    onChange={(v) => setNewCap((c) => ({ ...c, min_budget: v ? parseFloat(v) : undefined }))}
                     className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-[#6b7280] mb-0.5">Max budget</label>
-                  <input
+                  <Input unstyled
                     type="number"
                     value={newCap.max_budget ?? ''}
-                    onChange={(e) => setNewCap((c) => ({ ...c, max_budget: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                    onChange={(v) => setNewCap((c) => ({ ...c, max_budget: v ? parseFloat(v) : undefined }))}
                     className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
                   />
                 </div>
@@ -740,13 +741,13 @@ function ScoringEditor({
         <div>
           <dt className="text-[#6b7280]">Rating</dt>
           <dd>
-            <input
+            <Input unstyled
               type="number"
               step="0.1"
               min="0"
               max="5"
               value={local.average_rating}
-              onChange={(e) => setLocal((l) => ({ ...l, average_rating: e.target.value }))}
+              onChange={(v) => setLocal((l) => ({ ...l, average_rating: v }))}
               className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
             />
           </dd>
@@ -754,11 +755,11 @@ function ScoringEditor({
         <div>
           <dt className="text-[#6b7280]">Reviews</dt>
           <dd>
-            <input
+            <Input unstyled
               type="number"
               min="0"
               value={local.review_count}
-              onChange={(e) => setLocal((l) => ({ ...l, review_count: e.target.value }))}
+              onChange={(v) => setLocal((l) => ({ ...l, review_count: v }))}
               className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
             />
           </dd>
@@ -766,11 +767,11 @@ function ScoringEditor({
         <div>
           <dt className="text-[#6b7280]">SLA (h)</dt>
           <dd>
-            <input
+            <Input unstyled
               type="number"
               min="0"
               value={local.response_sla_hours}
-              onChange={(e) => setLocal((l) => ({ ...l, response_sla_hours: e.target.value }))}
+              onChange={(v) => setLocal((l) => ({ ...l, response_sla_hours: v }))}
               className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
             />
           </dd>
@@ -778,13 +779,13 @@ function ScoringEditor({
         <div>
           <dt className="text-[#6b7280]">Admin score (0–100)</dt>
           <dd>
-            <input
+            <Input unstyled
               type="number"
               step="1"
               min="0"
               max="100"
               value={local.admin_score}
-              onChange={(e) => setLocal((l) => ({ ...l, admin_score: e.target.value }))}
+              onChange={(v) => setLocal((l) => ({ ...l, admin_score: v }))}
               className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
               placeholder="Optional boost"
             />
@@ -793,10 +794,10 @@ function ScoringEditor({
         <div>
           <dt className="text-[#6b7280]">Manual priority</dt>
           <dd>
-            <input
+            <Input unstyled
               type="number"
               value={local.manual_priority}
-              onChange={(e) => setLocal((l) => ({ ...l, manual_priority: e.target.value }))}
+              onChange={(v) => setLocal((l) => ({ ...l, manual_priority: v }))}
               className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
               placeholder="Higher = rank higher"
             />
@@ -897,20 +898,20 @@ function RankingDebugCard({
         </div>
         <div>
           <label className="block text-xs text-[#6b7280] mb-0.5">Destination country</label>
-          <input
+          <Input unstyled
             type="text"
             value={destinationCountry}
-            onChange={(e) => setDestinationCountry(e.target.value.toUpperCase().slice(0, 2))}
+            onChange={(v) => setDestinationCountry(v.toUpperCase().slice(0, 2))}
             className="w-20 border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
             placeholder="GB"
           />
         </div>
         <div>
           <label className="block text-xs text-[#6b7280] mb-0.5">Destination city (optional)</label>
-          <input
+          <Input unstyled
             type="text"
             value={destinationCity}
-            onChange={(e) => setDestinationCity(e.target.value)}
+            onChange={(v) => setDestinationCity(v)}
             className="w-32 border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
             placeholder="London"
           />

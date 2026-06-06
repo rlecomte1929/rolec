@@ -10,6 +10,7 @@
  * completion-% header tile and "Build dossier" CTA.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
@@ -162,14 +163,14 @@ export const EmployeeDossierPage: React.FC = () => {
                 </div>
               </div>
             )}
-            <button
+            <Button unstyled
               type="button"
               disabled
               title="Build dossier lands in P3-4 — coming soon"
               className="px-4 py-2 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
             >
               Build dossier
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -182,13 +183,13 @@ export const EmployeeDossierPage: React.FC = () => {
             className="mb-4 flex items-center justify-between gap-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
           >
             <span>Showing only documents from this roadmap step.</span>
-            <button
+            <Button unstyled
               type="button"
               onClick={clearRoadmapStep}
               className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
             >
               Clear filter
-            </button>
+            </Button>
           </div>
         )}
 
@@ -216,7 +217,7 @@ export const EmployeeDossierPage: React.FC = () => {
           {FILTER_TABS.map((tab) => {
             const isActive = filter === tab.key;
             return (
-              <button
+              <Button unstyled
                 key={tab.key}
                 type="button"
                 onClick={() => setFilter(tab.key)}
@@ -237,7 +238,7 @@ export const EmployeeDossierPage: React.FC = () => {
                 {isActive && (
                   <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#0b2b43]" />
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>

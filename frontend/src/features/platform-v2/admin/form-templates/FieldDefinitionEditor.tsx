@@ -8,6 +8,7 @@
  * Drag-and-drop uses @dnd-kit/sortable (same package as DataTable).
  */
 import React, { useCallback, useMemo } from 'react';
+import { Input } from '../../../../components/antigravity/Input';
 import {
   DndContext,
   PointerSensor,
@@ -198,7 +199,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
       className="grid grid-cols-12 gap-2 items-center bg-white border border-slate-200 rounded px-2 py-2"
     >
       {/* Drag handle */}
-      <button
+      <Button unstyled
         type="button"
         ref={sortable.setActivatorNodeRef}
         {...sortable.attributes}
@@ -217,18 +218,18 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
           <circle cx="15" cy="12" r="1.5" />
           <circle cx="15" cy="18" r="1.5" />
         </svg>
-      </button>
+      </Button>
 
-      <input
+      <Input unstyled
         value={field.id}
-        onChange={(e) => onChange({ id: e.target.value })}
+        onChange={(v) => onChange({ id: v })}
         placeholder="snake_case_id"
         disabled={disabled}
         className="col-span-2 rounded border border-slate-200 px-2 py-1 text-xs font-mono"
       />
-      <input
+      <Input unstyled
         value={field.label}
-        onChange={(e) => onChange({ label: e.target.value })}
+        onChange={(v) => onChange({ label: v })}
         placeholder="Human label"
         disabled={disabled}
         className="col-span-3 rounded border border-slate-200 px-2 py-1 text-sm"
@@ -252,9 +253,9 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
           aria-label="Required"
         />
       </label>
-      <input
+      <Input unstyled
         value={field.prefill_source ?? ''}
-        onChange={(e) => onChange({ prefill_source: e.target.value || undefined })}
+        onChange={(v) => onChange({ prefill_source: v || undefined })}
         placeholder="profile.legal_full_name"
         disabled={disabled}
         className="col-span-2 rounded border border-slate-200 px-2 py-1 text-xs font-mono"
@@ -270,7 +271,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
       </label>
 
       {/* Remove (full-width row below on mobile would be nicer but for now use a small overlay) */}
-      <button
+      <Button unstyled
         type="button"
         onClick={onRemove}
         disabled={disabled}
@@ -278,7 +279,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
         className="col-span-12 text-right text-xs text-rose-600 hover:text-rose-700 mt-1 pr-1 disabled:opacity-50"
       >
         Remove
-      </button>
+      </Button>
     </div>
   );
 };

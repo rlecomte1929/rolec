@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Card, Button, Badge, LoadingButton } from '../../components/antigravity';
 import {
   timelineAPI,
@@ -362,7 +363,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
         ).map((tab) => {
           const active = activeFilter === tab.key;
           return (
-            <button
+            <Button unstyled
               key={tab.key}
               type="button"
               role="tab"
@@ -373,7 +374,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
               }`}
             >
               {tab.label} {tab.count}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -409,7 +410,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
                 active ? 'border-[#0b2b43] bg-[#f0f9ff]' : 'border-[#e2e8f0] bg-white hover:bg-[#f8fafc]'
               } ${active ? panelAccentClass(u) : ''}`}
             >
-              <button
+              <Button unstyled
                 type="button"
                 aria-expanded={active}
                 onClick={() => setSelectedId(active ? null : m.id)}
@@ -445,7 +446,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
                     )}
                   </div>
                 </div>
-              </button>
+              </Button>
 
               {active && selected && (
                 <div className="border-t border-[#e2e8f0] px-4 pt-3 pb-4 bg-white">
@@ -522,14 +523,14 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
                     </label>
                     <label className="block">
                       <span className="text-xs font-medium text-[#6b7280]">Due date</span>
-                      <input
+                      <Input unstyled
                         type="date"
                         className="mt-1 w-full rounded-md border border-[#e2e8f0] px-2 py-1.5 text-sm"
                         value={selected.target_date ? selected.target_date.slice(0, 10) : ''}
                         disabled={updating}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           patchMilestone(selected.id, {
-                            target_date: e.target.value || undefined,
+                            target_date: v || undefined,
                           })
                         }
                       />

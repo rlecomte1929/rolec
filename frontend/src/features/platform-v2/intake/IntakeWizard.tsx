@@ -18,6 +18,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { countryFlag } from '../shared';
 import type { CreateCaseRequest } from '../../../types/relopass-api-contracts';
 
@@ -203,7 +205,7 @@ function CountryDropdown({
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button
+      <Button unstyled
         id={id}
         type="button"
         onClick={() => { setOpen(v => !v); setSearch(''); }}
@@ -237,7 +239,7 @@ function CountryDropdown({
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginLeft: selected ? '0' : 'auto', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform var(--transition-fast)', flexShrink: 0, color: 'var(--text-tertiary)' }}>
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </button>
+      </Button>
 
       {open && (
         <div style={{
@@ -253,10 +255,10 @@ function CountryDropdown({
           overflow: 'hidden',
         }}>
           <div style={{ padding: '8px' }}>
-            <input
+            <Input unstyled
               autoFocus
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={v => setSearch(v)}
               placeholder="Search countries…"
               style={{
                 width: '100%',
@@ -275,7 +277,7 @@ function CountryDropdown({
             {filtered.length === 0 ? (
               <p style={{ padding: '12px 14px', fontSize: '13px', color: 'var(--text-tertiary)', margin: 0 }}>No countries found</p>
             ) : filtered.map(c => (
-              <button
+              <Button unstyled
                 key={c.code}
                 type="button"
                 onClick={() => { onChange(c.code); setOpen(false); setSearch(''); }}
@@ -299,7 +301,7 @@ function CountryDropdown({
                 <span aria-hidden="true" style={{ fontSize: '18px' }}>{countryFlag(c.code)}</span>
                 <span style={{ flex: 1 }}>{c.name}</span>
                 <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{c.code}</span>
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -314,7 +316,7 @@ function AITooltip({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
   return (
     <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-      <button
+      <Button unstyled
         type="button"
         onMouseEnter={() => setVisible(true)}
         onMouseLeave={() => setVisible(false)}
@@ -339,7 +341,7 @@ function AITooltip({ text }: { text: string }) {
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
           <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
         </svg>
-      </button>
+      </Button>
       {visible && (
         <div
           role="tooltip"
@@ -501,7 +503,7 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
             </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               {/* Quick fill */}
-              <button
+              <Button unstyled
                 type="button"
                 onClick={quickFill}
                 style={{
@@ -527,11 +529,11 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
                 }}
               >
                 ⚡ Quick fill
-              </button>
+              </Button>
               {onCancel && (
-                <button type="button" onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px 8px', borderRadius: 'var(--radius-md)', fontSize: '13px' }}>
+                <Button unstyled type="button" onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px 8px', borderRadius: 'var(--radius-md)', fontSize: '13px' }}>
                   Cancel
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -616,11 +618,11 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
                 <label htmlFor="dest-city" style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   City
                 </label>
-                <input
+                <Input unstyled
                   id="dest-city"
                   type="text"
                   value={answer('destination_city')}
-                  onChange={e => setAnswer('destination_city', e.target.value)}
+                  onChange={v => setAnswer('destination_city', v)}
                   placeholder="e.g. Berlin, Munich, Hamburg…"
                   style={{
                     width: '100%',
@@ -645,7 +647,7 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
               {question.options.map(opt => {
                 const selected = answer(question.id) === opt.id;
                 return (
-                  <button
+                  <Button unstyled
                     key={opt.id}
                     type="button"
                     onClick={() => setAnswer(question.id, opt.id)}
@@ -672,7 +674,7 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
                         {opt.description}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -696,7 +698,7 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
             justifyContent: 'space-between',
           }}
         >
-          <button
+          <Button unstyled
             type="button"
             onClick={handleBack}
             disabled={step === 0}
@@ -718,14 +720,14 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
               <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
             </svg>
             Back
-          </button>
+          </Button>
 
           <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
             Press Enter ↵ to continue
           </span>
 
           {step < totalSteps - 1 ? (
-            <button
+            <Button unstyled
               type="button"
               onClick={handleNext}
               style={{
@@ -746,9 +748,9 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
               </svg>
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button unstyled
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
@@ -773,7 +775,7 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
                 </svg>
               )}
               {submitting ? 'Creating case…' : 'Create case →'}
-            </button>
+            </Button>
           )}
         </div>
       </div>

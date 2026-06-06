@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
@@ -209,12 +210,12 @@ const ConfirmModal: React.FC<{
       </p>
       <div className="flex gap-2 justify-end">
         <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-        <button
+        <Button unstyled
           className="px-3 py-1.5 text-sm rounded-lg bg-[#E24B4A] text-white font-medium hover:bg-[#A32D2D] transition-colors"
           onClick={onConfirm}
         >
           Remove
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -372,10 +373,10 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
         {/* search */}
         <div className="relative flex-1 min-w-[180px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input
+          <Input unstyled
             type="text"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(v) => { setSearch(v); setPage(1); }}
             placeholder="Search by name, email, level…"
             className="w-full pl-8 pr-3 py-2 text-sm border border-[#e5e7eb] rounded-lg bg-white placeholder:text-[#9ca3af] text-[#0b2b43] focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
           />
@@ -412,28 +413,28 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
         ))}
 
         {activeFilters > 0 && (
-          <button onClick={clearFilters} className="text-xs text-[#9ca3af] hover:text-[#374151] underline-offset-2 hover:underline transition-colors">
+          <Button unstyled onClick={clearFilters} className="text-xs text-[#9ca3af] hover:text-[#374151] underline-offset-2 hover:underline transition-colors">
             Clear {activeFilters} filter{activeFilters > 1 ? 's' : ''}
-          </button>
+          </Button>
         )}
 
         <div className="ml-auto flex items-center gap-2">
           {selected.size > 0 && (
-            <button
+            <Button unstyled
               onClick={() => setPendingDelete(Array.from(selected))}
               className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-[#F09595] text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
               Remove {selected.size}
-            </button>
+            </Button>
           )}
-          <button
+          <Button unstyled
             onClick={() => navigate(buildRoute('hrCommandCenter'))}
             className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-[#1D9E75] text-white font-medium hover:bg-[#0F6E56] transition-colors"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Assign employee
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -597,13 +598,13 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </Link>
-                            <button
+                            <Button unstyled
                               onClick={() => setPendingDelete([emp.id])}
                               className="p-1 rounded text-[#9ca3af] hover:text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors"
                               title="Remove employee"
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -629,17 +630,17 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
           </span>
           {pageCount > 1 && (
             <div className="flex gap-1">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 rounded-md border border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40 text-xs">←</button>
+              <Button unstyled onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 rounded-md border border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40 text-xs">←</Button>
               {Array.from({ length: Math.min(pageCount, 7) }, (_, i) => i + 1).map((p) => (
-                <button
+                <Button unstyled
                   key={p}
                   onClick={() => setPage(p)}
                   className={`w-7 h-7 rounded-md text-xs border transition-colors ${p === safePage ? 'bg-[#1D9E75] border-[#1D9E75] text-white font-medium' : 'border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6]'}`}
                 >
                   {p}
-                </button>
+                </Button>
               ))}
-              <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={safePage === pageCount} className="w-7 h-7 rounded-md border border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40 text-xs">→</button>
+              <Button unstyled onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={safePage === pageCount} className="w-7 h-7 rounded-md border border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40 text-xs">→</Button>
             </div>
           )}
         </div>

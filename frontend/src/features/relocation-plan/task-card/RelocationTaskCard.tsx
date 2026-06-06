@@ -134,7 +134,7 @@ export const RelocationTaskCard: React.FC<RelocationTaskCardProps> = ({
 
   return (
     <div className={cardSurfaceClass(task, highlightSuggested)}>
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
@@ -205,7 +205,7 @@ export const RelocationTaskCard: React.FC<RelocationTaskCardProps> = ({
         <span className="text-xs text-[#94a3b8] shrink-0 pt-1" aria-hidden>
           {expanded ? 'Hide' : 'Details'}
         </span>
-      </button>
+      </Button>
 
       {showExpandedShell ? (
         <div className="px-4 pb-4 pt-0 border-t border-[#f1f5f9] bg-[#fafbfc]/70">

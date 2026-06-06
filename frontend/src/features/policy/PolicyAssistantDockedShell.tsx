@@ -23,6 +23,7 @@
  * responsive switch — pages stay simple.
  */
 import React, { useEffect, useRef } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { X } from 'lucide-react';
 
 export type PolicyAssistantDockedShellProps = {
@@ -161,7 +162,7 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
               <div className="text-xs text-slate-500 mt-1 leading-snug">{subtitle}</div>
             ) : null}
           </div>
-          <button
+          <Button unstyled
             ref={closeBtnRef}
             type="button"
             onClick={close}
@@ -169,7 +170,7 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
             aria-label="Close"
           >
             <X className="h-5 w-5" aria-hidden />
-          </button>
+          </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6">
           {open ? assistant({ close }) : null}
@@ -187,7 +188,7 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
           aria-modal="true"
           aria-labelledby={`${titleId}-mobile`}
         >
-          <button
+          <Button unstyled
             type="button"
             className="absolute inset-0 bg-slate-900/35 backdrop-blur-[1px]"
             aria-label="Close panel"
@@ -206,14 +207,14 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
                   <div className="text-xs text-slate-500 mt-1 leading-snug">{subtitle}</div>
                 ) : null}
               </div>
-              <button
+              <Button unstyled
                 type="button"
                 onClick={close}
                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-200/60 hover:text-slate-800 shrink-0"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" aria-hidden />
-              </button>
+              </Button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6">
               {assistant({ close })}

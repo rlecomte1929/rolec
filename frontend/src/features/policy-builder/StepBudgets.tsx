@@ -4,6 +4,7 @@
  * Each cell holds a BudgetCap (amount + currency or salary-multiple toggle).
  */
 import React, { useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import type { PolicyTier, PolicyBudgets, BudgetCap } from '../../types/relocationPolicy';
 import { Button, Select } from '../../components/antigravity';
 
@@ -153,30 +154,30 @@ export const StepBudgets: React.FC<Props> = ({
                       <div className="space-y-2">
                         {/* Cap type toggle */}
                         <div className="flex gap-2 text-xs">
-                          <button
+                          <Button unstyled
                             type="button"
                             className={`px-2 py-0.5 rounded border text-xs transition-colors ${cap.cap_type === 'absolute' ? 'bg-[#0b2b43] text-white border-[#0b2b43]' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
                             onClick={() => updateCap(tier.id, corridor.key, { cap_type: 'absolute' })}
                           >
                             Lump sum
-                          </button>
-                          <button
+                          </Button>
+                          <Button unstyled
                             type="button"
                             className={`px-2 py-0.5 rounded border text-xs transition-colors ${cap.cap_type === 'salary_multiple' ? 'bg-[#0b2b43] text-white border-[#0b2b43]' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
                             onClick={() => updateCap(tier.id, corridor.key, { cap_type: 'salary_multiple' })}
                           >
                             × salary
-                          </button>
+                          </Button>
                         </div>
 
                         {cap.cap_type === 'absolute' ? (
                           <div className="flex gap-1 items-center">
-                            <input
+                            <Input unstyled
                               type="number"
                               value={cap.amount === 0 ? '' : String(cap.amount)}
-                              onChange={(e) =>
+                              onChange={(v) =>
                                 updateCap(tier.id, corridor.key, {
-                                  amount: parseFloat(e.target.value) || 0,
+                                  amount: parseFloat(v) || 0,
                                 })
                               }
                               placeholder="0"
@@ -193,12 +194,12 @@ export const StepBudgets: React.FC<Props> = ({
                           </div>
                         ) : (
                           <div className="flex gap-1 items-center">
-                            <input
+                            <Input unstyled
                               type="number"
                               value={cap.amount === 0 ? '' : String(cap.amount)}
-                              onChange={(e) =>
+                              onChange={(v) =>
                                 updateCap(tier.id, corridor.key, {
-                                  amount: parseFloat(e.target.value) || 0,
+                                  amount: parseFloat(v) || 0,
                                 })
                               }
                               placeholder="1.5"
@@ -219,10 +220,10 @@ export const StepBudgets: React.FC<Props> = ({
 
       {/* Add custom corridor */}
       <div className="flex gap-2 items-center">
-        <input
+        <Input unstyled
           type="text"
           value={customCorridor}
-          onChange={(e) => setCustomCorridor(e.target.value)}
+          onChange={(v) => setCustomCorridor(v)}
           placeholder='Add destination, e.g. "FR→DE" or "*→JP"'
           className={`${inlineInput} w-64`}
           onKeyDown={(e) => e.key === 'Enter' && addCorridor()}

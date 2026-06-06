@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import type { CompanyProfilePayload } from '../../../types';
 import { Breadcrumb } from '../../../components/Breadcrumb';
@@ -392,9 +394,9 @@ export function CompanyProfileForm({
               required
               helper="Used as the employer name on new relocation cases."
             >
-              <input
+              <Input unstyled
                 value={form.name}
-                onChange={(e) => setField('name', e.target.value)}
+                onChange={(v) => setField('name', v)}
                 className={inputCx}
                 placeholder="e.g. Aurora Energy"
               />
@@ -403,9 +405,9 @@ export function CompanyProfileForm({
               label="Legal name"
               helper="Used on official case documents and contracts."
             >
-              <input
+              <Input unstyled
                 value={form.legal_name}
-                onChange={(e) => setField('legal_name', e.target.value)}
+                onChange={(v) => setField('legal_name', v)}
                 className={inputCx}
                 placeholder="e.g. Aurora Energy AS"
               />
@@ -438,9 +440,9 @@ export function CompanyProfileForm({
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12.5px] text-slate-400">
                   https://
                 </span>
-                <input
+                <Input unstyled
                   value={form.website}
-                  onChange={(e) => setField('website', e.target.value.replace(/^https?:\/\//, ''))}
+                  onChange={(v) => setField('website', v.replace(/^https?:\/\//, ''))}
                   className={`${inputCx} pl-[60px]`}
                   placeholder="aurora-energy.com"
                 />
@@ -467,17 +469,17 @@ export function CompanyProfileForm({
               />
             </Field>
             <Field label="HQ city">
-              <input
+              <Input unstyled
                 value={form.hq_city}
-                onChange={(e) => setField('hq_city', e.target.value)}
+                onChange={(v) => setField('hq_city', v)}
                 className={inputCx}
                 placeholder="Paris"
               />
             </Field>
             <Field label="Address" full>
-              <input
+              <Input unstyled
                 value={form.address}
-                onChange={(e) => setField('address', e.target.value)}
+                onChange={(v) => setField('address', v)}
                 className={inputCx}
                 placeholder="12 Avenue de Friedland, 75008 Paris, France"
               />
@@ -487,9 +489,9 @@ export function CompanyProfileForm({
               full
               helper="International format with country code."
             >
-              <input
+              <Input unstyled
                 value={form.phone}
-                onChange={(e) => setField('phone', e.target.value)}
+                onChange={(v) => setField('phone', v)}
                 className={inputCx}
                 placeholder="+33 1 4502 8821"
               />
@@ -509,17 +511,17 @@ export function CompanyProfileForm({
               label="HR contact"
               helper="Internal — used in audit logs and admin views."
             >
-              <input
+              <Input unstyled
                 value={form.hr_contact}
-                onChange={(e) => setField('hr_contact', e.target.value)}
+                onChange={(v) => setField('hr_contact', v)}
                 className={inputCx}
                 placeholder="helena.muller@aurora-energy.com"
               />
             </Field>
             <Field label="Support email">
-              <input
+              <Input unstyled
                 value={form.support_email}
-                onChange={(e) => setField('support_email', e.target.value)}
+                onChange={(v) => setField('support_email', v)}
                 className={inputCx}
                 placeholder="mobility@aurora-energy.com"
               />
@@ -589,7 +591,7 @@ export function CompanyProfileForm({
               />
               <div className="flex flex-wrap gap-2">
                 {onUploadLogo ? (
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={logoUploading}
@@ -597,21 +599,21 @@ export function CompanyProfileForm({
                   >
                     <UploadIcon className="h-3.5 w-3.5" />
                     {logoUploading ? 'Uploading…' : logoUrl ? 'Replace' : 'Upload logo'}
-                  </button>
+                  </Button>
                 ) : (
                   <span className="text-[11px] text-slate-400">
                     Logo upload is only available to HR for their own company.
                   </span>
                 )}
                 {onRemoveLogo && logoUrl && (
-                  <button
+                  <Button unstyled
                     type="button"
                     onClick={() => void handleRemoveLogo()}
                     disabled={logoUploading}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
                   >
                     <span aria-hidden>×</span> Remove
-                  </button>
+                  </Button>
                 )}
               </div>
               {logoError && <p className="text-[11px] text-rose-600">{logoError}</p>}
@@ -652,21 +654,21 @@ export function CompanyProfileForm({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button unstyled
               type="button"
               onClick={() => navigate(backTo)}
               className="inline-flex items-center gap-1.5 rounded-lg border-2 border-[#0b2b43] bg-white px-4 py-2 text-[13px] font-medium text-[#0b2b43] transition-colors hover:bg-[#e6f2f4] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2"
             >
               <span aria-hidden>←</span> {backLabel}
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="button"
               onClick={() => void handleManualSave()}
               disabled={saving || !form.name.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2b43] px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckIcon className="h-3.5 w-3.5" /> Save profile
-            </button>
+            </Button>
           </div>
         </div>
       </div>

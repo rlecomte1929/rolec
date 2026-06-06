@@ -10,6 +10,7 @@
  * the whole page (reduced from original 60s to match demo UX requirements).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '../antigravity/Input';
 import { hrAPI } from '../../api/client';
 import type { EmployeeTask, EmployeeTaskListResponse, TaskType } from '../../api/client';
 import { Alert, Button, Card, LoadingButton, ProgressBar } from '../antigravity';
@@ -100,13 +101,13 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, caseId, onUpdated }) => {
       {/* Header row */}
       <div className="flex flex-wrap items-start gap-3 justify-between">
         <div className="flex-1 min-w-0">
-          <button
+          <Button unstyled
             type="button"
             className="text-left w-full"
             onClick={() => setExpanded((v) => !v)}
           >
             <span className="font-medium text-[#0b2b43] text-sm">{task.title}</span>
-          </button>
+          </Button>
           {task.description && (
             <p className="text-xs text-[#6b7280] mt-0.5 line-clamp-1">{task.description}</p>
           )}
@@ -265,23 +266,23 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
         </div>
         <div>
           <label className="block text-xs text-[#6b7280] mb-1">Due date</label>
-          <input
+          <Input unstyled
             type="date"
             className="w-full text-sm border border-[#e2e8f0] rounded p-2 focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
             value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            onChange={(v) => setDueDate(v)}
           />
         </div>
       </div>
 
       <div>
         <label className="block text-xs text-[#6b7280] mb-1">Title *</label>
-        <input
+        <Input unstyled
           type="text"
           className="w-full text-sm border border-[#e2e8f0] rounded p-2 focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
           placeholder="e.g. Upload proof of address"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(v) => setTitle(v)}
         />
       </div>
 

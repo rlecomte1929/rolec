@@ -92,7 +92,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
           {question.type === 'single_select' && question.options && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {question.options.map((option) => (
-                <button
+                <Button unstyled
                   key={option.value}
                   onClick={() => handleQuickOption(option.value)}
                   className={`p-4 border-2 rounded-lg text-left transition-all ${
@@ -102,7 +102,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                   }`}
                 >
                   <div className="font-medium text-gray-900">{option.label}</div>
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -157,7 +157,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
 
           {question.type === 'boolean' && (
             <div className="flex gap-4">
-              <button
+              <Button unstyled
                 onClick={() => setAnswer('true')}
                 className={`flex-1 p-4 border-2 rounded-lg transition-all ${
                   answer === 'true'
@@ -166,8 +166,8 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                 }`}
               >
                 <div className="font-medium text-gray-900">Yes</div>
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 onClick={() => setAnswer('false')}
                 className={`flex-1 p-4 border-2 rounded-lg transition-all ${
                   answer === 'false'
@@ -176,7 +176,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
                 }`}
               >
                 <div className="font-medium text-gray-900">No</div>
-              </button>
+              </Button>
             </div>
           )}
         </div>

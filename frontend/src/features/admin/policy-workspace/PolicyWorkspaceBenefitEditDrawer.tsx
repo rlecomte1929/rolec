@@ -109,7 +109,7 @@ export const PolicyWorkspaceBenefitEditDrawer: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex justify-end" aria-modal="true" role="dialog">
-      <button type="button" className="absolute inset-0 bg-black/30" aria-label="Close panel" onClick={onClose} />
+      <Button unstyled type="button" className="absolute inset-0 bg-black/30" aria-label="Close panel" onClick={onClose} />
       <div className="relative w-full max-w-lg h-full bg-white shadow-xl border-l border-[#e2e8f0] flex flex-col">
         <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-start gap-2 shrink-0">
           <div className="min-w-0">

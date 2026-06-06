@@ -3,6 +3,7 @@
  * HR selects which documents must be uploaded for each visa/permit category.
  */
 import React, { useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import type { PolicyDocuments } from '../../types/relocationPolicy';
 import { Button } from '../../components/antigravity';
 
@@ -135,7 +136,7 @@ export const StepDocuments: React.FC<Props> = ({
               className="border border-slate-200 rounded-lg overflow-hidden"
             >
               {/* Accordion header */}
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => setExpandedVisa(isOpen ? null : visa.key)}
                 className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 transition-colors text-left"
@@ -161,7 +162,7 @@ export const StepDocuments: React.FC<Props> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
-              </button>
+              </Button>
 
               {/* Accordion body */}
               {isOpen && (
@@ -198,14 +199,14 @@ export const StepDocuments: React.FC<Props> = ({
                             className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs rounded-full px-2 py-1"
                           >
                             {d}
-                            <button
+                            <Button unstyled
                               type="button"
                               onClick={() => removeDoc(visa.key, d)}
                               className="text-slate-400 hover:text-red-500 transition-colors ml-0.5"
                               aria-label={`Remove ${d}`}
                             >
                               ×
-                            </button>
+                            </Button>
                           </span>
                         ))}
                     </div>
@@ -213,11 +214,11 @@ export const StepDocuments: React.FC<Props> = ({
 
                   {/* Add custom document */}
                   <div className="flex gap-2 items-center pt-1">
-                    <input
+                    <Input unstyled
                       type="text"
                       value={customInputs[visa.key] ?? ''}
-                      onChange={(e) =>
-                        setCustomInputs({ ...customInputs, [visa.key]: e.target.value })
+                      onChange={(v) =>
+                        setCustomInputs({ ...customInputs, [visa.key]: v })
                       }
                       onKeyDown={(e) => e.key === 'Enter' && addCustomDoc(visa.key)}
                       placeholder="Add a custom document…"

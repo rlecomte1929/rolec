@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
 import { Container } from '../antigravity';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
@@ -95,7 +96,7 @@ export const PublicHeader: React.FC = () => {
             >
               Sign in
             </Link>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => {
                 setMobileOpen(false);
@@ -104,8 +105,8 @@ export const PublicHeader: React.FC = () => {
               className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-marketing-primary hover:bg-marketing-primary-muted rounded-lg transition-colors"
             >
               Book a demo
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
               className="p-2 rounded-lg text-marketing-text-muted hover:bg-marketing-surface-muted sm:hidden"
@@ -121,7 +122,7 @@ export const PublicHeader: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </Container>

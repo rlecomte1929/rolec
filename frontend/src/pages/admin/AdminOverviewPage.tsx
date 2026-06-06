@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
@@ -157,12 +158,12 @@ export const AdminOverviewPage: React.FC = () => {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
             admin scope · @relopass.com
           </span>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50">
+          <Button unstyled className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50">
             <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
             </svg>
             All tenants
-          </button>
+          </Button>
         </div>
       }
     >

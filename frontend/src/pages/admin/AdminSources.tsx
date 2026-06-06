@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -81,15 +82,15 @@ export const AdminSources: React.FC = () => {
       <Card padding="lg" className="mb-4">
         <h3 className="font-semibold mb-3">New Source</h3>
         <div className="flex gap-2 flex-wrap items-center">
-          <input
+          <Input unstyled
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            onChange={(v) => setNewName(v)}
             placeholder="Source name"
             className="rounded border border-slate-200 px-3 py-2 w-48"
           />
-          <input
+          <Input unstyled
             value={newPublisher}
-            onChange={(e) => setNewPublisher(e.target.value)}
+            onChange={(v) => setNewPublisher(v)}
             placeholder="Publisher"
             className="rounded border border-slate-200 px-3 py-2 w-48"
           />
@@ -128,7 +129,7 @@ export const AdminSources: React.FC = () => {
                 <tr key={s.id} className="border-b border-slate-100">
                   <td className="py-2 pr-4">
                     {editing === s.id ? (
-                      <input
+                      <Input unstyled
                         className="rounded border border-slate-200 px-2 py-1 w-40"
                         defaultValue={s.source_name}
                         id={`edit-name-${s.id}`}
@@ -139,7 +140,7 @@ export const AdminSources: React.FC = () => {
                   </td>
                   <td className="py-2 pr-4">
                     {editing === s.id ? (
-                      <input
+                      <Input unstyled
                         className="rounded border border-slate-200 px-2 py-1 w-32"
                         defaultValue={s.publisher || ''}
                         id={`edit-publisher-${s.id}`}
@@ -172,7 +173,7 @@ export const AdminSources: React.FC = () => {
                   </td>
                   <td className="py-2 pr-4 max-w-[12rem] truncate">
                     {editing === s.id ? (
-                      <input
+                      <Input unstyled
                         className="rounded border border-slate-200 px-2 py-1 w-48"
                         defaultValue={s.url || ''}
                         id={`edit-url-${s.id}`}

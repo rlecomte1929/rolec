@@ -7,6 +7,8 @@
  * Patterned on CaseFormCard.tsx but with HR-specific actions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { Badge, Card } from '../../../components/antigravity';
 import type {
   CaseFormStatus,
@@ -333,7 +335,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
   return (
     <Card padding="lg" className={`transition-shadow hover:shadow-sm ${isFlagged ? 'ring-1 ring-amber-300' : ''}`}>
       {/* ── Collapsed header row ─────────────────────────────────────────── */}
-      <button
+      <Button unstyled
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
@@ -410,7 +412,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
-      </button>
+      </Button>
 
       {/* ── Expanded panel ──────────────────────────────────────────────── */}
       {expanded && (
@@ -510,22 +512,22 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
 
             {/* New comment input */}
             <div className="flex gap-2 mt-1">
-              <input
+              <Input unstyled
                 type="text"
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                onChange={(v) => setCommentText(v)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handlePostComment()}
                 placeholder="Add a comment…"
                 className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
               />
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => void handlePostComment()}
                 disabled={submittingComment || !commentText.trim()}
                 className="px-3 py-1 rounded text-xs font-medium bg-[#0b2b43] text-white disabled:opacity-40"
               >
                 Post
-              </button>
+              </Button>
             </div>
             {commentError && <p className="mt-1 text-xs text-rose-600">{commentError}</p>}
           </div>
@@ -575,7 +577,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
               <span className="text-xs font-medium text-slate-600 shrink-0">Change status:</span>
               <div className="flex flex-wrap gap-1.5">
                 {HR_STATUS_OPTIONS.map((opt) => (
-                  <button
+                  <Button unstyled
                     key={opt.value}
                     type="button"
                     disabled={actionLoading || opt.value === form.status}
@@ -595,16 +597,16 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                       }`}
                   >
                     {opt.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             {/* Optional status note (for non-modal transitions only) */}
-            <input
+            <Input unstyled
               type="text"
               value={statusNote}
-              onChange={(e) => setStatusNote(e.target.value)}
+              onChange={(v) => setStatusNote(v)}
               placeholder="Note for status change (optional)"
               className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
             />
@@ -612,7 +614,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
 
             {/* Flag toggle */}
             <div className="flex items-center gap-2 flex-wrap">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => {
                   setShowFlagInput((v) => !v);
@@ -628,37 +630,37 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                   <path fillRule="evenodd" d="M3 6a1 1 0 011-1h10a1 1 0 01.832 1.555L11.5 11l3.332 4.445A1 1 0 0114 17H4a1 1 0 01-1-1V6z" clipRule="evenodd"/>
                 </svg>
                 {isFlagged ? 'Clear flag' : 'Flag'}
-              </button>
+              </Button>
 
               {showFlagInput && !isFlagged && (
                 <>
-                  <input
+                  <Input unstyled
                     type="text"
                     value={flagInput}
-                    onChange={(e) => setFlagInput(e.target.value)}
+                    onChange={(v) => setFlagInput(v)}
                     placeholder="Flag reason…"
                     className="flex-1 min-w-[160px] rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
                   />
-                  <button
+                  <Button unstyled
                     type="button"
                     disabled={actionLoading || !flagInput.trim()}
                     onClick={() => void handleFlag()}
                     className="px-2.5 py-1 rounded text-xs font-medium bg-amber-500 text-white disabled:opacity-40"
                   >
                     Set flag
-                  </button>
+                  </Button>
                 </>
               )}
 
               {isFlagged && showFlagInput && (
-                <button
+                <Button unstyled
                   type="button"
                   disabled={actionLoading}
                   onClick={() => void handleFlag()}
                   className="px-2.5 py-1 rounded text-xs font-medium bg-rose-500 text-white disabled:opacity-40"
                 >
                   Confirm clear
-                </button>
+                </Button>
               )}
             </div>
             {flagError && <p className="text-xs text-rose-600">{flagError}</p>}
@@ -679,40 +681,40 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
               <label className="block text-xs font-medium text-slate-700">
                 Receipt / Reference <span className="text-rose-500">*</span>
               </label>
-              <input
+              <Input unstyled
                 type="text"
                 value={submitReceiptRef}
-                onChange={(e) => setSubmitReceiptRef(e.target.value)}
+                onChange={(v) => setSubmitReceiptRef(v)}
                 placeholder="e.g. UDI-2026-00123"
                 autoFocus
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
               />
               <label className="block text-xs font-medium text-slate-700 mt-2">Note (optional)</label>
-              <input
+              <Input unstyled
                 type="text"
                 value={submitNote}
-                onChange={(e) => setSubmitNote(e.target.value)}
+                onChange={(v) => setSubmitNote(v)}
                 placeholder="Internal note…"
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
               />
             </div>
             {submitError && <p className="text-xs text-rose-600">{submitError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => { setShowSubmitModal(false); setSubmitReceiptRef(''); setSubmitNote(''); setSubmitError(null); }}
                 className="px-4 py-2 rounded text-sm border border-slate-200 text-slate-600 hover:bg-slate-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 disabled={actionLoading || !submitReceiptRef.trim()}
                 onClick={() => void handleSubmitConfirm()}
                 className="px-4 py-2 rounded text-sm font-medium bg-[#0b2b43] text-white disabled:opacity-40 hover:bg-[#0e3a5c]"
               >
                 {actionLoading ? 'Saving…' : 'Confirm Submission'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -750,21 +752,21 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
             </label>
             {rejectError && <p className="text-xs text-rose-600">{rejectError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => { setShowRejectModal(false); setRejectReason(''); setReopenForCorrection(true); setRejectError(null); }}
                 className="px-4 py-2 rounded text-sm border border-slate-200 text-slate-600 hover:bg-slate-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 disabled={actionLoading || !rejectReason.trim()}
                 onClick={() => void handleRejectConfirm()}
                 className="px-4 py-2 rounded text-sm font-medium bg-rose-600 text-white disabled:opacity-40 hover:bg-rose-700"
               >
                 {actionLoading ? 'Saving…' : 'Reject Form'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

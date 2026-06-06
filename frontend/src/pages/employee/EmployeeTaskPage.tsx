@@ -3,6 +3,7 @@
  * Uses servicesAPI.getTasks() (AIQ-34-B).
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
 import { servicesAPI } from '../../api/client';
 import type { EmployeeTask } from '../../api/client';
@@ -87,13 +88,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit }) => {
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-          <button
+          <Button unstyled
             onClick={handleSubmit}
             disabled={submitting}
             className="px-4 py-1.5 rounded bg-[#0b2b43] text-white text-sm font-medium hover:bg-[#0d3456] disabled:opacity-50"
           >
             {submitting ? 'Submitting…' : 'Submit'}
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -143,7 +144,7 @@ export const EmployeeTaskPage: React.FC = () => {
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {error}
-            <button onClick={load} className="ml-2 underline">Retry</button>
+            <Button unstyled onClick={load} className="ml-2 underline">Retry</Button>
           </div>
         )}
 

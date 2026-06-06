@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { HelpCircle } from 'lucide-react';
 import type { CompensationGlossaryId } from './compensationGlossary';
 import { getCompensationGlossaryEntry } from './compensationGlossary';
@@ -19,13 +20,13 @@ export const TermHelpIcon: React.FC<Props> = ({ glossaryId, className }) => {
       className={`inline-flex items-center align-middle ${className ?? ''}`}
       title={tip}
     >
-      <button
+      <Button unstyled
         type="button"
         className="inline-flex rounded-full p-0.5 text-[#94a3b8] hover:text-[#0b2b43] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-1"
         aria-label={`About ${entry.term}`}
       >
         <HelpCircle className="w-4 h-4" aria-hidden />
-      </button>
+      </Button>
       <span className="sr-only">{tip}</span>
     </span>
   );

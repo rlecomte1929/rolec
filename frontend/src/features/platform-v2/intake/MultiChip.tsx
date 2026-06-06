@@ -1,3 +1,4 @@
+import { Button } from '../../../components/antigravity/Button';
 // ─── MultiChip ────────────────────────────────────────────────────────────────
 // Small presentational pill-group used across the intake wizard. Multi-select by
 // design; single-select fields wire it as `value={x ? [x] : []}` and read the
@@ -15,10 +16,10 @@ export function MultiChip({ value, onChange, options }: {
         const val = typeof o === 'string' ? o : o.value;
         const lbl = typeof o === 'string' ? o : o.label;
         return (
-          <button key={val} type="button" onClick={() => toggle(val)}
+          <Button unstyled key={val} type="button" onClick={() => toggle(val)}
             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
               value.includes(val) ? 'bg-accent-600 text-white border-accent-600' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-            }`}>{lbl}</button>
+            }`}>{lbl}</Button>
         );
       })}
     </div>

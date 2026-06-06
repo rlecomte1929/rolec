@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../../api/client';
@@ -97,11 +99,11 @@ export const AdminFreshnessChanges: React.FC = () => {
           <option value="removed">removed</option>
           <option value="unchanged">unchanged</option>
         </select>
-        <input
+        <Input unstyled
           type="text"
           placeholder="Filter by source"
           value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value)}
+          onChange={(v) => setSourceFilter(v)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               const next = new URLSearchParams(searchParams);
@@ -112,7 +114,7 @@ export const AdminFreshnessChanges: React.FC = () => {
           }}
           className="rounded border border-slate-300 px-2 py-1 text-sm"
         />
-        <button
+        <Button unstyled
           onClick={() => {
             const next = new URLSearchParams(searchParams);
             if (sourceFilter.trim()) next.set('source', sourceFilter.trim());
@@ -122,7 +124,7 @@ export const AdminFreshnessChanges: React.FC = () => {
           className="rounded bg-slate-200 px-2 py-1 text-sm hover:bg-slate-300"
         >
           Filter
-        </button>
+        </Button>
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="min-w-full text-sm">

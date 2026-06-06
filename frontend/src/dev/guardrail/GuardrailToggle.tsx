@@ -9,6 +9,7 @@
  */
 import { useAiGuardrail } from './useAiGuardrail';
 
+import { Button } from '../../components/antigravity/Button';
 export function GuardrailToggle() {
   const { enabled, loading, saving, error, toggle } = useAiGuardrail();
 
@@ -41,7 +42,7 @@ export function GuardrailToggle() {
         </div>
 
         {/* Toggle */}
-        <button
+        <Button unstyled
           role="switch"
           aria-checked={enabled}
           aria-label={enabled ? 'Disable guardrail' : 'Enable guardrail'}
@@ -50,7 +51,7 @@ export function GuardrailToggle() {
           className={`relative flex-shrink-0 w-11 h-6 rounded-full border-0 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${enabled ? 'bg-accent-500' : 'bg-slate-200'}`}
         >
           <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all duration-200 ${enabled ? 'left-[calc(100%-22px)]' : 'left-0.5'}`} />
-        </button>
+        </Button>
       </div>
 
       {/* Dev mode badge */}

@@ -20,6 +20,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { ArrowRight, Download, Loader2, MessageSquare, RefreshCcw } from 'lucide-react';
 import { employeeAPI } from '../../api/client';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
@@ -104,7 +105,7 @@ export function QuestionTileGrid({ tiles, disabled, onTileClick }: QuestionTileG
       data-testid="question-tile-grid"
     >
       {tiles.map((tile) => (
-        <button
+        <Button unstyled
           key={tile}
           type="button"
           data-testid="question-tile"
@@ -114,7 +115,7 @@ export function QuestionTileGrid({ tiles, disabled, onTileClick }: QuestionTileG
         >
           <span className="leading-snug">{tile}</span>
           <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -337,7 +338,7 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
           {/* Action bar — shown when tiles are hidden and at least one turn exists */}
           {!showTiles && turns.length > 0 ? (
             <div className="flex flex-wrap items-center gap-3">
-              <button
+              <Button unstyled
                 type="button"
                 data-testid="new-question-button"
                 onClick={handleNewQuestion}
@@ -345,9 +346,9 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
               >
                 <RefreshCcw className="h-4 w-4 shrink-0" aria-hidden />
                 New question
-              </button>
+              </Button>
 
-              <button
+              <Button unstyled
                 type="button"
                 data-testid="export-pdf-button"
                 disabled={exporting}
@@ -361,7 +362,7 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
                   <Download className="h-4 w-4 shrink-0" aria-hidden />
                 )}
                 {exporting ? 'Generating PDF…' : 'Export session'}
-              </button>
+              </Button>
             </div>
           ) : null}
 
@@ -384,7 +385,7 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
               className="w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 disabled:opacity-60"
             />
 
-            <button
+            <Button unstyled
               type="button"
               data-testid="submit-button"
               disabled={!message.trim() || submitting || noAssignment}
@@ -400,7 +401,7 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
               ) : (
                 'Ask'
               )}
-            </button>
+            </Button>
 
             {error ? (
               <div

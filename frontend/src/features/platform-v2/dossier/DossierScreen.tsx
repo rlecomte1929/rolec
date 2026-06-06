@@ -4,6 +4,7 @@
  */
 
 import type { Form, FormType } from '../../../types/relopass-api-contracts';
+import { Button } from '../../../components/antigravity/Button';
 import { StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
 import { logger } from '../../../lib/logger';
 
@@ -135,7 +136,7 @@ function FormCard({ form, onOpen }: FormCardProps) {
       </div>
 
       {/* Action */}
-      <button
+      <Button unstyled
         onClick={handleOpen}
         style={{
           alignSelf: 'flex-start',
@@ -159,7 +160,7 @@ function FormCard({ form, onOpen }: FormCardProps) {
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12h14m-7-7l7 7-7 7" />
         </svg>
-      </button>
+      </Button>
     </div>
   );
 }

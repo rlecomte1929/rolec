@@ -7,6 +7,7 @@
  * Route: /employee/quote-request  (see routes.ts → employeeQuoteRequest)
  */
 import React, { useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Card, Button } from '../../components/antigravity';
@@ -167,7 +168,7 @@ export const QuoteRequestPage: React.FC = () => {
               {availableCategories.map((cat) => {
                 const selected = categories.includes(cat);
                 return (
-                  <button
+                  <Button unstyled
                     key={cat}
                     type="button"
                     onClick={() => toggleCategory(cat)}
@@ -180,7 +181,7 @@ export const QuoteRequestPage: React.FC = () => {
                     aria-pressed={selected}
                   >
                     {cat}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -210,11 +211,11 @@ export const QuoteRequestPage: React.FC = () => {
               Budget range
               <span className="ml-1 font-normal text-[#64748b]">(optional)</span>
             </label>
-            <input
+            <Input unstyled
               id="qr-budget"
               type="text"
               value={budgetRange}
-              onChange={(e) => setBudgetRange(e.target.value)}
+              onChange={(v) => setBudgetRange(v)}
               maxLength={100}
               placeholder="e.g. €1,500–€2,500/month for housing"
               className="w-full rounded-lg border border-[#cbd5e1] px-3 py-2 text-sm text-[#374151] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"

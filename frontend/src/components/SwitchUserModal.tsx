@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from './antigravity/Button';
 import { Card } from './antigravity';
 import { TEST_ACCOUNTS, type TestAccount } from '../config/testAccounts';
 import { authAPI } from '../api/client';
@@ -56,12 +57,12 @@ export const SwitchUserModal: React.FC<Props> = ({ open, onClose }) => {
       <Card padding="lg" className="w-full max-w-md">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-[#0b2b43]">Switch test account</div>
-          <button
+          <Button unstyled
             onClick={onClose}
             className="text-sm text-[#6b7280] hover:text-[#0b2b43]"
           >
             Close
-          </button>
+          </Button>
         </div>
 
         {error && (
@@ -72,7 +73,7 @@ export const SwitchUserModal: React.FC<Props> = ({ open, onClose }) => {
 
         <div className="space-y-2">
           {TEST_ACCOUNTS.map((account) => (
-            <button
+            <Button unstyled
               key={account.email}
               disabled={switching !== null}
               onClick={() => handleSwitch(account)}
@@ -100,7 +101,7 @@ export const SwitchUserModal: React.FC<Props> = ({ open, onClose }) => {
               {switching === account.email && (
                 <div className="text-xs text-[#1d4ed8] mt-1">Switching...</div>
               )}
-            </button>
+            </Button>
           ))}
         </div>
 

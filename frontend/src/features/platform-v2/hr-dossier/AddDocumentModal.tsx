@@ -8,6 +8,7 @@
  *         optional PDF upload, notes textarea.
  */
 import React, { useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity';
 import { adhocFormsAPI } from '../../../api/dossier';
 
@@ -82,10 +83,10 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Document name <span className="text-rose-500">*</span>
             </label>
-            <input
+            <Input unstyled
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(v) => setName(v)}
               placeholder="e.g. Apostilled birth certificate"
               autoFocus
               className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
@@ -94,10 +95,10 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Issuing authority</label>
-            <input
+            <Input unstyled
               type="text"
               value={authority}
-              onChange={(e) => setAuthority(e.target.value)}
+              onChange={(v) => setAuthority(v)}
               placeholder="e.g. Town hall"
               className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
             />
@@ -121,10 +122,10 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Deadline</label>
-            <input
+            <Input unstyled
               type="date"
               value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
+              onChange={(v) => setDeadline(v)}
               className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
             />
           </div>

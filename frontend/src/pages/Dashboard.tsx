@@ -171,7 +171,7 @@ export const Dashboard: React.FC = () => {
               { id: 'movers', label: 'Movers', count: dashboard.recommendations.movers?.length },
               { id: 'documents', label: 'Documents' },
             ].map((tab) => (
-              <button
+              <Button unstyled
                 key={tab.id}
                 id={`dashboard-tab-${tab.id}`}
                 role="tab"
@@ -190,7 +190,7 @@ export const Dashboard: React.FC = () => {
                     {tab.count}
                   </span>
                 )}
-              </button>
+              </Button>
             ))}
           </nav>
         </div>

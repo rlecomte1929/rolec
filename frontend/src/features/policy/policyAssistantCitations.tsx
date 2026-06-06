@@ -17,6 +17,7 @@
  * formatRichMessage for each non-citation segment.
  */
 import React from 'react';
+import { Button } from '../../components/antigravity/Button';
 import { formatRichMessage } from '../../utils/richMessage';
 import type { PolicyAssistantCitedChunk } from '../../types/policyAssistant';
 
@@ -136,7 +137,7 @@ const CitationChip: React.FC<CitationChipProps> = ({ index, chunk, rawId, onActi
     scrollToSourceRef(chunk.source_ref);
   };
   return (
-    <button
+    <Button unstyled
       type="button"
       onClick={handleClick}
       title={tooltip}
@@ -149,7 +150,7 @@ const CitationChip: React.FC<CitationChipProps> = ({ index, chunk, rawId, onActi
       <span className="sr-only"> — view source row in policy</span>
       {/* Use raw id only for test selectors; visible label is the index. */}
       <span className="hidden" data-chunk-id={rawId} />
-    </button>
+    </Button>
   );
 };
 

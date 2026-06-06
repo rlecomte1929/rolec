@@ -404,7 +404,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                             </div>
                             <div className="flex flex-wrap gap-1 shrink-0">
                               {(['pending', 'in_progress', 'done', 'waived', 'blocked'] as const).map((st) => (
-                                <button
+                                <Button unstyled
                                   key={st}
                                   type="button"
                                   disabled={actionBusy === `chk-${row.id}`}
@@ -416,7 +416,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                                   }`}
                                 >
                                   {st.replace('_', ' ')}
-                                </button>
+                                </Button>
                               ))}
                             </div>
                           </li>

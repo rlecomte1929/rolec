@@ -14,6 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import { MilestoneTracker } from '../immigration/MilestoneTracker';
 import type { ImmigrationContext } from './immigrationContext';
@@ -170,13 +171,13 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
     return (
       <div className="rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#b91c1c]">
         {error}
-        <button
+        <Button unstyled
           type="button"
           onClick={load}
           className="ml-3 underline hover:no-underline"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -377,14 +378,14 @@ const QuickActions: React.FC<{
   onViewProfile: () => void;
 }> = ({ onFindVendor, onViewProfile }) => (
   <div className="flex flex-wrap gap-2">
-    <button
+    <Button unstyled
       type="button"
       onClick={onViewProfile}
       className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-medium text-[#374151] hover:bg-[#f8fafc] transition-colors"
     >
       View employee data
-    </button>
-    <button
+    </Button>
+    <Button unstyled
       type="button"
       disabled
       title="Form generation available in Phase 3"
@@ -394,8 +395,8 @@ const QuickActions: React.FC<{
       <span className="ml-1.5 rounded-full bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-normal text-[#94a3b8]">
         Phase 3
       </span>
-    </button>
-    <button
+    </Button>
+    <Button unstyled
       type="button"
       onClick={onFindVendor}
       className="flex items-center gap-1.5 rounded-lg border border-[#0b2b43] bg-white px-3 py-1.5 text-xs font-medium text-[#0b2b43] hover:bg-[#f8fafc] transition-colors"
@@ -404,6 +405,6 @@ const QuickActions: React.FC<{
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
       Find immigration vendor
-    </button>
+    </Button>
   </div>
 );

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { Card } from '../../../components/antigravity';
 import { adminAPI } from '../../../api/client';
 
@@ -93,14 +95,14 @@ export const AdminPolicyAssistantGroundingSection: React.FC<{ companyId: string 
             Document uploads, extraction runs, snapshot revisions, and activation for the assistant.
           </p>
         </div>
-        <button
+        <Button unstyled
           type="button"
           className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
           onClick={() => load()}
           disabled={loading}
         >
           {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        </Button>
       </div>
 
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
@@ -171,30 +173,30 @@ export const AdminPolicyAssistantGroundingSection: React.FC<{ companyId: string 
       <div className="flex flex-wrap gap-2 items-end">
         <label className="flex flex-col text-xs text-slate-600">
           Older snapshot
-          <input
+          <Input unstyled
             className="mt-1 border border-slate-300 rounded px-2 py-1 text-xs font-mono w-72 max-w-full"
             value={olderSnap}
-            onChange={(e) => setOlderSnap(e.target.value)}
+            onChange={(v) => setOlderSnap(v)}
             placeholder="snapshot uuid"
           />
         </label>
         <label className="flex flex-col text-xs text-slate-600">
           Newer snapshot
-          <input
+          <Input unstyled
             className="mt-1 border border-slate-300 rounded px-2 py-1 text-xs font-mono w-72 max-w-full"
             value={newerSnap}
-            onChange={(e) => setNewerSnap(e.target.value)}
+            onChange={(v) => setNewerSnap(v)}
             placeholder="snapshot uuid"
           />
         </label>
-        <button
+        <Button unstyled
           type="button"
           className="rounded-md bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-50"
           onClick={() => runDiff()}
           disabled={diffLoading || !olderSnap || !newerSnap}
         >
           {diffLoading ? 'Comparing…' : 'Compare'}
-        </button>
+        </Button>
       </div>
 
       {diff && (

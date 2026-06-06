@@ -5,6 +5,8 @@
  * Opens after clicking "Request quote" in VendorBrowsePanel.
  */
 import React, { useEffect, useState } from 'react';
+import { Input } from '../antigravity/Input';
+import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import { buildImmigrationSummary, type ImmigrationContext } from './immigrationContext';
 
@@ -105,7 +107,7 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
               <h2 className="text-base font-semibold text-[#0b2b43]">Send quote request</h2>
               <p className="text-xs text-[#64748b] mt-0.5">to {vendor.name}</p>
             </div>
-            <button
+            <Button unstyled
               type="button"
               onClick={onClose}
               className="rounded-lg p-2 text-[#94a3b8] hover:bg-[#f1f5f9] transition-colors"
@@ -114,7 +116,7 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-            </button>
+            </Button>
           </div>
 
           {/* Form */}
@@ -146,11 +148,11 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
               <label className="block text-xs font-medium text-[#374151] mb-1" htmlFor="rfq-move-date">
                 Move date <span className="text-[#94a3b8] font-normal">(optional)</span>
               </label>
-              <input
+              <Input unstyled
                 id="rfq-move-date"
                 type="date"
                 value={moveDate}
-                onChange={(e) => setMoveDate(e.target.value)}
+                onChange={(v) => setMoveDate(v)}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
               />
             </div>
@@ -160,11 +162,11 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
               <label className="block text-xs font-medium text-[#374151] mb-1" htmlFor="rfq-budget">
                 Budget range <span className="text-[#94a3b8] font-normal">(optional)</span>
               </label>
-              <input
+              <Input unstyled
                 id="rfq-budget"
                 type="text"
                 value={budgetRange}
-                onChange={(e) => setBudgetRange(e.target.value)}
+                onChange={(v) => setBudgetRange(v)}
                 placeholder="e.g. €2,000–€3,000/month"
                 maxLength={100}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#374151] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
@@ -194,20 +196,20 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
             )}
 
             <div className="flex gap-3 pt-1">
-              <button
+              <Button unstyled
                 type="submit"
                 disabled={submitting}
                 className="flex-1 rounded-lg bg-[#0b2b43] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#1e4d6b] disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Sending…' : 'Send quote request'}
-              </button>
-              <button
+              </Button>
+              <Button unstyled
                 type="button"
                 onClick={onClose}
                 className="rounded-lg border border-[#d1d5db] px-4 py-2.5 text-sm font-medium text-[#374151] hover:bg-[#f8fafc] transition-colors"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </div>

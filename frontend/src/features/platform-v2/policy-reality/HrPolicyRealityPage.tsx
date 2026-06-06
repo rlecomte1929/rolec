@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 
 /**
@@ -179,15 +180,15 @@ function CaseDrawer({
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <button disabled={!hasPrev} onClick={onPrev} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 transition-colors">
+            <Button unstyled disabled={!hasPrev} onClick={onPrev} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
-            </button>
-            <button disabled={!hasNext} onClick={onNext} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 transition-colors">
+            </Button>
+            <Button unstyled disabled={!hasNext} onClick={onNext} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-            </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 ml-1 transition-colors">
+            </Button>
+            <Button unstyled onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 ml-1 transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -331,12 +332,12 @@ export function HrPolicyRealityPage() {
         <div className="flex items-end gap-3">
           <h1 className="text-xl font-semibold text-slate-900">Policy vs. Reality</h1>
           <div className="flex-1" />
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+          <Button unstyled className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Export CSV
-          </button>
+          </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500">
           Compare your company's policy commitments against what employees are actually selecting from service providers.
@@ -600,9 +601,9 @@ export function HrPolicyRealityPage() {
             <p className="text-sm text-amber-700 mt-0.5">
               The market has moved — consider revising to €2,900/mo to align with current provider pricing.
             </p>
-            <button className="mt-2 text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900 transition-colors">
+            <Button unstyled className="mt-2 text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900 transition-colors">
               Update policy →
-            </button>
+            </Button>
           </div>
         </div>
       </div>

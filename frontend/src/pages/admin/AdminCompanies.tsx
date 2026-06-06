@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { logger } from '../../lib/logger';
@@ -246,9 +247,9 @@ export const AdminCompanies: React.FC = () => {
     <AdminLayout title="Companies" subtitle="Create, edit, plan tier, delete">
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <Input unstyled
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(v) => setQuery(v)}
             placeholder="Search by company name"
             className="w-64 rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
           />
@@ -384,94 +385,94 @@ export const AdminCompanies: React.FC = () => {
                     </th>
                   )}
                   <th className="py-2 pr-4 align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('name')}
                       className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Company name{sortIndicator('name')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('status')}
                       className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Status{sortIndicator('status')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('plan')}
                       className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Plan{sortIndicator('plan')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('country')}
                       className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Country{sortIndicator('country')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('size_band')}
                       className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Size band{sortIndicator('size_band')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 text-right align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('hr_users_count')}
                       className="w-full text-right font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       HR users{sortIndicator('hr_users_count')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 text-right align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('employee_count')}
                       className="w-full text-right font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Employees{sortIndicator('employee_count')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 text-right align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('assignments_count')}
                       className="w-full text-right font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Cases{sortIndicator('assignments_count')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pr-4 align-bottom">
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => toggleSort('contact')}
                       className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
                     >
                       Contact person{sortIndicator('contact')}
-                    </button>
+                    </Button>
                   </th>
                   <th className="py-2 pl-2 align-bottom text-left font-medium text-[#6b7280]">Actions</th>
                 </tr>
                 <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-left">
                   {selectionMode && <th className="py-2 pr-2" />}
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       value={filterNameCol}
-                      onChange={(e) => setFilterNameCol(e.target.value)}
+                      onChange={(v) => setFilterNameCol(v)}
                       placeholder="Contains…"
                       className="w-full min-w-[7rem] max-w-[11rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
                       aria-label="Filter by company name"
@@ -506,60 +507,60 @@ export const AdminCompanies: React.FC = () => {
                     </select>
                   </th>
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       value={filterCountry}
-                      onChange={(e) => setFilterCountry(e.target.value)}
+                      onChange={(v) => setFilterCountry(v)}
                       placeholder="Contains…"
                       className="w-full min-w-[4rem] max-w-[6rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
                       aria-label="Filter by country"
                     />
                   </th>
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       value={filterSizeBand}
-                      onChange={(e) => setFilterSizeBand(e.target.value)}
+                      onChange={(v) => setFilterSizeBand(v)}
                       placeholder="Contains…"
                       className="w-full min-w-[4rem] max-w-[6rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
                       aria-label="Filter by size band"
                     />
                   </th>
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       type="number"
                       min={0}
                       value={filterHrMin}
-                      onChange={(e) => setFilterHrMin(e.target.value)}
+                      onChange={(v) => setFilterHrMin(v)}
                       placeholder="Min"
                       className="w-full min-w-[3.25rem] max-w-[4.5rem] ml-auto block rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151] text-right tabular-nums"
                       aria-label="Minimum HR users"
                     />
                   </th>
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       type="number"
                       min={0}
                       value={filterEmployeesMin}
-                      onChange={(e) => setFilterEmployeesMin(e.target.value)}
+                      onChange={(v) => setFilterEmployeesMin(v)}
                       placeholder="Min"
                       className="w-full min-w-[3.25rem] max-w-[4.5rem] ml-auto block rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151] text-right tabular-nums"
                       aria-label="Minimum employees"
                     />
                   </th>
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       type="number"
                       min={0}
                       value={filterCasesMin}
-                      onChange={(e) => setFilterCasesMin(e.target.value)}
+                      onChange={(v) => setFilterCasesMin(v)}
                       placeholder="Min"
                       className="w-full min-w-[3.25rem] max-w-[4.5rem] ml-auto block rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151] text-right tabular-nums"
                       aria-label="Minimum cases"
                     />
                   </th>
                   <th className="py-2 pr-4 font-normal align-top">
-                    <input
+                    <Input unstyled
                       value={filterContact}
-                      onChange={(e) => setFilterContact(e.target.value)}
+                      onChange={(v) => setFilterContact(v)}
                       placeholder="Contains…"
                       className="w-full min-w-[6rem] max-w-[9rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
                       aria-label="Filter by contact"
@@ -573,13 +574,13 @@ export const AdminCompanies: React.FC = () => {
                   <tr>
                     <td colSpan={10} className="py-8 text-center text-[#6b7280] text-sm">
                       No companies match the table filters.{' '}
-                      <button
+                      <Button unstyled
                         type="button"
                         onClick={clearColumnFilters}
                         className="text-[#0b2b43] underline font-medium"
                       >
                         Clear filters
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ) : null}
@@ -606,9 +607,9 @@ export const AdminCompanies: React.FC = () => {
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         {canEdit(c) && editingId === c.id ? (
-                          <input
+                          <Input unstyled
                             value={editDraft.name !== undefined ? editDraft.name : c.name}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                            onChange={(v) => setEditDraft((d) => ({ ...d, name: v }))}
                             className="rounded border border-[#d1d5db] px-2 py-1 text-sm font-medium w-48"
                             placeholder="Company name"
                           />
@@ -654,9 +655,9 @@ export const AdminCompanies: React.FC = () => {
                     </td>
                     <td className="py-3 pr-4 text-[#374151]">
                       {editingId === c.id ? (
-                        <input
+                        <Input unstyled
                           value={editDraft.country !== undefined ? editDraft.country : (c.country || '')}
-                          onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          onChange={(v) => setEditDraft((d) => ({ ...d, country: v }))}
                           className="rounded border border-[#d1d5db] px-2 py-0.5 text-xs w-28"
                           placeholder="Country"
                         />
@@ -763,9 +764,9 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Name *</label>
-            <input
+            <Input unstyled
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(v) => setName(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
               placeholder="Company name"
               autoFocus
@@ -773,9 +774,9 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
           </div>
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Country</label>
-            <input
+            <Input unstyled
               value={country}
-              onChange={(e) => setCountry(e.target.value)}
+              onChange={(v) => setCountry(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
               placeholder="e.g. Norway"
             />
@@ -807,22 +808,22 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">HR seat limit</label>
-              <input
+              <Input unstyled
                 type="number"
                 min={0}
                 value={hr_seat_limit}
-                onChange={(e) => setHrSeatLimit(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                onChange={(v) => setHrSeatLimit(v === '' ? '' : parseInt(v, 10))}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
                 placeholder="-"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#374151] mb-1">Employee seat limit</label>
-              <input
+              <Input unstyled
                 type="number"
                 min={0}
                 value={employee_seat_limit}
-                onChange={(e) => setEmployeeSeatLimit(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                onChange={(v) => setEmployeeSeatLimit(v === '' ? '' : parseInt(v, 10))}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
                 placeholder="-"
               />

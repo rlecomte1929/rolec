@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
 import type { RoadmapTrack, RoadmapStep, StepStatus } from '../../../types/relopass-api-contracts';
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
@@ -93,7 +94,7 @@ function TrackList({ tracks, selectedId, onSelect }: TrackListProps) {
         const total = track.steps.length;
         const isSelected = track.id === selectedId;
         return (
-          <button
+          <Button unstyled
             key={track.id}
             onClick={() => onSelect(track.id)}
             aria-pressed={isSelected}
@@ -131,7 +132,7 @@ function TrackList({ tracks, selectedId, onSelect }: TrackListProps) {
               </div>
             </div>
             <ProgressBar value={track.progress_pct} height={4} color={isSelected ? 'var(--accent)' : 'var(--text-muted)'} />
-          </button>
+          </Button>
         );
       })}
     </nav>
@@ -193,7 +194,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
         <StepStatusIcon status={step.status} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <button
+            <Button unstyled
               onClick={handleTitleClick}
               style={{
                 background: 'none', border: 'none', padding: 0,
@@ -203,11 +204,11 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
               title="Ask AI about this step"
             >
               {step.title}
-            </button>
+            </Button>
             <StatusBadge type="step" status={step.status} size="sm" />
             {confLevel && <ConfidenceBadge level={confLevel} size="sm" />}
             {docChip && docChip.count > 0 && (
-              <button
+              <Button unstyled
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onDocChipClick?.(); }}
                 title={`${docChip.count} document${docChip.count === 1 ? '' : 's'}`}
@@ -229,7 +230,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
                   <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 {docChip.count}
-              </button>
+              </Button>
             )}
             {vendorName && (
               <Pill variant="info" size="sm">{vendorName}</Pill>
@@ -244,7 +245,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
         </div>
 
         {step.description && (
-          <button
+          <Button unstyled
             onClick={() => setExpanded(e => !e)}
             aria-expanded={expanded}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', flexShrink: 0 }}
@@ -253,7 +254,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
               <path d="M6 9l6 6 6-6" />
             </svg>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -279,7 +280,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
         <div style={{ marginLeft: '28px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {confidence?.sourceUrl && (
             <>
-              <button
+              <Button unstyled
                 type="button"
                 onClick={() => setSourceOpen(o => !o)}
                 aria-expanded={sourceOpen}
@@ -293,7 +294,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
                   <path d="M6 9l6 6 6-6" />
                 </svg>
                 {sourceOpen ? 'Hide source' : 'Show source'}
-              </button>
+              </Button>
               {sourceOpen && (
                 <div style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm, 6px)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <a

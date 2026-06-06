@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import {
   MILESTONE_DEFS,
@@ -228,14 +229,14 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
                   </div>
 
                   {!completed && (
-                    <button
+                    <Button unstyled
                       type="button"
                       onClick={() => void handleMarkDone(def, persisted, computedISO)}
                       disabled={savingType === def.type}
                       className="mt-1.5 rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-medium text-[#374151] hover:bg-[#f8fafc] transition-colors disabled:opacity-50"
                     >
                       {savingType === def.type ? 'Saving…' : 'Mark as done'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </li>

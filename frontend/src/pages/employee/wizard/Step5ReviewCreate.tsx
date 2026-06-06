@@ -44,13 +44,13 @@ function SummarySection({
       <div className="flex items-center justify-between mb-2">
         <div className="text-sm font-semibold text-[#0b2b43]">{title}</div>
         {onEdit && (
-          <button
+          <Button unstyled
             type="button"
             onClick={onEdit}
             className="text-xs text-[#0b2b43] underline hover:no-underline"
           >
             Edit (Step {stepNumber})
-          </button>
+          </Button>
         )}
       </div>
       <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
@@ -398,12 +398,12 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       </div>
 
       {localStorage.getItem('demo_role') === 'admin' && (
-        <button
+        <Button unstyled
           className="mt-3 text-xs text-[#0b2b43] underline"
           onClick={() => navigate('/admin/countries')}
         >
           View Country Requirements DB
-        </button>
+        </Button>
       )}
 
       {(sufficiencyLoading || sufficiencyMessage) && (

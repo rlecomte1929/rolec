@@ -119,7 +119,7 @@ export const PolicyTemplatePicker: React.FC<Props> = ({
           <h2 className="text-lg font-semibold text-[#0b2b43]">
             Start from a template
           </h2>
-          <button
+          <Button unstyled
             type="button"
             onClick={onClose}
             disabled={!!applyingKey}
@@ -127,7 +127,7 @@ export const PolicyTemplatePicker: React.FC<Props> = ({
             aria-label="Close template picker"
           >
             Close
-          </button>
+          </Button>
         </div>
         <div className="p-6 overflow-y-auto flex-1">
           {error && (
@@ -170,7 +170,7 @@ export const PolicyTemplatePicker: React.FC<Props> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {templates.map((tpl) => (
-                <button
+                <Button unstyled
                   key={tpl.key}
                   type="button"
                   onClick={() => void apply(tpl, false)}
@@ -187,7 +187,7 @@ export const PolicyTemplatePicker: React.FC<Props> = ({
                   <div className="mt-3 text-xs font-medium text-[#0b2b43]">
                     {applyingKey === tpl.key ? 'Applying…' : 'Use this template →'}
                   </div>
-                </button>
+                </Button>
               ))}
             </div>
           )}

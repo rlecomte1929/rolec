@@ -12,6 +12,7 @@
  */
 
 import { Pill, type PillVariant } from '../shared';
+import { Button } from '../../../components/antigravity/Button';
 import {
   computeAvailableNow,
   computeBlockers,
@@ -140,7 +141,7 @@ export function AvailableNowWidget({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <button
+                <Button unstyled
                   onClick={() => onStartStep?.(step.id)}
                   disabled={!onStartStep}
                   style={{
@@ -155,7 +156,7 @@ export function AvailableNowWidget({
                   }}
                 >
                   {step.title}
-                </button>
+                </Button>
                 {ownerPill(step.owner)}
                 {step.estimated_effort && (
                   <Pill variant="muted" size="sm">{step.estimated_effort}</Pill>
@@ -178,7 +179,7 @@ export function AvailableNowWidget({
       )}
 
       {hasMore && (
-        <button
+        <Button unstyled
           onClick={onSeeAll}
           disabled={!onSeeAll}
           style={{
@@ -193,7 +194,7 @@ export function AvailableNowWidget({
           }}
         >
           See all available steps ({available.length})
-        </button>
+        </Button>
       )}
     </WidgetShell>
   );

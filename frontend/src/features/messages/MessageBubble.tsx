@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../../components/antigravity/Button';
 import type { Message } from './types';
 
 const ROLE_BG: Record<string, string> = {
@@ -72,14 +73,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </span>
         )}
         {showDelete && onDelete && (
-          <button
+          <Button unstyled
             type="button"
             disabled={isDeleting}
             onClick={() => onDelete(message.id)}
             className="ml-1 text-[11px] text-red-600 hover:text-red-800 underline disabled:opacity-40"
           >
             {isDeleting ? 'Deleting…' : 'Delete'}
-          </button>
+          </Button>
         )}
       </div>
     </div>

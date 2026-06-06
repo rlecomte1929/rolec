@@ -471,13 +471,13 @@ export const AdminProspects: React.FC = () => {
                   </div>
                 )}
               </div>
-              <button
+              <Button unstyled
                 className="text-[#6b7280] hover:text-[#0b2b43]"
                 onClick={() => setSelected(null)}
                 aria-label="Close"
               >
                 ✕
-              </button>
+              </Button>
             </div>
 
             <div className="flex items-center gap-2 mb-3">

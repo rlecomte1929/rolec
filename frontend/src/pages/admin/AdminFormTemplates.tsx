@@ -6,6 +6,7 @@
  * only in Phase 2A; Fields and Trigger rules tabs land in Phase 2B).
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
 import { Button, Card } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
@@ -80,15 +81,15 @@ export const AdminFormTemplates: React.FC = () => {
             </option>
           ))}
         </select>
-        <input
+        <Input unstyled
           value={filters.category}
-          onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
+          onChange={(v) => setFilters((f) => ({ ...f, category: v }))}
           placeholder="Category"
           className="rounded border border-slate-200 px-3 py-2 text-sm w-40"
         />
-        <input
+        <Input unstyled
           value={filters.code}
-          onChange={(e) => setFilters((f) => ({ ...f, code: e.target.value }))}
+          onChange={(v) => setFilters((f) => ({ ...f, code: v }))}
           placeholder="Code (e.g. UTL-2011)"
           className="rounded border border-slate-200 px-3 py-2 text-sm w-48"
         />

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams, Link } from 'react-router-dom';
 import { AdminReviewQueueLayout } from './AdminReviewQueueLayout';
 import { ReviewQueuePriorityBadge } from '../../../components/admin/review-queue/ReviewQueuePriorityBadge';
@@ -271,12 +273,12 @@ export const AdminReviewQueuePage: React.FC = () => {
             />
             Unassigned only
           </label>
-          <input
+          <Input unstyled
             type="text"
             placeholder="Search..."
             className="rounded border border-slate-300 px-2 py-1 text-sm"
             value={searchText}
-            onChange={(e) => updateFilter('search', e.target.value || undefined)}
+            onChange={(v) => updateFilter('search', v || undefined)}
           />
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
@@ -288,14 +290,14 @@ export const AdminReviewQueuePage: React.FC = () => {
             <option value="due">Due date</option>
             <option value="age">Age</option>
           </select>
-          <button
+          <Button unstyled
             type="button"
             onClick={handleBackfill}
             disabled={backfillLoading}
             className="ml-auto rounded bg-[#0b2b43] px-3 py-1 text-sm text-white hover:bg-[#0d3552] disabled:opacity-50"
           >
             {backfillLoading ? 'Backfilling…' : 'Backfill from signals'}
-          </button>
+          </Button>
         </div>
 
         {error && (
@@ -378,14 +380,14 @@ export const AdminReviewQueuePage: React.FC = () => {
                       <td className="px-3 py-2 text-sm">{formatAge(it.created_at)}</td>
                       <td className="px-3 py-2">
                         {['new', 'triaged', 'assigned'].includes(it.status) && (
-                          <button
+                          <Button unstyled
                             type="button"
                             onClick={() => handleClaim(it.id)}
                             disabled={actionLoading === it.id}
                             className="rounded bg-slate-200 px-2 py-0.5 text-xs hover:bg-slate-300 disabled:opacity-50"
                           >
                             Claim
-                          </button>
+                          </Button>
                         )}
                       </td>
                     </tr>

@@ -17,6 +17,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { Button } from './antigravity/Button';
 const SEEN_KEY = 'relopass_changelog_seen';
 
 interface ChangelogEntry {
@@ -132,7 +133,7 @@ export const ChangelogBell: React.FC = () => {
 
   return (
     <div ref={containerRef} className="relative">
-      <button
+      <Button unstyled
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
@@ -167,7 +168,7 @@ export const ChangelogBell: React.FC = () => {
             data-testid="changelog-bell-unread-dot"
           />
         )}
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -177,14 +178,14 @@ export const ChangelogBell: React.FC = () => {
         >
           <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-900">What's new</span>
-            <button
+            <Button unstyled
               type="button"
               onClick={() => setOpen(false)}
               className="text-xs text-slate-400 hover:text-slate-600"
               aria-label="Close"
             >
               Close
-            </button>
+            </Button>
           </div>
 
           {!entries && (

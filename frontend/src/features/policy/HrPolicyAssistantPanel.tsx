@@ -226,7 +226,7 @@ function HrAnswerResultCard({
                     }
                     return (
                       <li key={i}>
-                        <button
+                        <Button unstyled
                           type="button"
                           onClick={handleScroll}
                           aria-label={`Show ${headline} on the policy page`}
@@ -248,7 +248,7 @@ function HrAnswerResultCard({
                             </div>
                           ) : null}
                           <div className="text-xs text-slate-500 mt-1">{meta}</div>
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}
@@ -276,7 +276,7 @@ function HrAnswerResultCard({
                 <ul className="flex flex-wrap gap-2">
                   {answer.follow_up_options.map((opt, i) => (
                     <li key={i}>
-                      <button
+                      <Button unstyled
                         type="button"
                         className="text-xs rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700 text-left hover:bg-slate-100"
                         onClick={() =>
@@ -290,7 +290,7 @@ function HrAnswerResultCard({
                         }
                       >
                         {opt.label}
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -482,7 +482,7 @@ export const HrPolicyAssistantPanel: React.FC<{
           <ul className="flex flex-col gap-2">
             {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
               <li key={s}>
-                <button
+                <Button unstyled
                   type="button"
                   onClick={() => applySuggestion(s)}
                   disabled={submitting || contextLoading}
@@ -490,7 +490,7 @@ export const HrPolicyAssistantPanel: React.FC<{
                 >
                   <span className="min-w-0 leading-snug">{s}</span>
                   <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -520,7 +520,7 @@ export const HrPolicyAssistantPanel: React.FC<{
         {isEmptyState ? null : (
           <div className="flex flex-wrap gap-2">
             {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
-              <button
+              <Button unstyled
                 key={s}
                 type="button"
                 onClick={() => applySuggestion(s)}
@@ -528,7 +528,7 @@ export const HrPolicyAssistantPanel: React.FC<{
                 className="text-left text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50 max-w-full"
               >
                 {s}
-              </button>
+              </Button>
             ))}
           </div>
         )}

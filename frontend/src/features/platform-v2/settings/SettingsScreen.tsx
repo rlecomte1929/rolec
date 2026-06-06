@@ -4,6 +4,8 @@
  */
 
 import { useRef, useState } from 'react';
+import { Button } from '../../../components/antigravity/Button';
+import { Input } from '../../../components/antigravity/Input';
 import { Avatar, Pill } from '../shared';
 import type { UserRole } from '../../../types/relopass-api-contracts';
 
@@ -90,7 +92,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <button
+    <Button unstyled
       role="switch"
       aria-checked={checked}
       aria-label={label}
@@ -118,7 +120,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
         transition: 'left 0.2s',
         boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
       }} />
-    </button>
+    </Button>
   );
 }
 
@@ -205,16 +207,16 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         <Field label="Full name">
-          <input style={inputStyle} value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
+          <Input unstyled style={inputStyle} value={form.full_name} onChange={v => set('full_name', v)} required />
         </Field>
         <Field label="Email">
-          <input style={{ ...inputStyle, background: 'var(--surface-2)', color: 'var(--text-muted)' }} value={form.email} readOnly />
+          <Input unstyled style={{ ...inputStyle, background: 'var(--surface-2)', color: 'var(--text-muted)' }} value={form.email} readOnly />
         </Field>
         <Field label="Company">
-          <input style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
+          <Input unstyled style={inputStyle} value={form.company_name} onChange={v => set('company_name', v)} />
         </Field>
         <Field label="Phone">
-          <input style={inputStyle} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
+          <Input unstyled style={inputStyle} type="tel" value={form.phone} onChange={v => set('phone', v)} />
         </Field>
         <Field label="Preferred language">
           <select
@@ -239,12 +241,12 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
       </Field>
 
       <div>
-        <button
+        <Button unstyled
           type="submit"
           style={{ padding: '9px 20px', borderRadius: 'var(--radius-md)', border: 'none', background: saved ? 'var(--success)' : 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
         >
           {saved ? '✓ Saved' : 'Save changes'}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -305,12 +307,12 @@ function NotificationsTab({ prefs: initial, onSave }: NotificationsTabProps) {
           </div>
         ))}
       </div>
-      <button
+      <Button unstyled
         onClick={handleSave}
         style={{ padding: '9px 20px', borderRadius: 'var(--radius-md)', border: 'none', background: saved ? 'var(--success)' : 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
       >
         {saved ? '✓ Saved' : 'Save preferences'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -326,7 +328,7 @@ export function SettingsScreen({
   const [tab, setTab] = useState<'profile' | 'notifications'>('profile');
 
   const tabBtn = (id: 'profile' | 'notifications', label: string) => (
-    <button
+    <Button unstyled
       key={id}
       onClick={() => setTab(id)}
       style={{
@@ -341,7 +343,7 @@ export function SettingsScreen({
       }}
     >
       {label}
-    </button>
+    </Button>
   );
 
   return (

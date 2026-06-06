@@ -30,7 +30,7 @@ export const PolicyConfigVersionHistoryDrawer: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <button
+      <Button unstyled
         type="button"
         className="absolute inset-0 bg-black/30"
         aria-label="Close history"

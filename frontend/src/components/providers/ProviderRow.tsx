@@ -3,6 +3,7 @@
  * with inline status controls on each task.
  */
 import React, { useState } from 'react';
+import { Button } from '../antigravity/Button';
 import { patchProviderTask } from '../../api/providers';
 import type { ProviderItem, ProviderTaskItem } from '../../api/providers';
 
@@ -58,14 +59,14 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onUpdated }) => {
       {/* status advance buttons */}
       <div className="flex gap-1 shrink-0 flex-wrap">
         {NEXT_STATUSES[task.status]?.map((ns) => (
-          <button
+          <Button unstyled
             key={ns}
             disabled={saving}
             onClick={() => advance(ns)}
             className="text-xs px-2.5 py-1 rounded border border-[#d1d5db] text-[#374151] bg-white hover:bg-[#f9fafb] disabled:opacity-50 transition-colors"
           >
             {saving ? '…' : STATUS_LABELS[ns]?.label}
-          </button>
+          </Button>
         ))}
       </div>
     </li>
@@ -92,7 +93,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
   return (
     <div className="rounded-lg border border-[#e2e8f0] bg-white overflow-hidden">
       {/* Provider header */}
-      <button
+      <Button unstyled
         className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[#f8fafc] transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
@@ -123,21 +124,21 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          <Button unstyled
             onClick={(e) => { e.stopPropagation(); onAssignTask(provider); }}
             className="text-xs font-medium px-2.5 py-1 rounded border border-[#d1d5db] text-[#374151] bg-white hover:bg-[#f9fafb] transition-colors"
           >
             + Task
-          </button>
-          <button
+          </Button>
+          <Button unstyled
             onClick={(e) => { e.stopPropagation(); onInvite(provider); }}
             className="text-xs font-medium px-2.5 py-1 rounded border border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe] transition-colors"
           >
             Invite
-          </button>
+          </Button>
           <span className="text-[#94a3b8] text-sm select-none">{expanded ? '▲' : '▼'}</span>
         </div>
-      </button>
+      </Button>
 
       {/* Task list */}
       {expanded && (

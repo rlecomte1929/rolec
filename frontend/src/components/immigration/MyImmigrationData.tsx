@@ -332,14 +332,14 @@ export const MyImmigrationData: React.FC = () => {
                           <span className="break-words">
                             {displayValue}
                             {isPassport && (
-                              <button
+                              <Button unstyled
                                 type="button"
                                 onClick={() => setShowFullPassport((s) => !s)}
                                 className="ml-2 text-xs font-medium text-[#0b2b43] underline hover:text-[#1f8e8b]"
                                 aria-label={showFullPassport ? 'Hide full passport number' : 'Show full passport number'}
                               >
                                 {showFullPassport ? 'Hide' : 'Show full'}
-                              </button>
+                              </Button>
                             )}
                           </span>
                           {source && (

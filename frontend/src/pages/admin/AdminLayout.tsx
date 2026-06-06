@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Input } from '../../components/antigravity/Input';
+import { Button } from '../../components/antigravity/Button';
 import { useMatch, useNavigate } from 'react-router-dom';
 import { getAuthItem } from '../../utils/demo';
 import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
@@ -61,23 +63,23 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button aria-label="Download" className="text-slate-400 hover:text-slate-600 transition-colors">
+            <Button unstyled aria-label="Download" className="text-slate-400 hover:text-slate-600 transition-colors">
               <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-            </button>
-            <button aria-label="Notifications" className="text-slate-400 hover:text-slate-600 transition-colors">
+            </Button>
+            <Button unstyled aria-label="Notifications" className="text-slate-400 hover:text-slate-600 transition-colors">
               <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-            </button>
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0b2b43] text-white text-xs font-medium hover:bg-[#0d3456] transition-colors">
+            </Button>
+            <Button unstyled className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0b2b43] text-white text-xs font-medium hover:bg-[#0d3456] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Ask ReloPass AI
               <span className="bg-white/20 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">3</span>
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -180,7 +182,7 @@ const CompanySwitcher: React.FC = () => {
 
   return (
     <div ref={wrapperRef} className="relative">
-      <button
+      <Button unstyled
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -195,16 +197,16 @@ const CompanySwitcher: React.FC = () => {
         <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-[60vh] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
           <div className="sticky top-0 z-10 border-b border-slate-100 bg-white p-2">
-            <input
+            <Input unstyled
               type="search"
               placeholder="Filter tenants…"
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={(v) => setFilter(v)}
               autoFocus
               className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
@@ -215,7 +217,7 @@ const CompanySwitcher: React.FC = () => {
             filtered.map((c) => {
               const isSelected = c.id === selectedCompany?.id;
               return (
-                <button
+                <Button unstyled
                   key={c.id}
                   type="button"
                   onClick={() => handlePick(c)}
@@ -231,7 +233,7 @@ const CompanySwitcher: React.FC = () => {
                   {isSelected && (
                     <span className="text-accent-600 text-[11px]" aria-label="selected">✓</span>
                   )}
-                </button>
+                </Button>
               );
             })
           )}
