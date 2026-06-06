@@ -24,6 +24,7 @@ import { Button } from '../components/antigravity/Button';
 | `onClick` | `(e: React.MouseEvent<HTMLButtonElement>) => void` | — | receives the event (e.g. `e.stopPropagation()`) |
 | `title` | `string` | — | native tooltip |
 | `aria-label` | `string` | — | accessible name for icon-only buttons |
+| `style` | `React.CSSProperties` | — | inline styles for dynamic values (e.g. a data-driven colour) |
 | `unstyled` | `boolean` | `false` | see below |
 
 ### `unstyled`

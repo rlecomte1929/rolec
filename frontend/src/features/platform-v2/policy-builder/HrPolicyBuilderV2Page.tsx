@@ -6,6 +6,7 @@ import {
   Pencil, Activity, Minus, AlertTriangle,
 } from 'lucide-react';
 import { AppShell } from '../../../components/AppShell';
+import { Button } from '../../../components/antigravity/Button';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -302,10 +303,10 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
         {/* mode tabs */}
         <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[12px] font-medium">
           {(['template','document'] as const).map(m => (
-            <button key={m} onClick={() => setMode(m)}
+            <Button unstyled key={m} onClick={() => setMode(m)}
               className={`px-3 py-1.5 transition-colors ${mode === m ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
               {m === 'template' ? 'Build from template' : 'Import from document'}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -322,17 +323,17 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => setCtxOpen(o => !o)}
+          <Button unstyled onClick={() => setCtxOpen(o => !o)}
             className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border transition-colors font-medium ${ctxOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
             <Activity size={12}/> {ctxOpen ? 'Context on' : 'Context'}
-          </button>
-          <button className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700"><Clock size={14}/></button>
-          <button className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Save draft</button>
-          <button className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"><Eye size={12}/> Preview</button>
-          <button disabled={tiers.length === 0}
+          </Button>
+          <Button unstyled className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700"><Clock size={14}/></Button>
+          <Button unstyled className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Save draft</Button>
+          <Button unstyled className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"><Eye size={12}/> Preview</Button>
+          <Button unstyled disabled={tiers.length === 0}
             className="text-[12px] px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-40 flex items-center gap-1.5">
             <Check size={12}/> Publish
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -342,14 +343,14 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <h2 className="text-xl font-semibold text-gray-900">No tiers yet</h2>
           <p className="text-sm text-gray-500 max-w-sm">Start from a template to get set up in minutes, or build a custom tier structure from scratch.</p>
           <div className="flex gap-3 mt-2">
-            <button onClick={() => setTemplateOpen(true)}
+            <Button unstyled onClick={() => setTemplateOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
               <Sparkles size={14}/> Start from a template
-            </button>
-            <button onClick={addTier}
+            </Button>
+            <Button unstyled onClick={addTier}
               className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
               <Plus size={14}/> Add a tier
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -365,14 +366,14 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <h2 className="text-xl font-semibold text-gray-900">Upload your existing policy document</h2>
           <p className="text-sm text-gray-500 max-w-sm">PDF or Word. Our AI extracts benefits, caps, and conditions, then you review and apply to the canvas.</p>
           <div className="flex gap-3 mt-2">
-            <button onClick={() => setImportOpen(true)}
+            <Button unstyled onClick={() => setImportOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
               <Upload size={14}/> Choose file
-            </button>
-            <button onClick={() => setMode('template')}
+            </Button>
+            <Button unstyled onClick={() => setMode('template')}
               className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
               Use a template instead
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -466,7 +467,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
         <div className="px-6 py-2 text-[12px] text-gray-500 border-t border-gray-200 bg-gray-50 flex items-center gap-2">
           <strong className="text-gray-700">Tiers are evaluated left to right.</strong>
           The first matching tier wins.
-          <button className="ml-auto text-blue-600 hover:underline text-[12px]">Reorder tiers →</button>
+          <Button unstyled className="ml-auto text-blue-600 hover:underline text-[12px]">Reorder tiers →</Button>
         </div>
       )}
 
@@ -504,13 +505,13 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
             <div className="flex items-center gap-3 p-5 border-b border-gray-200">
               <Sparkles size={18} className="text-blue-600"/>
               <h2 className="text-base font-semibold text-gray-900 flex-1">Choose a template</h2>
-              <button onClick={() => setTemplateOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={16}/></button>
+              <Button unstyled onClick={() => setTemplateOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
             </div>
             <div className="p-5">
               <p className="text-[13px] text-gray-500 mb-4">Pick a starting point. You can fully customise every tier and benefit after applying.</p>
               <div className="grid grid-cols-2 gap-3">
                 {TEMPLATES.map(tpl => (
-                  <button key={tpl.id} onClick={() => applyTemplate(tpl)}
+                  <Button unstyled key={tpl.id} onClick={() => applyTemplate(tpl)}
                     className="text-left p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                     <div className="text-2xl mb-2">{tpl.ico}</div>
                     <div className="text-[13px] font-semibold text-gray-900 mb-1">{tpl.t}</div>
@@ -520,7 +521,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
                         <span key={t} className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{t}</span>
                       ))}
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -574,27 +575,27 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tier.color }}/>
           <input value={tier.name} onChange={e => onRename(e.target.value)}
             className="flex-1 min-w-0 text-[13px] font-semibold text-gray-900 bg-transparent border-none outline-none"/>
-          <button className="text-gray-400 hover:text-gray-600 text-lg leading-none">⋯</button>
+          <Button unstyled className="text-gray-400 hover:text-gray-600 text-lg leading-none">⋯</Button>
         </div>
         <div className="flex items-center gap-1 text-[11px] text-gray-400 mb-2">
           <Users size={11}/>
           {tier.emp ? `${tier.emp} employee${tier.emp > 1 ? 's' : ''}` : '0 employees'}
         </div>
-        <button onClick={onOpenRules}
+        <Button unstyled onClick={onOpenRules}
           className="w-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-blue-600 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mb-2 transition-colors">
           <Filter size={11} className="flex-shrink-0"/>
           <span className="flex-1 text-left truncate">{targetingSummary(tier.targeting)}</span>
           <ChevronRight size={10}/>
-        </button>
+        </Button>
         <div className="flex rounded-lg overflow-hidden border border-gray-200 text-[11px] font-semibold">
-          <button onClick={() => onModeChange('lump')}
+          <Button unstyled onClick={() => onModeChange('lump')}
             className={`flex-1 py-1 transition-colors ${tier.mode === 'lump' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Lump sum
-          </button>
-          <button onClick={() => onModeChange('caps')}
+          </Button>
+          <Button unstyled onClick={() => onModeChange('caps')}
             className={`flex-1 py-1 transition-colors ${tier.mode === 'caps' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Caps
-          </button>
+          </Button>
         </div>
         {isLump && (
           <div className="flex items-center gap-2 mt-2 text-[11.5px]">
@@ -659,22 +660,22 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
     const style = inc === 'included' ? 'bg-blue-50 text-blue-700 border-blue-200' : inc === 'optional' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-400 border-gray-200';
     return (
       <div className="h-9 flex items-center justify-center border-b border-gray-100 px-2">
-        <button onClick={() => onChange({ lump_inc: next })}
+        <Button unstyled onClick={() => onChange({ lump_inc: next })}
           className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border cursor-pointer ${style}`}>
           {inc === 'included' && <><Check size={9}/> Included</>}
           {inc === 'optional' && <>• Optional</>}
           {inc === 'excluded' && <><Minus size={9}/> Excluded</>}
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className={`h-9 flex items-center gap-1 border-b border-gray-100 px-1.5 group ${!v.covered ? 'bg-gray-50/50' : ''}`}>
-      <button onClick={() => onChange({ covered: !v.covered })}
+      <Button unstyled onClick={() => onChange({ covered: !v.covered })}
         className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-[11px] font-bold border transition-colors ${v.covered ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-300 hover:border-gray-400'}`}>
         {v.covered ? '✓' : '—'}
-      </button>
+      </Button>
       {v.covered && (
         <>
           <select value={v.value_type} onChange={e => onChange({ value_type: e.target.value as BenefitValueType })}
@@ -714,9 +715,9 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
           {v.conditions && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0 rounded" title="Conditional">IF</span>}
         </>
       )}
-      <button className="ml-auto opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 flex-shrink-0">
+      <Button unstyled className="ml-auto opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 flex-shrink-0">
         <Pencil size={10}/>
-      </button>
+      </Button>
     </div>
   );
 }
@@ -771,7 +772,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
               An employee matching <strong>all three</strong> criteria is assigned to this tier.
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></button>
+          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
@@ -807,11 +808,11 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
         </div>
 
         <div className="flex items-center gap-3 p-4 border-t border-gray-200">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button onClick={() => { onChange(local); onClose(); }}
+          <Button unstyled onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</Button>
+          <Button unstyled onClick={() => { onChange(local); onClose(); }}
             className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
             Save rules
-          </button>
+          </Button>
         </div>
       </aside>
     </>
@@ -899,7 +900,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
           <Upload size={18} className="text-blue-600"/>
           <h2 className="text-base font-semibold text-gray-900 flex-1">Import policy from document</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></button>
+          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
         </div>
 
         {/* Stepper */}
@@ -937,7 +938,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                   <Upload size={28} className="text-gray-300"/>
                   <div className="text-sm font-semibold text-gray-700">Drop your policy document here</div>
                   <div className="text-[12px] text-gray-400">PDF or Word (.docx) · max 50 MB</div>
-                  <button className="text-[12px] text-blue-600 font-medium hover:underline">Browse files</button>
+                  <Button unstyled className="text-[12px] text-blue-600 font-medium hover:underline">Browse files</Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl">
@@ -946,7 +947,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                     <div className="text-[13px] font-semibold text-gray-900">{file.nm}</div>
                     <div className="text-[11.5px] text-gray-400">{file.sz} · ready to extract</div>
                   </div>
-                  <button onClick={() => setFile(null)} className="text-gray-400 hover:text-gray-600"><X size={16}/></button>
+                  <Button unstyled onClick={() => setFile(null)} className="text-gray-400 hover:text-gray-600"><X size={16}/></Button>
                 </div>
               )}
               <div className="mt-4 p-4 bg-blue-50 rounded-xl text-[12.5px] text-blue-700">
@@ -967,9 +968,9 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                   {stage.lbl}
                 </div>
               </div>
-              <button onClick={() => setShowLog(s => !s)} className="text-[12px] text-gray-500 hover:text-gray-700">
+              <Button unstyled onClick={() => setShowLog(s => !s)} className="text-[12px] text-gray-500 hover:text-gray-700">
                 {showLog ? '▼ Hide details' : '▶ Show extraction details'}
-              </button>
+              </Button>
               {showLog && (
                 <div className="w-full max-w-lg font-mono text-[11px] text-green-400 bg-gray-900 rounded-xl p-4 space-y-1">
                   {visibleLog.map((l, i) => <div key={i}>{l}</div>)}
@@ -1013,8 +1014,8 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                   <span className="text-gray-600 flex-1">
                     <strong>{rules.length}</strong> rules · <strong className="text-green-600">{accepted.length}</strong> accepted · <strong className="text-red-500">{rejected.length}</strong> rejected · {pending} pending
                   </span>
-                  <button onClick={acceptHighConf} className="text-[11px] px-2 py-1 border border-gray-200 rounded bg-white text-gray-600 hover:bg-gray-50">High-conf</button>
-                  <button onClick={acceptAll} className="text-[11px] px-2 py-1 border border-gray-200 rounded bg-white text-gray-600 hover:bg-gray-50">All</button>
+                  <Button unstyled onClick={acceptHighConf} className="text-[11px] px-2 py-1 border border-gray-200 rounded bg-white text-gray-600 hover:bg-gray-50">High-conf</Button>
+                  <Button unstyled onClick={acceptAll} className="text-[11px] px-2 py-1 border border-gray-200 rounded bg-white text-gray-600 hover:bg-gray-50">All</Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {rules.map(r => {
@@ -1032,15 +1033,15 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                         <div className="text-[11.5px] text-gray-600 font-mono">{r.val}</div>
                         <div className="text-[11px] text-gray-400 mb-2">{r.cond}</div>
                         <div className="flex gap-1">
-                          <button onClick={() => setDecision(r.id, r.decision === 'accepted' ? 'pending' : 'accepted')}
+                          <Button unstyled onClick={() => setDecision(r.id, r.decision === 'accepted' ? 'pending' : 'accepted')}
                             className={`flex-1 py-1 rounded text-[11px] font-semibold border transition-colors ${r.decision === 'accepted' ? 'bg-green-600 text-white border-green-600' : 'border-gray-200 text-gray-600 hover:bg-green-50'}`}>
                             ✓ Accept
-                          </button>
-                          <button onClick={() => setDecision(r.id, r.decision === 'rejected' ? 'pending' : 'rejected')}
+                          </Button>
+                          <Button unstyled onClick={() => setDecision(r.id, r.decision === 'rejected' ? 'pending' : 'rejected')}
                             className={`flex-1 py-1 rounded text-[11px] font-semibold border transition-colors ${r.decision === 'rejected' ? 'bg-red-500 text-white border-red-500' : 'border-gray-200 text-gray-600 hover:bg-red-50'}`}>
                             ✗ Reject
-                          </button>
-                          <button className="px-2 py-1 rounded text-[11px] border border-gray-200 text-gray-600 hover:bg-gray-50">✎</button>
+                          </Button>
+                          <Button unstyled className="px-2 py-1 rounded text-[11px] border border-gray-200 text-gray-600 hover:bg-gray-50">✎</Button>
                         </div>
                       </div>
                     );
@@ -1068,11 +1069,11 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                       <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Assign to tier(s)</div>
                       <div className="flex flex-wrap gap-2">
                         {tiers.map((t, idx) => (
-                          <button key={t.id} onClick={() => toggleTier(r.id, idx)}
+                          <Button unstyled key={t.id} onClick={() => toggleTier(r.id, idx)}
                             className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${r.assign_to.includes(idx) ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}
                             style={r.assign_to.includes(idx) ? { background: t.color, borderColor: t.color } : undefined}>
                             {t.name}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                       {r.assign_to.length === 0 && (
@@ -1095,34 +1096,34 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
         {/* Footer */}
         <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-200">
           {step > 1 && step < 4 && (
-            <button onClick={() => setStep(s => Math.max(1, s - 1))}
-              className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</button>
+            <Button unstyled onClick={() => setStep(s => Math.max(1, s - 1))}
+              className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</Button>
           )}
-          {step === 1 && <button onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Cancel</button>}
+          {step === 1 && <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Cancel</Button>}
           <div className="flex-1"/>
           {step === 1 && (
-            <button disabled={!file} onClick={() => setStep(2)}
+            <Button unstyled disabled={!file} onClick={() => setStep(2)}
               className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
               Start extraction →
-            </button>
+            </Button>
           )}
           {step === 2 && <span className="text-[13px] text-gray-400">Processing…</span>}
           {step === 3 && (
             <>
-              <button onClick={() => { acceptAll(); setStep(4); }}
-                className="text-[13px] text-gray-500 hover:text-gray-700">Skip review — apply all</button>
-              <button disabled={accepted.length === 0} onClick={() => setStep(4)}
+              <Button unstyled onClick={() => { acceptAll(); setStep(4); }}
+                className="text-[13px] text-gray-500 hover:text-gray-700">Skip review — apply all</Button>
+              <Button unstyled disabled={accepted.length === 0} onClick={() => setStep(4)}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
                 Continue to mapping →
-              </button>
+              </Button>
             </>
           )}
           {step === 4 && (
-            <button disabled={accepted.filter(r => r.assign_to.length > 0).length === 0}
+            <Button unstyled disabled={accepted.filter(r => r.assign_to.length > 0).length === 0}
               onClick={() => onApply(accepted.filter(r => r.assign_to.length > 0))}
               className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
               Apply to canvas →
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -1241,7 +1242,7 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-start justify-between mb-1">
           <div className="text-[13px] font-semibold text-gray-900">Market context</div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={14}/></button>
+          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={14}/></Button>
         </div>
         <div className="text-[11.5px] text-gray-400 mb-3">{lbl}{focusedTier ? ` · ${focusedTier.name}` : ''}</div>
         <select value={country} onChange={e => setCountry(e.target.value)}
@@ -1252,10 +1253,10 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
 
       <div className="flex border-b border-gray-200">
         {(['bench','providers','historical'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <Button unstyled key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2 text-[11.5px] font-medium transition-colors ${tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
             {t === 'bench' ? 'Benchmarks' : t === 'providers' ? `Providers (${providers.length})` : 'History'}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -1373,10 +1374,10 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
 
       {focusedBenefit && data && yourCap != null && (
         <div className="p-4 border-t border-gray-200">
-          <button onClick={() => onApplyMedian(data.avg)}
+          <Button unstyled onClick={() => onApplyMedian(data.avg)}
             className="w-full py-2 text-[12.5px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors">
             Apply median ({cur}{data.avg.toLocaleString()}) to this tier
-          </button>
+          </Button>
           <div className="mt-2 text-[10.5px] text-gray-400 text-center">Benchmarks are indicative, sourced from the ReloPass network. Not legal or tax advice.</div>
         </div>
       )}
