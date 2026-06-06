@@ -76,6 +76,24 @@ class TestImmigrationRetrieveEndpoint(unittest.TestCase):
         self.assertEqual(len(body["chunks"]), 1)
         self.assertEqual(body["chunks"][0]["id"], "c1")
 
+    def test_answer_route_registered(self):
+        # N4/AIQ-843 — /answer on the same (dual-registered) immigration router.
+        self.assertIn("/api/immigration/answer", {getattr(r, "path", None) for r in app.routes})
+
+    def test_answer_empty_corpus_refuses_200_no_llm(self):
+        empty = {"chunks": [], "all_stale_warning": False, "oldest_fetched_at": None}
+        with patch("backend.app.services.immigration_retriever.retrieve_with_staleness", return_value=empty), \
+             patch("backend.app.services.ai_trace_logger._write_to_db"):
+            resp = self.client.post("/api/immigration/answer", json={
+                "corridor_from": "ZZ", "corridor_to": "XX", "nationality": "X",
+                "permit_type": "work", "is_eea": False, "query": "anything",
+            })
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["answer_kind"], "refusal_insufficient_context")
+        self.assertEqual(body["corridor"], "ZZ→XX")
+        self.assertTrue(body["trace_id"])
+
     def test_requires_authentication(self):
         app.dependency_overrides.pop(get_current_user, None)
         try:
