@@ -42,6 +42,18 @@ end$$;
 grant usage on schema public to relopass_api;
 grant select, insert, update, delete on public.policy_assistant_chunks to relopass_api;
 
+-- Explicit CONNECT. relopass_api also inherits CONNECT via PUBLIC today, but be
+-- explicit so it keeps working if PUBLIC's CONNECT is ever revoked.
+grant connect on database postgres to relopass_api;
+
+-- The retriever references `policy_assistant_chunks` and the pgvector `vector`
+-- type UNQUALIFIED, so pin the role's search_path to resolve the public schema
+-- (where pgvector lives) regardless of any pooler/role search_path default.
+alter role relopass_api set search_path = public, extensions;
+
+-- No sequence grants: policy_assistant_chunks.id defaults to gen_random_uuid()
+-- (no SERIAL/sequence columns), so relopass_api needs no sequence privileges.
+
 -- 3) Request-scoped second-barrier SELECT policy for relopass_api. Reads the
 --    company id from a transaction-local GUC. nullif(...,'') + missing_ok=true
 --    means: GUC unset/blank -> NULL -> `company_id = NULL` -> zero rows
