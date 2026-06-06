@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
+import { Button } from '../../../components/antigravity/Button';
 import { patchCase } from '../../../api/cases';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
@@ -227,24 +228,24 @@ function FieldWrap({
         {required && <span className="text-red-500" title="Required">*</span>}
         {optional && <span className="text-gray-400 font-normal">(optional)</span>}
         {prefill && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-medium">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent-100 text-accent-700 text-[10px] font-medium">
             🔒 HR pre-filled
             {onUnlock && (
-              <button type="button" onClick={onUnlock} className="underline text-violet-500 hover:text-violet-700 ml-0.5">
+              <Button unstyled type="button" onClick={onUnlock} className="underline text-accent-500 hover:text-accent-700 ml-0.5">
                 Edit
-              </button>
+              </Button>
             )}
           </span>
         )}
         {why && (
-          <button type="button" onClick={() => setWhyOpen((o) => !o)} className="text-violet-500 text-[10px] font-medium hover:text-violet-700">
+          <Button unstyled type="button" onClick={() => setWhyOpen((o) => !o)} className="text-accent-500 text-[10px] font-medium hover:text-accent-700">
             Why?
-          </button>
+          </Button>
         )}
       </label>
       {children}
       {whyOpen && why && (
-        <div className="text-xs text-gray-500 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">{why}</div>
+        <div className="text-xs text-gray-500 bg-accent-50 border border-accent-100 rounded-lg px-3 py-2">{why}</div>
       )}
       {hint && <div className="text-xs text-gray-400">{hint}</div>}
     </div>
@@ -252,12 +253,12 @@ function FieldWrap({
 }
 
 const inputCls = (locked?: boolean) =>
-  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 ${
+  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
     locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
 const selectCls = (locked?: boolean) =>
-  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 ${
+  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
     locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
@@ -305,7 +306,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
             ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
             : filtered.map((c) => (
               <div key={c.code} onClick={() => { onChange(c.code); setOpen(false); setQuery(''); }}
-                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-violet-50 text-violet-700' : ''}`}>
+                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-accent-50 text-accent-700' : ''}`}>
                 <span className="text-base">{c.flag}</span>
                 <span className="flex-1">{c.name}</span>
                 <span className="text-xs text-gray-400">{c.code}</span>
@@ -368,7 +369,7 @@ function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
   const inCount = NEIGHBORHOODS.filter((n) => n.t_min <= maxMins).length;
   return (
     <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-950">
-      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-medium">
+      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-600 text-white text-[10px] font-medium">
         <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" /> live
       </span>
       <svg viewBox="0 0 100 100" className="w-full h-48" preserveAspectRatio="xMidYMid meet" aria-hidden>
@@ -378,23 +379,23 @@ function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
             <line x1={0} y1={v} x2={100} y2={v} stroke="#1f2937" strokeWidth="0.3" />
           </g>
         ))}
-        <circle cx={cx} cy={cy} r={radius} fill="rgba(124,58,237,0.12)" stroke="rgba(124,58,237,0.4)" strokeWidth="0.6" />
+        <circle cx={cx} cy={cy} r={radius} fill="rgba(31, 142, 139,0.12)" stroke="rgba(31, 142, 139,0.4)" strokeWidth="0.6" />
         {NEIGHBORHOODS.map((n) => {
           const inside = n.t_min <= maxMins;
           return (
             <g key={n.id}>
-              <circle cx={n.x} cy={n.y} r="3.5" fill={inside ? '#7c3aed' : '#374151'} />
+              <circle cx={n.x} cy={n.y} r="3.5" fill={inside ? '#1f8e8b' : '#374151'} />
               <text x={n.x} y={n.y + 7} textAnchor="middle" fontSize="3.5"
-                fill={inside ? '#a78bfa' : '#6b7280'}>{n.name}</text>
+                fill={inside ? '#6ec0bd' : '#6b7280'}>{n.name}</text>
             </g>
           );
         })}
-        <circle cx={cx} cy={cy} r="8" fill="rgba(124,58,237,0.2)" stroke="#7c3aed" strokeWidth="1" />
-        <circle cx={cx} cy={cy} r="2.5" fill="#7c3aed" />
-        <text x={cx} y={cy - 5} textAnchor="middle" fontSize="3" fill="#a78bfa">Office</text>
+        <circle cx={cx} cy={cy} r="8" fill="rgba(31, 142, 139,0.2)" stroke="#1f8e8b" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r="2.5" fill="#1f8e8b" />
+        <text x={cx} y={cy - 5} textAnchor="middle" fontSize="3" fill="#6ec0bd">Office</text>
       </svg>
       <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-gray-400">
-        <strong className="text-violet-400">{inCount} neighborhoods</strong> within {maxMins}min
+        <strong className="text-accent-400">{inCount} neighborhoods</strong> within {maxMins}min
         {mode.length > 0 ? ` by ${mode.slice(0, 2).map((m) => m === 'public_transit' ? 'transit' : m).join('/')}` : ''}
       </div>
     </div>
@@ -413,7 +414,7 @@ function CardShell({ ico, title, sub, status, expanded, onToggle, onRemove, urge
   const statusLbl = { complete: '✓ Complete', partial: 'In progress', empty: 'Not started' };
   return (
     <div className={`border rounded-xl overflow-hidden ${urgent ? 'border-amber-200' : 'border-gray-100'} bg-white`}>
-      <button type="button" onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+      <Button unstyled type="button" onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
         <span className="text-xl flex-shrink-0">{ico}</span>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
@@ -422,10 +423,10 @@ function CardShell({ ico, title, sub, status, expanded, onToggle, onRemove, urge
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusCls[status]}`}>{statusLbl[status]}</span>
         <span className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
         {onRemove && (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="ml-1 text-gray-300 hover:text-red-400 transition-colors text-sm font-bold">✕</button>
+          <Button unstyled type="button" onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="ml-1 text-gray-300 hover:text-red-400 transition-colors text-sm font-bold">✕</Button>
         )}
-      </button>
+      </Button>
       {expanded && <div className="px-4 pb-4 border-t border-gray-100">{children}</div>}
     </div>
   );
@@ -490,7 +491,7 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
           <input type="date" className={inputCls()} value={m.dob ?? ''}
             onChange={(e) => onChange({ ...m, dob: e.target.value })} />
           {age != null && (
-            <div className="text-[10px] text-violet-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
+            <div className="text-[10px] text-accent-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
           )}
         </FieldWrap>
         <FieldWrap label="School type preference" className="sm:col-span-2">
@@ -583,16 +584,16 @@ function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
                 <input type="date" className={`${inputCls()} flex-1`} value={vax.vax_expiry}
                   title="Expiry date"
                   onChange={(e) => updateVax(i, 'vax_expiry', e.target.value)} />
-                <button type="button" onClick={() => removeVax(i)}
-                  className="text-gray-300 hover:text-red-400 text-sm font-bold flex-shrink-0">✕</button>
+                <Button unstyled type="button" onClick={() => removeVax(i)}
+                  className="text-gray-300 hover:text-red-400 text-sm font-bold flex-shrink-0">✕</Button>
               </div>
             ))}
           </div>
         )}
-        <button type="button" onClick={addVax}
-          className="text-xs text-violet-600 hover:text-violet-800 font-semibold">
+        <Button unstyled type="button" onClick={addVax}
+          className="text-xs text-accent-600 hover:text-accent-800 font-semibold">
           + Add vaccination
-        </button>
+        </Button>
       </div>
 
       {/* Vet information */}
@@ -675,21 +676,21 @@ function QuoteRequestPanel({ caseId, services }: { caseId: string; services: str
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-600">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-          <textarea rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+          <textarea rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300 resize-none"
             placeholder="Any specific requirements or context for the vendor…"
             value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-600">Budget range <span className="text-gray-400 font-normal">(optional)</span></label>
-          <input type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+          <input type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
             placeholder="e.g. 5 000–10 000 €"
             value={budgetRange} onChange={(e) => setBudgetRange(e.target.value)} />
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
-        <button type="button" onClick={handleSend} disabled={sending}
-          className="self-start px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+        <Button unstyled type="button" onClick={handleSend} disabled={sending}
+          className="self-start px-4 py-2 text-xs font-semibold rounded-lg bg-navy-800 text-white hover:bg-navy-900 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
           {sending ? 'Sending…' : 'Send quote request'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -751,7 +752,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
     role === 'hr' ? 'HR' : role === 'admin' ? 'Admin' : 'You';
 
   const roleColor = (role: string) =>
-    role === 'employee' ? 'bg-violet-100 text-violet-800' : 'bg-blue-100 text-blue-800';
+    role === 'employee' ? 'bg-accent-100 text-accent-800' : 'bg-blue-100 text-blue-800';
 
   return (
     <div className="mt-4 border border-gray-100 rounded-xl bg-white overflow-hidden">
@@ -771,7 +772,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
             </span>
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
               msg.sender_role === 'employee'
-                ? 'bg-violet-600 text-white rounded-br-none'
+                ? 'bg-accent-600 text-white rounded-br-none'
                 : 'bg-gray-100 text-gray-800 rounded-bl-none'
             }`}>
               {msg.content}
@@ -786,17 +787,17 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
       <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
         <input
           type="text"
-          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
           placeholder="Write a message…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           disabled={sending}
         />
-        <button type="button" onClick={handleSend} disabled={!input.trim() || sending}
-          className="px-3 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+        <Button unstyled type="button" onClick={handleSend} disabled={!input.trim() || sending}
+          className="px-3 py-2 text-xs font-semibold rounded-lg bg-navy-800 text-white hover:bg-navy-900 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
           {sending ? '…' : 'Send'}
-        </button>
+        </Button>
       </div>
       {error && <p className="px-4 pb-3 text-xs text-red-500">{error}</p>}
     </div>
@@ -830,13 +831,13 @@ function BudgetSummaryPanel({ caseId, services }: { caseId: string; services: st
     : services.map((s) => ({ name: s, cap_amount: null, cap_currency: 'EUR', status: 'no_cap' }));
 
   return (
-    <div className="mt-4 border border-violet-100 rounded-xl p-4 bg-violet-50">
+    <div className="mt-4 border border-accent-100 rounded-xl p-4 bg-accent-50">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-bold text-violet-700 uppercase tracking-wide">Budget caps</span>
-        <span className="text-xs text-violet-400">(from your HR policy)</span>
+        <span className="text-xs font-bold text-accent-700 uppercase tracking-wide">Budget caps</span>
+        <span className="text-xs text-accent-400">(from your HR policy)</span>
       </div>
       {loading ? (
-        <p className="text-xs text-violet-400">Loading budget information…</p>
+        <p className="text-xs text-accent-400">Loading budget information…</p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {displayCats.map((cat) => (
@@ -850,7 +851,7 @@ function BudgetSummaryPanel({ caseId, services }: { caseId: string; services: st
             </div>
           ))}
           {displayCats.length === 0 && (
-            <p className="text-xs text-violet-400">No services selected.</p>
+            <p className="text-xs text-accent-400">No services selected.</p>
           )}
         </div>
       )}
@@ -870,7 +871,7 @@ function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => 
     <div className="border border-gray-100 rounded-xl p-4 bg-white">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{label}</span>
-        <button type="button" onClick={() => goTo(step)} className="text-xs text-violet-600 font-medium hover:text-violet-800">Edit →</button>
+        <Button unstyled type="button" onClick={() => goTo(step)} className="text-xs text-accent-600 font-medium hover:text-accent-800">Edit →</Button>
       </div>
       <div className="flex flex-col gap-1.5">
         {rows.map(([k, v]) => (
@@ -1138,7 +1139,7 @@ export function EmployeeIntakePage() {
       <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
+          <div className="text-xs font-semibold text-accent-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
           <h1 className="text-2xl font-bold text-gray-900">Detailed intake</h1>
           <p className="mt-1 text-sm text-gray-500">
             This is where most of your relocation information lives. Work through the steps below — your answers help us build your personalised case, match the right services, and flag what needs attention before your move.
@@ -1172,19 +1173,19 @@ export function EmployeeIntakePage() {
                 const isDone = !onHold && stepValid(n) && n < step;
                 const isActive = n === step;
                 return (
-                  <button key={lbl} type="button"
+                  <Button unstyled key={lbl} type="button"
                     onClick={() => n < step && goTo(n)}
                     disabled={n > step}
                     title={onHold ? 'On hold — coming soon' : undefined}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
                       onHold && !isActive ? 'text-gray-400 opacity-60' :
-                      isActive ? 'bg-violet-100 text-violet-700' :
+                      isActive ? 'bg-accent-100 text-accent-700' :
                       isDone ? 'text-green-600 cursor-pointer hover:bg-green-50' :
                       'text-gray-300'
                     }`}>
                     <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center flex-shrink-0 ${
                       onHold && !isActive ? 'bg-gray-100 text-gray-400' :
-                      isActive ? 'bg-violet-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+                      isActive ? 'bg-accent-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
                     }`}>{isDone ? '✓' : n}</span>
                     <span className="hidden sm:inline">{STEP_ICONS[i]} {lbl}</span>
                     {onHold && (
@@ -1192,7 +1193,7 @@ export function EmployeeIntakePage() {
                         On hold
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -1260,7 +1261,7 @@ export function EmployeeIntakePage() {
                       onChange={(e) => setField('passport_expiry', e.target.value)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
-                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-violet-300 hover:text-violet-500 transition-colors">
+                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-accent-300 hover:text-accent-500 transition-colors">
                       ↑ Drop your passport or click to browse
                     </div>
                   </FieldWrap>
@@ -1295,8 +1296,8 @@ export function EmployeeIntakePage() {
                 </div>
                 {/* Add buttons */}
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {!partner && <button type="button" onClick={() => addMember('partner')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add partner</button>}
-                  <button type="button" onClick={() => addMember('child')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add a child</button>
+                  {!partner && <Button unstyled type="button" onClick={() => addMember('partner')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add partner</Button>}
+                  <Button unstyled type="button" onClick={() => addMember('child')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add a child</Button>
                 </div>
                 {data.members.length === 1 && (
                   <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
@@ -1339,11 +1340,11 @@ export function EmployeeIntakePage() {
                   ))}
                 </div>
 
-                <button type="button"
+                <Button unstyled type="button"
                   onClick={() => addMember('pet', { pet_type: '' })}
-                  className="mt-3 w-full py-3 text-sm font-semibold text-violet-600 border-2 border-dashed border-violet-200 rounded-xl hover:bg-violet-50 transition-colors">
+                  className="mt-3 w-full py-3 text-sm font-semibold text-accent-600 border-2 border-dashed border-accent-200 rounded-xl hover:bg-accent-50 transition-colors">
                   🐾 Add a pet
-                </button>
+                </Button>
 
                 <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
                   ℹ <span><strong>No pets travelling with you?</strong> Skip this step — click Continue.</span>
@@ -1401,8 +1402,8 @@ export function EmployeeIntakePage() {
                         <div className="flex items-center gap-3">
                           <input type="range" min={15} max={75} step={5} value={data.commute_mins}
                             onChange={(e) => setField('commute_mins', Number(e.target.value))}
-                            className="flex-1 accent-violet-600" />
-                          <span className="text-sm font-bold text-violet-700 w-12 text-right">{data.commute_mins}min</span>
+                            className="flex-1 accent-accent-600" />
+                          <span className="text-sm font-bold text-accent-700 w-12 text-right">{data.commute_mins}min</span>
                         </div>
                         <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
                       </FieldWrap>
@@ -1437,20 +1438,20 @@ export function EmployeeIntakePage() {
                 <StepHd title="What do you need help with?" sub="We've pre-selected services most relevant to your household. Adjust freely." />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
                   {SERVICES.map((svc) => (
-                    <button key={svc.id} type="button" disabled={svc.soon}
+                    <Button unstyled key={svc.id} type="button" disabled={svc.soon}
                       onClick={() => !svc.soon && setField('services', data.services.includes(svc.id)
                         ? data.services.filter((s) => s !== svc.id)
                         : [...data.services, svc.id])}
                       className={`flex flex-col gap-1 p-3 rounded-xl border text-left transition-all ${
                         svc.soon ? 'opacity-40 cursor-not-allowed border-gray-100 bg-gray-50' :
-                        data.services.includes(svc.id) ? 'border-violet-300 bg-violet-50 ring-1 ring-violet-300' :
+                        data.services.includes(svc.id) ? 'border-accent-300 bg-accent-50 ring-1 ring-accent-300' :
                         'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
                       }`}>
                       <span className="text-lg">{svc.ico}</span>
                       <span className="text-xs font-semibold text-gray-900">{svc.t}{svc.soon && <span className="ml-1 text-[9px] text-gray-400">soon</span>}</span>
                       <span className="text-[10px] text-gray-400 leading-tight">{svc.s}</span>
-                      {data.services.includes(svc.id) && <span className="text-[9px] font-bold text-violet-600 mt-0.5">✓ Selected</span>}
-                    </button>
+                      {data.services.includes(svc.id) && <span className="text-[9px] font-bold text-accent-600 mt-0.5">✓ Selected</span>}
+                    </Button>
                   ))}
                 </div>
                 {data.services.length === 0 && (
@@ -1523,7 +1524,7 @@ export function EmployeeIntakePage() {
                 <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
                   <input type="checkbox" checked={data.consent} id="consent-cb"
                     onChange={(e) => setField('consent', e.target.checked)}
-                    className="mt-0.5 accent-violet-600" />
+                    className="mt-0.5 accent-accent-600" />
                   <label htmlFor="consent-cb" className="cursor-pointer">
                     <div className="text-sm font-semibold text-gray-900">I agree to ReloPass storing this information to generate my relocation roadmap.</div>
                     <div className="text-xs text-gray-400 mt-0.5">
@@ -1538,27 +1539,27 @@ export function EmployeeIntakePage() {
           {/* Footer nav */}
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
             {step > 1 ? (
-              <button type="button" onClick={() => goTo(step - 1)}
+              <Button unstyled type="button" onClick={() => goTo(step - 1)}
                 className="px-4 py-2 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 ← Back
-              </button>
+              </Button>
             ) : <div />}
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               🔒 Encrypted · only you and your HR team see this
             </div>
             {step < TOTAL_STEPS ? (
-              <button type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
+              <Button unstyled type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  stepValid(step) ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                  stepValid(step) ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                 }`}>
                 Continue →
-              </button>
+              </Button>
             ) : (
               <>
                 {submitError && (
                   <p className="text-xs text-red-500 mr-2">{submitError}</p>
                 )}
-                <button type="button" disabled={!data.consent || submitting}
+                <Button unstyled type="button" disabled={!data.consent || submitting}
                   onClick={async () => {
                     setSubmitting(true);
                     setSubmitError(null);
@@ -1581,10 +1582,10 @@ export function EmployeeIntakePage() {
                     }
                   }}
                   className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                    data.consent && !submitting ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    data.consent && !submitting ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                   }`}>
                   {submitting ? 'Submitting…' : '✦ Generate my roadmap'}
-                </button>
+                </Button>
               </>
             )}
           </div>

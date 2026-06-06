@@ -138,7 +138,7 @@ const SECTIONS: NavSection[] = [
 const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, variant = 'count' }) => {
   if (variant === 'new') {
     return (
-      <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-500 border border-indigo-100">
+      <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-50 text-accent-500 border border-accent-100">
         NEW
       </span>
     );
@@ -402,7 +402,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                     <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
                   )}
                   {collapsed && badgeVariant === 'new' && (
-                    <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                    <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent-500" />
                   )}
                   {collapsed && badgeVariant === 'live' && (
                     <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />

@@ -96,7 +96,7 @@ const TYPE_BADGE_COLORS: Record<ExcType, string> = {
 function AuditDot({ kind }: { kind: AuditKind }) {
   const cls: Record<AuditKind, string> = {
     submit:  'bg-slate-400',
-    ai:      'bg-violet-400',
+    ai:      'bg-accent-400',
     approve: 'bg-emerald-500',
     reject:  'bg-rose-500',
     note:    'bg-slate-400',

@@ -199,7 +199,7 @@ function RecCard({
               </span>
             )}
             {item.metadata?.company_preferred && (
-              <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-800 font-medium">
+              <span className="px-2 py-0.5 rounded text-xs bg-accent-100 text-accent-800 font-medium">
                 Preferred by your company
               </span>
             )}
@@ -279,8 +279,8 @@ function RecCard({
           the other recommendations visible while writing their reason. Submitting
           writes an ai_decisions row with decision='override' for EU AI Act Art. 14. */}
       {pendingConfirmActive && (
-        <div className="mt-3 pt-3 border-t border-violet-200 bg-violet-50/50 -mx-6 -mb-6 px-6 pb-4 rounded-b-xl">
-          <p className="text-xs font-semibold text-violet-800">
+        <div className="mt-3 pt-3 border-t border-accent-200 bg-accent-50/50 -mx-6 -mb-6 px-6 pb-4 rounded-b-xl">
+          <p className="text-xs font-semibold text-accent-800">
             Why this one
             {topMatchName ? <> over our top match <span className="font-normal italic">{topMatchName}</span></> : ' instead of the top match'}?
             <span className="text-rose-500 ml-1">*</span>
@@ -290,11 +290,11 @@ function RecCard({
             onChange={(e) => setOverrideReason(e.target.value)}
             rows={2}
             placeholder="Explain why this option fits this case better."
-            className="mt-2 w-full rounded-md border border-violet-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-200 resize-none bg-white"
+            className="mt-2 w-full rounded-md border border-accent-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-200 resize-none bg-white"
             autoFocus
           />
           <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="text-[11px] text-violet-500">Logged for human oversight audit · EU AI Act Art. 14</p>
+            <p className="text-[11px] text-accent-500">Logged for human oversight audit · EU AI Act Art. 14</p>
             <div className="flex items-center gap-2">
               <button
                 type="button"

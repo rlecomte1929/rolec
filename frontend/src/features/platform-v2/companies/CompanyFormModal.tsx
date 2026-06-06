@@ -197,7 +197,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               onChange={(e) => setField('name', e.target.value)}
               placeholder="Company name"
               autoFocus
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 
@@ -206,7 +206,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               value={form.country}
               onChange={(e) => setField('country', e.target.value)}
               placeholder="e.g. Norway"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 
@@ -215,7 +215,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               value={form.size_band}
               onChange={(e) => setField('size_band', e.target.value)}
               placeholder="e.g. 50–200"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 
@@ -224,7 +224,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               <select
                 value={form.plan_tier}
                 onChange={(e) => setField('plan_tier', e.target.value as CompanyV2PlanTier)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -235,7 +235,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               <select
                 value={form.status}
                 onChange={(e) => setField('status', e.target.value as CompanyV2Status)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -252,7 +252,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
                 value={form.hr_seat_limit}
                 onChange={(e) => setField('hr_seat_limit', e.target.value)}
                 placeholder="—"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </Field>
             <Field label="Employee seat limit">
@@ -262,7 +262,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
                 value={form.employee_seat_limit}
                 onChange={(e) => setField('employee_seat_limit', e.target.value)}
                 placeholder="—"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </Field>
           </div>
@@ -272,7 +272,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               value={form.address}
               onChange={(e) => setField('address', e.target.value)}
               placeholder="Street, city, postcode"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 
@@ -282,7 +282,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
                 value={form.phone}
                 onChange={(e) => setField('phone', e.target.value)}
                 placeholder="+33 …"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </Field>
             <Field label="HR contact email">
@@ -290,7 +290,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
                 value={form.hr_contact}
                 onChange={(e) => setField('hr_contact', e.target.value)}
                 placeholder="hr@company.com"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </Field>
           </div>
@@ -300,7 +300,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               value={form.support_email}
               onChange={(e) => setField('support_email', e.target.value)}
               placeholder="support@company.com"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
 

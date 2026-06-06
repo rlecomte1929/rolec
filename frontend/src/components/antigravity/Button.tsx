@@ -2,7 +2,7 @@ import React from 'react';
 
 interface ButtonProps {
   children: React.ReactNode;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
@@ -13,6 +13,16 @@ interface ButtonProps {
   title?: string;
   /** Accessible name for icon-only buttons (passed through to the native element) */
   'aria-label'?: string;
+  /**
+   * Render the semantic <button> with NO design-system styling — only the
+   * passed `className`, plus type/onClick/disabled/title/aria-label. For
+   * bespoke or container-style buttons (selectable cards, accordion rows,
+   * brand-coloured inline actions) whose layout the styled variants would
+   * fight. Lets every clickable element route through this one primitive — a
+   * single a11y/behaviour chokepoint, no raw <button> — without imposing a
+   * visual opinion. Prefer a real `variant` whenever one fits.
+   */
+  unstyled?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -26,6 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   title,
   'aria-label': ariaLabel,
+  unstyled = false,
 }) => {
   const baseStyles = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
   
@@ -44,7 +55,13 @@ export const Button: React.FC<ButtonProps> = ({
   
   const widthClass = fullWidth ? 'w-full' : '';
   const disabledClass = disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
-  
+
+  // `unstyled` callers own their full appearance (incl. disabled/hover states)
+  // via className — the design system only lends the semantic element + a11y.
+  const composedClassName = unstyled
+    ? className
+    : `${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${disabledClass} ${className}`;
+
   return (
     <button
       type={type}
@@ -52,7 +69,7 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled}
       title={title}
       aria-label={ariaLabel}
-      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${disabledClass} ${className}`}
+      className={composedClassName}
     >
       {children}
     </button>

@@ -24,6 +24,20 @@ export default {
           border: 'var(--marketing-border)',
           'border-subtle': 'var(--marketing-border-subtle)',
         },
+        // ReloPass brand scales — source of truth: design/system/tokens.css.
+        // navy = primary (actions/structure); accent = teal (links/accents,
+        // used sparingly per the Branding Blueprint). These replace the
+        // off-brand violet/indigo/purple drift — there is no purple in the brand.
+        navy: {
+          50: '#f0f5fa', 100: '#d6e4f0', 200: '#adc9e1', 300: '#7fa5c8',
+          400: '#4d7fac', 500: '#2d5f8e', 600: '#1f4870', 700: '#133456',
+          800: '#0b2b43', 900: '#061a2a',
+        },
+        accent: {
+          50: '#ebf7f6', 100: '#d2eceb', 200: '#a4d8d6', 300: '#6ec0bd',
+          400: '#3aa6a3', 500: '#1f8e8b', 600: '#167572', 700: '#105d5b',
+          800: '#0b4543', 900: '#062d2c',
+        },
       },
       maxWidth: {
         'marketing': 'var(--marketing-container)',

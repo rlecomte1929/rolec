@@ -36,7 +36,7 @@ const PIPELINE_STATUS_STYLE: Record<PipelineStatus, string> = {
   extracting_text:      'bg-blue-100 text-blue-700',
   text_ready:           'bg-blue-100 text-blue-700',
   extracting_facts:     'bg-amber-100 text-amber-700',
-  ready_for_assistant:  'bg-purple-100 text-purple-700',
+  ready_for_assistant:  'bg-accent-100 text-accent-700',
   failed:               'bg-rose-100 text-rose-700',
 };
 

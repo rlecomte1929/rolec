@@ -314,7 +314,7 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
           <GripDots
             className={`shrink-0 transition-opacity ${
               isDragging
-                ? 'text-indigo-500 opacity-100'
+                ? 'text-accent-500 opacity-100'
                 : 'text-slate-300 opacity-0 group-hover:opacity-100'
             }`}
           />
@@ -354,8 +354,8 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
         <span
           className={`pointer-events-none absolute right-0 top-1/4 h-1/2 transition-all ${
             isResizing
-              ? 'w-[3px] bg-indigo-500'
-              : 'w-px bg-slate-300 group-hover/resize:w-[3px] group-hover/resize:bg-indigo-400'
+              ? 'w-[3px] bg-accent-500'
+              : 'w-px bg-slate-300 group-hover/resize:w-[3px] group-hover/resize:bg-accent-400'
           }`}
         />
       </span>
@@ -397,7 +397,7 @@ function DataRow<T>({ row, columns, onClick, isActive }: DataRowProps<T>) {
   return (
     <tr
       onClick={clickable ? () => onClick?.(row.original) : undefined}
-      className={`${clickable ? 'cursor-pointer hover:bg-slate-50' : ''} ${isActive ? 'bg-indigo-50' : ''}`}
+      className={`${clickable ? 'cursor-pointer hover:bg-slate-50' : ''} ${isActive ? 'bg-accent-50' : ''}`}
     >
       {row.getVisibleCells().map((cell) => {
         const col = columns.find((c) => c.id === cell.column.id);

@@ -119,7 +119,7 @@ function HorizontalBars({ items }: { items: DelayCause[] }) {
           </span>
           <div className="flex-1 bg-[#f3f4f6] rounded-full h-2.5">
             <div
-              className="bg-[#6366f1] h-2.5 rounded-full transition-all duration-500"
+              className="bg-[#1f4870] h-2.5 rounded-full transition-all duration-500"
               style={{ width: `${Math.round((item.count / max) * 100)}%` }}
             />
           </div>
@@ -244,7 +244,7 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
         })}
 
         {/* Line */}
-        <path d={pathD} fill="none" stroke="#6366f1" strokeWidth={2} strokeLinejoin="round" />
+        <path d={pathD} fill="none" stroke="#1f4870" strokeWidth={2} strokeLinejoin="round" />
 
         {/* Dots */}
         {validPoints.map((p, i) => (
@@ -253,7 +253,7 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
             cx={toX(i)}
             cy={toY(p.avg_completion_days as number)}
             r={3}
-            fill="#6366f1"
+            fill="#1f4870"
           />
         ))}
 

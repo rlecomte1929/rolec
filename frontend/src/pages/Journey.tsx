@@ -78,7 +78,7 @@ export const Journey: React.FC = () => {
     return (
       <AppShell title="Journey" subtitle="Your relocation profile.">
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your profile...</p>
         </div>
       </AppShell>

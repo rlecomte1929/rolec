@@ -16,12 +16,12 @@ import { CompaniesV2Table } from './CompaniesV2Table';
 
 // Gradient + ring tones for the company logo chip — richer than flat bg.
 const TONE_LOGO: Record<CompanyV2Tone, string> = {
-  a: 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white',
+  a: 'bg-gradient-to-br from-navy-600 to-navy-800 text-white',
   b: 'bg-gradient-to-br from-emerald-500 to-emerald-700 text-white',
   c: 'bg-gradient-to-br from-amber-500 to-amber-700 text-white',
   d: 'bg-gradient-to-br from-sky-500 to-sky-700 text-white',
   e: 'bg-gradient-to-br from-rose-500 to-rose-700 text-white',
-  f: 'bg-gradient-to-br from-violet-500 to-violet-700 text-white',
+  f: 'bg-gradient-to-br from-accent-500 to-accent-700 text-white',
 };
 
 export const PLAN_PILL: Record<CompanyV2PlanTier, string> = {
@@ -94,14 +94,14 @@ function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
     default: 'text-slate-900',
     success: 'text-emerald-700',
     warning: 'text-amber-700',
-    accent: 'text-indigo-700',
+    accent: 'text-accent-700',
     teal: 'text-teal-700',
   };
   const dot: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'bg-slate-200',
     success: 'bg-emerald-500',
     warning: 'bg-amber-500',
-    accent: 'bg-indigo-500',
+    accent: 'bg-accent-500',
     teal: 'bg-teal-500',
   };
   return (
@@ -165,7 +165,7 @@ export function ContactCell({
         <a
           href={`mailto:${email}`}
           onClick={(e) => e.stopPropagation()}
-          className={`block truncate text-xs text-slate-500 hover:text-indigo-600 hover:underline ${maxWidthClass}`}
+          className={`block truncate text-xs text-slate-500 hover:text-accent-600 hover:underline ${maxWidthClass}`}
           title={email}
         >
           {email}
@@ -455,13 +455,13 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         </div>
         <div className="mt-1.5 flex items-baseline gap-3">
           <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Companies</h1>
-          <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
+          <Pill className="bg-accent-50 text-accent-700 ring-accent-200">v2 preview</Pill>
           <div className="ml-auto flex items-center gap-3">
             {onRefresh && (
               <button
                 type="button"
                 onClick={onRefresh}
-                className="text-xs font-medium text-indigo-600 underline-offset-2 hover:underline disabled:opacity-50"
+                className="text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50"
                 disabled={loading}
               >
                 {loading ? 'Refreshing…' : 'Refresh'}
@@ -507,14 +507,14 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             placeholder="Search by name, contact, email…"
             value={filters.search}
             onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-            className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             aria-label="Search companies"
           />
           <select
             value={filters.status}
             onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as FilterState['status'] }))}
             aria-label="Filter by status"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           >
             <option value="">All statuses</option>
             <option value="active">Active</option>
@@ -525,7 +525,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             value={filters.plan}
             onChange={(e) => setFilters((f) => ({ ...f, plan: e.target.value as FilterState['plan'] }))}
             aria-label="Filter by plan"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           >
             <option value="">All plans</option>
             <option value="low">Low</option>
@@ -536,7 +536,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             value={filters.country}
             onChange={(e) => setFilters((f) => ({ ...f, country: e.target.value }))}
             aria-label="Filter by country"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           >
             <option value="">All countries</option>
             {countries.map((c) => (
@@ -549,7 +549,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             value={filters.sizeBand}
             onChange={(e) => setFilters((f) => ({ ...f, sizeBand: e.target.value }))}
             aria-label="Filter by size"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           >
             <option value="">All sizes</option>
             {sizes.map((s) => (
@@ -661,7 +661,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                     key={c.id}
                     onClick={() => setActiveId(c.id)}
                     className={`cursor-pointer hover:bg-slate-50 ${
-                      activeId === c.id ? 'bg-indigo-50' : ''
+                      activeId === c.id ? 'bg-accent-50' : ''
                     }`}
                   >
                     <td className="pl-4 py-2.5">

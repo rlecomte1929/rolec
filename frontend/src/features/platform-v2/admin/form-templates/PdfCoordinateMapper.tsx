@@ -32,7 +32,7 @@ const DOT_COLOURS = [
   '#0b2b43', // brand navy
   '#e04c14', // brand orange
   '#10b981', // emerald
-  '#8b5cf6', // violet
+  '#1f8e8b', // violet
   '#ef4444', // red
   '#f59e0b', // amber
   '#06b6d4', // cyan
