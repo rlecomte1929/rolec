@@ -660,6 +660,30 @@ async def request_id_and_timing_middleware(request: Request, call_next):
     return response
 
 
+# SEC-005: security headers on every API response. Registered BEFORE CORSMiddleware
+# so CORS stays outermost (Starlette prepends each registration at index 0 — last
+# registered runs first; see the NOTE at the top of this middleware block). The API
+# serves JSON, never HTML pages, so its CSP is locked all the way down: `default-src
+# 'none'` plus `frame-ancestors 'none'` to forbid framing. The browser-facing SPA at
+# relopass.com gets its own, looser, resource-aware CSP via frontend/public/_headers.
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Force HTTPS for a year incl. subdomains — blocks protocol-downgrade / SSL-strip.
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Clickjacking: the API must never be framed.
+    response.headers["X-Frame-Options"] = "DENY"
+    # Stop browsers MIME-sniffing a JSON body into something executable.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Don't leak full URLs (with tokens/ids) to cross-origin destinations.
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # API needs none of these device features.
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # JSON API loads no resources and renders no pages — deny everything + framing.
+    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=default_origins,
