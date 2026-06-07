@@ -19,6 +19,36 @@ from .policy_row_to_template_mapper import _merge_sub_values
 TEMPLATE_FIRST_MODE = "canonical_lta_template_first"
 
 
+def get_template_defaults(db: Any, template_id: Optional[str]) -> Dict[str, Any]:
+    """
+    Read ``default_policy_templates.snapshot_json`` for ``template_id`` and return a
+    gap-fill map keyed by benefit-taxonomy key (e.g. ``"housing"``, ``"movers"``).
+
+    Each value is the raw ``benefit_rules`` entry for that key. Returns an empty dict
+    (never raises) when the template id is missing, unknown, or carries no benefit_rules
+    — so callers can always treat the result as "the defaults available, if any".
+    """
+    if not template_id:
+        return {}
+    try:
+        row = db.get_default_policy_template(str(template_id))
+    except Exception:
+        return {}
+    if not row:
+        return {}
+    snapshot = row.get("snapshot_json")
+    if not isinstance(snapshot, dict):
+        return {}
+    defaults: Dict[str, Any] = {}
+    for rule in snapshot.get("benefit_rules") or []:
+        if not isinstance(rule, dict):
+            continue
+        key = rule.get("benefit_key")
+        if isinstance(key, str) and key.strip():
+            defaults[key.strip()] = rule
+    return defaults
+
+
 def _drafts_by_clause_index(
     draft_rule_candidates: Sequence[Dict[str, Any]],
 ) -> Dict[int, List[Dict[str, Any]]]:
@@ -311,12 +341,21 @@ def build_template_first_import_payload(
     draft_rule_candidates: Sequence[Dict[str, Any]],
     *,
     grouped_policy_items_count: int = 0,
+    template_defaults: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Build full-template view + import summary for HR review.
 
     Does not create or mutate Layer-2 benefit rows.
+
+    ``template_defaults`` (from :func:`get_template_defaults`) is an optional
+    gap-fill map keyed by benefit-taxonomy key. When a template field is genuinely
+    absent from the document (``import_status == "unmapped"``) and its
+    ``maps_to_benefit_taxonomy_key`` has a default, the field is filled from the
+    template and marked ``source == "template_default"`` so HR can see and override
+    it. Fields the document actually covers (``mapped``) are never overridden.
     """
+    defaults_map = template_defaults if isinstance(template_defaults, dict) else {}
     clause_list = [c for c in clauses if isinstance(c, dict)]
     drafts_by = _drafts_by_clause_index(draft_rule_candidates)
 
@@ -337,6 +376,37 @@ def build_template_first_import_payload(
     for field in template_fields:
         entries = buckets.get(field.key) or []
         if not entries:
+            # Field is genuinely absent from the document. Gap-fill from the
+            # template default if one exists for this field's taxonomy key —
+            # this branch only runs when the document is silent, so it can never
+            # override a value the LLM actually extracted.
+            taxonomy_key = field.maps_to_benefit_taxonomy_key
+            default_rule = defaults_map.get(taxonomy_key) if taxonomy_key else None
+            if isinstance(default_rule, dict) and default_rule:
+                template_items.append(
+                    {
+                        "canonical_key": field.key,
+                        "domain_id": field.domain_id,
+                        "employee_visible_label": field.employee_visible_label,
+                        "template_value_type": field.value_type.value,
+                        "drives_comparison": field.drives_comparison,
+                        "import_status": "template_default",
+                        "source": "template_default",
+                        "sub_values": {},
+                        "applicability": [],
+                        "coverage_status": None,
+                        "quantification": {},
+                        "comparison_readiness_hint": None,
+                        "parse_confidence": None,
+                        "source_ref": None,
+                        "merged_source_row_ids": [],
+                        "clause_indices": [],
+                        "external_reference_flag": False,
+                        "review_needed": True,
+                        "template_default": dict(default_rule),
+                    }
+                )
+                continue
             review_needed = bool(field.drives_comparison)
             template_items.append(
                 {
@@ -346,6 +416,7 @@ def build_template_first_import_payload(
                     "template_value_type": field.value_type.value,
                     "drives_comparison": field.drives_comparison,
                     "import_status": "unmapped",
+                    "source": "unmapped",
                     "sub_values": {},
                     "applicability": [],
                     "coverage_status": None,
@@ -384,6 +455,7 @@ def build_template_first_import_payload(
                 "template_value_type": field.value_type.value,
                 "drives_comparison": field.drives_comparison,
                 "import_status": "mapped",
+                "source": "extracted",
                 "sub_values": merged.get("sub_values") or {},
                 "applicability": merged.get("applicability") or [],
                 "coverage_status": merged.get("coverage_status"),
