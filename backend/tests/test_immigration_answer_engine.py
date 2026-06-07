@@ -55,7 +55,9 @@ class AnswerEngineTests(unittest.TestCase):
         self.assertEqual(res["cited_sources"][0]["trust_tier"], 1)
         self.assertEqual(res["model"], "claude-sonnet-4-6")
         self.assertTrue(res["trace_id"])
-        self.assertEqual(len(mockc.calls), 1)
+        # 2 calls: generation + the N5/AIQ-844 grounding verifier (reuses the same
+        # mock, which returns non-JSON -> verifier fails open, answer untouched).
+        self.assertEqual(len(mockc.calls), 2)
 
     def test_zero_chunks_refuses_without_llm_call(self):
         mockc = MockClient(default_response="should never be used")
