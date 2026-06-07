@@ -311,7 +311,11 @@ export const Auth: React.FC = () => {
     // VITE_DEMO_*_USER / VITE_DEMO_*_PASS. If you haven't run the seed
     // script yet, login will fail with "Invalid username or email."
     const credMap: Record<string, { user: string; pass: string }> = {
-      admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',        pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? 'AdminPass!1' },
+      // SECURITY (UIAUDIT-G2): admin is the platform SUPERUSER (full CMS, all tenants).
+      // Never embed a working admin password in the shipped bundle — no hardcoded
+      // fallback. The dev-only admin one-click (below) relies on VITE_DEMO_ADMIN_PASS
+      // being set locally; in production the admin button isn't rendered at all.
+      admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',        pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? '' },
       hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'hr@testingapril.com',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? 'HrPass!1' },
       employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'employee@testingapril.com', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? 'EmpPass!1' },
     };
@@ -639,8 +643,11 @@ export const Auth: React.FC = () => {
                 PROTOTYPE
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(['admin', 'hr', 'employee'] as const).map((r) => (
+            {/* SECURITY (UIAUDIT-G2): only render the Admin one-click in dev builds so
+                the platform-superuser login (and any admin credential) is stripped from
+                production by Vite. HR/Employee are low-privilege demo tenants. */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${import.meta.env.DEV ? 3 : 2}, minmax(0, 1fr))` }}>
+              {((import.meta.env.DEV ? ['admin', 'hr', 'employee'] : ['hr', 'employee']) as Array<'admin' | 'hr' | 'employee'>).map((r) => (
                 <Button key={r} type="button" variant="ghost" onClick={() => handleDemoLogin(r)} disabled={isLoading}
                   className="!px-0 border border-slate-200 !text-xs !text-slate-600 hover:!bg-slate-50 hover:border-slate-300 capitalize transition-colors">
                   {r === 'admin' ? 'Admin' : r === 'hr' ? 'HR' : 'Employee'}
