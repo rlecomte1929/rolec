@@ -6,6 +6,16 @@ import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
+// ── Loading skeleton ───────────────────────────────────────────────────────────
+// A muted pulse instead of a bare '…', which read as a broken/WIP value (UI9).
+
+const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
+  <span
+    aria-hidden="true"
+    className={`inline-block animate-pulse rounded bg-slate-200 align-middle ${className ?? ''}`}
+  />
+);
+
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
@@ -18,7 +28,7 @@ interface StatCardProps {
 const StatCard: React.FC<StatCardProps> = ({ label, value, sub, loading }) => (
   <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
     <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
-    <p className="text-3xl font-semibold text-slate-900">{loading ? '…' : value}</p>
+    <p className="text-3xl font-semibold text-slate-900">{loading ? <Skeleton className="h-7 w-16" /> : value}</p>
     {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
   </div>
 );
@@ -49,13 +59,13 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ to, icon, title, subtitle, metr
           <p className="text-xs text-slate-400">{subtitle}</p>
         </div>
       </div>
-      <span className="text-2xl font-semibold text-slate-900">{loading ? '…' : metric}</span>
+      <span className="text-2xl font-semibold text-slate-900">{loading ? <Skeleton className="h-6 w-10" /> : metric}</span>
     </div>
     <div className="space-y-1.5">
       {rows.map((row) => (
         <div key={row.label} className="flex items-center justify-between">
           <span className="text-xs text-slate-500">{row.label}</span>
-          <span className="text-xs font-medium text-slate-700">{loading ? '…' : row.value}</span>
+          <span className="text-xs font-medium text-slate-700">{loading ? <Skeleton className="h-3 w-8" /> : row.value}</span>
         </div>
       ))}
     </div>

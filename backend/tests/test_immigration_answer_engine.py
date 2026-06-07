@@ -55,7 +55,9 @@ class AnswerEngineTests(unittest.TestCase):
         self.assertEqual(res["cited_sources"][0]["trust_tier"], 1)
         self.assertEqual(res["model"], "claude-sonnet-4-6")
         self.assertTrue(res["trace_id"])
-        self.assertEqual(len(mockc.calls), 1)
+        # 2 calls: generation + the N5/AIQ-844 grounding verifier (reuses the same
+        # mock, which returns non-JSON -> verifier fails open, answer untouched).
+        self.assertEqual(len(mockc.calls), 2)
 
     def test_zero_chunks_refuses_without_llm_call(self):
         mockc = MockClient(default_response="should never be used")
@@ -103,7 +105,9 @@ class AnswerEngineTests(unittest.TestCase):
         self.assertEqual(res["conflicts_detected"], 1)
         self.assertEqual(res["conflicts_resolved"], 1)
         self.assertFalse(res["contradiction_check_skipped"])
-        gen_call = mockc.calls[-1]   # last call is generation; earlier calls are pair checks
+        # The generation call carries the QUESTION (unlike the pair checks or the
+        # AIQ-844 grounding-verifier call that share this client).
+        gen_call = next(c for c in mockc.calls if "QUESTION:" in c.user_message)
         self.assertNotIn("https://a.example/visa", gen_call.user_message)   # tier-2 suppressed
         self.assertIn("https://udi.no/permit", gen_call.user_message)       # tier-1 kept
 
@@ -115,7 +119,7 @@ class AnswerEngineTests(unittest.TestCase):
             default_response="Sources differ [source: https://udi.no/a][source: https://politiet.no/b].",
         )
         res = generate_immigration_answer(_payload([a, b]), "How long?", "FR→NO", client=mockc)
-        gen_call = mockc.calls[-1]
+        gen_call = next(c for c in mockc.calls if "QUESTION:" in c.user_message)
         self.assertIn("CONFLICTING OFFICIAL SOURCES", gen_call.system)      # escalation note injected
         self.assertEqual(res["conflicts_resolved"], 0)                     # neither suppressed
         self.assertIn("https://udi.no/a", gen_call.user_message)

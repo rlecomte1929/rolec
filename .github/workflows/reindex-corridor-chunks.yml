@@ -1,0 +1,73 @@
+name: Re-index corridor chunks (real embeddings)
+
+# Manually-triggered data backfill (NOT a schema change): re-embeds the corridor
+# corpus chunks in public.policy_assistant_chunks with real OpenAI vectors,
+# replacing the HashEmbedder vectors loaded when no key was available (P2-06e
+# follow-up). The indexer's SQL is idempotent (per-corridor DELETE + INSERT ...
+# ON CONFLICT DO UPDATE), so re-running converges. Both embedders are 1536-dim —
+# no schema change. A guard refuses to apply unless the SQL is OpenAI-embedded.
+
+on:
+  workflow_dispatch:
+    inputs:
+      corpus_files:
+        description: "Space-separated corridor corpus JSON paths to re-embed."
+        required: false
+        default: "corpus/us_fr_corridor.json corpus/in_de_corridor.json"
+
+jobs:
+  reindex:
+    name: Re-embed corridor chunks with OpenAI
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps + psql client
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Fail fast if secrets are missing
+        run: |
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "::error::OPENAI_API_KEY secret is not set — the indexer would emit hash vectors that mismatch the retriever."
+            exit 1
+          fi
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::DATABASE_URL secret is not set."
+            exit 1
+          fi
+
+      - name: Generate idempotent re-index SQL (real OpenAI embeddings)
+        env:
+          CORPUS_FILES: ${{ inputs.corpus_files }}
+        run: |
+          # Split the space-separated paths into an array (shellcheck-safe).
+          read -ra FILES <<< "$CORPUS_FILES"
+          python backend/scripts/index_corridor_corpus_chunks.py "${FILES[@]}" \
+            --emit-sql --wrap-transaction > /tmp/reindex.sql
+          echo "--- SQL header ---"
+          head -4 /tmp/reindex.sql
+
+      - name: Guard — refuse to apply unless OpenAI-embedded
+        run: |
+          if ! grep -qiE '^-- embedder: openai' /tmp/reindex.sql; then
+            echo "::error::Emitted SQL is not OpenAI-embedded — refusing to overwrite prod with hash vectors."
+            grep -i '^-- embedder:' /tmp/reindex.sql || true
+            exit 1
+          fi
+
+      - name: Apply to prod (idempotent per-corridor DELETE + UPSERT)
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/reindex.sql
