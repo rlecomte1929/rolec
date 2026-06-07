@@ -859,11 +859,17 @@ export const hrAPI = {
 
   /** GET /api/hr/cases/{caseId}/immigration-requirements */
   getImmigrationRequirements: async (caseId: string): Promise<{
+    // AIQ-847 / F1: backend fails closed on uncovered corridors (AIQ-832, PR #399).
+    // covered=false ⇒ no seeded checklist for this corridor × visa_type; the
+    // timeline is then null and requirements/risk_flags are empty.
+    covered: boolean;
+    coverage_reason: string | null;
+    corridor: string | null;
     corridor_from: string;
     corridor_to: string;
     visa_type: string;
     document_count: number;
-    estimated_timeline_days: number;
+    estimated_timeline_days: number | null;
     requirements: Array<{
       document_type: string;
       document_name: string;
