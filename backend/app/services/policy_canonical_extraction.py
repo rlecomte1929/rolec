@@ -115,6 +115,10 @@ class OpenAIPolicyCanonicalExtractor:
                     "content": (
                         "Extract relocation policy facts into strict JSON. "
                         "Return only fields supported by the schema. "
+                        "Set per-fact confidence_score on a coarse 3-tier scale "
+                        "(N11/AIQ-851): 1.0 when the fact has a clear supporting "
+                        "source_quote in the policy; 0.5 when inferred from context "
+                        "without a direct quote; 0.1 when absent/guessed. "
                         f"Schema: {json.dumps(schema_json)}"
                     ),
                 },

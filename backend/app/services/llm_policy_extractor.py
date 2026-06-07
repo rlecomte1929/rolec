@@ -156,10 +156,12 @@ EXTRACT_POLICY_TOOL: Dict[str, Any] = {
                         "confidence": {
                             "type": "number",
                             "description": (
-                                "0.0-1.0 confidence. Use 0.9+ when the policy "
-                                "states the value explicitly, 0.6-0.8 when "
-                                "inferred from context, and < 0.5 when "
-                                "speculative — those should typically be omitted."
+                                "Per-field confidence 0.0-1.0, on a coarse 3-tier scale "
+                                "(N11/AIQ-851): 1.0 when the value has a clear supporting "
+                                "source_quote stated in the policy; 0.5 when inferred from "
+                                "context without a direct quote; 0.1 when absent/guessed "
+                                "(the policy is silent) — speculative values should typically "
+                                "be omitted entirely."
                             ),
                         },
                     },
