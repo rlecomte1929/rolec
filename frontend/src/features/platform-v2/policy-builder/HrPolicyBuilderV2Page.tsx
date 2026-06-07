@@ -5,11 +5,16 @@ import { Input } from '../../../components/antigravity/Input';
 import {
   Sparkles, Check, Eye, Clock, Plus, Filter,
   ChevronDown, ChevronRight, Info, Users, X, Upload,
-  Pencil, Activity, Minus, AlertTriangle,
+  Pencil, Activity, Minus, AlertTriangle, MessageSquare,
 } from 'lucide-react';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
+import { Alert } from '../../../components/antigravity';
 import { Breadcrumb } from '../../../components/Breadcrumb';
+import { policyConfigMatrixAPI } from '../../../api/client';
+import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssistantDockedShell';
+import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
+import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';
@@ -243,11 +248,80 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const [collapsed, setCollapsed]     = useState<Record<number, boolean>>({});
   const [rulesDrawerFor, setRulesDrawerFor] = useState<string | null>(null);
   const [savedAt, setSavedAt]         = useState<number | null>(null);
-  const [version]                     = useState<string | null>(null);
+  const [version, setVersion]         = useState<string | null>(null);
   const [ctxOpen, setCtxOpen]         = useState(false);
   const [currency, setCurrency]       = useState('EUR');
   const [focusedBenefit]              = useState('host_housing_cap');
   const [focusedTierId]               = useState<string | null>(null);
+
+  // ── Persistence / publish wiring (policy_config matrix system) ──
+  const [draftVersionId, setDraftVersionId] = useState<string | null>(null);
+  const [effectiveDate, setEffectiveDate]   = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [saving, setSaving]           = useState(false);
+  const [publishing, setPublishing]   = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [banner, setBanner]           = useState<{ kind: 'success' | 'error' | 'info'; msg: string } | null>(null);
+
+  const errMsg = (e: unknown, fallback: string): string => {
+    const data = e && typeof e === 'object' && 'response' in e
+      ? (e as { response?: { data?: { detail?: unknown; message?: string } } }).response?.data
+      : null;
+    const detail = data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (data?.message) return data.message;
+    if (e instanceof Error) return e.message;
+    return fallback;
+  };
+
+  // Ensure a policy_config draft exists, returning its version id.
+  const ensureDraftId = async (): Promise<string> => {
+    if (draftVersionId) return draftVersionId;
+    const draft = await policyConfigMatrixAPI.hrPostDraft();
+    const pv = (draft?.policy_version as string | null) || null;
+    if (!pv) throw new Error('Could not create a draft (no policy_version returned).');
+    setDraftVersionId(pv);
+    return pv;
+  };
+
+  const handleSaveDraft = async () => {
+    if (tiers.length === 0) { setBanner({ kind: 'info', msg: 'Add at least one tier first.' }); return; }
+    setSaving(true); setBanner(null);
+    try {
+      const pv = await ensureDraftId();
+      const { body, rowCount, warnings } = canvasPolicyToConfigDraft({ tiers, categories: CATEGORIES, effectiveDate, currency, policyVersion: pv });
+      if (rowCount === 0) { setBanner({ kind: 'info', msg: 'No covered benefits yet — mark some benefits as covered, then save.' }); return; }
+      await policyConfigMatrixAPI.hrPutDraft(body);
+      setSavedAt(Date.now());
+      setVersion(null); // back to draft state after edits
+      setBanner({ kind: 'success', msg: `Draft saved — ${rowCount} benefit row(s)${warnings.length ? ` · ${warnings.length} mapping note(s)` : ''}.` });
+    } catch (e) {
+      setBanner({ kind: 'error', msg: errMsg(e, 'Save failed.') });
+    } finally { setSaving(false); }
+  };
+
+  const handlePublish = async () => {
+    if (tiers.length === 0) return;
+    setPublishing(true); setBanner(null);
+    try {
+      const pv = await ensureDraftId();
+      const { body, rowCount } = canvasPolicyToConfigDraft({ tiers, categories: CATEGORIES, effectiveDate, currency, policyVersion: pv });
+      if (rowCount === 0) { setBanner({ kind: 'info', msg: 'Add at least one covered benefit before publishing.' }); return; }
+      await policyConfigMatrixAPI.hrPutDraft(body);
+      await policyConfigMatrixAPI.hrPublish({ policy_version: pv });
+      setVersion('published');
+      setSavedAt(Date.now());
+      setDraftVersionId(null); // next edit starts a fresh draft
+      setBanner({ kind: 'success', msg: 'Published. Employees can now see this policy, and the Policy Assistant can answer about it.' });
+    } catch (e) {
+      setBanner({ kind: 'error', msg: errMsg(e, 'Publish failed.') });
+    } finally { setPublishing(false); }
+  };
+
+  const previewResult = useMemo(
+    () => canvasPolicyToConfigDraft({ tiers, categories: CATEGORIES, effectiveDate, currency, policyVersion: 'preview' }),
+    [tiers, effectiveDate, currency],
+  );
 
   const applyTemplate = (tpl: typeof TEMPLATES[0]) => {
     setTiers(tiersForTemplate(tpl.id));
@@ -325,19 +399,39 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
         </div>
 
         <div className="flex items-center gap-2">
+          <Button unstyled onClick={() => setAssistantOpen(o => !o)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border transition-colors font-medium ${assistantOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
+            <MessageSquare size={12}/> Ask about this policy
+          </Button>
           <Button unstyled onClick={() => setCtxOpen(o => !o)}
             className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border transition-colors font-medium ${ctxOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
             <Activity size={12}/> {ctxOpen ? 'Context on' : 'Context'}
           </Button>
-          <Button unstyled className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700"><Clock size={14}/></Button>
-          <Button unstyled className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Save draft</Button>
-          <Button unstyled className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"><Eye size={12}/> Preview</Button>
-          <Button unstyled disabled={tiers.length === 0}
+          {/* Effective date — required by the publish pipeline */}
+          <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+            <Clock size={12} className="text-gray-400"/>
+            <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)}
+              title="Effective date"
+              className="border border-gray-200 rounded px-2 py-1 text-[11px] bg-white focus:outline-none"/>
+          </label>
+          <Button unstyled onClick={handleSaveDraft} disabled={saving || tiers.length === 0}
+            className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+            {saving ? 'Saving…' : 'Save draft'}
+          </Button>
+          <Button unstyled onClick={() => setPreviewOpen(true)} disabled={tiers.length === 0}
+            className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1.5"><Eye size={12}/> Preview</Button>
+          <Button unstyled onClick={handlePublish} disabled={publishing || tiers.length === 0}
             className="text-[12px] px-3 py-1.5 rounded-lg bg-navy-800 text-white font-semibold hover:bg-navy-900 disabled:opacity-40 flex items-center gap-1.5">
-            <Check size={12}/> Publish
+            <Check size={12}/> {publishing ? 'Publishing…' : 'Publish'}
           </Button>
         </div>
       </div>
+
+      {banner && (
+        <div className="px-6 pt-3">
+          <Alert variant={banner.kind}>{banner.msg}</Alert>
+        </div>
+      )}
 
       {/* ── Empty state — template ── */}
       {mode === 'template' && tiers.length === 0 && (
@@ -530,11 +624,124 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           </div>
         </div>
       )}
+      {/* ── Preview (read-only summary of the mapped, to-be-published matrix) ── */}
+      {previewOpen && (
+        <PreviewModal
+          result={previewResult}
+          currency={currency}
+          effectiveDate={effectiveDate}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </>
   );
 
-  if (embedded) return inner;
-  return <AppShell wide>{inner}</AppShell>;
+  // The Policy Assistant docked shell wraps the builder so HR can ask about the
+  // published policy without leaving the page (reuses the same shell + panel as
+  // the Published-policy tab).
+  const shell = (
+    <PolicyAssistantDockedShell
+      open={assistantOpen}
+      onOpenChange={setAssistantOpen}
+      title="Ask about this policy"
+      subtitle="Bounded Q&A on your published policy."
+      titleId="hr-builder-assistant-shell-title"
+      assistant={() => <HrPolicyAssistantPanel policyId={draftVersionId} variant="embedded" />}
+    >
+      {inner}
+    </PolicyAssistantDockedShell>
+  );
+
+  if (embedded) return shell;
+  return <AppShell wide>{shell}</AppShell>;
+}
+
+// ─── Preview modal ──────────────────────────────────────────────────────────
+const CATEGORY_TITLES: Record<string, string> = {
+  pre_assignment_support: 'Pre-assignment support',
+  relocation_assistance: 'Relocation assistance',
+  compensation_allowances: 'Compensation & allowances',
+  family_support_education: 'Family support & education',
+  leave_repatriation: 'Leave & repatriation',
+  tax_payroll: 'Tax & payroll',
+};
+
+function PreviewModal({
+  result,
+  currency,
+  effectiveDate,
+  onClose,
+}: {
+  result: CanvasMapResult;
+  currency: string;
+  effectiveDate: string;
+  onClose: () => void;
+}) {
+  const cur = CUR_SYM[currency] || currency;
+  const fmtValue = (b: CanvasMapResult['body']['categories'][number]['benefits'][number]): string => {
+    if (b.value_type === 'currency' && b.amount_value != null) return `${cur}${b.amount_value.toLocaleString()}${b.unit_frequency !== 'one_time' ? ` ${b.unit_frequency}` : ''}`;
+    if (b.value_type === 'percentage' && b.percentage_value != null) return `${b.percentage_value}%`;
+    if (b.value_type === 'text' && b.notes) return b.notes;
+    if (b.value_type === 'none') return 'Service';
+    return b.notes || '—';
+  };
+  const fmtTargeting = (b: CanvasMapResult['body']['categories'][number]['benefits'][number]): string => {
+    const parts = [...b.employee_levels, ...b.assignment_types, ...b.family_statuses];
+    return parts.length ? parts.join(' · ') : 'All employees';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 p-5 border-b border-gray-200">
+          <Eye size={18} className="text-blue-600"/>
+          <div className="flex-1">
+            <h2 className="text-base font-semibold text-gray-900">Preview — published policy</h2>
+            <p className="text-[12px] text-gray-500">
+              {result.rowCount} benefit row(s) · effective {effectiveDate}. This is exactly what will be saved/published to the policy matrix.
+            </p>
+          </div>
+          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
+        </div>
+        <div className="p-5 overflow-y-auto">
+          {result.rowCount === 0 ? (
+            <p className="text-sm text-gray-500">No covered benefits yet. Mark benefits as covered (or included) to populate the policy.</p>
+          ) : (
+            <div className="space-y-5">
+              {result.body.categories.map(cat => (
+                <div key={cat.category_key}>
+                  <div className="text-[13px] font-semibold text-gray-900 mb-2">{CATEGORY_TITLES[cat.category_key] || cat.category_key}</div>
+                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                    {cat.benefits.map((b, i) => (
+                      <div key={`${b.benefit_key}-${i}`} className="flex items-start justify-between gap-4 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="text-[13px] text-gray-800">{b.benefit_label}</div>
+                          <div className="text-[11px] text-gray-400">{fmtTargeting(b)}</div>
+                        </div>
+                        <div className="text-[12px] font-medium text-gray-700 whitespace-nowrap">{fmtValue(b)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {result.warnings.length > 0 && (
+            <div className="mt-5">
+              <Alert variant="info">
+                <div className="text-[12px]">
+                  <div className="font-semibold mb-1">Mapping notes</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              </Alert>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── TierColumn ───────────────────────────────────────────────────────────────
