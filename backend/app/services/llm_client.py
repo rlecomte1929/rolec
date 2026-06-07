@@ -10,10 +10,15 @@ Features:
 
 Public API
 ----------
-  await complete(*, system, user, schema, ...)        — OpenAI  (gpt-4o default)
-  await claude_complete(*, system, user, schema, ...) — Anthropic (claude-sonnet-4-6 default)
+  await complete(*, system, user, schema, ...)        — OpenAI  (gpt-4o default)  → dict
+  await claude_complete(*, system, user, schema, ...) — Anthropic (sonnet default) → dict
+  await complete_text(*, system, user, ...)           — OpenAI free-text          → str
+  await claude_complete_text(*, system, user, ...)    — Anthropic free-text       → str
+  complete_sync / complete_text_sync / claude_complete_text_sync — sync bridges
+    for synchronous call sites (run the coroutine even inside a running loop).
 
-Both functions return the parsed dict produced by the model.
+The *_text variants return the raw text content (callers parse if needed); the
+schema variants return the parsed dict produced by the model.
 
 Security: never pass raw user-controlled text into the *system* parameter.
 The *system* arg must be a static template. User-supplied values belong in
@@ -361,3 +366,170 @@ async def claude_complete(
             await asyncio.sleep(delay)
 
     raise last_exc
+
+
+# ---------------------------------------------------------------------------
+# Free-text variants (AUDIT-B5-followup / AIQ-401)
+# ---------------------------------------------------------------------------
+# Some call sites need the raw text completion (they do their own parsing or
+# return prose), and most of them are synchronous. These helpers give those
+# sites the same timeout + 429/5xx retry + structured logging as the JSON
+# functions above, plus sync bridges. The egress kill-switch
+# (core.llm_flags.policy_llm_disabled) stays at the call sites — it must short-
+# circuit BEFORE any client is built, so it is intentionally not handled here.
+
+
+async def _run_with_retry(make_awaitable, *, label: str, model: str,
+                          timeout: float, max_retries: int):
+    """Run an awaitable factory with timeout + 429/5xx retry + structured logging.
+
+    ``make_awaitable`` is a zero-arg callable returning a *fresh* awaitable on
+    each attempt. Returns the raw SDK response; the caller extracts content.
+    Mirrors the retry/logging policy of ``complete`` / ``claude_complete``.
+    """
+    request_id = str(uuid.uuid4())
+    last_exc: Exception = RuntimeError("No attempts were made")
+    for attempt in range(max_retries + 1):
+        t0 = time.monotonic()
+        try:
+            resp = await asyncio.wait_for(make_awaitable(), timeout=timeout)
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            usage = getattr(resp, "usage", None)
+            log.info(
+                "%s ok request_id=%s model=%s attempt=%d latency_ms=%d "
+                "input_tokens=%s output_tokens=%s",
+                label, request_id, model, attempt, latency_ms,
+                getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", "?")) if usage else "?",
+                getattr(usage, "completion_tokens", getattr(usage, "output_tokens", "?")) if usage else "?",
+            )
+            return resp
+        except asyncio.TimeoutError:
+            log.warning("%s timeout request_id=%s model=%s attempt=%d",
+                        label, request_id, model, attempt)
+            last_exc = TimeoutError(f"{label} timed out after {timeout}s")
+        except Exception as exc:
+            status = _http_status(exc)
+            if status in _RETRY_STATUS_CODES:
+                log.warning("%s retryable request_id=%s model=%s attempt=%d status=%s error=%s",
+                            label, request_id, model, attempt, status, exc)
+                last_exc = exc
+            else:
+                log.error("%s fatal request_id=%s model=%s attempt=%d status=%s error=%s",
+                          label, request_id, model, attempt, status, exc)
+                raise
+        if attempt < max_retries:
+            await asyncio.sleep(_jitter(attempt))
+    raise last_exc
+
+
+async def complete_text(
+    *,
+    system: str,
+    user: str,
+    model: str = _OPENAI_DEFAULT_MODEL,
+    temperature: float = 0.2,
+    json_object: bool = False,
+    timeout: float = DEFAULT_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> str:
+    """OpenAI chat completion returning the raw text content (no JSON parse).
+
+    ``json_object=True`` sets ``response_format={"type": "json_object"}`` for
+    callers that want guaranteed-JSON text they parse themselves.
+    """
+    try:
+        from openai import AsyncOpenAI  # type: ignore
+    except ImportError:
+        raise RuntimeError("openai package is not installed — run: pip install openai")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+
+    client = AsyncOpenAI(api_key=api_key)
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": user})
+    kwargs: Dict[str, Any] = {"model": model, "messages": messages, "temperature": temperature}
+    if json_object:
+        kwargs["response_format"] = {"type": "json_object"}
+
+    resp = await _run_with_retry(
+        lambda: client.chat.completions.create(**kwargs),
+        label="complete_text", model=model, timeout=timeout, max_retries=max_retries,
+    )
+    return resp.choices[0].message.content or ""
+
+
+async def claude_complete_text(
+    *,
+    system: str,
+    user: str,
+    model: str = _ANTHROPIC_DEFAULT_MODEL,
+    max_tokens: int = 1024,
+    temperature: float = 0.2,
+    timeout: float = DEFAULT_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> str:
+    """Anthropic completion returning the concatenated text blocks (no tools)."""
+    try:
+        import anthropic  # type: ignore
+    except ImportError:
+        raise RuntimeError("anthropic package is not installed — run: pip install anthropic")
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set.")
+
+    sync_client = anthropic.Anthropic(api_key=api_key)
+    resp = await _run_with_retry(
+        lambda: asyncio.to_thread(
+            sync_client.messages.create,
+            model=model,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        ),
+        label="claude_complete_text", model=model, timeout=timeout, max_retries=max_retries,
+    )
+    text = ""
+    for block in (resp.content or []):
+        if getattr(block, "type", "") == "text":
+            text += getattr(block, "text", "")
+    return text.strip()
+
+
+# ---------------------------------------------------------------------------
+# Sync bridges — for the many synchronous call sites
+# ---------------------------------------------------------------------------
+
+def _run_sync(coro):
+    """Run a coroutine to completion from sync code, even inside a running loop.
+
+    No running loop (the common case: sync service fns, FastAPI sync routes in
+    the threadpool) → ``asyncio.run``. If a loop is already running in this
+    thread, run the coroutine on a fresh loop in a worker thread so we never
+    raise "asyncio.run() cannot be called from a running event loop".
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(asyncio.run, coro).result()
+
+
+def complete_text_sync(**kwargs) -> str:
+    """Synchronous wrapper over :func:`complete_text`."""
+    return _run_sync(complete_text(**kwargs))
+
+
+def claude_complete_text_sync(**kwargs) -> str:
+    """Synchronous wrapper over :func:`claude_complete_text`."""
+    return _run_sync(claude_complete_text(**kwargs))
+
+
+def complete_sync(**kwargs) -> Dict[str, Any]:
+    """Synchronous wrapper over :func:`complete` (structured JSON)."""
+    return _run_sync(complete(**kwargs))
