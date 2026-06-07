@@ -40,8 +40,11 @@ _URL = "https://www.udi.no/en/want-to-apply/"
 
 def _chunk(url=_URL, text="A residence permit is required.", tier=1,
            fetched="2026-06-06T00:00:00+00:00"):
+    # adjusted_score is always present on real retriever chunks; include it so the N6
+    # confidence band (#454) doesn't read these fixtures as artificially low-confidence
+    # and append the caveat (which broke these passthrough assertions on main).
     return {"source_url": url, "source_ref": url, "chunk_text": text,
-            "trust_tier": tier, "fetched_at": fetched, "corridor": "FR_NO"}
+            "trust_tier": tier, "fetched_at": fetched, "corridor": "FR_NO", "adjusted_score": 0.8}
 
 
 def _payload(chunks):
@@ -235,7 +238,10 @@ class EngineVerifierIntegrationTests(unittest.TestCase):
             client=_gen(answer), verifier_client=_RaisingClient(),
         )
         self.assertEqual(res["answer_kind"], "answer")
-        self.assertEqual(res["answer_text"], answer)
+        # Fail-open keeps the original answer; N6 (#454) treats a skipped verifier as
+        # low-confidence and appends its caveat, so check the answer is preserved
+        # (contained), not byte-identical.
+        self.assertIn(answer, res["answer_text"])
         self.assertTrue(res["verification_skipped"])
         self.assertIsNone(res["grounding_verdict"])
 

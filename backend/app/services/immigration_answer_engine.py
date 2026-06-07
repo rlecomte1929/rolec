@@ -303,6 +303,15 @@ def generate_immigration_answer(
         answer_text = answer_text + _LOW_CONFIDENCE_CAVEAT
     tracer.record_step("confidence_scoring", latency_ms=0, confidence=confidence, **confidence_factors)
 
+    # N8-FU/AIQ-856: record the immigration_corpus_chunks ids this answer cited onto the
+    # trace. The N4 answer cites by source_url; map those back to the retrieved chunks'
+    # ids so reviewer feedback (ai_human_feedback.trace_session_id -> traces.id ->
+    # cited_chunk_ids) can be joined to the chunks by source_reliability_service. This is
+    # the producer side that makes the N8 reliability loop non-inert.
+    cited_urls = {s["source_url"] for s in cited_sources}
+    cited_chunk_ids = [c["id"] for c in chunks if c.get("source_url") in cited_urls and c.get("id")]
+    tracer.record_citations(cited_chunk_ids)
+
     tracer.flush()
     return {
         "answer_text": answer_text,
