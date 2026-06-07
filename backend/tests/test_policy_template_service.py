@@ -6,6 +6,7 @@ into one versioned schema + service, without breaking the W4 gap-fill.
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -21,7 +22,7 @@ from backend.app.services.policy_template_service import (
 )
 
 _MIGRATION = os.path.join(
-    _REPO_ROOT, "supabase", "migrations", "20260617000000_policy_templates_v2.sql"
+    _REPO_ROOT, "supabase", "migrations", "20260617010000_policy_templates_v2.sql"
 )
 
 
@@ -101,12 +102,34 @@ def test_migration_creates_rls_gated_table_and_seeds_six_templates():
     assert parent_block.count("'1.0.0'") >= 6
 
 
+def _parse_seed(sql):
+    """Parse seed → {template_id: pk} and {(pk, benefit_key): (default_value, value_type)}."""
+    parents = {}
+    for m in re.finditer(r"\('([0-9a-f-]{36})',\s*'((?:LTA|STA)_\w+)',\s*'1\.0\.0'", sql):
+        parents[m.group(2)] = m.group(1)
+    benefits = {}
+    for m in re.finditer(
+        r"\('[0-9a-f-]{36}',\s*'([0-9a-f-]{36})',\s*'(\w+)',\s*(NULL|[0-9.]+),\s*'(\w+)'", sql
+    ):
+        pk, key, val, vtype = m.groups()
+        benefits[(pk, key)] = (None if val == "NULL" else float(val), vtype)
+    return parents, benefits
+
+
 def test_migration_seed_matches_service_registry():
-    """The migration seed must mirror the Python registry (no drift)."""
+    """The migration seed must mirror the Python registry exactly (no drift)."""
     sql = open(_MIGRATION, encoding="utf-8").read()
+    parents, benefits = _parse_seed(sql)
     svc = PolicyTemplateService()
     for t in svc.list_templates():
-        assert f"'{t.template_id}'" in sql
+        assert t.template_id in parents, t.template_id
+        pk = parents[t.template_id]
+        for b in t.benefits:
+            key = (pk, b.benefit_key)
+            assert key in benefits, (t.template_id, b.benefit_key)
+            seed_value, seed_vtype = benefits[key]
+            assert seed_value == b.default_value, (t.template_id, b.benefit_key, seed_value, b.default_value)
+            assert seed_vtype == b.value_type, (t.template_id, b.benefit_key, seed_vtype, b.value_type)
 
 
 # --- Criterion 4: W4 gap-fill still works (template_default rows) -----------

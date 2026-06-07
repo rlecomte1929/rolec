@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.policy_template_benefits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   template_pk uuid NOT NULL REFERENCES public.policy_templates_v2(id) ON DELETE CASCADE,
   benefit_key text NOT NULL,
-  default_value numeric,                 -- numeric cap; NULL for narrative-only fields
+  default_value numeric,                 -- numeric cap where one exists (incl. a cap on a narrative field); NULL when uncapped
   value_type text NOT NULL CHECK (value_type IN ('amount', 'duration', 'quantity', 'percentage', 'narrative', 'external_reference')),
   is_required boolean NOT NULL DEFAULT false,
   field_confidence numeric NOT NULL DEFAULT 0.5 CHECK (field_confidence >= 0 AND field_confidence <= 1),
