@@ -77,32 +77,43 @@ async def complete(
     *,
     system: str,
     user: str,
-    schema: Dict[str, Any],
+    schema: Optional[Dict[str, Any]] = None,
     image_url: Optional[str] = None,
+    temperature: Optional[float] = None,
     timeout: float = DEFAULT_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
     model: str = _OPENAI_DEFAULT_MODEL,
-) -> Dict[str, Any]:
+) -> Any:
     """
-    Call OpenAI with structured JSON output and automatic retry.
+    Call OpenAI with automatic retry, structured logging, and timeout.
+
+    Output mode is selected by ``schema``:
+      - ``schema={...}`` (non-empty) → OpenAI structured outputs
+        (``response_format`` json_schema); returns the parsed JSON ``dict``.
+      - ``schema={}``               → free-form json_object mode; returns the
+        parsed JSON ``dict``.
+      - ``schema=None``             → free-text mode; no ``response_format`` is
+        set and the model's raw message content is returned as a ``str``.
 
     Args:
         system:      Static system prompt (never interpolate user input here).
         user:        User message text.
-        schema:      JSON Schema dict for the response. When non-empty, uses
-                     OpenAI structured outputs (``response_format`` json_schema).
-                     Pass ``{}`` to fall back to free-form json_object mode.
+        schema:      See output-mode table above.
         image_url:   Optional base64 data URL or HTTPS URL for vision calls.
+        temperature: Sampling temperature. ``None`` leaves it unset so the
+                     OpenAI SDK default applies (matches callers that never
+                     specified one).
         timeout:     Per-request timeout in seconds.
         max_retries: Number of additional attempts after the first on 429/5xx.
         model:       OpenAI model ID.
 
     Returns:
-        Parsed JSON dict from the model.
+        Parsed JSON ``dict`` (json_schema / json_object modes) or the raw
+        response ``str`` (free-text mode).
 
     Raises:
         RuntimeError: OPENAI_API_KEY not set or openai not installed.
-        ValueError:   Response could not be parsed as JSON.
+        ValueError:   Response could not be parsed as JSON (JSON modes only).
         Exception:    Propagated after all retries exhausted.
     """
     try:
@@ -131,9 +142,12 @@ async def complete(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": user_content})
 
-    # Decide response_format
-    if schema:
-        response_format: Any = {
+    # Decide response_format from the output mode (see docstring table).
+    response_format: Any
+    if schema is None:
+        response_format = None  # free-text mode — return raw content as str
+    elif schema:
+        response_format = {
             "type": "json_schema",
             "json_schema": {
                 "name": "structured_output",
@@ -144,16 +158,18 @@ async def complete(
     else:
         response_format = {"type": "json_object"}
 
+    create_kwargs: Dict[str, Any] = {"model": model, "messages": messages}
+    if response_format is not None:
+        create_kwargs["response_format"] = response_format
+    if temperature is not None:
+        create_kwargs["temperature"] = temperature
+
     last_exc: Exception = RuntimeError("No attempts were made")
     for attempt in range(max_retries + 1):
         t0 = time.monotonic()
         try:
             response = await asyncio.wait_for(
-                client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    response_format=response_format,
-                ),
+                client.chat.completions.create(**create_kwargs),
                 timeout=timeout,
             )
             latency_ms = int((time.monotonic() - t0) * 1000)
@@ -166,7 +182,12 @@ async def complete(
                 getattr(usage, "completion_tokens", "?"),
             )
 
-            raw = response.choices[0].message.content or "{}"
+            content = response.choices[0].message.content or ""
+            if schema is None:
+                # Free-text mode: hand the raw content back to the caller,
+                # which is responsible for any parsing.
+                return content
+            raw = content or "{}"
             try:
                 return json.loads(raw)
             except json.JSONDecodeError as exc:
@@ -221,32 +242,42 @@ async def claude_complete(
     *,
     system: str,
     user: str,
-    schema: Dict[str, Any],
+    schema: Optional[Dict[str, Any]] = None,
+    temperature: Optional[float] = None,
+    max_tokens: int = 4096,
     timeout: float = DEFAULT_TIMEOUT,
     max_retries: int = DEFAULT_MAX_RETRIES,
     model: str = _ANTHROPIC_DEFAULT_MODEL,
-) -> Dict[str, Any]:
+) -> Any:
     """
-    Call Anthropic Claude with structured JSON output via tool use, with retry.
+    Call Anthropic Claude with automatic retry, structured logging, and timeout.
 
-    Uses Anthropic's ``tool_use`` feature with ``tool_choice`` forced to the
-    single schema tool so the model always returns a conforming JSON object.
+    Output mode is selected by ``schema``:
+      - ``schema={...}`` → uses Anthropic's ``tool_use`` feature with
+        ``tool_choice`` forced to the single schema tool so the model always
+        returns a conforming JSON object; returns the parsed ``dict``.
+      - ``schema=None``  → free-text mode; no tools are sent and the
+        concatenated text of the response is returned as a ``str``.
 
     Args:
         system:      Static system prompt.
         user:        User message text.
-        schema:      JSON Schema dict for the response (used as input_schema
-                     for the tool).
+        schema:      See output-mode table above.
+        temperature: Sampling temperature. ``None`` leaves it unset so the
+                     Anthropic SDK default applies.
+        max_tokens:  Max output tokens.
         timeout:     Per-request timeout in seconds.
         max_retries: Number of additional attempts on 429/5xx.
         model:       Anthropic model ID.
 
     Returns:
-        Parsed JSON dict from the tool_use block.
+        Parsed JSON ``dict`` (tool_use mode) or the raw response ``str``
+        (free-text mode).
 
     Raises:
         RuntimeError: ANTHROPIC_API_KEY not set or anthropic not installed.
-        ValueError:   No tool_use block or unparseable content returned.
+        ValueError:   No tool_use block or unparseable content returned
+                      (tool_use mode only).
         Exception:    Propagated after all retries exhausted.
     """
     try:
@@ -262,26 +293,31 @@ async def claude_complete(
     # The anthropic SDK is synchronous; wrap in asyncio.to_thread
     sync_client = anthropic.Anthropic(api_key=api_key)
 
-    tool_def = {
-        "name": "structured_output",
-        "description": "Return the answer as a structured JSON object exactly matching the schema.",
-        "input_schema": schema or {"type": "object", "properties": {}, "additionalProperties": True},
+    create_kwargs: Dict[str, Any] = {
+        "model": model,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+        "max_tokens": max_tokens,
     }
+    if temperature is not None:
+        create_kwargs["temperature"] = temperature
+    if schema is not None:
+        # tool_use mode — force a single structured-output tool call.
+        create_kwargs["tools"] = [
+            {
+                "name": "structured_output",
+                "description": "Return the answer as a structured JSON object exactly matching the schema.",
+                "input_schema": schema or {"type": "object", "properties": {}, "additionalProperties": True},
+            }
+        ]
+        create_kwargs["tool_choice"] = {"type": "tool", "name": "structured_output"}
 
     last_exc: Exception = RuntimeError("No attempts were made")
     for attempt in range(max_retries + 1):
         t0 = time.monotonic()
         try:
             response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    sync_client.messages.create,
-                    model=model,
-                    system=system,
-                    messages=[{"role": "user", "content": user}],
-                    max_tokens=4096,
-                    tools=[tool_def],
-                    tool_choice={"type": "tool", "name": "structured_output"},
-                ),
+                asyncio.to_thread(sync_client.messages.create, **create_kwargs),
                 timeout=timeout,
             )
             latency_ms = int((time.monotonic() - t0) * 1000)
@@ -293,6 +329,14 @@ async def claude_complete(
                 getattr(usage, "input_tokens", "?") if usage else "?",
                 getattr(usage, "output_tokens", "?") if usage else "?",
             )
+
+            if schema is None:
+                # Free-text mode: concatenate text blocks and return as str.
+                text_out = ""
+                for block in (response.content or []):
+                    if getattr(block, "type", "") == "text":
+                        text_out += getattr(block, "text", "")
+                return text_out
 
             # Extract the tool_use block input (the structured JSON)
             tool_input: Optional[Dict[str, Any]] = None
