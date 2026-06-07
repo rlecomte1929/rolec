@@ -116,7 +116,8 @@ def extract_text_from_bytes(data: bytes, mime_type: str) -> Tuple[List[str], Opt
     Extract text from PDF or DOCX. Returns (lines, error).
     """
     if mime_type in ("application/pdf", "pdf") or (isinstance(mime_type, str) and "pdf" in mime_type.lower()):
-        return _extract_text_from_pdf(data)
+        lines, err, _method = _extract_text_from_pdf(data)
+        return lines, err
     if mime_type in (
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "docx",
@@ -157,7 +158,19 @@ def _extract_text_from_docx(data: bytes) -> Tuple[List[str], Optional[str]]:
         return [], str(e)
 
 
-def _extract_text_from_pdf(data: bytes) -> Tuple[List[str], Optional[str]]:
+# N10/AIQ-850: below this many characters of extracted text, a PDF is treated as
+# having no real text layer (scanned/image-only) and the OCR fallback is tried.
+_OCR_MIN_TEXT_CHARS = 50
+# Tesseract mean word-confidence below this flags the OCR output as unreliable.
+_OCR_LOW_CONFIDENCE = 60
+# Languages for scanned HR policies (Norwegian Bokmål is first-class alongside English).
+_OCR_LANGS = "nor+eng"
+_OCR_DPI = 150
+
+
+def _pdfplumber_lines(data: bytes) -> Tuple[List[str], Optional[str]]:
+    """Native text-layer extraction. Returns (lines, error). Raising parsers
+    (corrupt/encrypted) become an error string — the caller does NOT OCR those."""
     try:
         import pdfplumber  # type: ignore
     except ImportError as exc:
@@ -177,6 +190,76 @@ def _extract_text_from_pdf(data: bytes) -> Tuple[List[str], Optional[str]]:
     except Exception as e:
         log.warning("pdf extraction failed: %s", e, exc_info=True)
         return [], str(e)
+
+
+def _ocr_pdf(data: bytes) -> Tuple[List[str], Optional[str], str]:
+    """
+    OCR fallback for scanned/image-only PDFs. Rasterises each page at 150 DPI,
+    OSD-corrects rotation, runs Tesseract (nor+eng), and concatenates page text.
+    Returns (lines, error, quality) where quality is 'ok' | 'low' | 'none'.
+
+    Fails soft: if the OCR system libraries (pytesseract / pdf2image / Tesseract /
+    poppler) are unavailable, returns an error string so extraction degrades to the
+    existing no-text behaviour rather than crashing.
+    """
+    try:
+        import pytesseract  # type: ignore
+        from pdf2image import convert_from_bytes  # type: ignore
+    except Exception as exc:  # ImportError, or a binary-loading error
+        return [], f"ocr unavailable: {exc}", "none"
+    try:
+        images = convert_from_bytes(data, dpi=_OCR_DPI)
+    except Exception as exc:
+        return [], f"ocr rasterise failed: {exc}", "none"
+
+    lines: List[str] = []
+    confidences: List[int] = []
+    for img in images:
+        page_img = img
+        # OSD rotation correction — best-effort (OSD fails on sparse pages).
+        try:
+            osd = pytesseract.image_to_osd(img)
+            rot = next((int(l.split(":")[1]) for l in osd.splitlines() if l.startswith("Rotate:")), 0)
+            if rot:
+                page_img = img.rotate(-rot, expand=True)
+        except Exception:
+            page_img = img
+        try:
+            text = pytesseract.image_to_string(page_img, lang=_OCR_LANGS)
+            lines.extend(text.splitlines())
+            d = pytesseract.image_to_data(page_img, lang=_OCR_LANGS, output_type=pytesseract.Output.DICT)
+            confidences.extend(int(c) for c in d.get("conf", []) if str(c).lstrip("-").isdigit() and int(c) >= 0)
+        except Exception as exc:
+            return [], f"ocr failed: {exc}", "none"
+
+    cleaned = _normalize_lines(lines)
+    if not cleaned:
+        return [], "ocr produced no text", "none"
+    mean_conf = sum(confidences) / len(confidences) if confidences else 0
+    return cleaned, None, ("low" if mean_conf < _OCR_LOW_CONFIDENCE else "ok")
+
+
+def _extract_text_from_pdf(data: bytes) -> Tuple[List[str], Optional[str], str]:
+    """
+    Extract PDF text, preferring the native text layer and falling back to OCR for
+    scanned/image-only PDFs. Returns (lines, error, extraction_method) where method
+    is 'pdfplumber' | 'ocr' | 'ocr_low_quality' | 'none'.
+    """
+    lines, err = _pdfplumber_lines(data)
+    if err:
+        # The parser raised (corrupt/encrypted) — surface it; do NOT OCR.
+        return [], err, "none"
+
+    if sum(len(l) for l in lines) >= _OCR_MIN_TEXT_CHARS:
+        return lines, None, "pdfplumber"
+
+    # Near-empty native text → likely a scanned/image-only PDF. Try OCR.
+    ocr_lines, ocr_err, quality = _ocr_pdf(data)
+    if ocr_err or not ocr_lines:
+        # OCR unavailable or empty → keep the (near-empty) native result so the
+        # intake raises its existing "no readable text" MalformedDocumentError.
+        return lines, None, "pdfplumber"
+    return ocr_lines, None, ("ocr_low_quality" if quality == "low" else "ocr")
 
 
 @dataclass(frozen=True)
@@ -665,6 +748,7 @@ def process_uploaded_document(
         "extracted_metadata": {},
         "processing_status": STATUS_UPLOADED,
         "extraction_error": None,
+        "extraction_method": None,
         "version_label": None,
         "effective_date": None,
     }
@@ -678,14 +762,16 @@ def process_uploaded_document(
         # ignored — sniff is authoritative). A parser failure becomes
         # MalformedDocumentError.
         if sniff.kind == "pdf":
-            lines, err = _extract_text_from_pdf(data)
+            lines, err, extraction_method = _extract_text_from_pdf(data)
         else:
             lines, err = _extract_text_from_docx(data)
+            extraction_method = "docx"
         if err:
             raise MalformedDocumentError(f"Could not read document: {err}")
         if not lines:
             raise MalformedDocumentError("No readable text extracted from document.")
 
+        result["extraction_method"] = extraction_method
         raw_text = "\n".join(lines)
         result["raw_text"] = raw_text
         result["processing_status"] = STATUS_TEXT_EXTRACTED
