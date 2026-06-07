@@ -21,6 +21,7 @@ from .routers import (
     cases_write,
     conjoint,
     employee_quotes,
+    employee_steps,
     exception_requests,
     hr_analytics,
     hr_case_audit,
@@ -90,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
     app.include_router(employee_quotes.router)
+    app.include_router(employee_steps.router)  # [B11/AIQ-421] /api/employee/steps/4 → quote-request alias
     app.include_router(pets.router)
     app.include_router(support.router)
     app.include_router(translation.router)
