@@ -9440,6 +9440,50 @@ def post_policy_assistant_rag_query(
         raise HTTPException(status_code=400, detail="question is required")
     if len(question) > 4000:
         raise HTTPException(status_code=400, detail="question too long")
+
+    # [AIQ-853] Fast-path input classifier. After F2 (AIQ-833) cut the frontend
+    # over to this RAG endpoint, the deterministic out-of-scope/forbidden-phrase
+    # input classifier stopped running for policy-assistant queries. Restore it
+    # here: refuse legal/tax/immigration/lifestyle/jailbreak asks BEFORE any
+    # retrieval or LLM call. Reuses the existing classifier + refusal copy and
+    # returns the SAME flat shape answer_policy_question does, so the frontend
+    # adapter renders it unchanged. The classifier must never block a legitimate
+    # query — any failure falls through to the RAG engine.
+    role = user.get("role") or "employee"
+    try:
+        from .app.services.policy_assistant_refusal_service import (
+            classify_policy_message_with_guardrails,
+            policy_assistant_refusal_for_code,
+        )
+        from .app.services.policy_assistant_contract import PolicyAssistantRefusalCode
+
+        classification = classify_policy_message_with_guardrails(question, role)
+        code = classification.refusal_code
+        # Only fast-path the GENUINELY out-of-scope / forbidden asks (legal,
+        # tax, immigration, lifestyle, jailbreak, employee-asking-for-HR-draft).
+        # Ambiguous / ungrounded / insufficient-policy questions are NOT
+        # short-circuited — the RAG engine does retrieval and can answer or
+        # refuse them itself; refusing them here would over-block real queries.
+        is_out_of_scope = (
+            not classification.supported
+            and code is not None
+            and (code.name.startswith("OUT_OF_SCOPE") or code == PolicyAssistantRefusalCode.ROLE_FORBIDDEN_DRAFT)
+        )
+        if is_out_of_scope:
+            refusal = policy_assistant_refusal_for_code(
+                code, role, ambiguity_override=classification.ambiguity_reason
+            )
+            return {
+                "answer_text": refusal.refusal_text,
+                "answer_kind": "refusal_out_of_policy",
+                "cited_chunks": [],
+                "model": "input-classifier",
+                "cost_usd": 0.0,
+                "audit_id": None,
+            }
+    except Exception:
+        log.exception("policy_assistant input classifier failed; falling through to RAG")
+
     session_id = (body.get("session_id") or "").strip() or None
     top_k = int(body.get("top_k") or 8)
     if top_k < 1 or top_k > 16:
