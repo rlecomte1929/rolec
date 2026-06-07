@@ -29,6 +29,7 @@ from .routers import (
     compliance,
     hr_case_resolve,
     hr_catalog,
+    hr_vendor_assignments,
     hr_coordination,
     immigration_forms,
     immigration_gdpr,
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
 
     # ── Month-1 migration: HR cluster ─────────────────────────────────────────
     app.include_router(hr_catalog.router)
+    app.include_router(hr_vendor_assignments.router)  # B16 — /api/hr aliases for vendor curation widget
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
