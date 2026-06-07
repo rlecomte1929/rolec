@@ -21,7 +21,10 @@ from .policy_hr_rule_override_layer import (
 )
 from .policy_processing_readiness import evaluate_stored_policy_readiness
 from .policy_hr_grouped_review import build_grouped_hr_review
-from .policy_template_first_import import build_template_first_import_payload
+from .policy_template_first_import import (
+    build_template_first_import_payload,
+    get_template_defaults,
+)
 
 
 def _strip_layer2_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -142,6 +145,26 @@ def _resolve_ids_for_draft(
         anchor = (doc or {}).get("id") or pid
         pvid = f"preview-version-{anchor}"
     return company_id, pid, pvid
+
+
+def _resolve_template_defaults(db: Any) -> Dict[str, Any]:
+    """
+    Resolve the gap-fill defaults for the configured template. Until per-company
+    template selection exists, the platform default template (``is_default_template``)
+    is the configured template. Always returns a dict (empty when no template is
+    configured), and never raises — gap-fill must not break HR review.
+    """
+    try:
+        templates = db.list_default_policy_templates() or []
+    except Exception:
+        return {}
+    if not templates:
+        return {}
+    chosen = next((t for t in templates if t.get("is_default_template")), templates[0])
+    template_id = chosen.get("id") if isinstance(chosen, dict) else None
+    if not template_id:
+        return {}
+    return get_template_defaults(db, str(template_id))
 
 
 def _aggregate_issues(
@@ -348,10 +371,12 @@ def build_hr_policy_review_payload(
 
     draft_list = mapped.get("draft_rule_candidates") or []
     grouped_policy_items, comparison_subrules = build_grouped_policy_review_view(clauses, draft_list)
+    template_defaults = _resolve_template_defaults(db)
     template_first_import = build_template_first_import_payload(
         clauses,
         draft_list,
         grouped_policy_items_count=len(grouped_policy_items),
+        template_defaults=template_defaults,
     )
     grouped_review = build_grouped_hr_review(
         grouped_policy_items,
