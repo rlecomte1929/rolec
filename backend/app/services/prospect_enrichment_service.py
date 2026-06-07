@@ -85,20 +85,15 @@ class EnrichmentRequest:
     enable_web_search: bool = False
 
 
-def _build_client() -> Any:
+def _build_client() -> Optional[LLMDisabled]:
+    """Egress guard: return an LLMDisabled sentinel when policy LLM egress is
+    off, else None. The actual call now goes through llm_client.complete_text_sync
+    (AIQ-401); this guard stays here so we never egress prospect data when
+    RELOPASS_POLICY_LLM_DISABLED=1.
+    """
     if policy_llm_disabled():
         return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
-    try:
-        from openai import OpenAI  # type: ignore
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("openai package is required for prospect enrichment") from exc
-    timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
-    max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        timeout=timeout_s,
-        max_retries=max_retries,
-    )
+    return None
 
 
 def _model_name() -> str:
@@ -141,22 +136,25 @@ def _system_prompt() -> str:
 
 
 def _call_llm(
-    client: Any,
     *,
     system_prompt: str,
     user_prompt: str,
     model: str,
 ) -> Dict[str, Any]:
-    response = client.chat.completions.create(
+    # AIQ-401: route through the shared wrapper for timeout + 429/5xx retry +
+    # structured logging. json_object preserves the strict-JSON contract; the
+    # 60s timeout / 3 retries match the previous OpenAI client config.
+    from .llm_client import complete_text_sync
+
+    content = complete_text_sync(
+        system=system_prompt,
+        user=user_prompt,
         model=model,
         temperature=policy_llm_temperature(),
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+        json_object=True,
+        timeout=float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60")),
+        max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "3")),
     )
-    content = response.choices[0].message.content if response.choices else "{}"
     try:
         return json.loads(content or "{}")
     except json.JSONDecodeError as exc:
@@ -258,7 +256,6 @@ def _enrich_row(
         search_text=search_text,
     )
     payload = _call_llm(
-        client,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         model=_model_name(),
