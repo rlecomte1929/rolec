@@ -242,6 +242,10 @@ function App() {
         <Route path="/journey" element={<Journey />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
+        {/* Bare /employee/roadmap has no caseId — keep logged-in employees in-app
+            (they'd otherwise hit the catch-all → public marketing landing). The
+            dashboard is the case hub where the case-scoped roadmap is reachable. */}
+        <Route path="/employee/roadmap" element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeDashboard.path} element={<RequireEmployeeRoute><EmployeeJourney /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<RequireEmployeeRoute><QuoteRequestPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeTaskPage.path} element={<RequireEmployeeRoute><EmployeeTaskPage /></RequireEmployeeRoute>} />

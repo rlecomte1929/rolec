@@ -71,7 +71,7 @@ const SECTIONS: NavSection[] = [
         hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
       },
       { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path, badge: { kind: 'static-count', count: 3 } },
-      { id: 'documents', label: 'Documents', to: ROUTE_DEFS.employeeTaskPage.path },
+      { id: 'documents', label: 'Tasks', hint: 'Documents and actions requested by your HR team', to: ROUTE_DEFS.employeeTaskPage.path },
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'service-providers', label: 'Service providers', to: ROUTE_DEFS.services.path },
       { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
@@ -252,10 +252,12 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   // e.g. /employee/case/43556892-2f33-4ab1-8533-9c11095e5565/wizard/1 → caseId
   const urlCaseId = location.pathname.match(/\/employee\/case\/([^/]+)/)?.[1] ?? null;
 
-  // Fall back to the last-known caseId (from SelectedCaseContext / localStorage)
-  // so sidebar links work even from /employee/dashboard where there is no case in the URL.
+  // Fall back to the last-known caseId (SelectedCaseContext / localStorage), then to the
+  // employee's primary linked case, so sidebar links resolve to the case-scoped roadmap/dossier
+  // even from /employee/dashboard where there is no case in the URL and nothing was selected yet.
   const { selectedCaseId } = useSelectedCase();
-  const effectiveCaseId = urlCaseId ?? selectedCaseId;
+  const { linkedCount, primaryCaseId } = useEmployeeAssignment();
+  const effectiveCaseId = urlCaseId ?? selectedCaseId ?? primaryCaseId;
 
   // Resolve the effective `to` for an item, allowing case-scoped overrides
   const resolveItemTo = (item: SectionItem): string => {
@@ -274,14 +276,27 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const { linkedCount } = useEmployeeAssignment();
   const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount };
   const visibleSections = SECTIONS
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
-    .map((s) => ({
-      ...s,
-      items: s.items.filter((item) => !item.hidden?.(visibilityCtx)),
-    }))
+    .map((s) => {
+      // A higher-role user (e.g. HR) inherits lower-persona sections via the rank
+      // model, but should NOT see that persona's exclusive surfaces — only items
+      // that explicitly declare a route for their role (e.g. the shared Inbox via
+      // toByRole). Admin keeps everything for cross-persona preview.
+      const borrowed = ROLE_RANK[s.minRole] < rank && role !== 'ADMIN';
+      return {
+        ...s,
+        // Suppress the persona heading on a borrowed section: its surviving shared
+        // items (Inbox) float at the top rather than under a misleading "Employee" label.
+        borrowed,
+        items: s.items.filter((item) => {
+          if (item.hidden?.(visibilityCtx)) return false;
+          if (borrowed) return Boolean(item.toByRole?.[role]);
+          return true;
+        }),
+      };
+    })
     .filter((s) => s.items.length > 0);
 
   return (
@@ -347,11 +362,13 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
       <nav className="flex-1 px-2 pb-4">
         {visibleSections.map((section) => (
           <React.Fragment key={section.label}>
-            <SectionHeading
-              label={section.label}
-              count={section.items.length}
-              collapsed={collapsed}
-            />
+            {!section.borrowed && (
+              <SectionHeading
+                label={section.label}
+                count={section.items.length}
+                collapsed={collapsed}
+              />
+            )}
             {section.items.map((item) => {
               const active = isActive(item);
               const to = resolveItemTo(item);
