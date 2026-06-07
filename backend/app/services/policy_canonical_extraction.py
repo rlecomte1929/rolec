@@ -3,6 +3,7 @@ LLM-backed canonical fact extraction with legacy compatibility projection.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any, Dict, List, Optional
@@ -61,37 +62,9 @@ class OpenAIPolicyCanonicalExtractor:
         self._client = client
         self._model = model or os.getenv("OPENAI_POLICY_EXTRACTION_MODEL", "gpt-4.1-mini")
 
-    def _client_or_raise(self) -> Any:
-        if self._client is not None:
-            return self._client
-        from ...core.llm_flags import LLMDisabled, policy_llm_disabled
-        if policy_llm_disabled():
-            # RELOPASS_POLICY_LLM_DISABLED=1 — never build a client, never
-            # egress. Caller must treat this as "no LLM contribution".
-            return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
-        try:
-            from openai import OpenAI  # type: ignore
-        except ImportError as exc:  # pragma: no cover - exercised via tests with mock clients
-            raise RuntimeError("openai package is required for canonical policy extraction") from exc
-        # Explicit timeout + retries — the OpenAI SDK's defaults let a hung
-        # connection block the background task indefinitely. OPENAI_TIMEOUT_SECONDS
-        # and OPENAI_MAX_RETRIES are the env-var overrides for ops tuning.
-        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
-        return OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            timeout=timeout_s,
-            max_retries=max_retries,
-        )
-
     def extract(self, llm_input: PolicyFactExtractionLLMInput) -> PolicyFactExtractionLLMOutput:
-        from ...core.llm_flags import LLMDisabled, policy_llm_temperature
-        client = self._client_or_raise()
-        if isinstance(client, LLMDisabled):
-            # Deterministic short-circuit. Callers will typically route to
-            # the fallback extractor (extract_minimal_policy_facts) and set
-            # review_required=True on the document row.
-            return PolicyFactExtractionLLMOutput(facts=[])
+        from ...core.llm_flags import policy_llm_disabled, policy_llm_temperature
+
         schema_json = {
             "type": "object",
             "properties": {
@@ -105,27 +78,56 @@ class OpenAIPolicyCanonicalExtractor:
             "required": ["facts"],
             "additionalProperties": False,
         }
-        response = client.chat.completions.create(
-            model=self._model,
-            temperature=policy_llm_temperature(),
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Extract relocation policy facts into strict JSON. "
-                        "Return only fields supported by the schema. "
-                        f"Schema: {json.dumps(schema_json)}"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": llm_input.model_dump_json(),
-                },
-            ],
+        system = (
+            "Extract relocation policy facts into strict JSON. "
+            "Return only fields supported by the schema. "
+            f"Schema: {json.dumps(schema_json)}"
         )
-        content = response.choices[0].message.content if response.choices else "{}"
-        payload = json.loads(content or "{}")
+        user = llm_input.model_dump_json()
+
+        if self._client is not None:
+            # Explicit client injection (tests / advanced override): call it
+            # directly, preserving the legacy chat-completions contract. This
+            # path intentionally bypasses the disabled gate, as before.
+            response = self._client.chat.completions.create(
+                model=self._model,
+                temperature=policy_llm_temperature(),
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            content = response.choices[0].message.content if response.choices else "{}"
+            payload = json.loads(content or "{}")
+            return PolicyFactExtractionLLMOutput.model_validate(payload)
+
+        if policy_llm_disabled():
+            # RELOPASS_POLICY_LLM_DISABLED=1 — never egress. Deterministic
+            # short-circuit; callers route to the fallback extractor and set
+            # review_required=True on the document row.
+            return PolicyFactExtractionLLMOutput(facts=[])
+
+        # Production: route through the shared llm_client wrapper (json_object
+        # mode → parsed dict) for timeout, retry on 429/5xx, and structured
+        # logging. Same model + temperature; OPENAI_TIMEOUT_SECONDS /
+        # OPENAI_MAX_RETRIES still apply. Runs in a sync route/background task,
+        # so asyncio.run() drives the async wrapper to result.
+        from .llm_client import complete
+
+        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        payload = asyncio.run(
+            complete(
+                system=system,
+                user=user,
+                schema={},  # json_object mode (free-form JSON object)
+                temperature=policy_llm_temperature(),
+                model=self._model,
+                timeout=timeout_s,
+                max_retries=max_retries,
+            )
+        )
         return PolicyFactExtractionLLMOutput.model_validate(payload)
 
 
