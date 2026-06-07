@@ -208,10 +208,15 @@ def generate_immigration_answer(
             verification_skipped=verification_skipped,
         )
         if grounding_verdict == "ungrounded":
-            # Hallucination caught — discard the answer and refuse.
+            # Hallucination caught — discard the answer and refuse. Don't echo the
+            # unsupported claims back on the response; that would re-surface the very
+            # fabricated content the refusal exists to suppress. They stay in the
+            # grounding_verification trace step above for auditing.
             answer_text = INSUFFICIENT_CONTEXT_REFUSAL
             answer_kind = "refusal_ungrounded"
             cited_sources = []
+            unsupported_claims = []
+            grounding_score = None
             tracer.mark_fallback("ungrounded")
         elif grounding_verdict == "partially_grounded":
             answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT

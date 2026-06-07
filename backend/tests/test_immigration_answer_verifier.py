@@ -71,6 +71,22 @@ class _RaisingClient:
         raise TimeoutError("verifier timed out")
 
 
+class _SlowClient:
+    """Verifier with a fixed simulated model latency, to measure added overhead."""
+    name = "slow"
+
+    def __init__(self, delay, verdict_json):
+        self.delay = delay
+        self._verdict = verdict_json
+        self.calls = []
+
+    def complete(self, req):
+        self.calls.append(req)
+        time.sleep(self.delay)
+        return {"text": self._verdict, "model": req.model, "stop_reason": "end_turn",
+                "usage": {"input_tokens": 10, "output_tokens": 10}}
+
+
 # --------------------------------------------------------------------------- #
 # verify_grounding() unit behavior                                            #
 # --------------------------------------------------------------------------- #
@@ -119,6 +135,32 @@ class VerifierUnitTests(unittest.TestCase):
     def test_parse_verdict_rejects_invalid_verdict(self):
         self.assertIsNone(_parse_verdict('{"verdict": "maybe", "grounding_score": 0.5}'))
 
+    def test_non_dict_response_fails_open_not_closed(self):
+        # A client returning a non-dict must NOT raise — the parse is inside the guard.
+        class _BadShapeClient:
+            name = "badshape"
+
+            def __init__(self):
+                self.calls = []
+
+            def complete(self, req):
+                self.calls.append(req)
+                return "not a dict"  # resp.get(...) would AttributeError
+
+        res = verify_grounding("X", [_chunk()], client=_BadShapeClient())
+        self.assertTrue(res["verification_skipped"])
+        self.assertIsNone(res["verdict"])
+
+    def test_out_of_range_score_is_clamped(self):
+        self.assertEqual(
+            _parse_verdict('{"verdict": "grounded", "unsupported_claims": [], "grounding_score": 5.0}')["grounding_score"],
+            1.0,
+        )
+        self.assertEqual(
+            _parse_verdict('{"verdict": "ungrounded", "unsupported_claims": [], "grounding_score": -3}')["grounding_score"],
+            0.0,
+        )
+
 
 # --------------------------------------------------------------------------- #
 # Engine integration                                                          #
@@ -156,7 +198,15 @@ class EngineVerifierIntegrationTests(unittest.TestCase):
         self.assertEqual(res["answer_text"], INSUFFICIENT_CONTEXT_REFUSAL)
         self.assertEqual(res["cited_sources"], [])
         self.assertEqual(res["grounding_verdict"], "ungrounded")
-        self.assertIn("5000 EUR bond", res["unsupported_claims"])
+        # The fabricated claim must NOT be echoed on the response (it would re-surface
+        # the suppressed hallucination)...
+        self.assertEqual(res["unsupported_claims"], [])
+        self.assertIsNone(res["grounding_score"])
+        # ...but it MUST remain in the trace step for auditing.
+        trace_steps = self.mock_write.call_args.args[0]["steps"]
+        gv = next(s for s in trace_steps if "grounding_verdict" in s)
+        self.assertEqual(gv["grounding_verdict"], "ungrounded")
+        self.assertIn("5000 EUR bond", gv["unsupported_claims"])
 
     def test_partially_grounded_answer_gets_caveat(self):
         answer = f"A residence permit is required within 90 days [source: {_URL}]."
@@ -205,16 +255,28 @@ class EngineVerifierIntegrationTests(unittest.TestCase):
         for field in ("grounding_verdict", "grounding_score", "unsupported_claims", "verification_skipped"):
             self.assertIn(field, res)
 
-    def test_verifier_latency_under_2s_median(self):
-        # Criterion 5: the verifier adds no more than 2s median latency (mock timing).
+    def test_verifier_synchronous_latency_is_bounded(self):
+        # Criterion 5: the verifier runs synchronously and adds bounded latency.
+        # Simulate a fixed verifier model latency; assert the engine incurs it
+        # exactly once (sync) and stays well under the 2s budget. A double-call or
+        # an async leak would blow one of the bounds — so this isn't tautological.
+        SLOW = 0.2
         answer = f"A residence permit is required [source: {_URL}]."
         verdict = '{"verdict": "grounded", "unsupported_claims": [], "grounding_score": 0.9}'
         durations = []
-        for _ in range(5):
+        for _ in range(3):
+            slow = _SlowClient(SLOW, verdict)
             t0 = time.perf_counter()
-            self._run(answer, verdict)
+            res = generate_immigration_answer(
+                _payload([_chunk()]), "q", "FR→NO", client=_gen(answer), verifier_client=slow,
+            )
             durations.append(time.perf_counter() - t0)
-        self.assertLess(median(durations), 2.0)
+            self.assertEqual(len(slow.calls), 1)        # exactly one synchronous verifier call
+            self.assertFalse(res["verification_skipped"])
+        med = median(durations)
+        self.assertGreaterEqual(med, SLOW)              # the verifier latency is actually incurred
+        self.assertLess(med, SLOW + 1.0)                # engine overhead small; no second call
+        self.assertLess(med, 2.0)                       # within the criterion-5 budget
 
 
 if __name__ == "__main__":

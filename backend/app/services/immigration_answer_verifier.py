@@ -70,7 +70,9 @@ def _parse_verdict(text: Optional[str]) -> Optional[Dict[str, Any]]:
     if verdict not in VALID_VERDICTS:
         return None
     try:
-        score = float(data.get("grounding_score"))
+        # Contract is float 0-1; clamp so a model that returns e.g. 5 or -1
+        # can't leak an out-of-range score onto the response.
+        score = max(0.0, min(1.0, float(data.get("grounding_score"))))
     except (TypeError, ValueError):
         score = None
     claims = data.get("unsupported_claims") or []
@@ -114,6 +116,10 @@ def verify_grounding(
         return _skipped_result()
 
     client = client or get_default_client()
+    # The call AND its parsing are guarded together: a client that returns a
+    # non-dict (or anything else unexpected) must still fail OPEN, never raise.
+    # This function is the safety net — it cannot become the thing that 500s an
+    # answer.
     try:
         resp = client.complete(
             LlmRequest(
@@ -123,13 +129,14 @@ def verify_grounding(
                 max_tokens=400,
             )
         )
+        latency_ms = int((time.time() - started) * 1000)
+        parsed = _parse_verdict(resp.get("text"))
+        model = resp.get("model") or VERIFIER_MODEL
     except Exception:
-        # LLM error / timeout — fail open per the Technical Constraint.
+        # LLM error / timeout / malformed response — fail open per the constraint.
         log.warning("immigration grounding verifier call failed; failing open", exc_info=True)
         return _skipped_result(int((time.time() - started) * 1000))
 
-    latency_ms = int((time.time() - started) * 1000)
-    parsed = _parse_verdict(resp.get("text"))
     if parsed is None:
         log.warning("immigration grounding verifier returned unparseable verdict; failing open")
         return _skipped_result(latency_ms)
@@ -137,6 +144,6 @@ def verify_grounding(
     return {
         **parsed,
         "verification_skipped": False,
-        "model": resp.get("model") or VERIFIER_MODEL,
+        "model": model,
         "latency_ms": latency_ms,
     }
