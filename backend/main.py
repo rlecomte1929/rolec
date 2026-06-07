@@ -189,6 +189,7 @@ from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be �
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
+from .app.routers import employee_steps as employee_steps_router
 from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration_intake_consent as immigration_intake_consent_router
@@ -744,6 +745,7 @@ app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoin
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
+app.include_router(employee_steps_router.router)  # [B11/AIQ-421] /api/employee/steps/4
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
 app.include_router(immigration_intake_consent_router.router)  # [AUDIT-B9-imm-6] 1/5 — consent + immigration-requirements (3 handlers)
