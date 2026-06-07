@@ -1,0 +1,59 @@
+name: Immigration corpus indexer
+
+# Manually-triggered one-off job to chunk/embed/ingest the immigration corpus
+# into prod (immigration_corpus_chunks). Replaces Render Shell / One-Off Jobs
+# (paid). Embeds with the same OpenAI model the prod retriever queries with, so
+# run it with the prod OPENAI_API_KEY + DATABASE_URL set as repo secrets.
+# Idempotent — safe to re-run. See docs/runbooks/immigration-rag-landing.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      corridor:
+        description: "Corridor key to index (e.g. FR_NO). Leave blank for all corridors."
+        required: false
+        default: "FR_NO"
+
+jobs:
+  index:
+    name: Index immigration corpus
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Fail fast if secrets are missing
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::DATABASE_URL secret is not set — add it under Settings → Secrets → Actions."
+            exit 1
+          fi
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "::error::OPENAI_API_KEY secret is not set — embeddings would fall back to hash vectors that mismatch the retriever."
+            exit 1
+          fi
+
+      - name: Run indexer
+        env:
+          CORRIDOR: ${{ inputs.corridor }}
+        run: |
+          if [ -n "$CORRIDOR" ]; then
+            python -m backend.app.services.immigration_chunk_indexer --corridor "$CORRIDOR"
+          else
+            python -m backend.app.services.immigration_chunk_indexer
+          fi
