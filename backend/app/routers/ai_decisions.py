@@ -71,8 +71,18 @@ class AIDecisionRead(BaseModel):
 
 
 def _caller_company_id(user: Dict[str, Any]) -> Optional[str]:
-    profile = db.get_profile_record(user.get("id"))
+    # AIQ-861: legacy text HR ids (e.g. ``seed-hr-testingapril``) aren't
+    # UUID-castable, so ``get_profile_record`` returns ``None`` and the ``users``
+    # row carries no company — which made this EU AI Act audit surface 403 with
+    # "No company linked" for HR who resolve fine everywhere else. Fall back to
+    # ``db.get_hr_company_id`` (the hr_users-aware resolver, same path as
+    # command-center / exceptions / AIQ-862). Returns the caller's OWN company
+    # only, so tenant scoping is preserved.
+    uid = user.get("id")
+    profile = db.get_profile_record(uid)
     company_id = (profile or {}).get("company_id") or user.get("company")
+    if not company_id and uid:
+        company_id = db.get_hr_company_id(uid)
     return str(company_id) if company_id else None
 
 
