@@ -58,8 +58,9 @@ class ServicesStateRead(BaseModel):
 
 
 def _caller_company_id(user: Dict[str, Any]) -> str:
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company")
+    uid = user.get("id")
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id") or user.get("company")
     if not company_id:
         raise HTTPException(
             status_code=403,

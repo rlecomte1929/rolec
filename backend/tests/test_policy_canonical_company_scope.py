@@ -131,6 +131,11 @@ class _TenantDb:
         }
         return mapping.get(user_id)
 
+    def get_hr_company_id(self, profile_id: str) -> Optional[str]:
+        # Mirror real Database.get_hr_company_id: no hr_users rows in this fake,
+        # so it falls back to the profile's company_id.
+        return (self.get_profile_record(profile_id) or {}).get("company_id")
+
     def is_admin_allowlisted(self, email: str) -> bool:
         return email.endswith("@relopass.com")
 
@@ -279,6 +284,7 @@ class PolicyCanonicalCompanyScopeTests(unittest.TestCase):
         originals = (
             policy_canonical_router.db.get_user_by_token,
             policy_canonical_router.db.get_profile_record,
+            policy_canonical_router.db.get_hr_company_id,
             policy_canonical_router.db.is_admin_allowlisted,
             policy_canonical_router.db.get_active_canonical_policy_document_for_company,
             policy_canonical_router.db.list_canonical_policy_facts,
@@ -290,6 +296,7 @@ class PolicyCanonicalCompanyScopeTests(unittest.TestCase):
         try:
             policy_canonical_router.db.get_user_by_token = self.db.get_user_by_token
             policy_canonical_router.db.get_profile_record = self.db.get_profile_record
+            policy_canonical_router.db.get_hr_company_id = self.db.get_hr_company_id
             policy_canonical_router.db.is_admin_allowlisted = self.db.is_admin_allowlisted
             policy_canonical_router.db.get_active_canonical_policy_document_for_company = self.db.get_active_canonical_policy_document_for_company
             policy_canonical_router.db.list_canonical_policy_facts = self.db.list_canonical_policy_facts
@@ -321,6 +328,7 @@ class PolicyCanonicalCompanyScopeTests(unittest.TestCase):
             (
                 policy_canonical_router.db.get_user_by_token,
                 policy_canonical_router.db.get_profile_record,
+                policy_canonical_router.db.get_hr_company_id,
                 policy_canonical_router.db.is_admin_allowlisted,
                 policy_canonical_router.db.get_active_canonical_policy_document_for_company,
                 policy_canonical_router.db.list_canonical_policy_facts,

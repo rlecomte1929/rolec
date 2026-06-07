@@ -3934,8 +3934,8 @@ async def upload_company_logo(
 ):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    profile = db.get_profile_record(effective["id"])
-    company_id = profile.get("company_id") if profile else None
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = _get_hr_company_id(effective) or (db.get_profile_record(effective["id"]) or {}).get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="No company linked to your profile")
 
@@ -3982,8 +3982,8 @@ async def upload_company_logo(
 def remove_company_logo(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    profile = db.get_profile_record(effective["id"])
-    company_id = profile.get("company_id") if profile else None
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = _get_hr_company_id(effective) or (db.get_profile_record(effective["id"]) or {}).get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="No company linked to your profile")
     db.update_company_logo(company_id, None)
@@ -3998,8 +3998,8 @@ def list_hr_preferred_suppliers(
 ):
     """List company preferred suppliers for the HR user's company."""
     effective = _effective_user(user, UserRole.HR)
-    profile = db.get_profile_record(effective["id"])
-    company_id = profile.get("company_id") if profile else None
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = _get_hr_company_id(effective) or (db.get_profile_record(effective["id"]) or {}).get("company_id")
     if not company_id:
         return {"preferred": []}
     items = db.list_company_preferred_suppliers(company_id, service_category)
@@ -4013,8 +4013,8 @@ def add_hr_preferred_supplier(
 ):
     """Add supplier to company preferred list."""
     effective = _effective_user(user, UserRole.HR)
-    profile = db.get_profile_record(effective["id"])
-    company_id = profile.get("company_id") if profile else None
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = _get_hr_company_id(effective) or (db.get_profile_record(effective["id"]) or {}).get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="No company linked to your profile")
     supplier_id = (body.get("supplier_id") or "").strip()
@@ -4038,8 +4038,8 @@ def remove_hr_preferred_supplier(
 ):
     """Remove supplier from company preferred list."""
     effective = _effective_user(user, UserRole.HR)
-    profile = db.get_profile_record(effective["id"])
-    company_id = profile.get("company_id") if profile else None
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = _get_hr_company_id(effective) or (db.get_profile_record(effective["id"]) or {}).get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="No company linked to your profile")
     n = db.remove_company_preferred_supplier(company_id, supplier_id, service_category)
@@ -9498,7 +9498,9 @@ def post_policy_assistant_rag_query(
     # the user cannot ask about another company by passing a different
     # company_id.
     profile = db.get_profile_record(user.get("id")) or {}
-    company_id = profile.get("company_id")
+    # hr_users-first so legacy/text HR ids resolve; employees have no hr_users row
+    # and correctly fall back to their profile company.
+    company_id = _get_hr_company_id(user) or profile.get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="user has no company")
 

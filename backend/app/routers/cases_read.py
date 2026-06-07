@@ -1909,9 +1909,10 @@ def get_budget_summary(
     """
     _assert_case_access(user, case_id)
 
-    # Resolve company from profile
-    profile = main_db.get_profile_record(user.get("id"))
-    company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
+    # Resolve company — hr_users-first so legacy/text HR ids (NULL profiles.company_id
+    # but a valid hr_users row) still get their published policy's budget caps.
+    uid = user.get("id")
+    company_id: str = (main_db.get_hr_company_id(uid) if uid else None) or (main_db.get_profile_record(uid) or {}).get("company_id") or user.get("company") or ""
 
     # Pull selected services from the case draft_json
     selected_services: List[str] = []

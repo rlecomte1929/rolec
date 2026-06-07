@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 
 
 def _caller_company_id(user: Dict[str, Any]) -> str:
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company")
+    uid = user.get("id")
+    # hr_users-first: legacy/text HR ids (e.g. seed-hr-testingapril) have a NULL
+    # profiles.company_id but a valid hr_users row — profiles-only would 403 them.
+    company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id") or user.get("company")
     if not company_id:
         raise HTTPException(
             status_code=403,
@@ -45,8 +47,8 @@ def _caller_company_id_optional(user: Dict[str, Any]) -> Optional[str]:
     Used by read-only "dashboard widget" endpoints (notification badges,
     summary counts) that should render gracefully for admins / unlinked
     users rather than 403-ing every HR page load."""
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company")
+    uid = user.get("id")
+    company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id") or user.get("company")
     return str(company_id) if company_id else None
 
 

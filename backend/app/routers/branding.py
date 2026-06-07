@@ -93,8 +93,9 @@ def _resolve_company_id(user: Dict[str, Any]) -> str:
     if not company_id:
         try:
             from ...database import db
-            profile = db.get_profile_record(user.get("id"))
-            company_id = (profile or {}).get("company_id")
+            uid = user.get("id")
+            # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+            company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id")
         except Exception:
             pass
     return str(company_id) if company_id else None
