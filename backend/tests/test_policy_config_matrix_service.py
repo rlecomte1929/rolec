@@ -277,6 +277,34 @@ class PolicyConfigMatrixServiceTests(unittest.TestCase):
         finally:
             self.db.get_policy_config_version_with_config = real  # type: ignore[method-assign]
 
+    def test_apply_template_marks_rows_template_default(self) -> None:
+        self.svc.apply_template_to_draft(self.db.company_id, template_key="standard", created_by="u1")
+        bens = self.db.list_policy_config_benefits(self.db.draft_id)
+        self.assertGreater(len(bens), 0)
+        self.assertTrue(all(b.get("source") == "template_default" for b in bens))
+        self.assertTrue(all(b.get("auto_generated") for b in bens))
+
+    def test_ensure_draft_seed_rows_marked_seeded(self) -> None:
+        self.svc.ensure_draft(self.db.company_id, created_by="u1")
+        bens = self.db.list_policy_config_benefits(self.db.draft_id)
+        self.assertGreater(len(bens), 0)
+        self.assertTrue(all(b.get("source") == "seeded" for b in bens))
+
+    def test_ensure_draft_clone_preserves_source(self) -> None:
+        pub_vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "published", "2025-01-01")
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": pub_vid, "benefit_key": "cola", "benefit_label": "COLA",
+                "category": "compensation_allowances", "covered": True, "value_type": "currency",
+                "amount_value": 1000, "currency_code": "USD", "unit_frequency": "monthly",
+                "targeting_signature": "global", "source": "manual_hr", "auto_generated": False,
+            }
+        )
+        self.svc.ensure_draft(self.db.company_id, created_by="u1")
+        bens = self.db.list_policy_config_benefits(self.db.draft_id)
+        cola = next(b for b in bens if b["benefit_key"] == "cola")
+        self.assertEqual(cola["source"], "manual_hr")
+
     def test_publish_requires_effective_date(self) -> None:
         vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "")
         self.db._version_meta[vid]["effective_date"] = None
