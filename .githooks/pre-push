@@ -27,20 +27,34 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if [ "$local_sha" = "$zero" ]; then
     continue
   fi
-  if [ "$remote_sha" = "$zero" ]; then
-    # New branch — diff against the default upstream if available.
-    range="$local_sha"
-    if base=$(git merge-base "$local_sha" origin/main 2>/dev/null); then
-      range="$base..$local_sha"
-    fi
-  else
+  # Determine the commit range being pushed. Resolve it to a real
+  # "<base>..<tip>" so `git diff` reports the commits' OWN changes — never a
+  # bare single sha, which `git diff` interprets as "tip vs working tree" and
+  # at push time (clean tree == tip) yields an empty diff → silent skip. That
+  # bug (AIQ-550) let a frontend change ship without a build.
+  range=""
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+    # Updating an existing remote branch — diff what we're adding on top of it.
     range="$remote_sha..$local_sha"
+  elif base=$(git merge-base "$local_sha" origin/main 2>/dev/null); then
+    # New branch — diff against where it forked from main.
+    range="$base..$local_sha"
   fi
 
-  if git diff --name-only "$range" 2>/dev/null | grep -qE '^frontend/'; then
+  if [ -z "$range" ]; then
+    # Range is undeterminable (new branch and origin/main is unavailable, or the
+    # remote sha isn't a local object). We can't tell what's in the push, so
+    # build to be safe rather than silently skip.
+    echo "pre-push: ⚠️  cannot determine push range — building to be safe (see AIQ-550)."
+    need_build=1
+    continue
+  fi
+
+  changed=$(git diff --name-only "$range" 2>/dev/null || true)
+  if printf '%s\n' "$changed" | grep -qE '^frontend/'; then
     need_build=1
   fi
-  if git diff --name-only "$range" 2>/dev/null | grep -qE '^\.github/workflows/'; then
+  if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/'; then
     touches_workflow=1
   fi
 done
