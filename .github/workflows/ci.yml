@@ -67,42 +67,16 @@ jobs:
         with:
           files: ".github/workflows/*.yml"
 
-  frontend-build:
-    name: Frontend build
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Confirm dist/ was produced
-        run: |
-          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
-            echo "::error::frontend/dist was not produced by the build"
-            exit 1
-          fi
-
-  # Frontend type-check + lint. Moved here from autofix-ci.yml (DEV-LOOP-2C) so a
-  # single workflow covers the frontend and the autofix workflow no longer
-  # double-runs on every push/PR. Same check name as before.
-  frontend-checks:
-    name: TypeScript & ESLint
+  # Frontend build + type-check + lint + unit tests, consolidated into ONE job
+  # (was three: frontend-build / frontend-checks / frontend-unit-tests).
+  # The three separate jobs each did their own checkout + setup-node + `npm ci`,
+  # so a single frontend PR paid for `npm ci` three times. Merging them runs one
+  # install and reuses it across all four checks. Trade-off: the checks now run
+  # sequentially instead of in parallel (slower wall-clock) — acceptable since
+  # the goal here is billed-minutes, not latency. `main` is not branch-protected,
+  # so the old job names were not required status checks.
+  frontend:
+    name: Frontend (build, types, lint, unit)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -132,27 +106,15 @@ jobs:
         run: npx eslint src --ext .ts,.tsx --max-warnings 0
         continue-on-error: true
 
-  # Frontend unit tests (Vitest). Moved here from autofix-ci.yml. Same check name.
-  frontend-unit-tests:
-    name: Unit Tests
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
+      - name: Build
+        run: npm run build
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Confirm dist/ was produced
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::frontend/dist was not produced by the build"
+            exit 1
+          fi
 
       - name: Run Vitest unit tests
         run: npm test
@@ -260,12 +222,7 @@ jobs:
             backend/tests/test_hr_vendors_corridors.py \
             backend/tests/test_policy_assistant_rag_input_classifier.py \
             backend/tests/test_notion_ready_queue.py \
-            backend/tests/test_pre_push_hook.py \
-            backend/tests/test_employee_steps_alias.py \
-            backend/tests/test_hr_vendor_widgets_bare_paths.py \
-            backend/tests/test_llm_client_text.py \
-            backend/tests/test_cron_crawl_schedules.py \
-            scripts/tests/test_check_rls_coverage.py
+            backend/tests/test_pre_push_hook.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route

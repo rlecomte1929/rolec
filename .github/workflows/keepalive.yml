@@ -11,7 +11,11 @@ name: Render keepalive
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Keep the worker warm only during likely-active hours (06:00-19:00 UTC,
+    # Mon-Fri). Nights/weekends accept the cold start, which the frontend's 45s
+    # axios cap on /api/auth/login already tolerates. Caps the billed-minute
+    # ceiling vs the previous 24/7 */10 schedule.
+    - cron: "*/12 6-19 * * 1-5"
   workflow_dispatch:
 
 concurrency:
