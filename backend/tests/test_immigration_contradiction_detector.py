@@ -105,6 +105,20 @@ class ContradictionDetectorTests(unittest.TestCase):
         self.assertEqual(res["suppressed_chunks"], [])
         self.assertFalse(res["contradiction_check_skipped"])
 
+    def test_non_official_tie_resolves_by_relevance_no_escalation(self):
+        # Two NON-official (tier 2) sources, same fetched_at, conflicting:
+        # must NOT escalate (the note claims "official sources"); keep the more
+        # relevant (higher adjusted_score) chunk and suppress the other.
+        a = _chunk("https://a.example/visa", "Processing time is 4 weeks.", tier=2, fetched="2026-06-06T00:00:00+00:00", score=0.9)
+        b = _chunk("https://b.example/visa", "Processing time is 12 weeks.", tier=2, fetched="2026-06-06T00:00:00+00:00", score=0.5)
+        res = detect_and_resolve_conflicts([a, b], client=_conflict_client())
+
+        self.assertEqual(res["conflicts_detected"], 1)
+        self.assertEqual(res["conflicts_resolved"], 1)
+        self.assertEqual(res["escalations"], [])
+        kept = {c["source_url"] for c in res["kept_chunks"]}
+        self.assertEqual(kept, {"https://a.example/visa"})   # higher adjusted_score kept
+
     def test_low_score_pairs_are_not_compared(self):
         # adjusted_score < 0.4 → pair skipped (no LLM call, no false positive).
         a = _chunk("https://a.example/visa", "Processing time is 4 weeks.", tier=2, fetched="2026-06-06T00:00:00+00:00", score=0.3)

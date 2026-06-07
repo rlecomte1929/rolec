@@ -112,11 +112,16 @@ def _resolve(a: Dict[str, Any], b: Dict[str, Any]) -> str:
     fa, fb = _parse_fetched_at(a.get("fetched_at")), _parse_fetched_at(b.get("fetched_at"))
     if fa and fb and fa != fb:
         return "a" if fa > fb else "b"
-    # Equal trust AND equal/again unknown freshness.
+    # Equal trust tier, no freshness signal to break the tie.
     if ta == _OFFICIAL_TIER:
+        # Two OFFICIAL sources disagree and can't be ranked → surface both (escalate).
         return "escalate"
-    # Non-official, fully tied: can't rank — keep both rather than drop silently.
-    return "escalate"
+    # Non-official tie: do NOT escalate (the escalation note claims "official
+    # sources", which would be untrue here). Keep the more relevant chunk by
+    # adjusted_score so we never silently blend, without overclaiming authority.
+    sa = float(a.get("adjusted_score") or 0)
+    sb = float(b.get("adjusted_score") or 0)
+    return "a" if sa >= sb else "b"
 
 
 def detect_and_resolve_conflicts(
