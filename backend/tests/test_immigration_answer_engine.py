@@ -251,5 +251,31 @@ class AnswerConfidenceIntegrationTests(unittest.TestCase):
         self.assertGreaterEqual(len(res["cited_sources"]), 2)
 
 
+class CitedChunkIdRecordingTests(unittest.TestCase):
+    """N8-FU/AIQ-856 — the engine records the immigration_corpus_chunks ids it cited
+    onto the trace (producer side of the N8 reliability loop)."""
+
+    def _chunk_with_id(self, url, cid):
+        return {**_chunk(url), "id": cid, "adjusted_score": 0.8}
+
+    def test_only_cited_chunk_ids_recorded_on_trace(self):
+        url_a, url_b = "https://gov.example/a", "https://gov.example/b"
+        chunks = [self._chunk_with_id(url_a, "chunk-a"), self._chunk_with_id(url_b, "chunk-b")]
+        # the answer cites only url_a
+        gen = MockClient(default_response=f"You need a permit [source: {url_a}].")
+        with mock.patch(_TRACE_WRITE) as mock_write:
+            res = generate_immigration_answer(_payload(chunks), "q", "FR→NO", client=gen)
+        self.assertEqual(res["answer_kind"], "answer")
+        payload = mock_write.call_args.args[0]
+        # only the CITED chunk's id is recorded (not every retrieved chunk)
+        self.assertEqual(payload["cited_chunk_ids"], ["chunk-a"])
+
+    def test_zero_chunks_records_no_citations(self):
+        gen = MockClient(default_response="unused")
+        with mock.patch(_TRACE_WRITE) as mock_write:
+            generate_immigration_answer(_payload([]), "q", "ZZ→XX", client=gen)
+        self.assertEqual(mock_write.call_args.args[0]["cited_chunk_ids"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
