@@ -136,15 +136,22 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
 
     The route parameter is the case_assignments.id (PK), not case_id (FK).
     We try by PK first, then fall back to FK so the helper works in both call sites.
+
+    Geography: HR-create cases carry origin/destination on mobility_cases; wizard /
+    bridged cases (the employee-intake demo spine) carry it on wizard_cases. COALESCE
+    both so a wizard case (e.g. FR→NO demo 08b7280b) resolves its corridor instead of
+    reporting covered=false/corridor=null — mirroring how exception-requests resolves
+    geography (AIQ-863).
     """
     with db.engine.begin() as conn:
         row = conn.execute(
             text("""
                 SELECT ca.id, ca.case_id, ca.employee_user_id,
-                       mc.destination_country AS dest_country,
-                       mc.origin_country
+                       COALESCE(mc.destination_country, wc.dest_country)   AS dest_country,
+                       COALESCE(mc.origin_country,      wc.origin_country) AS origin_country
                 FROM public.case_assignments ca
                 LEFT JOIN public.mobility_cases mc ON mc.id::text = ca.case_id
+                LEFT JOIN public.wizard_cases   wc ON wc.id::text = ca.case_id
                 WHERE ca.id = :case_id OR ca.case_id = :case_id
                 LIMIT 1
             """),
