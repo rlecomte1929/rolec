@@ -430,7 +430,7 @@ export function InboxV2Page() {
   }, [activeConversation]);
 
   return (
-    <AppShell section="HR Operations" title="Inbox" subtitle={undefined} wide>
+    <AppShell section={role === 'EMPLOYEE' ? 'Employee' : 'HR Operations'} title="Inbox" subtitle={undefined} wide>
       <div className="-mx-6 -my-6 flex h-[calc(100vh-10rem)] min-h-[560px] flex-col overflow-hidden bg-slate-100">
         {/* Breadcrumb row */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 shrink-0">
