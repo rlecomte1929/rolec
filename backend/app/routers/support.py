@@ -405,14 +405,12 @@ def _fetch_company_brain_context() -> str:
 def _call_triage_model(content: str, subject: Optional[str], user_role: str,
                        company_id: Optional[str], recent_events: List[Dict],
                        domain_context: str) -> Dict[str, Any]:
-    """Call Claude Sonnet and return the parsed triage result dict."""
-    import anthropic
+    """Call Claude Sonnet and return the parsed triage result dict.
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not configured")
-
-    client = anthropic.Anthropic(api_key=api_key)
+    Routes through llm_client.claude_complete_text_sync for shared timeout +
+    429/5xx retry + structured logging (AIQ-401). Same model/tokens/temperature.
+    """
+    from ..services.llm_client import claude_complete_text_sync
 
     user_message_parts = []
     if subject:
@@ -430,19 +428,13 @@ def _call_triage_model(content: str, subject: Optional[str], user_role: str,
 
     system_prompt = _TRIAGE_SYSTEM.format(domain_context=domain_context)
 
-    resp = client.messages.create(
-        model="claude-sonnet-4-6",
+    raw = claude_complete_text_sync(
         system=system_prompt,
-        messages=[{"role": "user", "content": "\n".join(user_message_parts)}],
+        user="\n".join(user_message_parts),
+        model="claude-sonnet-4-6",
         max_tokens=512,
         temperature=0.1,
-    )
-
-    raw = ""
-    for block in (resp.content or []):
-        if getattr(block, "type", "") == "text":
-            raw += getattr(block, "text", "")
-    raw = raw.strip()
+    ).strip()
 
     # Strip any accidental markdown fences
     if raw.startswith("```"):
