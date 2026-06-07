@@ -66,8 +66,14 @@ CREATE TABLE audit_logs (
 );
 """
 
-# Rewrite `CAST(? AS jsonb)` → `?` so the production SQL runs on SQLite.
-_JSONB_CAST_RE = re.compile(r"CAST\s*\(\s*(\?|\:\w+)\s+AS\s+jsonb\s*\)", re.IGNORECASE)
+# Rewrite Postgres-only casts `CAST(? AS jsonb)` and `CAST(? AS uuid)` → `?` so the
+# production SQL runs on SQLite. Postgres needs these casts; SQLite has neither type.
+# The uuid strip is load-bearing for determinism (UIAUDIT-G13): left in place,
+# `CAST(:id AS uuid)` gives SQLite NUMERIC affinity, which coerces the uuid string to
+# a number — e.g. 'a1b2…' → 0, '550e8400…' → inf — so distinct uuids collapse to the
+# same stored id and INSERTs hit a flaky "UNIQUE constraint failed: ai_decisions.id".
+# Stripping the cast stores the id as its TEXT uuid, matching how the row reads back.
+_PG_CAST_RE = re.compile(r"CAST\s*\(\s*(\?|\:\w+)\s+AS\s+(?:jsonb|uuid)\s*\)", re.IGNORECASE)
 
 
 def _make_user(uid: str, role: str, company_id: str | None, is_admin: bool = False):
@@ -87,7 +93,7 @@ class AIDecisionsRouterTests(unittest.TestCase):
 
         @event.listens_for(self.engine, "before_cursor_execute", retval=True)
         def _strip_jsonb_cast(conn, cursor, statement, parameters, context, executemany):
-            new_statement = _JSONB_CAST_RE.sub(r"\1", statement)
+            new_statement = _PG_CAST_RE.sub(r"\1", statement)
             return new_statement, parameters
 
         with self.engine.begin() as conn:
