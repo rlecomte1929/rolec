@@ -8,6 +8,15 @@
 # must either get a policy migration or be added here with a justification —
 # otherwise scripts/check_rls_coverage.py fails CI.
 #
+# Allowlist size on 2026-05-25 (seed):                113
+# Allowlist size after SEC-RLS sprint (this commit):    0
+# Steady-state floor (server-only by design):           0
+#
+# SEC-RLSf (AIQ-663): every retained entry MUST carry a justification — an
+# inline `# reason` after the name, or a `#` section header above the block.
+# scripts/check_rls_coverage.py enforces this statically (no DB needed); see
+# its find_unjustified_allowlist_entries + scripts/tests/test_check_rls_coverage.py.
+#
 # Drain log:
 #   2026-05-30  SEC-RLSd (AIQ-661) — catalog/seed domain: removed 7 entries
 #               (country_events, country_profiles, country_resource_items,

@@ -21,6 +21,7 @@ from .routers import (
     cases_write,
     conjoint,
     employee_quotes,
+    employee_steps,
     exception_requests,
     hr_analytics,
     hr_case_audit,
@@ -28,6 +29,7 @@ from .routers import (
     compliance,
     hr_case_resolve,
     hr_catalog,
+    hr_vendor_widgets,
     hr_coordination,
     immigration_forms,
     immigration_gdpr,
@@ -90,6 +92,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
     app.include_router(employee_quotes.router)
+    app.include_router(employee_steps.router)  # [B11/AIQ-421] /api/employee/steps/4 → quote-request alias
     app.include_router(pets.router)
     app.include_router(support.router)
     app.include_router(translation.router)
@@ -102,6 +105,7 @@ def create_app() -> FastAPI:
 
     # ── Month-1 migration: HR cluster ─────────────────────────────────────────
     app.include_router(hr_catalog.router)
+    app.include_router(hr_vendor_widgets.router)  # [B16/AIQ-422] bare-path vendor widget aliases
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.

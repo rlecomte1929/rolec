@@ -139,6 +139,9 @@ export function InboxV2Page() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  // Bumped by the "Try again" recovery action to re-run the conversation fetch
+  // effects (HR + employee) without a full page reload (AIQ-419 / P15).
+  const [reloadKey, setReloadKey] = useState(0);
   const [mailbox, setMailbox] = useState<MailboxKey>('inbox');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -200,7 +203,7 @@ export function InboxV2Page() {
       cancelled = true;
       ac.abort();
     };
-  }, [isHrLike, debouncedSearch, mailbox]);
+  }, [isHrLike, debouncedSearch, mailbox, reloadKey]);
 
   // EMPLOYEE: HR threads + supplier (vendor) threads
   useEffect(() => {
@@ -244,7 +247,7 @@ export function InboxV2Page() {
     return () => {
       cancelled = true;
     };
-  }, [isHrLike, role, userId, userName]);
+  }, [isHrLike, role, userId, userName, reloadKey]);
 
   // Honour ?assignmentId= deep-link
   const assignmentIdFromUrl = searchParams.get('assignmentId');
@@ -545,7 +548,17 @@ export function InboxV2Page() {
               {loading ? (
                 <div className="px-4 py-6 text-sm text-slate-400">Loading conversations…</div>
               ) : listError ? (
-                <div className="px-4 py-6 text-sm text-rose-600">{listError}</div>
+                <div className="px-4 py-6">
+                  <p className="text-sm text-rose-600">{listError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setReloadKey((k) => k + 1)}
+                  >
+                    Try again
+                  </Button>
+                </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-slate-400">No threads in this mailbox.</div>
               ) : (

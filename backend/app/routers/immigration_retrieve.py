@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from ..auth_deps import get_current_user
 from ..services import immigration_answer_engine, immigration_retriever
+from ..services.immigration_source_reconciler import reconcile
 from ..services.immigration_retriever import (
     PathClassification,
     UserProfile,
@@ -96,7 +97,24 @@ def answer_immigration_question(
     200 (no LLM call). Every response carries a trace_id.
     """
     corridor, profile, classification = _profile_and_classification(body)
-    payload = immigration_retriever.retrieve_with_staleness(
+    # N9/AIQ-849: multi-source triangulation. Retrieve official (tier-1) and
+    # all-tier sets, reconcile by cross-tier embedding agreement, then generate
+    # from the reconciled chunks (tagged with source_agreement).
+    multi = immigration_retriever.retrieve_multi_source(
         profile=profile, classification=classification, top_k=body.top_k
     )
+    recon = reconcile(multi["official_chunks"], multi["secondary_chunks"])
+    # Drop the bulky embedding vectors before generation; keep source_agreement.
+    chunks = sorted(
+        ({k: v for k, v in c.items() if k != "embedding"} for c in recon["reconciled_chunks"]),
+        key=lambda c: float(c.get("adjusted_score") or 0),
+        reverse=True,
+    )[: body.top_k]
+    all_stale = bool(chunks) and all(c.get("is_stale") for c in chunks)
+    fetched = [c.get("fetched_at") for c in chunks if c.get("fetched_at")]
+    payload = {
+        "chunks": chunks,
+        "all_stale_warning": all_stale,
+        "oldest_fetched_at": min(fetched) if fetched else None,
+    }
     return immigration_answer_engine.generate_immigration_answer(payload, body.query, corridor)

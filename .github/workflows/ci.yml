@@ -260,7 +260,10 @@ jobs:
             backend/tests/test_hr_vendors_corridors.py \
             backend/tests/test_policy_assistant_rag_input_classifier.py \
             backend/tests/test_notion_ready_queue.py \
-            backend/tests/test_pre_push_hook.py
+            backend/tests/test_pre_push_hook.py \
+            backend/tests/test_employee_steps_alias.py \
+            backend/tests/test_hr_vendor_widgets_bare_paths.py \
+            scripts/tests/test_check_rls_coverage.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route

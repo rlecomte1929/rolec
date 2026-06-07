@@ -125,6 +125,61 @@ class ImmigrationRetrieverTests(unittest.TestCase):
         self.assertEqual(chunks, [])
 
 
+def _engine_with_mixed_tiers():
+    """Corpus with both official (tier-1) and secondary (tier-2) chunks, plus a
+    single-tier corridor — exercises the N9 trust_tier filter + embedding-carry."""
+    eng = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    emb = HashEmbedder()
+    with eng.begin() as c:
+        c.execute(text(_SCHEMA))
+
+        def seed(cid, corridor_db, body, tier):
+            c.execute(text(
+                "INSERT INTO immigration_corpus_chunks "
+                "(id, corridor, source_url, chunk_text, chunk_index, chunk_metadata, trust_tier, "
+                " fetched_at, embedding, content_hash, is_active) VALUES "
+                "(:id,:cor,:u,:t,:i,:m,:tt,:f,:e,:h,1)"),
+                {"id": cid, "cor": corridor_db, "u": f"https://src.example/{cid}", "t": body,
+                 "i": 0, "m": json.dumps({"corridor": corridor_db}), "tt": tier,
+                 "f": "2026-06-06T00:00:00+00:00", "e": json.dumps(emb.embed(body)), "h": cid})
+
+        seed("off-1", "FR_NO", "France to Norway residence registration rule A", 1)
+        seed("off-2", "FR_NO", "France to Norway residence registration rule B", 1)
+        seed("sec-1", "FR_NO", "France to Norway residence registration rule A", 2)
+        seed("sec-2", "FR_NO", "France to Norway secondary blog guidance C", 2)
+        seed("only-1", "NO_XX", "Norway only official rule", 1)   # single-tier corridor
+    return eng
+
+
+class RetrieveMultiSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.engine = _engine_with_mixed_tiers()
+        self.emb = HashEmbedder()
+        self.profile = UserProfile(nationality="FR", origin_country="FR", destination_country="NO", is_eea=True)
+        self.path = PathClassification(pathway_type="eu_free_movement")
+
+    def test_returns_official_and_unrestricted_sets_with_embeddings(self):
+        res = immigration_retriever.retrieve_multi_source(
+            profile=self.profile, classification=self.path, top_k=10,
+            embedder=self.emb, engine=self.engine, min_similarity_score=0.0,
+        )
+        official, secondary = res["official_chunks"], res["secondary_chunks"]
+        self.assertTrue(official)
+        self.assertTrue(all(int(c["trust_tier"]) == 1 for c in official))      # tier-1 filter applied
+        self.assertTrue(any(int(c["trust_tier"]) == 2 for c in secondary))     # unrestricted includes secondary
+        self.assertIsInstance(official[0]["embedding"], list)                  # embeddings carried
+        self.assertTrue(official[0]["embedding"])
+
+    def test_single_tier_corridor_does_not_error(self):
+        prof = UserProfile(nationality="X", origin_country="NO", destination_country="XX", is_eea=False)
+        res = immigration_retriever.retrieve_multi_source(
+            profile=prof, classification=PathClassification(pathway_type="x", corridor="NO→XX"),
+            embedder=self.emb, engine=self.engine, min_similarity_score=0.0,
+        )
+        self.assertTrue(res["official_chunks"])                                 # tier-1 present
+        self.assertTrue(all(int(c["trust_tier"]) == 1 for c in res["secondary_chunks"]))  # no secondary tier
+
+
 _NOW = datetime(2026, 6, 6, tzinfo=timezone.utc)
 
 

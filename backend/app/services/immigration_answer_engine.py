@@ -21,7 +21,12 @@ from typing import Any, Dict, List, Optional
 
 from .ai_trace_logger import TraceSession
 from .immigration_answer_verifier import verify_grounding
+from .immigration_contradiction_detector import (
+    CONFLICTING_OFFICIAL_SOURCES_NOTE,
+    detect_and_resolve_conflicts,
+)
 from .immigration_retriever import IMMIGRATION_CORPUS_COMPANY_ID
+from .immigration_source_reconciler import confidence_from_agreement
 from .policy_assistant_llm_client import (
     LlmClient,
     LlmRequest,
@@ -154,12 +159,23 @@ def generate_immigration_answer(
             "grounding_score": None,
             "unsupported_claims": [],
             "verification_skipped": False,
+            "confidence": 0.0,
+            "source_agreement_summary": {},
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
         }
 
     client = client or get_default_client()
+
+    # N7 / AIQ-846: detect + resolve cross-source contradictions BEFORE generation,
+    # so the model never silently blends conflicting facts. Suppressed (lower-authority)
+    # chunks are dropped from the prompt; escalated official conflicts are kept with a note.
+    conflict_result = detect_and_resolve_conflicts(chunks, client=client)
+    chunks = conflict_result["kept_chunks"] or chunks
+
     system = SYSTEM_PROMPT + (_STALE_CAVEAT_HINT if all_stale else "")
+    if conflict_result["escalations"]:
+        system += "\n\n" + CONFLICTING_OFFICIAL_SOURCES_NOTE
     user_message = _build_user_message(chunks, query, corridor)
 
     resp = client.complete(LlmRequest(system=system, user_message=user_message, model=_MODEL, max_tokens=800))
@@ -221,6 +237,16 @@ def generate_immigration_answer(
         elif grounding_verdict == "partially_grounded":
             answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT
 
+    # N9/AIQ-849: confidence derived from cross-tier source agreement of the chunks
+    # the answer is built from (set upstream by the multi-source reconciler). Confirmed
+    # (official + secondary corroborate) > official_only > secondary_only.
+    confidence = confidence_from_agreement(chunks)
+    source_agreement_summary: Dict[str, int] = {}
+    for c in chunks:
+        sa = c.get("source_agreement")
+        if sa:
+            source_agreement_summary[sa] = source_agreement_summary.get(sa, 0) + 1
+
     tracer.flush()
     return {
         "answer_text": answer_text,
@@ -236,6 +262,11 @@ def generate_immigration_answer(
         "unsupported_claims": unsupported_claims,
         "verification_skipped": verification_skipped,
         "truncated": stop_reason == "max_tokens",
+        "conflicts_detected": conflict_result["conflicts_detected"],
+        "conflicts_resolved": conflict_result["conflicts_resolved"],
+        "contradiction_check_skipped": conflict_result["contradiction_check_skipped"],
+        "confidence": confidence,
+        "source_agreement_summary": source_agreement_summary,
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,
     }

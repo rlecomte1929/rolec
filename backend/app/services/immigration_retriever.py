@@ -24,7 +24,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import text
 
@@ -88,6 +88,8 @@ def retrieve_for_profile(
     embedder: Optional[Embedder] = None,
     engine=None,
     min_similarity_score: Optional[float] = None,
+    trust_tiers: Optional[Sequence[int]] = None,
+    include_embedding: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Retrieve the immigration-rule chunks for this profile's corridor, ranked by
@@ -121,9 +123,9 @@ def retrieve_for_profile(
     fetch_k = min(50, max(k, k * 3))
 
     if engine.dialect.name == "sqlite":
-        raw = _retrieve_corpus_sqlite(engine, corridor_db, q_emb, fetch_k)
+        raw = _retrieve_corpus_sqlite(engine, corridor_db, q_emb, fetch_k, trust_tiers=trust_tiers, include_embedding=include_embedding)
     else:
-        raw = _retrieve_corpus_postgres(engine, corridor_db, q_emb, fetch_k)
+        raw = _retrieve_corpus_postgres(engine, corridor_db, q_emb, fetch_k, trust_tiers=trust_tiers, include_embedding=include_embedding)
 
     # Corridor hard-filter (belt-and-suspenders; the query already scopes corridor).
     raw = [c for c in raw if c.get("corridor") == corridor_db]
@@ -162,6 +164,33 @@ def retrieve_with_staleness(
     # ISO-8601 strings sort chronologically.
     oldest = min(fetched) if fetched else None
     return {"chunks": chunks, "all_stale_warning": all_stale, "oldest_fetched_at": oldest}
+
+
+def retrieve_multi_source(
+    *,
+    profile: UserProfile,
+    classification: PathClassification,
+    top_k: int = 10,
+    embedder: Optional[Embedder] = None,
+    engine=None,
+    min_similarity_score: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    N9/AIQ-849 multi-source triangulation retrieval. Runs two corridor-scoped
+    queries: one restricted to official (trust_tier=1) sources and one unrestricted
+    (all tiers). Returns both sets WITH embeddings so the source reconciler can
+    compute cross-tier agreement. Falls back gracefully to single-source when only
+    one tier of sources exists for the corridor (e.g. no official sources crawled
+    yet) — the empty set simply yields official_only / secondary_only downstream.
+    """
+    common = dict(
+        profile=profile, classification=classification, top_k=top_k,
+        embedder=embedder, engine=engine, min_similarity_score=min_similarity_score,
+        include_embedding=True,
+    )
+    official_chunks = retrieve_for_profile(trust_tiers=[1], **common)
+    all_chunks = retrieve_for_profile(trust_tiers=None, **common)
+    return {"official_chunks": official_chunks, "secondary_chunks": all_chunks}
 
 
 def _days_old(fetched_at: Any, now: datetime) -> int:
@@ -204,7 +233,7 @@ def _apply_quality_gates(
 
 
 def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, fetched_at, score,
-           reliability_score: Any = None) -> Dict[str, Any]:
+           reliability_score: Any = None, embedding=None) -> Dict[str, Any]:
     meta = meta_raw
     if isinstance(meta, str):
         try:
@@ -213,7 +242,7 @@ def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, 
             meta = {}
     # N8/AIQ-848: feedback-loop reliability (neutral when absent/null).
     rel = _rel_cfg.NEUTRAL_RELIABILITY if reliability_score is None else float(reliability_score)
-    return {
+    shaped = {
         "id": str(id_),
         "source_type": IMMIGRATION_SOURCE_TYPE,
         "source_ref": source_url,
@@ -226,16 +255,33 @@ def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, 
         "score": max(0.0, min(1.0, float(score))),
         "reliability_score": max(0.0, min(1.0, rel)),
     }
+    # N9/AIQ-849: triangulation needs the raw embedding vector to compute cross-tier
+    # cosine agreement. Only carried when requested (retrieve_multi_source) so the
+    # default retrieval payload stays lean.
+    if embedding is not None:
+        shaped["embedding"] = embedding
+    return shaped
 
 
-def _retrieve_corpus_postgres(engine, corridor_db: str, q_emb: List[float], k: int) -> List[Dict[str, Any]]:
+def _tier_filter_sql(trust_tiers: Optional[Sequence[int]]) -> str:
+    if not trust_tiers:
+        return ""
+    vals = ", ".join(str(int(t)) for t in trust_tiers)
+    return f" AND trust_tier IN ({vals})"
+
+
+def _retrieve_corpus_postgres(
+    engine, corridor_db: str, q_emb: List[float], k: int,
+    *, trust_tiers: Optional[Sequence[int]] = None, include_embedding: bool = False,
+) -> List[Dict[str, Any]]:
     q = "[" + ",".join(f"{x:.6f}" for x in q_emb) + "]"
+    emb_col = ", embedding::text AS emb_text " if include_embedding else " "
     sql = text(
         "SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, "
         "       reliability_score, "
-        "       (embedding <=> CAST(:q AS vector)) AS distance "
+        "       (embedding <=> CAST(:q AS vector)) AS distance" + emb_col +
         "FROM immigration_corpus_chunks "
-        "WHERE corridor = :corridor AND is_active = true "
+        "WHERE corridor = :corridor AND is_active = true" + _tier_filter_sql(trust_tiers) + " "
         "ORDER BY embedding <=> CAST(:q AS vector) ASC LIMIT :k"
     )
     with engine.begin() as conn:
@@ -243,17 +289,27 @@ def _retrieve_corpus_postgres(engine, corridor_db: str, q_emb: List[float], k: i
     out = []
     for r in rows:
         dist = float(r["distance"] if r["distance"] is not None else 1.0)
+        emb = None
+        if include_embedding and r.get("emb_text"):
+            try:
+                emb = json.loads(r["emb_text"])
+            except Exception:
+                emb = None
         out.append(_shape(
             r["chunk_metadata"], id_=r["id"], source_url=r["source_url"], chunk_text=r["chunk_text"],
             corridor=r["corridor"], trust_tier=r["trust_tier"], fetched_at=r["fetched_at"],
-            score=1.0 - (dist / 2.0), reliability_score=r["reliability_score"],
+            score=1.0 - (dist / 2.0), reliability_score=r["reliability_score"], embedding=emb,
         ))
     return out
 
 
-def _retrieve_corpus_sqlite(engine, corridor_db: str, q_emb: List[float], k: int) -> List[Dict[str, Any]]:
+def _retrieve_corpus_sqlite(
+    engine, corridor_db: str, q_emb: List[float], k: int,
+    *, trust_tiers: Optional[Sequence[int]] = None, include_embedding: bool = False,
+) -> List[Dict[str, Any]]:
     base = ("SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, "
-            "embedding{rel} FROM immigration_corpus_chunks WHERE corridor = :corridor AND is_active = 1")
+            "embedding{rel} FROM immigration_corpus_chunks WHERE corridor = :corridor AND is_active = 1"
+            + _tier_filter_sql(trust_tiers))
     with engine.begin() as conn:
         # reliability_score (N8) is read when present; tolerate older sqlite fixtures
         # that predate the column without forcing a fixture edit.
@@ -271,6 +327,7 @@ def _retrieve_corpus_sqlite(engine, corridor_db: str, q_emb: List[float], k: int
             r["chunk_metadata"], id_=r["id"], source_url=r["source_url"], chunk_text=r["chunk_text"],
             corridor=r["corridor"], trust_tier=r["trust_tier"], fetched_at=r["fetched_at"],
             score=cosine_similarity(q_emb, emb), reliability_score=r.get("reliability_score"),
+            embedding=(list(emb) if include_embedding else None),
         ))
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:k]
