@@ -117,6 +117,10 @@ class OpenAIEmbedder:
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set; cannot use OpenAIEmbedder")
+        # AIQ-401 documented exception: llm_client is a chat/completions wrapper
+        # with no embeddings entry point. Embeddings (client.embeddings.create)
+        # legitimately use the OpenAI client directly until/unless llm_client
+        # grows an embeddings method.
         try:
             from openai import OpenAI
         except ImportError:

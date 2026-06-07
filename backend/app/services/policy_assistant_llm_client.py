@@ -79,6 +79,11 @@ class AnthropicClient:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set; cannot use AnthropicClient")
+        # AIQ-401 documented exception: this is the policy-assistant's dedicated
+        # client (Anthropic sonnet default + haiku fallback, per-call PII masking
+        # before egress, and structured usage/cost accounting). It intentionally
+        # stays separate from the generic llm_client wrapper; unifying would lose
+        # the masking + fallback + usage contract its callers depend on.
         try:
             import anthropic
         except ImportError:

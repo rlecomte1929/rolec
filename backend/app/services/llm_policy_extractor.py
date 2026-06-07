@@ -231,6 +231,10 @@ def extract_policy_with_llm(
         )
         return None
 
+    # AIQ-401 documented exception: this extractor drives Anthropic tool-use with
+    # a domain-specific tool (record_extracted_policy) + prompt-version management
+    # and bespoke tool_use-block handling. The generic llm_client.claude_complete
+    # forces a single "structured_output" tool, so it can't carry this faithfully.
     try:
         import anthropic  # type: ignore
     except ImportError:
