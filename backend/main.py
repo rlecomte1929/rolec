@@ -182,6 +182,7 @@ from .app.routers import exception_requests as exception_requests_router
 from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
+from .app.routers import hr_vendor_widgets as hr_vendor_widgets_router
 from .app.routers import hr_case_detail as hr_case_detail_router  # C1-11c-be — per-case detail reads (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
 from .app.routers import roadmap_audit as roadmap_audit_router  # P1-08c/d/e — roadmap audit trail (dual-layer per CLAUDE.md)
@@ -738,6 +739,7 @@ app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)  # [AUDIT-C2.3] re-added — vendor curation, notification-counts (B16)
+app.include_router(hr_vendor_widgets_router.router)  # [B16/AIQ-422] bare-path vendor widget aliases
 app.include_router(hr_case_detail_router.router)  # C1-11c-be — 6 per-case detail reads consumed by HR Dashboard
 app.include_router(hr_case_audit_router.router)  # C1-16 — GET /api/hr/cases/{id}/audit chronological lineage
 app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases/{id}/audit?as_of, admin export, rule-change notifier
