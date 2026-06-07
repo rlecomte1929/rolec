@@ -153,7 +153,19 @@ def _resolve_template_defaults(db: Any) -> Dict[str, Any]:
     template selection exists, the platform default template (``is_default_template``)
     is the configured template. Always returns a dict (empty when no template is
     configured), and never raises — gap-fill must not break HR review.
+
+    N12/AIQ-852: prefer the unified ``PolicyTemplateService`` (single versioned source
+    of truth). Fall back to the legacy ``default_policy_templates.snapshot_json`` reader
+    if the service yields nothing, so existing behaviour is preserved.
     """
+    try:
+        from .policy_template_service import PolicyTemplateService
+
+        unified = PolicyTemplateService().get_default_benefits()
+        if unified:
+            return unified
+    except Exception:
+        pass
     try:
         templates = db.list_default_policy_templates() or []
     except Exception:
