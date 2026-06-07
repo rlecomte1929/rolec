@@ -108,6 +108,17 @@ class AIDecisionsRouterTests(unittest.TestCase):
         )
         self.profile_patcher.start()
         self.addCleanup(self.profile_patcher.stop)
+        # [AIQ-861] _caller_company_id now also falls back to the hr_users-aware
+        # resolver for legacy text HR ids. Stub it to None so these synthetic
+        # users (whose company comes only from user["company"]) keep exercising
+        # the no-company path — e.g. admin-with-no-company must still see all.
+        self.hr_company_patcher = mock.patch.object(
+            router_module.db,
+            "get_hr_company_id",
+            return_value=None,
+        )
+        self.hr_company_patcher.start()
+        self.addCleanup(self.hr_company_patcher.stop)
 
     def _rows(self):
         with self.engine.connect() as conn:
