@@ -47,13 +47,21 @@ supabase migration new <name>        # Create a new migration file
 
 **Dual-layer pattern — this is the most important thing to understand:**
 - `backend/main.py` is the primary entry point and still owns the bulk of routes (auth, assignments, policies, HR command center, employee journey). It is large (~12k lines) and is being progressively decomposed.
-- `backend/app/` is the modular layer. New routes go here as `app/routers/<domain>.py`, registered in `app/main.py`. The `app/` app is mounted into the root `main.py`.
+- `backend/app/` is the modular layer. New routes go here as `app/routers/<domain>.py`, registered in `app/main.py`. Note: `backend/main.py` does **not** sub-mount the `app/` app — it re-imports each `app/routers/` module individually and re-registers it via its own `include_router()` call. That is why a router needs registering in *both* places (see below).
 
 **⚠️ Routers must be registered in BOTH `backend/main.py` AND `backend/app/main.py`.** Render boots `uvicorn backend.main:app`, so a router registered only in `backend/app/main.py` will return 405 in production — the modular app instance is never the one serving traffic. This has bitten us three times now (AI-002 v2 → hotfix `5d796c2`; AIQ-567 → rejected pre-merge; AIQ-568 → rejected pre-merge), so it's a hard rule until the modular cutover described in `backend/MIGRATION_PLAN.md` lands. When you add a new router:
   1. Create `backend/app/routers/<name>.py`.
   2. Register it in `backend/app/main.py` (the modular sub-app, where future-prod will live).
-  3. **Also** register it in `backend/main.py` alongside the existing `auth_router`, `cases_read_router`, `ai_decisions_router`, etc. block (~line 580). The import + `include_router` call belong here too.
+  3. **Also** register it in `backend/main.py` alongside the existing `auth_router`, `cases_read_router`, `ai_decisions_router`, etc. block (~line 580) — the literal import + `include_router` lines belong here too:
+     ```python
+     # backend/main.py — match the existing pattern (imports ~line 130, registrations ~line 710)
+     from .app.routers import <name> as <name>_router   # import the module, aliased
+     app.include_router(<name>_router.router)            # register its .router
+     ```
+     This is an **AND, not an OR**: step 2 (`backend/app/main.py`) is still required for tests and the modular app; step 3 (`backend/main.py`) is what actually serves prod traffic. Skip step 3 and the route 405s in production — that is exactly the AI-002 v2 incident: the `/api/ai/decisions` router was registered in `backend/app/main.py` only, shipped a 405, and needed hotfix `5d796c2` to resolve.
   4. Verify both registrations with `python3 -c "from backend.main import app; print(sorted(r.path for r in app.routes if '<your-prefix>' in r.path))"` before pushing — if the route doesn't show up here, prod is dead on arrival.
+
+  This duplication is temporary: once the modular cutover in `backend/MIGRATION_PLAN.md` lands and prod boots the `app/` app directly, the `backend/main.py` re-registration step goes away. Until then, both are mandatory.
 
   Tests that mount the prod app (`from backend.main import app`) must import auth dependencies (`get_current_user`, `require_admin_or_hr`) from `backend.app.auth_deps` — there's a second `get_current_user` in `backend/main.py` that's a different function, and `dependency_overrides` keyed to the wrong reference silently never fires. AIQ-567's tests had this bug on top of the wiring bug.
 
