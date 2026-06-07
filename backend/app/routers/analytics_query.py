@@ -25,7 +25,6 @@ LLM:
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from datetime import date, timedelta
@@ -158,35 +157,23 @@ def _build_context(
 
 
 def _call_sonnet(question: str, context: str) -> str:
-    """Call Claude Sonnet via the existing LLM client pattern. Returns plain text."""
-    try:
-        import anthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not set")
+    """Call Claude Sonnet via the shared llm_client wrapper. Returns plain text.
 
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model="claude-sonnet-4-6",
+    Routes through llm_client.claude_complete_text_sync for shared timeout +
+    429/5xx retry + structured logging (AIQ-401). Same model/tokens/temperature.
+    """
+    from ..services.llm_client import claude_complete_text_sync
+    try:
+        return claude_complete_text_sync(
             system=SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {question}",
-            }],
+            user=f"Context:\n{context}\n\nQuestion: {question}",
+            model="claude-sonnet-4-6",
             max_tokens=1024,
             temperature=0.2,
         )
-        text = ""
-        for block in (resp.content or []):
-            if getattr(block, "type", "") == "text":
-                text += getattr(block, "text", "")
-        return text.strip()
-
-    except ImportError:
-        return f"Analytics answer unavailable (anthropic package not installed). Summarised context:\n{context[:500]}"
     except Exception as exc:
         log.warning("analytics_query: LLM call failed: %s", exc)
-        return f"Unable to generate answer at this time. Raw data is available in the `data` field."
+        return "Unable to generate answer at this time. Raw data is available in the `data` field."
 
 
 # ─── Route ────────────────────────────────────────────────────────────────────
