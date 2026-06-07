@@ -172,6 +172,46 @@ class AdminFormTemplatesRouterTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["category"], "registration")
 
+    def test_list_serializes_list_shaped_trigger_rules(self) -> None:
+        # [AIQ-858] Regression: all 83 seeded prod rows (and the P1-3 trigger engine)
+        # store trigger_rules as a LIST of rule objects, but FormTemplateRead originally
+        # typed it as a Dict — so FastAPI's response_model validation raised on every
+        # row → GET /api/admin/form-templates 500. The handler returns a plain dict
+        # (bypassing validation), so we assert FormTemplateRead accepts the row, which
+        # is exactly what FastAPI does before serializing the response.
+        rules = [
+            {
+                "event": "roadmap.profile_completed",
+                "priority": 90,
+                "conditions": {"has_spouse": True, "destination_country": "NO"},
+                "for_persons": ["spouse"],
+                "blocked_by_template_code": None,
+            }
+        ]
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO form_templates (id, code, name, country, fields, trigger_rules, version) "
+                    "VALUES (:id, :code, :name, :country, :fields, :rules, :version)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "code": "UTL-2011F",
+                    "name": "Spouse registration (NO)",
+                    "country": "NO",
+                    "fields": "[]",
+                    "rules": json.dumps(rules),
+                    "version": "1.0.0",
+                },
+            )
+        rows = list_form_templates(
+            country=None, category=None, code=None, limit=100, offset=0, user=self.user
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["trigger_rules"], rules)
+        # Must NOT raise — this is the response_model validation FastAPI runs.
+        router_module.FormTemplateRead(**rows[0])
+
     def test_get_returns_full_row(self) -> None:
         created = create_form_template(
             body=FormTemplateCreate(code="G-1", name="get me", country="NO"),

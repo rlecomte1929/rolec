@@ -329,7 +329,7 @@ async def list_rfqs(
         SELECT r.id, r.case_id, r.vendor_id, r.service_category,
                r.move_date, r.budget_range, r.special_requirements,
                r.hr_email, r.hr_name, r.status, r.created_at, r.updated_at,
-               v.name AS vendor_name, v.contact_email AS vendor_email
+               v.name AS vendor_name, v.email AS vendor_email
         FROM rfq_requests r
         LEFT JOIN vendors v ON v.id = r.vendor_id
         WHERE {where}
