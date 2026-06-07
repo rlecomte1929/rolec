@@ -117,6 +117,13 @@ def _authorize_company(user: Dict[str, Any], company_id: str) -> None:
     if user.get("role") == UserRole.ADMIN.value or user.get("is_admin"):
         return
     user_cid = str(user.get("company_id") or user.get("company") or "")
+    if not user_cid:
+        # AIQ-862: legacy text HR ids resolve their company only via hr_users;
+        # without this a legitimate HR 403'd on their OWN company's summary.
+        # Isolation is preserved — we compare the caller's RESOLVED company to
+        # the path company_id below, so this never grants cross-company access.
+        uid = user.get("id")
+        user_cid = str(db.get_hr_company_id(uid) or "") if uid else ""
     if user_cid and user_cid == str(company_id):
         return
     raise HTTPException(status_code=403, detail="Cross-company access denied")

@@ -73,9 +73,18 @@ class QuoteRequestRead(BaseModel):
 
 
 def _caller_company_id(user: Dict[str, Any]) -> str:
-    """Resolve the caller's company_id; 403 if missing."""
-    profile = db.get_profile_record(user.get("id"))
+    """Resolve the caller's company_id; 403 if missing.
+
+    AIQ-862: legacy text HR ids (e.g. ``seed-hr-testingapril``) are not
+    UUID-castable, so ``get_profile_record`` returns ``None`` and ``users`` rows
+    carry no company — which 403'd legitimate HR on their own company's quotes.
+    Fall back to ``db.get_hr_company_id`` (hr_users-aware) before failing.
+    """
+    uid = user.get("id")
+    profile = db.get_profile_record(uid)
     company_id = (profile or {}).get("company_id") or user.get("company")
+    if not company_id and uid:
+        company_id = db.get_hr_company_id(uid)
     if not company_id:
         raise HTTPException(
             status_code=403,
