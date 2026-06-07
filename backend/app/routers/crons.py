@@ -14,6 +14,9 @@ POST /api/crons/process-crawl-schedules
     [P3-02a] Runs all due source-monitoring crawl schedules with retry +
     exponential backoff. Designed to be called daily (e.g. 03:00 UTC) by the
     `.github/workflows/crawl-scheduler.yml` GitHub Actions cron.
+    [AIQ-872] Also fires notify_superseded_rules() on this same daily tick so
+    superseded-rule notifications reach affected open cases within 24h with no
+    admin action (completes AIQ-642's manual-only notifier). Idempotent.
 
 Example Supabase pg_cron setup (run once after deployment):
     SELECT cron.schedule(
@@ -39,6 +42,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
 from ..services.monitoring_alerts import send_test_alert
+from ..services.rule_change_notifier import notify_superseded_rules
 from ..services.source_reliability_service import recompute_reliability_scores
 
 log = logging.getLogger(__name__)
@@ -87,12 +91,25 @@ def process_crawl_schedules(request: Request) -> Dict[str, Any]:
     results = process_due_schedules(user_id="cron")
     succeeded = sum(1 for r in results if r.get("status") == "succeeded")
     failed = sum(1 for r in results if r.get("status") == "failed")
+
+    # [AIQ-872 / P1-08d-followup] Piggyback the rule-change notifier on this daily
+    # tick so affected open cases learn of a superseded rule within 24h with NO
+    # admin action — completing AIQ-642 (which shipped notify_superseded_rules()
+    # admin-trigger-only). It's idempotent (per case, prior rule_version) and
+    # non-fatal here: a notifier error must never fail the crawl cron.
+    try:
+        rule_change_notifications: Dict[str, Any] = notify_superseded_rules()
+    except Exception:
+        log.exception("process_crawl_schedules: rule-change notifier failed")
+        rule_change_notifications = {"error": "notifier_failed"}
+
     return {
         "ok": True,
         "processed": len(results),
         "succeeded": succeeded,
         "failed": failed,
         "results": results,
+        "rule_change_notifications": rule_change_notifications,
     }
 
 

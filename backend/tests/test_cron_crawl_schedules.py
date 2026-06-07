@@ -45,7 +45,9 @@ class TestProcessCrawlSchedulesCron(unittest.TestCase):
         ]
         with patch.dict(os.environ, {"CRON_SECRET": "right"}), \
              patch("backend.app.routers.crons.process_due_schedules",
-                   return_value=fake_results) as mock_proc:
+                   return_value=fake_results) as mock_proc, \
+             patch("backend.app.routers.crons.notify_superseded_rules",
+                   return_value={"notified": 0}):
             r = self.client.post(CRON_PATH, headers={"Authorization": "Bearer right"})
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -54,6 +56,31 @@ class TestProcessCrawlSchedulesCron(unittest.TestCase):
         self.assertEqual(body["succeeded"], 1)
         self.assertEqual(body["failed"], 1)
         mock_proc.assert_called_once()
+
+    # [AIQ-872] The daily crawl tick also fires the rule-change notifier.
+    def test_fires_rule_change_notifier_on_tick(self):
+        with patch.dict(os.environ, {"CRON_SECRET": "right"}), \
+             patch("backend.app.routers.crons.process_due_schedules", return_value=[]), \
+             patch("backend.app.routers.crons.notify_superseded_rules",
+                   return_value={"notified": 2, "skipped_idempotent": 1}) as mock_notify:
+            r = self.client.post(CRON_PATH, headers={"Authorization": "Bearer right"})
+        self.assertEqual(r.status_code, 200)
+        mock_notify.assert_called_once()
+        self.assertEqual(
+            r.json()["rule_change_notifications"],
+            {"notified": 2, "skipped_idempotent": 1},
+        )
+
+    def test_notifier_error_is_non_fatal(self):
+        with patch.dict(os.environ, {"CRON_SECRET": "right"}), \
+             patch("backend.app.routers.crons.process_due_schedules", return_value=[]), \
+             patch("backend.app.routers.crons.notify_superseded_rules",
+                   side_effect=RuntimeError("db down")):
+            r = self.client.post(CRON_PATH, headers={"Authorization": "Bearer right"})
+        # Crawl cron must stay green even if the notifier blows up.
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(r.json()["rule_change_notifications"], {"error": "notifier_failed"})
 
 
 if __name__ == "__main__":
