@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from ...database import db
-from .policy_assistant_embedder import Embedder, get_default_embedder
+from .embeddings import Embedder, get_default_embedder  # AI-I.4a: via embeddings abstraction layer
 
 log = logging.getLogger(__name__)
 
