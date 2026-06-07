@@ -71,8 +71,16 @@ class AIDecisionRead(BaseModel):
 
 
 def _caller_company_id(user: Dict[str, Any]) -> Optional[str]:
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company")
+    # UIAUDIT-G6 / AIQ-862: legacy or text HR ids (e.g. seed-hr-testingapril)
+    # resolve their company ONLY via hr_users — the profiles path is uuid-keyed and
+    # misses them, which made this tenant-scoped audit log show "No company linked"
+    # for a company-linked HR. Resolve via hr_users first, then fall back to profile
+    # / user.company (the same order the working HR endpoints use).
+    uid = user.get("id")
+    company_id = db.get_hr_company_id(uid) if uid else None
+    if not company_id:
+        profile = db.get_profile_record(uid)
+        company_id = (profile or {}).get("company_id") or user.get("company")
     return str(company_id) if company_id else None
 
 

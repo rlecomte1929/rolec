@@ -108,6 +108,14 @@ class AIDecisionsRouterTests(unittest.TestCase):
         )
         self.profile_patcher.start()
         self.addCleanup(self.profile_patcher.stop)
+        # UIAUDIT-G6: _caller_company_id now resolves hr_users FIRST. Default it to
+        # None so the existing tests exercise the profile / user.company fallback
+        # cleanly (and don't query a non-existent hr_users table in the sqlite mirror).
+        self.hr_company_patcher = mock.patch.object(
+            router_module.db, "get_hr_company_id", return_value=None,
+        )
+        self.hr_company_patcher.start()
+        self.addCleanup(self.hr_company_patcher.stop)
 
     def _rows(self):
         with self.engine.connect() as conn:
@@ -127,6 +135,31 @@ class AIDecisionsRouterTests(unittest.TestCase):
                     )
                 ).mappings()
             )
+
+    # ------------------------------------------------------------------
+    # UIAUDIT-G6 — company resolution (hr_users-first for legacy/text HR ids)
+    # ------------------------------------------------------------------
+    def test_caller_company_id_resolves_via_hr_users(self):
+        # Legacy/text HR id (e.g. seed-hr-testingapril): no user.company, profile
+        # company_id is NULL, but hr_users links them — must resolve, not 403.
+        user = _make_user("seed-hr-testingapril", "hr", None)
+        with mock.patch.object(
+            router_module.db, "get_hr_company_id", return_value="c0000000-0000-0000-0000-000000000001"
+        ):
+            self.assertEqual(
+                router_module._caller_company_id(user),
+                "c0000000-0000-0000-0000-000000000001",
+            )
+
+    def test_caller_company_id_falls_back_to_profile(self):
+        # When hr_users has nothing, fall back to the profile company_id.
+        user = _make_user("uuid-hr", "hr", None)
+        with mock.patch.object(router_module.db, "get_hr_company_id", return_value=None), \
+             mock.patch.object(
+                 router_module.db, "get_profile_record",
+                 return_value={"id": "uuid-hr", "company_id": "comp-via-profile"},
+             ):
+            self.assertEqual(router_module._caller_company_id(user), "comp-via-profile")
 
     # ------------------------------------------------------------------
     # POST /api/ai/decisions
