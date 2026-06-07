@@ -209,10 +209,16 @@ const BuildNextVersionSection: React.FC<{
   const [docsOpen, setDocsOpen] = useState(false);
   return (
     <Card padding="lg">
-      <h2 className="text-lg font-semibold text-[#0b2b43]">Start your policy</h2>
+      {/* fix: AIQ-LIVE-QA — when a version is already live, this is "create a new
+          version", not "start your policy"; the first-run framing is misleading
+          next to a published matrix. */}
+      <h2 className="text-lg font-semibold text-[#0b2b43]">
+        {hasLivePolicy ? 'Create a new policy version' : 'Start your policy'}
+      </h2>
       <p className="text-sm text-slate-600 mt-1.5">
-        Pick a template baseline. You'll edit the caps yourself in the benefit table
-        below — no document upload required.
+        {hasLivePolicy
+          ? "Start from a template or import a document to draft a replacement. Your live version stays in effect until you publish it."
+          : "Pick a template baseline. You'll edit the caps yourself in the benefit table below — no document upload required."}
       </p>
       {/* PR 0.5 simplification: template is the primary CTA (matrix-first
           authoring). Document import demoted to a quieter secondary link
