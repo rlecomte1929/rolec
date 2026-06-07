@@ -31,7 +31,6 @@ if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
 from backend.app.services import immigration_retriever  # noqa: E402
-from backend.app.services import policy_chunk_retriever  # noqa: E402
 from backend.app.services.policy_assistant_embedder import HashEmbedder  # noqa: E402
 from backend.app.services.policy_assistant_llm_client import MockClient  # noqa: E402
 
@@ -151,19 +150,27 @@ class EvaluateTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+# N2/AIQ-841 (#420): immigration rules moved to a dedicated immigration_corpus_chunks
+# table (corridor-scoped, underscore corridor form), read via immigration_retriever.db.
+# This fixture mirrors the one in test_eval_rag_context_precision.py, which drives the
+# same retriever adapter. (Before this, the test seeded the old policy_assistant_chunks
+# and patched policy_chunk_retriever.db, so the retriever read an empty table and the
+# step came back ungrounded → factual_consistency 0.0 — UIAUDIT-G16.)
 _SCHEMA = """
-CREATE TABLE policy_assistant_chunks (
+CREATE TABLE immigration_corpus_chunks (
     id TEXT PRIMARY KEY,
-    company_id TEXT NOT NULL,
-    policy_version_id TEXT,
-    source_type TEXT NOT NULL,
-    source_ref TEXT NOT NULL,
+    corridor TEXT NOT NULL,
+    source_doc_id TEXT,
+    source_url TEXT NOT NULL,
     chunk_text TEXT NOT NULL,
-    chunk_metadata TEXT NOT NULL DEFAULT '{}',
+    chunk_index INTEGER NOT NULL DEFAULT 0,
+    chunk_metadata TEXT DEFAULT '{}',
+    trust_tier INTEGER NOT NULL DEFAULT 2,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     embedding TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id, source_type, source_ref)
+    content_hash TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT
 );
 """
 
@@ -184,28 +191,35 @@ class FactualConsistencyIntegrationTests(unittest.TestCase):
                     conn.execute(text(stmt))
         emb = HashEmbedder()
         with self.engine.begin() as conn:
-            meta = json.dumps({"corridor": "IN→DE", "pathway_type": "blue_card"})
-            for cid, body in (
-                ("in_de_bc_passport", "India Germany Blue Card passport requirement"),
-                ("in_de_bc_degree", "India Germany Blue Card recognised degree requirement"),
-            ):
+            # Corridor stored in underscore form; the retriever normalizes arrow -> underscore.
+            meta = json.dumps({"corridor": "IN_DE", "pathway_type": "blue_card"})
+            # The retrieval query is synthesized from the profile (immigration_retriever
+            # ._build_query), NOT query_text — so the chunk BODIES must overlap it enough
+            # to clear the N3 similarity floor (IMMIGRATION_MIN_SIMILARITY=0.25) under
+            # HashEmbedder. Short bodies score below the floor and the retriever returns
+            # nothing (the original UIAUDIT-G16 failure). Mirror the floor-clearing body
+            # style from test_eval_rag_context_precision.py.
+            for cid in ("in_de_bc_passport", "in_de_bc_degree"):
+                body = f"India Germany Blue Card chunk {cid} passport degree contract"
                 conn.execute(
                     text(
-                        "INSERT INTO policy_assistant_chunks "
-                        "(id, company_id, source_type, source_ref, chunk_text, chunk_metadata, embedding) "
-                        "VALUES (:id,:co,:st,:ref,:body,:meta,:emb)"
+                        "INSERT INTO immigration_corpus_chunks "
+                        "(id, corridor, source_url, chunk_text, chunk_index, chunk_metadata, "
+                        " trust_tier, fetched_at, embedding, content_hash, is_active) "
+                        "VALUES (:id, :cor, :ref, :body, 0, :meta, 1, :f, :emb, :h, 1)"
                     ),
                     {
                         "id": cid,
-                        "co": immigration_retriever.IMMIGRATION_CORPUS_COMPANY_ID,
-                        "st": immigration_retriever.IMMIGRATION_SOURCE_TYPE,
-                        "ref": f"immigration_rule.{cid}",
+                        "cor": "IN_DE",
+                        "ref": f"https://gov.example/immigration_rule/{cid}",
                         "body": body,
                         "meta": meta,
+                        "f": "2026-06-06T00:00:00+00:00",
                         "emb": json.dumps(emb.embed(body)),
+                        "h": cid,
                     },
                 )
-        self._patch = mock.patch.object(policy_chunk_retriever, "db", _FakeDb(self.engine))
+        self._patch = mock.patch.object(immigration_retriever, "db", _FakeDb(self.engine))
         self._patch.start()
         self.addCleanup(self._patch.stop)
 
