@@ -148,9 +148,17 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
 
 
 def get_org_id_for_hr_user(user: Dict[str, Any] = Depends(require_admin_or_hr)) -> str:
-    """Return the company_id for the current HR / Admin user."""
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company") or ""
+    """Return the company_id for the current HR / Admin user.
+
+    Resolution order (AIQ-862): ``db.get_hr_company_id`` first — it is the only
+    path that works for LEGACY text HR ids (e.g. ``seed-hr-testingapril``),
+    resolving via the ``hr_users`` table (and ``profiles`` internally). A
+    profiles-only lookup returns ``None`` for non-UUID legacy ids, which used to
+    leave ``org_id=""`` and silently mis-scope every HR endpoint that depends on
+    this. ``user.get("company")`` (the session claim) is the final fallback.
+    """
+    uid = user.get("id")
+    company_id = (db.get_hr_company_id(uid) if uid else None) or user.get("company") or ""
     return company_id
 
 
