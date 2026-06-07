@@ -45,6 +45,31 @@ _PARTIALLY_GROUNDED_CAVEAT = (
     "\n\nSome details could not be verified against current official sources."
 )
 
+# N6/AIQ-845 — mandatory caveat appended to low-confidence answers (verbatim per spec).
+_LOW_CONFIDENCE_CAVEAT = (
+    "This information is based on limited or potentially outdated sources. "
+    "Please verify with the relevant immigration authority before making decisions."
+)
+
+
+def _derive_confidence(
+    avg_adjusted_score: float, grounding_score: Optional[float],
+    citation_count: int, all_stale: bool,
+) -> str:
+    """
+    N6/AIQ-845 calibrated confidence band from signals already in the pipeline
+    (N3 retrieval scores, N5 grounding_score, N3 staleness). Returns 'high' |
+    'medium' | 'low'. grounding_score may be None (verifier skipped) — a missing
+    grounding signal never forces 'low' (fail-open) but does block 'high'.
+    """
+    g = grounding_score
+    if avg_adjusted_score < 0.5 or (g is not None and g < 0.5) or all_stale:
+        return "low"
+    if (avg_adjusted_score >= 0.75 and g is not None and g >= 0.8
+            and not all_stale and citation_count >= 2):
+        return "high"
+    return "medium"
+
 # Verbatim per the N4 spec — do not paraphrase.
 SYSTEM_PROMPT = """You are an immigration guidance assistant for ReloPass.
 You answer questions about work permit and visa requirements ONLY from the provided source documents.
@@ -144,6 +169,11 @@ def generate_immigration_answer(
     # Hard guard: no context -> refuse without an LLM call.
     if not chunks:
         tracer.mark_fallback("insufficient_context")
+        _zero_factors = {
+            "avg_retrieval_score": 0.0, "grounding_score": None,
+            "citation_count": 0, "has_stale_sources": all_stale, "source_agreement": 0.0,
+        }
+        tracer.record_step("confidence", latency_ms=0, confidence="low", **_zero_factors)
         tracer.flush()
         return {
             "answer_text": INSUFFICIENT_CONTEXT_REFUSAL,
@@ -159,7 +189,9 @@ def generate_immigration_answer(
             "grounding_score": None,
             "unsupported_claims": [],
             "verification_skipped": False,
-            "confidence": 0.0,
+            # N6/AIQ-845: a refusal is low-confidence by construction.
+            "confidence": "low",
+            "confidence_factors": _zero_factors,
             "source_agreement_summary": {},
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
@@ -237,15 +269,36 @@ def generate_immigration_answer(
         elif grounding_verdict == "partially_grounded":
             answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT
 
-    # N9/AIQ-849: confidence derived from cross-tier source agreement of the chunks
-    # the answer is built from (set upstream by the multi-source reconciler). Confirmed
-    # (official + secondary corroborate) > official_only > secondary_only.
-    confidence = confidence_from_agreement(chunks)
+    # N9/AIQ-849 cross-tier source-agreement signal. Kept as a confidence FACTOR
+    # (N9 left it as "the hook a future confidence model can refine") rather than as
+    # the headline confidence, which N6 now owns.
+    source_agreement = confidence_from_agreement(chunks)
     source_agreement_summary: Dict[str, int] = {}
     for c in chunks:
         sa = c.get("source_agreement")
         if sa:
             source_agreement_summary[sa] = source_agreement_summary.get(sa, 0) + 1
+
+    # N6/AIQ-845 — calibrated confidence band from signals already in the pipeline
+    # (avg N3 adjusted_score, N5 grounding_score, citation count, N3 staleness).
+    # Supersedes N9's raw float. Refusals are 'low' by construction; a low-confidence
+    # answer gets a mandatory verify-with-authority caveat.
+    adj_scores = [float(c["adjusted_score"]) for c in chunks if c.get("adjusted_score") is not None]
+    avg_retrieval_score = (sum(adj_scores) / len(adj_scores)) if adj_scores else 0.0
+    confidence_factors = {
+        "avg_retrieval_score": round(avg_retrieval_score, 4),
+        "grounding_score": grounding_score,
+        "citation_count": len(cited_sources),
+        "has_stale_sources": all_stale,
+        "source_agreement": source_agreement,
+    }
+    if answer_kind == "answer":
+        confidence = _derive_confidence(avg_retrieval_score, grounding_score, len(cited_sources), all_stale)
+        if confidence == "low" and _LOW_CONFIDENCE_CAVEAT not in answer_text:
+            answer_text = answer_text + "\n\n" + _LOW_CONFIDENCE_CAVEAT
+    else:
+        confidence = "low"  # any refusal is low-confidence
+    tracer.record_step("confidence", latency_ms=0, confidence=confidence, **confidence_factors)
 
     tracer.flush()
     return {
@@ -266,6 +319,7 @@ def generate_immigration_answer(
         "conflicts_resolved": conflict_result["conflicts_resolved"],
         "contradiction_check_skipped": conflict_result["contradiction_check_skipped"],
         "confidence": confidence,
+        "confidence_factors": confidence_factors,
         "source_agreement_summary": source_agreement_summary,
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,

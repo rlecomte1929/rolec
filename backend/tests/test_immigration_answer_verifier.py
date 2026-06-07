@@ -40,8 +40,10 @@ _URL = "https://www.udi.no/en/want-to-apply/"
 
 def _chunk(url=_URL, text="A residence permit is required.", tier=1,
            fetched="2026-06-06T00:00:00+00:00"):
+    # adjusted_score is always present on real retriever chunks; include it so the
+    # N6 confidence band doesn't read these fixtures as artificially low-confidence.
     return {"source_url": url, "source_ref": url, "chunk_text": text,
-            "trust_tier": tier, "fetched_at": fetched, "corridor": "FR_NO"}
+            "trust_tier": tier, "fetched_at": fetched, "corridor": "FR_NO", "adjusted_score": 0.8}
 
 
 def _payload(chunks):

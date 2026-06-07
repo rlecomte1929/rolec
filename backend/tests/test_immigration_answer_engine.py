@@ -19,6 +19,7 @@ if _REPO_ROOT not in sys.path:
 
 from backend.app.services.immigration_answer_engine import (
     INSUFFICIENT_CONTEXT_REFUSAL,
+    _LOW_CONFIDENCE_CAVEAT,
     generate_immigration_answer,
 )
 from backend.app.services.policy_assistant_llm_client import MockClient
@@ -134,7 +135,12 @@ class AnswerEngineTests(unittest.TestCase):
 
         confirmed = _answer("confirmed")
         secondary = _answer("secondary_only")
-        self.assertGreater(confirmed["confidence"], secondary["confidence"])
+        # N6/AIQ-845: the raw agreement float moved into confidence_factors (the
+        # headline `confidence` is now N6's calibrated enum). The N9 ordering holds there.
+        self.assertGreater(
+            confirmed["confidence_factors"]["source_agreement"],
+            secondary["confidence_factors"]["source_agreement"],
+        )
         self.assertEqual(confirmed["source_agreement_summary"], {"confirmed": 1})
 
     def test_stale_refusal_with_caveat_prefix_is_classified_stale(self):
@@ -168,6 +174,68 @@ class AnswerEngineTests(unittest.TestCase):
         res = generate_immigration_answer(_payload([_chunk("https://gov.example/x")]), "q", "FR→NO", client=mockc)
         self.assertEqual(res["answer_kind"], "refusal_insufficient_context")
         self.assertEqual(res["answer_text"], INSUFFICIENT_CONTEXT_REFUSAL)
+
+
+class ConfidenceScoringTests(unittest.TestCase):
+    """N6/AIQ-845 — calibrated confidence band + factors + low-confidence caveat."""
+
+    def setUp(self):
+        p = mock.patch(_TRACE_WRITE)
+        self.mock_write = p.start()
+        self.addCleanup(p.stop)
+
+    def _run(self, adj_scores, grounding, all_stale=False):
+        urls = [f"https://x.example/{i}" for i in range(len(adj_scores))]
+        chunks = [{**_chunk(u), "adjusted_score": a} for u, a in zip(urls, adj_scores)]
+        answer = "You need a permit " + " ".join(f"[source: {u}]" for u in urls) + "."
+        gen = MockClient(default_response=answer)
+        ver = MockClient(default_response='{"verdict": "grounded", "unsupported_claims": [], '
+                         f'"grounding_score": {grounding}}}')
+        return generate_immigration_answer(
+            _payload(chunks, all_stale=all_stale), "q", "FR→NO", client=gen, verifier_client=ver)
+
+    def test_criterion1_2_high_confidence(self):
+        # avg_adjusted=0.85, grounding=0.9, citation=3, not stale -> high
+        res = self._run([0.85, 0.85, 0.85], 0.9)
+        self.assertIn(res["confidence"], ["high", "medium", "low"])   # criterion 1
+        self.assertEqual(res["confidence"], "high")                   # criterion 2
+
+    def test_criterion3_stale_is_low_with_caveat(self):
+        res = self._run([0.9], 0.9, all_stale=True)
+        self.assertEqual(res["confidence"], "low")
+        self.assertIn(_LOW_CONFIDENCE_CAVEAT, res["answer_text"])     # mandatory caveat
+
+    def test_low_grounding_is_low(self):
+        res = self._run([0.85], 0.3)                                  # grounding < 0.5
+        self.assertEqual(res["confidence"], "low")
+
+    def test_medium_when_neither_high_nor_low(self):
+        # avg 0.6 (not <0.5, not >=0.75), grounding ok, citation 1 (<2) -> medium
+        res = self._run([0.6], 0.85)
+        self.assertEqual(res["confidence"], "medium")
+
+    def test_criterion4_confidence_factors_present(self):
+        res = self._run([0.85, 0.85], 0.9)
+        f = res["confidence_factors"]
+        for k in ("avg_retrieval_score", "grounding_score", "citation_count", "has_stale_sources"):
+            self.assertIn(k, f)
+            self.assertIsNotNone(f[k])
+        self.assertAlmostEqual(f["avg_retrieval_score"], 0.85, places=3)
+        self.assertEqual(f["citation_count"], 2)
+        self.assertFalse(f["has_stale_sources"])
+
+    def test_criterion5_confidence_in_trace(self):
+        self._run([0.85, 0.85], 0.9)
+        payload = self.mock_write.call_args.args[0]
+        conf_steps = [s for s in payload["steps"] if "confidence" in s]
+        self.assertTrue(conf_steps, "no trace step carried confidence")
+        self.assertIn(conf_steps[0]["confidence"], ["high", "medium", "low"])
+
+    def test_refusal_is_low_confidence(self):
+        res = generate_immigration_answer(_payload([]), "q", "ZZ→XX",
+                                          client=MockClient(default_response="unused"))
+        self.assertEqual(res["confidence"], "low")
+        self.assertIn("confidence_factors", res)
 
 
 if __name__ == "__main__":
