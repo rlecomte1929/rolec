@@ -54,8 +54,9 @@ jobs:
         env:
           CORPUS_FILES: ${{ inputs.corpus_files }}
         run: |
-          # CORPUS_FILES is intentionally unquoted for multi-file word-splitting.
-          python backend/scripts/index_corridor_corpus_chunks.py $CORPUS_FILES \
+          # Split the space-separated paths into an array (shellcheck-safe).
+          read -ra FILES <<< "$CORPUS_FILES"
+          python backend/scripts/index_corridor_corpus_chunks.py "${FILES[@]}" \
             --emit-sql --wrap-transaction > /tmp/reindex.sql
           echo "--- SQL header ---"
           head -4 /tmp/reindex.sql
