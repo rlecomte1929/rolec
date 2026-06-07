@@ -19,11 +19,20 @@ if _REPO_ROOT not in sys.path:
 
 from backend.app.services.immigration_answer_engine import (
     INSUFFICIENT_CONTEXT_REFUSAL,
+    _LOW_CONFIDENCE_CAVEAT,
+    _calibrated_confidence,
     generate_immigration_answer,
 )
 from backend.app.services.policy_assistant_llm_client import MockClient
 
 _TRACE_WRITE = "backend.app.services.ai_trace_logger._write_to_db"
+
+
+def _scored_chunk(score, **kw):
+    return {"source_url": "https://gov.example/x", "source_ref": "https://gov.example/x",
+            "chunk_text": "A residence permit is required for stays over 90 days.",
+            "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00", "corridor": "FR_NO",
+            "adjusted_score": score, **kw}
 
 
 def _chunk(url, text="A residence permit is required.", tier=1, fetched="2026-06-06T00:00:00+00:00"):
@@ -134,7 +143,8 @@ class AnswerEngineTests(unittest.TestCase):
 
         confirmed = _answer("confirmed")
         secondary = _answer("secondary_only")
-        self.assertGreater(confirmed["confidence"], secondary["confidence"])
+        # N6/AIQ-845 made `confidence` the calibrated enum; N9's float is now agreement_confidence.
+        self.assertGreater(confirmed["agreement_confidence"], secondary["agreement_confidence"])
         self.assertEqual(confirmed["source_agreement_summary"], {"confirmed": 1})
 
     def test_stale_refusal_with_caveat_prefix_is_classified_stale(self):
@@ -168,6 +178,77 @@ class AnswerEngineTests(unittest.TestCase):
         res = generate_immigration_answer(_payload([_chunk("https://gov.example/x")]), "q", "FR→NO", client=mockc)
         self.assertEqual(res["answer_kind"], "refusal_insufficient_context")
         self.assertEqual(res["answer_text"], INSUFFICIENT_CONTEXT_REFUSAL)
+
+
+class CalibratedConfidenceTests(unittest.TestCase):
+    # --- the pure formula (N6 derivation) ---
+    def test_high_when_strong_fresh_grounded_cited(self):
+        level, factors = _calibrated_confidence(
+            [_scored_chunk(0.8), _scored_chunk(0.9)], grounding_score=0.9, citation_count=3, all_stale=False)
+        self.assertEqual(level, "high")
+        self.assertAlmostEqual(factors["avg_retrieval_score"], 0.85, places=2)
+        self.assertEqual(factors["grounding_score"], 0.9)
+        self.assertEqual(factors["citation_count"], 3)
+        self.assertFalse(factors["has_stale_sources"])
+
+    def test_low_when_all_stale(self):
+        level, _ = _calibrated_confidence([_scored_chunk(0.9)], grounding_score=0.9, citation_count=3, all_stale=True)
+        self.assertEqual(level, "low")
+
+    def test_low_when_grounding_below_half(self):
+        level, _ = _calibrated_confidence([_scored_chunk(0.9)], grounding_score=0.4, citation_count=3, all_stale=False)
+        self.assertEqual(level, "low")
+
+    def test_low_when_retrieval_below_half(self):
+        level, _ = _calibrated_confidence([_scored_chunk(0.4)], grounding_score=0.9, citation_count=3, all_stale=False)
+        self.assertEqual(level, "low")
+
+    def test_medium_otherwise(self):
+        level, _ = _calibrated_confidence([_scored_chunk(0.6)], grounding_score=0.7, citation_count=2, all_stale=False)
+        self.assertEqual(level, "medium")
+
+    def test_grounding_none_coerced_to_zero_is_low(self):
+        level, factors = _calibrated_confidence([_scored_chunk(0.9)], grounding_score=None, citation_count=3, all_stale=False)
+        self.assertEqual(level, "low")
+        self.assertEqual(factors["grounding_score"], 0.0)   # non-null per criterion 4
+
+
+class AnswerConfidenceIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        p = mock.patch(_TRACE_WRITE)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_response_has_confidence_enum_and_factors(self):
+        # Criterion 1 + 4: confidence in enum; confidence_factors has the 4 non-null keys.
+        mockc = MockClient(default_response="A residence permit is required [source: https://gov.example/x].")
+        res = generate_immigration_answer(_payload([_scored_chunk(0.6)]), "q", "FR→NO", client=mockc)
+        self.assertIn(res["confidence"], ["high", "medium", "low"])
+        f = res["confidence_factors"]
+        for key in ("avg_retrieval_score", "grounding_score", "citation_count", "has_stale_sources"):
+            self.assertIn(key, f)
+            self.assertIsNotNone(f[key])
+
+    def test_stale_answer_is_low_with_mandatory_caveat(self):
+        # Criterion 3: all_stale → confidence='low' AND the caveat is in answer_text.
+        mockc = MockClient(default_response="⚠️ Note: ... You need a permit [source: https://gov.example/x].")
+        res = generate_immigration_answer(_payload([_scored_chunk(0.9)], all_stale=True), "q", "FR→NO", client=mockc)
+        self.assertEqual(res["confidence"], "low")
+        self.assertIn(_LOW_CONFIDENCE_CAVEAT, res["answer_text"])
+
+    def test_strong_grounded_answer_is_high(self):
+        # Criterion 2: high retrieval + grounding + citations + fresh → high.
+        from backend.app.services import immigration_answer_engine as eng
+        mockc = MockClient(
+            default_response="Permit required [source: https://a.example/1][source: https://b.example/2].")
+        chunks = [_scored_chunk(0.85, source_url="https://a.example/1", source_ref="https://a.example/1"),
+                  _scored_chunk(0.85, source_url="https://b.example/2", source_ref="https://b.example/2")]
+        verdict = {"verdict": "grounded", "grounding_score": 0.9, "unsupported_claims": [],
+                   "verification_skipped": False, "latency_ms": 0}
+        with mock.patch.object(eng, "verify_grounding", return_value=verdict):
+            res = generate_immigration_answer(_payload(chunks), "q", "FR→NO", client=mockc)
+        self.assertEqual(res["confidence"], "high")
+        self.assertGreaterEqual(len(res["cited_sources"]), 2)
 
 
 if __name__ == "__main__":
