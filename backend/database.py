@@ -12785,20 +12785,26 @@ class Database:
                         ),
                         params_agg,
                     ).fetchall()
-                    hr_counts = {row._mapping["id"]: int(row._mapping["hr_users_count"] or 0) for row in hr_count_rows}
-                    employee_counts = {row._mapping["id"]: int(row._mapping["employee_count"] or 0) for row in employee_count_rows}
-                    assignment_counts = {row._mapping["id"]: int(row._mapping["assignments_count"] or 0) for row in assignment_count_rows}
+                    # [AIQ-864] Normalize all keys to str. companies.id is a uuid
+                    # (returned as a uuid.UUID object) while hr_users/employees/
+                    # case_assignments .company_id are text, so the aggregate dicts
+                    # were str-keyed and `.get(uuid)` always missed → every rollup
+                    # tile showed 0 in prod (SQLite tests are all-text → false green).
+                    hr_counts = {str(row._mapping["id"]): int(row._mapping["hr_users_count"] or 0) for row in hr_count_rows}
+                    employee_counts = {str(row._mapping["id"]): int(row._mapping["employee_count"] or 0) for row in employee_count_rows}
+                    assignment_counts = {str(row._mapping["id"]): int(row._mapping["assignments_count"] or 0) for row in assignment_count_rows}
                     first_contacts: Dict[str, Optional[str]] = {}
                     for row in contact_rows:
-                        company_id = row._mapping["id"]
+                        company_id = str(row._mapping["id"])
                         if company_id not in first_contacts:
                             first_contacts[company_id] = row._mapping.get("contact_name")
                     for r in result:
-                        r["hr_users_count"] = hr_counts.get(r["id"], 0)
-                        r["employee_count"] = employee_counts.get(r["id"], 0)
-                        r["assignments_count"] = assignment_counts.get(r["id"], 0)
+                        rid = str(r["id"])
+                        r["hr_users_count"] = hr_counts.get(rid, 0)
+                        r["employee_count"] = employee_counts.get(rid, 0)
+                        r["assignments_count"] = assignment_counts.get(rid, 0)
                         explicit_contact = (r.get("hr_contact") or "").strip() if isinstance(r.get("hr_contact"), str) else None
-                        r["primary_contact_name"] = explicit_contact or first_contacts.get(r["id"])
+                        r["primary_contact_name"] = explicit_contact or first_contacts.get(rid)
                 except Exception as e:
                     log.warning("admin_company_index: enrich counts failed: %s", e)
                     for r in result:
