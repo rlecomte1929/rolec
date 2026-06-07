@@ -46,11 +46,16 @@ type RiskFlag = {
 };
 
 type ImmigrationData = {
+  // AIQ-847 / F1: covered=false means the corridor × visa_type isn't seeded
+  // (backend fail-closed, AIQ-832 / PR #399) — timeline is null in that case.
+  covered: boolean;
+  coverage_reason: string | null;
+  corridor: string | null;
   corridor_from: string;
   corridor_to: string;
   visa_type: string;
   document_count: number;
-  estimated_timeline_days: number;
+  estimated_timeline_days: number | null;
   requirements: Requirement[];
   risk_flags: RiskFlag[];
   // IMM-15: case context for vendor RFQ pre-fill
@@ -182,6 +187,28 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
     );
   }
 
+  // fix: AIQ-847 — uncovered corridor (backend covered=false) is a distinct
+  // state from "not started yet": there is no checklist to generate, so we say
+  // so honestly instead of implying a setup action that does not exist.
+  if (immData && immData.covered === false) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-6 text-center">
+          <p className="text-sm font-medium text-[#64748b]">
+            {immData.corridor
+              ? `Immigration guidance for ${immData.corridor} isn't available yet`
+              : "Immigration guidance for this corridor isn't available yet"}
+          </p>
+          <p className="mt-1 text-xs text-[#94a3b8]">
+            We don't yet have a verified document checklist for this corridor and
+            visa type, so none is shown.
+          </p>
+        </div>
+        <QuickActions onFindVendor={() => onFindVendor(buildImmigrationContext())} onViewProfile={onViewProfile} />
+      </div>
+    );
+  }
+
   const noData = !immData || immData.requirements.length === 0;
 
   if (noData) {
@@ -213,9 +240,11 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
         <span className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1 text-[#374151]">
           {immData.visa_type.replace(/_/g, ' ')}
         </span>
-        <span className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1 text-[#374151]">
-          ~{immData.estimated_timeline_days}d processing
-        </span>
+        {immData.estimated_timeline_days != null && (
+          <span className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1 text-[#374151]">
+            ~{immData.estimated_timeline_days}d processing
+          </span>
+        )}
         {criticalCount > 0 && (
           <span className="rounded-full border border-[#fecaca] bg-[#fee2e2] px-3 py-1 font-medium text-[#b91c1c]">
             {criticalCount} critical flag{criticalCount > 1 ? 's' : ''}
