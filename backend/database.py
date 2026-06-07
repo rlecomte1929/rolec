@@ -9619,11 +9619,23 @@ class Database:
                 ), {"aid": assignment_id, "pj": pj, "now": now})
 
     def get_employee_profile(self, assignment_id: str) -> Optional[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            row = conn.execute(text(
-                "SELECT profile_json FROM employee_profiles WHERE assignment_id = :aid"
-            ), {"aid": assignment_id}).fetchone()
-        return json.loads(row._mapping["profile_json"]) if row else None
+        # LIVE-QA: the immigration-core migration (20260518120000) replaced
+        # public.employee_profiles (assignment_id, profile_json) with a different
+        # schema (case_id, employee_id, …; no profile_json/assignment_id). This
+        # wizard-profile store therefore no longer exists in prod and the query
+        # raises UndefinedColumn — which 500s the benefit-comparison endpoint.
+        # Degrade to None (every caller already handles a missing profile by
+        # falling back to assignment/case defaults) until wizard-profile storage
+        # is relocated to its own table. Tracked as a separate migration task.
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT profile_json FROM employee_profiles WHERE assignment_id = :aid"
+                ), {"aid": assignment_id}).fetchone()
+            return json.loads(row._mapping["profile_json"]) if row else None
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("get_employee_profile: wizard-profile store unavailable (schema collision) — returning None: %s", ex)
+            return None
 
     # ==================================================================
     # Compliance reports
