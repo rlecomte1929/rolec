@@ -152,7 +152,7 @@ def extract_resolution_context(
         "school_age_children": False,
     }
 
-    # Merge wizard case draft (profile_json) with employee_profiles row; latter wins on conflicts.
+    # Merge wizard case draft (profile_json) with wizard_employee_profiles row; latter wins on conflicts.
     p_merged: Dict[str, Any] = {}
     if profile and isinstance(profile, dict):
         if profile.get("relocationBasics") is not None or profile.get("familyMembers") is not None:

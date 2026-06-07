@@ -112,6 +112,30 @@ class EmployeeCasePersonServiceTests(unittest.TestCase):
             ).scalar()
         self.assertEqual(int(n), 1)
 
+    def test_employee_profile_save_get_round_trip(self) -> None:
+        # AIQ-868: wizard profiles now persist in wizard_employee_profiles (the
+        # immigration-core migration claimed public.employee_profiles). Saving
+        # then reading a profile must round-trip the exact blob, overwrite in
+        # place on a second save, and miss gracefully for an unknown assignment.
+        from unittest.mock import MagicMock
+        if isinstance(self.db, MagicMock):
+            # The root conftest replaces backend.database with a MagicMock for
+            # app.services unit tests; this real-DB round-trip is then covered by
+            # the Postgres rollback-tx validation instead (see PR).
+            self.skipTest("backend.database mocked by root conftest")
+        db = self.db
+        aid, _mid, _ = self._seed_assignment_with_link(db)
+        profile = {
+            "movePlan": {"originCountry": "France", "destinationCountry": "NO"},
+            "employeeProfile": {"fullName": "Round Trip", "email": "rt@example.com"},
+        }
+        db.save_employee_profile(aid, profile)
+        self.assertEqual(db.get_employee_profile(aid), profile)
+        updated = {"movePlan": {"originCountry": "Spain"}}
+        db.save_employee_profile(aid, updated)
+        self.assertEqual(db.get_employee_profile(aid), updated)
+        self.assertIsNone(db.get_employee_profile(str(uuid.uuid4())))
+
     def test_profile_update_refreshes_metadata(self) -> None:
         db = self.db
         aid, _mid, _ = self._seed_assignment_with_link(db)
