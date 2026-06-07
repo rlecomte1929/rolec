@@ -37,6 +37,8 @@ class _StatefulPolicyDb:
         self.draft_id: str | None = None
         self.published_id: str | None = None
         self.publish_atomic_calls: list[str] = []
+        self.audit_rows: list[dict] = []
+        self._bid_seq = 0
 
     def ensure_policy_config(self, company_id: str, config_key: str) -> dict:
         return {"id": self.pc_id, "company_id": company_id, "config_key": config_key}
@@ -77,9 +79,17 @@ class _StatefulPolicyDb:
             self.published_id = vid
         return vid
 
-    def insert_policy_config_benefit_row(self, row: dict) -> None:
+    def insert_policy_config_benefit_row(self, row: dict) -> str:
         vid = str(row["policy_config_version_id"])
-        self._benefits.setdefault(vid, []).append(dict(row))
+        self._bid_seq += 1
+        bid = str(row.get("id") or f"ben-{self._bid_seq}")
+        stored = dict(row)
+        stored["id"] = bid
+        self._benefits.setdefault(vid, []).append(stored)
+        return bid
+
+    def insert_policy_config_benefit_audit_row(self, row: dict) -> None:
+        self.audit_rows.append(dict(row))
 
     def delete_policy_config_benefits_for_version(self, vid: str) -> None:
         self._benefits[str(vid)] = []
@@ -143,6 +153,60 @@ class PolicyConfigMatrixServiceTests(unittest.TestCase):
         bens = self.db.list_policy_config_benefits(vid)
         self.assertEqual(len(bens), 1)
         self.assertEqual(bens[0]["benefit_key"], "tax_equalisation")
+
+    def _manual_body(self, vid: str, amount: float) -> dict:
+        return {
+            "policy_version": vid,
+            "effective_date": "2025-06-15",
+            "categories": [
+                {
+                    "category_key": "compensation_allowances",
+                    "benefits": [
+                        {
+                            "benefit_key": "cola",
+                            "benefit_label": "COLA",
+                            "covered": True,
+                            "value_type": "currency",
+                            "amount_value": amount,
+                            "currency_code": "USD",
+                            "unit_frequency": "monthly",
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_put_draft_stamps_manual_hr_provenance(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 1000), changed_by="user-1")
+        bens = self.db.list_policy_config_benefits(vid)
+        self.assertEqual(len(bens), 1)
+        self.assertEqual(bens[0]["source"], "manual_hr")
+        self.assertIs(bens[0]["auto_generated"], False)
+
+    def test_put_draft_writes_audit_row_on_new_benefit(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 1000), changed_by="user-1")
+        self.assertEqual(len(self.db.audit_rows), 1)
+        a = self.db.audit_rows[0]
+        self.assertEqual(a["action"], "insert")
+        self.assertIsNone(a["old_value"])
+        self.assertEqual(a["new_value"]["amount_value"], 1000)
+        self.assertEqual(a["changed_by"], "user-1")
+        self.assertEqual(a["source"], "manual_hr")
+        self.assertEqual(str(a["policy_config_version_id"]), vid)
+
+    def test_put_draft_audit_captures_old_value_on_update(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 1000), changed_by="user-1")
+        self.db.audit_rows.clear()
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 2000), changed_by="user-2")
+        self.assertEqual(len(self.db.audit_rows), 1)
+        a = self.db.audit_rows[0]
+        self.assertEqual(a["action"], "update")
+        self.assertEqual(a["old_value"]["amount_value"], 1000)
+        self.assertEqual(a["new_value"]["amount_value"], 2000)
+        self.assertEqual(a["changed_by"], "user-2")
 
     def test_validate_put_body_rejects_missing_policy_version(self) -> None:
         with self.assertRaises(ValueError) as ctx:

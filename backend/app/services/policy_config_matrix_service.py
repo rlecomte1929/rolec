@@ -113,6 +113,25 @@ _CANONICAL_KEYS: List[Tuple[str, str, PolicyConfigCategory]] = [
 ]
 
 
+_AUDIT_VALUE_KEYS = (
+    "covered",
+    "value_type",
+    "amount_value",
+    "currency_code",
+    "percentage_value",
+    "unit_frequency",
+    "cap_rule_json",
+    "notes",
+)
+
+
+def _benefit_audit_value(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Curated value snapshot of a benefit row for the audit trail (old/new_value)."""
+    if not row:
+        return None
+    return {k: row.get(k) for k in _AUDIT_VALUE_KEYS}
+
+
 def compute_targeting_signature(
     assignment_types: Sequence[str],
     family_statuses: Sequence[str],
@@ -830,7 +849,9 @@ class PolicyConfigMatrixService:
         if errs:
             raise ValueError(json.dumps({"code": "validation_error", "errors": errs}))
 
-    def put_draft(self, company_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    def put_draft(
+        self, company_id: str, body: Dict[str, Any], changed_by: Optional[str] = None
+    ) -> Dict[str, Any]:
         self.validate_put_body(body)
         vid = str(body["policy_version"])
         vmeta = self._db.get_policy_config_version_with_config(vid)
@@ -884,6 +905,14 @@ class PolicyConfigMatrixService:
                     )
                 )
 
+        # AIQ-839: snapshot existing rows (keyed by benefit_key + targeting) BEFORE
+        # the destructive delete so the audit trail can record old→new per benefit.
+        prior_by_key = {
+            (str(b.get("benefit_key")), str(b.get("targeting_signature") or "global")): b
+            for b in (self._db.list_policy_config_benefits(vid) or [])
+        }
+        _write_audit = getattr(self._db, "insert_policy_config_benefit_audit_row", None)
+
         self._db.delete_policy_config_benefits_for_version(vid)
         for m in flat_writes:
             sig = compute_targeting_signature(
@@ -913,8 +942,27 @@ class PolicyConfigMatrixService:
                 "targeting_signature": sig,
                 "is_active": m.is_active,
                 "display_order": m.display_order,
+                # AIQ-839: this PUT path is the only one where HR enters values
+                # by hand, so every row written here is a manual HR entry.
+                "source": "manual_hr",
+                "auto_generated": False,
             }
             inserted_id = self._db.insert_policy_config_benefit_row(row)
+            # AIQ-839: append a field-level audit row (old→new) for this benefit.
+            if callable(_write_audit):
+                prior = prior_by_key.get((str(m.benefit_key), str(sig)))
+                _write_audit(
+                    {
+                        "benefit_id": inserted_id,
+                        "policy_config_version_id": vid,
+                        "benefit_key": m.benefit_key,
+                        "action": "update" if prior else "insert",
+                        "old_value": _benefit_audit_value(prior) if prior else None,
+                        "new_value": _benefit_audit_value(row),
+                        "source": "manual_hr",
+                        "changed_by": changed_by,
+                    }
+                )
             # Section C: persist overrides for this benefit row. Empty list
             # means "no overrides" — the helper deletes prior rows and
             # inserts nothing, which is the correct shape after the parent

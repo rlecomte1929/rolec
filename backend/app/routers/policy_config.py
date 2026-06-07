@@ -239,7 +239,7 @@ def hr_put_policy_config_draft(
 ):
     cid = _policy_matrix_company_hr(user, companyId)
     try:
-        return policy_config_matrix_svc.put_draft(cid, body)
+        return policy_config_matrix_svc.put_draft(cid, body, changed_by=user.get("id"))
     except ValueError as e:
         raise _policy_matrix_validation_http(e)
     except KeyError:
@@ -514,7 +514,7 @@ def admin_put_policy_config_draft(
     user: Dict[str, Any] = Depends(require_admin),
 ):
     try:
-        return policy_config_matrix_svc.put_draft(company_id, body)
+        return policy_config_matrix_svc.put_draft(company_id, body, changed_by=user.get("id"))
     except ValueError as e:
         raise _policy_matrix_validation_http(e)
     except KeyError:

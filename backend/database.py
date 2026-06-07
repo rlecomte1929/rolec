@@ -714,7 +714,8 @@ class Database:
                           targeting_signature text NOT NULL DEFAULT 'global',
                           is_active boolean NOT NULL DEFAULT true,
                           display_order int NOT NULL DEFAULT 0,
-                          source text,
+                          source text DEFAULT 'seeded',
+                          auto_generated boolean NOT NULL DEFAULT true,
                           created_at timestamptz NOT NULL DEFAULT now(),
                           updated_at timestamptz NOT NULL DEFAULT now(),
                           UNIQUE (policy_config_version_id, benefit_key, targeting_signature)
@@ -735,12 +736,43 @@ class Database:
                     )
                 except Exception:
                     pass
-                # AIQ-838: provenance marker (extracted | template_default | manual).
+                # AIQ-838: provenance marker (extracted_llm | template_default | manual_hr | seeded).
                 try:
                     conn.execute(
                         text(
                             "ALTER TABLE public.policy_config_benefits "
                             "ADD COLUMN IF NOT EXISTS source text"
+                        )
+                    )
+                except Exception:
+                    pass
+                # AIQ-839: auto_generated flag + field-level audit table.
+                try:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE public.policy_config_benefits "
+                            "ADD COLUMN IF NOT EXISTS auto_generated boolean NOT NULL DEFAULT true"
+                        )
+                    )
+                except Exception:
+                    pass
+                try:
+                    conn.execute(
+                        text(
+                            """
+                            CREATE TABLE IF NOT EXISTS public.policy_config_benefits_audit (
+                              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                              benefit_id uuid,
+                              policy_config_version_id uuid,
+                              benefit_key text,
+                              action text NOT NULL,
+                              old_value jsonb,
+                              new_value jsonb,
+                              source text,
+                              changed_by text,
+                              changed_at timestamptz NOT NULL DEFAULT now()
+                            )
+                            """
                         )
                     )
                 except Exception:
@@ -1499,7 +1531,8 @@ class Database:
                     targeting_signature TEXT NOT NULL DEFAULT 'global',
                     is_active INTEGER NOT NULL DEFAULT 1,
                     display_order INTEGER NOT NULL DEFAULT 0,
-                    source TEXT,
+                    source TEXT DEFAULT 'seeded',
+                    auto_generated INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(policy_config_version_id, benefit_key, targeting_signature)
@@ -1526,10 +1559,17 @@ class Database:
                     # Column already exists — safe to ignore in SQLite (caught error
                     # does not abort SQLite transactions).
                     pass
-                # AIQ-838: provenance marker (extracted | template_default | manual).
+                # AIQ-838: provenance marker (extracted_llm | template_default | manual_hr | seeded).
                 try:
                     conn.execute(text(
-                        "ALTER TABLE policy_config_benefits ADD COLUMN source TEXT"
+                        "ALTER TABLE policy_config_benefits ADD COLUMN source TEXT DEFAULT 'seeded'"
+                    ))
+                except Exception:
+                    pass
+                # AIQ-839: auto_generated flag (0 = manual HR entry, 1 = AI/template/seeded).
+                try:
+                    conn.execute(text(
+                        "ALTER TABLE policy_config_benefits ADD COLUMN auto_generated INTEGER NOT NULL DEFAULT 1"
                     ))
                 except Exception:
                     pass
@@ -1537,6 +1577,28 @@ class Database:
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_sqlite_pc_benefits_version
                 ON policy_config_benefits(policy_config_version_id)
+            """))
+
+            # AIQ-839: field-level audit trail for policy_config_benefits manual-override
+            # path. SQLite mirror of supabase/migrations/20260607070000_policy_config_benefits_audit.sql.
+            # No FK on benefit_id (the PUT draft path deletes+reinserts rows each save).
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_config_benefits_audit (
+                    id TEXT PRIMARY KEY,
+                    benefit_id TEXT,
+                    policy_config_version_id TEXT,
+                    benefit_key TEXT,
+                    action TEXT NOT NULL,
+                    old_value TEXT,
+                    new_value TEXT,
+                    source TEXT,
+                    changed_by TEXT,
+                    changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_sqlite_pcb_audit_benefit
+                ON policy_config_benefits_audit(benefit_id, changed_at DESC)
             """))
 
             # Section C of HR Policy: per-jurisdiction × employee_level ×
@@ -16667,6 +16729,9 @@ class Database:
         iact = row.get("is_active", True)
         if _is_sqlite:
             iact = 1 if iact else 0
+        ag = row.get("auto_generated", True)
+        if _is_sqlite:
+            ag = 1 if ag else 0
         params = {
             "id": bid,
             "vid": str(row["policy_config_version_id"]),
@@ -16689,6 +16754,7 @@ class Database:
             "ia": iact,
             "do": int(row.get("display_order") or 0),
             "src": (str(row["source"]) if row.get("source") else None),
+            "ag": ag,
             "ca": now,
             "ua": now,
         }
@@ -16701,15 +16767,52 @@ class Database:
                      value_type, amount_value, currency_code, percentage_value, unit_frequency,
                      cap_rule_json, notes, conditions_json, assignment_types, family_statuses,
                      employee_levels, targeting_signature, is_active, display_order, source,
-                     created_at, updated_at)
+                     auto_generated, created_at, updated_at)
                     VALUES
                     (:id, :vid, :bk, :bl, :cat, :cov, :vt, :av, :cc, :pv, :uf, :crj, :notes, :cj,
-                     :atj, :fsj, :elj, :tsig, :ia, :do, :src, :ca, :ua)
+                     :atj, :fsj, :elj, :tsig, :ia, :do, :src, :ag, :ca, :ua)
 """
                 ),
                 params,
             )
         return bid
+
+    def insert_policy_config_benefit_audit_row(self, row: Dict[str, Any]) -> str:
+        """AIQ-839: append one field-level audit entry for a policy_config_benefits change."""
+        aid = str(row.get("id") or uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        ov = row.get("old_value")
+        if isinstance(ov, (dict, list)):
+            ov = json.dumps(ov)
+        nv = row.get("new_value")
+        if isinstance(nv, (dict, list)):
+            nv = json.dumps(nv)
+        params = {
+            "id": aid,
+            "bid": str(row["benefit_id"]) if row.get("benefit_id") else None,
+            "vid": str(row["policy_config_version_id"]) if row.get("policy_config_version_id") else None,
+            "bk": row.get("benefit_key"),
+            "act": str(row.get("action") or "update"),
+            "ov": ov,
+            "nv": nv,
+            "src": row.get("source"),
+            "cb": row.get("changed_by"),
+            "ca": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_config_benefits_audit
+                    (id, benefit_id, policy_config_version_id, benefit_key, action,
+                     old_value, new_value, source, changed_by, changed_at)
+                    VALUES
+                    (:id, :bid, :vid, :bk, :act, :ov, :nv, :src, :cb, :ca)
+"""
+                ),
+                params,
+            )
+        return aid
 
     # ------------------------------------------------------------------
     # Section C: jurisdiction overrides on policy_config_benefits rows.
