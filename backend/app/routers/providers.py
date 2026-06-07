@@ -51,8 +51,13 @@ _INVITE_EXPIRY_DAYS = 7
 def _caller_org_id(user: Dict[str, Any]) -> str:
     """Return org_id (company_id) for the authenticated HR user."""
     from ...database import db
-    profile = db.get_profile_record(user.get("id"))
-    org_id = (profile or {}).get("company_id") or user.get("company")
+    # UIAUDIT-G4 / AIQ-861 pattern: legacy or text HR ids (e.g. seed-hr-testingapril)
+    # resolve their company ONLY via hr_users — the profiles path is uuid-keyed and
+    # returns NULL for them. hr_users first, then profile / user.company.
+    uid = user.get("id")
+    org_id = (db.get_hr_company_id(uid) if uid else None) \
+        or (db.get_profile_record(uid) or {}).get("company_id") \
+        or user.get("company")
     if not org_id:
         raise HTTPException(
             status_code=403,
@@ -282,9 +287,14 @@ def get_provider_status_grid(
     """
     from ...database import db
 
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company")
-    hr_user_id = user.get("id")
+    # UIAUDIT-G4: hr_users-first company resolution so legacy/text HR ids (e.g.
+    # seed-hr-testingapril, whose profiles.company_id is NULL) resolve their company
+    # and the grid shows their active cases instead of "0 active cases".
+    uid = user.get("id")
+    company_id = (db.get_hr_company_id(uid) if uid else None) \
+        or (db.get_profile_record(uid) or {}).get("company_id") \
+        or user.get("company")
+    hr_user_id = uid
 
     raw_rows = db.get_provider_status_grid(
         company_id=str(company_id) if company_id else None,
