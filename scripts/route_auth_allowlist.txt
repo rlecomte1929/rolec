@@ -125,6 +125,9 @@ backend/app/routers/crons.py:deadline_reminder
 backend/app/routers/crons.py:process_crawl_schedules
 # CRON (P3-02a): _verify_cron_secret(request) inline (503 if unset, 401 on
 # mismatch). Invoked by the crawl-scheduler workflow, not an end user.
+backend/app/routers/crons.py:recompute_source_reliability
+# CRON (N8/AIQ-848): _verify_cron_secret(request) inline. Nightly source-reliability
+# recompute, invoked by the scheduler, not an end user.
 backend/app/routers/crons.py:test_monitoring_alert
 # CRON (P3-02c): _verify_cron_secret(request) inline. Staging-only test
 # endpoint that fires a sample Slack/email monitoring alert.
