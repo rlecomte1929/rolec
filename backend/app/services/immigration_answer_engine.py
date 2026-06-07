@@ -114,6 +114,47 @@ def _extract_cited_sources(answer_text: str, chunks: List[Dict[str, Any]]) -> Li
     return out
 
 
+# N6/AIQ-845 — mandatory caveat appended to low-confidence answers (hardcoded, not LLM-generated).
+_LOW_CONFIDENCE_CAVEAT = (
+    "\n\nThis information is based on limited or potentially outdated sources. "
+    "Please verify with the relevant immigration authority before making decisions."
+)
+
+
+def _calibrated_confidence(
+    chunks: List[Dict[str, Any]],
+    grounding_score: Optional[float],
+    citation_count: int,
+    all_stale: bool,
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    N6/AIQ-845 calibrated confidence enum + factors, from inputs already in the pipeline
+    (no new LLM call): retrieval quality (N3 adjusted_score), grounding (N5), citations, freshness.
+
+      high   if avg_adjusted_score >= 0.75 AND grounding_score >= 0.8 AND not all_stale AND citations >= 2
+      low    if avg_adjusted_score < 0.5 OR grounding_score < 0.5 OR all_stale
+      medium otherwise
+    """
+    scores = [float(c.get("adjusted_score") or 0.0) for c in chunks]
+    avg = sum(scores) / len(scores) if scores else 0.0
+    g = float(grounding_score) if grounding_score is not None else 0.0  # unverifiable -> treat as 0
+
+    if avg < 0.5 or g < 0.5 or all_stale:
+        level = "low"
+    elif avg >= 0.75 and g >= 0.8 and not all_stale and citation_count >= 2:
+        level = "high"
+    else:
+        level = "medium"
+
+    factors = {
+        "avg_retrieval_score": round(avg, 4),
+        "grounding_score": round(g, 4),
+        "citation_count": int(citation_count),
+        "has_stale_sources": bool(all_stale),
+    }
+    return level, factors
+
+
 def generate_immigration_answer(
     chunks_payload: Dict[str, Any],
     query: str,
@@ -159,8 +200,16 @@ def generate_immigration_answer(
             "grounding_score": None,
             "unsupported_claims": [],
             "verification_skipped": False,
-            "confidence": 0.0,
+            "agreement_confidence": 0.0,
             "source_agreement_summary": {},
+            # N6/AIQ-845: no context -> lowest confidence.
+            "confidence": "low",
+            "confidence_factors": {
+                "avg_retrieval_score": 0.0,
+                "grounding_score": 0.0,
+                "citation_count": 0,
+                "has_stale_sources": bool(all_stale),
+            },
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
         }
@@ -237,15 +286,22 @@ def generate_immigration_answer(
         elif grounding_verdict == "partially_grounded":
             answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT
 
-    # N9/AIQ-849: confidence derived from cross-tier source agreement of the chunks
-    # the answer is built from (set upstream by the multi-source reconciler). Confirmed
-    # (official + secondary corroborate) > official_only > secondary_only.
-    confidence = confidence_from_agreement(chunks)
+    # N9/AIQ-849: float signal from cross-tier source agreement of the kept chunks.
+    agreement_confidence = confidence_from_agreement(chunks)
     source_agreement_summary: Dict[str, int] = {}
     for c in chunks:
         sa = c.get("source_agreement")
         if sa:
             source_agreement_summary[sa] = source_agreement_summary.get(sa, 0) + 1
+
+    # N6/AIQ-845: calibrated confidence enum from retrieval quality + grounding +
+    # citations + freshness. Low-confidence answers get a mandatory hardcoded caveat.
+    confidence, confidence_factors = _calibrated_confidence(
+        chunks, grounding_score, len(cited_sources), all_stale
+    )
+    if confidence == "low" and answer_kind == "answer" and _LOW_CONFIDENCE_CAVEAT.strip() not in answer_text:
+        answer_text = answer_text + _LOW_CONFIDENCE_CAVEAT
+    tracer.record_step("confidence_scoring", latency_ms=0, confidence=confidence, **confidence_factors)
 
     tracer.flush()
     return {
@@ -265,8 +321,10 @@ def generate_immigration_answer(
         "conflicts_detected": conflict_result["conflicts_detected"],
         "conflicts_resolved": conflict_result["conflicts_resolved"],
         "contradiction_check_skipped": conflict_result["contradiction_check_skipped"],
-        "confidence": confidence,
+        "agreement_confidence": agreement_confidence,
         "source_agreement_summary": source_agreement_summary,
+        "confidence": confidence,
+        "confidence_factors": confidence_factors,
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,
     }
