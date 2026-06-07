@@ -349,6 +349,49 @@ def hr_post_policy_config_apply_template(
         raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
 
 
+@hr_policy_config_router.post("/policy-config/draft/import-extraction")
+def hr_post_policy_config_import_extraction(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    AIQ-873: import an extracted policy's benefits (policy_benefits, the document
+    pipeline) into the company's config-matrix draft as `extracted_llm` rows.
+    Body: { policy_id }.
+
+    Each extracted benefit whose key maps to a canonical matrix key is inserted
+    into the draft ONLY if that key is not already present — existing
+    manual_hr/template/seeded rows are never clobbered. Extracted free-text terms
+    land in `notes`, per-field confidence in `field_confidence`; structured amounts
+    stay at defaults for HR to fill. Unmapped extraction keys are returned for HR
+    manual entry. The live published version is untouched.
+
+    Returns { imported, skipped_existing, unmapped, version_id }.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    policy_id = str(body.get("policy_id") or "").strip()
+    if not policy_id:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "validation_error", "message": "policy_id is required"},
+        )
+    # Tenant scope: the extracted policy must belong to the HR user's own company.
+    pol = db.get_company_policy(policy_id)
+    if not pol or str(pol.get("company_id") or "") != str(cid):
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "policy_not_found", "message": "Policy not found for this company"},
+        )
+    try:
+        return policy_config_matrix_svc.import_extraction_to_draft(
+            policy_id, changed_by=user.get("id")
+        )
+    except KeyError as exc:
+        code = exc.args[0] if exc.args else "not_found"
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
 @hr_policy_config_router.get("/policy-config/diff")
 def hr_get_policy_config_diff(
     companyId: Optional[str] = Query(None, alias="companyId"),
