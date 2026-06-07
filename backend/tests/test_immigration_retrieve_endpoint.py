@@ -81,8 +81,8 @@ class TestImmigrationRetrieveEndpoint(unittest.TestCase):
         self.assertIn("/api/immigration/answer", {getattr(r, "path", None) for r in app.routes})
 
     def test_answer_empty_corpus_refuses_200_no_llm(self):
-        empty = {"chunks": [], "all_stale_warning": False, "oldest_fetched_at": None}
-        with patch("backend.app.services.immigration_retriever.retrieve_with_staleness", return_value=empty), \
+        empty = {"official_chunks": [], "secondary_chunks": []}
+        with patch("backend.app.services.immigration_retriever.retrieve_multi_source", return_value=empty), \
              patch("backend.app.services.ai_trace_logger._write_to_db"):
             resp = self.client.post("/api/immigration/answer", json={
                 "corridor_from": "ZZ", "corridor_to": "XX", "nationality": "X",
@@ -97,13 +97,13 @@ class TestImmigrationRetrieveEndpoint(unittest.TestCase):
     def test_answer_happy_path_returns_cited_answer(self):
         from backend.app.services.policy_assistant_llm_client import MockClient
         url = "https://www.udi.no/en/want-to-apply/"
-        payload = {
-            "chunks": [{"source_url": url, "source_ref": url, "chunk_text": "A permit is required.",
-                        "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00", "corridor": "FR_NO"}],
-            "all_stale_warning": False, "oldest_fetched_at": "2026-06-06T00:00:00+00:00",
-        }
+        chunk = {"id": "c1", "source_url": url, "source_ref": url, "chunk_text": "A permit is required.",
+                 "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00", "corridor": "FR_NO",
+                 "adjusted_score": 0.9}
+        # N9: endpoint now triangulates official vs all-tier sets then reconciles.
+        multi = {"official_chunks": [chunk], "secondary_chunks": [chunk]}
         mockc = MockClient(default_response=f"You need a residence permit [source: {url}].")
-        with patch("backend.app.services.immigration_retriever.retrieve_with_staleness", return_value=payload), \
+        with patch("backend.app.services.immigration_retriever.retrieve_multi_source", return_value=multi), \
              patch("backend.app.services.immigration_answer_engine.get_default_client", return_value=mockc), \
              patch("backend.app.services.ai_trace_logger._write_to_db"):
             resp = self.client.post("/api/immigration/answer", json={
