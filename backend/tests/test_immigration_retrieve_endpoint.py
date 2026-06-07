@@ -76,6 +76,48 @@ class TestImmigrationRetrieveEndpoint(unittest.TestCase):
         self.assertEqual(len(body["chunks"]), 1)
         self.assertEqual(body["chunks"][0]["id"], "c1")
 
+    def test_answer_route_registered(self):
+        # N4/AIQ-843 — /answer on the same (dual-registered) immigration router.
+        self.assertIn("/api/immigration/answer", {getattr(r, "path", None) for r in app.routes})
+
+    def test_answer_empty_corpus_refuses_200_no_llm(self):
+        empty = {"chunks": [], "all_stale_warning": False, "oldest_fetched_at": None}
+        with patch("backend.app.services.immigration_retriever.retrieve_with_staleness", return_value=empty), \
+             patch("backend.app.services.ai_trace_logger._write_to_db"):
+            resp = self.client.post("/api/immigration/answer", json={
+                "corridor_from": "ZZ", "corridor_to": "XX", "nationality": "X",
+                "permit_type": "work", "is_eea": False, "query": "anything",
+            })
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["answer_kind"], "refusal_insufficient_context")
+        self.assertEqual(body["corridor"], "ZZ→XX")
+        self.assertTrue(body["trace_id"])
+
+    def test_answer_happy_path_returns_cited_answer(self):
+        from backend.app.services.policy_assistant_llm_client import MockClient
+        url = "https://www.udi.no/en/want-to-apply/"
+        payload = {
+            "chunks": [{"source_url": url, "source_ref": url, "chunk_text": "A permit is required.",
+                        "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00", "corridor": "FR_NO"}],
+            "all_stale_warning": False, "oldest_fetched_at": "2026-06-06T00:00:00+00:00",
+        }
+        mockc = MockClient(default_response=f"You need a residence permit [source: {url}].")
+        with patch("backend.app.services.immigration_retriever.retrieve_with_staleness", return_value=payload), \
+             patch("backend.app.services.immigration_answer_engine.get_default_client", return_value=mockc), \
+             patch("backend.app.services.ai_trace_logger._write_to_db"):
+            resp = self.client.post("/api/immigration/answer", json={
+                "corridor_from": "FR", "corridor_to": "NO", "nationality": "French",
+                "permit_type": "work_permit", "is_eea": True, "query": "What documents are required?",
+            })
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["answer_kind"], "answer")
+        self.assertEqual(body["model"], "claude-sonnet-4-6")
+        self.assertGreaterEqual(len(body["cited_sources"]), 1)
+        self.assertEqual(body["cited_sources"][0]["source_url"], url)
+        self.assertTrue(body["trace_id"])
+
     def test_requires_authentication(self):
         app.dependency_overrides.pop(get_current_user, None)
         try:
