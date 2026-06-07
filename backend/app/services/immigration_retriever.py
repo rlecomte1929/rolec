@@ -36,6 +36,8 @@ log = logging.getLogger(__name__)
 # N3/AIQ-842 retrieval quality gates.
 _IMMIGRATION_MIN_SIMILARITY = float(os.getenv("IMMIGRATION_MIN_SIMILARITY", "0.25"))
 _TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
+# N8/AIQ-848: neutral reliability for chunks with no feedback yet (column default).
+_NEUTRAL_RELIABILITY = 0.5
 
 # Synthetic corpus owner: immigration rules are corridor-scoped, not
 # company-scoped, but policy_chunk_retriever requires a company_id. The
@@ -193,18 +195,25 @@ def _apply_quality_gates(
         boost = _TIER_BOOST.get(tier, 1.0)
         days = _days_old(c.get("fetched_at"), now)
         freshness = 0.70 if days > 180 else (0.85 if days > 90 else 1.0)
-        out.append({**c, "raw_score": raw, "adjusted_score": raw * boost * freshness, "is_stale": days > 180})
+        # N8/AIQ-848: feedback-loop reliability is the 4th ranking factor.
+        rel = c.get("reliability_score")
+        rel = _NEUTRAL_RELIABILITY if rel is None else float(rel)
+        out.append({**c, "raw_score": raw,
+                    "adjusted_score": raw * boost * freshness * rel, "is_stale": days > 180})
     out.sort(key=lambda x: x["adjusted_score"], reverse=True)
     return out[: max(1, top_k)]
 
 
-def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, fetched_at, score) -> Dict[str, Any]:
+def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, fetched_at, score,
+           reliability_score: Any = None) -> Dict[str, Any]:
     meta = meta_raw
     if isinstance(meta, str):
         try:
             meta = json.loads(meta)
         except Exception:
             meta = {}
+    # N8/AIQ-848: feedback-loop reliability (0.5 neutral when absent/null).
+    rel = _NEUTRAL_RELIABILITY if reliability_score is None else float(reliability_score)
     return {
         "id": str(id_),
         "source_type": IMMIGRATION_SOURCE_TYPE,
@@ -216,6 +225,7 @@ def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, 
         "trust_tier": trust_tier,
         "fetched_at": str(fetched_at) if fetched_at is not None else None,
         "score": max(0.0, min(1.0, float(score))),
+        "reliability_score": max(0.0, min(1.0, rel)),
     }
 
 
@@ -223,6 +233,7 @@ def _retrieve_corpus_postgres(engine, corridor_db: str, q_emb: List[float], k: i
     q = "[" + ",".join(f"{x:.6f}" for x in q_emb) + "]"
     sql = text(
         "SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, "
+        "       reliability_score, "
         "       (embedding <=> CAST(:q AS vector)) AS distance "
         "FROM immigration_corpus_chunks "
         "WHERE corridor = :corridor AND is_active = true "
@@ -236,18 +247,23 @@ def _retrieve_corpus_postgres(engine, corridor_db: str, q_emb: List[float], k: i
         out.append(_shape(
             r["chunk_metadata"], id_=r["id"], source_url=r["source_url"], chunk_text=r["chunk_text"],
             corridor=r["corridor"], trust_tier=r["trust_tier"], fetched_at=r["fetched_at"],
-            score=1.0 - (dist / 2.0),
+            score=1.0 - (dist / 2.0), reliability_score=r["reliability_score"],
         ))
     return out
 
 
 def _retrieve_corpus_sqlite(engine, corridor_db: str, q_emb: List[float], k: int) -> List[Dict[str, Any]]:
-    sql = text(
-        "SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, embedding "
-        "FROM immigration_corpus_chunks WHERE corridor = :corridor AND is_active = 1"
-    )
+    base = ("SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, "
+            "embedding{rel} FROM immigration_corpus_chunks WHERE corridor = :corridor AND is_active = 1")
     with engine.begin() as conn:
-        rows = conn.execute(sql, {"corridor": corridor_db}).mappings().all()
+        # reliability_score (N8) is read when present; tolerate older sqlite fixtures
+        # that predate the column without forcing a fixture edit.
+        try:
+            rows = conn.execute(text(base.format(rel=", reliability_score")),
+                                {"corridor": corridor_db}).mappings().all()
+        except Exception:
+            rows = conn.execute(text(base.format(rel="")),
+                                {"corridor": corridor_db}).mappings().all()
     scored = []
     for r in rows:
         emb_raw = r["embedding"]
@@ -255,7 +271,7 @@ def _retrieve_corpus_sqlite(engine, corridor_db: str, q_emb: List[float], k: int
         scored.append(_shape(
             r["chunk_metadata"], id_=r["id"], source_url=r["source_url"], chunk_text=r["chunk_text"],
             corridor=r["corridor"], trust_tier=r["trust_tier"], fetched_at=r["fetched_at"],
-            score=cosine_similarity(q_emb, emb),
+            score=cosine_similarity(q_emb, emb), reliability_score=r.get("reliability_score"),
         ))
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:k]

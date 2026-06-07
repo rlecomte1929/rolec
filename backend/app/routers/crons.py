@@ -39,6 +39,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
 from ..services.monitoring_alerts import send_test_alert
+from ..services.source_reliability_service import recompute_reliability_scores
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +94,21 @@ def process_crawl_schedules(request: Request) -> Dict[str, Any]:
         "failed": failed,
         "results": results,
     }
+
+
+@router.post("/recompute-source-reliability")
+def recompute_source_reliability(request: Request) -> Dict[str, Any]:
+    """
+    [N8/AIQ-848] Nightly recompute of immigration_corpus_chunks.reliability_score
+    from the feedback loop (cited chunks in rejected answers get down-ranked).
+    Full recompute — idempotent. Designed to be called daily (e.g. 02:00 UTC).
+    Staleness of up to 24h is acceptable, so this is never run synchronously on an
+    answer. See backend/app/services/source_reliability_service.py.
+    """
+    _verify_cron_secret(request)
+    log.info("recompute_source_reliability cron triggered")
+    result = recompute_reliability_scores()
+    return {"ok": True, **result}
 
 
 @router.post("/test-monitoring-alert")
