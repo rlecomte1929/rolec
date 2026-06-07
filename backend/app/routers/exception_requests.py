@@ -250,9 +250,16 @@ SELECT
     -- to the users.email -> profiles.email bridge (same path the canonical-case
     -- bridge uses). Correlated subqueries (LIMIT 1) so a duplicate email can't
     -- fan the row out.
-    COALESCE(rp.full_name, (
-        SELECT p.full_name FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
-        WHERE u.id = pcr.requested_by_user_id LIMIT 1)) AS requested_by_name,
+    -- [AIQ-865] full_name is empty/NULL for the legacy demo employee, so the
+    -- inbox rendered a generic "Employee". NULLIF('') so an empty string falls
+    -- through, then fall back to the requester's email (profile, then users).
+    COALESCE(
+        NULLIF(rp.full_name, ''),
+        NULLIF((SELECT p.full_name FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
+                WHERE u.id = pcr.requested_by_user_id LIMIT 1), ''),
+        NULLIF(rp.email, ''),
+        (SELECT u.email FROM users u WHERE u.id = pcr.requested_by_user_id LIMIT 1)
+    ) AS requested_by_name,
     COALESCE(rp.role, (
         SELECT p.role FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
         WHERE u.id = pcr.requested_by_user_id LIMIT 1)) AS requested_by_role,
