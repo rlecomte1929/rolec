@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .ai_trace_logger import TraceSession
+from .immigration_answer_verifier import verify_grounding
 from .immigration_retriever import IMMIGRATION_CORPUS_COMPANY_ID
 from .policy_assistant_llm_client import (
     LlmClient,
@@ -32,6 +33,12 @@ log = logging.getLogger(__name__)
 
 _FEATURE_KEY = "immigration_answer"
 _MODEL = "claude-sonnet-4-6"
+
+# N5/AIQ-844 — appended when the grounding verifier judges an answer only
+# partially supported by the retrieved chunks (verbatim per spec).
+_PARTIALLY_GROUNDED_CAVEAT = (
+    "\n\nSome details could not be verified against current official sources."
+)
 
 # Verbatim per the N4 spec — do not paraphrase.
 SYSTEM_PROMPT = """You are an immigration guidance assistant for ReloPass.
@@ -108,12 +115,17 @@ def generate_immigration_answer(
     corridor: str,
     *,
     client: Optional[LlmClient] = None,
+    verifier_client: Optional[LlmClient] = None,
 ) -> Dict[str, Any]:
     """
     Generate a grounded answer from a retrieve_with_staleness() payload.
     Returns: answer_text, answer_kind ('answer' | 'refusal_insufficient_context'
-    | 'refusal_stale_sources'), cited_sources, model, corridor, cost_usd,
-    generated_at, trace_id.
+    | 'refusal_stale_sources' | 'refusal_ungrounded'), cited_sources, model,
+    corridor, cost_usd, grounding_verdict, grounding_score, unsupported_claims,
+    verification_skipped, generated_at, trace_id.
+
+    N5/AIQ-844: real answers pass through a self-critique grounding verifier
+    (verifier_client, defaults to the generation client) before return.
     """
     chunks = chunks_payload.get("chunks") or []
     all_stale = bool(chunks_payload.get("all_stale_warning"))
@@ -137,6 +149,11 @@ def generate_immigration_answer(
             "cost_usd": 0.0,
             "all_stale_warning": all_stale,
             "oldest_fetched_at": oldest_fetched_at,
+            # Refusals are grounded by construction — the verifier never runs.
+            "grounding_verdict": None,
+            "grounding_score": None,
+            "unsupported_claims": [],
+            "verification_skipped": False,
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
         }
@@ -167,6 +184,43 @@ def generate_immigration_answer(
         answer_kind = "answer"  # stale answers still answer, with the model-prepended caveat
 
     cited_sources = _extract_cited_sources(answer_text, chunks)
+
+    # N5/AIQ-844 — self-critique grounding verifier. Only fact-check real answers
+    # (refusals are grounded by construction). Synchronous, before return. Fails
+    # OPEN: a verifier error/timeout sets verification_skipped and never blocks
+    # the answer. Defaults to the same client (Haiku is selected per-request).
+    grounding_verdict: Optional[str] = None
+    grounding_score: Optional[float] = None
+    unsupported_claims: List[str] = []
+    verification_skipped = False
+    if answer_kind == "answer":
+        verdict = verify_grounding(answer_text, chunks, client=verifier_client or client)
+        grounding_verdict = verdict["verdict"]
+        grounding_score = verdict["grounding_score"]
+        unsupported_claims = verdict["unsupported_claims"]
+        verification_skipped = verdict["verification_skipped"]
+        tracer.record_step(
+            "grounding_verification",
+            latency_ms=int(verdict.get("latency_ms", 0)),
+            grounding_verdict=grounding_verdict,
+            grounding_score=grounding_score,
+            unsupported_claims=unsupported_claims,
+            verification_skipped=verification_skipped,
+        )
+        if grounding_verdict == "ungrounded":
+            # Hallucination caught — discard the answer and refuse. Don't echo the
+            # unsupported claims back on the response; that would re-surface the very
+            # fabricated content the refusal exists to suppress. They stay in the
+            # grounding_verification trace step above for auditing.
+            answer_text = INSUFFICIENT_CONTEXT_REFUSAL
+            answer_kind = "refusal_ungrounded"
+            cited_sources = []
+            unsupported_claims = []
+            grounding_score = None
+            tracer.mark_fallback("ungrounded")
+        elif grounding_verdict == "partially_grounded":
+            answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT
+
     tracer.flush()
     return {
         "answer_text": answer_text,
@@ -177,6 +231,10 @@ def generate_immigration_answer(
         "cost_usd": cost,
         "all_stale_warning": all_stale,
         "oldest_fetched_at": oldest_fetched_at,
+        "grounding_verdict": grounding_verdict,
+        "grounding_score": grounding_score,
+        "unsupported_claims": unsupported_claims,
+        "verification_skipped": verification_skipped,
         "truncated": stop_reason == "max_tokens",
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,
