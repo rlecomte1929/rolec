@@ -11,8 +11,10 @@ from ...database import Database
 
 
 def resolve_user_company_id(user: Dict[str, Any], db: Database) -> str:
-    profile = db.get_profile_record(str(user.get("id") or "")) or {}
-    company_id = str(profile.get("company_id") or user.get("company") or "").strip()
+    uid = str(user.get("id") or "")
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    profile = db.get_profile_record(uid) or {}
+    company_id = str((db.get_hr_company_id(uid) if uid else None) or profile.get("company_id") or user.get("company") or "").strip()
     if not company_id:
         raise HTTPException(status_code=400, detail="User is not linked to a company")
     return company_id

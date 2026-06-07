@@ -95,8 +95,10 @@ def _require_hr(user: Dict[str, Any]) -> tuple[str, str]:
     role = (user.get("role") or "").upper()
     if role not in (UserRole.HR.value, UserRole.ADMIN.value) and not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="HR or Admin only")
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company") or ""
+    uid = user.get("id")
+    profile = db.get_profile_record(uid)
+    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
+    company_id = (db.get_hr_company_id(uid) if uid else None) or (profile or {}).get("company_id") or user.get("company") or ""
     email = (profile or {}).get("email") or user.get("email") or ""
     name = (
         f"{(profile or {}).get('first_name', '')} {(profile or {}).get('last_name', '')}".strip()

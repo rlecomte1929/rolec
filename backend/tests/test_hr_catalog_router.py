@@ -84,7 +84,9 @@ class HrCatalogRouterTests(unittest.TestCase):
             patcher = mock.patch.object(mod.db, "engine", self.engine)
             patcher.start()
             self.addCleanup(patcher.stop)
-        # Profile lookup gets bypassed because user dict carries `company`.
+        # Company comes from the user dict's `company` claim. get_profile_record
+        # returns a NULL company_id and there is no hr_users row for the synthetic
+        # user, so the hr_users-first resolver must fall through to user["company"].
         profile_patcher = mock.patch.object(
             hr_catalog_router.db,
             "get_profile_record",
@@ -92,6 +94,11 @@ class HrCatalogRouterTests(unittest.TestCase):
         )
         profile_patcher.start()
         self.addCleanup(profile_patcher.stop)
+        hr_company_patcher = mock.patch.object(
+            hr_catalog_router.db, "get_hr_company_id", return_value=None
+        )
+        hr_company_patcher.start()
+        self.addCleanup(hr_company_patcher.stop)
 
     def _seed_geo_bound(self) -> None:
         # 3 schools — 2 in Munich, 1 in Singapore (geo-bound)
