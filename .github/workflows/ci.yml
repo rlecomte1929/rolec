@@ -263,6 +263,7 @@ jobs:
             backend/tests/test_pre_push_hook.py \
             backend/tests/test_employee_steps_alias.py \
             backend/tests/test_hr_vendor_widgets_bare_paths.py \
+            backend/tests/test_llm_client_text.py \
             scripts/tests/test_check_rls_coverage.py
 
   route-auth-check:
