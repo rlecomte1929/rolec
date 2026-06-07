@@ -402,17 +402,17 @@ def _fetch_company_brain_context() -> str:
         return _RELOPASS_FALLBACK_CONTEXT
 
 
-def _call_triage_model(content: str, subject: Optional[str], user_role: str,
-                       company_id: Optional[str], recent_events: List[Dict],
-                       domain_context: str) -> Dict[str, Any]:
-    """Call Claude Sonnet and return the parsed triage result dict."""
-    import anthropic
+async def _call_triage_model(content: str, subject: Optional[str], user_role: str,
+                             company_id: Optional[str], recent_events: List[Dict],
+                             domain_context: str) -> Dict[str, Any]:
+    """Call Claude Sonnet and return the parsed triage result dict.
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not configured")
-
-    client = anthropic.Anthropic(api_key=api_key)
+    Routes through ``llm_client.claude_complete`` (free-text mode) so the call
+    gains timeout, retry on 429/5xx, and structured logging. The prompt still
+    asks for raw JSON and we parse it here — behaviour (model, system prompt,
+    max_tokens, temperature, fence-stripping, validation) is unchanged.
+    """
+    from ..services.llm_client import claude_complete
 
     user_message_parts = []
     if subject:
@@ -430,19 +430,15 @@ def _call_triage_model(content: str, subject: Optional[str], user_role: str,
 
     system_prompt = _TRIAGE_SYSTEM.format(domain_context=domain_context)
 
-    resp = client.messages.create(
-        model="claude-sonnet-4-6",
+    raw = await claude_complete(
         system=system_prompt,
-        messages=[{"role": "user", "content": "\n".join(user_message_parts)}],
+        user="\n".join(user_message_parts),
+        schema=None,  # prompt returns raw JSON text; parsed below
+        model="claude-sonnet-4-6",
         max_tokens=512,
         temperature=0.1,
     )
-
-    raw = ""
-    for block in (resp.content or []):
-        if getattr(block, "type", "") == "text":
-            raw += getattr(block, "text", "")
-    raw = raw.strip()
+    raw = (raw or "").strip()
 
     # Strip any accidental markdown fences
     if raw.startswith("```"):
@@ -507,7 +503,7 @@ async def triage_ticket(body: TriageRequest):
 
     # Call triage model
     try:
-        result = _call_triage_model(
+        result = await _call_triage_model(
             content=content,
             subject=subject,
             user_role=body.user_role or "unknown",

@@ -24,8 +24,8 @@ LLM:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
-import os
 import threading
 import time
 from datetime import date, timedelta
@@ -158,35 +158,33 @@ def _build_context(
 
 
 def _call_sonnet(question: str, context: str) -> str:
-    """Call Claude Sonnet via the existing LLM client pattern. Returns plain text."""
+    """Call Claude Sonnet via the shared llm_client wrapper. Returns plain text.
+
+    Routes through ``llm_client.claude_complete`` (free-text mode) so the call
+    gains timeout, retry on 429/5xx, and structured logging. Same model,
+    prompt, max_tokens, and temperature as before. Any failure (missing key,
+    SDK absent, network) degrades gracefully to a static message — the raw
+    data is always returned alongside in the ``data`` field.
+    """
+    from ..services.llm_client import claude_complete
+
+    # This runs in a sync FastAPI route (threadpool), so there is no event
+    # loop in this thread — asyncio.run() drives the async wrapper to result.
     try:
-        import anthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not set")
-
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model="claude-sonnet-4-6",
-            system=SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {question}",
-            }],
-            max_tokens=1024,
-            temperature=0.2,
+        answer = asyncio.run(
+            claude_complete(
+                system=SYSTEM_PROMPT,
+                user=f"Context:\n{context}\n\nQuestion: {question}",
+                schema=None,  # free-text answer, not structured JSON
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                temperature=0.2,
+            )
         )
-        text = ""
-        for block in (resp.content or []):
-            if getattr(block, "type", "") == "text":
-                text += getattr(block, "text", "")
-        return text.strip()
-
-    except ImportError:
-        return f"Analytics answer unavailable (anthropic package not installed). Summarised context:\n{context[:500]}"
+        return answer.strip()
     except Exception as exc:
         log.warning("analytics_query: LLM call failed: %s", exc)
-        return f"Unable to generate answer at this time. Raw data is available in the `data` field."
+        return "Unable to generate answer at this time. Raw data is available in the `data` field."
 
 
 # ─── Route ────────────────────────────────────────────────────────────────────
