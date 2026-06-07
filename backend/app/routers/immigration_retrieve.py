@@ -30,6 +30,20 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/immigration", tags=["immigration-retrieve"])
 
 
+def _profile_and_classification(body):
+    """Build (corridor, UserProfile, PathClassification) from a request body.
+    Shared by /retrieve and /answer — both bodies carry the same corridor fields."""
+    corridor = corridor_key(body.corridor_from, body.corridor_to)
+    profile = UserProfile(
+        nationality=body.nationality,
+        origin_country=body.corridor_from,
+        destination_country=body.corridor_to,
+        is_eea=body.is_eea,
+    )
+    classification = PathClassification(pathway_type=body.permit_type, corridor=corridor)
+    return corridor, profile, classification
+
+
 class ImmigrationRetrieveBody(BaseModel):
     corridor_from: str
     corridor_to: str
@@ -45,14 +59,7 @@ def retrieve_immigration_rules(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Retrieve corridor-scoped immigration-rule chunks for a structured profile."""
-    corridor = corridor_key(body.corridor_from, body.corridor_to)
-    profile = UserProfile(
-        nationality=body.nationality,
-        origin_country=body.corridor_from,
-        destination_country=body.corridor_to,
-        is_eea=body.is_eea,
-    )
-    classification = PathClassification(pathway_type=body.permit_type, corridor=corridor)
+    corridor, profile, classification = _profile_and_classification(body)
     query_string = _build_query(profile, classification, corridor)
 
     chunks: List[Dict[str, Any]] = immigration_retriever.retrieve_for_profile(
@@ -88,14 +95,7 @@ def answer_immigration_question(
     sourced ONLY from them. Zero chunks -> refusal_insufficient_context at HTTP
     200 (no LLM call). Every response carries a trace_id.
     """
-    corridor = corridor_key(body.corridor_from, body.corridor_to)
-    profile = UserProfile(
-        nationality=body.nationality,
-        origin_country=body.corridor_from,
-        destination_country=body.corridor_to,
-        is_eea=body.is_eea,
-    )
-    classification = PathClassification(pathway_type=body.permit_type, corridor=corridor)
+    corridor, profile, classification = _profile_and_classification(body)
     payload = immigration_retriever.retrieve_with_staleness(
         profile=profile, classification=classification, top_k=body.top_k
     )

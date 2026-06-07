@@ -52,6 +52,10 @@ INSUFFICIENT_CONTEXT_REFUSAL = (
     "I cannot confirm the requirements for this corridor from current official sources. "
     "Please verify directly with the relevant immigration authority."
 )
+# Distinctive refusal clause, derived from the constant (no drift). Matched
+# anywhere in the answer so a stale refusal — which the prompt makes the model
+# prefix with the "⚠️ Note:" caveat — is still detected.
+_REFUSAL_MARKER = INSUFFICIENT_CONTEXT_REFUSAL.split(".")[0].strip()
 _STALE_CAVEAT_HINT = (
     "\n\nThe provided sources are flagged as potentially outdated — begin your response "
     "with the outdated-sources note specified in the rules."
@@ -83,7 +87,13 @@ def _extract_cited_sources(answer_text: str, chunks: List[Dict[str, Any]]) -> Li
         if url in seen:
             continue
         seen.add(url)
-        chunk = by_url.get(url, {})
+        chunk = by_url.get(url)
+        if chunk is None:
+            # Citation-enforced: a [source: …] the model invents that is NOT in
+            # the provided chunks is ungrounded — drop it rather than surface an
+            # unverifiable source.
+            log.warning("immigration_answer dropped ungrounded citation: %s", url)
+            continue
         out.append({
             "source_url": url,
             "trust_tier": chunk.get("trust_tier"),
@@ -107,6 +117,7 @@ def generate_immigration_answer(
     """
     chunks = chunks_payload.get("chunks") or []
     all_stale = bool(chunks_payload.get("all_stale_warning"))
+    oldest_fetched_at = chunks_payload.get("oldest_fetched_at")
     now_iso = datetime.now(timezone.utc).isoformat()
 
     tracer = TraceSession(
@@ -124,6 +135,8 @@ def generate_immigration_answer(
             "model": None,
             "corridor": corridor,
             "cost_usd": 0.0,
+            "all_stale_warning": all_stale,
+            "oldest_fetched_at": oldest_fetched_at,
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
         }
@@ -136,14 +149,22 @@ def generate_immigration_answer(
     answer_text = (resp.get("text") or "").strip()
     usage = resp.get("usage") or {}
     model = resp.get("model") or _MODEL
-    cost = estimate_cost_usd(usage, model)
+    stop_reason = resp.get("stop_reason")
+    # Price by the requested alias, not the API-echoed (possibly date-suffixed)
+    # model id, which would miss the alias-keyed pricing table and log $0.
+    cost = estimate_cost_usd(usage, _MODEL)
     tracer.record_llm_call(model, int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0)), 0)
 
-    is_refusal = answer_text.startswith("I cannot confirm the requirements for this corridor")
-    if is_refusal:
+    # Classify. Empty output is treated as an insufficient-context refusal (never
+    # serve a blank "answer"). The refusal marker is matched ANYWHERE so a stale
+    # refusal — prefixed by the "⚠️ Note:" caveat — is still detected.
+    if not answer_text:
+        answer_text = INSUFFICIENT_CONTEXT_REFUSAL
+        answer_kind = "refusal_stale_sources" if all_stale else "refusal_insufficient_context"
+    elif _REFUSAL_MARKER in answer_text:
         answer_kind = "refusal_stale_sources" if all_stale else "refusal_insufficient_context"
     else:
-        answer_kind = "answer"  # stale answers still answer, with the caveat the model prepends
+        answer_kind = "answer"  # stale answers still answer, with the model-prepended caveat
 
     cited_sources = _extract_cited_sources(answer_text, chunks)
     tracer.flush()
@@ -154,6 +175,9 @@ def generate_immigration_answer(
         "model": model,
         "corridor": corridor,
         "cost_usd": cost,
+        "all_stale_warning": all_stale,
+        "oldest_fetched_at": oldest_fetched_at,
+        "truncated": stop_reason == "max_tokens",
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,
     }

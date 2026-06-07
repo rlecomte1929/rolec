@@ -85,6 +85,38 @@ class AnswerEngineTests(unittest.TestCase):
         res = generate_immigration_answer(_payload([_chunk("https://gov.example/x")]), "q", "FR→NO", client=mockc)
         self.assertEqual(res["answer_kind"], "refusal_insufficient_context")
 
+    def test_stale_refusal_with_caveat_prefix_is_classified_stale(self):
+        # Regression: a stale refusal is prefixed with the "⚠️ Note:" caveat, so
+        # the refusal sentence is NOT at the start — must still be detected.
+        text = ("⚠️ Note: The available sources may be outdated. Please verify. "
+                + INSUFFICIENT_CONTEXT_REFUSAL)
+        mockc = MockClient(default_response=text)
+        res = generate_immigration_answer(_payload([_chunk("https://gov.example/x")], all_stale=True),
+                                          "q", "FR→NO", client=mockc)
+        self.assertEqual(res["answer_kind"], "refusal_stale_sources")
+
+    def test_response_surfaces_staleness_fields(self):
+        url = "https://gov.example/x"
+        mockc = MockClient(default_response=f"You need X [source: {url}].")
+        res = generate_immigration_answer(_payload([_chunk(url)], all_stale=True), "q", "FR→NO", client=mockc)
+        self.assertTrue(res["all_stale_warning"])
+        self.assertEqual(res["oldest_fetched_at"], "2026-06-06T00:00:00+00:00")
+        self.assertIn("truncated", res)
+
+    def test_fabricated_citation_is_dropped(self):
+        # Citation-enforced: a [source: url] not in the provided chunks is ungrounded.
+        real = "https://gov.example/real"
+        mockc = MockClient(default_response="You need X [source: https://gov.example/FABRICATED].")
+        res = generate_immigration_answer(_payload([_chunk(real)]), "q", "FR→NO", client=mockc)
+        self.assertEqual(res["answer_kind"], "answer")
+        self.assertEqual(res["cited_sources"], [])  # fabricated source not surfaced
+
+    def test_empty_answer_is_refusal(self):
+        mockc = MockClient(default_response="")
+        res = generate_immigration_answer(_payload([_chunk("https://gov.example/x")]), "q", "FR→NO", client=mockc)
+        self.assertEqual(res["answer_kind"], "refusal_insufficient_context")
+        self.assertEqual(res["answer_text"], INSUFFICIENT_CONTEXT_REFUSAL)
+
 
 if __name__ == "__main__":
     unittest.main()
