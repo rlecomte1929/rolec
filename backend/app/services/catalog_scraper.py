@@ -25,7 +25,7 @@ Operational guards:
 """
 from __future__ import annotations
 
-import json
+import asyncio
 import logging
 import os
 import re
@@ -86,49 +86,33 @@ def _build_prompt(category: str, destination_city: str, country: Optional[str]) 
     )
 
 
-def _build_client() -> Optional[Any]:
-    """Create an OpenAI client when configured; return None when not (tests)."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return None
-    try:
-        from openai import OpenAI  # type: ignore
-    except ImportError:  # pragma: no cover — listed in requirements.txt
-        return None
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        timeout=DEFAULT_TIMEOUT_S,
-        max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "2")),
+def _call_llm(prompt: str) -> Dict[str, Any]:
+    """Synthesize vendors via the shared llm_client wrapper (json_object mode).
+
+    Returns the parsed JSON object. Routing through ``llm_client.complete``
+    gains timeout, retry on 429/5xx, and structured logging. Same model,
+    prompt, temperature, timeout, and retry budget as before. Runs in a sync
+    route/threadpool, so asyncio.run() drives the async wrapper to result.
+    """
+    from .llm_client import complete
+
+    return asyncio.run(
+        complete(
+            system=(
+                "You are a careful research assistant for a corporate "
+                "relocation platform. You output strictly valid JSON."
+            ),
+            user=prompt,
+            schema={},  # json_object mode (free-form JSON object)
+            temperature=0.2,
+            model=DEFAULT_MODEL,
+            timeout=DEFAULT_TIMEOUT_S,
+            max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "2")),
+        )
     )
 
 
-def _call_llm(client: Any, prompt: str) -> str:
-    """Run the chat completion. Caller validates the JSON shape."""
-    resp = client.chat.completions.create(
-        model=DEFAULT_MODEL,
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a careful research assistant for a corporate "
-                    "relocation platform. You output strictly valid JSON."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.2,
-    )
-    return (resp.choices[0].message.content or "").strip()
-
-
-def _parse_vendors(raw: str) -> List[Dict[str, Any]]:
-    if not raw:
-        return []
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        log.warning("catalog_scraper_invalid_json snippet=%s", raw[:200])
-        return []
+def _parse_vendors(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
     vendors = payload.get("vendors") if isinstance(payload, dict) else None
     if not isinstance(vendors, list):
         return []
@@ -156,17 +140,17 @@ def populate_destination_catalog(
     category: str,
     destination_city: str,
     country: Optional[str] = None,
-    client: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
     """
     Scrape (synthesize) up to MAX_ITEMS_PER_DESTINATION vendors and write
     them to the master catalog. Returns the list of upserted master rows.
 
-    `client` may be passed for tests to inject a mock; in production it's
-    built lazily from env. Returns an empty list (without raising) when:
+    The LLM call is delegated to ``_call_llm`` (the shared llm_client wrapper);
+    tests patch ``_call_llm`` to inject a payload. Returns an empty list
+    (without raising) when:
       - the scraper is disabled,
       - no OPENAI_API_KEY is set,
-      - the LLM returns non-JSON or zero usable vendors.
+      - the LLM call fails or returns zero usable vendors.
     """
     if not _enabled():
         log.info(
@@ -188,9 +172,9 @@ def populate_destination_catalog(
             destination_city,
         )
         return []
-    if client is None:
-        client = _build_client()
-    if client is None:
+    # No key → skip silently (case creation must never fail on a missing
+    # scraper key). The wrapper would raise without one, so guard here.
+    if not os.getenv("OPENAI_API_KEY"):
         log.warning(
             "catalog_scraper_no_client category=%s destination_city=%s",
             category,
@@ -200,7 +184,7 @@ def populate_destination_catalog(
 
     prompt = _build_prompt(category, destination_city, country)
     try:
-        raw = _call_llm(client, prompt)
+        payload = _call_llm(prompt)
     except Exception as ex:  # pragma: no cover — network path
         log.warning(
             "catalog_scraper_llm_failed category=%s destination_city=%s error=%s",
@@ -210,7 +194,7 @@ def populate_destination_catalog(
         )
         return []
 
-    vendors = _parse_vendors(raw)
+    vendors = _parse_vendors(payload)
     if not vendors:
         log.info(
             "catalog_scraper_returned_empty category=%s destination_city=%s",

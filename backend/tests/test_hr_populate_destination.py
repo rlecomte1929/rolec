@@ -7,7 +7,6 @@ mocked so no network is needed.
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 import unittest
@@ -95,12 +94,10 @@ def _user(role: str, company_id: str):
     return {"id": str(uuid.uuid4()), "role": role, "company": company_id, "is_admin": False}
 
 
-def _fake_client(payload: dict):
-    msg = mock.Mock(); msg.content = json.dumps(payload)
-    choice = mock.Mock(); choice.message = msg
-    resp = mock.Mock(); resp.choices = [choice]
-    client = mock.Mock(); client.chat.completions.create.return_value = resp
-    return client
+def _patch_llm(payload: dict):
+    """Patch the scraper's wrapper seam to return the given parsed JSON
+    payload instead of calling OpenAI."""
+    return mock.patch.object(catalog_scraper, "_call_llm", return_value=payload)
 
 
 class PopulateDestinationTests(unittest.TestCase):
@@ -156,11 +153,11 @@ class PopulateDestinationTests(unittest.TestCase):
         company = str(uuid.uuid4())
         admin = str(uuid.uuid4())
         scrape_safety.add_allowlist_entry(city="Tokyo", country="Japan", approved_by_user_id=admin)
-        client = _fake_client({"vendors": [
+        payload = {"vendors": [
             {"name": "Vendor A", "summary": "x", "website": None, "strengths": [], "notes": None},
             {"name": "Vendor B", "summary": "x", "website": None, "strengths": [], "notes": None},
-        ]})
-        with mock.patch.object(catalog_scraper, "_build_client", return_value=client):
+        ]}
+        with _patch_llm(payload):
             result = populate_destination_with_ai(
                 body=PopulateDestinationBody(destination_city="Tokyo", country="Japan"),
                 user=_user("HR", company),
@@ -199,8 +196,7 @@ class PopulateDestinationTests(unittest.TestCase):
                 category=cat["key"], name="Pre", attributes={}, source="seed",
                 city="Munich", external_id=f"pre-{cat['key']}",
             )
-        client = _fake_client({"vendors": []})
-        with mock.patch.object(catalog_scraper, "_build_client", return_value=client):
+        with _patch_llm({"vendors": []}) as m:
             result = populate_destination_with_ai(
                 body=PopulateDestinationBody(destination_city="Munich", country="Germany"),
                 user=_user("HR", company),
@@ -210,7 +206,7 @@ class PopulateDestinationTests(unittest.TestCase):
         self.assertEqual(result["categories_populated"], 0)
         self.assertEqual(result["total_inserted"], 0)
         self.assertEqual(scrape_safety.get_quota_state(company)["used"], 0)
-        client.chat.completions.create.assert_not_called()
+        m.assert_not_called()
 
     # ------------------------------------------------------------------
     # Quota mid-loop: stops incrementing when limit is hit
@@ -223,10 +219,10 @@ class PopulateDestinationTests(unittest.TestCase):
         # is allowed inside the loop.
         for _ in range(scrape_safety.DEFAULT_DAILY_QUOTA - 1):
             scrape_safety.check_and_increment_quota(company)
-        client = _fake_client({"vendors": [
+        payload = {"vendors": [
             {"name": "X", "summary": "x", "website": None, "strengths": [], "notes": None},
-        ]})
-        with mock.patch.object(catalog_scraper, "_build_client", return_value=client):
+        ]}
+        with _patch_llm(payload):
             result = populate_destination_with_ai(
                 body=PopulateDestinationBody(destination_city="Tokyo", country="Japan"),
                 user=_user("HR", company),
