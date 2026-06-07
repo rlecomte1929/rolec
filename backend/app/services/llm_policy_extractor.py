@@ -41,6 +41,28 @@ Configuration:
 * ``RELOPASS_LLM_POLICY_MAX_INPUT_CHARS`` — optional. Defaults to 12000.
   Truncates document text before sending so large policy PDFs don't blow
   the context window.
+
+llm_client wrapper exception (AUDIT-B5-followup / AIQ-401)
+---------------------------------------------------------
+This module constructs the Anthropic SDK client directly rather than going
+through ``services/llm_client.py``. This is a *documented, allowed* exception:
+the call needs three things the canonical wrapper does not currently expose,
+and replicating them through it would change behaviour rather than preserve it:
+
+  1. **Per-call token usage.** The success path reads
+     ``message.usage.input_tokens`` / ``output_tokens`` to feed the
+     unit-economics tracer (``ai_trace_logger.TraceSession.record_llm_call``)
+     and LangSmith. ``claude_complete`` returns only the parsed result, not the
+     usage object, so migrating here would silently drop cost telemetry.
+  2. **A bespoke tool schema.** It forces ``tool_choice`` onto
+     ``EXTRACT_POLICY_TOOL`` (a named, richly-typed input_schema), whereas the
+     wrapper always uses a single generic ``structured_output`` tool.
+  3. **Prompt-registry integration.** Model, system prompt, max_tokens, and
+     canary arm come from ``prompt_registry.get_active_prompt`` at call time.
+
+Unifying this with ``llm_client`` is tracked as a follow-up (it requires the
+wrapper to return usage + accept an arbitrary tool name/schema); until then
+this call site stays direct, by design.
 """
 from __future__ import annotations
 

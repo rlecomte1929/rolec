@@ -25,6 +25,16 @@ Cost: HashEmbedder is free. OpenAIEmbedder runs at $0.02 per 1M tokens
 (text-embedding-3-small price as of 2026-04). A typical company policy
 indexes to ~50 chunks of ~150 tokens each = 7,500 tokens = $0.00015
 per full reindex. Negligible at expected pilot volume.
+
+llm_client wrapper exception (AUDIT-B5-followup / AIQ-401)
+---------------------------------------------------------
+``OpenAIEmbedder`` constructs the OpenAI SDK client directly instead of
+going through ``services/llm_client.py``. This is a *documented, allowed*
+exception: ``llm_client`` only wraps chat/messages completions (``complete`` /
+``claude_complete``) and has no embeddings entry point. The embeddings API
+(``client.embeddings.create``) returns vectors, not chat text, so the
+wrapper's JSON-schema / retry-on-completion machinery does not apply. If a
+shared embeddings wrapper is ever added, migrate this call site to it.
 """
 from __future__ import annotations
 

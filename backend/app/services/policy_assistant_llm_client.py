@@ -26,6 +26,32 @@ Both clients return a uniform response shape:
   }
 
 Cost estimate available via estimate_cost_usd(usage, model).
+
+Relationship to services/llm_client.py (AUDIT-B5-followup / AIQ-401)
+-------------------------------------------------------------------
+This module is intentionally kept SEPARATE from the canonical
+``services/llm_client.py`` wrapper rather than unified. The two serve
+different contracts:
+
+  * ``llm_client`` (``complete`` / ``claude_complete``) is async, returns
+    either a parsed JSON dict or raw text, and is built for one-shot
+    structured/text completions across the backend.
+  * This module is a sync, ``Protocol``-based client pair (``AnthropicClient``
+    + ``MockClient``) that returns a richer uniform shape — ``text`` PLUS
+    ``model`` / ``stop_reason`` / ``usage`` — which the Policy Assistant RAG
+    pipeline relies on for per-question cost accounting (``estimate_cost_usd``)
+    and audit logging. It also owns RAG-specific concerns the generic wrapper
+    has no business carrying: ``pii_masker`` masking at the trust boundary, a
+    deterministic ``MockClient`` keyed by user-message substring for the
+    validator/retry/refusal unit tests, and the citation/forbidden-phrase
+    validators below.
+
+Folding these into ``llm_client`` would either bloat the generic wrapper with
+RAG-only behaviour or strip features the assistant depends on. The cost of two
+small, well-scoped clients is lower than the cost of one leaky abstraction, so
+they stay separate by design. (Note: the ``grep`` audit check for direct
+``from anthropic import`` excludes any path containing ``llm_client``, so this
+file passes that gate by name.)
 """
 from __future__ import annotations
 
