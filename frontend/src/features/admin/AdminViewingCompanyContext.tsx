@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { adminAPI } from '../../api/client';
+import { getAuthItem } from '../../utils/demo';
 import type { AdminCompany } from '../../types';
 
 /**
@@ -67,6 +68,15 @@ export function AdminViewingCompanyProvider({ children }: ProviderProps) {
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(() => readStored());
 
   const refresh = useCallback(async () => {
+    // This provider wraps the whole app but the company list is an admin-only
+    // surface. Non-admin sessions (employee/HR) would get a 403 — a wasted
+    // request + console error on every page. Skip the call entirely for them.
+    const role = (getAuthItem('relopass_role') || '').toUpperCase();
+    if (role !== 'ADMIN') {
+      setCompanies([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

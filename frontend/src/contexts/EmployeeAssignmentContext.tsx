@@ -18,6 +18,8 @@ export type EmployeePrimaryCompany = { id: string | null; name: string | null };
 interface EmployeeAssignmentContextValue {
   /** Primary linked assignment id (first by recency) for nav and case stats. */
   assignmentId: string | null;
+  /** Primary linked case id (first by recency). Distinct from assignmentId — case-scoped routes (roadmap/dossier) need this. */
+  primaryCaseId: string | null;
   /** Company on the primary linked assignment (from overview); prefer over generic /api/company for employees. */
   primaryAssignmentCompany: EmployeePrimaryCompany | null;
   isLoading: boolean;
@@ -32,6 +34,7 @@ interface EmployeeAssignmentContextValue {
 
 const defaultValue: EmployeeAssignmentContextValue = {
   assignmentId: null,
+  primaryCaseId: null,
   primaryAssignmentCompany: null,
   isLoading: false,
   linkedCount: 0,
@@ -66,6 +69,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
 
   const linkedCount = linkedSummaries.length;
   const pendingCount = pendingSummaries.length;
+  const primaryCaseId = linkedSummaries[0]?.case_id ?? null;
 
   useLayoutEffect(() => {
     if (!shouldFetch) {
@@ -168,6 +172,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
     <EmployeeAssignmentContext.Provider
       value={{
         assignmentId,
+        primaryCaseId,
         primaryAssignmentCompany,
         isLoading,
         linkedCount,
