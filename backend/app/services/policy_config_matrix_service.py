@@ -239,6 +239,9 @@ def _canonical_seed_rows(version_id: str) -> List[Dict[str, Any]]:
                 "targeting_signature": sig,
                 "display_order": order,
                 **d,
+                # AIQ-854: scaffold rows for a fresh draft with no published baseline.
+                "source": "seeded",
+                "auto_generated": True,
             }
         )
     return rows
@@ -1373,6 +1376,9 @@ class PolicyConfigMatrixService:
                 "benefit_label": label,
                 "targeting_signature": sig,
                 **row,
+                # AIQ-854: starter-template rows are template-originated, not HR-typed.
+                "source": "template_default",
+                "auto_generated": True,
             }
             self._db.insert_policy_config_benefit_row(row_payload)
 
