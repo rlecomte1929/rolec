@@ -148,24 +148,22 @@ class QualityGatesTests(unittest.TestCase):
         out = _apply_quality_gates([_gc(0.82, tier=3, cid="t3"), _gc(0.80, tier=1, cid="t1")],
                                    min_similarity=0.0, top_k=10, now=_NOW)
         self.assertEqual(out[0]["id"], "t1")
-        # N8/AIQ-848: adjusted_score now carries a 4th factor — reliability (0.5
-        # neutral for these no-feedback chunks). Order is unchanged; magnitude ×0.5.
-        self.assertAlmostEqual(out[0]["adjusted_score"], 0.80 * 0.5, places=3)
+        # N8/AIQ-848: reliability weight defaults to 0 (dormant), so adjusted_score
+        # is the unchanged 3-factor value (raw × tier × freshness).
+        self.assertAlmostEqual(out[0]["adjusted_score"], 0.80, places=3)
         self.assertAlmostEqual(
-            next(c for c in out if c["id"] == "t3")["adjusted_score"], 0.615 * 0.5, places=3)
+            next(c for c in out if c["id"] == "t3")["adjusted_score"], 0.615, places=3)
 
     def test_stale_flag_and_decay(self):
         old = (_NOW - timedelta(days=200)).isoformat()
         out = _apply_quality_gates([_gc(0.9, tier=1, fetched=old)], min_similarity=0.0, top_k=10, now=_NOW)
         self.assertTrue(out[0]["is_stale"])
-        # ×0.5 neutral reliability (N8/AIQ-848).
-        self.assertAlmostEqual(out[0]["adjusted_score"], 0.9 * 0.70 * 0.5, places=3)
+        self.assertAlmostEqual(out[0]["adjusted_score"], 0.9 * 0.70, places=3)
 
     def test_fresh_not_stale(self):
         out = _apply_quality_gates([_gc(0.9, tier=1)], min_similarity=0.0, top_k=10, now=_NOW)
         self.assertFalse(out[0]["is_stale"])
-        # ×0.5 neutral reliability (N8/AIQ-848).
-        self.assertAlmostEqual(out[0]["adjusted_score"], 0.9 * 0.5, places=3)
+        self.assertAlmostEqual(out[0]["adjusted_score"], 0.9, places=3)
 
 
 class StalenessWrapperTests(unittest.TestCase):

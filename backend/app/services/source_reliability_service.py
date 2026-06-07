@@ -42,15 +42,16 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from .. import db as _db
+from .source_reliability_config import (
+    LOW_SAMPLE_THRESHOLD as _LOW_SAMPLE_THRESHOLD,
+    NEUTRAL_RELIABILITY as _NEUTRAL_SCORE,
+    WILSON_Z as _WILSON_Z,
+)
 
 log = logging.getLogger(__name__)
 
 # policy_assistant_traces.feature_key value the N4 immigration engine logs under.
 IMMIGRATION_FEATURE_KEY = "immigration_answer"
-_NEUTRAL_SCORE = 0.5
-_WILSON_Z = 1.96
-# Below this many citations, use the Wilson lower bound instead of the raw rate.
-_LOW_SAMPLE_THRESHOLD = 10
 
 # Tolerate both a plain id and the policy-style "[chunk:<id>]" citation wrapper.
 _CHUNK_REF_RE = re.compile(r"\[chunk:([^\]]+)\]")

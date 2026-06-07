@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from ...database import db
+from . import source_reliability_config as _rel_cfg
 from .policy_assistant_embedder import Embedder, cosine_similarity, get_default_embedder
 
 log = logging.getLogger(__name__)
@@ -36,8 +37,6 @@ log = logging.getLogger(__name__)
 # N3/AIQ-842 retrieval quality gates.
 _IMMIGRATION_MIN_SIMILARITY = float(os.getenv("IMMIGRATION_MIN_SIMILARITY", "0.25"))
 _TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
-# N8/AIQ-848: neutral reliability for chunks with no feedback yet (column default).
-_NEUTRAL_RELIABILITY = 0.5
 
 # Synthetic corpus owner: immigration rules are corridor-scoped, not
 # company-scoped, but policy_chunk_retriever requires a company_id. The
@@ -195,11 +194,11 @@ def _apply_quality_gates(
         boost = _TIER_BOOST.get(tier, 1.0)
         days = _days_old(c.get("fetched_at"), now)
         freshness = 0.70 if days > 180 else (0.85 if days > 90 else 1.0)
-        # N8/AIQ-848: feedback-loop reliability is the 4th ranking factor.
-        rel = c.get("reliability_score")
-        rel = _NEUTRAL_RELIABILITY if rel is None else float(rel)
+        # N8/AIQ-848: feedback-loop reliability is the 4th ranking factor, blended
+        # by RELIABILITY_WEIGHT (0 = dormant/no effect; ships off by default).
+        factor = _rel_cfg.reliability_factor(c.get("reliability_score"))
         out.append({**c, "raw_score": raw,
-                    "adjusted_score": raw * boost * freshness * rel, "is_stale": days > 180})
+                    "adjusted_score": raw * boost * freshness * factor, "is_stale": days > 180})
     out.sort(key=lambda x: x["adjusted_score"], reverse=True)
     return out[: max(1, top_k)]
 
@@ -212,8 +211,8 @@ def _shape(meta_raw: Any, *, id_, source_url, chunk_text, corridor, trust_tier, 
             meta = json.loads(meta)
         except Exception:
             meta = {}
-    # N8/AIQ-848: feedback-loop reliability (0.5 neutral when absent/null).
-    rel = _NEUTRAL_RELIABILITY if reliability_score is None else float(reliability_score)
+    # N8/AIQ-848: feedback-loop reliability (neutral when absent/null).
+    rel = _rel_cfg.NEUTRAL_RELIABILITY if reliability_score is None else float(reliability_score)
     return {
         "id": str(id_),
         "source_type": IMMIGRATION_SOURCE_TYPE,

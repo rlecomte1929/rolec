@@ -20,7 +20,9 @@ if _REPO_ROOT not in sys.path:
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
 
+from backend.app.services import source_reliability_config as cfg
 from backend.app.services.immigration_retriever import _apply_quality_gates
+from backend.app.services.source_reliability_config import reliability_factor
 from backend.app.services.source_reliability_service import (
     recompute_reliability_scores,
     reliability_score,
@@ -167,19 +169,58 @@ class RecomputeServiceTests(unittest.TestCase):
         self.assertEqual(_row(eng, "X")["citation_count"], 1)
 
 
+class ReliabilityFactorBlendTests(unittest.TestCase):
+    """The RELIABILITY_WEIGHT blend: factor = (1-w) + w*reliability."""
+
+    def setUp(self):
+        self._orig = cfg.RELIABILITY_WEIGHT
+        self.addCleanup(lambda: setattr(cfg, "RELIABILITY_WEIGHT", self._orig))
+
+    def test_weight_zero_is_dormant(self):
+        cfg.RELIABILITY_WEIGHT = 0.0
+        self.assertEqual(reliability_factor(0.2), 1.0)   # bad chunk -> no effect
+        self.assertEqual(reliability_factor(0.9), 1.0)
+
+    def test_weight_one_is_full_effect(self):
+        cfg.RELIABILITY_WEIGHT = 1.0
+        self.assertAlmostEqual(reliability_factor(0.2), 0.2)
+        self.assertAlmostEqual(reliability_factor(None), cfg.NEUTRAL_RELIABILITY)
+
+    def test_weight_half_is_midpoint(self):
+        cfg.RELIABILITY_WEIGHT = 0.5
+        # (1-0.5) + 0.5*0.2 = 0.6
+        self.assertAlmostEqual(reliability_factor(0.2), 0.6)
+
+
 class RetrieverRankingTests(unittest.TestCase):
+    def setUp(self):
+        self._orig = cfg.RELIABILITY_WEIGHT
+        self.addCleanup(lambda: setattr(cfg, "RELIABILITY_WEIGHT", self._orig))
+
     def _chunk(self, cid, reliability):
         return {"id": cid, "score": 0.8, "trust_tier": 1,
                 "fetched_at": "2026-06-06T00:00:00+00:00", "reliability_score": reliability}
 
-    def test_criterion3_high_reliability_ranks_first(self):
+    def test_default_weight_is_dormant_no_reranking(self):
+        # Ships safe: at the default weight (0), reliability does NOT change ranking.
+        cfg.RELIABILITY_WEIGHT = 0.0
+        low = self._chunk("low", 0.2)
+        high = self._chunk("high", 0.9)
+        ranked = _apply_quality_gates([low, high], min_similarity=0.0, top_k=2)
+        # Equal raw/tier/freshness, reliability ignored -> equal adjusted scores.
+        self.assertAlmostEqual(ranked[0]["adjusted_score"], ranked[1]["adjusted_score"])
+        self.assertAlmostEqual(ranked[0]["adjusted_score"], 0.8)  # 0.8 * 1 * 1 * 1
+
+    def test_criterion3_high_reliability_ranks_first_when_enabled(self):
+        cfg.RELIABILITY_WEIGHT = 1.0
         low = self._chunk("low", 0.2)
         high = self._chunk("high", 0.9)
         ranked = _apply_quality_gates([low, high], min_similarity=0.0, top_k=2)
         self.assertEqual(ranked[0]["id"], "high")
         self.assertGreater(ranked[0]["adjusted_score"], ranked[1]["adjusted_score"])
 
-    def test_missing_reliability_defaults_neutral(self):
+    def test_full_weight_missing_reliability_uses_neutral(self):
+        cfg.RELIABILITY_WEIGHT = 1.0
         c = {"id": "c", "score": 0.8, "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00"}
         ranked = _apply_quality_gates([c], min_similarity=0.0, top_k=1)
         # 0.8 raw * 1.0 tier * 1.0 freshness * 0.5 neutral = 0.4
