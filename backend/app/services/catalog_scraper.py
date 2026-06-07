@@ -32,6 +32,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from . import service_catalog
+from .llm_client import complete_text_sync
 
 log = logging.getLogger(__name__)
 
@@ -86,39 +87,25 @@ def _build_prompt(category: str, destination_city: str, country: Optional[str]) 
     )
 
 
-def _build_client() -> Optional[Any]:
-    """Create an OpenAI client when configured; return None when not (tests)."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return None
-    try:
-        from openai import OpenAI  # type: ignore
-    except ImportError:  # pragma: no cover — listed in requirements.txt
-        return None
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
+def _call_llm(prompt: str) -> str:
+    """Run the chat completion via the shared wrapper. Caller validates JSON.
+
+    AIQ-401: routes through llm_client.complete_text_sync for timeout + 429/5xx
+    retry + structured logging. Same model, json_object contract, temperature,
+    and the 45s timeout / 2 retries the direct client used.
+    """
+    return complete_text_sync(
+        system=(
+            "You are a careful research assistant for a corporate "
+            "relocation platform. You output strictly valid JSON."
+        ),
+        user=prompt,
+        model=DEFAULT_MODEL,
+        temperature=0.2,
+        json_object=True,
         timeout=DEFAULT_TIMEOUT_S,
         max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "2")),
-    )
-
-
-def _call_llm(client: Any, prompt: str) -> str:
-    """Run the chat completion. Caller validates the JSON shape."""
-    resp = client.chat.completions.create(
-        model=DEFAULT_MODEL,
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a careful research assistant for a corporate "
-                    "relocation platform. You output strictly valid JSON."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.2,
-    )
-    return (resp.choices[0].message.content or "").strip()
+    ).strip()
 
 
 def _parse_vendors(raw: str) -> List[Dict[str, Any]]:
@@ -156,14 +143,14 @@ def populate_destination_catalog(
     category: str,
     destination_city: str,
     country: Optional[str] = None,
-    client: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
     """
     Scrape (synthesize) up to MAX_ITEMS_PER_DESTINATION vendors and write
     them to the master catalog. Returns the list of upserted master rows.
 
-    `client` may be passed for tests to inject a mock; in production it's
-    built lazily from env. Returns an empty list (without raising) when:
+    The LLM call goes through llm_client.complete_text_sync (AIQ-401); tests
+    patch ``catalog_scraper.complete_text_sync``. Returns an empty list
+    (without raising) when:
       - the scraper is disabled,
       - no OPENAI_API_KEY is set,
       - the LLM returns non-JSON or zero usable vendors.
@@ -188,11 +175,9 @@ def populate_destination_catalog(
             destination_city,
         )
         return []
-    if client is None:
-        client = _build_client()
-    if client is None:
+    if not os.getenv("OPENAI_API_KEY"):
         log.warning(
-            "catalog_scraper_no_client category=%s destination_city=%s",
+            "catalog_scraper_no_api_key category=%s destination_city=%s",
             category,
             destination_city,
         )
@@ -200,7 +185,7 @@ def populate_destination_catalog(
 
     prompt = _build_prompt(category, destination_city, country)
     try:
-        raw = _call_llm(client, prompt)
+        raw = _call_llm(prompt)
     except Exception as ex:  # pragma: no cover — network path
         log.warning(
             "catalog_scraper_llm_failed category=%s destination_city=%s error=%s",

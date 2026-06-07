@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from sqlalchemy import text
 
 from ...database import Database
+from .llm_client import complete_text_sync
 
 logger = logging.getLogger(__name__)
 
@@ -172,52 +173,47 @@ class CanonicalPolicyQueryLLM:
         self._client = client
         self._model = model or os.getenv("OPENAI_POLICY_QUERY_MODEL", "gpt-4.1-mini")
 
-    def _client_or_raise(self) -> Any:
-        if self._client is not None:
-            return self._client
-        from ...core.llm_flags import LLMDisabled, policy_llm_disabled
-        if policy_llm_disabled():
-            # RELOPASS_POLICY_LLM_DISABLED=1 — never build a client, never egress.
-            return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
-        try:
-            from openai import OpenAI  # type: ignore
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("openai package is required for policy query answering") from exc
-        # Explicit timeout + retries — avoids hung requests blocking policy Q&A.
-        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
-        return OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            timeout=timeout_s,
-            max_retries=max_retries,
-        )
-
     def answer(self, *, query: str, context_blocks: List[str]) -> str:
-        from ...core.llm_flags import LLMDisabled, policy_llm_temperature
-        client = self._client_or_raise()
-        if isinstance(client, LLMDisabled):
-            # Deterministic short-circuit. Caller is expected to treat an
-            # empty string as "no LLM answer" and route to a template-based
-            # deterministic response (or set review_required=True).
+        # AIQ-401: prod routes through llm_client.complete_text_sync (timeout +
+        # 429/5xx retry + structured logging). A test-injected `client` takes
+        # precedence (testing seam). The egress kill-switch applies on the prod
+        # path only; an injected client has opted into that client. Free-text
+        # (no json_object) — the answer is prose with [n] citations.
+        from ...core.llm_flags import policy_llm_disabled, policy_llm_temperature
+
+        if self._client is None and policy_llm_disabled():
+            # Deterministic short-circuit. Caller treats "" as "no LLM answer"
+            # and routes to a template-based deterministic response.
             return ""
+
         system = (
             "Answer strictly from the provided policy context. "
             "Do not use outside knowledge. "
             "If the answer is not fully supported, say so clearly. "
             "Cite every material statement using the provided numbered citations like [1], [2]."
         )
-        response = client.chat.completions.create(
+        user = json.dumps({"query": query, "context": context_blocks})
+        temperature = policy_llm_temperature()
+
+        if self._client is not None:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                temperature=temperature,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            return response.choices[0].message.content if response.choices else ""
+
+        return complete_text_sync(
+            system=system,
+            user=user,
             model=self._model,
-            temperature=policy_llm_temperature(),
-            messages=[
-                {"role": "system", "content": system},
-                {
-                    "role": "user",
-                    "content": json.dumps({"query": query, "context": context_blocks}),
-                },
-            ],
+            temperature=temperature,
+            timeout=float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60")),
+            max_retries=int(os.getenv("OPENAI_MAX_RETRIES", "3")),
         )
-        return response.choices[0].message.content if response.choices else ""
 
 
 def _resolve_caller_tier(db: Database, *, user_id: str, user_role: str) -> Optional[str]:
