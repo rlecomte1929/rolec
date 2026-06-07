@@ -74,11 +74,11 @@ export interface ConfigBenefitRow {
   display_order: number;
 }
 
-export interface PolicyConfigDraftBody {
+export type PolicyConfigDraftBody = {
   policy_version: string;
   effective_date: string;
   categories: Array<{ category_key: ConfigCategoryKey; benefits: ConfigBenefitRow[] }>;
-}
+};
 
 export interface CanvasMapResult {
   body: PolicyConfigDraftBody;

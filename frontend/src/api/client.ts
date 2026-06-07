@@ -3010,18 +3010,27 @@ export const policyConfigMatrixAPI = {
   hrPostDraft: async (companyId?: string): Promise<Record<string, unknown>> => {
     const response = await api.post('/api/hr/policy-config/draft', {}, {
       params: companyId ? { companyId } : {},
+      // Seeding/cloning a draft writes the full benefit matrix (~90 rows for a
+      // multi-tier policy) — override the 12s default per the B13 convention.
+      timeout: 120_000,
     });
     return response.data;
   },
   hrPutDraft: async (body: Record<string, unknown>, companyId?: string): Promise<Record<string, unknown>> => {
     const response = await api.put('/api/hr/policy-config/draft', body, {
       params: companyId ? { companyId } : {},
+      // Destructive replace of the whole matrix (~90 rows + audit rows) can
+      // exceed the 12s default; override per the B13 convention.
+      timeout: 120_000,
     });
     return response.data;
   },
   hrPublish: async (body: Record<string, unknown> | undefined, companyId?: string): Promise<Record<string, unknown>> => {
     const response = await api.post('/api/hr/policy-config/publish', body ?? {}, {
       params: companyId ? { companyId } : {},
+      // Publish also rebuilds the RAG index (OpenAI embeddings over all chunks),
+      // which can take well over 12s; override per the B13 convention.
+      timeout: 120_000,
     });
     return response.data;
   },
