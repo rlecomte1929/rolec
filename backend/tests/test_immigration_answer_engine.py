@@ -125,6 +125,18 @@ class AnswerEngineTests(unittest.TestCase):
         self.assertIn("https://udi.no/a", gen_call.user_message)
         self.assertIn("https://politiet.no/b", gen_call.user_message)
 
+    def test_confidence_higher_for_confirmed_than_secondary_only(self):
+        # N9 criterion #4: a confirmed-agreement answer outscores a secondary-only one.
+        def _answer(agreement):
+            ch = {**_chunk("https://x.example/a"), "source_agreement": agreement}
+            mockc = MockClient(default_response="A residence permit is required [source: https://x.example/a].")
+            return generate_immigration_answer(_payload([ch]), "q", "FR→NO", client=mockc)
+
+        confirmed = _answer("confirmed")
+        secondary = _answer("secondary_only")
+        self.assertGreater(confirmed["confidence"], secondary["confidence"])
+        self.assertEqual(confirmed["source_agreement_summary"], {"confirmed": 1})
+
     def test_stale_refusal_with_caveat_prefix_is_classified_stale(self):
         # Regression: a stale refusal is prefixed with the "⚠️ Note:" caveat, so
         # the refusal sentence is NOT at the start — must still be detected.

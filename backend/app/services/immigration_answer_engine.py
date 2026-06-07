@@ -26,6 +26,7 @@ from .immigration_contradiction_detector import (
     detect_and_resolve_conflicts,
 )
 from .immigration_retriever import IMMIGRATION_CORPUS_COMPANY_ID
+from .immigration_source_reconciler import confidence_from_agreement
 from .policy_assistant_llm_client import (
     LlmClient,
     LlmRequest,
@@ -158,6 +159,8 @@ def generate_immigration_answer(
             "grounding_score": None,
             "unsupported_claims": [],
             "verification_skipped": False,
+            "confidence": 0.0,
+            "source_agreement_summary": {},
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
         }
@@ -234,6 +237,16 @@ def generate_immigration_answer(
         elif grounding_verdict == "partially_grounded":
             answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT
 
+    # N9/AIQ-849: confidence derived from cross-tier source agreement of the chunks
+    # the answer is built from (set upstream by the multi-source reconciler). Confirmed
+    # (official + secondary corroborate) > official_only > secondary_only.
+    confidence = confidence_from_agreement(chunks)
+    source_agreement_summary: Dict[str, int] = {}
+    for c in chunks:
+        sa = c.get("source_agreement")
+        if sa:
+            source_agreement_summary[sa] = source_agreement_summary.get(sa, 0) + 1
+
     tracer.flush()
     return {
         "answer_text": answer_text,
@@ -252,6 +265,8 @@ def generate_immigration_answer(
         "conflicts_detected": conflict_result["conflicts_detected"],
         "conflicts_resolved": conflict_result["conflicts_resolved"],
         "contradiction_check_skipped": conflict_result["contradiction_check_skipped"],
+        "confidence": confidence,
+        "source_agreement_summary": source_agreement_summary,
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,
     }
