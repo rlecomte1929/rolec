@@ -35,6 +35,17 @@ function confidenceBadgeStyle(score: number | null): { bg: string; text: string;
   return { bg: 'bg-rose-100', text: 'text-rose-700', label: `${pct}%` };
 }
 
+// N11-FU2 (AIQ-851 follow-up): per-field confidence below this threshold maps to
+// the "absent/guessed" tier of the extraction's 3-tier scale (1.0 / 0.5 / 0.1) —
+// HR should verify these manually before approving. The badge already colours
+// anything < 0.70 rose; this adds an explicit warning icon at the < 0.5 line so
+// the "verify manually" tier is unmistakable.
+export const LOW_CONFIDENCE_THRESHOLD = 0.5;
+
+export function isLowConfidence(score: number | null): boolean {
+  return score !== null && score < LOW_CONFIDENCE_THRESHOLD;
+}
+
 function statusBadge(item: ReviewQueueItem) {
   if (item.status === 'validated') {
     return (
@@ -81,7 +92,7 @@ interface ReviewRowProps {
   loading: boolean;
 }
 
-const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject, loading }) => {
+export const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject, loading }) => {
   const [editMode, setEditMode] = useState(false);
   const [editValue, setEditValue] = useState(String(item.hr_override_value ?? item.value ?? ''));
   const [rejectMode, setRejectMode] = useState(false);
@@ -175,6 +186,16 @@ const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, onReject
           {badge.label}
           {item.ambiguity_flag && ' ⚠'}
         </span>
+        {isLowConfidence(item.confidence_score) && (
+          <span
+            role="img"
+            aria-label="Low confidence — verify manually"
+            title="Low confidence (below 50%) — verify this value against the source document before approving."
+            className="ml-1 align-middle text-rose-600 font-bold cursor-help"
+          >
+            ⚠
+          </span>
+        )}
       </td>
 
       {/* Conflicts */}
