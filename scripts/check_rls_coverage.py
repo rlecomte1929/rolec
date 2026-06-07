@@ -59,6 +59,37 @@ def load_allowlist(path: Path) -> set[str]:
     return allowed
 
 
+def find_unjustified_allowlist_entries(path: Path) -> "list[tuple[int, str]]":
+    """Return ``(line_no, tablename)`` for every allowlist entry lacking a
+    justification comment (SEC-RLSf / AIQ-663).
+
+    An entry is justified if it carries EITHER:
+      - an inline reason — ``tablename  # why it's server-role-only``, OR
+      - a ``#`` comment / section header directly above it. A header opens a
+        section that covers every entry beneath it until a blank line resets it.
+
+    Static check — no DB required, so it runs even when the RLS-coverage DB
+    secret is absent. A bare ``tablename`` with no reason is a failure.
+    """
+    if not path.exists():
+        return []
+    offenders: "list[tuple[int, str]]" = []
+    in_section = False  # under a comment / section header
+    for i, raw in enumerate(path.read_text().splitlines()):
+        stripped = raw.strip()
+        if not stripped:
+            in_section = False  # blank line ends the current section
+            continue
+        if stripped.startswith("#"):
+            in_section = True
+            continue
+        name, _, comment = raw.partition("#")
+        name = name.strip()
+        if name and not comment.strip() and not in_section:
+            offenders.append((i + 1, name))
+    return offenders
+
+
 def query_policy_less_tables(db_url: str) -> list[str]:
     try:
         import psycopg2
@@ -121,6 +152,27 @@ def main() -> int:
         ),
     )
     args = parser.parse_args()
+
+    # SEC-RLSf (AIQ-663): static guard — every retained allowlist entry must
+    # carry a justification. Runs first, with no DB dependency, so an
+    # unjustified entry fails CI even where the RLS-coverage DB secret is unset.
+    # Skipped for --update-allowlist, which (re)seeds the file.
+    if not args.update_allowlist:
+        unjustified = find_unjustified_allowlist_entries(ALLOWLIST_FILE)
+        if unjustified:
+            print(
+                f"[rls-coverage] FAIL — {len(unjustified)} allowlist entr"
+                f"{'y' if len(unjustified) == 1 else 'ies'} without a justification comment:",
+                file=sys.stderr,
+            )
+            for line_no, name in unjustified:
+                print(f"  {ALLOWLIST_FILE.name}:{line_no}: {name}", file=sys.stderr)
+            print(
+                "  Add an inline `# reason` after the name, or a `#` section header "
+                "above the block, explaining why the table is server-role-only.",
+                file=sys.stderr,
+            )
+            return 1
 
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
