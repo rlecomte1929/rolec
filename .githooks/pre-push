@@ -18,6 +18,7 @@ cd "$REPO_ROOT"
 # Detect whether this push touches the frontend. Stdin gives us
 # "<local_ref> <local_sha> <remote_ref> <remote_sha>" lines.
 need_build=0
+touches_workflow=0
 zero="0000000000000000000000000000000000000000"
 
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -39,7 +40,20 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if git diff --name-only "$range" 2>/dev/null | grep -qE '^frontend/'; then
     need_build=1
   fi
+  if git diff --name-only "$range" 2>/dev/null | grep -qE '^\.github/workflows/'; then
+    touches_workflow=1
+  fi
 done
+
+# Heads-up: pushing a workflow-file change needs the GitHub `workflow` token
+# scope, which the default OAuth token in some environments lacks. Warn (don't
+# block) so the remote rejection is anticipated. See docs/ci/editing-workflows.md.
+if [ "$touches_workflow" -eq 1 ]; then
+  echo "pre-push: ⚠️  this push edits .github/workflows/* — that needs the GitHub 'workflow' token scope."
+  echo "pre-push:     if the push is rejected ('without workflow scope'), run:"
+  echo "pre-push:         gh auth refresh -h github.com -s workflow"
+  echo "pre-push:     and keep workflow edits in a separate commit from product code."
+fi
 
 if [ "$need_build" -eq 0 ]; then
   echo "pre-push: no frontend changes detected — skipping build."
