@@ -33,7 +33,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -96,7 +96,11 @@ class FormTemplateRead(BaseModel):
     original_pdf_url: Optional[str]
     version: str
     fields: List[Dict[str, Any]]
-    trigger_rules: Dict[str, Any]
+    # [AIQ-858] Seeded prod rows + the P1-3 trigger engine store trigger_rules as a
+    # LIST of rule objects (event/conditions/for_persons), but the original admin
+    # CRUD contract typed it as an object. Accept both shapes so GET stops 500-ing
+    # on the 83 seeded templates. (Write-side dict/list reconciliation = follow-up.)
+    trigger_rules: Union[List[Any], Dict[str, Any]]
     created_at: str
     updated_at: str
 
