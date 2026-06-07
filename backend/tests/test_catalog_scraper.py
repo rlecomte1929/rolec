@@ -1,8 +1,8 @@
 """
-Tests for backend/services/catalog_scraper.py — Phase 2b.
+Tests for backend/app/services/catalog_scraper.py — Phase 2b.
 
-The real implementation calls OpenAI; tests mock that out so we never
-hit the network and never need an API key.
+The real implementation calls the LLM via llm_client.complete_text_sync; tests
+patch that seam so we never hit the network and never need an API key (AIQ-401).
 """
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import json
 import os
 import sys
 import unittest
-import uuid
 from unittest import mock
 
 from sqlalchemy import create_engine, text
@@ -41,17 +40,11 @@ CREATE TABLE service_catalog_items (
 """
 
 
-def _fake_client(payload: dict):
-    """Build a mock OpenAI client whose chat completion returns json.dumps(payload)."""
-    msg = mock.Mock()
-    msg.content = json.dumps(payload)
-    choice = mock.Mock()
-    choice.message = msg
-    resp = mock.Mock()
-    resp.choices = [choice]
-    client = mock.Mock()
-    client.chat.completions.create.return_value = resp
-    return client
+def _patch_complete(payload: dict):
+    """Patch the llm_client seam so the scraper 'LLM' returns json.dumps(payload)."""
+    return mock.patch.object(
+        catalog_scraper, "complete_text_sync", return_value=json.dumps(payload)
+    )
 
 
 class CatalogScraperTests(unittest.TestCase):
@@ -89,36 +82,39 @@ class CatalogScraperTests(unittest.TestCase):
     # Off-by-default
     # ------------------------------------------------------------------
     def test_no_op_when_disabled(self) -> None:
-        with mock.patch.dict(os.environ, {"CATALOG_SCRAPER_ENABLED": "0"}):
-            client = _fake_client({"vendors": [{"name": "X"}]})
-            result = catalog_scraper.populate_destination_catalog(
-                category="movers", destination_city="Tokyo", client=client,
-            )
-        self.assertEqual(result, [])
-        client.chat.completions.create.assert_not_called()
-
-    def test_no_op_when_no_api_key_and_no_client(self) -> None:
-        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+        with mock.patch.dict(os.environ, {"CATALOG_SCRAPER_ENABLED": "0"}), \
+                mock.patch.object(catalog_scraper, "complete_text_sync") as m:
             result = catalog_scraper.populate_destination_catalog(
                 category="movers", destination_city="Tokyo",
             )
         self.assertEqual(result, [])
+        m.assert_not_called()
+
+    def test_no_op_when_no_api_key(self) -> None:
+        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": ""}), \
+                mock.patch.object(catalog_scraper, "complete_text_sync") as m:
+            result = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
+        self.assertEqual(result, [])
+        m.assert_not_called()
 
     # ------------------------------------------------------------------
     # Happy path
     # ------------------------------------------------------------------
     def test_writes_vendors_with_scraper_source(self) -> None:
-        client = _fake_client({
+        payload = {
             "vendors": [
                 {"name": "Tokyo Movers Inc",  "summary": "Big in TY", "website": "https://t.example",
                  "strengths": ["fast"], "notes": None},
                 {"name": "Asahi Relocation",  "summary": "Family-owned", "website": None,
                  "strengths": ["family", "local"], "notes": "Speaks English."},
             ]
-        })
-        rows = catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", country="Japan", client=client,
-        )
+        }
+        with _patch_complete(payload):
+            rows = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo", country="Japan",
+            )
         self.assertEqual(len(rows), 2)
         for r in rows:
             self.assertEqual(r["source"], "scraper")
@@ -133,13 +129,13 @@ class CatalogScraperTests(unittest.TestCase):
                  "strengths": [], "notes": None},
             ]
         }
-        client = _fake_client(payload)
-        catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
-        catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
+        with _patch_complete(payload):
+            catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
+            catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
         rows = self._read_rows()
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Tokyo Movers Inc")
@@ -149,43 +145,40 @@ class CatalogScraperTests(unittest.TestCase):
             {"name": f"Vendor {i}", "summary": "x", "website": None, "strengths": [], "notes": None}
             for i in range(20)
         ]
-        client = _fake_client({"vendors": many})
-        rows = catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
+        with _patch_complete({"vendors": many}):
+            rows = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
         self.assertEqual(len(rows), catalog_scraper.MAX_ITEMS_PER_DESTINATION)
 
     def test_skips_unnamed_vendors(self) -> None:
-        client = _fake_client({"vendors": [
+        payload = {"vendors": [
             {"name": "OK Vendor", "summary": "x", "website": None, "strengths": [], "notes": None},
             {"name": "", "summary": "no name", "website": None, "strengths": [], "notes": None},
             {"summary": "missing name field"},
-        ]})
-        rows = catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
+        ]}
+        with _patch_complete(payload):
+            rows = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
         self.assertEqual([r["name"] for r in rows], ["OK Vendor"])
 
     # ------------------------------------------------------------------
     # Defensive parsing
     # ------------------------------------------------------------------
     def test_invalid_json_returns_empty(self) -> None:
-        msg = mock.Mock(); msg.content = "not json"
-        choice = mock.Mock(); choice.message = msg
-        resp = mock.Mock(); resp.choices = [choice]
-        client = mock.Mock(); client.chat.completions.create.return_value = resp
-        result = catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
+        with mock.patch.object(catalog_scraper, "complete_text_sync", return_value="not json"):
+            result = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
         self.assertEqual(result, [])
 
     def test_missing_vendors_key_returns_empty(self) -> None:
-        client = _fake_client({"items": [{"name": "x"}]})
-        result = catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
+        with _patch_complete({"items": [{"name": "x"}]}):
+            result = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
         self.assertEqual(result, [])
-
 
     # ------------------------------------------------------------------
     # L1 cost short-circuit: skip LLM when slot already populated
@@ -196,16 +189,13 @@ class CatalogScraperTests(unittest.TestCase):
             category="movers", name="Pre-existing", attributes={}, source="seed",
             city="Tokyo", external_id="pre-1",
         )
-        client = _fake_client({
-            "vendors": [{"name": "Should Not Insert", "summary": "x", "website": None,
-                         "strengths": [], "notes": None}]
-        })
-        result = catalog_scraper.populate_destination_catalog(
-            category="movers", destination_city="Tokyo", client=client,
-        )
+        with mock.patch.object(catalog_scraper, "complete_text_sync") as m:
+            result = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
         self.assertEqual(result, [])
-        # Critical: the LLM client must NOT have been called.
-        client.chat.completions.create.assert_not_called()
+        # Critical: the LLM must NOT have been called.
+        m.assert_not_called()
         # And no scraper-source row was added.
         rows = self._read_rows()
         self.assertEqual([r["source"] for r in rows], ["seed"])
@@ -219,15 +209,15 @@ class CatalogScraperTests(unittest.TestCase):
         # Tokyo entries — so report_coverage returns have=0 and needed=10,
         # which lets the scraper dispatch fire end-to-end.
         from backend.app.services import catalog_coverage
-        client = _fake_client({
+        payload = {
             "vendors": [
                 {"name": "Tokyo International School", "summary": "Big in TY",
                  "website": None, "strengths": [], "notes": None},
                 {"name": "ASIJ", "summary": "American school",
                  "website": None, "strengths": [], "notes": None},
             ]
-        })
-        with mock.patch.object(catalog_scraper, "_build_client", return_value=client):
+        }
+        with _patch_complete(payload):
             result = catalog_coverage.ensure_destination_catalog(
                 category="schools",
                 destination_city="Tokyo",
