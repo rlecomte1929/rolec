@@ -153,7 +153,23 @@ def _resolve_template_defaults(db: Any) -> Dict[str, Any]:
     template selection exists, the platform default template (``is_default_template``)
     is the configured template. Always returns a dict (empty when no template is
     configured), and never raises — gap-fill must not break HR review.
+
+    N12/AIQ-852: the unified ``PolicyTemplateService`` (single versioned source of truth)
+    now *replaces* the legacy ``default_policy_templates.snapshot_json`` reader as the
+    default gap-fill source. Its LTA-standard defaults are a superset of the prior
+    platform snapshot, so gap-fill surfaces the same-or-more ``template_default`` rows
+    (HR can still override each one). The legacy snapshot path remains only as a safety
+    fallback for when the service yields nothing (e.g. an unexpected import/registry error)
+    — it is no longer the primary source. Always returns a dict and never raises.
     """
+    try:
+        from .policy_template_service import PolicyTemplateService
+
+        unified = PolicyTemplateService().get_default_benefits()
+        if unified:
+            return unified
+    except Exception:
+        pass
     try:
         templates = db.list_default_policy_templates() or []
     except Exception:

@@ -1,4 +1,10 @@
 """
+DEPRECATED (N12/AIQ-852): one of four legacy template systems now unified by
+``policy_template_service.PolicyTemplateService`` (``POLICY_TEMPLATES`` below was
+ported into the versioned registry). Left in place until a follow-up cleanup task
+retires it after validation — do not extend; add new template data to the unified
+service instead.
+
 Starter-baseline templates for the Compensation & Allowance matrix.
 
 Product decision (2026-04-22): HR should be able to start a new draft

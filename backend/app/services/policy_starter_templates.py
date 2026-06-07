@@ -1,4 +1,9 @@
 """
+DEPRECATED (N12/AIQ-852): one of four legacy template systems now unified by
+``policy_template_service.PolicyTemplateService`` (``_TIER_CAPS`` below was ported
+into the versioned registry). Left in place until a follow-up cleanup task retires
+it after validation — do not extend; add new template data to the unified service.
+
 Platform starter policy templates (conservative / standard / premium).
 
 Structured baselines mapped to the canonical entitlement model (see policy_entitlement_model).

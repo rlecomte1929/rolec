@@ -1,4 +1,9 @@
 """
+DEPRECATED (N12/AIQ-852): the ``benefits_templates`` table read here is one of four
+legacy template systems now unified by ``policy_template_service.PolicyTemplateService``.
+Left in place until a follow-up cleanup task migrates this route to the unified
+service and retires the table after validation — do not extend.
+
 Policy Builder — 3-tier template library (P1-2).
 
 Routes:

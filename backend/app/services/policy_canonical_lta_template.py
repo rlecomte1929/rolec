@@ -1,4 +1,10 @@
 """
+PARTIALLY SUPERSEDED (N12/AIQ-852): the 35 canonical fields below are the field
+skeleton the unified ``policy_template_service.PolicyTemplateService`` builds its LTA
+templates from (still the source of field keys / value types / taxonomy mappings).
+The legacy ``default_policy_templates.snapshot_json`` gap-fill path it fed is now
+served by ``PolicyTemplateService.get_default_benefits`` (with snapshot fallback).
+
 Canonical long-term assignment (LTA) HR policy template — stable target for mapping uploads.
 
 Uploads map into this structure; HR reviews gaps rather than inferring a new ontology per file.
