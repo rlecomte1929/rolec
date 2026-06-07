@@ -24,6 +24,7 @@ vars, same `llm_flags` disabled gate, same JSON-object response format.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -35,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from ..db import SessionLocal
 from ..models import ProspectCandidate
-from ...core.llm_flags import LLMDisabled, policy_llm_disabled, policy_llm_temperature
+from ...core.llm_flags import policy_llm_disabled, policy_llm_temperature
 from .prospect_icp_config import band_for_score, config_as_prompt_block
 from .prospect_web_fetcher import fetch_prospect_snapshot
 from .prospect_web_search import run_prospect_web_search
@@ -85,22 +86,6 @@ class EnrichmentRequest:
     enable_web_search: bool = False
 
 
-def _build_client() -> Any:
-    if policy_llm_disabled():
-        return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
-    try:
-        from openai import OpenAI  # type: ignore
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("openai package is required for prospect enrichment") from exc
-    timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
-    max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        timeout=timeout_s,
-        max_retries=max_retries,
-    )
-
-
 def _model_name() -> str:
     return os.getenv(DEFAULT_MODEL_ENV, FALLBACK_MODEL)
 
@@ -141,26 +126,34 @@ def _system_prompt() -> str:
 
 
 def _call_llm(
-    client: Any,
     *,
     system_prompt: str,
     user_prompt: str,
     model: str,
 ) -> Dict[str, Any]:
-    response = client.chat.completions.create(
-        model=model,
-        temperature=policy_llm_temperature(),
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    """Run the enrichment completion through the shared llm_client wrapper
+    (json_object mode → parsed dict), so it gains timeout, retry on 429/5xx,
+    and structured logging. Same model, prompt, and temperature as before;
+    the OPENAI_TIMEOUT_SECONDS / OPENAI_MAX_RETRIES knobs still apply.
+
+    Runs in a sync background task (no event loop in this thread), so
+    asyncio.run() drives the async wrapper to result.
+    """
+    from .llm_client import complete
+
+    timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+    max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+    return asyncio.run(
+        complete(
+            system=system_prompt,
+            user=user_prompt,
+            schema={},  # json_object mode (free-form JSON object)
+            temperature=policy_llm_temperature(),
+            model=model,
+            timeout=timeout_s,
+            max_retries=max_retries,
+        )
     )
-    content = response.choices[0].message.content if response.choices else "{}"
-    try:
-        return json.loads(content or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"LLM returned non-JSON content: {exc}") from exc
 
 
 def _coerce_score(raw: Any) -> Optional[int]:
@@ -236,9 +229,10 @@ def _enrich_row(
         search_text = outcome.to_prompt_text()
         web_search_used = True
 
-    client = _build_client()
-    if isinstance(client, LLMDisabled):
-        _record_failure(row, f"LLM disabled: {client.reason}")
+    # RELOPASS_POLICY_LLM_DISABLED=1 → never egress; record + bail (same
+    # behaviour as the old _build_client() LLMDisabled short-circuit).
+    if policy_llm_disabled():
+        _record_failure(row, "LLM disabled: RELOPASS_POLICY_LLM_DISABLED=1")
         if snapshot and snapshot.fetch_errors:
             row.enrichment_error = (
                 (row.enrichment_error or "")
@@ -258,7 +252,6 @@ def _enrich_row(
         search_text=search_text,
     )
     payload = _call_llm(
-        client,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         model=_model_name(),
