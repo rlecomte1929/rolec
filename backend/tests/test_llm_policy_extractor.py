@@ -189,5 +189,125 @@ class TestMergePrefersLLM(unittest.TestCase):
         self.assertEqual(merged["policy_meta"]["effective_date"], "2026-01-01")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# N11 / AIQ-851 — per-field confidence on the Anthropic tool_use path.
+#
+# The tool schema already carries a `confidence` value on EACH benefit object
+# (it lives inside benefits[].items.properties, required per benefit), so this
+# IS per-field confidence. N11 calibrates it to a coarse 3-tier scale
+# (1.0 stated / 0.5 inferred / 0.1 absent). These tests lock in:
+#   * the schema/prompt actually declare the 3-tier instruction, and
+#   * the per-field confidence survives extraction → normalization, so a
+#     clearly-stated benefit lands >= 0.8 and a silent/guessed one lands <= 0.2.
+#
+# We can't assert what a live model emits without an API key, so we mock the
+# Anthropic client and feed the two boundary cases the 3-tier scale defines.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class _FakeToolUseBlock:
+    """Mimics an anthropic tool_use content block."""
+
+    type = "tool_use"
+
+    def __init__(self, tool_input):
+        self.input = tool_input
+
+
+class _FakeUsage:
+    input_tokens = 10
+    output_tokens = 20
+
+
+class _FakeMessage:
+    def __init__(self, blocks):
+        self.content = blocks
+        self.usage = _FakeUsage()
+
+
+def _fake_anthropic_returning(tool_input):
+    """Build a fake `anthropic` module whose client returns `tool_input`."""
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = _FakeMessage(
+        [_FakeToolUseBlock(tool_input)]
+    )
+    fake_module = MagicMock()
+    fake_module.Anthropic.return_value = fake_client
+    return fake_module
+
+
+class TestPerFieldConfidenceSchema(unittest.TestCase):
+    """The tool schema declares per-field confidence on the 3-tier scale."""
+
+    def test_confidence_is_per_benefit_field(self):
+        item_props = (
+            llm_policy_extractor.EXTRACT_POLICY_TOOL["input_schema"]["properties"][
+                "benefits"
+            ]["items"]["properties"]
+        )
+        self.assertIn("confidence", item_props)
+        self.assertIn("confidence", (
+            llm_policy_extractor.EXTRACT_POLICY_TOOL["input_schema"]["properties"][
+                "benefits"
+            ]["items"]["required"]
+        ))
+
+    def test_prompt_states_the_three_tier_scale(self):
+        desc = (
+            llm_policy_extractor.EXTRACT_POLICY_TOOL["input_schema"]["properties"][
+                "benefits"
+            ]["items"]["properties"]["confidence"]["description"]
+        )
+        for tier in ("1.0", "0.5", "0.1"):
+            self.assertIn(tier, desc)
+
+
+class TestPerFieldConfidenceCarriesThrough(unittest.TestCase):
+    """Per-field confidence survives extraction → normalization (N11 criteria 1 & 2)."""
+
+    def _extract(self, tool_input):
+        with patch.dict(sys.modules, {"anthropic": _fake_anthropic_returning(tool_input)}), \
+                patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test-noop"}):
+            return llm_policy_extractor.extract_policy_with_llm(SAMPLE_LINES)
+
+    def test_clearly_stated_value_keeps_high_confidence(self):
+        # Criterion 1: a benefit with a clear source_quote → confidence >= 0.8.
+        tool_input = {
+            "policy_meta": {"title": "Acme"},
+            "benefits": [
+                {
+                    "service_category": "housing",
+                    "benefit_key": "temporary_housing",
+                    "benefit_label": "Temporary housing",
+                    "source_quote": "Temporary housing capped at USD 6000 for 60 days.",
+                    "confidence": 1.0,
+                }
+            ],
+        }
+        result = self._extract(tool_input)
+        self.assertIsNotNone(result)
+        bench = {b["benefit_key"]: b for b in result["benefits"]}
+        self.assertGreaterEqual(bench["temporary_housing"]["confidence"], 0.8)
+
+    def test_absent_value_keeps_low_confidence(self):
+        # Criterion 2: a benefit the policy is silent on → confidence <= 0.2.
+        tool_input = {
+            "policy_meta": {"title": "Acme"},
+            "benefits": [
+                {
+                    "service_category": "tax",
+                    "benefit_key": "tax_assistance",
+                    "benefit_label": "Tax assistance",
+                    "source_quote": None,
+                    "confidence": 0.1,
+                }
+            ],
+        }
+        result = self._extract(tool_input)
+        self.assertIsNotNone(result)
+        bench = {b["benefit_key"]: b for b in result["benefits"]}
+        self.assertLessEqual(bench["tax_assistance"]["confidence"], 0.2)
+
+
 if __name__ == "__main__":
     unittest.main()
