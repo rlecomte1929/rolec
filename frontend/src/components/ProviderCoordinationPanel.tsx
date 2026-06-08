@@ -2,7 +2,7 @@ import { Button } from './antigravity/Button';
 import { Input } from './antigravity/Input';
 /// <reference types="vite/client" />
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "../api/supabase"
 import {
   assignTask,
   cancelTask,
@@ -11,15 +11,6 @@ import {
   type CaseProvider,
   type ProviderTask,
 } from "../api/hrCoordination"
-
-// ---------------------------------------------------------------------------
-// Supabase realtime client (anon key — read-only realtime is safe)
-// ---------------------------------------------------------------------------
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 // ---------------------------------------------------------------------------
 // Helpers
