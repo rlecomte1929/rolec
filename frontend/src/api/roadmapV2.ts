@@ -22,6 +22,9 @@ export interface RoadmapV2Step {
   source_url?: string | null;
   source_fetched_at?: string | null;
   source_excerpt?: string | null;
+  // [AIQ-869] Short effort label ('~15 min' | '~1 hour' | 'Half a day'); null
+  // once the step is done. Rendered by the AvailableNowWidget effort Pill.
+  estimated_effort?: string | null;
 }
 
 export interface RoadmapV2Track {

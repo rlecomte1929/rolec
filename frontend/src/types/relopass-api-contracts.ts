@@ -349,6 +349,7 @@ export interface RoadmapStep {
   source_url?: string | null;          // official source backing this step
   source_fetched_at?: string | null;   // ISO date the source was last verified
   source_excerpt?: string | null;      // one-sentence excerpt from the source
+  estimated_effort?: string | null;    // [AIQ-869] short effort label, null when done
 }
 
 // ── 2.5 Requirements & Documents ─────────────────────────────────────────────
