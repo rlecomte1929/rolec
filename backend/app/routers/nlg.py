@@ -61,32 +61,37 @@ def _t(name: str) -> str:
 
 
 def load_company_kpis(company_id: str) -> d2t.KPISet:
-    """Assemble a KPISet for a company from active-assignment aggregates.
+    """Assemble a KPISet for a company from the HR command-center aggregates.
 
-    Best-effort: any query failure yields an empty KPISet (the summariser
-    renders a safe 'no KPIs' sentence) rather than erroring the endpoint.
+    Reuses ``db.get_command_center_kpis`` — the same company-scoped join that
+    powers the command-center KPI cards — instead of querying a ``company_id``
+    column that does not exist on ``case_assignments`` (the previous query
+    always threw and silently rendered a misleading 'no KPIs' sentence).
+
+    Best-effort: any failure yields an empty KPISet (the summariser renders a
+    safe 'no KPIs' sentence) rather than erroring the endpoint.
     """
     period = "current period"
     kpis = []
     try:
-        with db.engine.connect() as conn:
-            row = conn.execute(
-                text(
-                    f"SELECT COUNT(*) AS active_count "
-                    f"FROM {_t('case_assignments')} "
-                    f"WHERE company_id = :cid AND COALESCE(status,'') <> 'closed'"
-                ),
-                {"cid": company_id},
-            ).mappings().first()
-            if row is not None:
-                kpis.append(
-                    d2t.KPI(
-                        key="active_assignments",
-                        label="Active assignments",
-                        current=float(row["active_count"] or 0),
-                        unit="",
-                    )
+        agg = db.get_command_center_kpis(company_id=company_id) or {}
+        kpi_specs = (
+            ("active_cases", "Active cases", agg.get("activeCases")),
+            ("at_risk", "At-risk cases", agg.get("atRiskCount")),
+            ("attention_needed", "Cases needing attention", agg.get("attentionNeededCount")),
+            ("completed_ytd", "Completed this year", agg.get("completedCount")),
+        )
+        for key, label, value in kpi_specs:
+            kpis.append(
+                d2t.KPI(
+                    key=key,
+                    label=label,
+                    current=float(value or 0),
+                    unit="",
+                    # at-risk / attention-needed are bad when they rise.
+                    higher_is_better=key not in ("at_risk", "attention_needed"),
                 )
+            )
     except Exception:
         logger.warning("exec-summary KPI load failed for company_id=%s", company_id, exc_info=True)
     return d2t.KPISet(period_label=period, kpis=kpis)

@@ -85,6 +85,39 @@ def test_exec_summary_llm_flag_defers(monkeypatch):
     assert body["summary"] is None
 
 
+# ── load_company_kpis (regression: was querying a non-existent column) ──────
+
+def test_load_company_kpis_builds_nonempty_set(monkeypatch):
+    """load_company_kpis must source from get_command_center_kpis and yield
+    real KPIs — the old hand-rolled query referenced case_assignments.company_id
+    (no such column), threw, and rendered a misleading 'no KPIs' summary."""
+    monkeypatch.setattr(
+        nlg.db, "get_command_center_kpis",
+        lambda company_id=None, hr_user_id=None: {
+            "activeCases": 22, "atRiskCount": 1,
+            "attentionNeededCount": 3, "completedCount": 0,
+        },
+    )
+    kpis = nlg.load_company_kpis("co-1")
+    labels = {k.label: k.current for k in kpis.kpis}
+    assert labels["Active cases"] == 22
+    assert labels["At-risk cases"] == 1
+    assert labels["Cases needing attention"] == 3
+    assert labels["Completed this year"] == 0
+    summary = nlg.d2t.summarise_kpis(kpis, audience="exec")
+    assert "No KPIs were reported" not in summary
+    assert "Active cases" in summary
+
+
+def test_load_company_kpis_failure_is_safe(monkeypatch):
+    """A failure in the aggregator degrades to an empty set, never raises."""
+    def _boom(*a, **k):
+        raise RuntimeError("db down")
+    monkeypatch.setattr(nlg.db, "get_command_center_kpis", _boom)
+    kpis = nlg.load_company_kpis("co-1")
+    assert list(kpis.kpis) == []
+
+
 # ── policy tldr ───────────────────────────────────────────────────────────
 
 def test_tldr_unauth_401():
