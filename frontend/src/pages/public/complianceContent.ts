@@ -34,12 +34,12 @@ export const complianceContent = {
     sectionHeader: 'What “EU AI Act Ready” means',
     title: 'Readiness is a posture, not a certificate.',
     body:
-      'The EU AI Act phases in obligations for high-risk HR AI systems through December 2027. No certification body issues an “EU AI Act certificate” today. “EU AI Act Ready” means ReloPass already operates the controls the Act asks for — human oversight, transparency, record-keeping, and data governance — so your compliance team can document them now, not scramble later.',
+      'The EU AI Act phases in obligations for high-risk HR AI systems over the coming years. No certification body issues an “EU AI Act certificate” today. “EU AI Act Ready” means ReloPass already operates the controls the Act asks for — human oversight, transparency, record-keeping, and data governance — so your compliance team can document them now, as the obligations phase in.',
     checklist: [
       'Human oversight on every AI recommendation (accept / override / reject).',
       'A complete, timestamped record of each decision and the AI output behind it.',
       'Source-grounded answers: the AI cites your policy and declines when it is not covered.',
-      'Simplified documentation: as an SME provider, ReloPass qualifies for the Act’s lighter record-keeping track.',
+      'Documentation built in: the record-keeping the Act expects is produced as you operate, not bolted on later.',
     ],
   },
 
@@ -48,7 +48,7 @@ export const complianceContent = {
     sectionHeader: 'Human oversight',
     title: 'A person decides. Every time.',
     body:
-      'ReloPass AI never acts on its own. It surfaces a recommendation; a named HR or admin user reviews it and records an explicit decision. The platform stores that decision next to the exact AI output it was based on, so an auditor can reconstruct who decided what, when, and why.',
+      'No AI recommendation is applied without a human decision. ReloPass surfaces a recommendation; a named HR or admin user reviews it and records an explicit decision. The platform stores that decision next to the exact AI output it was based on, so an auditor can reconstruct who decided what, when, and why.',
     steps: [
       {
         number: '01',
