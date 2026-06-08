@@ -15,7 +15,10 @@ Selection via factory get_default_client() based on env:
   - POLICY_ASSISTANT_LLM=mock   → MockClient (forces mock even if key set)
   - POLICY_ASSISTANT_LLM=anthropic → AnthropicClient (errors at construct
     if no key)
-  - Default: Anthropic when ANTHROPIC_API_KEY present, Mock otherwise
+  - Default: Anthropic when ANTHROPIC_API_KEY present, Mock otherwise.
+    In production (RENDER / ENV=production) the Mock fallback is DISABLED:
+    a missing/broken key raises instead of silently returning canned
+    refusals (see get_default_client).
 
 Both clients return a uniform response shape:
   {
@@ -168,6 +171,11 @@ class MockClient:
 
 # --- Factory + cost helper -------------------------------------------------
 
+def _is_production() -> bool:
+    """Match the project-wide prod signal (see db_config.py)."""
+    return bool(os.environ.get("RENDER") or os.environ.get("ENV") == "production")
+
+
 def get_default_client() -> LlmClient:
     forced = (os.environ.get("POLICY_ASSISTANT_LLM") or "").strip().lower()
     if forced == "mock":
@@ -178,8 +186,26 @@ def get_default_client() -> LlmClient:
         try:
             return AnthropicClient()
         except Exception as e:
+            # In prod, NEVER silently degrade to MockClient. Its default
+            # response is the verbatim REFUSAL_TEXT and it echoes the real
+            # model id into traces, so a broken key masquerades as a
+            # legitimate "out of policy" refusal — invisible in monitoring.
+            # Fail loud so the misconfiguration surfaces instead.
+            if _is_production():
+                raise RuntimeError(
+                    f"AnthropicClient unavailable in production ({e}); refusing to "
+                    "fall back to MockClient (would silently return canned refusals). "
+                    "Check ANTHROPIC_API_KEY / the anthropic package."
+                ) from e
             log.warning("AnthropicClient unavailable (%s); falling back to MockClient.", e)
             return MockClient()
+    # No key configured at all.
+    if _is_production():
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY not set in production; refusing to fall back to "
+            "MockClient (would silently return canned refusals for every question). "
+            "Set ANTHROPIC_API_KEY, or set POLICY_ASSISTANT_LLM=mock to opt in explicitly."
+        )
     return MockClient()
 
 
