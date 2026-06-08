@@ -2,7 +2,7 @@
    Tokens lifted from frontend/src/index.css of the ReloPass repo.
 */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Google Fonts @import removed (GDPR/CSP); prototype uses the system font stack. */
 
 :root {
   --pw-bg:      #f8fafb;                /* marketing-surface-subtle */

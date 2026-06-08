@@ -1,6 +1,6 @@
 /* Pathway Simple — minimal styles. Same ReloPass palette as v1, less density. */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Google Fonts @import removed (GDPR/CSP); prototype uses the system font stack. */
 
 :root {
   --bg:       #f8fafb;
