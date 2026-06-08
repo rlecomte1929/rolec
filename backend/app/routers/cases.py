@@ -341,6 +341,7 @@ class RoadmapStepV2(BaseModel):
     vendor_id: Optional[str] = None
     doc_count: int = 0
     worst_doc_status: Optional[str] = None
+    estimated_effort: Optional[str] = None   # [AIQ-869] short effort label; see cases_read.py
 
 
 class RoadmapTrackV2(BaseModel):
