@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { ResilientRoute } from './components/ResilientRoute';
 import { NavigationLogger } from './components/NavigationLogger';
 import { ScrollToTop } from './components/ScrollToTop';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
@@ -226,6 +227,7 @@ function App() {
       <QueryRedirect />
       <Suspense fallback={<RouteFallback />}>
       <AppErrorBoundary componentName="AppRouter">
+      <ResilientRoute>
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
@@ -489,6 +491,7 @@ function App() {
         )}
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
+      </ResilientRoute>
       </AppErrorBoundary>
       </Suspense>
       </ServicesFlowProvider>
