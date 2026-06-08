@@ -43,7 +43,6 @@ from .routers import (
     nlg,
     pets,
     policy_canonical,
-    policy_feedback,
     policy_gaps,
     policy_publish,
     policy_summary,
@@ -160,7 +159,6 @@ def create_app() -> FastAPI:
     # C2-06-FOLLOWUP: GET /api/hr/cases/{id}/policy-gaps — read-only gap surface.
     app.include_router(policy_gaps.router)
     app.include_router(policy_summary.router)
-    app.include_router(policy_feedback.router)
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
     app.include_router(policy_canonical.read_router, prefix="/api")
     app.include_router(policy_templates.router)
