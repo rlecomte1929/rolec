@@ -247,6 +247,30 @@ def _canonical_seed_rows(version_id: str) -> List[Dict[str, Any]]:
     return rows
 
 
+# AIQ-873: extraction (policy_benefits) → config-matrix (policy_config_benefits)
+# benefit-key bridge. The two subsystems use different vocabularies (~13 extraction
+# keys vs the 28 canonical matrix keys) with almost no overlap, so a translation
+# layer is mandatory. Only unambiguous 1:1 mappings are listed; the deliberately
+# OMITTED extraction keys (rental_deposit, travel_host, tax_assistance, repatriation,
+# home_sale_purchase) have no single clean matrix target and are reported as
+# "unmapped" for HR manual entry rather than guessed. Extend as vocabularies converge.
+EXTRACTION_TO_MATRIX_BENEFIT_KEY: Dict[str, str] = {
+    "temporary_housing": "temporary_living",
+    "shipment": "shipment_of_goods",
+    "visa_support": "visa_work_permit_assistance",
+    "settling_in_allowance": "settling_in_services",
+    "spousal_support": "spouse_partner_assistance",
+    "language_training": "language_training",
+    "education_support": "child_education_support",
+    "scouting_trip": "pre_assignment_visit",
+}
+
+# matrix benefit_key -> (label, category string) from the canonical registry.
+_MATRIX_KEY_META: Dict[str, Tuple[str, str]] = {
+    bk: (label, cat.value) for bk, label, cat in _CANONICAL_KEYS
+}
+
+
 def _normalize_cap_rule(cap: Any) -> Dict[str, Any]:
     if isinstance(cap, dict):
         return cap
@@ -1391,6 +1415,138 @@ class PolicyConfigMatrixService:
             editable=True,
             source="template_applied",
         )
+
+    def import_extraction_to_draft(
+        self,
+        policy_id: str,
+        *,
+        changed_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        AIQ-873: bridge extracted policy benefits (policy_benefits — the document /
+        PUBLISH subsystem) into the company's config-matrix draft.
+
+        For each extracted benefit whose key maps to a canonical matrix key
+        (EXTRACTION_TO_MATRIX_BENEFIT_KEY), insert an `extracted_llm` row into the
+        draft ONLY IF that matrix key is not already present — never clobbering a
+        manual_hr / template_default / seeded row. Extracted free-text terms
+        (eligibility / limits) land in `notes`; the per-field confidence lands in
+        `field_confidence`. Structured amounts stay at defaults for HR to fill
+        before publishing. The live published version is untouched.
+
+        Returns {imported, skipped_existing, unmapped, version_id}.
+
+        Raises KeyError("unknown_policy:<id>") when policy_id has no linked company.
+        """
+        pol = self._db.get_company_policy(policy_id)
+        if not pol or not pol.get("company_id"):
+            raise KeyError(f"unknown_policy:{policy_id}")
+        company_id = str(pol["company_id"])
+
+        extracted = self._db.list_policy_benefits(policy_id)
+
+        # Ensure a draft exists, then resolve its version id + current rows.
+        self.ensure_draft(company_id, created_by=changed_by)
+        cfg = self._config(company_id)
+        draft = self._db.get_policy_config_draft_for_config(str(cfg["id"]))
+        version_id = str(draft["id"])
+        existing_rows = self._db.list_policy_config_benefits(version_id)
+        # First row per benefit_key (the scaffold/real row we'd enrich or protect).
+        by_key: Dict[str, Dict[str, Any]] = {}
+        for r in existing_rows:
+            by_key.setdefault(str(r["benefit_key"]), r)
+
+        # A fresh draft is pre-seeded with all canonical keys as source='seeded'
+        # scaffold rows; those ARE enrichable. Only HR-meaningful sources are
+        # protected from clobbering.
+        protected = {"manual_hr", "template_default", "extracted_llm"}
+
+        imported: List[str] = []
+        skipped_existing: List[str] = []
+        unmapped: List[str] = []
+        enrich: Dict[str, Dict[str, Any]] = {}  # matrix_key -> extracted benefit
+
+        for b in extracted:
+            ek = str(b.get("benefit_key") or "")
+            mk = EXTRACTION_TO_MATRIX_BENEFIT_KEY.get(ek)
+            if not mk:
+                if ek:
+                    unmapped.append(ek)
+                continue
+            ex = by_key.get(mk)
+            if ex is not None and str(ex.get("source") or "") in protected:
+                skipped_existing.append(mk)
+                continue
+            if mk in enrich:  # two extraction keys → one matrix key: first wins
+                continue
+            enrich[mk] = b
+            imported.append(mk)
+
+        if not enrich:
+            return {
+                "imported": imported,
+                "skipped_existing": skipped_existing,
+                "unmapped": unmapped,
+                "version_id": version_id,
+            }
+
+        def _apply(row: Dict[str, Any], b: Dict[str, Any]) -> None:
+            note = " — ".join(
+                str(s).strip()
+                for s in (b.get("eligibility"), b.get("limits"))
+                if s and str(s).strip()
+            ).strip()
+            row["covered"] = True
+            row["notes"] = note or row.get("notes")
+            row["field_confidence"] = b.get("confidence")
+            row["source"] = "extracted_llm"
+            row["auto_generated"] = True
+
+        # Rebuild the draft row set: enrich the seeded scaffold row for each mapped
+        # key in place; append a fresh row for any mapped key with no existing row
+        # (drafts cloned from a published baseline may omit some keys). Protected
+        # rows pass through untouched. Mirrors the put_draft delete+reinsert pattern.
+        seen: set = set()
+        new_rows: List[Dict[str, Any]] = []
+        for r in existing_rows:
+            bk = str(r["benefit_key"])
+            rr = {k: v for k, v in r.items() if k != "id"}
+            rr["policy_config_version_id"] = version_id
+            if bk in enrich and str(r.get("source") or "") not in protected:
+                _apply(rr, enrich[bk])
+                seen.add(bk)
+            new_rows.append(rr)
+        for mk, b in enrich.items():
+            if mk in seen:
+                continue
+            label, category = _MATRIX_KEY_META[mk]
+            rr = _benefit_row_defaults(mk)
+            rr.update(
+                {
+                    "policy_config_version_id": version_id,
+                    "benefit_key": mk,
+                    "benefit_label": label,
+                    "category": category,
+                    "targeting_signature": compute_targeting_signature(
+                        rr.get("assignment_types") or [],
+                        rr.get("family_statuses") or [],
+                        rr.get("employee_levels") or [],
+                    ),
+                }
+            )
+            _apply(rr, b)
+            new_rows.append(rr)
+
+        self._db.delete_policy_config_benefits_for_version(version_id)
+        for rr in new_rows:
+            self._db.insert_policy_config_benefit_row(rr)
+
+        return {
+            "imported": imported,
+            "skipped_existing": skipped_existing,
+            "unmapped": unmapped,
+            "version_id": version_id,
+        }
 
     def history(self, company_id: str) -> List[Dict[str, Any]]:
         cfg = self._config(company_id)

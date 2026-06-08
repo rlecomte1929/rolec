@@ -39,6 +39,23 @@ class _StatefulPolicyDb:
         self.publish_atomic_calls: list[str] = []
         self.audit_rows: list[dict] = []
         self._bid_seq = 0
+        # AIQ-873: extraction-import fakes.
+        self._extracted: dict[str, list[dict]] = {}
+        self._policy_company: dict[str, str] = {}
+
+    def seed_extracted(self, policy_id: str, benefits: list[dict], *, company_id: str | None = None) -> None:
+        """Register an extracted policy (policy_benefits rows) for import tests."""
+        self._policy_company[policy_id] = company_id or self.company_id
+        self._extracted[policy_id] = list(benefits)
+
+    def get_company_policy(self, policy_id: str) -> dict | None:
+        cid = self._policy_company.get(policy_id)
+        if cid is None:
+            return None
+        return {"id": policy_id, "company_id": cid}
+
+    def list_policy_benefits(self, policy_id: str) -> list[dict]:
+        return list(self._extracted.get(policy_id, []))
 
     def ensure_policy_config(self, company_id: str, config_key: str) -> dict:
         return {"id": self.pc_id, "company_id": company_id, "config_key": config_key}
@@ -477,6 +494,59 @@ class PolicyConfigMatrixServiceTests(unittest.TestCase):
         self.assertIn("results", out)
         self.assertEqual(len(out["results"]), 1)
         self.assertTrue(out["results"][0].get("matched_cap"))
+
+    # ── AIQ-873: extraction → config-matrix importer ──────────────────────────
+    def test_import_extraction_maps_keys_and_persists_field_confidence(self) -> None:
+        self.db.seed_extracted(
+            "pol-1",
+            [
+                {"benefit_key": "language_training", "eligibility": "All assignees", "limits": "60h B1", "confidence": 0.9},
+                {"benefit_key": "shipment", "eligibility": "Up to 20ft", "limits": None, "confidence": 0.3},
+            ],
+        )
+        out = self.svc.import_extraction_to_draft("pol-1", changed_by="hr-1")
+        self.assertIn("language_training", out["imported"])
+        self.assertIn("shipment_of_goods", out["imported"])  # mapped key
+        rows = {b["benefit_key"]: b for b in self.db.list_policy_config_benefits(out["version_id"])}
+        lt = rows["language_training"]
+        self.assertEqual(lt["source"], "extracted_llm")
+        self.assertTrue(lt["covered"])
+        self.assertEqual(lt["field_confidence"], 0.9)
+        self.assertIn("60h B1", lt["notes"])
+        self.assertEqual(rows["shipment_of_goods"]["field_confidence"], 0.3)
+
+    def test_import_extraction_reports_unmapped_keys(self) -> None:
+        self.db.seed_extracted(
+            "pol-2",
+            [{"benefit_key": "tax_assistance", "eligibility": "x", "limits": "y", "confidence": 0.8}],
+        )
+        out = self.svc.import_extraction_to_draft("pol-2", changed_by="hr-1")
+        self.assertIn("tax_assistance", out["unmapped"])
+        self.assertEqual(out["imported"], [])
+
+    def test_import_extraction_never_clobbers_existing_manual_row(self) -> None:
+        # Seed a draft with a manual_hr language_training row already present.
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.db.insert_policy_config_benefit_row({
+            "policy_config_version_id": vid, "benefit_key": "language_training",
+            "benefit_label": "Language training", "category": "pre_assignment_support",
+            "covered": True, "source": "manual_hr", "field_confidence": None,
+            "targeting_signature": "global",
+        })
+        self.db.seed_extracted(
+            "pol-3",
+            [{"benefit_key": "language_training", "eligibility": "x", "limits": "y", "confidence": 0.9}],
+        )
+        out = self.svc.import_extraction_to_draft("pol-3", changed_by="hr-1")
+        self.assertIn("language_training", out["skipped_existing"])
+        self.assertNotIn("language_training", out["imported"])
+        rows = [b for b in self.db.list_policy_config_benefits(vid) if b["benefit_key"] == "language_training"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source"], "manual_hr")  # untouched
+
+    def test_import_extraction_unknown_policy_raises(self) -> None:
+        with self.assertRaises(KeyError):
+            self.svc.import_extraction_to_draft("nope", changed_by="hr-1")
 
 
 if __name__ == "__main__":

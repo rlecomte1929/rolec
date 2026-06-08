@@ -1533,6 +1533,7 @@ class Database:
                     display_order INTEGER NOT NULL DEFAULT 0,
                     source TEXT DEFAULT 'seeded',
                     auto_generated INTEGER NOT NULL DEFAULT 1,
+                    field_confidence REAL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(policy_config_version_id, benefit_key, targeting_signature)
@@ -1570,6 +1571,13 @@ class Database:
                 try:
                     conn.execute(text(
                         "ALTER TABLE policy_config_benefits ADD COLUMN auto_generated INTEGER NOT NULL DEFAULT 1"
+                    ))
+                except Exception:
+                    pass
+                # AIQ-873: per-field extraction confidence (NULL except extracted_llm rows).
+                try:
+                    conn.execute(text(
+                        "ALTER TABLE policy_config_benefits ADD COLUMN field_confidence REAL"
                     ))
                 except Exception:
                     pass
@@ -16767,6 +16775,7 @@ class Database:
             "do": int(row.get("display_order") or 0),
             "src": (str(row["source"]) if row.get("source") else None),
             "ag": ag,
+            "fc": row.get("field_confidence"),
             "ca": now,
             "ua": now,
         }
@@ -16779,10 +16788,10 @@ class Database:
                      value_type, amount_value, currency_code, percentage_value, unit_frequency,
                      cap_rule_json, notes, conditions_json, assignment_types, family_statuses,
                      employee_levels, targeting_signature, is_active, display_order, source,
-                     auto_generated, created_at, updated_at)
+                     auto_generated, field_confidence, created_at, updated_at)
                     VALUES
                     (:id, :vid, :bk, :bl, :cat, :cov, :vt, :av, :cc, :pv, :uf, :crj, :notes, :cj,
-                     :atj, :fsj, :elj, :tsig, :ia, :do, :src, :ag, :ca, :ua)
+                     :atj, :fsj, :elj, :tsig, :ia, :do, :src, :ag, :fc, :ca, :ua)
 """
                 ),
                 params,
