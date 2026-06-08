@@ -6,7 +6,7 @@ import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 
-const logoUrl = '/relopass-logo.png?v=2';
+const logoUrl = '/relopass-logo.png?v=3';
 
 const PUBLIC_NAV = [
   { key: 'platform', label: 'Platform', path: ROUTE_DEFS.platform.path },

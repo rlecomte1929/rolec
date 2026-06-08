@@ -163,7 +163,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
       {/* Brand */}
       <div className={`flex items-center gap-2.5 border-b border-slate-100 px-3 pb-3 pt-3.5 ${collapsed ? 'justify-center' : ''}`}>
         <img
-          src="/relopass-logo.png?v=2"
+          src="/relopass-logo.png?v=3"
           alt=""
           className="h-6 w-6 rounded-md object-contain"
         />
