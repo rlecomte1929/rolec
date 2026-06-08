@@ -11,21 +11,16 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { type User } from '@supabase/supabase-js';
 import type { PlanTier, UserRole } from '../types/relopass-api-contracts';
+import { supabase } from '../api/supabase';
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase env vars: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set.'
-  );
-}
-
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+// Re-export the single app-wide Supabase client (defined in ../api/supabase).
+// Existing `import { supabase } from '../lib/supabase'` call sites keep working
+// without instantiating a second GoTrueClient (which deadlocks the LockManager).
+export { supabase };
 
 // ─── Profile cache ────────────────────────────────────────────────────────────
 

@@ -103,12 +103,21 @@ Deno.serve(async (req: Request) => {
     breadcrumbs: body.breadcrumbs.slice(0, 10),
     severity:    body.severity ?? "error",
   };
+  // The client sends relopass_user_id, which under ReloPass's hybrid auth may be
+  // a legacy NON-UUID text id (e.g. "seed-hr-testingapril"). The error_logs.user_id
+  // column is uuid, so a non-UUID value throws 22P02 (not the FK 23503 below) and
+  // 500s the whole function. Coerce anything that isn't a valid UUID to null.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const safeUserId =
+    typeof body.user_id === "string" && UUID_RE.test(body.user_id)
+      ? body.user_id
+      : null;
   let { error: logError } = await supabase.from("error_logs").insert({
     ...baseRow,
-    user_id: body.user_id ?? null,
+    user_id: safeUserId,
   });
   // Postgres FK violation = 23503; capture-error supports anonymous logging.
-  if (logError && logError.code === "23503" && body.user_id) {
+  if (logError && logError.code === "23503" && safeUserId) {
     console.warn(
       "[capture-error] user_id FK violation, retrying anonymous:",
       body.user_id
