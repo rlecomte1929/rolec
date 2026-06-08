@@ -316,8 +316,8 @@ export const Auth: React.FC = () => {
       // fallback. The dev-only admin one-click (below) relies on VITE_DEMO_ADMIN_PASS
       // being set locally; in production the admin button isn't rendered at all.
       admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',        pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? '' },
-      hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'hr@testingapril.com',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? 'HrPass!1' },
-      employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'employee@testingapril.com', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? 'EmpPass!1' },
+      hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'hr@testingapril.com',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? '' },
+      employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'employee@testingapril.com', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? '' },
     };
     const { user, pass } = credMap[demoRole];
     setIdentifier(user);
@@ -635,19 +635,22 @@ export const Auth: React.FC = () => {
             </>
           )}
 
-          {/* ── One-click demo ── */}
+          {/* ── One-click demo (DEV builds ONLY) ──
+              SECURITY (UIAUDIT-G2 + secrets review): the entire one-click demo is gated
+              behind import.meta.env.DEV, which Vite statically evaluates to false in
+              production — so the demo buttons, handleDemoLogin call sites, and any demo
+              credentials are dead-code-eliminated from the prod bundle. No demo creds
+              (admin, HR, or employee) ship to the public site. */}
+          {import.meta.env.DEV && (
           <div className="mt-7 pt-6 border-t border-slate-100">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">One-click demo</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
-                PROTOTYPE
+                DEV ONLY
               </span>
             </div>
-            {/* SECURITY (UIAUDIT-G2): only render the Admin one-click in dev builds so
-                the platform-superuser login (and any admin credential) is stripped from
-                production by Vite. HR/Employee are low-privilege demo tenants. */}
-            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${import.meta.env.DEV ? 3 : 2}, minmax(0, 1fr))` }}>
-              {((import.meta.env.DEV ? ['admin', 'hr', 'employee'] : ['hr', 'employee']) as Array<'admin' | 'hr' | 'employee'>).map((r) => (
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+              {(['admin', 'hr', 'employee'] as const).map((r) => (
                 <Button key={r} type="button" variant="ghost" onClick={() => handleDemoLogin(r)} disabled={isLoading}
                   className="!px-0 border border-slate-200 !text-xs !text-slate-600 hover:!bg-slate-50 hover:border-slate-300 capitalize transition-colors">
                   {r === 'admin' ? 'Admin' : r === 'hr' ? 'HR' : 'Employee'}
@@ -655,6 +658,7 @@ export const Auth: React.FC = () => {
               ))}
             </div>
           </div>
+          )}
 
         </div>
       </div>
