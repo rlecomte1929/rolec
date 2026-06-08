@@ -1,0 +1,22 @@
+-- N12-followup-b / AIQ-890 — Retire the benefits_templates table.
+--
+-- benefits_templates is the ONLY one of N12's four "deprecated" template systems
+-- that is genuinely retired:
+--   * Its 42 rows (14 categories x 3 tiers, EUR) were ported to
+--     policy_templates_v2 (policy_type='benchmark_reference') by AIQ-889
+--     (migration 20260618100000 — applied + verified in prod).
+--   * routers/policy_templates.py now reads the unified PolicyTemplateService
+--     benchmark library (deterministic); NO live reader of benefits_templates remains.
+--
+-- The other three systems are NOT removed (they still have live callers — see the
+-- AIQ-890 PR description): POLICY_TEMPLATES dict (policy_config_templates.list_templates/
+-- get_template, used by policy_config router + policy_config_matrix_service), _TIER_CAPS
+-- dict (policy_starter_templates.build_starter_template_benefit_rows, used by
+-- policy_company_policy_template_init), and default_policy_templates (read by
+-- policy_hr_review_service + policy_template_first_import). Retiring those requires
+-- repointing their consumers to PolicyTemplateService first — a separate follow-up.
+--
+-- Snapshot-first practice: data is preserved in policy_templates_v2 before this drop;
+-- this only removes the now-orphaned legacy table. Idempotent.
+
+DROP TABLE IF EXISTS public.benefits_templates;
