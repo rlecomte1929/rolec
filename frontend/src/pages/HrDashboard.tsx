@@ -3,7 +3,7 @@ import { Checkbox } from '../components/antigravity/Checkbox';
 import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
-import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
+import { Card, Button, Input, Alert, Badge, Select } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
@@ -31,6 +31,7 @@ export const HrDashboard: React.FC = () => {
   const [employeeIdentifier, setEmployeeIdentifier] = useState('');
   const [employeeFirstName, setEmployeeFirstName] = useState('');
   const [employeeLastName, setEmployeeLastName] = useState('');
+  const [employeeLevel, setEmployeeLevel] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -168,6 +169,7 @@ export const HrDashboard: React.FC = () => {
       const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim(), {
         firstName: employeeFirstName || undefined,
         lastName: employeeLastName || undefined,
+        level: employeeLevel || undefined,
       });
       setAssignmentId(response.assignmentId);
       if (response.inviteToken) {
@@ -310,6 +312,18 @@ export const HrDashboard: React.FC = () => {
                 label="Employee username or email"
                 placeholder="jane_doe or jane@company.com"
                 fullWidth
+              />
+              <Select
+                value={employeeLevel}
+                onChange={setEmployeeLevel}
+                label="Seniority level (sets benefit caps)"
+                placeholder="— Select level (optional) —"
+                options={[
+                  { value: 'manager', label: 'Manager' },
+                  { value: 'director', label: 'Director' },
+                  { value: 'vp', label: 'VP' },
+                  { value: 'c_suite', label: 'C-suite' },
+                ]}
               />
               <Button onClick={handleAssign}>Assign</Button>
               {assignmentId && (
