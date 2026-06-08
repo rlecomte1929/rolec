@@ -2,16 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="0; url=/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ReloPass</title>
+    <!--
+      SPA deep-link restore. Static hosts (Render) serve this 404.html for any
+      path that isn't a real file (e.g. /hr/command-center on hard load / refresh
+      / bookmark). We preserve the requested path in ?__redirect= and bounce to
+      "/", where App.tsx's <QueryRedirect> reads __redirect and routes to it.
+
+      The previous version ALSO had a top-level <meta http-equiv="refresh" url=/>
+      which redirected to "/" WITHOUT the path, racing and defeating this script
+      (deep-links landed on the marketing home). The no-JS fallback now lives in
+      <noscript> so it can't strip the path when JS is enabled.
+    -->
     <script>
       (function () {
         var path = window.location.pathname + window.location.search + window.location.hash;
-        var target = "/?__redirect=" + encodeURIComponent(path);
-        window.location.replace(target);
+        window.location.replace("/?__redirect=" + encodeURIComponent(path));
       })();
     </script>
+    <noscript><meta http-equiv="refresh" content="0; url=/" /></noscript>
   </head>
   <body></body>
 </html>
