@@ -15,6 +15,7 @@ import { Landing } from './pages/Landing';
 import { PlatformPage } from './pages/public/PlatformPage';
 import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { GetStartedPage } from './pages/public/GetStartedPage';
+import { CompliancePage } from './pages/public/CompliancePage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
 import { SecurityPage } from './pages/public/SecurityPage';
@@ -233,6 +234,7 @@ function App() {
         <Route path={ROUTE_DEFS.getStarted.path} element={<GetStartedPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />
         <Route path={ROUTE_DEFS.privacy.path} element={<PrivacyPage />} />
+        <Route path={ROUTE_DEFS.compliance.path} element={<CompliancePage />} />
         <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         {/* Design preview — sandboxed Claude Design handoff bundle in iframe. Static, no auth, mock data only. */}

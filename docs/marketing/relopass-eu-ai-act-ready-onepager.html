@@ -1,0 +1,92 @@
+<!doctype html>
+<!--
+  Source for the enterprise one-pager PDF (AIQ-828 · DIGEST-2).
+  Render to /frontend/public/relopass-eu-ai-act-ready.pdf with:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+      --print-to-pdf=frontend/public/relopass-eu-ai-act-ready.pdf \
+      --no-pdf-header-footer --print-to-pdf-no-header \
+      docs/marketing/relopass-eu-ai-act-ready-onepager.html
+  Copy edits live here AND in complianceContent.ts — keep them in sync.
+  "Ready", never "Certified".
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ReloPass — EU AI Act Ready</title>
+<style>
+  @page { size: Letter; margin: 0.5in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    color: #1f2937; font-size: 9.6pt; line-height: 1.42;
+  }
+  .top { display: flex; justify-content: space-between; align-items: center;
+         border-bottom: 2px solid #0d9488; padding-bottom: 7px; margin-bottom: 12px; }
+  .brand { font-weight: 800; font-size: 13pt; color: #0b2b43; letter-spacing: -0.2px; }
+  .brand span { color: #0d9488; }
+  .badge { font-size: 7.4pt; font-weight: 800; letter-spacing: 0.7px;
+           color: #0d9488; background: #0d94881a; border: 1px solid #0d948855;
+           border-radius: 999px; padding: 3px 10px; text-transform: uppercase; }
+  h1 { font-size: 17pt; color: #0b2b43; line-height: 1.12; letter-spacing: -0.4px; margin-bottom: 5px; }
+  .lede { font-size: 10pt; color: #374151; margin-bottom: 10px; }
+  .callout { background: #f4f7f9; border-left: 3px solid #0d9488; border-radius: 4px;
+             padding: 8px 11px; margin-bottom: 13px; font-size: 9.2pt; }
+  .callout b { color: #0b2b43; }
+  h2 { font-size: 9.4pt; text-transform: uppercase; letter-spacing: 0.6px;
+       color: #0d9488; margin-bottom: 7px; }
+  .section { margin-bottom: 13px; }
+  .intro { color: #4b5563; margin-bottom: 9px; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .step { display: flex; gap: 8px; }
+  .num { font-weight: 800; color: #0d9488; font-size: 11pt; line-height: 1; min-width: 20px; }
+  .step b { color: #0b2b43; }
+  ul { list-style: none; }
+  li { position: relative; padding-left: 15px; margin-bottom: 5px; }
+  li::before { content: "✓"; position: absolute; left: 0; color: #0d9488; font-weight: 800; }
+  li b { color: #0b2b43; }
+  .foot { border-top: 1px solid #e5e7eb; padding-top: 9px; margin-top: 2px; }
+  .contact { font-weight: 700; color: #0b2b43; font-size: 10pt; }
+  .contact a { color: #0d9488; text-decoration: none; }
+  .disclaimer { font-size: 7.4pt; color: #9ca3af; line-height: 1.4; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand">Relo<span>Pass</span></div>
+    <div class="badge">EU AI Act Ready</div>
+  </div>
+
+  <h1>Mobility AI your auditor will trust.</h1>
+  <p class="lede">Every AI recommendation is reviewed by a person, every decision is logged with the AI output behind it, and every answer is grounded in your own policy and cited.</p>
+
+  <div class="callout">
+    <b>&ldquo;Ready,&rdquo; not &ldquo;certified.&rdquo;</b> No EU AI Act certification scheme exists yet. <i>Ready</i> means ReloPass already operates the controls the Act asks for &mdash; human oversight, transparency, record-keeping, data governance &mdash; so your compliance team can document them now, as the Act&rsquo;s obligations phase in.
+  </div>
+
+  <div class="section">
+    <h2>Human oversight &mdash; a person decides, every time</h2>
+    <p class="intro">No AI recommendation is applied without a human decision. ReloPass surfaces a recommendation; a named HR or admin user records an explicit decision (override and reject require a written reason). The decision is stored next to the exact AI output behind it &mdash; the Article&nbsp;14 evidence high-risk HR systems must keep.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div><b>AI recommends</b> &mdash; a policy insight, exception assessment, or provider/corridor match, with its reasoning and source policy shown.</div></div>
+      <div class="step"><div class="num">2</div><div><b>A human reviews</b> &mdash; a named reviewer reads it in context. Nothing is auto-applied.</div></div>
+      <div class="step"><div class="num">3</div><div><b>The decision is logged</b> &mdash; accept / override / reject, plus reviewer, timestamp, and the original AI output, in an immutable record.</div></div>
+      <div class="step"><div class="num">4</div><div><b>Auditors can replay it</b> &mdash; every AI-assisted decision is queryable and exportable on demand.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Transparency, data &amp; record-keeping</h2>
+    <ul>
+      <li><b>Cited, not invented</b> &mdash; the policy assistant answers only from your published policy and shows the source for each claim; if a question isn&rsquo;t covered, it says so.</li>
+      <li><b>Purpose-bound, EU-hosted</b> &mdash; personal data is processed to run the case it belongs to, scoped to the employee&rsquo;s company, on EU-region infrastructure with row-level tenant isolation.</li>
+      <li><b>A regulator-ready trail</b> &mdash; decisions, document changes, and AI-assisted actions are recorded with actor, timestamp, and the data they touched.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    <p class="contact">For EU enterprise inquiries: <a href="mailto:contact@relopass.com">contact@relopass.com</a></p>
+    <p class="disclaimer">&ldquo;EU AI Act Ready&rdquo; describes ReloPass&rsquo;s readiness posture and documentation, not a certification or legal guarantee &mdash; obligations depend on your own deployment and use. This document is informational, not legal advice.</p>
+  </div>
+</body>
+</html>

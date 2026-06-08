@@ -10,6 +10,7 @@ export const ROUTE_DEFS = {
   getStarted: { path: '/get-started', roles: ['PUBLIC'] as RouteRole[] },
   security: { path: '/security', roles: ['PUBLIC'] as RouteRole[] },
   privacy: { path: '/privacy', roles: ['PUBLIC'] as RouteRole[] },
+  compliance: { path: '/compliance', roles: ['PUBLIC'] as RouteRole[] },
   access: { path: '/access', roles: ['PUBLIC'] as RouteRole[] },
   auth: { path: '/auth', roles: ['PUBLIC'] as RouteRole[] },
   employeeJourney: { path: '/employee/journey', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
