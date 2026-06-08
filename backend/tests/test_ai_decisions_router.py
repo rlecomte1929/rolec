@@ -335,6 +335,38 @@ class AIDecisionsRouterTests(unittest.TestCase):
         companies = {r["company_id"] for r in admin_view}
         self.assertEqual(companies, {"company-a", "company-b"})
 
+    def test_list_order_is_deterministic_on_equal_created_at(self) -> None:
+        """AIQ-888: rows sharing a `created_at` must not order arbitrarily.
+        `ORDER BY created_at DESC` alone leaves same-timestamp rows in an
+        implementation-defined order (SQLite: insert/rowid order; Postgres:
+        heap order) → flaky. The endpoint carries an `id` tie-break so the
+        result is stable across calls. Insert directly with an identical
+        timestamp and known ids to exercise the tie-break in isolation."""
+        hr = _make_user(str(uuid.uuid4()), "HR", "company-a")
+        same_ts = "2026-06-07T00:00:00"
+        # Insert in ascending id order so a missing tie-break would surface as
+        # insert/rowid order (id-a, id-b, id-c) — the opposite of id DESC.
+        with self.engine.begin() as conn:
+            for cid in ["id-a", "id-b", "id-c"]:
+                conn.execute(
+                    text(
+                        "INSERT INTO ai_decisions (id, created_at, updated_at, "
+                        "actor_id, company_id, feature, recommendation_id, "
+                        "ai_output, decision, reason) VALUES "
+                        "(:id, :ts, :ts, :actor, 'company-a', 'exception_insight', "
+                        "'rec', '{}', 'accept', NULL)"
+                    ),
+                    {"id": cid, "ts": same_ts, "actor": hr["id"]},
+                )
+
+        first = [r["id"] for r in list_ai_decisions(user=hr, feature=None, decision=None, limit=100)]
+        second = [r["id"] for r in list_ai_decisions(user=hr, feature=None, decision=None, limit=100)]
+
+        # Stable across repeated calls...
+        self.assertEqual(first, second)
+        # ...and follows the id DESC tie-break for equal timestamps.
+        self.assertEqual(first, ["id-c", "id-b", "id-a"])
+
 
 if __name__ == "__main__":
     unittest.main()
