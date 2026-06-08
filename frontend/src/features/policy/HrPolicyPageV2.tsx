@@ -500,7 +500,13 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       title="Ask about this policy"
       subtitle="Bounded Q&A on this workspace's policy data."
       titleId="hr-policy-assistant-shell-title"
-      assistant={() => <HrPolicyAssistantPanel policyId={policyId} variant="embedded" />}
+      assistant={() => (
+        <HrPolicyAssistantPanel
+          policyId={policyId}
+          hasQueryablePolicy={hasLivePolicy}
+          variant="embedded"
+        />
+      )}
     >
     <div className="space-y-6 pb-12">
       {loadError && <Alert variant="error">{loadError}</Alert>}

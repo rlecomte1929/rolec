@@ -316,7 +316,16 @@ export const HrPolicyAssistantPanel: React.FC<{
    *   Render the form body only.
    */
   variant?: 'card' | 'embedded';
-}> = ({ policyId, documentId, contextLoading = false, variant = 'card' }) => {
+  /**
+   * Whether this workspace has a policy the company-scoped RAG engine can
+   * answer about. The backend query is company-scoped (policy_id is no
+   * longer sent — see client.ts), so the ask box must open for ANY live
+   * policy, including matrix-published ones that carry no document
+   * `policyId`. When omitted, falls back to the legacy `policyId` gate so
+   * the `card` variant and existing tests are unchanged.
+   */
+  hasQueryablePolicy?: boolean;
+}> = ({ policyId, documentId, contextLoading = false, variant = 'card', hasQueryablePolicy }) => {
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [error, setError] = useState('');
@@ -346,11 +355,15 @@ export const HrPolicyAssistantPanel: React.FC<{
   }, []);
 
   const pid = policyId?.trim() || null;
+  // Company-scoped RAG: the ask box opens whenever the workspace has a live
+  // policy, not only when a document-backed `policyId` exists. Fall back to
+  // the legacy pid gate when the caller doesn't supply the signal.
+  const canQuery = hasQueryablePolicy ?? Boolean(pid);
   const trimmed = message.trim();
-  const canSubmit = Boolean(pid && trimmed && !submitting);
+  const canSubmit = Boolean(canQuery && trimmed && !submitting);
 
   const submit = useCallback(async () => {
-    if (!pid || !trimmed) return;
+    if (!canQuery || !trimmed) return;
     setSubmitting(true);
     setError('');
     const source = submitSourceRef.current;
@@ -358,7 +371,7 @@ export const HrPolicyAssistantPanel: React.FC<{
     hadQuestionRef.current = true;
     trackPolicyAssistantQuestionSubmitted({ surface, source });
     try {
-      const res = await hrAPI.postPolicyAssistantQuery(pid, trimmed, documentId?.trim() || undefined);
+      const res = await hrAPI.postPolicyAssistantQuery(pid ?? '', trimmed, documentId?.trim() || undefined);
       hadAnswerRef.current = true;
       trackPolicyAssistantAnswerReceived({
         surface,
@@ -392,7 +405,7 @@ export const HrPolicyAssistantPanel: React.FC<{
     } finally {
       setSubmitting(false);
     }
-  }, [pid, trimmed, documentId, surface]);
+  }, [pid, canQuery, trimmed, documentId, surface]);
 
   const applySuggestion = (q: string) => {
     setMessage(q);
@@ -420,7 +433,7 @@ export const HrPolicyAssistantPanel: React.FC<{
     submitSourceRef.current = 'follow_up';
   };
 
-  if (contextLoading && !pid) {
+  if (contextLoading && !canQuery) {
     // embedded variant gets chrome from the docked shell.
     if (variant === 'embedded') return null;
     return (
@@ -431,7 +444,7 @@ export const HrPolicyAssistantPanel: React.FC<{
     );
   }
 
-  if (!pid) {
+  if (!canQuery) {
     if (variant === 'embedded') {
       // Honest minimal fallback inside the docked shell — no chrome to
       // repeat. break-words keeps the message inside the column even

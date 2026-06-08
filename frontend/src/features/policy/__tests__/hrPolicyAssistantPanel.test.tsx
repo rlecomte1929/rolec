@@ -62,14 +62,45 @@ describe('HrPolicyAssistantPanel', () => {
     expect(screen.getByText(HR_POLICY_ASSISTANT_TRUST_PILL)).toBeInTheDocument();
   });
 
-  it('shows no-policy guidance when policy id missing', () => {
-    render(<HrPolicyAssistantPanel policyId={null} />);
-    // Sprint 3.5: copy now explains the actual limitation (matrix-only
-    // policies aren't supported by the assistant backend) and tells the
-    // user the action that unlocks Q&A — uploading a policy document.
+  it('shows no-policy guidance when there is no live policy', () => {
+    // No document policyId AND not flagged queryable → genuinely no live
+    // policy. The empty-state now points at publishing (matrix or document),
+    // not only at uploading a document.
+    render(<HrPolicyAssistantPanel policyId={null} hasQueryablePolicy={false} />);
+    expect(screen.getByText(/publish a policy/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/upload a policy document to enable Q&A/i)
-    ).toBeInTheDocument();
+      screen.queryByPlaceholderText(/employees see for shipment/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the ask box for a matrix-published policy (no document policyId)', () => {
+    // Company-scoped RAG: a live matrix policy has no document `policyId`
+    // but is fully answerable. The input must render.
+    render(<HrPolicyAssistantPanel policyId={null} hasQueryablePolicy={true} />);
+    expect(screen.getByPlaceholderText(/employees see for shipment/i)).toBeInTheDocument();
+    expect(screen.queryByText(/publish a policy/i)).not.toBeInTheDocument();
+  });
+
+  it('submits a matrix-policy question with an empty policy id (backend is company-scoped)', async () => {
+    postPolicyAssistantQuery.mockResolvedValue({
+      ok: true,
+      policy_id: null,
+      document_id: null,
+      answer: baseAnswer(),
+    });
+    render(<HrPolicyAssistantPanel policyId={null} hasQueryablePolicy={true} />);
+    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
+      target: { value: 'What relocation benefits do we offer?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await waitFor(() =>
+      expect(postPolicyAssistantQuery).toHaveBeenCalledWith('', 'What relocation benefits do we offer?', undefined)
+    );
+  });
+
+  it('legacy: still gates on policyId when hasQueryablePolicy is not supplied', () => {
+    render(<HrPolicyAssistantPanel policyId={null} />);
+    expect(screen.getByText(/publish a policy/i)).toBeInTheDocument();
   });
 
   it('applies a suggestion chip to the textarea', () => {

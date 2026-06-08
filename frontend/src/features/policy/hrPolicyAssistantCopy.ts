@@ -17,7 +17,7 @@ export const HR_POLICY_ASSISTANT_TRUST_PILL =
   "Verified from this workspace's policy data — not legal or immigration advice";
 
 export const HR_POLICY_ASSISTANT_NO_POLICY =
-  'Q&A is currently available only for policies imported from a document. Upload a policy document to enable Q&A for this workspace.';
+  'Publish a policy for this workspace to enable Q&A. Once a policy is live, you can ask questions about it here.';
 
 export const HR_POLICY_ASSISTANT_SUBMIT = 'Ask';
 
