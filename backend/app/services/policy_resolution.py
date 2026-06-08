@@ -726,7 +726,7 @@ def resolve_policy_for_assignment(
                 company_name=None,
                 assignment_id=assignment_id,
                 case_id=(case.get("id") if case else assignment.get("case_id")),
-                employee_level_ctx=ctx.get("tier"),
+                employee_level_ctx=ctx.get("employee_level"),
             )
             # Thread the matrix-computed readiness so the comparison uses it instead of the
             # policy_version-based evaluator (a matrix policy has no policy_version_id).

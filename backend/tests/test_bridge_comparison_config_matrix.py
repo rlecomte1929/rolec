@@ -73,6 +73,32 @@ def test_resolve_falls_back_to_matrix_when_no_legacy_policy():
     assert "comparison_readiness_precalc" in resolved
 
 
+def test_resolve_threads_normalized_employee_level_not_raw_tier():
+    # The employee_level targeting axis must receive ctx["employee_level"] (the
+    # normalized canonical slug, derived from tier OR seniorityBand OR ...), not
+    # ctx["tier"]. Here the profile carries only a seniorityBand (no tier), so the
+    # old tier-only wiring would pass None and every level-narrowed cap would be
+    # filtered out.
+    db = MagicMock()
+    captured = {}
+
+    def _fake_build(_db, **kwargs):
+        captured.update(kwargs)
+        return ({"resolution_context": {"source": "policy_config_matrix"}, "benefits": []}, {})
+
+    assignment = {"id": "a1", "case_id": "c1"}
+    profile = {"primaryApplicant": {"employer": {"seniorityBand": "manager"}}}
+
+    with patch.object(pr, "find_first_published_company_policy", return_value=None), \
+        patch.object(bridge, "find_published_matrix_version", return_value=("co-1", {"id": "ver-1"})), \
+        patch.object(bridge, "build_matrix_assignment_package", side_effect=_fake_build), \
+        patch.object(pr, "collect_company_id_candidates_for_assignment", return_value=["co-1"]):
+        pr.resolve_policy_for_assignment(db, "a1", assignment, None, profile, None)
+
+    assert captured.get("employee_level_ctx") is not None, \
+        "employee_level must thread from seniorityBand; got None (raw-tier regression)"
+
+
 def _matrix_resolved_package():
     return {
         "id": "policy_config_matrix:ver-1",
