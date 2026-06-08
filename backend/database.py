@@ -7108,6 +7108,41 @@ class Database:
         with self.engine.begin() as conn:
             conn.execute(text(sql), params)
 
+    def set_case_employee_seniority(self, case_id: str, seniority_band: str) -> bool:
+        """Merge an HR-set seniority band into the case profile_json at
+        primaryApplicant.employer.seniorityBand, preserving all other fields.
+
+        This is the level signal benefit comparison targets — extract_resolution_context
+        reads it (policy_resolution.py). Read-modify-write; returns True on update.
+        """
+        band = (seniority_band or "").strip()
+        rid = (case_id or "").strip()
+        if not band or not rid:
+            return False
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT profile_json FROM relocation_cases WHERE id::text = :cid"),
+                {"cid": rid},
+            ).fetchone()
+            if not row:
+                return False
+            raw = row[0]
+            try:
+                profile = json.loads(raw) if isinstance(raw, str) else (raw or {})
+            except Exception:
+                profile = {}
+            if not isinstance(profile, dict):
+                profile = {}
+            applicant = profile.setdefault("primaryApplicant", {})
+            employer = applicant.setdefault("employer", {})
+            employer["seniorityBand"] = band
+            conn.execute(
+                text("UPDATE relocation_cases SET profile_json = :pj, updated_at = :ua WHERE id::text = :cid"),
+                {"pj": json.dumps(profile), "ua": now, "cid": rid},
+            )
+        return True
+
     def sync_relocation_case_route_from_wizard_draft(self, relocation_case_id: str, draft: Dict[str, Any]) -> None:
         """
         Denormalize relocationBasics onto relocation_cases (same fields as PATCH /api/cases).

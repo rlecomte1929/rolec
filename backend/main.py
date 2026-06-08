@@ -4324,6 +4324,23 @@ def assign_case(
                 home_country=case.get("home_country"),
             )
 
+        # [HR-sets-level] Persist an HR-supplied seniority band onto the case profile
+        # so benefit comparison can target the employee's level (matrix caps are
+        # level-gated; a level-less case shows an empty comparison). Normalized to the
+        # canonical slug so it matches matrix rows. Best-effort: a failure here must
+        # never break the assignment.
+        if request.employeeLevel:
+            try:
+                from .app.services.policy_config_targeting import normalize_employee_level
+                norm_level = normalize_employee_level(request.employeeLevel)
+                if norm_level:
+                    db.set_case_employee_seniority(case_id, norm_level)
+            except Exception:
+                log.warning(
+                    "assign_case: set employee seniority failed case=%s level=%s",
+                    case_id, request.employeeLevel, exc_info=True,
+                )
+
         try:
             employee_user = _user_fut.result(timeout=8)
         except concurrent.futures.TimeoutError:

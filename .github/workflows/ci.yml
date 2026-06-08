@@ -226,6 +226,7 @@ jobs:
             backend/tests/test_embedding_recall.py \
             backend/tests/test_bridge_comparison_config_matrix.py \
             backend/tests/test_llm_tracing.py \
+            backend/tests/test_hr_set_employee_level.py \
             backend/tests/test_notion_ready_queue.py \
             backend/tests/test_pre_push_hook.py
 

@@ -454,7 +454,7 @@ export const hrAPI = {
   assignCase: async (
     caseId: string,
     employeeIdentifier: string,
-    options?: { firstName?: string; lastName?: string }
+    options?: { firstName?: string; lastName?: string; level?: string }
   ): Promise<AssignCaseResponse> => {
     const response = await api.post(
       `/api/hr/cases/${caseId}/assign`,
@@ -462,6 +462,8 @@ export const hrAPI = {
         employeeIdentifier,
         employeeFirstName: options?.firstName?.trim() || undefined,
         employeeLastName: options?.lastName?.trim() || undefined,
+        // Optional seniority band → benefit comparison targets the employee's level.
+        employeeLevel: options?.level?.trim() || undefined,
       },
       { timeout: HR_CASE_TIMEOUT },
     );

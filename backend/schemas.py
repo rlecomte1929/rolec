@@ -448,6 +448,12 @@ class AssignCaseRequest(BaseModel):
     employeeIdentifier: str = Field(validation_alias=AliasChoices("employeeIdentifier", "employee_email"))
     employeeFirstName: Optional[str] = None
     employeeLastName: Optional[str] = None
+    # Optional seniority band HR sets when linking the employee, so benefit
+    # comparison can target the employee's level (matrix caps are level-gated).
+    # Stored into the case profile_json; resolved by extract_resolution_context.
+    employeeLevel: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("employeeLevel", "employee_level")
+    )
 
     # XSS defence: strip HTML from user-supplied text before storage
     @field_validator("employeeFirstName", "employeeLastName", mode="before")
