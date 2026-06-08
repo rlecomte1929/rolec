@@ -1401,7 +1401,7 @@ class Database:
             """))
 
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS employee_profiles (
+                CREATE TABLE IF NOT EXISTS wizard_employee_profiles (
                     assignment_id TEXT PRIMARY KEY,
                     profile_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -6953,7 +6953,7 @@ class Database:
             LEFT JOIN profiles hr_p ON CAST(hr_p.id AS TEXT) = a.hr_user_id
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
             LEFT JOIN employees emp ON emp.profile_id = a.employee_user_id
-            LEFT JOIN employee_profiles ep ON ep.assignment_id = a.id
+            LEFT JOIN wizard_employee_profiles ep ON ep.assignment_id = a.id
             LEFT JOIN resolved_assignment_policies rap ON rap.assignment_id = a.id
             WHERE 1=1 {where_sql}
             ORDER BY a.updated_at DESC, a.created_at DESC
@@ -9603,39 +9603,33 @@ class Database:
         return self._rows_to_list(rows)
 
     def save_employee_profile(self, assignment_id: str, profile: Dict[str, Any]) -> None:
+        # Wizard-profile store. Relocated from employee_profiles to
+        # wizard_employee_profiles after the immigration-core migration took the
+        # former over with an incompatible schema (AIQ-868).
         now = datetime.utcnow().isoformat()
         pj = json.dumps(profile)
         with self.engine.begin() as conn:
             existing = conn.execute(
-                text("SELECT 1 FROM employee_profiles WHERE assignment_id = :aid"), {"aid": assignment_id}
+                text("SELECT 1 FROM wizard_employee_profiles WHERE assignment_id = :aid"), {"aid": assignment_id}
             ).fetchone()
             if existing:
                 conn.execute(text(
-                    "UPDATE employee_profiles SET profile_json = :pj, updated_at = :now WHERE assignment_id = :aid"
+                    "UPDATE wizard_employee_profiles SET profile_json = :pj, updated_at = :now WHERE assignment_id = :aid"
                 ), {"pj": pj, "now": now, "aid": assignment_id})
             else:
                 conn.execute(text(
-                    "INSERT INTO employee_profiles (assignment_id, profile_json, updated_at) VALUES (:aid, :pj, :now)"
+                    "INSERT INTO wizard_employee_profiles (assignment_id, profile_json, updated_at) VALUES (:aid, :pj, :now)"
                 ), {"aid": assignment_id, "pj": pj, "now": now})
 
     def get_employee_profile(self, assignment_id: str) -> Optional[Dict[str, Any]]:
-        # LIVE-QA: the immigration-core migration (20260518120000) replaced
-        # public.employee_profiles (assignment_id, profile_json) with a different
-        # schema (case_id, employee_id, …; no profile_json/assignment_id). This
-        # wizard-profile store therefore no longer exists in prod and the query
-        # raises UndefinedColumn — which 500s the benefit-comparison endpoint.
-        # Degrade to None (every caller already handles a missing profile by
-        # falling back to assignment/case defaults) until wizard-profile storage
-        # is relocated to its own table. Tracked as a separate migration task.
-        try:
-            with self.engine.connect() as conn:
-                row = conn.execute(text(
-                    "SELECT profile_json FROM employee_profiles WHERE assignment_id = :aid"
-                ), {"aid": assignment_id}).fetchone()
-            return json.loads(row._mapping["profile_json"]) if row else None
-        except (OperationalError, ProgrammingError) as ex:
-            log.warning("get_employee_profile: wizard-profile store unavailable (schema collision) — returning None: %s", ex)
-            return None
+        # Wizard-profile store — see save_employee_profile (AIQ-868). Reads from
+        # wizard_employee_profiles, where the wizard profile blob now lives after
+        # the immigration-core migration claimed public.employee_profiles.
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT profile_json FROM wizard_employee_profiles WHERE assignment_id = :aid"
+            ), {"aid": assignment_id}).fetchone()
+        return json.loads(row._mapping["profile_json"]) if row else None
 
     # ==================================================================
     # Compliance reports
@@ -12093,7 +12087,7 @@ class Database:
                 id_params = {f"a{i}": assignment_ids[i] for i in range(len(assignment_ids))}
 
                 conn.execute(text(
-                    f"DELETE FROM employee_profiles WHERE assignment_id IN ({id_placeholders})"
+                    f"DELETE FROM wizard_employee_profiles WHERE assignment_id IN ({id_placeholders})"
                 ), id_params)
                 conn.execute(text(
                     f"DELETE FROM employee_answers WHERE assignment_id IN ({id_placeholders})"

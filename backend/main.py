@@ -5839,7 +5839,7 @@ def list_hr_assignments(
             ep_placeholders = ", ".join(f":aid{i}" for i in range(len(aids_for_profiles)))
             ep_params = {f"aid{i}": v for i, v in enumerate(aids_for_profiles)}
             ep_sql = (
-                "SELECT assignment_id, profile_json FROM employee_profiles "
+                "SELECT assignment_id, profile_json FROM wizard_employee_profiles "
                 "WHERE assignment_id IN (" + ep_placeholders + ")"
             )
             try:
@@ -6304,7 +6304,7 @@ def _resolve_assignment_route_for_list(
     and the case detail show the same corridor.
 
     Precedence:
-      1. employee_profiles.profile_json -> movePlan.origin / movePlan.destination
+      1. wizard_employee_profiles.profile_json -> movePlan.origin / movePlan.destination
       2. relocation_cases.profile_json  -> relocationBasics.originCountry / destCountry
       3. relocation_cases.home_country  / host_country (stored denormalized cols)
     """

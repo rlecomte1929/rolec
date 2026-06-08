@@ -1,7 +1,7 @@
 """
 Sync one case_people row (role=employee) from live assignment data into the mobility graph.
 
-Primary source: employee_profiles.profile_json (wizard / intake lane), keyed by assignment_id.
+Primary source: wizard_employee_profiles.profile_json (wizard / intake lane), keyed by assignment_id.
 Secondary: case_assignments HR-entered names; profiles table when employee_user_id is linked.
 
 Does not sync spouse/children. Idempotent; relies on assignment_mobility_links for mobility_cases.id.

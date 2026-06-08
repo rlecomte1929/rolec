@@ -90,7 +90,7 @@ def _seed(case_id: str, profile_json: str, employee_movePlan: dict | None,
         if employee_movePlan is not None:
             conn.execute(
                 text(
-                    "INSERT INTO employee_profiles (assignment_id, profile_json, updated_at) "
+                    "INSERT INTO wizard_employee_profiles (assignment_id, profile_json, updated_at) "
                     "VALUES (:aid, :pj, :ua)"
                 ),
                 {
