@@ -54,6 +54,38 @@ def _map_service_to_benefit(service_category: str) -> Optional[str]:
     return benefit or None
 
 
+# [Bridge ii] The config-matrix subsystem keys benefits by its own canonical
+# vocabulary (policy_config_benefits.benefit_key), but both comparison paths look
+# benefits up under the *legacy* vocabulary (SERVICE_TO_BENEFIT above and
+# policy_entitlement_model.CANONICAL_SERVICE_TO_LEGACY_BENEFIT_KEY). Without a
+# translation, a resolved matrix policy yields zero cap matches (every row falls to
+# out_of_scope). This map aliases the config keys the comparison actually queries
+# onto their legacy equivalents; unmapped config keys are left as-is (no regression).
+MATRIX_TO_LEGACY_BENEFIT_KEY: Dict[str, str] = {
+    "temporary_living": "temporary_housing",
+    "shipment_of_goods": "shipment",
+    "child_education_support": "schooling",
+    "banking_assistance": "banking_setup",
+    "visa_work_permit_assistance": "immigration",
+    "spouse_partner_assistance": "spouse_support",
+    "settling_in_services": "relocation_services",
+    "tax_return_preparation": "tax",
+}
+
+
+def _with_legacy_benefit_key_aliases(benefits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Additionally index matrix benefits under their legacy benefit_key alias so the
+    comparison's per-service lookups (legacy vocabulary) match. Originals are kept."""
+    out: List[Dict[str, Any]] = list(benefits)
+    for b in benefits:
+        legacy = MATRIX_TO_LEGACY_BENEFIT_KEY.get(b.get("benefit_key"))
+        if legacy and legacy != b.get("benefit_key"):
+            alias = dict(b)
+            alias["benefit_key"] = legacy
+            out.append(alias)
+    return out
+
+
 def _extract_requested_values(
     service_category: str,
     answers: Dict[str, Any],
@@ -276,20 +308,30 @@ def compute_policy_service_comparison(
 
     comparison_readiness = None
     legacy_comparisons_suppressed = False
+    # [Bridge ii] A config-matrix-sourced resolved policy carries its benefits inline and a
+    # precomputed readiness — it has no persisted policy_version_id / resolved_policy_benefits
+    # rows, so the policy_version-based readiness + DB benefit re-query don't apply to it.
+    is_matrix_policy = (resolved.get("resolution_context") or {}).get("source") == "policy_config_matrix"
     if employee_gate:
-        from .policy_comparison_readiness import evaluate_version_comparison_readiness
+        if is_matrix_policy:
+            comparison_readiness = resolved.get("comparison_readiness_precalc") or {"comparison_ready": True}
+        else:
+            from .policy_comparison_readiness import evaluate_version_comparison_readiness
 
-        pvid = resolved.get("policy_version_id")
-        comparison_readiness = evaluate_version_comparison_readiness(db, str(pvid) if pvid else None)
+            pvid = resolved.get("policy_version_id")
+            comparison_readiness = evaluate_version_comparison_readiness(db, str(pvid) if pvid else None)
         if not comparison_readiness.get("comparison_ready"):
             legacy_comparisons_suppressed = True
 
-    benefits = db.list_resolved_policy_benefits(resolved["id"])
-    pvid = resolved.get("policy_version_id")
-    if pvid:
-        from .policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
+    if is_matrix_policy:
+        benefits = _with_legacy_benefit_key_aliases(resolved.get("benefits") or [])
+    else:
+        benefits = db.list_resolved_policy_benefits(resolved["id"])
+        pvid = resolved.get("policy_version_id")
+        if pvid:
+            from .policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
 
-        benefits = enrich_resolved_benefits_with_rule_comparison(db, str(pvid), benefits)
+            benefits = enrich_resolved_benefits_with_rule_comparison(db, str(pvid), benefits)
     benefits_by_key: Dict[str, Dict] = {b.get("benefit_key"): b for b in benefits if b.get("benefit_key")}
 
     # Selected services and answers
