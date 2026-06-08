@@ -92,6 +92,26 @@ def _recipients_for_case(case_id: str) -> List[str]:
     return out
 
 
+def _fetch_affected_pairs(since: datetime) -> List[Dict[str, Any]]:
+    """Run _AFFECTED_SQL and return the (case, prior-version) pairs as plain dicts.
+
+    Thin seam over the Postgres-specific query (rce.* schema, ANY(), CURRENT_DATE)
+    so the orchestration in ``notify_superseded_rules`` is unit-testable without a
+    live Postgres DB (AIQ-797). The SQL itself still requires a Postgres harness to
+    execute — see test_rule_change_notifier.py for the coverage boundary.
+    """
+    with db.engine.connect() as conn:
+        return [
+            dict(r)
+            for r in conn.execute(
+                text(_AFFECTED_SQL),
+                {"since": since, "open_statuses": list(_OPEN_CASE_STATUSES)},
+            )
+            .mappings()
+            .all()
+        ]
+
+
 def notify_superseded_rules(since: Optional[datetime] = None) -> Dict[str, int]:
     """Notify open cases whose cited rule_version was recently superseded.
 
@@ -106,15 +126,7 @@ def notify_superseded_rules(since: Optional[datetime] = None) -> Dict[str, int]:
     if since is None:
         since = datetime.utcnow() - timedelta(hours=24)
 
-    with db.engine.connect() as conn:
-        affected = (
-            conn.execute(
-                text(_AFFECTED_SQL),
-                {"since": since, "open_statuses": list(_OPEN_CASE_STATUSES)},
-            )
-            .mappings()
-            .all()
-        )
+    affected = _fetch_affected_pairs(since)
 
     created = skipped_idem = skipped_norecip = 0
     for row in affected:
