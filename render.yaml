@@ -1,0 +1,70 @@
+# render.yaml — Render Blueprint (Infrastructure as Code)
+#
+# WHY THIS EXISTS
+# ---------------
+# The frontend security headers (SEC-005) were authored as a Netlify/Cloudflare-Pages
+# style `frontend/public/_headers` file. Render Static Sites do NOT honor that file —
+# they serve it as a static asset. Verified on prod: GET https://relopass.com/_headers
+# returns the file (HTTP 200) and NONE of the CSP / HSTS / X-Frame-Options / Referrer-
+# Policy / Permissions-Policy headers are present on responses. (Render DOES honor
+# `_redirects`, which is why SPA routing works but the headers never applied.)
+#
+# This Blueprint moves those headers to a mechanism Render actually enforces: the
+# static site `headers` field. The CSP value matches the (now self-hosted, Google-Fonts-
+# free) policy on `main`.
+#
+# !! THIS FILE IS INERT UNTIL YOU ADOPT IT IN RENDER !!
+# A render.yaml committed to the repo does nothing to an existing dashboard-created
+# service on its own. To enforce these headers you must, in the Render dashboard, EITHER:
+#   (A) Create a Blueprint instance from this file and point it at the existing static
+#       site — confirm `name` below matches the live service so it UPDATES (not
+#       duplicates) it; OR
+#   (B) Skip the Blueprint and paste the 6 headers below into the static site's
+#       Settings -> Headers UI (zero-risk, no Blueprint adoption needed). Recommended
+#       if you don't want to convert the service to IaC.
+#
+# CAUTION on Blueprint adoption: a Blueprint becomes the source of truth for the
+# services it defines. Verify the service `name`, build command, publish path, and
+# the env vars below match the live dashboard config before syncing, and validate on
+# a preview deploy first — a mismatch can break the production frontend deploy. Env
+# var VALUES are NOT stored here (`sync: false`); they stay dashboard-managed.
+
+services:
+  - type: web
+    name: relopass-frontend            # <-- MUST match the existing Render static site's name, or a duplicate is created
+    runtime: static
+    buildCommand: npm --prefix frontend ci && npm --prefix frontend run build
+    staticPublishPath: frontend/dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      # Values stay in the Render dashboard (sync: false = "managed elsewhere, don't overwrite").
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+    routes:
+      # SPA fallback — mirrors frontend/public/_redirects (/* -> /index.html 200).
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains; preload
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' https://us-assets.i.posthog.com; worker-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.relopass.com https://us.i.posthog.com https://us-assets.i.posthog.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
