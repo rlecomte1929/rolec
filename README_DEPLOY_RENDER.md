@@ -107,12 +107,27 @@ INFO:backend.main:Background: seeding demo cases…
 | -------------- | -------- | ------------------------------ |
 | `VITE_API_URL` | Yes      | `https://api.relopass.com`     |
 
-### SPA Routing
+### SPA routing & security headers — `render.yaml` (Render Blueprint)
 
-The file `frontend/public/_redirects` ensures all routes serve `index.html`:
-```
-/*    /index.html   200
-```
+Frontend hosting config lives in the repo-root **`render.yaml`** (adopted as a Render
+Blueprint), NOT in the dashboard or Netlify-style files:
+- **SPA rewrite:** `routes: [{ type: rewrite, source: /*, destination: /index.html }]` — every
+  route serves `index.html`.
+- **Security headers (SEC-005):** the 6 headers (Content-Security-Policy, Strict-Transport-Security,
+  X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) are declared under
+  the static site's `headers:`.
+
+**Why `render.yaml` and not `_headers`/`_redirects`:** Render does **not** honor a Netlify-style
+`_headers` file (it serves it as a static asset), and once any dashboard rule exists Render stops
+applying the file-based `_redirects` rewrite. Keeping routing **and** headers together in
+`render.yaml` stops them drifting apart — a 2026-06-08 incident: adding headers in the dashboard
+silently disabled the `_redirects` SPA rewrite and 404'd every deep link. The old
+`frontend/public/_headers` and `_redirects` files were therefore removed.
+
+**Deep-link safety net:** `frontend/public/404.html` + `frontend/public/404-redirect.js` restore the
+requested route via `?__redirect=` (consumed by `App.tsx`'s `QueryRedirect`) if the rewrite is ever
+missing. The redirect logic is an **external** script (not inline) because the CSP is
+`script-src 'self'` with no `'unsafe-inline'` — an inline script would be blocked.
 
 ---
 
