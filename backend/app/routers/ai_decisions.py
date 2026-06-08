@@ -220,7 +220,7 @@ def list_ai_decisions(
     sql = f"""
         SELECT * FROM ai_decisions
         {where_sql}
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT :limit
     """
     with db.engine.begin() as conn:
