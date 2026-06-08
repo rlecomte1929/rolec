@@ -177,6 +177,39 @@ def _build_registry() -> Dict[str, PolicyTemplateSchema]:
 _REGISTRY: Dict[str, PolicyTemplateSchema] = _build_registry()
 
 
+# --- Benchmark reference library (N12-followup-a / AIQ-889) ------------------
+#
+# Ported from the out-of-band ``benefits_templates`` prod table (42 rows = 14
+# categories x 3 generosity tiers), retiring the 4th legacy template system.
+# This is a CATEGORY-level benchmark *reference* (what a conservative/standard/
+# premium policy looks like per spend category, sourced from AIRINC/Mercer/ECA/
+# KPMG/CIGNA) — distinct from the granular per-benefit LTA/STA operational
+# templates above. Kept here as deterministic data (no DB IO, same philosophy as
+# the registry); migration 20260618100000 mirrors it into policy_templates_v2
+# (policy_type='benchmark_reference'). Currency is EUR (NOT the USD of the
+# LTA/STA registry) — preserved, never coerced.
+BENCHMARK_TIER_ORDER: Dict[str, int] = {"Conservative": 1, "Standard": 2, "Premium": 3}
+BENCHMARK_CURRENCY = "EUR"
+
+# (code, display_name, unit, benchmark_source, conservative, standard, premium)
+_BENCHMARK_CATEGORIES: List[tuple] = [
+    ("CAT-01", "Housing & Accommodation", "month", "AIRINC 2025 European upper quartile", 1800, 2800, 4500),
+    ("CAT-02", "Transportation", "month", "ECA International 2024 median (car lease option)", 400, 750, 1400),
+    ("CAT-03", "International Schooling", "month", "AIRINC 2025 state school contribution, Europe", 800, 1800, 4000),
+    ("CAT-04", "Cost of Living Adjustment", "month", "Mercer 2024 COLA upper range, high-cost city", 400, 700, 1200),
+    ("CAT-05", "Healthcare & Wellbeing", "month", "CIGNA Global 2025 premium plan + dental + mental health", 250, 450, 800),
+    ("CAT-06", "Tax & Social Security", "year", "KPMG 2024 full tax equalisation advisory", 2500, 4500, 9000),
+    ("CAT-07", "Travel & Home Leave", "year", "AIRINC 2025 two economy+ return flights per year", 900, 3000, 8000),
+    ("CAT-08", "Relocation Assistance", "per_move", "Mercer 2024 managed move + lump-sum, European executive", 8000, 15000, 28000),
+    ("CAT-09", "Settling-In & Orientation", "per_move", "ECA International 2024 standard DSP, 5 days + admin support", 1500, 3000, 6000),
+    ("CAT-10", "Spouse & Family Support", "per_move", "AIRINC 2025 full partner career coaching + integration", 1000, 3500, 8000),
+    ("CAT-11", "Assignment Allowances", "month", "ECA International 2024 standard foreign service premium", 300, 700, 1500),
+    ("CAT-12", "End of Assignment", "per_move", "Mercer 2024 repatriation median", 5000, 10000, 20000),
+    ("CAT-13", "Governance & Process", "year", "ReloPass internal standard (policy management + HR support)", 500, 1000, 2000),
+    ("CAT-14", "Legal & Compliance", "per_move", "KPMG 2024 full immigration + compliance advisory", 2000, 4000, 8000),
+]
+
+
 # --- Service ----------------------------------------------------------------
 
 
@@ -212,6 +245,33 @@ class PolicyTemplateService:
 
     def list_templates(self) -> List[PolicyTemplateSchema]:
         return list(self._registry.values())
+
+    def get_benchmark_library(self) -> List[Dict[str, object]]:
+        """Category-level benchmark reference library (AIQ-889), grouped by tier.
+
+        Returns 3 tiers (Conservative/Standard/Premium), each with all 14 spend
+        categories and their EUR benchmark caps. Shape matches the
+        /api/policy/templates response (replaces the direct benefits_templates read).
+        """
+        # tuple layout: (code, display_name, unit, source, conservative, standard, premium)
+        cap_pos = {"Conservative": 0, "Standard": 1, "Premium": 2}
+        tiers: List[Dict[str, object]] = []
+        for tier_name, tier_order in sorted(BENCHMARK_TIER_ORDER.items(), key=lambda kv: kv[1]):
+            pos = cap_pos[tier_name]
+            categories = [
+                {
+                    "category_id": code,  # stable category code (service is DB-free; was a uuid in the legacy table)
+                    "code": code,
+                    "display_name": display_name,
+                    "cap_value": float(caps[pos]),
+                    "cap_unit": unit,
+                    "cap_currency": BENCHMARK_CURRENCY,
+                    "benchmark_source": source,
+                }
+                for code, display_name, unit, source, *caps in _BENCHMARK_CATEGORIES
+            ]
+            tiers.append({"tier": tier_name, "tier_order": tier_order, "categories": categories})
+        return tiers
 
     def get_default_benefits(self, template_id: Optional[str] = None) -> Dict[str, Dict[str, object]]:
         """Gap-fill defaults keyed by benefit-taxonomy key.
