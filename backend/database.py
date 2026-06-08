@@ -16802,12 +16802,16 @@ class Database:
         """AIQ-839: append one field-level audit entry for a policy_config_benefits change."""
         aid = str(row.get("id") or uuid.uuid4())
         now = datetime.utcnow().isoformat()
+        # old/new values are snapshots of policy_config_benefits rows whose
+        # numeric columns (amount_value, percentage_value) come back from
+        # Postgres as Decimal — not JSON-serializable by default. default=str
+        # keeps the audit write from 500ing on any amount-bearing benefit.
         ov = row.get("old_value")
         if isinstance(ov, (dict, list)):
-            ov = json.dumps(ov)
+            ov = json.dumps(ov, default=str)
         nv = row.get("new_value")
         if isinstance(nv, (dict, list)):
-            nv = json.dumps(nv)
+            nv = json.dumps(nv, default=str)
         params = {
             "id": aid,
             "bid": str(row["benefit_id"]) if row.get("benefit_id") else None,
