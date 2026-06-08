@@ -44,7 +44,7 @@ export const ProductDiagramBlock: React.FC<ProductDiagramBlockProps> = ({
               {eyebrow}
             </p>
           )}
-          <h2 className="text-marketing-h1 font-semibold text-marketing-primary tracking-tight">
+          <h2 className="text-marketing-h1 font-bold text-marketing-primary tracking-tight">
             {title}
           </h2>
           {subtitle && (

@@ -35,7 +35,7 @@ export const HeroSurface: React.FC<HeroSurfaceProps> = ({
               {eyebrow}
             </p>
           )}
-          <h1 className="text-marketing-hero sm:text-marketing-hero-lg font-semibold text-marketing-primary tracking-tight leading-[1.1]">
+          <h1 className="text-marketing-hero sm:text-marketing-hero-lg font-bold text-marketing-primary tracking-tight leading-[1.1]">
             {title}
           </h1>
           {subtitle && (
