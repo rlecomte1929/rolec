@@ -704,6 +704,36 @@ def resolve_policy_for_assignment(
 
     pub = find_first_published_company_policy(db, candidates)
     if not pub:
+        # [Bridge ii] No legacy company_policies/policy_versions policy for any candidate —
+        # fall back to the config-matrix subsystem (the newer authoring path the working
+        # /employee/policy view uses). The matrix bridge translates policy_config_benefits
+        # into the same entitlement shape the comparison consumes. Purely additive: the
+        # legacy path above is unchanged, so companies on either authoring path resolve.
+        from .employee_policy_matrix_bridge import (
+            build_matrix_assignment_package,
+            find_published_matrix_version,
+        )
+
+        matrix_cid, matrix_version = find_published_matrix_version(db, candidates)
+        if matrix_version:
+            ctx = extract_resolution_context(assignment, case, profile, employee_profile)
+            resolved_matrix, readiness = build_matrix_assignment_package(
+                db,
+                company_id=str(matrix_cid),
+                pub_version=matrix_version,
+                assignment_type_ctx=ctx.get("assignment_type"),
+                family_status_ctx=ctx.get("family_status"),
+                company_name=None,
+                assignment_id=assignment_id,
+                case_id=(case.get("id") if case else assignment.get("case_id")),
+                employee_level_ctx=ctx.get("tier"),
+            )
+            # Thread the matrix-computed readiness so the comparison uses it instead of the
+            # policy_version-based evaluator (a matrix policy has no policy_version_id).
+            if isinstance(resolved_matrix, dict):
+                resolved_matrix["comparison_readiness_precalc"] = readiness
+            return resolved_matrix
+
         log.info(
             "policy_resolution: no published policy for any of companies %s (assignment %s)",
             candidates,
