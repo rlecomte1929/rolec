@@ -35,6 +35,8 @@ import time
 import uuid
 from typing import Any, Dict, Optional
 
+from .llm_tracing import traced_generation  # AIQ-571: fail-soft Langfuse trace emission
+
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -78,6 +80,7 @@ def _http_status(exc: Exception) -> Optional[int]:
 # OpenAI — async complete
 # ---------------------------------------------------------------------------
 
+@traced_generation("openai")
 async def complete(
     *,
     system: str,
@@ -222,6 +225,7 @@ async def complete(
 # Anthropic — async claude_complete
 # ---------------------------------------------------------------------------
 
+@traced_generation("anthropic")
 async def claude_complete(
     *,
     system: str,
@@ -422,6 +426,7 @@ async def _run_with_retry(make_awaitable, *, label: str, model: str,
     raise last_exc
 
 
+@traced_generation("openai")
 async def complete_text(
     *,
     system: str,
@@ -461,6 +466,7 @@ async def complete_text(
     return resp.choices[0].message.content or ""
 
 
+@traced_generation("anthropic")
 async def claude_complete_text(
     *,
     system: str,
