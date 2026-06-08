@@ -205,3 +205,41 @@ def test_legacy_template_systems_still_present():
     )
 
     assert len(CANONICAL_LTA_TEMPLATE_FIELDS) == 35
+
+
+# --- AIQ-889: category-level benchmark reference library --------------------
+
+def test_benchmark_library_has_three_tiers_fourteen_categories():
+    svc = PolicyTemplateService()
+    lib = svc.get_benchmark_library()
+    assert [t["tier"] for t in lib] == ["Conservative", "Standard", "Premium"]
+    assert all(len(t["categories"]) == 14 for t in lib)
+    total = sum(len(t["categories"]) for t in lib)
+    assert total == 42  # count parity with the ported benefits_templates rows
+
+
+def test_benchmark_library_currency_is_eur_not_coerced():
+    svc = PolicyTemplateService()
+    lib = svc.get_benchmark_library()
+    currencies = {c["cap_currency"] for t in lib for c in t["categories"]}
+    assert currencies == {"EUR"}
+
+
+def test_benchmark_caps_monotonic_conservative_le_standard_le_premium():
+    svc = PolicyTemplateService()
+    by_tier = {t["tier"]: {c["code"]: c["cap_value"] for c in t["categories"]} for t in svc.get_benchmark_library()}
+    for code in by_tier["Conservative"]:
+        assert by_tier["Conservative"][code] <= by_tier["Standard"][code] <= by_tier["Premium"][code], code
+
+
+def test_benchmark_library_preserves_provenance_and_units():
+    svc = PolicyTemplateService()
+    cats = svc.get_benchmark_library()[0]["categories"]
+    assert all(c["benchmark_source"] for c in cats)
+    assert {c["cap_unit"] for c in cats} <= {"month", "year", "per_move"}
+
+
+def test_benchmark_does_not_disturb_lta_sta_registry():
+    svc = PolicyTemplateService()
+    ids = {t.template_id for t in svc.list_templates()}
+    assert ids == {"LTA_conservative", "LTA_standard", "LTA_premium", "STA_conservative", "STA_standard", "STA_premium"}
