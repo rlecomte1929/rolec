@@ -6940,7 +6940,7 @@ class Database:
                 emp_p.full_name AS employee_full_name, emp_p.company_id AS employee_profile_company_id,
                 hr_p.full_name AS hr_full_name, hr_p.company_id AS hr_profile_company_id,
                 hu.company_id AS hr_company_id,
-                COALESCE(emp.company_id, emp_p.company_id) AS employee_company_id,
+                COALESCE(emp.company_id, emp_p.company_id::text) AS employee_company_id,
                 ep.profile_json,
                 rap.id AS resolved_policy_id,
                 (SELECT COUNT(*) FROM company_policies cp WHERE cp.company_id = COALESCE(rc.company_id, hu.company_id) AND cp.extraction_status = 'extracted') AS company_policy_count,
@@ -12429,36 +12429,36 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """Per-company policy status for admin overview."""
         params: Dict[str, Any] = {}
-        where = "WHERE c.id = :cid" if company_id else ""
+        where = "WHERE c.id::text = :cid" if company_id else ""
         if company_id:
             params["cid"] = company_id
         sql = f"""
             SELECT
                 c.id AS company_id,
                 c.name AS company_name,
-                (SELECT cp.id FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_id,
-                (SELECT cp.title FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_title,
-                (SELECT cp.extraction_status FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS extraction_status,
-                (SELECT cp.created_at FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_updated_at,
-                (SELECT COUNT(*) FROM policy_documents pd WHERE pd.company_id = c.id) AS doc_count,
+                (SELECT cp.id FROM company_policies cp WHERE cp.company_id = c.id::text ORDER BY cp.created_at DESC LIMIT 1) AS policy_id,
+                (SELECT cp.title FROM company_policies cp WHERE cp.company_id = c.id::text ORDER BY cp.created_at DESC LIMIT 1) AS policy_title,
+                (SELECT cp.extraction_status FROM company_policies cp WHERE cp.company_id = c.id::text ORDER BY cp.created_at DESC LIMIT 1) AS extraction_status,
+                (SELECT cp.created_at FROM company_policies cp WHERE cp.company_id = c.id::text ORDER BY cp.created_at DESC LIMIT 1) AS policy_updated_at,
+                (SELECT COUNT(*) FROM policy_documents pd WHERE pd.company_id = c.id::text) AS doc_count,
                 (SELECT COUNT(*) FROM policy_versions pv
-                 JOIN company_policies cp2 ON cp2.id = pv.policy_id WHERE cp2.company_id = c.id) AS version_count,
+                 JOIN company_policies cp2 ON cp2.id = pv.policy_id WHERE cp2.company_id = c.id::text) AS version_count,
                 (SELECT pv2.status FROM policy_versions pv2
                  JOIN company_policies cp3 ON cp3.id = pv2.policy_id
-                 WHERE cp3.company_id = c.id
+                 WHERE cp3.company_id = c.id::text
                  ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_status,
                 (SELECT pv2.version_number FROM policy_versions pv2
                  JOIN company_policies cp3 ON cp3.id = pv2.policy_id
-                 WHERE cp3.company_id = c.id
+                 WHERE cp3.company_id = c.id::text
                  ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_number,
                 (SELECT pv2.updated_at FROM policy_versions pv2
                  JOIN company_policies cp3 ON cp3.id = pv2.policy_id
-                 WHERE cp3.company_id = c.id
+                 WHERE cp3.company_id = c.id::text
                  ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_updated_at,
                 (SELECT COUNT(*) FROM resolved_assignment_policies rap
                  JOIN case_assignments ca ON ca.id = rap.assignment_id
                  LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("ca")}
-                 WHERE rc.company_id = c.id) AS resolved_count
+                 WHERE rc.company_id = c.id::text) AS resolved_count
             FROM companies c
             {where}
             ORDER BY c.name ASC
@@ -13091,7 +13091,7 @@ class Database:
                 text("""
                     SELECT DISTINCT c.id AS company_id, c.name AS company_name
                     FROM companies c
-                    JOIN company_policies cp ON cp.company_id = c.id
+                    JOIN company_policies cp ON cp.company_id = c.id::text
                     JOIN policy_versions pv ON pv.policy_id = cp.id AND pv.status = 'published'
                 """),
                 {},

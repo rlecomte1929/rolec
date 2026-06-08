@@ -77,6 +77,37 @@ _FORM_STATUS_TO_STEP_STATUS = {
 _COMPLETED_STEP_STATUSES = {"completed", "skipped"}
 
 
+# ── Estimated effort (AIQ-869) ───────────────────────────────────────────────
+# A short, human label for how long completing a step typically takes, bucketed
+# by the form's category. Grounded in data available in the projected path
+# (category + status), NOT the doc_count that AIQ-800 removed. Three buckets
+# matching the AvailableNowWidget effort Pill.
+_EFFORT_LIGHT = "~15 min"
+_EFFORT_STANDARD = "~1 hour"
+_EFFORT_HEAVY = "Half a day"
+
+_CATEGORY_EFFORT = {
+    "work_permit":     _EFFORT_HEAVY,
+    "registration":    _EFFORT_STANDARD,
+    "civil_documents": _EFFORT_STANDARD,
+    "family":          _EFFORT_STANDARD,
+    "tax":             _EFFORT_STANDARD,
+    "health":          _EFFORT_LIGHT,
+    "banking":         _EFFORT_LIGHT,
+}
+
+
+def estimated_effort_for_form(category: Optional[str], step_status: str) -> Optional[str]:
+    """Short effort label for a projected step. None once the step is done (no
+    remaining effort to surface); otherwise bucketed by the form's category,
+    defaulting to the standard bucket for ad-hoc / unknown forms."""
+    if step_status in _COMPLETED_STEP_STATUSES:
+        return None
+    if category and category in _CATEGORY_EFFORT:
+        return _CATEGORY_EFFORT[category]
+    return _EFFORT_STANDARD
+
+
 @dataclass
 class ProjectedStep:
     id: str
@@ -85,6 +116,7 @@ class ProjectedStep:
     owner: str
     due_date: Optional[str]
     sort_order: int
+    estimated_effort: Optional[str] = None
 
 
 @dataclass
@@ -149,13 +181,15 @@ def project_tracks(forms: List[Any]) -> List[ProjectedTrack]:
             by_key[key] = track
 
         title = getattr(template, "name", None) or "Document"
+        step_status = _step_status_for_form(form)
         track.steps.append(ProjectedStep(
             id=str(getattr(form, "id", "")),
             title=str(title),
-            status=_step_status_for_form(form),
+            status=step_status,
             owner="employee",
             due_date=getattr(form, "deadline", None),
             sort_order=len(track.steps),
+            estimated_effort=estimated_effort_for_form(category, step_status),
         ))
 
     # Compute per-track progress and return ordered tracks.

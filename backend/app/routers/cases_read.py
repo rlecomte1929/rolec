@@ -88,6 +88,10 @@ class RoadmapStepV2(BaseModel):
     source_url: Optional[str] = None
     source_fetched_at: Optional[str] = None
     source_excerpt: Optional[str] = None
+    # [AIQ-869] Short effort label ('~15 min' | '~1 hour' | 'Half a day'),
+    # derived from the projected step's form category. Null once the step is
+    # done or when no estimate applies. Powers the AvailableNowWidget effort Pill.
+    estimated_effort: Optional[str] = None
 
 
 class RoadmapTrackV2(BaseModel):
@@ -956,6 +960,7 @@ def get_case_roadmap_tracks(
                     # the roadmap renders tracks/steps/status/progress without it.
                     doc_count=0,
                     worst_doc_status=None,
+                    estimated_effort=s.estimated_effort,  # [AIQ-869]
                 )
                 for s in t.steps
             ],
