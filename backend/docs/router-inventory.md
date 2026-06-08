@@ -39,10 +39,10 @@ Legend:
 | 2 | `compat_router` | `backend/routes/compat.py` | util | `/api` `tags=["compat"]` | 6 — **med** | none | ✅ Ready | |
 | 3 | `cases_router` | `backend/app/routers/cases.py` | employee/HR | `/api/cases` `tags=["cases"]` | 16 — **high** | `SessionLocal`, `database.db`, `auth_deps` | ⚠️ Dual DB | ⭐ |
 | 4 | `case_form_pdf_router` | `backend/app/routers/case_form_pdf.py` | HR | `/api/cases` `tags=["case-form-pdf"]` | 1 — **low** | `database.db`, `auth_deps` | ✅ Ready | ⭐ |
-| 5 | `employee_tiers_router` | `backend/app/routers/employee_tiers.py` | employee | `/api/employees` `tags=["employee-tiers"]` | 1 — **low** | `database.db`, `auth_deps` | ✅ Ready | ⭐ |
+| 5 | ~~`employee_tiers_router`~~ | ~~`backend/app/routers/employee_tiers.py`~~ | — | — | — | — | ❌ REMOVED — orphaned (queried prod-missing `employee_tiers`; no callers). Canonical employee-level signal is `relocation_cases.profile_json.seniorityBand` (#504). | |
 | 6 | `policy_publish_router` | `backend/app/routers/policy_publish.py` | HR | `/api/policy` `tags=["policy-publish"]` | 1 — **low** | `database.db`, `auth_deps` | ✅ Ready | ⭐ |
 | 7 | `policy_summary_router` | `backend/app/routers/policy_summary.py` | HR | `/api/policy` `tags=["policy-summary"]` | 2 — **low** | `database.db`, `auth_deps` | ✅ Ready | ⭐ |
-| 8 | `policy_feedback_router` | `backend/app/routers/policy_feedback.py` | HR | `/api/policy` `tags=["policy-feedback"]` | 1 — **low** | `database.db`, `auth_deps` | ✅ Ready | ⭐ |
+| 8 | ~~`policy_feedback_router`~~ | ~~`backend/app/routers/policy_feedback.py`~~ | — | — | — | — | ❌ REMOVED — orphaned (queried prod-missing `policy_review_queue`/`policy_feedback`; no callers). | |
 | 9 | `crons_router` | `backend/app/routers/crons.py` | infra | `/api/crons` `tags=["crons"]` | 1 — **low** | none | ✅ Ready | |
 | 10 | `exception_requests_router` | `backend/app/routers/exception_requests.py` | employee | `tags=["exception_requests"]` | 4 — **med** | `database.db`, `auth_deps` | ✅ Ready | ⭐ |
 | 11 | `services_state_router` | `backend/app/routers/services_state.py` | infra | `tags=["services_state"]` | 2 — **low** | `database.db`, `_jb` | ✅ Ready | |
@@ -169,7 +169,7 @@ Ranked by: domain priority → migration readiness → churn (high churn = extra
 |----------|-------------|--------|-------|---------|
 | 7 | `backend/app/routers/policy_publish.py` | HR | low (1) | None |
 | 8 | `backend/app/routers/policy_summary.py` | HR | low (2) | None |
-| 9 | `backend/app/routers/policy_feedback.py` | HR | low (1) | None |
+| 9 | ~~`backend/app/routers/policy_feedback.py`~~ | — | — | ❌ REMOVED — orphaned, no callers |
 | 10 | `backend/app/routers/policy_canonical.py` | HR | low (1) | None |
 | 11 | `backend/app/routers/policy_templates.py` | HR | low (1) | None |
 | 12 | `backend/app/routers/hr_analytics.py` | HR | med (3) | None |

@@ -133,7 +133,6 @@ from .app.routers import cases_write as cases_write_router
 from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
-from .app.routers import employee_tiers as employee_tiers_router  # [P1-6]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
@@ -147,7 +146,6 @@ from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer re
 from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
-from .app.routers import policy_feedback as policy_feedback_router  # [P5-5]
 from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
 from .app.routers import admin_staging as admin_staging_router
@@ -716,7 +714,6 @@ app.include_router(cases_write_router.router)  # [AUDIT-B9-cases-6] split 2/3 �
 app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 — 1 DELETE (delete_dossier) — re-scoped from empty admin bucket
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
-app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
@@ -733,7 +730,6 @@ app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-la
 app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
 app.include_router(policy_summary_router.router)  # [AUDIT-C2.3 restore]
-app.include_router(policy_feedback_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)

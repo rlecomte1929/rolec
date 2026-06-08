@@ -146,7 +146,7 @@ After extraction: replace the inline definitions in `backend/main.py` with `from
 |---|-------------|--------|-------|-------|
 | 7 | `backend/app/routers/policy_publish.py` | HR | low (1) | Clean |
 | 8 | `backend/app/routers/policy_summary.py` | HR | low (2) | Clean |
-| 9 | `backend/app/routers/policy_feedback.py` | HR | low (1) | Clean |
+| 9 | ~~`backend/app/routers/policy_feedback.py`~~ | — | — | ❌ REMOVED — orphaned, no callers |
 | 10 | `backend/app/routers/policy_canonical.py` | HR | low (1) | Exposes 2 sub-routers (admin + read) — mount both |
 | 11 | `backend/app/routers/policy_templates.py` | HR | low (1) | Clean |
 | 12 | `backend/app/routers/hr_analytics.py` | HR | med (3) | Clean |
