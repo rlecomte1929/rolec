@@ -38,7 +38,7 @@ export const TrustContentBlock: React.FC<TrustContentBlockProps> = ({
     : '';
   return (
     <div className={`${hoverClasses} ${className}`.trim()}>
-      <h2 className="text-marketing-h1 font-semibold text-marketing-primary tracking-tight">
+      <h2 className="text-marketing-h1 font-bold text-marketing-primary tracking-tight">
         {title}
       </h2>
       {hasIntro && (

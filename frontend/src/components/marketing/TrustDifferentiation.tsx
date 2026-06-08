@@ -22,7 +22,7 @@ export const TrustDifferentiation: React.FC<TrustDifferentiationProps> = ({
       className={`grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center ${className}`}
     >
       <div>
-        <h2 className="text-marketing-h1 font-semibold text-marketing-primary tracking-tight">
+        <h2 className="text-marketing-h1 font-bold text-marketing-primary tracking-tight">
           {title}
         </h2>
         <p className="mt-4 text-marketing-body-lg text-marketing-text-muted leading-relaxed max-w-lg">
