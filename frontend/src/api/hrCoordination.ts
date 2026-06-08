@@ -1,11 +1,18 @@
 /// <reference types="vite/client" />
+import { getAuthItem } from '../utils/demo'
+
 const BASE = import.meta.env.VITE_API_URL
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem("hr_token")
+  // AIQ-862: read the ReloPass session token under the SAME key the shared
+  // axios client uses (`relopass_token`, set at login in useAuth.ts). The
+  // old `hr_token` key is never written anywhere, so this previously sent
+  // `Authorization: Bearer null` → 401 on every hr-coordination call
+  // (providers list + task assign/update/cancel).
+  const token = getAuthItem('relopass_token')
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${token ?? ''}`,
   }
 }
 
