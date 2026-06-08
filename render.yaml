@@ -31,7 +31,7 @@
 
 services:
   - type: web
-    name: relopass-frontend            # <-- MUST match the existing Render static site's name, or a duplicate is created
+    name: Static Site            # <-- MUST match the existing Render static site's name, or a duplicate is created
     runtime: static
     buildCommand: npm --prefix frontend ci && npm --prefix frontend run build
     staticPublishPath: frontend/dist
