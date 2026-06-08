@@ -230,7 +230,7 @@ export const ProviderPortal: React.FC = () => {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <img src="/logo.svg" alt="ReloPass" className="h-7 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        <img src="/relopass-logo.png" alt="ReloPass" className="h-7 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         <span className="font-semibold text-slate-900">ReloPass · Provider Portal</span>
         {providerName && (
           <span className="ml-auto text-sm text-slate-500">{providerName}</span>

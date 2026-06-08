@@ -413,7 +413,7 @@ export const Auth: React.FC = () => {
 
         {/* Header */}
         <div className="relative z-10 flex items-center gap-2.5 px-8 pt-7">
-          <img src="/logo.svg" alt="ReloPass" className="h-7 w-auto"
+          <img src="/relopass-logo.png" alt="ReloPass" className="h-7 w-auto"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <span className="text-white font-semibold text-base tracking-tight">ReloPass</span>
           <span className="text-slate-400 text-base">· Platform</span>
@@ -458,7 +458,7 @@ export const Auth: React.FC = () => {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <img src="/logo.svg" alt="ReloPass" className="h-6 w-auto"
+            <img src="/relopass-logo.png" alt="ReloPass" className="h-6 w-auto"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             <span className="font-semibold text-[#0b2b43]">ReloPass</span>
           </div>

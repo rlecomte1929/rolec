@@ -309,7 +309,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
         {!collapsed && (
           <>
             <img
-              src="/logo.svg"
+              src="/relopass-logo.png"
               alt="ReloPass"
               className="h-6 w-auto"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
