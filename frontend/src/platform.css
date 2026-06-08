@@ -15,7 +15,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Inter is self-hosted via @fontsource/inter (imported in main.tsx). The
+   Google Fonts @import was removed here too (GDPR: no visitor IPs to Google's
+   CDN). --font-mono below falls back to the local mono stack; if this file is
+   ever wired into the app, self-host JetBrains Mono via @fontsource rather than
+   re-adding a Google Fonts request. */
 
 /* ────────────────────────────────────────────────────────────────────────────
    LIGHT THEME (default)

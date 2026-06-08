@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+/* Inter is now self-hosted via @fontsource/inter (imported in main.tsx).
+   The previous Google Fonts @import was removed to stop leaking visitor IPs
+   to Google's CDN (GDPR). */
 
 @tailwind base;
 @tailwind components;
