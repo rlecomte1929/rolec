@@ -32,12 +32,38 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth_deps import require_admin_or_hr
+from ..db import SessionLocal
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.hris_token_crypto import decrypt_token, encrypt_token
 from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations-personio"])
+
+
+def _audit_personio(user: Dict[str, Any], conn_id: str, action: str, event: str) -> None:
+    """[AIQ-932] Fail-soft canonical audit for a Personio HRIS connection
+    mutation (Supabase write — no SQLAlchemy router conn)."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="hris_connection",
+                entity_id=str(conn_id),
+                action_type=action,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": event, "provider": "personio"},
+            )
+            asession.commit()
+    except Exception:
+        log.exception("audit: personio %s id=%s", event, conn_id)
 
 _PERSONIO_API_BASE = "https://api.personio.de/v1"
 _REQUEST_TIMEOUT   = 15
@@ -186,6 +212,7 @@ async def personio_connect(
             "updated_at":   now,
         }).eq("id", conn["id"]).execute()
         conn_id = conn["id"]
+        _audit_personio(user, conn_id, ACTION_UPDATE, "personio_reconnected")
     else:
         conn_id = str(uuid.uuid4())
         supabase.table("hris_connections").insert({
@@ -198,6 +225,7 @@ async def personio_connect(
             "created_at":   now,
             "updated_at":   now,
         }).execute()
+        _audit_personio(user, conn_id, ACTION_INSERT, "personio_connected")
 
     log.info("Personio connected via client credentials: org=%s", org_id)
     return {"ok": True, "connection_id": conn_id, "status": "connected"}
@@ -223,6 +251,7 @@ async def personio_disconnect(
         "last_error":   None,
         "updated_at":   datetime.now(timezone.utc).isoformat(),
     }).eq("id", conn["id"]).execute()
+    _audit_personio(user, conn["id"], ACTION_UPDATE, "personio_disconnected")
 
     log.info("Personio disconnected: org=%s", org_id)
     return {"ok": True, "status": "disconnected"}
@@ -317,5 +346,6 @@ async def personio_update_field_mappings(
         "field_mappings": json.dumps(body.mappings),
         "updated_at":     datetime.now(timezone.utc).isoformat(),
     }).eq("id", conn["id"]).execute()
+    _audit_personio(user, conn["id"], ACTION_UPDATE, "personio_field_mappings_updated")
 
     return {"ok": True, "mappings": body.mappings}
