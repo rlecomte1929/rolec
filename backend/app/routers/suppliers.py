@@ -1,12 +1,19 @@
 """Supplier Registry API — list, search, filter, detail, admin CRUD."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from ..auth_deps import require_admin, require_admin_or_hr
 from ..db import SessionLocal
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.supplier_registry import (
     add_capability,
     create_supplier,
@@ -23,6 +30,28 @@ from ..services.supplier_registry import (
 from ..services.supplier_validation import get_valid_service_categories
 
 router = APIRouter(prefix="/api/suppliers", tags=["suppliers"])
+
+logger = logging.getLogger(__name__)
+
+
+def _audit_supplier(user: Dict[str, Any], event: str, action: str,
+                    supplier_id: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """[AIQ-650-3b] Fail-soft canonical audit for a supplier mutation. Dedicated
+    txn — the supplier write goes through the service layer (no router conn)."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="supplier",
+                entity_id=str(supplier_id),
+                action_type=action,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": event, **(extra or {})},
+            )
+            asession.commit()
+    except Exception:
+        logger.exception("audit: supplier %s id=%s", event, supplier_id)
 
 
 def get_session():
@@ -97,7 +126,9 @@ def create_supplier_api(
     try:
         with SessionLocal() as session:
             s = create_supplier(session, body)
-            return s
+        _audit_supplier(user, "supplier_created", ACTION_INSERT,
+                        str(s.get("id")), {"name": s.get("name")})
+        return s
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -185,7 +216,8 @@ def update_supplier_api(
             s = update_supplier(session, supplier_id, body)
             if not s:
                 raise HTTPException(status_code=404, detail="Supplier not found")
-            return s
+        _audit_supplier(user, "supplier_updated", ACTION_UPDATE, supplier_id)
+        return s
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -204,7 +236,9 @@ def set_supplier_status_api(
         s = set_supplier_status(session, supplier_id, status)
         if not s:
             raise HTTPException(status_code=404, detail="Supplier not found")
-        return s
+    _audit_supplier(user, "supplier_status_changed", ACTION_UPDATE, supplier_id,
+                    {"status": status})
+    return s
 
 
 @router.post("/{supplier_id}/capabilities", response_model=Dict[str, Any])
