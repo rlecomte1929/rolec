@@ -442,6 +442,17 @@ export interface HrBacklogResponse {
   has_company: boolean;
 }
 
+/** AIQ-378d — one behind-schedule case in the HR "Case health" panel. */
+export interface CaseHealthFlag {
+  case_id: string;
+  stage: string | null;
+  days_behind: number | null;
+  expected_date: string | null;
+  severity: string | null;
+  suggested_action: string | null;
+  draft_reminder: string | null;
+}
+
 export const hrAPI = {
   getBacklog: async (): Promise<HrBacklogResponse> => {
     const response = await api.get('/api/hr/backlog');
@@ -500,6 +511,12 @@ export const hrAPI = {
     const totalRaw = payload && typeof payload === 'object' && 'total' in payload ? (payload as AssignmentsListResponse).total : undefined;
     const total = typeof totalRaw === 'number' && Number.isFinite(totalRaw) ? totalRaw : assignments.length;
     return { assignments, total };
+  },
+  /** AIQ-378d — behind-schedule ("case health") cases for the HR's company. */
+  getCaseHealth: async (opts?: { signal?: AbortSignal }): Promise<{ cases: CaseHealthFlag[] }> => {
+    const response = await api.get('/api/hr/cases/behind-schedule', { signal: opts?.signal });
+    const cases = Array.isArray(response.data?.cases) ? (response.data.cases as CaseHealthFlag[]) : [];
+    return { cases };
   },
   getAssignment: async (assignmentId: string, opts?: { signal?: AbortSignal }): Promise<AssignmentDetail> => {
     const response = await api.get(`/api/hr/assignments/${assignmentId}`, { signal: opts?.signal });

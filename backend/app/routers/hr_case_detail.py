@@ -636,3 +636,20 @@ def get_contradiction_history(
         corrections = []
 
     return CorrectionHistoryResponse(corrections=corrections)
+
+
+@router.get("/behind-schedule")
+def get_behind_schedule_cases(
+    _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """[AIQ-378d] Behind-schedule ("case health") cases for this HR company.
+
+    Returns the open ``case_behind_schedule`` proactive alerts scoped to the
+    company's own cases (tenant-safe). Each entry carries stage, days_behind,
+    expected_date, severity, and the suggested action / draft reminder. Empty
+    until the pilot populates case milestones.
+    """
+    from ..services.case_health_scan import list_behind_cases_for_company
+
+    return {"cases": list_behind_cases_for_company(org_id)}

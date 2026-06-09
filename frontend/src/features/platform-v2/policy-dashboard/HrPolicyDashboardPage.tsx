@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
-import { companyPolicyAPI, hrAPI } from '../../../api/client';
+import { companyPolicyAPI, hrAPI, type CaseHealthFlag } from '../../../api/client';
 import {
   listExceptionRequestsForCompany,
   resolveExceptionRequest,
@@ -102,6 +102,7 @@ export function HrPolicyDashboardPage() {
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [employeeTotal, setEmployeeTotal] = useState(0);
   const [exceptions, setExceptions] = useState<ExceptionRequest[]>([]);
+  const [caseHealth, setCaseHealth] = useState<CaseHealthFlag[]>([]);
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState<string | null>(null);
 
@@ -110,12 +111,16 @@ export function HrPolicyDashboardPage() {
     (async () => {
       // Each source is independent — settle all so one failure (e.g. no
       // published policy) doesn't blank the whole dashboard.
-      const [policyRes, assignRes, excRes] = await Promise.allSettled([
+      const [policyRes, assignRes, excRes, healthRes] = await Promise.allSettled([
         companyPolicyAPI.getLatest(),
         hrAPI.listAssignments({ limit: 100 }),
         listExceptionRequestsForCompany(),
+        hrAPI.getCaseHealth(),
       ]);
       if (cancelled) return;
+      if (healthRes.status === 'fulfilled') {
+        setCaseHealth(healthRes.value.cases ?? []);
+      }
       if (policyRes.status === 'fulfilled') {
         setPolicy((policyRes.value.policy as Record<string, unknown>) ?? null);
         setCompanyName(policyRes.value.company_name ?? null);
@@ -283,6 +288,52 @@ export function HrPolicyDashboardPage() {
         {loading && (
           <p className="text-sm text-slate-400">Loading live policy data…</p>
         )}
+
+        {/* Case health — proactively flagged behind-schedule cases (AIQ-378d) */}
+        <section>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-sm font-semibold text-slate-800">Case health</h2>
+            <span className="text-xs text-slate-400">
+              {caseHealth.length > 0 ? `${caseHealth.length} behind schedule` : 'all on track'}
+            </span>
+          </div>
+          {caseHealth.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-center">
+              <p className="text-sm text-slate-500">No cases are behind schedule.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Cases past an expected immigration milestone date show here with a suggested action.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+              {caseHealth.map((c) => (
+                <div key={c.case_id} className="px-5 py-4 flex flex-wrap items-start gap-x-6 gap-y-2">
+                  <div className="min-w-[140px]">
+                    <p className="text-sm font-medium text-slate-800">{c.case_id}</p>
+                    <p className="text-xs text-slate-400">{c.stage ?? '—'}</p>
+                  </div>
+                  <div className="min-w-[120px]">
+                    <span
+                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${
+                        c.severity === 'critical'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      {c.days_behind != null ? `${c.days_behind} day(s) behind` : 'behind'}
+                    </span>
+                    {c.expected_date && (
+                      <p className="mt-1 text-xs text-slate-400">target {c.expected_date}</p>
+                    )}
+                  </div>
+                  <p className="flex-1 min-w-[200px] text-sm text-slate-600">
+                    {c.suggested_action ?? 'Review this case and follow up.'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* 2 — Employee compliance table */}
         <section>
