@@ -157,6 +157,18 @@ Every migration that creates a new table in the `public` schema **must** include
 
 **If you are writing or reviewing a migration and a new table is missing any of the above, stop and add it before proceeding.** This is a hard review gate, not a soft suggestion.
 
+## Data minimisation — PII in AI prompts (GDPR Art. 28/44)
+
+The product sends user-supplied text to third-party LLM sub-processors (OpenAI and Anthropic, both US-based). Under GDPR these are sub-processors of any personal data included in a prompt, so **raw PII must never leave the platform in an LLM payload**.
+
+**Hard rule — mask before the prompt:** Any text that may contain user PII MUST pass through `backend/app/services/pii_masker.py` (`mask_pii()`) before it is placed in a prompt sent to OpenAI or Anthropic. `mask_pii` redacts phone, IBAN, passport, SSN/D-number, national ID, and email. Prefer passing anonymised identifiers or summaries over raw fields.
+
+- The Policy Assistant path (`policy_assistant_llm_client.py`) already masks the user message — follow that pattern.
+- When adding a **new** LLM call (anything that reaches `llm_client.py` `complete()`/`complete_text()`, `roadmap_generator`, `entity_resolution`, `policy_extractor`, etc.), mask any free-text user input first. Do not pass raw case details, names, or document contents unless they have been through `mask_pii` or are demonstrably non-personal (e.g. published policy document text).
+- Never log raw user input — use `safe_log_text()` from the same module.
+
+Sub-processor DPA coverage and EU-residency status are tracked in `docs/security/PRIV-004_sub-processor_register.md` (GDPR Art. 28 register). Update it whenever a new sub-processor (LLM, email, analytics, hosting, CDN) is added to the stack.
+
 ## Migration discipline (MANDATORY)
 
 NEVER apply a migration to production via MCP `apply_migration` or by manually
