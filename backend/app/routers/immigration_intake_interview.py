@@ -7,6 +7,7 @@ Houses 2 endpoints:
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -16,6 +17,11 @@ from sqlalchemy import text
 
 from ..auth_deps import get_current_user
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.immigration_interview_engine import (
     AddressGap,
     QuestionNode,
@@ -44,6 +50,8 @@ class InterviewAnswerBody(BaseModel):
     skip: Optional[bool] = False
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-interview"])
+
+log = logging.getLogger(__name__)
 
 
 @router.get("/employee/cases/{case_id}/interview/next")
@@ -206,6 +214,29 @@ def interview_answer(
         action="interview_answer",
         fields=logged_fields,
     )
+
+    # [AIQ-650] Canonical audit trail for the interview answer (may write PII to
+    # the vault via _apply_vault_updates above). Dedicated fail-soft txn — the
+    # session save goes through the service layer, so there is no router conn here.
+    try:
+        with db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type="interview_session",
+                entity_id=session["id"],
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=employee_id,
+                new_value={
+                    "event": "interview_answer_submitted",
+                    "question_id": body.question_id,
+                    "vault_updated": vault_updated,
+                },
+            )
+    except Exception:
+        log.exception(
+            "audit: interview_answer case=%s q=%s", case_id, body.question_id
+        )
 
     return {
         "session_id": session["id"],
