@@ -126,7 +126,7 @@ const SECTIONS: NavSection[] = [
       { id: 'prospects', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
       {
         id: 'integrations',
-        label: 'Integrations',
+        label: 'Catalog queue',
         to: ROUTE_DEFS.adminCatalogQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
       },
