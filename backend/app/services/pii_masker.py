@@ -122,6 +122,48 @@ _ALREADY_MASKED: Pattern[str] = re.compile(
 )
 
 
+# 11-digit candidate for the German Steuer-ID checksum gate.
+_DE_STEUER_CANDIDATE: Pattern[str] = re.compile(r"(?<!\d)\d{11}(?!\d)")
+
+
+# ---------------------------------------------------------------------------
+# Custom recognizer registry wiring (AI-I.3f)
+# ---------------------------------------------------------------------------
+# The masker stays presidio-free: it consumes the *pure validators* exposed by
+# backend/app/services/pii/presidio_recognizers/* (mod-97 IBAN, ICAO-9303
+# passport, Norwegian/German/French national-ID checksums). The presidio
+# AnalyzerEngine path (for NER name detection) is a deliberate, separate upgrade
+# that would add the spaCy runtime dependency — not pulled in here.
+
+def _mask_with_recognizers(text: str) -> str:
+    """Redact checksum-validated PII the shape-only regexes miss. Never raises;
+    returns the input unchanged if the recognizer package can't be imported."""
+    try:
+        from .pii.presidio_recognizers import eu_passport, de_steuer_id
+    except Exception:  # pragma: no cover - import safety
+        return text
+
+    out = text
+    # Country-format + MRZ-checksum passports (FR "19AB54321", IT "AA1234567",
+    # MRZ document fields) that `_PASSPORT` (leading-letter only) cannot see.
+    try:
+        spans = eu_passport.find_passports(out)
+        for m in sorted(spans, key=lambda x: x.start, reverse=True):
+            out = out[: m.start] + "[REDACTED_PASSPORT]" + out[m.end :]
+    except Exception:  # pragma: no cover
+        pass
+    # German Steuer-ID: an 11-digit run that passes the ISO 7064 MOD 11,10 check
+    # and the digit-uniqueness rule (otherwise it would fall to the phone rule).
+    try:
+        out = _DE_STEUER_CANDIDATE.sub(
+            lambda mt: "[REDACTED_ID]" if de_steuer_id.is_valid_steuer_id(mt.group(0)) else mt.group(0),
+            out,
+        )
+    except Exception:  # pragma: no cover
+        pass
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -146,6 +188,12 @@ def mask_pii(text: str) -> str:
         out = _US_SSN.sub("[REDACTED_SSN]", out)
         out = _NO_FNR.sub("[REDACTED_FNR]", out)
         out = _PASSPORT.sub("[REDACTED_PASSPORT]", out)
+        # [AI-I.3f] Checksum-validated pass from the custom recognizer registry,
+        # catching PII the shape-only regexes above miss — country-format
+        # passports (FR/IT/MRZ) and the German Steuer-ID — before the loose
+        # phone/generic rules claim them with a wrong label. Additive: it only
+        # touches spans the earlier passes left untouched.
+        out = _mask_with_recognizers(out)
         out = _PHONE.sub("[REDACTED_PHONE]", out)
         out = _GENERIC_ID.sub("[REDACTED_ID]", out)
         return out
