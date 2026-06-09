@@ -119,10 +119,12 @@ const SECTIONS: NavSection[] = [
       {
         id: 'review-queue',
         label: 'Review queue',
+        // AIQ-914: no badge — it was wired to admin.pending_tickets (HR-opened
+        // destination requests = the Catalog queue metric, not review-queue items)
+        // and carried a stale '24' fallback, so it never matched /admin/review-queue.
+        // No review-queue-item count is exposed to the sidebar; show nothing until
+        // one is (don't add a new endpoint per task scope).
         to: ROUTE_DEFS.adminReviewQueue.path,
-        // Fallback 0 (not 24) so the badge shows nothing until the real
-        // pending_tickets count resolves, instead of a stale pre-load number.
-        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
       },
       // 'Ops analytics' lands on /admin/ops; the former 'Workflow analytics'
       // entry was a second sidebar link to the Queue *tab* of the same page
