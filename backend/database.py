@@ -12138,63 +12138,12 @@ class Database(CasesMixin, PoliciesMixin):
                     out[k] = bool(v)
         return out
 
-    def create_policy_version(
-        self,
-        version_id: str,
-        policy_id: str,
-        source_policy_document_id: Optional[str] = None,
-        version_number: int = 1,
-        status: str = "auto_generated",
-        auto_generated: bool = True,
-        review_status: str = "pending",
-        confidence: Optional[float] = None,
-        created_by: Optional[str] = None,
-        request_id: Optional[str] = None,
-        *,
-        normalization_state: Optional[str] = None,
-        connection: Any = None,
-    ) -> None:
-        now = datetime.utcnow().isoformat()
-        # Coerce to str for Postgres uuid columns (driver may return UUID from list_company_policies)
-        params = {
-            "id": str(version_id),
-            "pid": str(policy_id),
-            "doc_id": str(source_policy_document_id) if source_policy_document_id is not None else None,
-            "vn": version_number,
-            "status": status,
-            "ag": _policy_bool_bind(auto_generated),
-            "rs": review_status,
-            "conf": confidence,
-            "cb": created_by,
-            "now": now,
-            "ns": normalization_state,
-        }
-        params = normalize_policy_boolean_fields(params)
-        if request_id:
-            log.info(
-                "request_id=%s policy_versions insert payload keys=%s status=%s auto_generated=%s review_status=%s ag_type=%s doc_id=%s",
-                request_id, list(params.keys()), params.get("status"), params.get("ag"),
-                params.get("rs"), type(params.get("ag")).__name__, params.get("doc_id"),
-            )
-        ag_sql = _policy_ag_sql()
-
-        def _ins(conn: Any) -> None:
-            conn.execute(
-                text(f"""
-                    INSERT INTO policy_versions
-                    (id, policy_id, source_policy_document_id, version_number, status,
-                     auto_generated, review_status, confidence, created_by, created_at, updated_at,
-                     normalization_state)
-                    VALUES (:id, :pid, :doc_id, :vn, :status, {ag_sql}, :rs, :conf, :cb, :now, :now, :ns)
-                """),
-                params,
-            )
-
-        if connection is not None:
-            _ins(connection)
-        else:
-            with self.engine.begin() as conn:
-                _ins(conn)
+    # [AUDIT-C1.3] policies batch 4 — create_policy_version extracted to
+    # backend/db/policies.py (PoliciesMixin); it lazy-imports the module-level
+    # _policy_ag_sql / _policy_bool_bind / normalize_policy_boolean_fields helpers
+    # (which remain here). Database inherits it, callers unchanged.
+    # NOTE: the _coerce_policy_boolean_fields staticmethod above is pre-existing
+    # dead code (no callers) — left in place per surgical-change discipline.
 
     # [AUDIT-C1.3] policies batch 2 — policy_versions lifecycle (get_latest/get_published/
     # update_status/archive_other/archive_all/get/list/list_by_source/
