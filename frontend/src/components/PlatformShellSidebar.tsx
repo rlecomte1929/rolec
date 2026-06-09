@@ -80,7 +80,10 @@ const SECTIONS: NavSection[] = [
         label: 'Inbox',
         to: ROUTE_DEFS.messages.path,
         toByRole: { HR: ROUTE_DEFS.hrMessages.path, ADMIN: ROUTE_DEFS.hrMessages.path },
-        badge: { kind: 'static-count', count: 3 },
+        // AIQ-914: no badge — the prior static '3' was a placeholder unrelated to
+        // the real thread count. No unread-thread count is fetched for the sidebar,
+        // so show nothing rather than a stale number. Wire to a real unread count
+        // here if/when one is exposed.
       },
     ],
   },
@@ -99,7 +102,9 @@ const SECTIONS: NavSection[] = [
         label: 'Mobility center',
         to: ROUTE_DEFS.hrCommandCenter.path,
         exact: true,
-        badge: { kind: 'static-count', count: 12 },
+        // AIQ-914: no badge — the prior static '12' did not reflect the real case
+        // count. No case-count is fetched for the sidebar, so show nothing rather
+        // than a stale number. Wire to a real active-case count here when exposed.
       },
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
@@ -116,8 +121,12 @@ const SECTIONS: NavSection[] = [
       {
         id: 'review-queue',
         label: 'Review queue',
+        // AIQ-914: no badge — it was wired to admin.pending_tickets (HR-opened
+        // destination requests = the Catalog queue metric, not review-queue items)
+        // and carried a stale '24' fallback, so it never matched /admin/review-queue.
+        // No review-queue-item count is exposed to the sidebar; show nothing until
+        // one is (don't add a new endpoint per task scope).
         to: ROUTE_DEFS.adminReviewQueue.path,
-        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 24 },
       },
       // 'Ops analytics' lands on /admin/ops; the former 'Workflow analytics'
       // entry was a second sidebar link to the Queue *tab* of the same page
