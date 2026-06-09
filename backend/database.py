@@ -6879,77 +6879,7 @@ class Database(CasesMixin):
                     "answer_json = excluded.answer_json, answered_at = excluded.answered_at"
                 ), payload)
 
-    def list_dossier_case_questions(self, case_id: str) -> List[Dict[str, Any]]:
-        """Prefers canonical_case_id, falls back to case_id."""
-        cid = self.coalesce_case_lookup_id(case_id)
-        with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT * FROM dossier_case_questions WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY created_at ASC"
-            ), {"cid": cid}).fetchall()
-        items = self._rows_to_list(rows)
-        for item in items:
-            item["options"] = self._json_load(item.get("options"))
-            item["sources"] = self._json_load(item.get("sources"))
-        return items
-
-    def add_dossier_case_question(
-        self,
-        case_id: str,
-        question_text: str,
-        answer_type: str,
-        options: Optional[Any],
-        is_mandatory: bool,
-        sources: Optional[Any],
-    ) -> Dict[str, Any]:
-        now = datetime.utcnow().isoformat()
-        row = {
-            "id": str(uuid.uuid4()),
-            "case_id": case_id,
-            "question_text": question_text,
-            "answer_type": answer_type,
-            "options": json.dumps(options) if options is not None else None,
-            "is_mandatory": 1 if is_mandatory else 0,
-            "sources": json.dumps(sources) if sources is not None else None,
-            "created_at": now,
-        }
-        with self.engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO dossier_case_questions "
-                "(id, case_id, question_text, answer_type, options, is_mandatory, sources, created_at) "
-                "VALUES (:id, :case_id, :question_text, :answer_type, :options, :is_mandatory, :sources, :created_at)"
-            ), row)
-        return row
-
-    def list_dossier_case_answers(self, case_id: str, user_id: str) -> List[Dict[str, Any]]:
-        """Prefers canonical_case_id, falls back to case_id."""
-        cid = self.coalesce_case_lookup_id(case_id)
-        with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT * FROM dossier_case_answers WHERE (canonical_case_id = :cid OR case_id = :cid) AND user_id = :uid"
-            ), {"cid": cid, "uid": user_id}).fetchall()
-        items = self._rows_to_list(rows)
-        for item in items:
-            item["answer"] = self._json_load(item.get("answer_json"))
-        return items
-
-    def upsert_dossier_case_answers(self, case_id: str, user_id: str, answers: List[Dict[str, Any]]) -> None:
-        now = datetime.utcnow().isoformat()
-        with self.engine.begin() as conn:
-            for ans in answers:
-                payload = {
-                    "id": ans.get("id") or str(uuid.uuid4()),
-                    "cid": case_id,
-                    "uid": user_id,
-                    "qid": ans["case_question_id"],
-                    "answer": json.dumps(ans["answer"]),
-                    "answered_at": now,
-                }
-                conn.execute(text(
-                    "INSERT INTO dossier_case_answers (id, case_id, user_id, case_question_id, answer_json, answered_at) "
-                    "VALUES (:id, :cid, :uid, :qid, :answer, :answered_at) "
-                    "ON CONFLICT(case_id, user_id, case_question_id) DO UPDATE SET "
-                    "answer_json = excluded.answer_json, answered_at = excluded.answered_at"
-                ), payload)
+    # [AUDIT-C1.2] cases batch 6 — dossier case questions/answers extracted to backend/db/cases.py (CasesMixin).
 
     def list_dossier_source_suggestions(self, case_id: str) -> List[Dict[str, Any]]:
         """Prefers canonical_case_id, falls back to case_id."""
