@@ -2646,3 +2646,190 @@ class CasesMixin:
                 pass
             out[nid] = disp
         return out
+
+    def create_assignment(
+        self,
+        assignment_id: str,
+        case_id: str,
+        hr_user_id: str,
+        employee_user_id: Optional[str],
+        employee_identifier: str,
+        status: str,
+        request_id: Optional[str] = None,
+        employee_first_name: Optional[str] = None,
+        employee_last_name: Optional[str] = None,
+        employee_contact_id: Optional[str] = None,
+        employee_link_mode: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        efn = (employee_first_name or "").strip() or None
+        eln = (employee_last_name or "").strip() or None
+        # B3-fix: skip pre-validation SELECT on employee_contact_id.
+        # The ID was just returned by resolve_or_create_employee_contact which already
+        # verified its existence.  The extra SELECT opened a second pool connection that
+        # was the first DB op to hit a stale/locked Supabase connection, causing the
+        # 20-second hang.  Callers are responsible for passing a valid ID.
+        ecid_check = (employee_contact_id or "").strip() if employee_contact_id else None
+        elm = (employee_link_mode or "").strip() or None
+        # B3-fix-v4: ensure DB init is complete BEFORE opening the transaction.
+        # If _initialized=False here (startup race), we block before holding any
+        # connection — no zombie is created.  If _initialized=True (normal case),
+        # this is a single boolean read and is effectively free.
+        self.ensure_initialized()
+        with self.engine.begin() as conn:
+            # B3-fix-v3: SET LOCAL applies for the duration of this explicit transaction.
+            # PgBouncer transaction mode assigns the SAME backend server for BEGIN…COMMIT,
+            # so SET LOCAL is guaranteed to be honoured (unlike SET outside a transaction
+            # which PgBouncer may route to a different backend on the next round-trip).
+            if not _is_sqlite:
+                try:
+                    conn.execute(text("SET LOCAL statement_timeout = '7500ms'"))
+                    conn.execute(text("SET LOCAL lock_timeout = '5000ms'"))
+                except Exception:
+                    pass  # never block the insert for a non-critical SET
+            self._exec(
+                conn,
+                "INSERT INTO case_assignments "
+                "(id, case_id, canonical_case_id, hr_user_id, employee_user_id, employee_identifier, status, "
+                "employee_first_name, employee_last_name, employee_contact_id, employee_link_mode, created_at, updated_at) "
+                "VALUES (:id, :cid, :canonical, :hr, :emp, :ident, :status, :efn, :eln, :ecid, :elm, :ca, :ua)",
+                {
+                    "id": assignment_id,
+                    "cid": case_id,
+                    "canonical": case_id,
+                    "hr": hr_user_id,
+                    "emp": employee_user_id,
+                    "ident": employee_identifier,
+                    "status": status,
+                    "efn": efn,
+                    "eln": eln,
+                    "ecid": employee_contact_id,
+                    "elm": elm,
+                    "ca": now,
+                    "ua": now,
+                },
+                op_name="create_assignment",
+                request_id=request_id,
+            )
+
+    def update_assignment_status(self, assignment_id: str, status: str, request_id: Optional[str] = None) -> None:
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                "UPDATE case_assignments SET status = :status, updated_at = :ua WHERE id = :id",
+                {"status": status, "ua": datetime.utcnow().isoformat(), "id": assignment_id},
+                op_name="update_assignment_status",
+                request_id=request_id,
+            )
+
+    def update_assignment_identifier(self, assignment_id: str, employee_identifier: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE case_assignments SET employee_identifier = :ident, updated_at = :ua WHERE id = :id"
+            ), {"ident": employee_identifier, "ua": datetime.utcnow().isoformat(), "id": assignment_id})
+
+    def attach_employee_to_assignment(
+        self,
+        assignment_id: str,
+        employee_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        post_ecid: Optional[str] = None
+        post_hr_uid: Optional[str] = None
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT employee_contact_id, hr_user_id FROM case_assignments WHERE id = :id"
+                ),
+                {"id": assignment_id},
+            ).fetchone()
+            self._exec(
+                conn,
+                "UPDATE case_assignments SET employee_user_id = :emp, employee_link_mode = NULL, "
+                "updated_at = :ua WHERE id = :id",
+                {"emp": employee_user_id, "ua": now, "id": assignment_id},
+                op_name="attach_employee_to_assignment",
+                request_id=request_id,
+            )
+            ecid = None
+            if row:
+                m = row._mapping if hasattr(row, "_mapping") else dict(row)
+                ecid = m.get("employee_contact_id")
+                hu = m.get("hr_user_id")
+                if hu and str(hu).strip():
+                    post_hr_uid = str(hu).strip()
+            if ecid and str(ecid).strip():
+                post_ecid = str(ecid).strip()
+                conn.execute(
+                    text(
+                        "UPDATE employee_contacts SET linked_auth_user_id = :uid, updated_at = :ua "
+                        "WHERE id = :ecid AND (linked_auth_user_id IS NULL OR linked_auth_user_id = :uid)"
+                    ),
+                    {"uid": employee_user_id, "ua": now, "ecid": post_ecid},
+                )
+
+        company_for_dir: Optional[str] = None
+        if post_ecid:
+            ec_row = self.get_employee_contact_by_id(post_ecid, request_id=request_id)
+            if ec_row and ec_row.get("company_id"):
+                company_for_dir = str(ec_row["company_id"]).strip()
+        if not company_for_dir and post_hr_uid:
+            company_for_dir = self.get_hr_company_id(post_hr_uid)
+        if company_for_dir:
+            self.assign_employee_profile_to_company_directory(
+                employee_user_id.strip(), company_for_dir, request_id=request_id
+            )
+
+    def list_unassigned_assignments_for_employee_contact(
+        self, employee_contact_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        if not (employee_contact_id or "").strip():
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                "WHERE employee_contact_id = :ecid AND employee_user_id IS NULL "
+                "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
+                "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
+                {"ecid": employee_contact_id.strip()},
+                op_name="list_unassigned_assignments_for_employee_contact",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_unassigned_assignments_legacy_for_identifiers(
+        self, identifiers: List[str], request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Assignments with no employee_contact_id (legacy) and no employee_user_id,
+        matching normalized employee_identifier.
+        """
+        idents = sorted(
+            {normalize_invite_key(x) for x in identifiers if x and normalize_invite_key(x)}
+        )
+        if not idents:
+            return []
+        seen: Set[str] = set()
+        out: List[Dict[str, Any]] = []
+        with self.engine.connect() as conn:
+            for ident in idents:
+                rows = self._exec(
+                    conn,
+                    "SELECT * FROM case_assignments WHERE employee_user_id IS NULL "
+                    "AND (employee_contact_id IS NULL OR TRIM(COALESCE(employee_contact_id, '')) = '') "
+                    "AND LOWER(TRIM(COALESCE(employee_identifier, ''))) = :ident "
+                    "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
+                    "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
+                    {"ident": ident},
+                    op_name="list_unassigned_assignments_legacy_for_identifiers",
+                    request_id=request_id,
+                ).fetchall()
+                for row in rows:
+                    d = self._row_to_dict(row)
+                    aid = d.get("id") if d else None
+                    if aid and aid not in seen:
+                        seen.add(aid)
+                        out.append(d)
+        return out
