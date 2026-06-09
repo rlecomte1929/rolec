@@ -414,21 +414,13 @@ def create_auth_user_and_get_id(
         return None
     except Exception as ex:
         if _duplicate_user_error(ex):
-            # User already exists — try to fetch their UUID
-            log.debug("create_auth_user_and_get_id: user already present, attempting lookup email=%s", e[:3] + "***")
-            try:
-                users_resp = _call_with_timeout(
-                    client.auth.admin.list_users,  # type: ignore[union-attr]
-                )
-                users = getattr(users_resp, "users", users_resp) or []
-                for u in users:
-                    if (getattr(u, "email", "") or "").lower() == e:
-                        uid = str(getattr(u, "id", None))
-                        if uid and uid != "None":
-                            return uid
-            except Exception as le:
-                log.debug("create_auth_user_and_get_id: lookup failed: %s", le)
-            return None
+            # User already exists — recover their UUID via the shared auth.users
+            # DB resolver (AIQ-907), NOT GoTrue admin.list_users: that endpoint
+            # 500s past page 1 on prod, so the old inline scan silently failed to
+            # resolve a duplicate beyond the first page (→ None → profiles.id FK
+            # unsatisfied). The DB read sees every user.
+            log.debug("create_auth_user_and_get_id: user already present, resolving uid email=%s", e[:3] + "***")
+            return _resolve_auth_user_id_by_email(e)
         log.warning("create_auth_user_and_get_id: failed email=%s error=%s", e[:3] + "***", ex)
         return None
 
