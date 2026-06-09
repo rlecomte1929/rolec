@@ -1174,3 +1174,169 @@ class CasesMixin:
                 hr_user_id[:8] if hr_user_id else "",
             )
         return self._rows_to_list(rows)
+
+    def list_all_assignments(self) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text("SELECT * FROM case_assignments ORDER BY created_at DESC")).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_admin_assignments(
+        self,
+        company_id: Optional[str] = None,
+        employee_user_id: Optional[str] = None,
+        employee_search: Optional[str] = None,
+        status: Optional[str] = None,
+        destination_country: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List assignments for admin with filters. Joins case_assignments, relocation_cases, profiles, companies."""
+        clauses = []
+        params: Dict[str, Any] = {}
+        if company_id:
+            clauses.append("(rc.company_id = :company_id OR (rc.company_id IS NULL AND EXISTS (SELECT 1 FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id AND hu2.company_id = :company_id)))")
+            params["company_id"] = company_id
+        if employee_user_id:
+            clauses.append("a.employee_user_id = :employee_user_id")
+            params["employee_user_id"] = employee_user_id
+        if status:
+            clauses.append("a.status = :status")
+            params["status"] = status
+        else:
+            clauses.append("(COALESCE(TRIM(LOWER(a.status)), '') NOT IN ('archived', 'closed'))")
+        if destination_country:
+            clauses.append("LOWER(TRIM(COALESCE(rc.host_country, ''))) = LOWER(TRIM(:dest_country))")
+            params["dest_country"] = destination_country
+        if employee_search:
+            esc = (employee_search or "").strip()
+            pattern = f"%{esc}%"
+            if _is_sqlite:
+                clauses.append(
+                    "(LOWER(COALESCE(a.employee_identifier, '')) LIKE LOWER(:emp_search) OR "
+                    "LOWER(COALESCE(emp_p.full_name, '')) LIKE LOWER(:emp_search) OR "
+                    "LOWER(COALESCE(a.employee_first_name, '')) LIKE LOWER(:emp_search) OR "
+                    "LOWER(COALESCE(a.employee_last_name, '')) LIKE LOWER(:emp_search))"
+                )
+            else:
+                clauses.append(
+                    "(a.employee_identifier ILIKE :emp_search OR emp_p.full_name ILIKE :emp_search OR "
+                    "a.employee_first_name ILIKE :emp_search OR a.employee_last_name ILIKE :emp_search)"
+                )
+            params["emp_search"] = pattern
+
+        where_sql = "AND " + " AND ".join(clauses) if clauses else ""
+
+        if _is_sqlite:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+        else:
+            # Postgres: relocation_cases.id is uuid, case_assignments.case_id / canonical_case_id are text UUIDs.
+            # Cast uuid to text for a safe, index-friendly join.
+            join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+
+        sql = f"""
+            SELECT
+                a.id, a.case_id, a.canonical_case_id, a.hr_user_id, a.employee_user_id, a.employee_identifier,
+                a.status, a.employee_first_name, a.employee_last_name, a.expected_start_date, a.submitted_at,
+                a.created_at, a.updated_at,
+                rc.id AS case_pk, rc.company_id AS case_company_id, rc.host_country, rc.home_country,
+                rc.status AS case_status, rc.stage,
+                c.name AS company_name,
+                emp_p.full_name AS employee_full_name, emp_p.company_id AS employee_profile_company_id,
+                hr_p.full_name AS hr_full_name, hr_p.company_id AS hr_profile_company_id,
+                hu.company_id AS hr_company_id,
+                COALESCE(emp.company_id, emp_p.company_id::text) AS employee_company_id,
+                ep.profile_json,
+                rap.id AS resolved_policy_id,
+                (SELECT COUNT(*) FROM company_policies cp WHERE cp.company_id = COALESCE(rc.company_id, hu.company_id) AND cp.extraction_status = 'extracted') AS company_policy_count,
+                -- Count matrix-published policies too so the admin Policy
+                -- column shows "Available" for companies that publish via
+                -- the Compensation & Allowance matrix (policy_config_versions)
+                -- and haven't uploaded a document-normalized policy. Without
+                -- this, every matrix-only company reads as "None" even when
+                -- employees already resolve against a published matrix.
+                (SELECT COUNT(*) FROM policy_config_versions pcv
+                    JOIN policy_configs pcfg ON pcfg.id = pcv.policy_config_id
+                    WHERE pcfg.company_id = COALESCE(rc.company_id, hu.company_id)
+                      AND pcv.status = 'published') AS matrix_policy_count
+            FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON {join_on_cases}
+            LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
+            LEFT JOIN profiles emp_p ON CAST(emp_p.id AS TEXT) = a.employee_user_id
+            LEFT JOIN profiles hr_p ON CAST(hr_p.id AS TEXT) = a.hr_user_id
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN employees emp ON emp.profile_id = a.employee_user_id
+            LEFT JOIN wizard_employee_profiles ep ON ep.assignment_id = a.id
+            LEFT JOIN resolved_assignment_policies rap ON rap.assignment_id = a.id
+            WHERE 1=1 {where_sql}
+            ORDER BY a.updated_at DESC, a.created_at DESC
+        """
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+
+        result = []
+        for row in rows:
+            m = row._mapping
+            r = dict(m)
+            profile_json = r.get("profile_json")
+            profile = self._json_load(profile_json) if profile_json else {}
+            mp = profile.get("movePlan") or {}
+            pa = profile.get("primaryApplicant") or {}
+            assign = pa.get("assignment") or {}
+            r["assignment_type"] = assign.get("type") or assign.get("assignmentType")
+            r["move_date"] = mp.get("targetArrivalDate") or r.get("expected_start_date")
+            dep = profile.get("dependents") or []
+            has_spouse = bool(profile.get("spouse", {}).get("fullName"))
+            r["family_status"] = "family" if (has_spouse or dep) else "single"
+            r["destination_from_profile"] = mp.get("destination") if isinstance(mp.get("destination"), str) else None
+            r["policy_resolved"] = bool(r.get("resolved_policy_id"))
+            # Both canonical (document-normalized) and matrix-published
+            # policies count as "company has a policy" for admin visibility.
+            canon_count = r.get("company_policy_count") or 0
+            matrix_count = r.get("matrix_policy_count") or 0
+            r["company_has_policy"] = (canon_count + matrix_count) > 0
+            r["company_has_matrix_policy"] = matrix_count > 0
+            # Normalized fields for admin list
+            r["assignment_id"] = r.get("id")
+            r["company_id"] = r.get("case_company_id") or r.get("hr_company_id")
+            r["destination_country"] = r.get("host_country") or r.get("destination_from_profile")
+            r["orphan_employee"] = not (
+                (r.get("employee_user_id") and str(r.get("employee_user_id")).strip())
+                or (r.get("employee_identifier") and str(r.get("employee_identifier")).strip())
+            )
+            result.append(r)
+        return result
+
+    def get_admin_assignment_detail(self, assignment_id: str) -> Optional[Dict[str, Any]]:
+        """Full assignment context for admin detail: assignment, case, employee, HR, services, policy."""
+        with self.engine.connect() as conn:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)" if _is_sqlite else "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+            row = conn.execute(
+                text(f"""
+                    SELECT a.*, rc.id AS case_pk, rc.company_id AS case_company_id, rc.hr_user_id AS case_hr_user_id,
+                        rc.host_country, rc.home_country, rc.status AS case_status, rc.stage, rc.profile_json AS case_profile_json,
+                        c.name AS company_name,
+                        emp_p.id AS emp_profile_id, emp_p.full_name AS employee_full_name, emp_p.email AS employee_email, emp_p.company_id AS employee_profile_company_id,
+                        hr_p.id AS hr_profile_id, hr_p.full_name AS hr_full_name, hr_p.email AS hr_email, hr_p.company_id AS hr_profile_company_id,
+                        hu.company_id AS hr_company_id, emp.company_id AS employee_company_id
+                    FROM case_assignments a
+                    LEFT JOIN relocation_cases rc ON {join_on_cases}
+                    LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
+                    LEFT JOIN profiles emp_p ON CAST(emp_p.id AS TEXT) = a.employee_user_id
+                    LEFT JOIN profiles hr_p ON CAST(hr_p.id AS TEXT) = a.hr_user_id
+                    LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                    LEFT JOIN employees emp ON emp.profile_id = a.employee_user_id
+                    WHERE a.id = :aid
+                """),
+                {"aid": assignment_id},
+            ).fetchone()
+        if not row:
+            return None
+        out = dict(row._mapping)
+        ep = self.get_employee_profile(assignment_id)
+        out["employee_profile"] = ep
+        out["case_services"] = self.list_case_services(assignment_id)
+        out["resolved_policy"] = self.get_resolved_assignment_policy(assignment_id)
+        comp_id = out.get("case_company_id") or out.get("hr_company_id")
+        policies = self.list_company_policies(comp_id) if comp_id else []
+        out["company_policies"] = [p for p in policies if (p.get("extraction_status") or "") == "extracted"]
+        out["company_has_published_policy"] = len(out["company_policies"]) > 0
+        return out
