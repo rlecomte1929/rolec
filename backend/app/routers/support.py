@@ -35,10 +35,39 @@ from pydantic import BaseModel, EmailStr
 
 from ..services.supabase_client import get_supabase_admin_client
 from ..services.events_tracker import track
+from ..db import SessionLocal
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    ACTOR_SYSTEM,
+    insert_audit_log,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["support"])
+
+
+def _audit_ticket(actor_id, actor_type: str, ticket_id: str, action: str,
+                  event: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """[AIQ-932] Fail-soft canonical audit for a support-ticket mutation. The
+    ticket write goes through the Supabase client (no SQLAlchemy router conn);
+    events_tracker.track() above it is analytics, not a durable audit."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="support_ticket",
+                entity_id=str(ticket_id),
+                action_type=action,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                new_value={"event": event, **(extra or {})},
+            )
+            asession.commit()
+    except Exception:
+        logger.exception("audit: support_ticket %s id=%s", event, ticket_id)
 
 POSTMARK_WEBHOOK_SECRET = os.getenv("POSTMARK_WEBHOOK_SECRET", "")
 # SEC-MUT-DRAIN: shared secret for the internal support-automation endpoints
@@ -249,6 +278,8 @@ async def create_in_app_ticket(
                 "subject": body.subject or "",
             },
         )
+        _audit_ticket(body.user_id, ACTOR_HUMAN, ticket_id, ACTION_INSERT,
+                      "support_ticket_created", {"source": "in-app"})
 
     logger.info("support/in-app: ticket_id=%s created (user=%s)", ticket_id, body.user_id)
     return {"ok": True, "ticket_id": ticket_id}
@@ -282,6 +313,9 @@ async def update_ticket_status(ticket_id: str, body: TicketStatusUpdate):
         update["resolution_notes"] = body.resolution_notes
 
     supabase.table("support_tickets").update(update).eq("id", ticket_id).execute()
+    # Status change is automation-driven (triage Edge Function) → system actor.
+    _audit_ticket(None, ACTOR_SYSTEM, ticket_id, ACTION_UPDATE,
+                  "support_ticket_status_changed", {"status": body.status})
     return {"ok": True, "ticket_id": ticket_id, "status": body.status}
 
 
