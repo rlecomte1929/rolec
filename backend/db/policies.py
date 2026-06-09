@@ -604,3 +604,163 @@ class PoliciesMixin:
                         "ua": now,
                     },
                 )
+
+    # ── policy_config + config-version reads/writes (AUDIT-C1.3 batch 6) ──────
+
+    def _normalize_policy_config_benefit_row(self, d: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not d:
+            return None
+        for k in ("cap_rule_json", "conditions_json", "assignment_types", "family_statuses", "employee_levels"):
+            self._parse_json_col(d, k)
+        for bk in ("covered", "is_active"):
+            v = d.get(bk)
+            if v is not None and not isinstance(v, bool):
+                try:
+                    d[bk] = bool(int(v))
+                except (TypeError, ValueError):
+                    d[bk] = bool(v)
+        return d
+
+    def get_policy_config(self, company_id: str, config_key: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT * FROM policy_configs WHERE company_id = :cid AND config_key = :ck"
+                ),
+                {"cid": str(company_id), "ck": str(config_key)},
+            ).fetchone()
+        d = self._row_to_dict(row)
+        if not d:
+            return None
+        for bk in ("is_active",):
+            v = d.get(bk)
+            if v is not None and not isinstance(v, bool):
+                try:
+                    d[bk] = bool(int(v))
+                except (TypeError, ValueError):
+                    d[bk] = bool(v)
+        return d
+
+    def ensure_policy_config(
+        self, company_id: str, config_key: str, *, created_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        from ..database import _is_sqlite
+        existing = self.get_policy_config(company_id, config_key)
+        if existing:
+            return existing
+        pid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_configs
+                    (id, company_id, name, config_key, description, is_active, created_by, created_at, updated_at)
+                    VALUES (:id, :cid, :name, :ck, NULL, :ia, :cb, :ca, :ua)
+                    """
+                ),
+                {
+                    "id": pid,
+                    "cid": str(company_id),
+                    "name": "Compensation & Allowance",
+                    "ck": str(config_key),
+                    "ia": 1 if _is_sqlite else True,
+                    "cb": created_by,
+                    "ca": now,
+                    "ua": now,
+                },
+            )
+        got = self.get_policy_config(company_id, config_key)
+        assert got
+        return got
+
+    def get_policy_config_version_row(self, version_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM policy_config_versions WHERE id = :id"),
+                {"id": str(version_id)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_policy_config_version_with_config(self, version_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT v.*, c.company_id AS _company_id, c.config_key AS _config_key
+                    FROM policy_config_versions v
+                    JOIN policy_configs c ON c.id = v.policy_config_id
+                    WHERE v.id = :id
+                    """
+                ),
+                {"id": str(version_id)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def archive_policy_config_drafts(self, policy_config_id: str) -> int:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            r = conn.execute(
+                text(
+                    """
+                    UPDATE policy_config_versions
+                    SET status = 'archived', updated_at = :now
+                    WHERE policy_config_id = :pid AND status = 'draft'
+                    """
+                ),
+                {"pid": str(policy_config_id), "now": now},
+            )
+            try:
+                return int(r.rowcount or 0)
+            except Exception:
+                return 0
+
+    def max_policy_config_version_number(self, policy_config_id: str) -> int:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT MAX(version_number) AS m FROM policy_config_versions WHERE policy_config_id = :pid"
+                ),
+                {"pid": str(policy_config_id)},
+            ).fetchone()
+        m = row._mapping.get("m") if row else None
+        if m is None:
+            return 0
+        try:
+            return int(m)
+        except (TypeError, ValueError):
+            return 0
+
+    def insert_policy_config_version(
+        self,
+        policy_config_id: str,
+        version_number: int,
+        status: str,
+        effective_date: str,
+        *,
+        created_by: Optional[str] = None,
+    ) -> str:
+        vid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_config_versions
+                    (id, policy_config_id, version_number, status, effective_date, published_at,
+                     created_by, created_at, updated_at)
+                    VALUES (:id, :pid, :vn, :st, :ed, NULL, :cb, :ca, :ua)
+                    """
+                ),
+                {
+                    "id": vid,
+                    "pid": str(policy_config_id),
+                    "vn": int(version_number),
+                    "st": str(status),
+                    "ed": str(effective_date),
+                    "cb": created_by,
+                    "ca": now,
+                    "ua": now,
+                },
+            )
+        return vid
