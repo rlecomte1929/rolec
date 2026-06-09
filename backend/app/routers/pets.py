@@ -21,6 +21,13 @@ from sqlalchemy import text as _sql_text
 
 from ..auth_deps import get_current_user
 from ...database import db as main_db
+from ..services.audit_log_service import (
+    ACTION_DELETE,
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from .cases import _assert_case_access, _pg_table, _sql_now, _sql_uuid_gen
 
 
@@ -189,6 +196,19 @@ def create_pet(
     try:
         with main_db.engine.begin() as conn:
             row = _insert_returning(conn, sql, params)
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="pet",
+                    entity_id=str(dict(row).get("id") or ""),
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user.get("id") or user.get("sub"),
+                    new_value={"event": "pet_created", "case_id": case_id,
+                               "species": payload.species},
+                )
+            except Exception:
+                logger.exception("audit: create_pet case=%s", case_id)
     except HTTPException:
         raise
     except Exception:
@@ -229,6 +249,20 @@ def update_pet(
     try:
         with main_db.engine.begin() as conn:
             row = _update_returning(conn, sql, params)
+            if row:
+                try:
+                    insert_audit_log(
+                        conn,
+                        entity_type="pet",
+                        entity_id=pet_id,
+                        action_type=ACTION_UPDATE,
+                        actor_type=ACTOR_HUMAN,
+                        actor_id=user.get("id") or user.get("sub"),
+                        new_value={"event": "pet_updated", "case_id": case_id,
+                                   "fields": list(fields.keys())},
+                    )
+                except Exception:
+                    logger.exception("audit: update_pet case=%s pet=%s", case_id, pet_id)
     except HTTPException:
         raise
     except Exception:
@@ -251,6 +285,19 @@ def delete_pet(
         with main_db.engine.begin() as conn:
             result = conn.execute(_sql_text(sql), {"pet_id": pet_id, "case_id": case_id})
             rowcount = result.rowcount or 0
+            if rowcount:
+                try:
+                    insert_audit_log(
+                        conn,
+                        entity_type="pet",
+                        entity_id=pet_id,
+                        action_type=ACTION_DELETE,
+                        actor_type=ACTOR_HUMAN,
+                        actor_id=user.get("id") or user.get("sub"),
+                        new_value={"event": "pet_deleted", "case_id": case_id},
+                    )
+                except Exception:
+                    logger.exception("audit: delete_pet case=%s pet=%s", case_id, pet_id)
     except Exception:
         logger.exception("pets: delete failed case_id=%s pet_id=%s", case_id, pet_id)
         raise HTTPException(status_code=500, detail="Failed to delete pet")
