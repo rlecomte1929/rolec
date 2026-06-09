@@ -10,6 +10,7 @@ Houses 5 endpoints:
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,12 @@ from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.immigration_service import (
     _apply_vault_updates,
     _check_consent,
@@ -86,6 +93,8 @@ class EmployeeProfileUpdate(BaseModel):
     degree_anabin_status: Optional[str] = None
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-profile"])
+
+log = logging.getLogger(__name__)
 
 
 @router.get("/hr/cases/{case_id}/profile")
@@ -171,6 +180,18 @@ def update_profile_hr_fields(
         """
         with db.engine.begin() as conn:
             conn.execute(text(sql), params)
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="imm_employee_profile",
+                    entity_id=(profile.get("id") or case_id),
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user["id"],
+                    new_value={"event": "profile_hr_fields_updated", "fields": list(updates.keys())},
+                )
+            except Exception:
+                log.exception("audit: update_profile_hr_fields(update) case=%s", case_id)
     else:
         # No profile yet — create one with just the HR fields
         profile_id = str(uuid.uuid4())
@@ -194,6 +215,18 @@ def update_profile_hr_fields(
                 """),
                 params,
             )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="imm_employee_profile",
+                    entity_id=profile_id,
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user["id"],
+                    new_value={"event": "profile_hr_created", "fields": list(updates.keys())},
+                )
+            except Exception:
+                log.exception("audit: update_profile_hr_fields(create) case=%s", case_id)
 
     _log_access(
         case_id=case_id,
@@ -338,6 +371,18 @@ def upsert_profile_employee(
                 """),
                 params,
             )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="imm_employee_profile",
+                    entity_id=(profile.get("id") or case_id),
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=employee_id,
+                    new_value={"event": "profile_self_updated", "fields": list(updates.keys())},
+                )
+            except Exception:
+                log.exception("audit: upsert_profile_employee(update) case=%s", case_id)
     else:
         # Create new profile
         profile_id = str(uuid.uuid4())
@@ -361,6 +406,18 @@ def upsert_profile_employee(
                 """),
                 params,
             )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="imm_employee_profile",
+                    entity_id=profile_id,
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=employee_id,
+                    new_value={"event": "profile_self_created", "fields": list(updates.keys())},
+                )
+            except Exception:
+                log.exception("audit: upsert_profile_employee(create) case=%s", case_id)
 
     _log_access(
         case_id=case_id,
