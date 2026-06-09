@@ -18,6 +18,7 @@ updates together; if any step fails, the whole call rolls back).
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 
@@ -27,9 +28,16 @@ from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 
 
 router = APIRouter(prefix="/api/hr/cases", tags=["hr-case-resolve"])
+
+log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +406,23 @@ def resolve_contradiction(
                 },
             )
 
+            # [AIQ-650] Audit the HR contradiction resolution (compliance-relevant
+            # data-quality decision). Same txn; fail-soft.
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="contradiction",
+                    entity_id=contradiction_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user_id,
+                    new_value={"event": "contradiction_resolved", "case_id": case_id,
+                               "correction_id": correction_id,
+                               "reason_code": payload.reason_code},
+                )
+            except Exception:
+                log.exception("audit: resolve_contradiction cid=%s", contradiction_id)
+
             # 7. Mark the winning ExtractedField as Resolved (best-effort —
             #    the candidate may reference a synthetic extracted_field id).
             ef_id = winning_candidate.get("source_agent_run_id") or winning_candidate.get(
@@ -530,6 +555,20 @@ def escalate_contradiction(
                 ),
                 {"cid": contradiction_id},
             )
+
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="contradiction",
+                    entity_id=contradiction_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user_id,
+                    new_value={"event": "contradiction_escalated", "case_id": case_id,
+                               "correction_id": str(correction_row["correction_id"])},
+                )
+            except Exception:
+                log.exception("audit: escalate_contradiction cid=%s", contradiction_id)
 
         return EscalateResponse(
             contradiction_id=contradiction_id,
