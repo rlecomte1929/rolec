@@ -62,6 +62,84 @@ def _duplicate_user_error(exc: BaseException) -> bool:
     )
 
 
+def _resolve_auth_user_id_by_email(client, email: str) -> Optional[str]:
+    """Return the Supabase Auth user UUID for an email, or None. Never raises.
+
+    Supabase admin has no get-by-email, so this scans admin.list_users — O(users),
+    fine pre-launch. TODO(AIQ-907): persist the auth uid (user_metadata already
+    carries relopass_user_id) and resolve via an index once the user base grows.
+    """
+    e = (email or "").strip().lower()
+    if not e:
+        return None
+    try:
+        users_resp = _call_with_timeout(client.auth.admin.list_users)  # type: ignore[union-attr]
+        users = getattr(users_resp, "users", users_resp) or []
+        for u in users:
+            if (getattr(u, "email", "") or "").lower() == e:
+                uid = str(getattr(u, "id", None))
+                if uid and uid != "None":
+                    return uid
+    except Exception as le:  # pragma: no cover - network/SDK shape guard
+        log.debug("_resolve_auth_user_id_by_email lookup failed email=%s: %s", e[:3] + "***", le)
+    return None
+
+
+def set_supabase_auth_password(email: str, new_password: str) -> bool:
+    """
+    Propagate a backend password change to the matching Supabase Auth user via
+    the GoTrue admin API (admin.update_user_by_id), so signInWithPassword keeps
+    returning 200 after a backend-side password change (AIQ-907).
+
+    Idempotent and fail-soft: never raises, never blocks the backend password
+    write. Returns True when the password was updated OR the sync is
+    intentionally disabled / not configured (nothing left to do); False only
+    when an update was attempted against a real, existing auth user and failed
+    (including "no matching auth user found").
+    """
+    if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
+        return True
+    e = (email or "").strip().lower()
+    if not e or not (new_password or "").strip():
+        return True
+    if len(new_password) < 6:
+        # Supabase rejects very short passwords; skip rather than fail the change.
+        log.warning("set_supabase_auth_password skipped: password too short for Supabase policy email=%s", e[:3] + "***")
+        return True
+    if get_supabase_admin_client is None:
+        return True
+    try:
+        client = get_supabase_admin_client()
+    except Exception as ex:
+        log.debug("set_supabase_auth_password: no admin client: %s", ex)
+        return True
+
+    uid = _resolve_auth_user_id_by_email(client, e)
+    if not uid:
+        log.warning(
+            "set_supabase_auth_password: no Supabase auth user for email=%s — nothing to update",
+            e[:3] + "***",
+        )
+        return False
+    try:
+        _call_with_timeout(
+            client.auth.admin.update_user_by_id, uid, {"password": new_password}  # type: ignore[union-attr]
+        )
+        log.info("set_supabase_auth_password: updated auth password email=%s uid=%s", e[:3] + "***", uid[:8])
+        return True
+    except concurrent.futures.TimeoutError:
+        log.warning(
+            "set_supabase_auth_password: timed_out email=%s uid=%s timeout_s=%s",
+            e[:3] + "***",
+            uid[:8],
+            _SUPABASE_CALL_TIMEOUT_S,
+        )
+        return False
+    except Exception as ex:
+        log.warning("set_supabase_auth_password: failed email=%s uid=%s error=%s", e[:3] + "***", uid[:8], ex)
+        return False
+
+
 def sync_relopass_user_to_supabase_auth(
     email: str,
     password: str,
@@ -119,7 +197,13 @@ def sync_relopass_user_to_supabase_auth(
         return False
     except Exception as ex:
         if _duplicate_user_error(ex):
-            log.debug("supabase_auth_sync user already present email=%s", e[:3] + "***")
+            # User already exists in Supabase Auth. Their backend password may
+            # have changed since creation (or been re-seeded), so re-sync it to
+            # prevent signInWithPassword drift (AIQ-907). Fail-soft: a failed
+            # re-sync still returns True — the user exists, which is what this
+            # create-path contract promises; password drift is logged.
+            log.debug("supabase_auth_sync user already present, re-syncing password email=%s", e[:3] + "***")
+            set_supabase_auth_password(e, password)
             return True
         log.warning(
             "supabase_auth_sync failed email=%s relopass_id=%s error=%s",
