@@ -24,6 +24,12 @@ from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.gdpr_export_service import build_data_export_pdf
 from ..services.immigration_service import (
     _get_encryption_key,
@@ -219,6 +225,20 @@ def request_erasure(
                 "due": due,
             },
         )
+        # [AIQ-650] Canonical audit trail for the GDPR Art. 17 erasure request
+        # (the _log_access below is the PII access-log, a separate concern).
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="erasure_request",
+                entity_id=request_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=employee_id,
+                new_value={"event": "erasure_requested", "case_id": case_id},
+            )
+        except Exception:
+            log.exception("audit: erasure-request case=%s", case_id)
 
     _log_access(
         case_id=case_id,
@@ -356,6 +376,27 @@ def process_erasure_request(
                  "notes": body.review_notes, "request_id": body.request_id},
             )
             new_status = "rejected"
+
+        # [AIQ-650] Audit the HR/admin erasure decision — approval triggers
+        # irreversible PII anonymisation, so accountability is critical.
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="erasure_request",
+                entity_id=body.request_id,
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=reviewer_id,
+                new_value={
+                    "event": f"erasure_{new_status}",
+                    "case_id": case_id,
+                    "profiles_anonymised": anonymised,
+                },
+            )
+        except Exception:
+            log.exception(
+                "audit: process-erasure case=%s req=%s", case_id, body.request_id
+            )
 
     return {
         "request_id": body.request_id,
