@@ -131,6 +131,9 @@ backend/app/routers/crons.py:recompute_source_reliability
 backend/app/routers/crons.py:test_monitoring_alert
 # CRON (P3-02c): _verify_cron_secret(request) inline. Staging-only test
 # endpoint that fires a sample Slack/email monitoring alert.
+backend/app/routers/crons.py:case_health_scan
+# CRON (AIQ-378b): _verify_cron_secret(request) inline. Nightly proactive
+# case-health scan, invoked by the case-health-scan workflow, not an end user.
 
 # CRON (PERMANENT): calls _verify_cron_secret(request) in the body — fail-closed
 # (503 if CRON_SECRET unset, 401 on mismatch). Inline, not a Depends().
