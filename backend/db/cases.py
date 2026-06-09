@@ -2375,3 +2375,274 @@ class CasesMixin:
             with self.engine.begin() as conn:
                 _ins(conn)
         return aid
+
+    def update_relocation_case_host_country(self, case_id: str, host_country: str) -> None:
+        """Set destination (host_country) on a relocation case (e.g. after admin create)."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE relocation_cases SET host_country = :host, updated_at = :ua WHERE id::text = :cid"),
+                {"host": host_country, "ua": datetime.utcnow().isoformat(), "cid": case_id},
+            )
+
+    def touch_relocation_case_route_from_wizard(
+        self,
+        relocation_case_id: str,
+        *,
+        home_country: Optional[str] = None,
+        host_country: Optional[str] = None,
+    ) -> None:
+        """Denormalize wizard origin/destination onto relocation_cases for HR lists and filters."""
+        rid = (relocation_case_id or "").strip()
+        if not rid or (not home_country and not host_country):
+            return
+        if not self.get_case_by_id(rid):
+            return
+        now = datetime.utcnow().isoformat()
+        parts = ["updated_at = :ua"]
+        params: Dict[str, Any] = {"cid": rid, "ua": now}
+        if home_country:
+            parts.append("home_country = :home")
+            params["home"] = home_country
+        if host_country:
+            parts.append("host_country = :host")
+            params["host"] = host_country
+        sql = f"UPDATE relocation_cases SET {', '.join(parts)} WHERE id::text = :cid"
+        with self.engine.begin() as conn:
+            conn.execute(text(sql), params)
+
+    def sync_relocation_case_route_from_wizard_draft(self, relocation_case_id: str, draft: Dict[str, Any]) -> None:
+        """
+        Denormalize relocationBasics onto relocation_cases (same fields as PATCH /api/cases).
+        Used on employee submit so HR lists stay current without an extra wizard save.
+        """
+        basics = draft.get("relocationBasics") or {}
+        home = (basics.get("originCountry") or basics.get("origin_country") or "").strip() or None
+        host = (
+            basics.get("destCountry")
+            or basics.get("destination_country")
+            or basics.get("hostCountry")
+            or basics.get("host_country")
+            or ""
+        )
+        host = (host or "").strip() or None
+        if home or host:
+            self.touch_relocation_case_route_from_wizard(
+                relocation_case_id,
+                home_country=home,
+                host_country=host,
+            )
+
+    def _sync_case_dependents_from_draft(self, canonical_case_id: str, draft: Dict[str, Any]) -> None:
+        """Sync the wizard family (spouse + children) into ``case_dependents``.
+
+        The trigger engine reads ``case_dependents`` to set has_spouse /
+        has_children, which gate the family-reunion forms (NO UTL-2011F/B, GB
+        DEP-*, DE FAM-*). The household intake writes only the wizard draft, so
+        without this sync ``case_dependents`` is never populated and NO family
+        form is ever generated. Insert-if-absent keyed on
+        (case_id, relationship, full_name) so re-saves never duplicate or churn
+        ids (``case_forms.dependent_id`` stays stable). No-op when the canonical
+        ``public.cases`` row doesn't exist yet (FK) or there is no family.
+        """
+        cid = (canonical_case_id or "").strip()
+        if not cid:
+            return
+        fam = (draft or {}).get("familyMembers") or (draft or {}).get("family") or {}
+        if not isinstance(fam, dict):
+            return
+        members: List[Any] = []  # (relationship, full_name, nationality, dob)
+        sp = fam.get("spouse")
+        if isinstance(sp, dict):
+            members.append((
+                "spouse",
+                (str(sp.get("fullName") or sp.get("full_name") or "").strip() or "Spouse"),
+                sp.get("nationality"),
+                sp.get("dateOfBirth") or sp.get("date_of_birth"),
+            ))
+        kids = fam.get("children")
+        if isinstance(kids, list):
+            for i, c in enumerate(kids):
+                if not isinstance(c, dict):
+                    continue
+                members.append((
+                    "child",
+                    (str(c.get("fullName") or c.get("full_name") or "").strip() or f"Child {i + 1}"),
+                    c.get("nationality"),
+                    c.get("dateOfBirth") or c.get("date_of_birth"),
+                ))
+        if not members:
+            return
+        cases_tbl = "cases" if _is_sqlite else "public.cases"
+        dep_tbl = "case_dependents" if _is_sqlite else "public.case_dependents"
+        try:
+            with self.engine.begin() as conn:
+                exists = conn.execute(
+                    text(f"SELECT 1 FROM {cases_tbl} WHERE CAST(id AS TEXT) = :c LIMIT 1"), {"c": cid}
+                ).first()
+                if not exists:
+                    return  # canonical case not materialized yet — sync on a later patch
+                for rel, name, nat, dob in members:
+                    already = conn.execute(
+                        text(
+                            f"SELECT 1 FROM {dep_tbl} WHERE CAST(case_id AS TEXT) = :c "
+                            "AND relationship = :rel AND full_name = :name LIMIT 1"
+                        ),
+                        {"c": cid, "rel": rel, "name": name},
+                    ).first()
+                    if already:
+                        continue
+                    dep_id = str(uuid.uuid4())
+                    dob_val = (str(dob).strip() or None) if dob else None
+                    if _is_sqlite:
+                        conn.execute(
+                            text(
+                                f"INSERT INTO {dep_tbl} (id, case_id, relationship, full_name, nationality, date_of_birth, created_at) "
+                                "VALUES (:id, :c, :rel, :name, :nat, :dob, :now)"
+                            ),
+                            {"id": dep_id, "c": cid, "rel": rel, "name": name, "nat": nat,
+                             "dob": dob_val, "now": datetime.utcnow().isoformat()},
+                        )
+                    else:
+                        conn.execute(
+                            text(
+                                f"INSERT INTO {dep_tbl} (id, case_id, relationship, full_name, nationality, date_of_birth, created_at) "
+                                "VALUES (CAST(:id AS uuid), CAST(:c AS uuid), :rel, :name, :nat, CAST(NULLIF(:dob,'') AS date), now())"
+                            ),
+                            {"id": dep_id, "c": cid, "rel": rel, "name": name, "nat": nat, "dob": (dob_val or "")},
+                        )
+        except Exception:
+            log.exception("case-dependents sync: failed case=%s", cid)
+
+    def _ensure_canonical_case_from_wizard(
+        self, case_id: str, derived: Dict[str, Any], assignment: Dict[str, Any]
+    ) -> None:
+        """Upsert the canonical ``public.cases`` row the Case Engine reads.
+
+        The intake wizard writes ``wizard_cases``; the trigger engine + case-access
+        guard read ``public.cases``. Without this bridge, no wizard-created case
+        ever appears to the trigger, so no CaseForms (and hence no roadmap/dossier)
+        are generated. We populate the canonical row from the wizard draft + the
+        ``case_assignments`` link. ``public.cases.employee_id`` is an FK to
+        ``profiles``; we resolve it via ``_resolve_employee_profile_id`` —
+        ``employee_user_id`` when it is itself a profile (uuid-native employees),
+        else the employee's email, else ``employee_contact_id``. (The contact id
+        is an FK to ``employee_contacts``, not ``profiles``, so it is almost never
+        a valid ``employee_id`` — using it directly broke every real case.)
+
+        Fail-safe: every NOT NULL column must resolve, else we skip — never insert
+        a partial/invalid row. Caller (apply_wizard_patch_side_effects) is itself
+        wrapped in try/except by the PATCH handler, so a failure can't break intake.
+        """
+        dest = (derived.get("dest_country") or "").strip()
+        employee_uuid = self._resolve_employee_profile_id(assignment)
+        if not dest or not employee_uuid:
+            return  # trigger needs a destination; public.cases needs a profile employee_id
+        canonical = str(assignment.get("canonical_case_id") or case_id).strip()
+        company_id = self._resolve_canonical_case_company(canonical, assignment, employee_uuid)
+        if not company_id:
+            return
+        origin = (derived.get("origin_country") or "").strip()
+        purpose = (derived.get("purpose") or "").strip() or "relocation"
+        dest_city = (derived.get("dest_city") or "").strip() or None
+        move = (derived.get("target_move_date") or "") or ""
+        params = {
+            "id": case_id, "company": company_id, "emp": employee_uuid,
+            "origin": origin, "dest": dest, "dest_city": dest_city,
+            "purpose": purpose, "move": move,
+        }
+        # public.cases enforces CHECK constraints — status in (draft, active,
+        # on_hold, completed, cancelled), stage in (discovery, dossier, roadmap,
+        # in_progress, closing, closed) — and FK employee_id -> profiles. We seed
+        # status='active', stage='discovery'; employee_contact_id must already be
+        # a profiles row (real employees have one). The whole upsert is
+        # try/except-wrapped, so a constraint miss skips rather than breaking intake.
+        if self.engine.dialect.name == "postgresql":
+            sql = (
+                "INSERT INTO cases "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, created_at, updated_at) "
+                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'active', 'discovery', CAST(NULLIF(:move,'') AS date), now(), now()) "
+                "ON CONFLICT (id) DO UPDATE SET "
+                "dest_country_code = EXCLUDED.dest_country_code, origin_country_code = EXCLUDED.origin_country_code, "
+                "dest_city = EXCLUDED.dest_city, purpose = EXCLUDED.purpose, employee_id = EXCLUDED.employee_id, updated_at = now()"
+            )
+        else:
+            sql = (
+                "INSERT INTO cases "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date) "
+                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'active', 'discovery', NULLIF(:move,'')) "
+                "ON CONFLICT (id) DO UPDATE SET dest_country_code=excluded.dest_country_code, "
+                "origin_country_code=excluded.origin_country_code, dest_city=excluded.dest_city, "
+                "purpose=excluded.purpose, employee_id=excluded.employee_id"
+            )
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text(sql), params)
+        except Exception:
+            log.exception("canonical-case bridge: upsert failed case=%s", case_id)
+
+    def next_open_milestone_deadlines_for_cases(
+        self, relocation_case_ids: List[str], request_id: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Map normalized case id -> human-readable next open milestone date (earliest target_date)."""
+        if not relocation_case_ids:
+            return {}
+        # Note: coalesce_case_lookup_id ran a wizard_cases SELECT per id but
+        # always returned the input string unchanged. .strip() is equivalent
+        # and avoids N synchronous round-trips on the HR dashboard hot path.
+        normalized: List[str] = []
+        seen: Set[str] = set()
+        for raw in relocation_case_ids:
+            nid = (raw or "").strip()
+            if nid and nid not in seen:
+                seen.add(nid)
+                normalized.append(nid)
+        if not normalized:
+            return {}
+        n = len(normalized)
+        c_ph = ", ".join(f":c{i}" for i in range(n))
+        d_ph = ", ".join(f":d{i}" for i in range(n))
+        params: Dict[str, Any] = {f"c{i}": normalized[i] for i in range(n)}
+        params.update({f"d{i}": normalized[i] for i in range(n)})
+        sql = (
+            f"SELECT case_id, canonical_case_id, target_date, status FROM case_milestones "
+            f"WHERE case_id IN ({c_ph}) OR canonical_case_id IN ({d_ph})"
+        )
+        terminal = frozenset({"completed", "done", "cancelled", "canceled"})
+        best: Dict[str, Optional[str]] = {k: None for k in normalized}
+        try:
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="milestones_bulk_for_deadlines", request_id=request_id
+                ).fetchall()
+        except Exception:
+            return {}
+        for row in rows:
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            td = m.get("target_date")
+            if not td or not str(td).strip():
+                continue
+            st = (m.get("status") or "").strip().lower()
+            if st in terminal:
+                continue
+            c1 = (m.get("canonical_case_id") or "").strip()
+            c0 = (m.get("case_id") or "").strip()
+            key = (c1 or c0)
+            if key not in best:
+                continue
+            ts = str(td).strip()
+            cur = best.get(key)
+            if cur is None or ts < cur:
+                best[key] = ts
+        out: Dict[str, str] = {}
+        for nid, raw_date in best.items():
+            if not raw_date:
+                continue
+            disp = raw_date
+            try:
+                dpart = raw_date[:10]
+                parsed = datetime.strptime(dpart, "%Y-%m-%d").date()
+                disp = f"{parsed.strftime('%b')} {parsed.day}, {parsed.year}"
+            except Exception:
+                pass
+            out[nid] = disp
+        return out
