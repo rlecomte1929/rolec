@@ -252,8 +252,12 @@ class CorrectionAnalyticsTests(unittest.TestCase):
             (case_no, "OCR_ERROR", "schooling", 16),
             (case_no, "LEGITIMATE_VARIATION", "housing_allowance", 17),
             (case_no, "OTHER", "housing_allowance", 18),
-            (case_no, "TYPO_IN_SOURCE", None, 22),
-            (case_no, "OCR_ERROR", "language_training", 23),
+            # Keep the two oldest rows within 21 days. weekly_corrections_by_reason
+            # uses an ISO-week-aligned window (this-Monday − (weeks_back−1) weeks),
+            # which covers only 21 + today.weekday() days — so days_ago=22/23 fell
+            # outside the window on Mon/Tue, making this assertion weekday-flaky.
+            (case_no, "TYPO_IN_SOURCE", None, 19),
+            (case_no, "OCR_ERROR", "language_training", 20),
         ]
         for case_id, reason, clause, days_ago in plan:
             self._seed_correction(case_id, reason, clause, days_ago)
