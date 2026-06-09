@@ -197,6 +197,7 @@ from .app.routers import immigration_intake_profile as immigration_intake_profil
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router
 from .app.routers import immigration_status as immigration_status_router
 from .app.routers import immigration_gdpr as immigration_gdpr_router
+from .app.routers import gdpr as gdpr_router
 from .app.routers import immigration_forms as immigration_forms_router
 from .app.routers import immigration_retrieve as immigration_retrieve_router
 from .app.routers import analytics as analytics_router
@@ -752,6 +753,7 @@ app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6]
 app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)
 app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 — milestones, interview-status, immigration cases (8 handlers)
 app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
+app.include_router(gdpr_router.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
 app.include_router(immigration_forms_router.router)  # IMM-11 — form library + PDF pre-fill (2 handlers)
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
