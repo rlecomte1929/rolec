@@ -10,6 +10,7 @@ backend.main wiring that other test files break on).
 from __future__ import annotations
 
 import os
+import re
 import sys
 import unittest
 import uuid
@@ -33,12 +34,19 @@ from backend.app.routers.exception_requests import (  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
 
+# The live router reads/writes `policy_cap_requests` (renamed from the original
+# `exception_requests`) and the Q3-A migration added a NULLABLE `exception_type`
+# column. The shared read-back projection (`_EXCEPTION_SELECT_WITH_JOINS`) LEFT
+# JOINs profiles / users / mobility_cases / wizard_cases / relocation_cases to
+# enrich the row with requester/resolver names + corridor, so those tables must
+# exist (empty is fine — LEFT JOIN -> NULL enrichment, which the router tolerates).
 SCHEMA = """
-CREATE TABLE exception_requests (
+CREATE TABLE policy_cap_requests (
   id TEXT PRIMARY KEY,
   case_id TEXT NOT NULL,
   organization_id TEXT NOT NULL,
   category TEXT NOT NULL,
+  exception_type TEXT,
   requested_amount REAL NOT NULL,
   cap_amount REAL NOT NULL,
   currency TEXT NOT NULL,
@@ -62,7 +70,47 @@ CREATE TABLE audit_logs (
   actor_id TEXT,
   created_at TEXT
 );
+CREATE TABLE profiles (
+  id TEXT PRIMARY KEY,
+  full_name TEXT,
+  email TEXT,
+  role TEXT
+);
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT
+);
+CREATE TABLE mobility_cases (
+  id TEXT PRIMARY KEY,
+  origin_country TEXT,
+  destination_country TEXT
+);
+CREATE TABLE wizard_cases (
+  id TEXT PRIMARY KEY,
+  origin_country TEXT,
+  dest_country TEXT
+);
+CREATE TABLE relocation_cases (
+  id TEXT PRIMARY KEY,
+  home_country TEXT,
+  host_country TEXT
+);
 """
+
+
+def _sqlite_select_with_joins() -> str:
+    """SQLite-dialect twin of the router's Postgres `_EXCEPTION_SELECT_WITH_JOINS`.
+
+    The live projection casts the uuid join keys with Postgres' `x::text`
+    syntax, which SQLite cannot parse. We translate only that dialect token
+    (`x.y::text` -> `CAST(x.y AS TEXT)`) and leave everything else byte-for-byte
+    identical, deriving it from the real constant at runtime so this twin can
+    never drift out of sync. The Postgres SQL string itself stays under test via
+    ExceptionSelectJoinGuardTests.
+    """
+    from backend.app.routers import exception_requests as _rm
+
+    return re.sub(r"(\w+\.\w+)::text", r"CAST(\1 AS TEXT)", _rm._EXCEPTION_SELECT_WITH_JOINS)
 
 
 def _company_id():
@@ -100,6 +148,39 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         )
         self.profile_patcher.start()
         self.addCleanup(self.profile_patcher.stop)
+        # The router reads rows back through a Postgres-only projection
+        # (`x::text` casts). Swap in the SQLite-dialect twin so the CRUD/list
+        # functions exercise the real INSERT/UPDATE/status/tenant/audit logic
+        # against in-memory SQLite.
+        self.select_patcher = mock.patch.object(
+            router_module, "_EXCEPTION_SELECT_WITH_JOINS", _sqlite_select_with_joins()
+        )
+        self.select_patcher.start()
+        self.addCleanup(self.select_patcher.stop)
+        # `require_case_access` (B21) verifies case ownership via assignment
+        # tables that aren't part of this unit's SQLite fixture — case-access
+        # authz has its own test surface. Stub it so these tests stay focused
+        # on the exception-request CRUD/tenant/audit behaviour.
+        self.case_access_patcher = mock.patch.object(
+            router_module, "require_case_access", return_value={}
+        )
+        self.case_access_patcher.start()
+        self.addCleanup(self.case_access_patcher.stop)
+        # backend/conftest.py mocks `backend.database`, so `db` is a MagicMock
+        # whose un-patched methods auto-return truthy mocks. Pin the company
+        # fallback resolvers to None so the "no company linked" path is
+        # deterministic; tests with a company resolve via user["company"] first
+        # and never reach these.
+        self.hr_company_patcher = mock.patch.object(
+            router_module.db, "get_hr_company_id", return_value=None
+        )
+        self.hr_company_patcher.start()
+        self.addCleanup(self.hr_company_patcher.stop)
+        self.assignment_patcher = mock.patch.object(
+            router_module.db, "get_assignment_for_employee", return_value=None
+        )
+        self.assignment_patcher.start()
+        self.addCleanup(self.assignment_patcher.stop)
 
     def _audit_rows(self):
         # rowid gives stable insertion order even when multiple rows share
@@ -125,6 +206,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         case_id = str(uuid.uuid4())
         body = ExceptionRequestCreate(
             category="housing",
+            exception_type="cap_override",
             requested_amount=3500,
             cap_amount=3000,
             currency="eur",
@@ -151,6 +233,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         emp["company"] = None  # no company linked
         body = ExceptionRequestCreate(
             category="housing",
+            exception_type="cap_override",
             requested_amount=100,
             cap_amount=50,
             currency="EUR",
@@ -170,6 +253,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         case_id = str(uuid.uuid4())
         common_body = lambda: ExceptionRequestCreate(  # noqa: E731
             category="housing",
+            exception_type="cap_override",
             requested_amount=1000,
             cap_amount=900,
             currency="EUR",
@@ -197,6 +281,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
             case_id=str(uuid.uuid4()),
             body=ExceptionRequestCreate(
                 category="schools",
+                exception_type="cap_override",
                 requested_amount=20000,
                 cap_amount=15000,
                 currency="USD",
@@ -227,6 +312,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
             case_id=str(uuid.uuid4()),
             body=ExceptionRequestCreate(
                 category="movers",
+                exception_type="cap_override",
                 requested_amount=5000,
                 cap_amount=3000,
                 currency="EUR",
@@ -250,6 +336,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
             case_id=str(uuid.uuid4()),
             body=ExceptionRequestCreate(
                 category="housing",
+                exception_type="cap_override",
                 requested_amount=100,
                 cap_amount=50,
                 currency="EUR",
@@ -278,6 +365,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
             case_id=str(uuid.uuid4()),
             body=ExceptionRequestCreate(
                 category="housing",
+                exception_type="cap_override",
                 requested_amount=100,
                 cap_amount=50,
                 currency="EUR",
@@ -310,10 +398,10 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         hr = _make_user(str(uuid.uuid4()), "HR", company)
         # 2 created (pending), then resolve one
         a = create_exception_request(case_id=str(uuid.uuid4()), body=ExceptionRequestCreate(
-            category="housing", requested_amount=100, cap_amount=50, currency="EUR", reason="r1",
+            category="housing", exception_type="cap_override", requested_amount=100, cap_amount=50, currency="EUR", reason="r1",
         ), user=emp)
         create_exception_request(case_id=str(uuid.uuid4()), body=ExceptionRequestCreate(
-            category="schools", requested_amount=200, cap_amount=150, currency="EUR", reason="r2",
+            category="schools", exception_type="cap_override", requested_amount=200, cap_amount=150, currency="EUR", reason="r2",
         ), user=emp)
         resolve_exception_request(request_id=a["id"],
                                   body=ExceptionRequestPatch(status="approved"),
@@ -333,7 +421,7 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         emp_b = _make_user(str(uuid.uuid4()), "EMPLOYEE", company_b)
         hr_a = _make_user(str(uuid.uuid4()), "HR", company_a)
         body = lambda: ExceptionRequestCreate(  # noqa: E731
-            category="housing", requested_amount=100, cap_amount=50, currency="EUR", reason="x",
+            category="housing", exception_type="cap_override", requested_amount=100, cap_amount=50, currency="EUR", reason="x",
         )
         create_exception_request(case_id=str(uuid.uuid4()), body=body(), user=emp_a)
         create_exception_request(case_id=str(uuid.uuid4()), body=body(), user=emp_b)
