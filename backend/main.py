@@ -54,6 +54,7 @@ from .schemas import (
 )
 from .app.services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
 from .app.services.guidance_pack_service import generate_guidance_pack
+from .app.services.immigration_service import _log_access  # data_access_log PII-access writer
 from .app.services.policy_adapter import normalize_policy_caps
 from .app.services.policy_extractor import (
     extract_policy_from_bytes,
@@ -13755,6 +13756,18 @@ def get_command_center_case_detail(
     )
     if not detail:
         raise HTTPException(status_code=404, detail="Case not found or not visible")
+    # [AIQ-650-5] GDPR PII-access accountability: an HR opening an employee's case
+    # detail reads PII (employee identifier, household). Log it to data_access_log
+    # (fail-soft internally) so the subject's access trail isn't immigration-only.
+    _log_access(
+        case_id=assignment_id,
+        profile_id=None,
+        user_id=hr_user_id,
+        role="hr",
+        action="view",
+        fields=["employee_identifier", "case_detail"],
+        purpose="hr_case_management",
+    )
     return CommandCenterCaseDetail(**detail)
 
 
