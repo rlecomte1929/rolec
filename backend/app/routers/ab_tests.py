@@ -32,9 +32,31 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth_deps import require_admin
+from ..db import SessionLocal
+from ..services.audit_log_service import ACTION_UPDATE, ACTOR_HUMAN, insert_audit_log
 
 router = APIRouter(prefix="/api/ab-tests", tags=["ab-tests"])
 logger = logging.getLogger(__name__)
+
+
+def _audit_abtest(admin: Dict[str, Any], event: str, flag_name: str, extra: Dict[str, Any]) -> None:
+    """[AIQ-932] Durable canonical audit for an A/B-test traffic change. The
+    existing _write_audit_event writes the public.events table (analytics, not a
+    durable audit), so this adds the canonical audit_logs row in its own txn."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="ab_test_flag",
+                entity_id=str(flag_name),
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=admin.get("id") or admin.get("sub"),
+                new_value={"event": event, **extra},
+            )
+            asession.commit()
+    except Exception:
+        logger.exception("audit: ab_test %s flag=%s", event, flag_name)
 
 # ─── Vercel Edge Config constants ────────────────────────────────────────────
 
@@ -179,6 +201,11 @@ async def promote_variant(body: PromoteRequest, admin: Dict[str, Any] = Depends(
             "new_traffic_split": new_split,
         },
     )
+    _audit_abtest(admin, "ab_test_promoted", body.flag_name, {
+        "variant": body.variant,
+        "old_traffic_split": old_split,
+        "new_traffic_split": new_split,
+    })
 
     return {
         "ok": True,
@@ -227,6 +254,10 @@ async def rollback_flag(body: RollbackRequest, admin: Dict[str, Any] = Depends(r
             "new_traffic_split": new_split,
         },
     )
+    _audit_abtest(admin, "ab_test_rolled_back", body.flag_name, {
+        "old_traffic_split": old_split,
+        "new_traffic_split": new_split,
+    })
 
     return {
         "ok": True,
