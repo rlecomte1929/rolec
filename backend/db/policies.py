@@ -1820,3 +1820,137 @@ class PoliciesMixin:
             ).fetchone()
         m = int(row[0]) if row and row[0] is not None else 0
         return m + 1
+
+    # ── snapshot activation + extraction locks (AUDIT-C1.3 batch 15) ──────────
+
+    def activate_policy_knowledge_snapshot(
+        self,
+        new_snapshot_id: str,
+        company_id: str,
+        policy_document_id: str,
+        activated_by_user_id: str,
+    ) -> None:
+        """Supersede prior active snapshot for company; activate new snapshot and update binding."""
+        if not self.policy_assistant_tables_available():
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_knowledge_snapshots
+                    SET activation_state = 'superseded', status = 'superseded', superseded_at = :now,
+                        superseded_by_snapshot_id = :new_id
+                    WHERE company_id = :cid
+                      AND CAST(id AS TEXT) <> CAST(:new_id AS TEXT)
+                      AND COALESCE(activation_state, CASE WHEN status = 'active_for_assistant' THEN 'active_for_assistant' ELSE status END) = 'active_for_assistant'
+                    """
+                ),
+                {"now": now, "new_id": new_snapshot_id, "cid": company_id},
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_knowledge_snapshots
+                    SET activation_state = 'active_for_assistant', status = 'active_for_assistant',
+                        activated_at = :now, activated_by_user_id = :uid
+                    WHERE id = :sid
+                    """
+                ),
+                {"now": now, "uid": activated_by_user_id, "sid": new_snapshot_id},
+            )
+        self.upsert_company_policy_assistant_binding(company_id, new_snapshot_id, policy_document_id)
+
+    def mark_policy_snapshot_failed(self, snapshot_id: str) -> None:
+        if not self.policy_assistant_tables_available():
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_knowledge_snapshots
+                    SET activation_state = 'failed', status = 'failed'
+                    WHERE id = :id
+                    """
+                ),
+                {"id": snapshot_id},
+            )
+
+    def try_acquire_policy_extraction_lock(
+        self,
+        policy_document_id: str,
+        company_id: str,
+        locked_by_user_id: str,
+        *,
+        ttl_seconds: int = 900,
+    ) -> Optional[str]:
+        """
+        Returns lock_token if acquired; None if table missing.
+        Caller should check for active lock and raise 409 if row exists and not expired.
+        """
+        if not self.policy_hardening_tables_available():
+            return str(uuid.uuid4())
+        token = str(uuid.uuid4())
+        now = datetime.utcnow()
+        expires = datetime.utcfromtimestamp(now.timestamp() + ttl_seconds).isoformat()
+        now_iso = now.isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT id, expires_at, status FROM policy_extraction_locks WHERE policy_document_id = :doc"
+                ),
+                {"doc": policy_document_id},
+            ).fetchone()
+            if row:
+                d = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+                exp = d.get("expires_at")
+                st = (d.get("status") or "").strip()
+                if st == "active" and exp:
+                    try:
+                        from datetime import datetime as dt
+
+                        ex = dt.fromisoformat(str(exp).replace("Z", "+00:00"))
+                        if ex.timestamp() > now.timestamp():
+                            return None
+                    except Exception:
+                        if st == "active":
+                            return None
+                conn.execute(
+                    text("DELETE FROM policy_extraction_locks WHERE policy_document_id = :doc"),
+                    {"doc": policy_document_id},
+                )
+            lid = str(uuid.uuid4())
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_extraction_locks
+                    (id, policy_document_id, company_id, locked_by_user_id, lock_token, acquired_at, expires_at, status)
+                    VALUES (:id, :doc, :cid, :uid, :tok, :acq, :exp, 'active')
+                    """
+                ),
+                {
+                    "id": lid,
+                    "doc": policy_document_id,
+                    "cid": company_id,
+                    "uid": locked_by_user_id,
+                    "tok": token,
+                    "acq": now_iso,
+                    "exp": expires,
+                },
+            )
+        return token
+
+    def release_policy_extraction_lock(self, policy_document_id: str, lock_token: str) -> None:
+        if not self.policy_hardening_tables_available():
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_extraction_locks
+                    SET status = 'released'
+                    WHERE policy_document_id = :doc AND lock_token = :tok AND status = 'active'
+                    """
+                ),
+                {"doc": policy_document_id, "tok": lock_token},
+            )
