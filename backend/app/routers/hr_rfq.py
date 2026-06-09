@@ -25,6 +25,12 @@ from pydantic import BaseModel
 
 from ..auth_deps import get_current_user
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ...schemas import UserRole
 
 router = APIRouter(tags=["hr_rfq"])
@@ -285,6 +291,19 @@ async def create_rfq(
                 "now": now,
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="rfq_request",
+                entity_id=rfq_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=str(user.get("id", "")),
+                new_value={"event": "rfq_created", "case_id": body.case_id,
+                           "vendor_id": body.vendor_id, "service_category": body.service_category},
+            )
+        except Exception:
+            log.exception("audit: create_rfq rfq=%s", rfq_id)
 
     # Send email in background
     background_tasks.add_task(
@@ -407,6 +426,19 @@ async def update_rfq_status(
             """),
             params,
         ).mappings().first()
+        if result:
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="rfq_request",
+                    entity_id=rfq_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=str(user.get("id", "")),
+                    new_value={"event": "rfq_status_updated", "status": body.status},
+                )
+            except Exception:
+                log.exception("audit: update_rfq_status rfq=%s", rfq_id)
 
     if not result:
         raise HTTPException(status_code=404, detail="RFQ not found")
