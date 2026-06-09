@@ -22,6 +22,12 @@ from sqlalchemy import text
 
 from ..auth_deps import get_current_user, require_hr_or_employee
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ...schemas import UserRole
 
 router = APIRouter(tags=["quote_requests"])
@@ -172,6 +178,18 @@ def create_quote_request(
                 "now": now,
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="quote_request",
+                entity_id=new_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=employee_id,
+                new_value={"event": "quote_request_created", "case_id": body.case_id},
+            )
+        except Exception:
+            logger.exception("audit: create_quote_request id=%s", new_id)
         row = conn.execute(
             text("SELECT * FROM quote_requests WHERE id = :id"),
             {"id": new_id},
@@ -290,6 +308,18 @@ def update_quote_request_status(
             ),
             {"status": body.status, "now": now, "id": request_id},
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="quote_request",
+                entity_id=request_id,
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": "quote_status_updated", "status": body.status},
+            )
+        except Exception:
+            logger.exception("audit: update_quote_request_status id=%s", request_id)
         row = conn.execute(
             text("SELECT * FROM quote_requests WHERE id = :id"),
             {"id": request_id},
