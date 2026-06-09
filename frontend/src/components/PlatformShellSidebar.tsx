@@ -80,7 +80,8 @@ const SECTIONS: NavSection[] = [
         label: 'Inbox',
         to: ROUTE_DEFS.messages.path,
         toByRole: { HR: ROUTE_DEFS.hrMessages.path, ADMIN: ROUTE_DEFS.hrMessages.path },
-        badge: { kind: 'static-count', count: 3 },
+        // No badge: there is no thread-count source wired yet, and a hard-coded
+        // '3' (vs 0 real threads) trained users to distrust the badge (AIQ-914).
       },
     ],
   },
@@ -99,7 +100,9 @@ const SECTIONS: NavSection[] = [
         label: 'Mobility center',
         to: ROUTE_DEFS.hrCommandCenter.path,
         exact: true,
-        badge: { kind: 'static-count', count: 12 },
+        // No badge: the hard-coded '12' never matched the real case count
+        // (116 in prod). No active-case count is exposed by the notification
+        // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
@@ -117,7 +120,9 @@ const SECTIONS: NavSection[] = [
         id: 'review-queue',
         label: 'Review queue',
         to: ROUTE_DEFS.adminReviewQueue.path,
-        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 24 },
+        // Fallback 0 (not 24) so the badge shows nothing until the real
+        // pending_tickets count resolves, instead of a stale pre-load number.
+        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
       },
       // 'Ops analytics' lands on /admin/ops; the former 'Workflow analytics'
       // entry was a second sidebar link to the Queue *tab* of the same page
