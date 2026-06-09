@@ -62,8 +62,11 @@ def _duplicate_user_error(exc: BaseException) -> bool:
     )
 
 
-_LIST_USERS_PER_PAGE = 200
-_LIST_USERS_MAX_PAGES = 50  # cap: 50 * 200 = 10k users — guards against an unbounded loop
+# GoTrue's admin list_users endpoint on this project returns HTTP 500
+# ("Database error finding users") for large per_page (e.g. 200) — verified live
+# in AIQ-907 review. 50 is GoTrue's default and works, so page at 50.
+_LIST_USERS_PER_PAGE = 50
+_LIST_USERS_MAX_PAGES = 200  # cap: 200 * 50 = 10k users — guards against an unbounded loop
 
 
 def _resolve_auth_user_id_by_email(client, email: str) -> Optional[str]:
