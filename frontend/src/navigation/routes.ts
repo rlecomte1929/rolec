@@ -176,6 +176,8 @@ export const ROUTE_DEFS = {
   adminFormTemplatesMap: { path: '/admin/form-templates/:id/map', roles: ['ADMIN'] as RouteRole[] },
   // [PRODUCT-6E] A/B test experiment dashboard
   adminAbTests: { path: '/admin/ab-tests', roles: ['ADMIN'] as RouteRole[] },
+  // [AIQ-598] Corrections trend dashboard (per week, per reason / per agent)
+  adminCorrectionsTrends: { path: '/admin/corrections/trends', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
   /** [AIQ-633] Specialist review — admin reviews AI-generated roadmap steps per case */
