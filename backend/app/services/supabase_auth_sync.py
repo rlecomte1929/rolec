@@ -62,26 +62,38 @@ def _duplicate_user_error(exc: BaseException) -> bool:
     )
 
 
-def _resolve_auth_user_id_by_email(client, email: str) -> Optional[str]:
-    """Return the Supabase Auth user UUID for an email, or None. Never raises.
+def _resolve_auth_user_id_by_email(email: str) -> Optional[str]:
+    """Resolve the Supabase Auth user UUID for an email via a direct auth.users
+    read. Returns None when not found / unavailable. Never raises.
 
-    Supabase admin has no get-by-email, so this scans admin.list_users — O(users),
-    fine pre-launch. TODO(AIQ-907): persist the auth uid (user_metadata already
-    carries relopass_user_id) and resolve via an index once the user base grows.
+    Why a DB read and NOT GoTrue admin.list_users: on this project the admin
+    list_users endpoint returns HTTP 500 "Database error finding users" for
+    page>=2 and for large per_page (verified live in AIQ-907 review — it returns
+    only the first 50 users, then errors), so it cannot reliably enumerate users
+    and there is no get-by-email. Reading `auth.users.id` is a SELECT; the
+    password WRITE still goes through the GoTrue admin API
+    (admin.update_user_by_id), so the "no raw auth.users password write from app
+    code" constraint holds. The backend service-role DB connection can read the
+    auth schema.
     """
     e = (email or "").strip().lower()
     if not e:
         return None
     try:
-        users_resp = _call_with_timeout(client.auth.admin.list_users)  # type: ignore[union-attr]
-        users = getattr(users_resp, "users", users_resp) or []
-        for u in users:
-            if (getattr(u, "email", "") or "").lower() == e:
-                uid = str(getattr(u, "id", None))
-                if uid and uid != "None":
-                    return uid
-    except Exception as le:  # pragma: no cover - network/SDK shape guard
-        log.debug("_resolve_auth_user_id_by_email lookup failed email=%s: %s", e[:3] + "***", le)
+        from ...database import db
+        from sqlalchemy import text
+
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM auth.users WHERE lower(email) = :e ORDER BY created_at LIMIT 1"),
+                {"e": e},
+            ).fetchone()
+        if row:
+            uid = str(row[0])
+            if uid and uid != "None":
+                return uid
+    except Exception as le:  # pragma: no cover - DB/driver shape guard
+        log.debug("_resolve_auth_user_id_by_email DB lookup failed email=%s: %s", e[:3] + "***", le)
     return None
 
 
@@ -114,7 +126,7 @@ def set_supabase_auth_password(email: str, new_password: str) -> bool:
         log.debug("set_supabase_auth_password: no admin client: %s", ex)
         return True
 
-    uid = _resolve_auth_user_id_by_email(client, e)
+    uid = _resolve_auth_user_id_by_email(e)
     if not uid:
         log.warning(
             "set_supabase_auth_password: no Supabase auth user for email=%s — nothing to update",
