@@ -22,10 +22,38 @@ from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin_or_hr
 from ...database import db
+from ..db import SessionLocal
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hr/policies", tags=["hr_policies"])
+
+
+def _audit_policy(user: Dict[str, Any], policy_id: str, action: str,
+                  event: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """[AIQ-932] Fail-soft canonical audit for a relocation-policy mutation. The
+    write goes through the Supabase client (no SQLAlchemy router conn), so audit
+    runs in its own SessionLocal txn."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="relocation_policy",
+                entity_id=str(policy_id),
+                action_type=action,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": event, **(extra or {})},
+            )
+            asession.commit()
+    except Exception:
+        log.exception("audit: policy %s id=%s", event, policy_id)
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +223,9 @@ def create_policy(
         log.exception("create_policy insert failed org=%s", org_id)
         raise HTTPException(status_code=502, detail=f"Database error: {exc}") from exc
 
+    _audit_policy(user, row.get("id") or new_row["id"], ACTION_INSERT,
+                  "policy_created", {"version": next_version, "label": body.label})
+
     return CreatePolicyResponse(policy=PolicyVersionOut(**row))
 
 
@@ -232,6 +263,9 @@ def update_policy(
 
     if not rows:
         raise HTTPException(status_code=404, detail="Policy version not found.")
+
+    _audit_policy(user, policy_id, ACTION_UPDATE, "policy_updated",
+                  {"fields": list(updates.keys())})
 
     return CreatePolicyResponse(policy=PolicyVersionOut(**rows[0]))
 
@@ -271,5 +305,8 @@ def activate_policy(
 
     if not row:
         raise HTTPException(status_code=404, detail="Policy version not found after activation.")
+
+    _audit_policy(user, policy_id, ACTION_UPDATE, "policy_activated",
+                  {"version": row.get("version")})
 
     return CreatePolicyResponse(policy=PolicyVersionOut(**row))
