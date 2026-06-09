@@ -411,9 +411,10 @@ def _auto_id_col() -> str:
 # mixed in here. backend.db.cases imports nothing from this module, so there is
 # no import cycle. Callers (db.create_case(...) etc.) are unchanged via MRO.
 from .db.cases import CasesMixin
+from .db.policies import PoliciesMixin
 
 
-class Database(CasesMixin):
+class Database(CasesMixin, PoliciesMixin):
     def __init__(self) -> None:
         self.engine = _engine
         # F3/AIQ-834: least-privilege request-path engine (relopass_api when
@@ -12488,67 +12489,12 @@ class Database(CasesMixin):
             except Exception:
                 d[key] = None
 
-    def list_policy_benefit_rules(self, policy_version_id: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT * FROM policy_benefit_rules WHERE policy_version_id = :vid ORDER BY benefit_key"),
-                {"vid": policy_version_id},
-            ).fetchall()
-        items = self._rows_to_list(rows)
-        for d in items:
-            self._parse_json_col(d, "metadata_json")
-        return items
-
-    def list_policy_exclusions(self, policy_version_id: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT * FROM policy_exclusions WHERE policy_version_id = :vid"),
-                {"vid": policy_version_id},
-            ).fetchall()
-        return self._rows_to_list(rows)
-
-    def list_policy_evidence_requirements(self, policy_version_id: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT * FROM policy_evidence_requirements WHERE policy_version_id = :vid"),
-                {"vid": policy_version_id},
-            ).fetchall()
-        items = self._rows_to_list(rows)
-        for d in items:
-            self._parse_json_col(d, "evidence_items_json")
-        return items
-
-    def list_policy_rule_conditions(self, policy_version_id: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT * FROM policy_rule_conditions WHERE policy_version_id = :vid"),
-                {"vid": policy_version_id},
-            ).fetchall()
-        items = self._rows_to_list(rows)
-        for d in items:
-            self._parse_json_col(d, "condition_value_json")
-        return items
+    # [AUDIT-C1.3] policies batch 1 — list_policy_benefit_rules, list_policy_exclusions,
+    # list_policy_evidence_requirements, list_policy_rule_conditions,
+    # list_policy_family_applicability, list_policy_tier_overrides extracted to
+    # backend/db/policies.py (PoliciesMixin). Database inherits them, callers unchanged.
 
     # [AUDIT-C1.2] cases batch 10b extracted to backend/db/cases.py (CasesMixin).
-
-    def list_policy_family_applicability(self, policy_version_id: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT * FROM policy_family_status_applicability WHERE policy_version_id = :vid"),
-                {"vid": policy_version_id},
-            ).fetchall()
-        return self._rows_to_list(rows)
-
-    def list_policy_tier_overrides(self, policy_version_id: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT * FROM policy_tier_overrides WHERE policy_version_id = :vid"),
-                {"vid": policy_version_id},
-            ).fetchall()
-        items = self._rows_to_list(rows)
-        for d in items:
-            self._parse_json_col(d, "override_limits_json")
-        return items
 
     def list_hr_benefit_rule_overrides(self, policy_version_id: str) -> List[Dict[str, Any]]:
         try:
