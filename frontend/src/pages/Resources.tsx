@@ -167,9 +167,14 @@ export const Resources: React.FC = () => {
             Open a case and set a destination to see corridor requirements here.
             {!isCaseRoute && ' Or open Requirements from a case.'}
           </p>
-          <Button className="mt-4" onClick={() => navigate(buildRoute('employeeDashboard'))}>
-            Go to dashboard
-          </Button>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button onClick={() => navigate(buildRoute('employeeJourney'))}>
+              Start relocation setup
+            </Button>
+            <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
+              Go to dashboard
+            </Button>
+          </div>
         </Card>
       </AppShell>
     );

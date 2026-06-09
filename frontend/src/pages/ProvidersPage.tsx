@@ -292,8 +292,11 @@ export const ProvidersPage: React.FC = () => {
       <AppShell section="Employee" title="Services" subtitle="Select what you need for this move.">
         <Alert variant="info" className="mb-6">
           <p className="mb-3">No case linked. Select a case to access services for this relocation.</p>
-          <div className="flex gap-3">
-            <Button onClick={() => refetch()}>Refresh assignment</Button>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => navigate(buildRoute('employeeJourney'))}>
+              Start relocation setup
+            </Button>
+            <Button variant="outline" onClick={() => refetch()}>Refresh assignment</Button>
             <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
               Back to Dashboard
             </Button>
