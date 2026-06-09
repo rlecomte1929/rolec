@@ -108,13 +108,7 @@ class CanonicalCaseEnumGuardTests(unittest.TestCase):
     """
 
     def _bridge_source(self) -> str:
-        import os
-        path = os.path.join(_REPO_ROOT, "backend", "database.py")
-        with open(path, "r", encoding="utf-8") as fh:
-            src = fh.read()
-        start = src.index("def _ensure_canonical_case_from_wizard")
-        end = src.index("\n    def ", start + 1)
-        return src[start:end]
+        return _read_def("def _ensure_canonical_case_from_wizard")
 
     def test_bridge_uses_valid_status_and_stage(self) -> None:
         body = self._bridge_source()
@@ -128,6 +122,22 @@ class CanonicalCaseEnumGuardTests(unittest.TestCase):
 _REPO_ROOT = __import__("os").path.dirname(
     __import__("os").path.dirname(__import__("os").path.dirname(__file__))
 )
+
+
+def _read_def(marker: str) -> str:
+    """Source of a Database/CasesMixin method, searching BOTH backend/database.py
+    and the extracted backend/db/cases.py (AUDIT-C1.2 moved cases methods out of
+    the monolith into a mixin; these source guards must follow them)."""
+    import os
+    for parts in (("backend", "database.py"), ("backend", "db", "cases.py")):
+        with open(os.path.join(_REPO_ROOT, *parts), "r", encoding="utf-8") as fh:
+            src = fh.read()
+        if marker in src:
+            start = src.index(marker)
+            rest = src[start + 1:]
+            end = start + 1 + rest.index("\n    def ") if "\n    def " in rest else len(src)
+            return src[start:end]
+    raise AssertionError(f"{marker!r} not found in backend/database.py or backend/db/cases.py")
 
 
 class CanonicalCaseBridgeCompanyFallbackGuardTests(unittest.TestCase):
@@ -144,13 +154,7 @@ class CanonicalCaseBridgeCompanyFallbackGuardTests(unittest.TestCase):
     """
 
     def _src(self, marker: str) -> str:
-        import os
-        path = os.path.join(_REPO_ROOT, "backend", "database.py")
-        with open(path, "r", encoding="utf-8") as fh:
-            src = fh.read()
-        start = src.index(marker)
-        end = src.index("\n    def ", start + 1)
-        return src[start:end]
+        return _read_def(marker)
 
     def test_resolver_has_relocation_hr_and_profile_fallbacks(self) -> None:
         body = self._src("def _resolve_canonical_case_company")
@@ -176,14 +180,8 @@ class CaseDependentsBridgeGuardTests(unittest.TestCase):
     forms; the household intake writes only the wizard draft, so without this
     sync no family form is ever generated. Behavior is verified live."""
 
-    def _src(self, marker: str, path_parts) -> str:
-        import os
-        path = os.path.join(_REPO_ROOT, *path_parts)
-        with open(path, "r", encoding="utf-8") as fh:
-            src = fh.read()
-        start = src.index(marker)
-        end = src.index("\n    def ", start + 1)
-        return src[start:end]
+    def _src(self, marker: str, path_parts=None) -> str:
+        return _read_def(marker)
 
     def test_sync_writes_case_dependents_with_relationships(self) -> None:
         body = self._src("def _sync_case_dependents_from_draft", ("backend", "database.py"))
