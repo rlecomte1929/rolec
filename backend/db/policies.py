@@ -449,3 +449,158 @@ class PoliciesMixin:
         else:
             with self.engine.begin() as conn:
                 _ins(conn)
+
+    # ── policy benefit-rule / exclusion / condition writers + benefits (AUDIT-C1.3 batch 5) ──
+
+    def update_policy_benefit_rule(
+        self,
+        rule_id: str,
+        amount_value: Optional[float] = None,
+        amount_unit: Optional[str] = None,
+        currency: Optional[str] = None,
+        frequency: Optional[str] = None,
+        description: Optional[str] = None,
+        review_status: Optional[str] = None,
+        benefit_key: Optional[str] = None,
+        metadata_json: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        fields = ["updated_at = :now"]
+        params: Dict[str, Any] = {"id": rule_id, "now": datetime.utcnow().isoformat()}
+        if amount_value is not None:
+            fields.append("amount_value = :av")
+            params["av"] = amount_value
+        if amount_unit is not None:
+            fields.append("amount_unit = :au")
+            params["au"] = amount_unit
+        if currency is not None:
+            fields.append("currency = :cur")
+            params["cur"] = currency
+        if frequency is not None:
+            fields.append("frequency = :freq")
+            params["freq"] = frequency
+        if description is not None:
+            fields.append("description = :desc")
+            params["desc"] = description
+        if review_status is not None:
+            fields.append("review_status = :rs")
+            params["rs"] = review_status
+        if benefit_key is not None:
+            fields.append("benefit_key = :bk")
+            params["bk"] = benefit_key
+        if metadata_json is not None:
+            fields.append("metadata_json = :meta")
+            params["meta"] = json.dumps(metadata_json)
+        if len(fields) <= 1:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE policy_benefit_rules SET {', '.join(fields)} WHERE id = :id"),
+                params,
+            )
+
+    def update_policy_exclusion(
+        self,
+        excl_id: str,
+        description: Optional[str] = None,
+        review_status: Optional[str] = None,
+    ) -> None:
+        fields = ["updated_at = :now"]
+        params: Dict[str, Any] = {"id": excl_id, "now": datetime.utcnow().isoformat()}
+        if description is not None:
+            fields.append("description = :desc")
+            params["desc"] = description
+        if review_status is not None:
+            fields.append("review_status = :rs")
+            params["rs"] = review_status
+        if len(fields) <= 1:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE policy_exclusions SET {', '.join(fields)} WHERE id = :id"),
+                params,
+            )
+
+    def update_policy_rule_condition(
+        self,
+        cond_id: str,
+        condition_value_json: Optional[Dict[str, Any]] = None,
+        review_status: Optional[str] = None,
+    ) -> None:
+        fields = ["updated_at = :now"]
+        params: Dict[str, Any] = {"id": cond_id, "now": datetime.utcnow().isoformat()}
+        if condition_value_json is not None:
+            fields.append("condition_value_json = :val")
+            params["val"] = json.dumps(condition_value_json)
+        if review_status is not None:
+            fields.append("review_status = :rs")
+            params["rs"] = review_status
+        if len(fields) <= 1:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE policy_rule_conditions SET {', '.join(fields)} WHERE id = :id"),
+                params,
+            )
+
+    def get_policy_benefit_rule(self, rule_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM policy_benefit_rules WHERE id = :id"),
+                {"id": rule_id},
+            ).fetchone()
+        d = self._row_to_dict(row)
+        if d:
+            self._parse_json_col(d, "metadata_json")
+        return d
+
+    def list_policy_benefits(self, policy_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT * FROM policy_extracted_benefits WHERE policy_id = :pid ORDER BY service_category, benefit_label"),
+                {"pid": policy_id},
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            try:
+                item["eligibility"] = json.loads(item.get("eligibility") or "null")
+            except Exception:
+                item["eligibility"] = None
+            try:
+                item["limits"] = json.loads(item.get("limits") or "null")
+            except Exception:
+                item["limits"] = None
+        return items
+
+    def replace_policy_benefits(
+        self,
+        policy_id: str,
+        benefits: List[Dict[str, Any]],
+        updated_by: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM policy_extracted_benefits WHERE policy_id = :pid"), {"pid": policy_id})
+            for item in benefits:
+                conn.execute(
+                    text(
+                        "INSERT INTO policy_extracted_benefits "
+                        "(id, policy_id, service_category, benefit_key, benefit_label, eligibility, limits, notes, "
+                        "source_quote, source_section, confidence, updated_by, updated_at) "
+                        "VALUES (:id, :pid, :cat, :key, :label, :elig, :limits, :notes, :quote, :section, :conf, :ub, :ua)"
+                    ),
+                    {
+                        "id": item.get("id") or str(uuid.uuid4()),
+                        "pid": policy_id,
+                        "cat": item.get("service_category"),
+                        "key": item.get("benefit_key"),
+                        "label": item.get("benefit_label"),
+                        "elig": json.dumps(item.get("eligibility")) if item.get("eligibility") is not None else None,
+                        "limits": json.dumps(item.get("limits")) if item.get("limits") is not None else None,
+                        "notes": item.get("notes"),
+                        "quote": item.get("source_quote"),
+                        "section": item.get("source_section"),
+                        "conf": item.get("confidence"),
+                        "ub": updated_by,
+                        "ua": now,
+                    },
+                )
