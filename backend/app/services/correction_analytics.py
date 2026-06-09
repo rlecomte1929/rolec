@@ -113,6 +113,84 @@ def weekly_corrections_by_reason(
     return rows
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AIQ-871: group_by-aware pivoted counts for the AIQ-598 trend dashboard.
+# ─────────────────────────────────────────────────────────────────────────────
+
+GROUP_BY_DIMENSIONS: tuple[str, ...] = ("reason", "agent", "corridor", "clause_type")
+
+# SQL expression per dimension. 'agent' = the extracting AI agent recorded in the
+# correction's context_snapshot (the same JSONB the clause_type dimension reads).
+# rce.corrections has no dedicated agent column; context_snapshot->>'agent' is the
+# canonical source once the C1-12 Resolution UI logs it. NULL → 'unknown' bucket.
+_GROUP_BY_SQL: Dict[str, str] = {
+    "reason": "co.reason_code",
+    "agent": "(co.context_snapshot->>'agent')",
+    "corridor": "ca.corridor_id",
+    "clause_type": "(co.context_snapshot->>'clause_type')",
+}
+
+
+def weekly_correction_counts(
+    employer_id: Optional[str] = None,
+    group_by: str = "reason",
+    weeks_back: int = 4,
+) -> Dict[str, Any]:
+    """Weekly correction counts pivoted by one dimension (AIQ-871).
+
+    Returns the exact shape the AIQ-598 trend dashboard consumes::
+
+        {
+          "buckets": [{"week_start": "2026-05-25", "counts": {"OCR_ERROR": 3, ...}}, ...],
+          "series":  ["OCR_ERROR", ...],   # distinct dimension values, stable order
+          "group_by": "reason",
+        }
+
+    ``group_by`` is one of ``GROUP_BY_DIMENSIONS`` (unknown falls back to
+    ``reason``). A NULL dimension value is bucketed under ``'unknown'``. Same
+    tenant scoping + ISO-week window as ``weekly_corrections_by_reason``.
+    """
+    if group_by not in _GROUP_BY_SQL:
+        group_by = "reason"
+    dim_expr = _GROUP_BY_SQL[group_by]
+    weeks_back = max(1, min(int(weeks_back or 4), 52))
+    window_start = _week_start_utc() - timedelta(weeks=weeks_back - 1)
+
+    sql = f"""
+        SELECT
+            date_trunc('week', co.corrected_at) AS week_start,
+            COALESCE({dim_expr}, 'unknown')      AS dim_value,
+            COUNT(*)                             AS count
+        FROM rce.corrections AS co
+        LEFT JOIN rce.cases AS ca ON ca.case_id = co.case_id
+        WHERE co.corrected_at >= :window_start
+          AND (:employer_id IS NULL OR ca.employer_id = CAST(:employer_id AS uuid))
+        GROUP BY 1, 2
+        ORDER BY 1 ASC
+    """
+    with db.engine.begin() as conn:
+        result = conn.execute(
+            text(sql), {"window_start": window_start, "employer_id": employer_id}
+        ).mappings().all()
+
+    by_week: Dict[str, Dict[str, int]] = {}
+    series: set = set()
+    for r in result:
+        ws = r["week_start"]
+        if hasattr(ws, "date"):
+            wk = ws.date().isoformat()
+        elif hasattr(ws, "isoformat"):
+            wk = ws.isoformat()
+        else:
+            wk = str(ws)[:10]
+        val = str(r["dim_value"])
+        series.add(val)
+        by_week.setdefault(wk, {})[val] = int(r["count"])
+
+    buckets = [{"week_start": wk, "counts": by_week[wk]} for wk in sorted(by_week)]
+    return {"buckets": buckets, "series": sorted(series), "group_by": group_by}
+
+
 def summarize_by_reason(rows: List[Dict[str, Any]]) -> Dict[str, int]:
     """Collapse the grouped rows into a total-per-reason map, zero-filled.
 

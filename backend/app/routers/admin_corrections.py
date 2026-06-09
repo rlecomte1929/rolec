@@ -20,6 +20,7 @@ from ..auth_deps import require_admin_or_hr
 from ...database import db
 from ..services.correction_analytics import (
     summarize_by_reason,
+    weekly_correction_counts,
     weekly_corrections_by_reason,
 )
 
@@ -28,8 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 def _caller_company_id(user: Dict[str, Any]) -> Optional[str]:
-    profile = db.get_profile_record(user.get("id"))
-    company_id = (profile or {}).get("company_id") or user.get("company")
+    # HR↔company links via hr_users for legacy/seed HR (the profiles.company_id
+    # path is empty for those), so resolve hr_users first, then fall back to the
+    # profile / token. Mirrors policy_config._get_hr_company_id (AIQ-871 fix:
+    # the demo HR has no profiles.company_id and was 403'ing on this endpoint).
+    uid = user.get("id")
+    company_id = db.get_hr_company_id(uid) if uid else None
+    if not company_id:
+        profile = db.get_profile_record(uid) if uid else None
+        company_id = (profile or {}).get("company_id") or user.get("company")
     return str(company_id) if company_id else None
 
 
@@ -41,9 +49,17 @@ def corrections_by_reason(
         "Ignored for HR callers (always pinned to their own employer).",
     ),
     weeks_back: int = Query(4, ge=1, le=52),
+    group_by: Optional[str] = Query(
+        None,
+        description="Dimension to pivot weekly counts by: reason | agent | "
+        "corridor | clause_type. When set, returns the {buckets, series, "
+        "group_by} shape the AIQ-598 trend dashboard consumes. Omit for the "
+        "legacy 3-way bucket shape.",
+    ),
     user: Dict[str, Any] = Depends(require_admin_or_hr),
 ) -> Dict[str, Any]:
-    """Weekly correction counts grouped by reason_code, corridor, and clause_type."""
+    """Weekly correction counts. Default: grouped by reason_code/corridor/
+    clause_type. With ``?group_by=...``: pivoted single-dimension counts."""
     is_admin = bool(user.get("is_admin"))
     caller_company = _caller_company_id(user)
 
@@ -59,6 +75,20 @@ def corrections_by_reason(
             )
         scope_employer_id = caller_company
 
+    # AIQ-871: pivoted single-dimension shape for the trend dashboard.
+    if group_by is not None:
+        result = weekly_correction_counts(
+            employer_id=scope_employer_id,
+            group_by=group_by,
+            weeks_back=weeks_back,
+        )
+        return {
+            "employer_id": scope_employer_id,
+            "weeks_back": weeks_back,
+            **result,
+        }
+
+    # Legacy default: flat 3-way buckets (AIQ-554 contract, unchanged).
     rows: List[Dict[str, Any]] = weekly_corrections_by_reason(
         employer_id=scope_employer_id,
         weeks_back=weeks_back,

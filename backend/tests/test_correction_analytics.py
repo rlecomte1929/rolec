@@ -193,6 +193,34 @@ class CorrectionAnalyticsTests(unittest.TestCase):
         self.profile_patch.start()
         self.addCleanup(self.profile_patch.stop)
 
+        # AIQ-871: legacy/seed HR resolve company via hr_users. Default to None so
+        # the existing HR tests fall back to user["company"]; the hr_users test
+        # overrides this locally.
+        self.hr_company_patch = mock.patch.object(
+            router_module.db, "get_hr_company_id", side_effect=lambda uid: None
+        )
+        self.hr_company_patch.start()
+        self.addCleanup(self.hr_company_patch.stop)
+
+        # AIQ-871: weekly_correction_counts also references rce.* — strip the
+        # schema prefix for SQLite exactly as weekly_corrections_by_reason does.
+        self._orig_counts = svc.weekly_correction_counts
+
+        def _counts_no_schema(employer_id=None, group_by="reason", weeks_back=4):
+            with mock.patch.object(svc, "text", lambda s: text(s.replace("rce.", ""))):
+                return self._orig_counts(
+                    employer_id=employer_id, group_by=group_by, weeks_back=weeks_back
+                )
+
+        self.counts_patch = mock.patch.object(svc, "weekly_correction_counts", _counts_no_schema)
+        self.counts_patch.start()
+        self.addCleanup(self.counts_patch.stop)
+        self.router_counts_patch = mock.patch.object(
+            router_module, "weekly_correction_counts", _counts_no_schema
+        )
+        self.router_counts_patch.start()
+        self.addCleanup(self.router_counts_patch.stop)
+
     # --- seeding -----------------------------------------------------------
     def _seed_case(self, case_id: str, corridor: str, employer_id: str) -> None:
         with self.engine.begin() as conn:
@@ -286,7 +314,7 @@ class CorrectionAnalyticsTests(unittest.TestCase):
         emp = str(uuid.uuid4())
         self._seed_twenty(emp)
         admin = _make_user("ADMIN", company=None, is_admin=True)
-        resp = corrections_by_reason(employer_id=None, weeks_back=4, user=admin)
+        resp = corrections_by_reason(employer_id=None, weeks_back=4, group_by=None, user=admin)
         self.assertEqual(resp["total"], 20)
         self.assertEqual(sum(resp["totals_by_reason"].values()), 20)
         # totals_by_reason is zero-filled across the full taxonomy.
@@ -304,7 +332,7 @@ class CorrectionAnalyticsTests(unittest.TestCase):
         self._seed_correction(case_b, "OTHER", "schooling", 1)
 
         hr = _make_user("HR", company=emp_a)
-        resp = corrections_by_reason(employer_id=emp_b, weeks_back=4, user=hr)
+        resp = corrections_by_reason(employer_id=emp_b, weeks_back=4, group_by=None, user=hr)
         # HR override is ignored — still pinned to company-a's 20 rows.
         self.assertEqual(resp["total"], 20)
         self.assertEqual(resp["employer_id"], emp_a)
@@ -314,6 +342,58 @@ class CorrectionAnalyticsTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             corrections_by_reason(employer_id=None, weeks_back=4, user=hr)
         self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_hr_company_resolved_via_hr_users(self) -> None:
+        # AIQ-871 fix: HR whose company links via hr_users (empty profile.company_id,
+        # no token company) resolves and is no longer 403'd.
+        with mock.patch.object(
+            router_module.db, "get_hr_company_id", side_effect=lambda uid: "company-via-hrusers"
+        ):
+            self._seed_twenty("company-via-hrusers")
+            hr = _make_user("HR", company=None)
+            resp = corrections_by_reason(employer_id=None, weeks_back=4, group_by=None, user=hr)
+            self.assertEqual(resp["employer_id"], "company-via-hrusers")
+            self.assertEqual(resp["total"], 20)
+
+    def test_endpoint_group_by_reason_pivoted_shape(self) -> None:
+        # AIQ-871: ?group_by= returns the AIQ-598 contract {buckets,series,group_by}.
+        emp = str(uuid.uuid4())
+        self._seed_twenty(emp)
+        admin = _make_user("ADMIN", company=None, is_admin=True)
+        resp = corrections_by_reason(employer_id=None, weeks_back=4, group_by="reason", user=admin)
+        self.assertEqual(resp["group_by"], "reason")
+        self.assertIn("series", resp)
+        self.assertTrue(all("week_start" in b and "counts" in b for b in resp["buckets"]))
+        total = sum(n for b in resp["buckets"] for n in b["counts"].values())
+        self.assertEqual(total, 20)
+        self.assertIn("OCR_ERROR", resp["series"])
+
+    def test_endpoint_group_by_agent(self) -> None:
+        # AIQ-871: agent dimension reads context_snapshot->>'agent'.
+        emp = str(uuid.uuid4())
+        case = str(uuid.uuid4())
+        self._seed_case(case, "IN-DE", emp)
+        for agent, n in (("passport_extractor", 2), ("iban_extractor", 1)):
+            for _ in range(n):
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "INSERT INTO corrections (correction_id, case_id, reason_code, "
+                            "context_snapshot, corrected_at) VALUES (:i,:c,:r,:s,:t)"
+                        ),
+                        {
+                            "i": str(uuid.uuid4()), "c": case, "r": "OCR_ERROR",
+                            "s": json.dumps({"agent": agent}),
+                            "t": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(sep=" "),
+                        },
+                    )
+        admin = _make_user("ADMIN", company=None, is_admin=True)
+        resp = corrections_by_reason(employer_id=None, weeks_back=4, group_by="agent", user=admin)
+        self.assertEqual(resp["group_by"], "agent")
+        self.assertEqual(set(resp["series"]), {"passport_extractor", "iban_extractor"})
+        counts = resp["buckets"][0]["counts"]
+        self.assertEqual(counts["passport_extractor"], 2)
+        self.assertEqual(counts["iban_extractor"], 1)
 
     def test_zero_correction_week_digest(self) -> None:
         # No data seeded → empty buckets, but digest still renders full taxonomy.
