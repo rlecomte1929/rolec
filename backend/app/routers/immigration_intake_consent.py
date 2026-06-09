@@ -9,6 +9,7 @@ Houses 3 endpoints:
 from __future__ import annotations
 
 import hashlib
+import logging
 import uuid
 from datetime import date
 from typing import Any, Dict, List, Optional
@@ -19,6 +20,12 @@ from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.immigration_requirement_service import (
     RiskFlag,
     evaluate_risks,
@@ -32,6 +39,8 @@ from ..services.immigration_service import (
     _log_access,
     _now_iso,
 )
+
+log = logging.getLogger(__name__)
 
 CONSENT_TEXT_VERSION = "v1.0-2026-05"
 
@@ -266,6 +275,19 @@ def record_consent(
                     "now": now,
                 },
             )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="consent_record",
+                    entity_id=record_id,
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user["id"],
+                    new_value={"event": "consent_recorded", "purpose": purpose,
+                               "case_id": case_id, "on_behalf_of": body.employee_id},
+                )
+            except Exception:
+                log.exception("audit: record_consent(hr) case=%s purpose=%s", case_id, purpose)
         if purpose == "immigration_processing":
             primary_id = record_id
 
@@ -346,6 +368,19 @@ def record_consent_employee(
                     "now": now,
                 },
             )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="consent_record",
+                    entity_id=record_id,
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=employee_id,
+                    new_value={"event": "consent_recorded", "purpose": purpose,
+                               "case_id": case_id},
+                )
+            except Exception:
+                log.exception("audit: record_consent(emp) case=%s purpose=%s", case_id, purpose)
         if purpose == "immigration_processing":
             primary_id = record_id
 
@@ -431,6 +466,20 @@ def withdraw_consent_employee(
             },
         )
         affected = result.rowcount or 0
+        if affected > 0:
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="consent_record",
+                    entity_id=case_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=employee_id,
+                    new_value={"event": "consent_withdrawn", "purpose": body.purpose,
+                               "records_withdrawn": affected},
+                )
+            except Exception:
+                log.exception("audit: withdraw_consent case=%s purpose=%s", case_id, body.purpose)
 
     if affected == 0:
         raise HTTPException(

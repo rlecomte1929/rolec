@@ -18,6 +18,7 @@ immigration.py router is retained but no longer wired.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +28,12 @@ from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.immigration_interview_engine import (
     compute_completion_pct,
     compute_section_progress,
@@ -42,6 +49,8 @@ from ..services.immigration_service import (
     _serialize_imm_case,
     _ts,
 )
+
+log = logging.getLogger(__name__)
 
 VALID_PERMIT_TYPES = {
     "eu_blue_card", "work_permit", "skilled_worker_visa", "eea_registration", "other"
@@ -135,6 +144,19 @@ def create_milestone(
                 "now": now,
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="immigration_milestone",
+                entity_id=milestone_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=hr_user.get("id"),
+                new_value={"event": "milestone_created", "case_id": case_id,
+                           "milestone_type": body.milestone_type},
+            )
+        except Exception:
+            log.exception("audit: create_milestone case=%s", case_id)
     return {"id": milestone_id, "milestone_type": body.milestone_type, "status": "pending"}
 
 
@@ -169,6 +191,19 @@ def update_milestone(
             """),
             params,
         ).mappings().first()
+        if result:
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="immigration_milestone",
+                    entity_id=milestone_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user.get("id"),
+                    new_value={"event": "milestone_updated", "fields": list(updates.keys())},
+                )
+            except Exception:
+                log.exception("audit: update_milestone ms=%s", milestone_id)
 
     if not result:
         raise HTTPException(status_code=404, detail="Milestone not found.")
@@ -349,6 +384,19 @@ def create_immigration_case(
                 "now": now,
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="immigration_case",
+                entity_id=imm_case_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=hr_user.get("id"),
+                new_value={"event": "immigration_case_created", "case_id": body.case_id,
+                           "permit_type": body.permit_type},
+            )
+        except Exception:
+            log.exception("audit: create_immigration_case case=%s", body.case_id)
 
     # Fetch and return the full record
     with db.engine.begin() as conn:
