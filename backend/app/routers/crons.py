@@ -41,6 +41,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
+from ..services.milestone_reminders import run_milestone_reminder_cron
 from ..services.monitoring_alerts import send_test_alert
 from ..services.rule_change_notifier import notify_superseded_rules
 from ..services.source_reliability_service import recompute_reliability_scores
@@ -74,6 +75,20 @@ def deadline_reminder(request: Request) -> Dict[str, Any]:
     _verify_cron_secret(request)
     log.info("deadline_reminder cron triggered")
     result = run_deadline_reminder_cron()
+    return {"ok": True, **result}
+
+
+@router.post("/milestone-reminders")
+def milestone_reminders(request: Request) -> Dict[str, Any]:
+    """
+    [AIQ-656] Milestone D-7/D-3/D-0 reminder cron (scheduled hourly via pg_cron).
+    Scans case_milestones for target_date = today + 7/3/0 days and writes one
+    notification_outbox row per due milestone. Idempotent on (milestone_id,
+    day_offset) via public.case_milestone_reminders, so re-runs never duplicate.
+    """
+    _verify_cron_secret(request)
+    log.info("milestone_reminders cron triggered")
+    result = run_milestone_reminder_cron()
     return {"ok": True, **result}
 
 
