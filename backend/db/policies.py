@@ -1686,3 +1686,137 @@ class PoliciesMixin:
                 {"cid": company_id},
             ).fetchone()
         return self._row_to_dict(row) if row else None
+
+    # ── assistant binding upsert + knowledge-snapshot getters (AUDIT-C1.3 batch 14) ──
+
+    def upsert_company_policy_assistant_binding(
+        self,
+        company_id: str,
+        active_snapshot_id: Optional[str],
+        policy_document_id: Optional[str],
+    ) -> None:
+        if not self.policy_assistant_tables_available():
+            return
+        from ..database import _is_sqlite
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO company_policy_assistant_bindings
+                        (company_id, active_snapshot_id, policy_document_id, updated_at)
+                        VALUES (:cid, :sid, :doc, :now)
+                        ON CONFLICT(company_id) DO UPDATE SET
+                          active_snapshot_id = excluded.active_snapshot_id,
+                          policy_document_id = excluded.policy_document_id,
+                          updated_at = excluded.updated_at
+                        """
+                    ),
+                    {"cid": company_id, "sid": active_snapshot_id, "doc": policy_document_id, "now": now},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO company_policy_assistant_bindings
+                        (company_id, active_snapshot_id, policy_document_id, updated_at)
+                        VALUES (:cid, :sid, :doc, :now::timestamptz)
+                        ON CONFLICT (company_id) DO UPDATE SET
+                          active_snapshot_id = EXCLUDED.active_snapshot_id,
+                          policy_document_id = EXCLUDED.policy_document_id,
+                          updated_at = EXCLUDED.updated_at
+                        """
+                    ),
+                    {"cid": company_id, "sid": active_snapshot_id, "doc": policy_document_id, "now": now},
+                )
+
+    def get_active_policy_knowledge_snapshot_for_company(self, company_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT s.* FROM policy_knowledge_snapshots s
+                    WHERE s.company_id = :cid
+                      AND COALESCE(
+                        NULLIF(TRIM(s.activation_state), ''),
+                        CASE WHEN s.status = 'active_for_assistant' THEN 'active_for_assistant' ELSE s.status END
+                      ) = 'active_for_assistant'
+                    ORDER BY s.created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"cid": company_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def get_latest_policy_knowledge_snapshot_for_document(self, policy_document_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_knowledge_snapshots
+                    WHERE policy_document_id = :id
+                    ORDER BY COALESCE(revision_number, 0) DESC, created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"id": policy_document_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def count_policy_facts_for_document_via_snapshots(self, policy_document_id: str) -> int:
+        """Count facts tied to this document through any snapshot (latest snapshot row used in UI)."""
+        snap = self.get_latest_policy_knowledge_snapshot_for_document(policy_document_id)
+        if not snap:
+            return 0
+        return self.count_policy_facts_for_snapshot(str(snap.get("id")))
+
+    def policy_hardening_tables_available(self) -> bool:
+        from ..database import _is_sqlite
+        try:
+            with self.engine.connect() as conn:
+                if _is_sqlite:
+                    r = conn.execute(
+                        text(
+                            "SELECT name FROM sqlite_master WHERE type='table' AND name='policy_extraction_locks'"
+                        )
+                    ).fetchone()
+                    return r is not None
+                r = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'policy_extraction_locks'"
+                    )
+                ).fetchone()
+                return r is not None
+        except Exception:
+            return False
+
+    def get_policy_knowledge_snapshot_by_id(self, snapshot_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM policy_knowledge_snapshots WHERE id = :id"),
+                {"id": snapshot_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def next_snapshot_revision_number(self, policy_document_id: str) -> int:
+        if not self.policy_assistant_tables_available():
+            return 1
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT COALESCE(MAX(revision_number), 0) AS m FROM policy_knowledge_snapshots "
+                    "WHERE policy_document_id = :id"
+                ),
+                {"id": policy_document_id},
+            ).fetchone()
+        m = int(row[0]) if row and row[0] is not None else 0
+        return m + 1
