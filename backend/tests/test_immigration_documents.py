@@ -57,10 +57,12 @@ class ImmigrationUploadTests(unittest.TestCase):
         # Default: a valid PDF passes the size/MIME gate.
         _UV.read_and_validate = AsyncMock(return_value=(b"data", "x.pdf", "application/pdf"))
 
-    @staticmethod
-    def _call():
+    def _call(self):
+        self.bg = MagicMock()
         return asyncio.run(
-            upload_immigration_document(case_id="case-1", file=MagicMock(), user=_USER)
+            upload_immigration_document(
+                case_id="case-1", background_tasks=self.bg, file=MagicMock(), user=_USER
+            )
         )
 
     def test_valid_upload_returns_document_contract(self) -> None:
@@ -73,6 +75,10 @@ class ImmigrationUploadTests(unittest.TestCase):
         self.assertEqual(store.call_args.kwargs["uploaded_by"], "user-1")
         self.assertEqual(store.call_args.kwargs["case_id"], "case-1")
         self.assertEqual(store.call_args.kwargs["mime_type"], "application/pdf")
+        # BL-OCR.3: extraction scheduled in the background for the stored doc.
+        self.bg.add_task.assert_called_once()
+        self.assertIs(self.bg.add_task.call_args.args[0], router_mod.run_extraction)
+        self.assertEqual(self.bg.add_task.call_args.kwargs["document_id"], "d1")
 
     def test_oversized_file_rejected_413(self) -> None:
         _UV.read_and_validate = AsyncMock(side_effect=HTTPException(status_code=413, detail="file_too_large"))
