@@ -1449,7 +1449,7 @@ class Database:
             """))
 
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS policy_benefits (
+                CREATE TABLE IF NOT EXISTS policy_extracted_benefits (
                     id TEXT PRIMARY KEY,
                     policy_id TEXT NOT NULL,
                     service_category TEXT NOT NULL,
@@ -15831,7 +15831,7 @@ class Database:
     def list_policy_benefits(self, policy_id: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
             rows = conn.execute(
-                text("SELECT * FROM policy_benefits WHERE policy_id = :pid ORDER BY service_category, benefit_label"),
+                text("SELECT * FROM policy_extracted_benefits WHERE policy_id = :pid ORDER BY service_category, benefit_label"),
                 {"pid": policy_id},
             ).fetchall()
         items = self._rows_to_list(rows)
@@ -15854,11 +15854,11 @@ class Database:
     ) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
-            conn.execute(text("DELETE FROM policy_benefits WHERE policy_id = :pid"), {"pid": policy_id})
+            conn.execute(text("DELETE FROM policy_extracted_benefits WHERE policy_id = :pid"), {"pid": policy_id})
             for item in benefits:
                 conn.execute(
                     text(
-                        "INSERT INTO policy_benefits "
+                        "INSERT INTO policy_extracted_benefits "
                         "(id, policy_id, service_category, benefit_key, benefit_label, eligibility, limits, notes, "
                         "source_quote, source_section, confidence, updated_by, updated_at) "
                         "VALUES (:id, :pid, :cat, :key, :label, :elig, :limits, :notes, :quote, :section, :conf, :ub, :ua)"
