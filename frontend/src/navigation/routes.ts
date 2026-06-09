@@ -13,6 +13,10 @@ export const ROUTE_DEFS = {
   compliance: { path: '/compliance', roles: ['PUBLIC'] as RouteRole[] },
   access: { path: '/access', roles: ['PUBLIC'] as RouteRole[] },
   auth: { path: '/auth', roles: ['PUBLIC'] as RouteRole[] },
+  /** AIQ-920: /login alias for password managers, bookmarks, and email links —
+   *  renders the same Auth screen (defaults to login mode) so a direct hit
+   *  shows the form instead of bouncing to the marketing homepage. */
+  login: { path: '/login', roles: ['PUBLIC'] as RouteRole[] },
   employeeJourney: { path: '/employee/journey', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeDashboard: { path: '/employee/dashboard', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeQuoteRequest: { path: '/employee/quote-request', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
