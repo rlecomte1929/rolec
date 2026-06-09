@@ -11848,6 +11848,32 @@ def normalize_policy_document(
         readiness_issues = result.get("readiness_issues") or []
         policy_readiness = result.get("policy_readiness")
 
+        # AIQ-931: advance the document out of 'classified' now that normalization
+        # produced a policy/version. Without this the doc reads 'classified'
+        # forever even after a successful normalize+publish (verified live:
+        # /normalize returned normalized+published but processing_status never
+        # moved), which is exactly the "21 docs stuck at classified" symptom.
+        # Publish state is tracked separately on the policy_version; the document
+        # stage is 'normalized' regardless of whether the subsequent publish
+        # succeeds, so set it here. Fail-soft: a status-write hiccup must not
+        # turn a successful normalization into an error response.
+        try:
+            from .app.services.policy_document_intake import STATUS_NORMALIZED
+
+            db.update_policy_document(
+                doc_id,
+                processing_status=STATUS_NORMALIZED,
+                processed_at=datetime.utcnow().isoformat(),
+                request_id=request_id,
+            )
+        except Exception:
+            log.warning(
+                "request_id=%s policy_norm stage=status_advance document_id=%s action=failed",
+                request_id,
+                doc_id,
+                exc_info=True,
+            )
+
         published = False
         published_version: Optional[Dict[str, Any]] = None
         publish_block_detail: Optional[str] = None
