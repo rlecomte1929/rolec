@@ -230,7 +230,11 @@ jobs:
             backend/tests/test_llm_tracing.py \
             backend/tests/test_hr_set_employee_level.py \
             backend/tests/test_notion_ready_queue.py \
-            backend/tests/test_pre_push_hook.py
+            backend/tests/test_pre_push_hook.py \
+            backend/tests/test_exception_requests_router.py \
+            backend/tests/test_normalize_advances_status.py \
+            backend/tests/test_database_no_duplicate_method_defs.py \
+            backend/tests/test_supabase_password_sync.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
