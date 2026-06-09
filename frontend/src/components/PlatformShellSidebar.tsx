@@ -119,8 +119,10 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.adminReviewQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 24 },
       },
+      // 'Ops analytics' lands on /admin/ops; the former 'Workflow analytics'
+      // entry was a second sidebar link to the Queue *tab* of the same page
+      // (reachable via the Ops page tab strip), removed to end the false split.
       { id: 'ops-analytics', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
-      { id: 'workflow-analytics', label: 'Workflow analytics', to: ROUTE_DEFS.adminOpsQueue.path },
       { id: 'resources-cms', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
       { id: 'form-templates', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'prospects', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
