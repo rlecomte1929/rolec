@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
@@ -1024,3 +1024,110 @@ class PoliciesMixin:
                     ),
                     {"ed": ed, "now": now, "vid": vid},
                 )
+
+    # ── company_policies reads/writes (AUDIT-C1.3 batch 9) ───────────────────
+
+    def get_company_policy(self, policy_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM company_policies WHERE id = :id"),
+                {"id": policy_id},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_latest_company_policy(self, company_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT * FROM company_policies WHERE company_id = :cid "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"cid": company_id},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_company_policy_with_published_version(
+        self, company_id: str
+    ) -> Optional[Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """
+        Return (policy, version) for the best-matching published policy for this company.
+
+        Uses one indexed lookup for (policy_id, version_id) instead of N queries per policy row
+        (list_company_policies × get_published_policy_version).
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT cp.id AS policy_id, pv.id AS version_id
+                    FROM company_policies cp
+                    INNER JOIN policy_versions pv
+                        ON pv.policy_id = cp.id AND LOWER(TRIM(pv.status)) = 'published'
+                    WHERE cp.company_id = :cid
+                    ORDER BY cp.created_at DESC, pv.version_number DESC, pv.created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"cid": company_id},
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping
+        pid, vid = str(m["policy_id"]), str(m["version_id"])
+        policy = self.get_company_policy(pid)
+        version = self.get_policy_version(vid)
+        if policy and version:
+            return (policy, version)
+        return None
+
+    def list_company_ids_with_published_policy(self) -> List[Dict[str, Any]]:
+        """Return list of {company_id, company_name} for companies that have at least one published policy (for debug logging)."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT DISTINCT c.id AS company_id, c.name AS company_name
+                    FROM companies c
+                    JOIN company_policies cp ON cp.company_id = c.id::text
+                    JOIN policy_versions pv ON pv.policy_id = cp.id AND pv.status = 'published'
+                """),
+                {},
+            ).fetchall()
+        return [{"company_id": r._mapping["company_id"], "company_name": r._mapping.get("company_name")} for r in rows]
+
+    def update_company_policy_status(
+        self,
+        policy_id: str,
+        status: str,
+        extracted_at: Optional[str] = None,
+    ) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE company_policies SET extraction_status = :status, extracted_at = :ea "
+                    "WHERE id = :id"
+                ),
+                {"status": status, "ea": extracted_at, "id": policy_id},
+            )
+
+    def update_company_policy_meta(
+        self,
+        policy_id: str,
+        title: Optional[str] = None,
+        version: Optional[str] = None,
+        effective_date: Optional[str] = None,
+    ) -> None:
+        fields = []
+        params: Dict[str, Any] = {"id": policy_id}
+        if title is not None:
+            fields.append("title = :title")
+            params["title"] = title
+        if version is not None:
+            fields.append("version = :version")
+            params["version"] = version
+        if effective_date is not None:
+            fields.append("effective_date = :effective_date")
+            params["effective_date"] = effective_date
+        if not fields:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(text(f"UPDATE company_policies SET {', '.join(fields)} WHERE id = :id"), params)
