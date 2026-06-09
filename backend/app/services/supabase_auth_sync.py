@@ -62,24 +62,37 @@ def _duplicate_user_error(exc: BaseException) -> bool:
     )
 
 
+_LIST_USERS_PER_PAGE = 200
+_LIST_USERS_MAX_PAGES = 50  # cap: 50 * 200 = 10k users — guards against an unbounded loop
+
+
 def _resolve_auth_user_id_by_email(client, email: str) -> Optional[str]:
     """Return the Supabase Auth user UUID for an email, or None. Never raises.
 
-    Supabase admin has no get-by-email, so this scans admin.list_users — O(users),
-    fine pre-launch. TODO(AIQ-907): persist the auth uid (user_metadata already
+    Supabase admin has no get-by-email, so this scans admin.list_users. That call
+    is PAGINATED (defaults to page 1 only), so we must walk pages — otherwise a
+    user beyond the first page is reported as "not found" and the password
+    re-sync silently no-ops (caught live in AIQ-907 review: an existing user was
+    missed because list_users() returned only page 1). O(users) — fine
+    pre-launch. TODO(AIQ-907): persist the auth uid (user_metadata already
     carries relopass_user_id) and resolve via an index once the user base grows.
     """
     e = (email or "").strip().lower()
     if not e:
         return None
     try:
-        users_resp = _call_with_timeout(client.auth.admin.list_users)  # type: ignore[union-attr]
-        users = getattr(users_resp, "users", users_resp) or []
-        for u in users:
-            if (getattr(u, "email", "") or "").lower() == e:
-                uid = str(getattr(u, "id", None))
-                if uid and uid != "None":
-                    return uid
+        for page in range(1, _LIST_USERS_MAX_PAGES + 1):
+            users_resp = _call_with_timeout(
+                client.auth.admin.list_users, page=page, per_page=_LIST_USERS_PER_PAGE  # type: ignore[union-attr]
+            )
+            users = getattr(users_resp, "users", users_resp) or []
+            for u in users:
+                if (getattr(u, "email", "") or "").lower() == e:
+                    uid = str(getattr(u, "id", None))
+                    if uid and uid != "None":
+                        return uid
+            if len(users) < _LIST_USERS_PER_PAGE:
+                break  # short/empty page → last page reached
     except Exception as le:  # pragma: no cover - network/SDK shape guard
         log.debug("_resolve_auth_user_id_by_email lookup failed email=%s: %s", e[:3] + "***", le)
     return None

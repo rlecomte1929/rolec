@@ -47,6 +47,18 @@ def _fake_client(users, *, update_raises: bool = False, create_exc: Exception | 
     return client
 
 
+def _paginated_client(pages):
+    """Client whose admin.list_users(page,per_page) serves one page per call."""
+    client = mock.MagicMock()
+
+    def _list(page=None, per_page=None):
+        idx = (page or 1) - 1
+        return _FakeListResp(pages[idx] if 0 <= idx < len(pages) else [])
+
+    client.auth.admin.list_users.side_effect = _list
+    return client
+
+
 def _dup_error():
     exc = Exception("Email address has already been registered")
     setattr(exc, "code", "email_exists")
@@ -67,6 +79,20 @@ class SetSupabaseAuthPasswordTests(unittest.TestCase):
         self.assertTrue(ok)
         client.auth.admin.update_user_by_id.assert_called_once_with(
             "uid-123", {"password": "NewPass!1"}
+        )
+
+    def test_resolves_user_on_a_later_page(self):
+        # Regression (AIQ-907 live review): list_users is paginated; a user
+        # beyond page 1 must still be found and updated. Page 1 is a FULL page
+        # (== per_page) so the resolver keeps walking; the target is on page 2.
+        page1 = [_FakeUser(f"other{i}@x.com", f"uid-{i}") for i in range(s._LIST_USERS_PER_PAGE)]
+        page2 = [_FakeUser("late@testco.com", "uid-late")]
+        client = _paginated_client([page1, page2])
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+            ok = s.set_supabase_auth_password("late@testco.com", "NewPass!1")
+        self.assertTrue(ok)
+        client.auth.admin.update_user_by_id.assert_called_once_with(
+            "uid-late", {"password": "NewPass!1"}
         )
 
     def test_returns_false_when_no_matching_auth_user(self):
