@@ -1425,3 +1425,131 @@ class PoliciesMixin:
                     "notes": notes,
                     "created_at": now,
                 })
+
+    # ── policy knowledge snapshots / document chunks (AUDIT-C1.3 batch 12) ────
+
+    def list_policy_document_chunks(self, doc_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        from ..database import _coerce_json_dict
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_document_chunks WHERE policy_document_id = :id "
+                    "ORDER BY chunk_index ASC"
+                ),
+                {"id": doc_id},
+            ).fetchall()
+        out = self._rows_to_list(rows)
+        for d in out:
+            d["metadata_json"] = _coerce_json_dict(d.get("metadata_json"))
+        return out
+
+    def list_policy_document_chunks_for_snapshot(self, doc_id: str, snapshot_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        from ..database import _coerce_json_dict
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_document_chunks WHERE policy_document_id = :id "
+                    "AND snapshot_id = :sid ORDER BY chunk_index ASC"
+                ),
+                {"id": doc_id, "sid": snapshot_id},
+            ).fetchall()
+        out = self._rows_to_list(rows)
+        for d in out:
+            d["metadata_json"] = _coerce_json_dict(d.get("metadata_json"))
+        return out
+
+    def insert_policy_knowledge_snapshot(
+        self,
+        company_id: str,
+        doc_id: str,
+        *,
+        version_label: Optional[str] = None,
+        status: str = "failed",
+        extraction_method: str = "deterministic_v1",
+        revision_number: int = 1,
+        parent_snapshot_id: Optional[str] = None,
+        activation_state: str = "candidate",
+    ) -> str:
+        sid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_knowledge_snapshots
+                    (id, company_id, policy_document_id, version_label, status, extraction_method, created_at,
+                     revision_number, parent_snapshot_id, activation_state)
+                    VALUES (:id, :cid, :doc, :vl, :st, :em, :now, :rn, :par, :as)
+                    """
+                ),
+                {
+                    "id": sid,
+                    "cid": company_id,
+                    "doc": doc_id,
+                    "vl": version_label,
+                    "st": status,
+                    "em": extraction_method,
+                    "now": now,
+                    "rn": revision_number,
+                    "par": parent_snapshot_id,
+                    "as": activation_state,
+                },
+            )
+        return sid
+
+    def update_policy_knowledge_snapshot(
+        self,
+        snapshot_id: str,
+        *,
+        status: Optional[str] = None,
+        superseded_at: Optional[str] = None,
+    ) -> None:
+        fields = []
+        params: Dict[str, Any] = {"id": snapshot_id}
+        if status is not None:
+            fields.append("status = :st")
+            params["st"] = status
+        if superseded_at is not None:
+            fields.append("superseded_at = :sa")
+            params["sa"] = superseded_at
+        if not fields:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE policy_knowledge_snapshots SET {', '.join(fields)} WHERE id = :id"),
+                params,
+            )
+
+    def supersede_active_snapshots_for_company(self, company_id: str, except_snapshot_id: Optional[str] = None) -> None:
+        """Mark active_for_assistant snapshots as superseded for this company."""
+        if not self.policy_assistant_tables_available():
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            if except_snapshot_id:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_knowledge_snapshots
+                        SET status = 'superseded', superseded_at = :now
+                        WHERE company_id = :cid AND status = 'active_for_assistant'
+                          AND id <> :ex
+                        """
+                    ),
+                    {"cid": company_id, "now": now, "ex": except_snapshot_id},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_knowledge_snapshots
+                        SET status = 'superseded', superseded_at = :now
+                        WHERE company_id = :cid AND status = 'active_for_assistant'
+                        """
+                    ),
+                    {"cid": company_id, "now": now},
+                )
