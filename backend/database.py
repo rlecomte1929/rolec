@@ -12734,7 +12734,10 @@ class Database:
                 d = dict(r._mapping)
                 d["missing_from_companies_table"] = 0
                 result.append(d)
-            seen = {r["id"] for r in result}
+            # [AIQ-864] str() so this text-keyed set matches the TEXT company_id
+            # columns below (companies.id is uuid); otherwise the orphan NOT IN
+            # check compares text vs uuid and mis-flags every id as an orphan.
+            seen = {str(r["id"]) for r in result}
             # Collect orphan company_ids for logging only; do not add them to the visible list.
             orphan_ids: set = set()
             for table, col in [("hr_users", "company_id"), ("profiles", "company_id"),
@@ -12764,7 +12767,12 @@ class Database:
 
             # Enrich each row with grouped counts instead of correlated subqueries per company.
             if result:
-                ids = [r["id"] for r in result]
+                # [AIQ-864] companies.id is a Postgres uuid; hr_users/employees/
+                # case_assignments .company_id are TEXT. Passing uuid objects as the
+                # IN-params compares `text = uuid` (no implicit cast) → the aggregate
+                # subqueries error/return nothing → the except below zeroes every tile.
+                # Cast ids to str so it's a text=text match (no-op for SQLite's text ids).
+                ids = [str(r["id"]) for r in result]
                 id_placeholders = ",".join([f":id{i}" for i in range(len(ids))])
                 params_agg = {f"id{i}": ids[i] for i in range(len(ids))}
                 if _is_sqlite:
