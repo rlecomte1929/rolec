@@ -42,6 +42,7 @@ def run_case_health_scan() -> Dict[str, Any]:
 
     # Lazy imports: an unconfigured Supabase / alert client must not break import
     # of this module (mirrors case_staleness_alert.py).
+    from .case_suggested_action import build_suggested_action
     from .monitoring_alerts import dispatch_monitoring_alert
     from .ops_notification_service import create_or_update_notification
 
@@ -54,11 +55,15 @@ def run_case_health_scan() -> Dict[str, Any]:
         if not case_id:
             continue
         severity = _SEVERITY_MAP.get(sig.get("severity"), "warning")
+        # AIQ-378c: per-stage suggested action + draft reminder, attached to the
+        # payload (consumed by the HR surface, AIQ-378d) and the alert message.
+        suggested = build_suggested_action(sig)
         title = f"Case {case_id} behind schedule"
         message = (
             f"Stage '{sig.get('stage')}' is {sig.get('days_behind')} day(s) past its "
-            f"expected date ({sig.get('expected_date')}). Review the case and follow up."
+            f"expected date ({sig.get('expected_date')}). {suggested['suggested_action']}"
         )
+        payload = {**sig, **suggested}
         try:
             create_or_update_notification(
                 NOTIFICATION_TYPE,
@@ -66,7 +71,7 @@ def run_case_health_scan() -> Dict[str, Any]:
                 title,
                 message,
                 _dedupe_key(case_id),
-                payload=sig,
+                payload=payload,
             )
             notifications += 1
         except Exception:  # noqa: BLE001 — one bad case must not abort the scan
