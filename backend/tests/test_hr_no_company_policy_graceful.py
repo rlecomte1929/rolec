@@ -69,6 +69,14 @@ class HrNoCompanyPolicyGracefulTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertTrue(r.json().get("company_setup_required"))
 
+    def test_policy_config_published_returns_empty_scaffold_not_400(self) -> None:
+        # Found via the live policy-flow E2E sweep, 2026-06-09: /published was the
+        # lone HR policy read still 400ing for a no-company HR while its three
+        # siblings degraded gracefully.
+        r = self.client.get("/api/hr/policy-config/published")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json().get("company_setup_required"))
+
     def test_policy_config_diff_returns_empty_not_400(self) -> None:
         r = self.client.get("/api/hr/policy-config/diff")
         self.assertEqual(r.status_code, 200, r.text)
