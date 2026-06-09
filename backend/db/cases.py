@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
@@ -2055,3 +2055,221 @@ class CasesMixin:
     # ==================================================================
     # New HR/Admin flows must use `ensure_pending_assignment_invites` only (writes both tables in sync).
     # Do not add standalone `create_assignment_invite` call sites for product features.
+
+    def get_resolved_assignment_policy(self, assignment_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM resolved_assignment_policies WHERE assignment_id = :aid"),
+                {"aid": assignment_id},
+            ).fetchone()
+        d = self._row_to_dict(row)
+        if d:
+            self._parse_json_col(d, "resolution_context_json")
+        return d
+
+    def upsert_resolved_assignment_policy(
+        self,
+        assignment_id: str,
+        case_id: Optional[str],
+        company_id: str,
+        policy_id: str,
+        policy_version_id: str,
+        canonical_case_id: Optional[str],
+        resolution_status: str,
+        resolution_context: Dict[str, Any],
+        benefits: List[Dict[str, Any]],
+        exclusions: List[Dict[str, Any]],
+    ) -> str:
+        now = datetime.utcnow().isoformat()
+        with self.engine.connect() as conn:
+            existing = conn.execute(
+                text("SELECT id FROM resolved_assignment_policies WHERE assignment_id = :aid"),
+                {"aid": assignment_id},
+            ).fetchone()
+        rid = str(uuid.uuid4()) if not existing else existing._mapping["id"]
+        with self.engine.begin() as conn:
+            if existing:
+                conn.execute(text(f"""
+                    UPDATE resolved_assignment_policies SET
+                    case_id = :cid, company_id = :coid, policy_id = :pid, policy_version_id = :vid,
+                    canonical_case_id = :ccid, resolution_status = :status, resolved_at = :now,
+                    resolution_context_json = :ctx{_jb}, updated_at = :now
+                    WHERE assignment_id = :aid
+                """), {
+                    "aid": assignment_id, "cid": case_id, "coid": company_id, "pid": policy_id,
+                    "vid": policy_version_id, "ccid": canonical_case_id, "status": resolution_status,
+                    "now": now, "ctx": json.dumps(resolution_context),
+                })
+                conn.execute(text("DELETE FROM resolved_assignment_policy_benefits WHERE resolved_policy_id = :rid"), {"rid": rid})
+                conn.execute(text("DELETE FROM resolved_assignment_policy_exclusions WHERE resolved_policy_id = :rid"), {"rid": rid})
+            else:
+                conn.execute(text(f"""
+                    INSERT INTO resolved_assignment_policies
+                    (id, assignment_id, case_id, company_id, policy_id, policy_version_id, canonical_case_id,
+                     resolution_status, resolved_at, resolution_context_json, created_at, updated_at)
+                    VALUES (:id, :aid, :cid, :coid, :pid, :vid, :ccid, :status, :now, :ctx{_jb}, :now, :now)
+                """), {
+                    "id": rid, "aid": assignment_id, "cid": case_id, "coid": company_id, "pid": policy_id,
+                    "vid": policy_version_id, "ccid": canonical_case_id, "status": resolution_status,
+                    "now": now, "ctx": json.dumps(resolution_context),
+                })
+            for b in benefits:
+                bid = str(uuid.uuid4())
+                inc = b.get("included", True)
+                apr = b.get("approval_required", False)
+                if not isinstance(inc, bool):
+                    inc = bool(inc)
+                if not isinstance(apr, bool):
+                    apr = bool(apr)
+                conn.execute(text(f"""
+                    INSERT INTO resolved_assignment_policy_benefits
+                    (id, resolved_policy_id, benefit_key, included, min_value, standard_value, max_value,
+                     currency, amount_unit, frequency, approval_required, evidence_required_json,
+                     exclusions_json, condition_summary, source_rule_ids_json, created_at, updated_at)
+                    VALUES (:id, :rid, :bk, :inc, :minv, :stdv, :maxv, :cur, :au, :freq, :apr,
+                            :evj{_jb}, :exj{_jb}, :cs, :srj{_jb}, :now, :now)
+                """), {
+                    "id": bid, "rid": rid, "bk": b["benefit_key"], "inc": inc,
+                    "minv": b.get("min_value"), "stdv": b.get("standard_value"), "maxv": b.get("max_value"),
+                    "cur": b.get("currency"), "au": b.get("amount_unit"), "freq": b.get("frequency"),
+                    "apr": apr,
+                    "evj": json.dumps(b.get("evidence_required_json") or []),
+                    "exj": json.dumps(b.get("exclusions_json") or []),
+                    "cs": b.get("condition_summary"), "srj": json.dumps(b.get("source_rule_ids_json") or []),
+                    "now": now,
+                })
+            for e in exclusions:
+                eid = str(uuid.uuid4())
+                conn.execute(text(f"""
+                    INSERT INTO resolved_assignment_policy_exclusions
+                    (id, resolved_policy_id, benefit_key, domain, description, source_rule_ids_json)
+                    VALUES (:id, :rid, :bk, :dom, :desc, :srj{_jb})
+                """), {
+                    "id": eid, "rid": rid, "bk": e.get("benefit_key"), "dom": e["domain"],
+                    "desc": e.get("description"), "srj": json.dumps(e.get("source_rule_ids_json") or []),
+                })
+        return rid
+
+    # ==================================================================
+    # Case Readiness Core v1
+    # ==================================================================
+
+    def resolve_readiness_destination_for_assignment(self, assignment_id: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Returns (destination_raw, destination_key) for the assignment.
+
+        Priority:
+          1. Employee profile (intake form) — most recent first-party answer
+          2. Canonical `relocation_cases.host_country` column — set by the
+             intake/admin flow and updated on reassignment
+          3. Case `profile_json.movePlan.destination` — historical blob,
+             may be stale (e.g. assignment was reassigned but the blob was
+             never re-saved)
+
+        The blob is the LAST fallback, not the first, because we have seen
+        cases where it disagrees with the canonical column (e.g. monica's
+        case had host_country="Japan" but profile_json said "Singapore",
+        causing the readiness summary to mislabel a Japan assignment with
+        a Singapore template).
+        """
+        prof = self.get_employee_profile(assignment_id)
+        raw = extract_destination_from_profile(prof)
+        if not raw:
+            asn = self.get_assignment_by_id(assignment_id)
+            if asn:
+                cid = (asn.get("case_id") or "").strip()
+                case = self.get_case_by_id(cid) if cid else None
+                if case:
+                    if case.get("host_country"):
+                        raw = str(case.get("host_country")).strip() or None
+                    if not raw:
+                        # Last-resort fallback to the historical blob.
+                        raw = extract_destination_from_case_profile(case.get("profile_json"))
+        key = normalize_destination_key(raw)
+        return raw, key
+
+    def ensure_case_readiness_binding(self, assignment_id: str) -> Optional[Dict[str, Any]]:
+        """Create case_readiness row pointing at resolved template; no template duplication."""
+        asn = self.get_assignment_by_id(assignment_id)
+        if not asn:
+            return None
+        prof = self.get_employee_profile(assignment_id)
+        _, dest_key = self.resolve_readiness_destination_for_assignment(assignment_id)
+        route_key = resolve_readiness_route_key(asn, prof)
+        if not dest_key:
+            return None
+        tmpl = self.get_readiness_template(dest_key, route_key)
+        if not tmpl:
+            return None
+        tid = tmpl["id"]
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT * FROM case_readiness WHERE assignment_id = :aid"),
+                {"aid": assignment_id},
+            ).fetchone()
+            if row:
+                d = dict(row._mapping)
+                if d.get("template_id") != tid:
+                    conn.execute(
+                        text(
+                            "UPDATE case_readiness SET template_id = :tid, destination_key = :dk, "
+                            "route_key = :rk, updated_at = :ua WHERE assignment_id = :aid"
+                        ),
+                        {"tid": tid, "dk": dest_key, "rk": route_key, "ua": now, "aid": assignment_id},
+                    )
+                row2 = conn.execute(
+                    text("SELECT * FROM case_readiness WHERE assignment_id = :aid"), {"aid": assignment_id}
+                ).fetchone()
+                return self._row_to_dict(row2) if row2 else None
+            conn.execute(
+                text(
+                    "INSERT INTO case_readiness (assignment_id, template_id, destination_key, route_key, updated_at) "
+                    "VALUES (:aid, :tid, :dk, :rk, :ua)"
+                ),
+                {"aid": assignment_id, "tid": tid, "dk": dest_key, "rk": route_key, "ua": now},
+            )
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT * FROM case_readiness WHERE assignment_id = :aid"), {"aid": assignment_id}).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def upsert_readiness_milestone_state(
+        self, assignment_id: str, template_milestone_id: str, completed: bool, notes: Optional[str] = None
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        completed_at = now if completed else None
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO case_readiness_milestone_state
+                        (assignment_id, template_milestone_id, completed_at, notes, updated_at)
+                        VALUES (:aid, :mid, :cat, :notes, :ua)
+                        ON CONFLICT(assignment_id, template_milestone_id) DO UPDATE SET
+                            completed_at = excluded.completed_at,
+                            notes = COALESCE(excluded.notes, case_readiness_milestone_state.notes),
+                            updated_at = excluded.updated_at
+                        """
+                    ),
+                    {"aid": assignment_id, "mid": template_milestone_id, "cat": completed_at, "notes": notes, "ua": now},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO case_readiness_milestone_state
+                        (assignment_id, template_milestone_id, completed_at, notes, updated_at)
+                        VALUES (:aid, :mid, :cat, :notes, :ua)
+                        ON CONFLICT(assignment_id, template_milestone_id) DO UPDATE SET
+                            completed_at = EXCLUDED.completed_at,
+                            notes = COALESCE(EXCLUDED.notes, case_readiness_milestone_state.notes),
+                            updated_at = EXCLUDED.updated_at
+                        """
+                    ),
+                    {"aid": assignment_id, "mid": template_milestone_id, "cat": completed_at, "notes": notes, "ua": now},
+                )
+
+    # ------------------------------------------------------------------
+    # Compensation & Allowance — policy_configs / policy_config_versions / policy_config_benefits
+    # ------------------------------------------------------------------
