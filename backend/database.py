@@ -915,38 +915,7 @@ class Database(CasesMixin):
         except Exception as ex:
             log.warning("archived_at columns ensure failed (run Supabase migration): %s", ex)
 
-    def _maybe_ensure_postgres_case_assignments_employee_link_mode(self) -> None:
-        """
-        case_assignments.employee_link_mode is required for create_assignment INSERT and pending-claim flows.
-        Supabase migration: 20260413120000_case_assignments_employee_link_mode.sql
-
-        When DISABLE_RUNTIME_DDL skips full init_db DDL, this narrow idempotent patch still runs so
-        production does not 500 on HR assign (UndefinedColumn).
-        """
-        if _is_sqlite:
-            return
-        try:
-            with self.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_link_mode TEXT"
-                    )
-                )
-                conn.execute(
-                    text(
-                        """
-                        CREATE INDEX IF NOT EXISTS idx_case_assignments_employee_link_mode
-                        ON case_assignments (employee_link_mode)
-                        WHERE employee_user_id IS NULL AND employee_link_mode IS NOT NULL
-                        """
-                    )
-                )
-            log.info(
-                "Ensured case_assignments.employee_link_mode exists (idempotent). "
-                "Prefer applying supabase/migrations/20260413120000_case_assignments_employee_link_mode.sql in CI."
-            )
-        except Exception as ex:
-            log.warning("case_assignments.employee_link_mode ensure failed (run Supabase migration): %s", ex)
+    # [AUDIT-C1.2] cases batch 13e — case assignments link-mode schema extracted to backend/db/cases.py (CasesMixin).
 
     def _ensure_postgres_canonical_identity_schema(self, conn) -> None:
         """Run inside a transaction; Postgres only. See _maybe_ensure_postgres_missing_schemas."""
@@ -1111,95 +1080,8 @@ class Database(CasesMixin):
         except (OperationalError, ProgrammingError) as ex:
             log.warning("assignment_claim_invites RLS/policy skipped: %s", ex)
 
-    def _ensure_postgres_case_milestones_schema(self, conn) -> None:
-        """Postgres timeline tables (text ids, aligned with app inserts). See supabase/migrations/20260325000000_*."""
-        conn.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS public.case_milestones (
-                  id text PRIMARY KEY,
-                  case_id text NOT NULL,
-                  canonical_case_id text,
-                  milestone_type text NOT NULL,
-                  title text NOT NULL,
-                  description text,
-                  target_date date,
-                  actual_date date,
-                  status text NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending','in_progress','done','skipped','overdue','blocked')),
-                  sort_order int NOT NULL DEFAULT 0,
-                  created_at timestamptz NOT NULL DEFAULT now(),
-                  updated_at timestamptz NOT NULL DEFAULT now(),
-                  owner text NOT NULL DEFAULT 'joint',
-                  criticality text NOT NULL DEFAULT 'normal',
-                  notes text
-                )
-                """
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_case_milestones_case_id "
-                "ON public.case_milestones(case_id)"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_case_milestones_canonical "
-                "ON public.case_milestones(canonical_case_id)"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_case_milestones_sort "
-                "ON public.case_milestones(case_id, sort_order)"
-            )
-        )
-        conn.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS public.milestone_links (
-                  id text PRIMARY KEY,
-                  milestone_id text NOT NULL REFERENCES public.case_milestones(id) ON DELETE CASCADE,
-                  linked_entity_type text NOT NULL,
-                  linked_entity_id text NOT NULL,
-                  created_at timestamptz NOT NULL DEFAULT now()
-                )
-                """
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_milestone_links_milestone "
-                "ON public.milestone_links(milestone_id)"
-            )
-        )
-        try:
-            conn.execute(text("ALTER TABLE public.case_milestones ENABLE ROW LEVEL SECURITY"))
-            conn.execute(text("DROP POLICY IF EXISTS case_milestones_all ON public.case_milestones"))
-            conn.execute(
-                text(
-                    "CREATE POLICY case_milestones_all ON public.case_milestones "
-                    "FOR ALL TO service_role USING (true) WITH CHECK (true)"
-                )
-            )
-        except (OperationalError, ProgrammingError) as ex:
-            log.warning("case_milestones RLS/policy skipped: %s", ex)
-        try:
-            conn.execute(text("ALTER TABLE public.milestone_links ENABLE ROW LEVEL SECURITY"))
-            conn.execute(text("DROP POLICY IF EXISTS milestone_links_all ON public.milestone_links"))
-            conn.execute(
-                text(
-                    "CREATE POLICY milestone_links_all ON public.milestone_links "
-                    "FOR ALL TO service_role USING (true) WITH CHECK (true)"
-                )
-            )
-        except (OperationalError, ProgrammingError) as ex:
-            log.warning("milestone_links RLS/policy skipped: %s", ex)
+    # [AUDIT-C1.2] cases batch 13d — case milestones schema extracted to backend/db/cases.py (CasesMixin).
 
-    # ------------------------------------------------------------------
-    # Schema creation
-    # ------------------------------------------------------------------
     def init_db(self) -> None:
         # In production (Render), avoid runtime DDL. Supabase migrations are the
         # source of truth. The early return must happen BEFORE the per-feature
@@ -4891,26 +4773,7 @@ class Database(CasesMixin):
             )
         return {"id": rfq_id, "rfq_ref": rfq_ref}
 
-    def list_rfqs_for_case(
-        self, case_id: str, request_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """List RFQs for a case with items and recipients."""
-        cid = self.coalesce_case_lookup_id(case_id)
-        with self.engine.connect() as conn:
-            rows = self._exec(
-                conn,
-                """SELECT * FROM rfqs
-                   WHERE case_id = :cid OR canonical_case_id = :cid
-                   ORDER BY created_at DESC""",
-                {"cid": cid},
-                op_name="list_rfqs_for_case",
-                request_id=request_id,
-            ).fetchall()
-            rfqs = self._rows_to_list(rows)
-            for rfq in rfqs:
-                rfq["items"] = self._list_rfq_items(conn, rfq["id"])
-                rfq["recipients"] = self._list_rfq_recipients(conn, rfq["id"])
-        return rfqs
+    # [AUDIT-C1.2] cases batch 13a extracted to backend/db/cases.py (CasesMixin).
 
     def _list_rfq_items(self, conn, rfq_id: str) -> List[Dict[str, Any]]:
         rows = conn.execute(
@@ -4929,17 +4792,7 @@ class Database(CasesMixin):
         ).fetchall()
         return self._rows_to_list(rows)
 
-    def list_rfqs_for_assignment(
-        self, assignment_id: str, request_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """List RFQs for an assignment via its case_id."""
-        assignment = self.get_assignment_by_id(assignment_id, request_id=request_id)
-        if not assignment:
-            return []
-        case_id = assignment.get("case_id")
-        if not case_id:
-            return []
-        return self.list_rfqs_for_case(case_id, request_id=request_id)
+    # [AUDIT-C1.2] cases batch 13b extracted to backend/db/cases.py (CasesMixin).
 
     def get_rfq(
         self, rfq_id: str, request_id: Optional[str] = None
@@ -7020,29 +6873,7 @@ class Database(CasesMixin):
     # ------------------------------------------------------------------
     # HR Command Center
     # ------------------------------------------------------------------
-    def _command_center_join_relocation_cases(self) -> str:
-        """Join relocation_cases using legacy case_id and/or canonical_case_id (COALESCE alone can miss rows)."""
-        if _is_sqlite:
-            return (
-                "("
-                "(NULLIF(TRIM(ca.case_id), '') IS NOT NULL AND rc.id = NULLIF(TRIM(ca.case_id), ''))"
-                " OR "
-                "(NULLIF(TRIM(ca.canonical_case_id), '') IS NOT NULL AND rc.id = NULLIF(TRIM(ca.canonical_case_id), ''))"
-                ")"
-            )
-        return (
-            "("
-            "(NULLIF(TRIM(ca.case_id::text), '') IS NOT NULL AND rc.id::text = NULLIF(TRIM(ca.case_id::text), ''))"
-            " OR "
-            "(NULLIF(TRIM(ca.canonical_case_id::text), '') IS NOT NULL AND rc.id::text = NULLIF(TRIM(ca.canonical_case_id::text), ''))"
-            ")"
-        )
-
-    def _command_center_join_wizard_cases(self) -> str:
-        """Join wizard_cases (intake source of truth) using the same id as relocation_cases / assignment pointers."""
-        if _is_sqlite:
-            return "wc.id = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), NULLIF(TRIM(ca.case_id), ''))"
-        return "wc.id::text = COALESCE(NULLIF(TRIM(ca.canonical_case_id::text), ''), NULLIF(TRIM(ca.case_id::text), ''))"
+    # [AUDIT-C1.2] cases batch 13c — command-center join helpers extracted to backend/db/cases.py (CasesMixin).
 
     def _command_center_dest_country_sql(self) -> str:
         """Prefer denormalized relocation_cases; fall back to wizard_cases from PATCH /api/cases."""
@@ -9581,20 +9412,7 @@ class Database(CasesMixin):
             })
         return out
 
-    def list_messages_by_assignment(self, assignment_id: str) -> List[Dict[str, Any]]:
-        """List all messages for an assignment (admin or HR/employee context)."""
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text(f"""
-                SELECT m.*, COALESCE(u.name, u.email, u.username) as sender_display_name
-                FROM messages m
-                LEFT JOIN users u ON {_eq_text("u.id", "COALESCE(m.sender_user_id, m.hr_user_id)")}
-                WHERE {_eq_text("m.assignment_id", ":aid")}
-                ORDER BY m.created_at ASC
-            """),
-                {"aid": assignment_id},
-            ).fetchall()
-        return self._rows_to_list(rows)
+    # [AUDIT-C1.2] cases batch 13f extracted to backend/db/cases.py (CasesMixin).
 
     def list_unread_message_notifications(
         self, recipient_user_id: str, limit: int = 20
@@ -10444,52 +10262,7 @@ class Database(CasesMixin):
         summary = {"count": len(people), "orphans_without_company": orphans}
         return people, summary
 
-    def get_admin_assignments_index(
-        self,
-        company_id: Optional[str] = None,
-        employee_user_id: Optional[str] = None,
-        employee_search: Optional[str] = None,
-        status: Optional[str] = None,
-        destination_country: Optional[str] = None,
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        List assignments for admin (same as list_admin_assignments) plus summary with
-        count, orphans_without_company, orphans_without_person.
-        """
-        items = self.list_admin_assignments(
-            company_id=company_id,
-            employee_user_id=employee_user_id,
-            employee_search=employee_search,
-            status=status,
-            destination_country=destination_country,
-        )
-        with self.engine.connect() as conn:
-            total = conn.execute(text("SELECT COUNT(*) AS n FROM case_assignments"), {}).fetchone()
-            total_count = int(total._mapping["n"]) if total else 0
-            no_company_sql = text(f"""
-                SELECT COUNT(*) AS n FROM case_assignments a
-                LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a", "canonical_coalesce")}
-                LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-                WHERE COALESCE(rc.company_id, hu.company_id) IS NULL
-            """)
-            no_emp_sql = text("""
-                SELECT COUNT(*) AS n FROM case_assignments
-                WHERE employee_user_id IS NULL OR TRIM(COALESCE(employee_user_id,'')) = ''
-            """)
-            try:
-                no_co = conn.execute(no_company_sql, {}).fetchone()
-                no_emp = conn.execute(no_emp_sql, {}).fetchone()
-                orphans_no_company = int(no_co._mapping["n"]) if no_co else 0
-                orphans_no_person = int(no_emp._mapping["n"]) if no_emp else 0
-            except Exception as e:
-                log.warning("admin_assignments_index: orphan counts failed: %s", e)
-                orphans_no_company = orphans_no_person = 0
-        summary = {
-            "count": total_count,
-            "orphans_without_company": orphans_no_company,
-            "orphans_without_person": orphans_no_person,
-        }
-        return items, summary
+    # [AUDIT-C1.2] cases batch 13g extracted to backend/db/cases.py (CasesMixin).
 
     def get_admin_policies_index(
         self, company_id: Optional[str] = None
