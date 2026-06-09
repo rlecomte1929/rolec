@@ -1330,3 +1330,98 @@ class PoliciesMixin:
                 text(f"UPDATE policy_documents SET {', '.join(fields)} WHERE id = :id"),
                 params,
             )
+
+    # ── requirement_* adapters (AUDIT-C1.3 batch 11) ─────────────────────────
+
+    def list_requirement_entities(self, destination_country: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if status:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_entities WHERE destination_country = :dest AND status = :status "
+                    "ORDER BY updated_at DESC"
+                ), {"dest": destination_country, "status": status}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_entities WHERE destination_country = :dest ORDER BY updated_at DESC"
+                ), {"dest": destination_country}).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_requirement_facts(self, entity_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if status:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_facts WHERE entity_id = :eid AND status = :status ORDER BY created_at DESC"
+                ), {"eid": entity_id, "status": status}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_facts WHERE entity_id = :eid ORDER BY created_at DESC"
+                ), {"eid": entity_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_to"] = self._json_load(item.get("applies_to")) or {}
+            item["required_fields"] = self._json_load(item.get("required_fields")) or []
+        return items
+
+    def list_requirement_facts_by_destination(self, destination_country: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if status:
+                rows = conn.execute(text(
+                    "SELECT f.* FROM requirement_facts f "
+                    "JOIN requirement_entities e ON e.id = f.entity_id "
+                    "WHERE e.destination_country = :dest AND f.status = :status "
+                    "ORDER BY f.created_at DESC"
+                ), {"dest": destination_country, "status": status}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT f.* FROM requirement_facts f "
+                    "JOIN requirement_entities e ON e.id = f.entity_id "
+                    "WHERE e.destination_country = :dest "
+                    "ORDER BY f.created_at DESC"
+                ), {"dest": destination_country}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_to"] = self._json_load(item.get("applies_to")) or {}
+            item["required_fields"] = self._json_load(item.get("required_fields")) or []
+        return items
+
+    def list_approved_requirement_facts(self, destination_country: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT f.* FROM requirement_facts f "
+                "JOIN requirement_entities e ON e.id = f.entity_id "
+                "WHERE e.destination_country = :dest AND f.status = 'approved'"
+            ), {"dest": destination_country}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_to"] = self._json_load(item.get("applies_to")) or {}
+            item["required_fields"] = self._json_load(item.get("required_fields")) or []
+        return items
+
+    def update_requirement_fact_status(
+        self,
+        fact_ids: List[str],
+        status: str,
+        reviewer_user_id: str,
+        notes: Optional[str] = None,
+    ) -> None:
+        if not fact_ids:
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for fid in fact_ids:
+                conn.execute(text(
+                    "UPDATE requirement_facts SET status = :status WHERE id = :id"
+                ), {"status": status, "id": fid})
+                conn.execute(text(
+                    "INSERT INTO requirement_reviews "
+                    "(id, entity_id, fact_id, reviewer_user_id, action, notes, created_at) "
+                    "VALUES (:id, :entity_id, :fact_id, :reviewer_user_id, :action, :notes, :created_at)"
+                ), {
+                    "id": str(uuid.uuid4()),
+                    "entity_id": None,
+                    "fact_id": fid,
+                    "reviewer_user_id": reviewer_user_id,
+                    "action": "approve" if status == "approved" else "reject",
+                    "notes": notes,
+                    "created_at": now,
+                })
