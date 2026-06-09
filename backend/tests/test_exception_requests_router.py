@@ -416,8 +416,11 @@ class ExceptionSelectJoinGuardTests(unittest.TestCase):
         self.assertIn("lower(p.email) = lower(u.email)", sql)
         self.assertIn("u.id = pcr.requested_by_user_id", sql)
         self.assertIn("LEFT JOIN wizard_cases   wc  ON wc.id::text  = pcr.case_id", sql)
-        self.assertIn("COALESCE(mc.origin_country, wc.origin_country)", sql)
-        self.assertIn("COALESCE(mc.destination_country, wc.dest_country)", sql)
+        # [AIQ-879] corridor also falls back to relocation_cases (home_/host_country)
+        # for cases that only materialised there.
+        self.assertIn("LEFT JOIN relocation_cases rc2 ON rc2.id::text = pcr.case_id", sql)
+        self.assertIn("COALESCE(mc.origin_country, wc.origin_country, rc2.home_country)", sql)
+        self.assertIn("COALESCE(mc.destination_country, wc.dest_country, rc2.host_country)", sql)
 
 
 if __name__ == "__main__":

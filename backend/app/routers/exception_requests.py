@@ -267,9 +267,12 @@ SELECT
         SELECT p.full_name FROM users u JOIN profiles p ON lower(p.email) = lower(u.email)
         WHERE u.id = pcr.resolved_by_user_id LIMIT 1)) AS resolved_by_name,
     -- Corridor: mobility_cases covers HR-create cases; wizard/bridged cases
-    -- (the employee-intake demo spine) carry it on wizard_cases instead.
-    COALESCE(mc.origin_country, wc.origin_country)      AS origin_country,
-    COALESCE(mc.destination_country, wc.dest_country)   AS destination_country
+    -- (the employee-intake demo spine) carry it on wizard_cases; cases that only
+    -- materialised into relocation_cases fall back to its home_/host_country.
+    -- [AIQ-879] relocation_cases fallback so a case present only there still
+    -- surfaces its corridor instead of a blank.
+    COALESCE(mc.origin_country, wc.origin_country, rc2.home_country)        AS origin_country,
+    COALESCE(mc.destination_country, wc.dest_country, rc2.host_country)     AS destination_country
 -- policy_cap_requests stores id/case_id/*_user_id as TEXT (legacy non-UUID
 -- ids like "seed-emp-testingapril" live here), while profiles.id and
 -- mobility_cases.id are UUID. Comparing uuid = text fails to plan, so the
@@ -280,6 +283,7 @@ LEFT JOIN profiles       rp  ON rp.id::text  = pcr.requested_by_user_id
 LEFT JOIN profiles       rsp ON rsp.id::text = pcr.resolved_by_user_id
 LEFT JOIN mobility_cases mc  ON mc.id::text  = pcr.case_id
 LEFT JOIN wizard_cases   wc  ON wc.id::text  = pcr.case_id
+LEFT JOIN relocation_cases rc2 ON rc2.id::text = pcr.case_id
 """
 
 
