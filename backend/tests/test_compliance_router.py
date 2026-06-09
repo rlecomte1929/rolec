@@ -62,6 +62,13 @@ def test_alerts_rejects_non_hr_user(client: TestClient):
 
 def test_update_alert_rejects_bad_status(client: TestClient):
     app.dependency_overrides[get_org_id_for_hr_user] = lambda: "co-1"
+    # update_alert now also depends on get_current_user (for the [AIQ-650] audit
+    # actor); override it so the request reaches body validation.
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "u1",
+        "role": "hr",
+        "email": "h@example.com",
+    }
     resp = client.patch(
         "/api/compliance/alerts/some-id", json={"status": "bogus"}
     )

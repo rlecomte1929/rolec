@@ -20,8 +20,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from ..auth_deps import get_org_id_for_hr_user, require_admin
+from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin
 from ..db import SessionLocal
+from ..services.audit_log_service import ACTION_UPDATE, ACTOR_HUMAN, insert_audit_log
 from ..services.compliance_evaluator import run_compliance_evaluation
 
 log = logging.getLogger(__name__)
@@ -178,12 +179,29 @@ def update_alert(
     alert_id: str,
     body: UpdateAlertBody,
     company_id: str = Depends(get_org_id_for_hr_user),
+    user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, str]:
     with SessionLocal() as db:
         row = db.execute(
             _UPDATE_SQL,
             {"status": body.status, "alert_id": alert_id, "company_id": company_id},
         ).first()
+        # [AIQ-650] Audit the human resolution/dismissal of a compliance alert
+        # (GDPR Art. 5(2) accountability). Same txn as the update; fail-soft so a
+        # logging failure never breaks the action. Only successful updates are logged.
+        if row:
+            try:
+                insert_audit_log(
+                    db,
+                    entity_type="compliance_alert",
+                    entity_id=alert_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user.get("id") or user.get("sub"),
+                    new_value={"event": f"alert_{body.status}", "status": body.status},
+                )
+            except Exception:
+                log.exception("audit: compliance alert update alert_id=%s", alert_id)
         db.commit()
     if not row:
         raise HTTPException(status_code=404, detail="Alert not found or not open")
