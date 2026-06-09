@@ -271,33 +271,37 @@ INSERT INTO auth.users (
   is_super_admin, role, aud,
   confirmation_token, recovery_token,
   email_change_token_new, email_change_token_current,
-  reauthentication_token
+  reauthentication_token,
+  -- AIQ-936: email_change must be '' not NULL. GoTrue's admin list_users scans it
+  -- into a Go string; a NULL → 500 "Database error finding users" on any page
+  -- containing the row. It has no DB default, so the seed must set it explicitly.
+  email_change
 )
 VALUES
   ('d0e00010-0000-4000-8000-000000000010'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
    'hannah.hr@globaltech-demo.com', '$2a$10$IfjnwmofkCd5tbxtZLGSqOOPJysKVjocUpj4UDllVTg9lEAbSNuCS',
    NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Hannah Müller"}'::jsonb,
-   false, 'authenticated', 'authenticated', '', '', '', '', ''),
+   false, 'authenticated', 'authenticated', '', '', '', '', '', ''),
   ('d0e00020-0000-4000-8000-000000000020'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
    'sophie.hr@meridian-demo.com', '$2a$10$IfjnwmofkCd5tbxtZLGSqOOPJysKVjocUpj4UDllVTg9lEAbSNuCS',
    NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Sophie Leclerc"}'::jsonb,
-   false, 'authenticated', 'authenticated', '', '', '', '', ''),
+   false, 'authenticated', 'authenticated', '', '', '', '', '', ''),
   ('d0e00030-0000-4000-8000-000000000030'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
    'marta.hr@nexora-demo.com', '$2a$10$IfjnwmofkCd5tbxtZLGSqOOPJysKVjocUpj4UDllVTg9lEAbSNuCS',
    NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marta García"}'::jsonb,
-   false, 'authenticated', 'authenticated', '', '', '', '', ''),
+   false, 'authenticated', 'authenticated', '', '', '', '', '', ''),
   ('d0e00100-0000-4000-8000-000000000100'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
    'adrien.martin@globaltech-demo.com', '$2a$10$IfjnwmofkCd5tbxtZLGSqOOPJysKVjocUpj4UDllVTg9lEAbSNuCS',
    NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Adrien Martin"}'::jsonb,
-   false, 'authenticated', 'authenticated', '', '', '', '', ''),
+   false, 'authenticated', 'authenticated', '', '', '', '', '', ''),
   ('d0e00200-0000-4000-8000-000000000200'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
    'celine.dupont@meridian-demo.com', '$2a$10$IfjnwmofkCd5tbxtZLGSqOOPJysKVjocUpj4UDllVTg9lEAbSNuCS',
    NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Céline Dupont"}'::jsonb,
-   false, 'authenticated', 'authenticated', '', '', '', '', ''),
+   false, 'authenticated', 'authenticated', '', '', '', '', '', ''),
   ('d0e00300-0000-4000-8000-000000000300'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
    'carlos.rivera@nexora-demo.com', '$2a$10$IfjnwmofkCd5tbxtZLGSqOOPJysKVjocUpj4UDllVTg9lEAbSNuCS',
    NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Carlos Rivera"}'::jsonb,
-   false, 'authenticated', 'authenticated', '', '', '', '', '')
+   false, 'authenticated', 'authenticated', '', '', '', '', '', '')
 ON CONFLICT (id) DO UPDATE SET
   email                      = EXCLUDED.email,
   encrypted_password         = EXCLUDED.encrypted_password,
@@ -308,7 +312,8 @@ ON CONFLICT (id) DO UPDATE SET
   recovery_token             = '',
   email_change_token_new     = '',
   email_change_token_current = '',
-  reauthentication_token     = '';
+  reauthentication_token     = '',
+  email_change               = '';
 
 INSERT INTO auth.identities (
   id, user_id, provider_id, provider, identity_data,
