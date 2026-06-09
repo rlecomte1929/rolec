@@ -139,3 +139,21 @@ def test_monitoring_alert(request: Request) -> Dict[str, Any]:
     log.info("test_monitoring_alert cron triggered")
     result = send_test_alert()
     return {"ok": True, **result}
+
+
+@router.post("/case-health-scan")
+def case_health_scan(request: Request) -> Dict[str, Any]:
+    """
+    [AIQ-378b] Nightly proactive case-health scan. Flags active immigration cases
+    past their expected milestone date (AIQ-378a signal) and raises one deduped
+    HR alert per behind-schedule case (ops-notification + best-effort Slack/email).
+    Read-only on case data; inert until the pilot populates case milestones.
+    Daily via `.github/workflows/case-health-scan.yml`, gated behind the
+    `CASE_HEALTH_CRON_ENABLED` repo var. Idempotent (per-case dedupe).
+    """
+    _verify_cron_secret(request)
+    log.info("case_health_scan cron triggered")
+    from ..services.case_health_scan import run_case_health_scan
+
+    result = run_case_health_scan()
+    return {"ok": True, **result}

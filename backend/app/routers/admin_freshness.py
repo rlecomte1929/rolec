@@ -137,6 +137,18 @@ def post_staleness_alert(user: Dict[str, Any] = Depends(_require_admin)):
     return evaluate_case_staleness_alert()
 
 
+@router.post("/case-health-scan/run")
+def post_case_health_scan(user: Dict[str, Any] = Depends(_require_admin)):
+    """[AIQ-378b] Run the proactive case-health scan now (manual / staging path).
+    Flags active immigration cases past their expected milestone date and raises
+    one deduped HR alert per behind-schedule case. Returns the run summary. Inert
+    until case milestones exist. The production trigger is the CRON_SECRET-guarded
+    POST /api/crons/case-health-scan."""
+    from ..services.case_health_scan import run_case_health_scan
+
+    return run_case_health_scan()
+
+
 # --- Crawl schedules ---
 @crawl_router.get("/schedules")
 def get_schedules(
