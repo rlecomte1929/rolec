@@ -92,6 +92,7 @@ class TestImm17DataExport(unittest.TestCase):
         ctx, conn = _patch_db([
             _result(first=(1,)),   # ownership ok
             _result(),             # insert
+            _result(),             # [AIQ-650] insert_audit_log
         ])
         with ctx, \
              patch.object(gdpr, "_load_profile_for_case_employee",
@@ -105,8 +106,8 @@ class TestImm17DataExport(unittest.TestCase):
         self.assertIn("statutory_due_at", body)
         log_access.assert_called_once()
         self.assertEqual(log_access.call_args.kwargs["action"], "erasure_request")
-        # ownership SELECT + INSERT = 2 execute calls
-        self.assertEqual(conn.execute.call_count, 2)
+        # ownership SELECT + INSERT + audit = 3 execute calls
+        self.assertEqual(conn.execute.call_count, 3)
 
     def test_routes_registered(self):
         paths = {r.path for r in gdpr.router.routes}

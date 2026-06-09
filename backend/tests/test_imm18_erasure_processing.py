@@ -81,6 +81,7 @@ class TestImm18ErasureProcessing(unittest.TestCase):
             _result(),  # fn_anonymise_imm_profile p-1
             _result(),  # fn_anonymise_imm_profile p-2
             _result(),  # UPDATE erasure_requests → completed
+            _result(),  # [AIQ-650] insert_audit_log
         ])
         with ctx:
             out = gdpr.process_erasure_request(
@@ -88,13 +89,14 @@ class TestImm18ErasureProcessing(unittest.TestCase):
         self.assertEqual(out["status"], "completed")
         self.assertEqual(out["profiles_anonymised"], 2)
         self.assertEqual(out["reviewed_by"], "hr-1")
-        # lookup + profile-ids + 2 anonymise + 1 update = 5 execute calls
-        self.assertEqual(conn.execute.call_count, 5)
+        # lookup + profile-ids + 2 anonymise + 1 update + 1 audit = 6 execute calls
+        self.assertEqual(conn.execute.call_count, 6)
 
     def test_reject_records_only(self):
         ctx, conn = _patch_db([
             _result(mappings_first={"id": "r-1", "status": "pending"}),  # lookup
             _result(),  # UPDATE erasure_requests → rejected
+            _result(),  # [AIQ-650] insert_audit_log
         ])
         with ctx:
             out = gdpr.process_erasure_request(
@@ -103,8 +105,8 @@ class TestImm18ErasureProcessing(unittest.TestCase):
                 HR, ORG)
         self.assertEqual(out["status"], "rejected")
         self.assertEqual(out["profiles_anonymised"], 0)
-        # lookup + update only — no anonymisation
-        self.assertEqual(conn.execute.call_count, 2)
+        # lookup + update + 1 audit — no anonymisation
+        self.assertEqual(conn.execute.call_count, 3)
 
     def test_list_returns_pending_count(self):
         rows = [
