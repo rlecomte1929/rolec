@@ -87,3 +87,13 @@ deepl>=1.18
 # Werkzeug is pulled in ONLY for secure_filename (filename sanitisation).
 python-magic==0.4.27
 Werkzeug==3.0.4
+# [AI-I.3] Microsoft Presidio — custom GDPR PII recognizers (IBAN, passports,
+# national IDs, multilingual names) for the cross-border mobility flows. Pulls
+# spaCy transitively. Lazy-imported: every module under
+# backend/app/services/pii/presidio_recognizers/ imports without presidio, and
+# the registry factory imports it only when called, so the backend boots and
+# tests run without it (tests importorskip presidio_analyzer). NOTE: no spaCy
+# language MODEL is provisioned yet — the pattern recognizers (IBAN etc.) don't
+# need one; the NLP-based multilingual-name recognizer (AI-I.3e) + masker wiring
+# (AI-I.3f) own adding the model download.
+presidio-analyzer>=2.2,<3
