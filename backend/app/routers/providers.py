@@ -36,10 +36,38 @@ from pydantic import BaseModel, EmailStr
 from ..auth_deps import require_admin_or_hr
 from ..services.supabase_client import get_supabase_admin_client
 from ..services.provider_jwt import generate_provider_token, verify_provider_token, hash_token
+from ..db import SessionLocal
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["providers"])
+
+
+def _audit_provider(actor_id, entity_type: str, entity_id: str, action: str,
+                    event: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """[AIQ-932b] Fail-soft canonical audit for a provider-domain mutation. These
+    endpoints write via the Supabase client (no SQLAlchemy router conn), so audit
+    runs in its own SessionLocal txn with the actor threaded from the router."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type=entity_type,
+                entity_id=str(entity_id),
+                action_type=action,
+                actor_type=ACTOR_HUMAN,
+                actor_id=actor_id,
+                new_value={"event": event, **(extra or {})},
+            )
+            asession.commit()
+    except Exception:
+        log.exception("audit: provider %s entity=%s id=%s", event, entity_type, entity_id)
 
 _INVITE_EXPIRY_DAYS = 7
 
@@ -433,6 +461,8 @@ def create_provider(
         "updated_at": now_iso,
     }
     supa.table("providers").insert(row).execute()
+    _audit_provider(user.get("id"), "provider", provider_id, ACTION_INSERT,
+                    "provider_created", {"service_type": body.service_type})
     log.info("Provider created: id=%s org_id=%s name=%s", provider_id, org_id, body.name)
     return ProviderItem(
         id=provider_id,
@@ -592,6 +622,8 @@ def patch_provider_task(
         updates["notes"] = body.notes
 
     supa.table("provider_tasks").update(updates).eq("id", task_id).execute()
+    _audit_provider(user.get("id"), "provider_task", task_id, ACTION_UPDATE,
+                    "provider_task_updated", {"status": body.status} if body.status else None)
 
     # Enrich with provider name
     prov_rows = (
@@ -679,6 +711,8 @@ def invite_provider(
         "created_by": user.get("id", ""),
         "created_at": now_iso,
     }).execute()
+    _audit_provider(user.get("id"), "provider_invite", invite_id, ACTION_INSERT,
+                    "provider_invited", {"provider_id": body.provider_id, "case_id": body.case_id})
 
     # Build magic link
     app_base = os.getenv("APP_BASE_URL", "https://app.relopass.com").rstrip("/")
@@ -750,6 +784,9 @@ def accept_provider_invite(body: AcceptRequest) -> AcceptResponse:
             supa.table("provider_invites").update({
                 "first_used_at": datetime.now(timezone.utc).isoformat(),
             }).eq("id", invite["id"]).execute()
+            # Public endpoint — the actor is the vendor redeeming via signed token.
+            _audit_provider(provider_id, "provider_invite", invite["id"], ACTION_UPDATE,
+                            "provider_invite_accepted", {"case_id": case_id})
             log.info("Provider invite first use: provider_id=%s", provider_id)
 
     return AcceptResponse(
