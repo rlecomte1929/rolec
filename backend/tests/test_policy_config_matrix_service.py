@@ -42,14 +42,37 @@ class _StatefulPolicyDb:
         # AIQ-873: extraction-import fakes.
         self._extracted: dict[str, list[dict]] = {}
         self._policy_company: dict[str, str] = {}
+        # E1b (AIQ-929): policy_documents extraction lineage.
+        self._document_company: dict[str, str] = {}
 
-    def seed_extracted(self, policy_id: str, benefits: list[dict], *, company_id: str | None = None) -> None:
-        """Register an extracted policy (policy_benefits rows) for import tests."""
-        self._policy_company[policy_id] = company_id or self.company_id
+    def seed_extracted(
+        self,
+        policy_id: str,
+        benefits: list[dict],
+        *,
+        company_id: str | None = None,
+        lineage: str = "company_policy",
+    ) -> None:
+        """Register an extracted policy (policy_extracted_benefits rows) for import
+        tests. ``lineage='document'`` registers the id in policy_documents only
+        (the canonical E1b path), so it resolves via get_policy_document and NOT
+        get_company_policy.
+        """
+        cid = company_id or self.company_id
+        if lineage == "document":
+            self._document_company[policy_id] = cid
+        else:
+            self._policy_company[policy_id] = cid
         self._extracted[policy_id] = list(benefits)
 
     def get_company_policy(self, policy_id: str) -> dict | None:
         cid = self._policy_company.get(policy_id)
+        if cid is None:
+            return None
+        return {"id": policy_id, "company_id": cid}
+
+    def get_policy_document(self, policy_id: str, request_id: str | None = None) -> dict | None:
+        cid = self._document_company.get(policy_id)
         if cid is None:
             return None
         return {"id": policy_id, "company_id": cid}
@@ -543,6 +566,24 @@ class PolicyConfigMatrixServiceTests(unittest.TestCase):
         rows = [b for b in self.db.list_policy_config_benefits(vid) if b["benefit_key"] == "language_training"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["source"], "manual_hr")  # untouched
+
+    def test_import_extraction_resolves_company_via_policy_document(self) -> None:
+        # E1b (AIQ-929): an extraction keyed by a policy_document id (NOT present in
+        # company_policies) still resolves its company + imports — proving the
+        # doc-first lineage resolution feeds the existing matrix bridge unchanged.
+        self.db.seed_extracted(
+            "doc-1",
+            [{"benefit_key": "language_training", "eligibility": "All", "limits": "60h B1", "confidence": 0.85}],
+            lineage="document",
+        )
+        # The legacy lineage misses this id; only get_policy_document resolves it.
+        self.assertIsNone(self.db.get_company_policy("doc-1"))
+        out = self.svc.import_extraction_to_draft("doc-1", changed_by="hr-1")
+        self.assertIn("language_training", out["imported"])
+        rows = {b["benefit_key"]: b for b in self.db.list_policy_config_benefits(out["version_id"])}
+        lt = rows["language_training"]
+        self.assertEqual(lt["source"], "extracted_llm")
+        self.assertEqual(lt["field_confidence"], 0.85)
 
     def test_import_extraction_unknown_policy_raises(self) -> None:
         with self.assertRaises(KeyError):

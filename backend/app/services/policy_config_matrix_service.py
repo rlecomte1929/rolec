@@ -271,6 +271,28 @@ _MATRIX_KEY_META: Dict[str, Tuple[str, str]] = {
 }
 
 
+def resolve_extraction_company_id(db: Any, policy_id: str) -> Optional[str]:
+    """Resolve the owning company_id for an extraction-lineage id.
+
+    E1b (AIQ-929): ``policy_documents`` is the canonical extraction lineage, so try
+    the document table first; fall back to the legacy ``company_policies`` lineage
+    so the older ``POST /api/policies/{id}/extract`` path keeps working. The two
+    tables share no ids in practice (independent uuid PKs), so the order is a
+    preference, not a correctness constraint. Returns None when the id matches
+    neither table (caller raises 404 / KeyError).
+    """
+    try:
+        doc = db.get_policy_document(policy_id)
+    except Exception:  # noqa: BLE001 — fall through to the legacy lineage
+        doc = None
+    if doc and doc.get("company_id"):
+        return str(doc["company_id"])
+    pol = db.get_company_policy(policy_id)
+    if pol and pol.get("company_id"):
+        return str(pol["company_id"])
+    return None
+
+
 def _normalize_cap_rule(cap: Any) -> Dict[str, Any]:
     if isinstance(cap, dict):
         return cap
@@ -1437,11 +1459,13 @@ class PolicyConfigMatrixService:
         Returns {imported, skipped_existing, unmapped, version_id}.
 
         Raises KeyError("unknown_policy:<id>") when policy_id has no linked company.
+
+        ``policy_id`` may be a policy_document id (the canonical E1b lineage) or a
+        legacy company_policies id — see ``resolve_extraction_company_id``.
         """
-        pol = self._db.get_company_policy(policy_id)
-        if not pol or not pol.get("company_id"):
+        company_id = resolve_extraction_company_id(self._db, policy_id)
+        if not company_id:
             raise KeyError(f"unknown_policy:{policy_id}")
-        company_id = str(pol["company_id"])
 
         extracted = self._db.list_policy_benefits(policy_id)
 
