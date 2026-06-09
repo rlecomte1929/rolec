@@ -764,3 +764,147 @@ class PoliciesMixin:
                 },
             )
         return vid
+
+    # ── policy_config benefit rows (AUDIT-C1.3 batch 7) ──────────────────────
+
+    def list_policy_config_benefits(self, policy_config_version_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_config_benefits
+                    WHERE policy_config_version_id = :vid
+                    ORDER BY display_order, benefit_key, targeting_signature
+                    """
+                ),
+                {"vid": str(policy_config_version_id)},
+            ).fetchall()
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            d = self._row_to_dict(row)
+            if d:
+                out.append(self._normalize_policy_config_benefit_row(d) or d)
+        return out
+
+    def delete_policy_config_benefits_for_version(self, policy_config_version_id: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM policy_config_benefits WHERE policy_config_version_id = :vid"),
+                {"vid": str(policy_config_version_id)},
+            )
+
+    def delete_policy_config_benefit_by_key(
+        self,
+        policy_config_version_id: str,
+        *,
+        benefit_key: str,
+        targeting_signature: str,
+    ) -> int:
+        """
+        Delete one benefit row from a specific version, matched by the
+        (benefit_key, targeting_signature) pair that uniquely identifies
+        a row within a version. Used by the diff "revert row" flow to
+        replace a single draft row without touching its siblings.
+        Returns the number of rows deleted (0 or 1).
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    DELETE FROM policy_config_benefits
+                    WHERE policy_config_version_id = :vid
+                      AND benefit_key = :bk
+                      AND targeting_signature = :tsig
+                    """
+                ),
+                {
+                    "vid": str(policy_config_version_id),
+                    "bk": str(benefit_key),
+                    "tsig": str(targeting_signature or "global"),
+                },
+            )
+            return int(result.rowcount or 0)
+
+    def insert_policy_config_benefit_row(self, row: Dict[str, Any]) -> str:
+        from ..database import _is_sqlite
+        bid = str(row.get("id") or uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        cap_j = row.get("cap_rule_json")
+        if isinstance(cap_j, dict):
+            cap_j = json.dumps(cap_j)
+        elif cap_j is None:
+            cap_j = "{}"
+        cond_j = row.get("conditions_json")
+        if isinstance(cond_j, dict):
+            cond_j = json.dumps(cond_j)
+        elif cond_j is None:
+            cond_j = "{}"
+        at_j = row.get("assignment_types")
+        if isinstance(at_j, list):
+            at_j = json.dumps(at_j)
+        elif at_j is None:
+            at_j = "[]"
+        fs_j = row.get("family_statuses")
+        if isinstance(fs_j, list):
+            fs_j = json.dumps(fs_j)
+        elif fs_j is None:
+            fs_j = "[]"
+        el_j = row.get("employee_levels")
+        if isinstance(el_j, list):
+            el_j = json.dumps(el_j)
+        elif el_j is None:
+            el_j = "[]"
+        cov = row.get("covered", False)
+        if _is_sqlite:
+            cov = 1 if cov else 0
+        iact = row.get("is_active", True)
+        if _is_sqlite:
+            iact = 1 if iact else 0
+        ag = row.get("auto_generated", True)
+        if _is_sqlite:
+            ag = 1 if ag else 0
+        params = {
+            "id": bid,
+            "vid": str(row["policy_config_version_id"]),
+            "bk": str(row["benefit_key"]),
+            "bl": str(row["benefit_label"]),
+            "cat": str(row["category"]),
+            "cov": cov,
+            "vt": str(row.get("value_type") or "none"),
+            "av": row.get("amount_value"),
+            "cc": row.get("currency_code"),
+            "pv": row.get("percentage_value"),
+            "uf": str(row.get("unit_frequency") or "one_time"),
+            "crj": cap_j,
+            "notes": row.get("notes"),
+            "cj": cond_j,
+            "atj": at_j,
+            "fsj": fs_j,
+            "elj": el_j,
+            "tsig": str(row.get("targeting_signature") or "global"),
+            "ia": iact,
+            "do": int(row.get("display_order") or 0),
+            "src": (str(row["source"]) if row.get("source") else None),
+            "ag": ag,
+            "fc": row.get("field_confidence"),
+            "ca": now,
+            "ua": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_config_benefits
+                    (id, policy_config_version_id, benefit_key, benefit_label, category, covered,
+                     value_type, amount_value, currency_code, percentage_value, unit_frequency,
+                     cap_rule_json, notes, conditions_json, assignment_types, family_statuses,
+                     employee_levels, targeting_signature, is_active, display_order, source,
+                     auto_generated, field_confidence, created_at, updated_at)
+                    VALUES
+                    (:id, :vid, :bk, :bl, :cat, :cov, :vt, :av, :cc, :pv, :uf, :crj, :notes, :cj,
+                     :atj, :fsj, :elj, :tsig, :ia, :do, :src, :ag, :fc, :ca, :ua)
+"""
+                ),
+                params,
+            )
+        return bid
