@@ -211,6 +211,7 @@ jobs:
             backend/tests/test_deliverable_integrity.py \
             backend/tests/test_queue_status_hygiene.py \
             backend/tests/test_policy_propagation.py \
+            backend/tests/test_policy_config_matrix_propagation.py \
             backend/tests/test_policy_canonical_chunking.py \
             backend/tests/test_corridor_persistence.py \
             backend/tests/test_hr_no_company_policy_graceful.py \
