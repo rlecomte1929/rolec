@@ -1633,7 +1633,12 @@ class PolicyConfigMatrixService:
                 continue
             if not b.get("covered"):
                 continue
-            if not row_matches_targeting(b, at_norm, fs_norm, strict_context=True):
+            # Forward employee_level: without it, strict_context drops every
+            # level-gated row, so a fully level-gated published config (e.g. all
+            # caps tagged manager/director) renders ZERO benefits to the employee.
+            if not row_matches_targeting(
+                b, at_norm, fs_norm, strict_context=True, employee_level=employee_level
+            ):
                 continue
             filtered.append(b)
 

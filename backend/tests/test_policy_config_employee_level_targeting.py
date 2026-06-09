@@ -21,7 +21,10 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.app.services.policy_config_matrix_service import compute_targeting_signature
+from backend.app.services.policy_config_matrix_service import (
+    PolicyConfigMatrixService,
+    compute_targeting_signature,
+)
 from backend.app.services.policy_config_targeting import (
     EMPLOYEE_LEVELS,
     normalize_employee_level,
@@ -158,6 +161,94 @@ class TargetingSignatureTests(unittest.TestCase):
         a = compute_targeting_signature([], [], ["vp", "director"])
         b = compute_targeting_signature([], [], ["director", "vp", "director"])
         self.assertEqual(a, b)
+
+
+class _FakeMatrixDb:
+    """Minimal duck-typed db for employee_grouped_payload: one published version
+    + a fixed benefit list. No jurisdiction overrides (getattr falls back)."""
+
+    def __init__(self, benefits):
+        self._benefits = benefits
+
+    def get_latest_published_policy_config_version(self, company_id, config_key):
+        return {"id": "ver-1", "version_number": 1, "effective_date": None}
+
+    def list_policy_config_benefits(self, version_id):
+        return list(self._benefits)
+
+
+def _benefit(benefit_key, employee_levels):
+    return {
+        "id": benefit_key,
+        "benefit_key": benefit_key,
+        "benefit_label": benefit_key.replace("_", " ").title(),
+        "category": None,
+        "covered": True,
+        "is_active": True,
+        "value_type": "currency",
+        "amount_value": 3800.0,
+        "currency_code": "EUR",
+        "unit_frequency": "monthly",
+        "assignment_types": ["long_term", "permanent"],
+        "family_statuses": ["single", "spouse_partner", "dependents"],
+        "employee_levels": employee_levels,
+        "display_order": 0,
+    }
+
+
+class EmployeeGroupedPayloadForwardsLevelTests(unittest.TestCase):
+    """Regression for the level-forwarding bug: employee_grouped_payload must
+    thread employee_level into row_matches_targeting. Before the fix, a fully
+    level-gated published config rendered ZERO benefits to every employee
+    (the row_matches_targeting unit tests passed; the caller dropped the level).
+    """
+
+    def _keys(self, payload):
+        keys = set()
+        for block in payload.get("categories", []):
+            for b in block.get("benefits", []):
+                keys.add(b.get("benefit_key"))
+        return keys
+
+    def _svc(self):
+        return PolicyConfigMatrixService(
+            _FakeMatrixDb(
+                [
+                    _benefit("host_housing_cap", ["director"]),
+                    _benefit("manager_perk", ["manager"]),
+                    _benefit("global_allowance", []),  # applies to all levels
+                ]
+            )
+        )
+
+    def test_director_sees_director_gated_cap(self):
+        payload = self._svc().employee_grouped_payload(
+            "co", assignment_type="long_term", family_status="dependents",
+            country=None, employee_level="director",
+        )
+        keys = self._keys(payload)
+        self.assertIn("host_housing_cap", keys)   # the bug blanked this
+        self.assertIn("global_allowance", keys)
+        self.assertNotIn("manager_perk", keys)    # other level correctly excluded
+
+    def test_legacy_band_alias_resolves_to_caps(self):
+        payload = self._svc().employee_grouped_payload(
+            "co", assignment_type="long_term", family_status="single",
+            country=None, employee_level="Band3",  # legacy alias -> director
+        )
+        self.assertIn("host_housing_cap", self._keys(payload))
+
+    def test_missing_level_drops_level_gated_caps_but_keeps_global(self):
+        """Strict employee-facing resolution: no level => level-gated caps are
+        dropped (the seniority-gap), but global rows still render."""
+        payload = self._svc().employee_grouped_payload(
+            "co", assignment_type="long_term", family_status="dependents",
+            country=None, employee_level=None,
+        )
+        keys = self._keys(payload)
+        self.assertNotIn("host_housing_cap", keys)
+        self.assertNotIn("manager_perk", keys)
+        self.assertIn("global_allowance", keys)
 
 
 if __name__ == "__main__":
