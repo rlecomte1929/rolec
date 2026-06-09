@@ -1412,3 +1412,168 @@ class CasesMixin:
                     "ON CONFLICT(case_id, user_id, case_question_id) DO UPDATE SET "
                     "answer_json = excluded.answer_json, answered_at = excluded.answered_at"
                 ), payload)
+
+    def upsert_relocation_case(
+        self,
+        case_id: str,
+        company_id: Optional[str],
+        employee_id: Optional[str],
+        status: Optional[str],
+        stage: Optional[str],
+        host_country: Optional[str],
+        home_country: Optional[str],
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE relocation_cases SET company_id = :cid, employee_id = :eid, status = :status, "
+                "stage = :stage, host_country = :host, home_country = :home, updated_at = :now "
+                "WHERE id = :id"
+            ), {
+                "id": case_id,
+                "cid": company_id,
+                "eid": employee_id,
+                "status": status,
+                "stage": stage,
+                "host": host_country,
+                "home": home_country,
+                "now": now,
+            })
+
+    def create_support_case(
+        self,
+        support_case_id: str,
+        company_id: str,
+        created_by_profile_id: str,
+        category: str,
+        severity: str,
+        status: str,
+        summary: Optional[str],
+        employee_id: Optional[str] = None,
+        hr_profile_id: Optional[str] = None,
+        last_error_code: Optional[str] = None,
+        last_error_context: Optional[Dict[str, Any]] = None,
+        priority: Optional[str] = None,
+        assignee_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        prio = (priority or "medium").lower() if priority else "medium"
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO support_cases "
+                "(id, company_id, created_by_profile_id, employee_id, hr_profile_id, category, severity, status, summary, last_error_code, last_error_context_json, created_at, updated_at, priority, assignee_id) "
+                "VALUES (:id, :cid, :cbp, :eid, :hid, :cat, :sev, :status, :summary, :err, :ctx, :created_at, :updated_at, :priority, :assignee_id) "
+                "ON CONFLICT(id) DO UPDATE SET company_id = excluded.company_id, status = excluded.status, summary = excluded.summary, "
+                "last_error_code = excluded.last_error_code, last_error_context_json = excluded.last_error_context_json, updated_at = excluded.updated_at, priority = excluded.priority, assignee_id = excluded.assignee_id"
+            ), {
+                "id": support_case_id,
+                "cid": company_id,
+                "cbp": created_by_profile_id,
+                "eid": employee_id,
+                "hid": hr_profile_id,
+                "cat": category,
+                "sev": severity,
+                "status": status,
+                "summary": summary,
+                "err": last_error_code,
+                "ctx": json.dumps(last_error_context or {}),
+                "created_at": now,
+                "updated_at": now,
+                "priority": prio,
+                "assignee_id": assignee_id,
+            })
+
+    def list_relocation_cases(self, company_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {}
+        clauses = []
+        if company_id:
+            clauses.append("company_id = :cid")
+            params["cid"] = company_id
+        if status:
+            clauses.append("status = :status")
+            params["status"] = status
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                f"SELECT * FROM relocation_cases {where} ORDER BY updated_at DESC"
+            ), params).fetchall()
+        return self._rows_to_list(rows)
+
+    def get_relocation_case(self, case_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM relocation_cases WHERE id = :id"),
+                {"id": case_id},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def list_support_cases(
+        self,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+        company_id: Optional[str] = None,
+        priority: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {}
+        clauses = []
+        if status:
+            clauses.append("status = :status")
+            params["status"] = status
+        if severity:
+            clauses.append("severity = :severity")
+            params["severity"] = severity
+        if company_id:
+            clauses.append("company_id = :cid")
+            params["cid"] = company_id
+        if priority:
+            clauses.append("priority = :priority")
+            params["priority"] = priority
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                f"SELECT * FROM support_cases {where} ORDER BY updated_at DESC"
+            ), params).fetchall()
+        return self._rows_to_list(rows)
+
+    def update_support_case(
+        self,
+        support_case_id: str,
+        *,
+        priority: Optional[str] = None,
+        status: Optional[str] = None,
+        assignee_id: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update ticket fields: priority (low|medium|high|urgent), status (open|investigating|blocked|resolved), assignee_id, category."""
+        updates = []
+        params: Dict[str, Any] = {"id": support_case_id, "now": datetime.utcnow().isoformat()}
+        if priority is not None:
+            updates.append("priority = :priority")
+            params["priority"] = priority
+        if status is not None:
+            updates.append("status = :status")
+            params["status"] = status
+        if assignee_id is not None:
+            updates.append("assignee_id = :assignee_id")
+            params["assignee_id"] = assignee_id
+        if category is not None:
+            updates.append("category = :category")
+            params["category"] = category
+        if not updates:
+            return self.get_support_case(support_case_id)
+        updates.append("updated_at = :now")
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE support_cases SET {', '.join(updates)} WHERE id = :id"),
+                params,
+            )
+        return self.get_support_case(support_case_id)
+
+    def get_support_case(self, support_case_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single support case by id."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM support_cases WHERE id = :id"),
+                {"id": support_case_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
