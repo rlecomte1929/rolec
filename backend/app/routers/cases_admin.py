@@ -19,6 +19,11 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import text as _sql_text
 
 from ..auth_deps import get_current_user
+from ..services.audit_log_service import (
+    ACTION_DELETE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.case_service import (
     _assert_case_access,
     _pg_table,
@@ -52,6 +57,18 @@ def delete_dossier(
             )
             if result.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Dossier package not found")
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="dossier_package",
+                    entity_id=dossier_id,
+                    action_type=ACTION_DELETE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user.get("id") or user.get("sub"),
+                    new_value={"event": "dossier_deleted", "case_id": case_id},
+                )
+            except Exception:
+                logger.exception("audit: delete_dossier dossier_id=%s", dossier_id)
     except HTTPException:
         raise
     except Exception:

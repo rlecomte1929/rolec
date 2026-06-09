@@ -8,6 +8,7 @@ DELETE /api/hr/tasks/{task_id}             — cancel (soft-delete) a provider t
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -18,10 +19,18 @@ from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 from ..services.events_tracker import track as track_event
 from ..services.outcome_recorder import record_outcome
 
 router = APIRouter(prefix="/api/hr", tags=["hr-coordination"])
+
+log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +216,19 @@ def assign_task(
                 "now": now,
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="provider_task",
+                entity_id=task_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=hr_user.get("id"),
+                new_value={"event": "provider_task_assigned", "case_id": case_id,
+                           "provider_id": body.provider_id},
+            )
+        except Exception:
+            log.exception("audit: assign_task task=%s", task_id)
 
     track_event(
         "assignment.supplier_assigned",
@@ -311,6 +333,19 @@ def update_task(
             ),
             {"tid": task_id},
         ).mappings().first()
+        if updated:
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="provider_task",
+                    entity_id=task_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=hr_user.get("id"),
+                    new_value={"event": "provider_task_updated", "status": body.status},
+                )
+            except Exception:
+                log.exception("audit: update_task task=%s", task_id)
 
     row = dict(updated) if updated else {}
     for col in ("created_at", "updated_at", "due_date"):
@@ -394,6 +429,18 @@ def cancel_task(
             ),
             {"tid": task_id, "org_id": org_id, "now": datetime.utcnow().isoformat()},
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="provider_task",
+                entity_id=task_id,
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=hr_user.get("id"),
+                new_value={"event": "provider_task_cancelled"},
+            )
+        except Exception:
+            log.exception("audit: cancel_task task=%s", task_id)
 
     track_event(
         "assignment.cancelled",
