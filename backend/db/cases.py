@@ -2273,3 +2273,105 @@ class CasesMixin:
     # ------------------------------------------------------------------
     # Compensation & Allowance — policy_configs / policy_config_versions / policy_config_benefits
     # ------------------------------------------------------------------
+
+    def purge_inactive_cases(self, active_statuses: List[str]) -> Dict[str, int]:
+        """Remove inactive case/assignment data and related records."""
+        status_list = [s for s in active_statuses if s]
+        if not status_list:
+            return {"assignments_deleted": 0, "relocation_cases_deleted": 0}
+
+        placeholders = ", ".join([f":s{i}" for i in range(len(status_list))])
+        params = {f"s{i}": status_list[i] for i in range(len(status_list))}
+
+        with self.engine.begin() as conn:
+            # Collect assignments to delete
+            rows = conn.execute(text(
+                f"SELECT id FROM case_assignments WHERE status NOT IN ({placeholders})"
+            ), params).fetchall()
+            assignment_ids = [r._mapping["id"] for r in rows]
+
+            if assignment_ids:
+                id_placeholders = ", ".join([f":a{i}" for i in range(len(assignment_ids))])
+                id_params = {f"a{i}": assignment_ids[i] for i in range(len(assignment_ids))}
+
+                conn.execute(text(
+                    f"DELETE FROM wizard_employee_profiles WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM employee_answers WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM compliance_reports WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM compliance_runs WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM policy_exceptions WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM compliance_actions WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+
+                conn.execute(text(
+                    f"DELETE FROM assignment_invites WHERE case_id IN (SELECT case_id FROM case_assignments WHERE id IN ({id_placeholders}))"
+                ), id_params)
+
+                conn.execute(text(
+                    f"DELETE FROM case_assignments WHERE id IN ({id_placeholders})"
+                ), id_params)
+
+            # Purge relocation_cases not active
+            rows_cases = conn.execute(text(
+                f"SELECT id FROM relocation_cases WHERE status NOT IN ({placeholders})"
+            ), params).fetchall()
+            case_ids = [r._mapping["id"] for r in rows_cases]
+            if case_ids:
+                case_placeholders = ", ".join([f":c{i}" for i in range(len(case_ids))])
+                case_params = {f"c{i}": case_ids[i] for i in range(len(case_ids))}
+                conn.execute(text(
+                    f"DELETE FROM relocation_cases WHERE id IN ({case_placeholders})"
+                ), case_params)
+
+        return {
+            "assignments_deleted": len(assignment_ids),
+            "relocation_cases_deleted": len(case_ids),
+        }
+
+    # ==================================================================
+    # HR Policies (full policy spec)
+    # ==================================================================
+
+    def list_policy_assignment_applicability(self, policy_version_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT * FROM policy_assignment_type_applicability WHERE policy_version_id = :vid"),
+                {"vid": policy_version_id},
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def insert_policy_assignment_applicability(self, app: Dict[str, Any], *, connection: Any = None) -> str:
+        aid = app.get("id") or str(uuid.uuid4())
+        bind = {
+            "id": aid,
+            "vid": app["policy_version_id"],
+            "brid": app["benefit_rule_id"],
+            "at": app["assignment_type"],
+        }
+
+        def _ins(conn: Any) -> None:
+            conn.execute(
+                text("""
+                    INSERT INTO policy_assignment_type_applicability
+                    (id, policy_version_id, benefit_rule_id, assignment_type)
+                    VALUES (:id, :vid, :brid, :at)
+                """),
+                bind,
+            )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
+        return aid
