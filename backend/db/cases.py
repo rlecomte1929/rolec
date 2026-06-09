@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
@@ -744,3 +744,247 @@ class CasesMixin:
     # ------------------------------------------------------------------
     # Exception requests (P2/P3 — HR sign-off flags)
     # ------------------------------------------------------------------
+
+    def get_assignment_by_id(
+        self,
+        assignment_id: str,
+        request_id: Optional[str] = None,
+        *,
+        include_archived: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        where = "WHERE id = :id" if include_archived else "WHERE id = :id AND archived_at IS NULL"
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                f"SELECT * FROM case_assignments {where}",
+                {"id": assignment_id},
+                op_name="get_assignment_by_id",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_assignment_by_case_id(self, case_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Prefer canonical_case_id when resolving, fall back to case_id for legacy."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE (canonical_case_id = :cid OR case_id = :cid)",
+                {"cid": cid},
+                op_name="get_assignment_by_case_id",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_mobility_case_id_for_assignment(
+        self, assignment_id: str, request_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Forward lookup: case_assignments.id -> mobility_cases.id via assignment_mobility_links."""
+        aid = (assignment_id or "").strip()
+        if not aid:
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT mobility_case_id FROM assignment_mobility_links WHERE assignment_id = :aid LIMIT 1",
+                    {"aid": aid},
+                    op_name="get_mobility_case_id_for_assignment",
+                    request_id=request_id,
+                ).mappings().first()
+            if not row:
+                return None
+            mid = row.get("mobility_case_id")
+            return str(mid).strip() if mid is not None else None
+        except Exception as e:
+            log.debug("get_mobility_case_id_for_assignment failed: %s", e)
+            return None
+
+    def get_assignment_id_for_mobility_case(
+        self, mobility_case_id: str, request_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Reverse lookup: mobility_cases.id -> case_assignments.id via assignment_mobility_links."""
+        mid = (mobility_case_id or "").strip()
+        if not mid:
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT assignment_id FROM assignment_mobility_links WHERE mobility_case_id = :mid LIMIT 1",
+                    {"mid": mid},
+                    op_name="get_assignment_id_for_mobility_case",
+                    request_id=request_id,
+                ).mappings().first()
+            if not row:
+                return None
+            aid = row.get("assignment_id")
+            return str(aid).strip() if aid is not None else None
+        except Exception as e:
+            log.debug("get_assignment_id_for_mobility_case failed: %s", e)
+            return None
+
+    def mobility_case_row_exists(self, mobility_case_id: str, request_id: Optional[str] = None) -> bool:
+        """True if a mobility_cases row exists (used for admin read access without assignment bridge)."""
+        mid = (mobility_case_id or "").strip()
+        if not mid:
+            return False
+        try:
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT 1 FROM mobility_cases WHERE id = :id LIMIT 1",
+                    {"id": mid},
+                    op_name="mobility_case_row_exists",
+                    request_id=request_id,
+                ).fetchone()
+            return row is not None
+        except Exception as e:
+            log.debug("mobility_case_row_exists failed: %s", e)
+            return False
+
+    def list_case_services(self, assignment_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_services WHERE assignment_id = :aid ORDER BY category, service_key",
+                {"aid": assignment_id},
+                op_name="list_case_services",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def upsert_case_services(
+        self,
+        assignment_id: str,
+        case_id: str,
+        services: List[Dict[str, Any]],
+        request_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for item in services:
+                payload = {
+                    "id": item.get("id") or str(uuid.uuid4()),
+                    "case_id": case_id,
+                    "canonical_case_id": case_id,
+                    "assignment_id": assignment_id,
+                    "service_key": item.get("service_key"),
+                    "category": item.get("category"),
+                    "selected": 1 if item.get("selected", True) else 0,
+                    "estimated_cost": item.get("estimated_cost"),
+                    "currency": item.get("currency") or "EUR",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                if _is_sqlite:
+                    # SQLite local dev: no unique constraint on (case_id, service_key)
+                    update = self._exec(
+                        conn,
+                        """
+                        UPDATE case_services
+                        SET assignment_id = :assignment_id,
+                            category = :category,
+                            selected = :selected,
+                            estimated_cost = :estimated_cost,
+                            currency = :currency,
+                            updated_at = :updated_at
+                        WHERE case_id = :case_id AND service_key = :service_key
+                        """,
+                        payload,
+                        op_name="update_case_services",
+                        request_id=request_id,
+                    )
+                    if update.rowcount == 0:
+                        self._exec(
+                            conn,
+                            """
+                            INSERT INTO case_services (
+                                id, case_id, canonical_case_id, assignment_id, service_key, category,
+                                selected, estimated_cost, currency, created_at, updated_at
+                            )
+                            VALUES (
+                                :id, :case_id, :canonical_case_id, :assignment_id, :service_key, :category,
+                                :selected, :estimated_cost, :currency, :created_at, :updated_at
+                            )
+                            """,
+                            payload,
+                            op_name="insert_case_services",
+                            request_id=request_id,
+                        )
+                else:
+                    self._exec(
+                        conn,
+                        """
+                        INSERT INTO case_services (
+                            id, case_id, canonical_case_id, assignment_id, service_key, category,
+                            selected, estimated_cost, currency, created_at, updated_at
+                        )
+                        VALUES (
+                            :id, :case_id, :canonical_case_id, :assignment_id, :service_key, :category,
+                            :selected, :estimated_cost, :currency, :created_at, :updated_at
+                        )
+                        ON CONFLICT(case_id, service_key)
+                        DO UPDATE SET
+                            canonical_case_id = COALESCE(excluded.canonical_case_id, case_services.canonical_case_id),
+                            assignment_id = excluded.assignment_id,
+                            category = excluded.category,
+                            selected = excluded.selected,
+                            estimated_cost = excluded.estimated_cost,
+                            currency = excluded.currency,
+                            updated_at = excluded.updated_at
+                        """,
+                        payload,
+                        op_name="upsert_case_services",
+                        request_id=request_id,
+                    )
+
+    def list_case_service_answers(
+        self,
+        case_id: str,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_service_answers WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY service_key",
+                {"cid": cid},
+                op_name="list_case_service_answers",
+                request_id=request_id,
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            try:
+                item["answers"] = json.loads(item.get("answers") or "{}")
+            except Exception:
+                item["answers"] = {}
+        return items
+
+    def upsert_case_service_answers(
+        self,
+        case_id: str,
+        service_key: str,
+        answers: Dict[str, Any],
+        request_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        sql = """
+            INSERT INTO case_service_answers (id, case_id, canonical_case_id, service_key, answers, updated_at)
+            VALUES (:id, :case_id, :canonical_case_id, :service_key, :answers, :updated_at)
+            ON CONFLICT(case_id, service_key) DO UPDATE SET
+                canonical_case_id = COALESCE(excluded.canonical_case_id, case_service_answers.canonical_case_id),
+                answers = excluded.answers,
+                updated_at = excluded.updated_at
+        """
+        params = {
+            "id": str(uuid.uuid4()),
+            "case_id": case_id,
+            "canonical_case_id": case_id,
+            "service_key": service_key,
+            "answers": json.dumps(answers),
+            "updated_at": now,
+        }
+        with self.engine.begin() as conn:
+            self._exec(conn, sql, params, op_name="upsert_case_service_answers", request_id=request_id)
