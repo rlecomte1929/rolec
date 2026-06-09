@@ -63,6 +63,7 @@ def _map_service_to_benefit(service_category: str) -> Optional[str]:
 # onto their legacy equivalents; unmapped config keys are left as-is (no regression).
 MATRIX_TO_LEGACY_BENEFIT_KEY: Dict[str, str] = {
     "temporary_living": "temporary_housing",
+    "host_housing_cap": "temporary_housing",
     "shipment_of_goods": "shipment",
     "child_education_support": "schooling",
     "banking_assistance": "banking_setup",
@@ -83,6 +84,44 @@ def _with_legacy_benefit_key_aliases(benefits: List[Dict[str, Any]]) -> List[Dic
             alias = dict(b)
             alias["benefit_key"] = legacy
             out.append(alias)
+    return out
+
+
+def _synthesize_matrix_rule_readiness(benefits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Attach ``rule_comparison_readiness`` to config-matrix benefits.
+
+    The policy_version-based ``enrich_resolved_benefits_with_rule_comparison`` can't
+    run for a matrix policy (no ``policy_version_id``), so without this the engine
+    sees ``MISSING_RULE_READINESS`` and downgrades every matrix row to
+    ``information_only`` even when a clean numeric cap is on file. A published
+    config benefit row IS the comparison-ready source of truth, so:
+      - included + numeric currency cap -> ``full`` + budget-delta (numeric within/exceed),
+      - included but no numeric cap      -> ``partial`` (honest information_only),
+      - excluded                         -> ``full`` (engine emits a clean ``excluded``).
+    """
+    from .policy_rule_comparison_readiness import (
+        RULE_COMPARISON_FULL,
+        RULE_COMPARISON_PARTIAL,
+    )
+
+    out: List[Dict[str, Any]] = []
+    for b in benefits:
+        nb = dict(b)
+        if not nb.get("included", True):
+            nb["rule_comparison_readiness"] = {
+                "level": RULE_COMPARISON_FULL, "supports_budget_delta": False, "reasons": []
+            }
+        elif nb.get("max_value") is not None or nb.get("standard_value") is not None:
+            nb["rule_comparison_readiness"] = {
+                "level": RULE_COMPARISON_FULL, "supports_budget_delta": True, "reasons": []
+            }
+        else:
+            nb["rule_comparison_readiness"] = {
+                "level": RULE_COMPARISON_PARTIAL,
+                "supports_budget_delta": False,
+                "reasons": ["MATRIX_NO_NUMERIC_CAP"],
+            }
+        out.append(nb)
     return out
 
 
@@ -324,7 +363,9 @@ def compute_policy_service_comparison(
             legacy_comparisons_suppressed = True
 
     if is_matrix_policy:
-        benefits = _with_legacy_benefit_key_aliases(resolved.get("benefits") or [])
+        benefits = _with_legacy_benefit_key_aliases(
+            _synthesize_matrix_rule_readiness(resolved.get("benefits") or [])
+        )
     else:
         benefits = db.list_resolved_policy_benefits(resolved["id"])
         pvid = resolved.get("policy_version_id")
