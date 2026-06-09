@@ -41,6 +41,12 @@ from sqlalchemy import text
 
 from ..auth_deps import require_admin
 from ...database import db
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 
 router = APIRouter(prefix="/form-templates", tags=["admin-form-templates"])
 logger = logging.getLogger(__name__)
@@ -488,6 +494,19 @@ def create_form_template(
                 "trigger_rules": _json_dumps(body.trigger_rules),
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="form_template",
+                entity_id=new_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": "form_template_created", "code": body.code,
+                           "version": body.version},
+            )
+        except Exception:
+            logger.exception("audit: create_form_template id=%s", new_id)
         row = conn.execute(
             text(f"SELECT {_select_cols()} FROM {_table()} WHERE id = :id"),
             {"id": new_id},
@@ -581,6 +600,20 @@ def update_form_template(
                     "trigger_rules": _json_dumps(merged.get("trigger_rules") or {}),
                 },
             )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="form_template",
+                    entity_id=new_id,
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user.get("id") or user.get("sub"),
+                    new_value={"event": "form_template_version_bumped",
+                               "from_id": template_id, "code": merged["code"],
+                               "version": merged["version"]},
+                )
+            except Exception:
+                logger.exception("audit: update_form_template(bump) id=%s", new_id)
             row = conn.execute(
                 text(f"SELECT {_select_cols()} FROM {_table()} WHERE id = :id"),
                 {"id": new_id},
@@ -633,6 +666,19 @@ def update_form_template(
                 **extra_params,
             },
         )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="form_template",
+                entity_id=template_id,
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": "form_template_updated", "code": merged["code"],
+                           "version": merged["version"]},
+            )
+        except Exception:
+            logger.exception("audit: update_form_template id=%s", template_id)
         row = conn.execute(
             text(f"SELECT {_select_cols()} FROM {_table()} WHERE id = :id"),
             {"id": template_id},
