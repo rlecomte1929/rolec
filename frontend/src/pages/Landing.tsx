@@ -100,16 +100,31 @@ export const Landing: React.FC = () => {
             align="center"
           />
         </FadeIn>
-        <div className="mt-12 sm:mt-16 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          {c.solution.blocks.map((block, i) => (
-            <FadeIn key={block.title} delay={i * 80}>
-              <FeatureCard
-                title={block.title}
-                description={block.body}
-                className="bg-marketing-surface"
-              />
-            </FadeIn>
-          ))}
+        {/* Anchored composition: one product visual + a scannable capabilities
+            list, instead of six equal tiles (breaks the back-to-back card-grid
+            rhythm; reuses the existing assignments screenshot). */}
+        <div className="mt-12 sm:mt-16 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          <FadeIn>
+            <img
+              src="/screenshot-hr-assignments.png"
+              alt="ReloPass — every relocation case, its tasks, providers and status on one record"
+              className="w-full rounded-xl border border-marketing-border shadow-sm"
+              loading="lazy"
+            />
+          </FadeIn>
+          <FadeIn delay={120}>
+            <ul className="space-y-7">
+              {c.solution.blocks.map((block) => (
+                <li key={block.title} className="flex gap-4">
+                  <span aria-hidden="true" className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-marketing-accent" />
+                  <div>
+                    <h3 className="text-marketing-h3 font-semibold text-marketing-primary">{block.title}</h3>
+                    <p className="mt-1.5 text-sm text-marketing-text-muted leading-relaxed">{block.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </FadeIn>
         </div>
       </Section>
 
