@@ -433,3 +433,50 @@ COMMIT;
 ---
 
 *Generated 2026-06-03 by Claude Cowork via notion-task-executor. Doc half of PRIV-001 — runbook, anonymisation strategy, PII inventory shipped. Code half (endpoints + UI) awaits Claude Code session.*
+
+---
+
+## 11. As-built erasure map (code-accurate — 2026-06-09, AIQ-469 / PRIV-001b)
+
+The export (`GET /api/users/{id}/data-export`) and erasure (`DELETE /api/users/{id}/data`)
+endpoints shipped in `backend/app/routers/gdpr.py` (PRs #545 + erasure follow-up). The
+endpoint operates in Python (per-table `SAVEPOINT`, fail-soft) rather than the §4.4
+`fn_erase_employee_data` SQL stub, because that stub assumed a pepper and tables that do
+**not** exist in prod.
+
+**Inventory correction.** The §5/§7 inventory referenced 6 tables that do not exist in the
+prod `public` schema and were dropped from the erasure surface: `case_audit_events`,
+`case_family_members`, `case_outcomes`, `email_log`, `pathway_sessions`, `pathway_answers`.
+The verified live surface is the 17 tables below.
+
+**Anonymisation choice (pre-launch).** Null-only / soft, not pepper-hashed (Romain, 2026-06-09).
+PII columns are set to `NULL` and operational rows hard-deleted; opaque UUIDs left in
+accountability tables no longer resolve to a person once `profiles`/`employees` are erased.
+Pepper-based stable hashing (§4.2/§4.3) is a deferred refinement for when audit-chain
+analytics need to survive erasure.
+
+| Table | Action | Detail |
+|---|---|---|
+| `employees`, `employee_tasks`, `quote_requests`, `case_documents`, `case_forms`, `pets` | **hard-delete** | Operational data, no retention obligation |
+| `case_messages` | **hard-delete (authored)** | Only rows where `sender_id` = subject |
+| `profiles` | anonymise | NULL `email`, `full_name`, `avatar_url` |
+| `cases` | anonymise | NULL `intake_data`, `notes` |
+| `relocation_cases` | anonymise | NULL `profile_json` |
+| `case_assignments` | anonymise | NULL names, `employee_identifier`, `hr_notes`, `intake_draft`, `employee_contact_id` |
+| `imm_employee_profiles` | anonymise | NULL the passport/DOB/salary/spouse/dependents block + `field_sources`/`field_conflicts`; stamp `anonymised_at = now()` |
+| `support_tickets` | anonymise | NULL `from_email`, `from_name`, `subject`, `raw_content`, `html_content` |
+| `exception_requests` | anonymise | NULL `reason`, `resolution_notes`, `ai_insight` |
+| `consent_records` | **retain**, null network PII | Keep consent proof; NULL `ip_address`, `user_agent` |
+| `data_access_log` | **retain**, null network PII | AI Act Art. 12 audit log; NULL `ip_address` |
+| `erasure_requests` | **retain + fulfil** | Compliance record; mark subject's open requests `completed` |
+
+**Supabase `auth.users`** is deleted **last**, outside the DB transaction, via the
+service-role admin client (`_call_with_timeout(client.auth.admin.delete_user, id)`),
+fail-soft so a wedged GoTrue cannot roll back the committed app-data erasure.
+
+**Known limitations (follow-ups):**
+- Storage blobs behind `case_documents` / `case_forms` (Supabase Storage) are not purged by
+  the SQL path — needs a storage-API sweep (separate task).
+- HR-authored `case_messages` referencing the subject are retained (erasing another data
+  subject's records is out of scope); only subject-authored messages are removed.
+- Point-in-time-recovery backups retain erased rows for the PITR window (see PRIV-003 §10).
