@@ -16,11 +16,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
 from ...database import db
+from ..services.document_extraction_queue import run_extraction
 from ..services.document_upload_service import store_immigration_document
 
 router = APIRouter(prefix="/api/immigration", tags=["immigration-documents"])
@@ -63,6 +64,7 @@ def _resolve_accessible_case(case_id: str, user: Dict[str, Any]) -> str:
 @router.post("/cases/{case_id}/documents")
 async def upload_immigration_document(
     case_id: str,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -80,7 +82,7 @@ async def upload_immigration_document(
     )
 
     try:
-        return store_immigration_document(
+        record = store_immigration_document(
             case_id=resolved_case_id,
             uploaded_by=str(user.get("id") or ""),
             file_name=safe_name,
@@ -97,3 +99,15 @@ async def upload_immigration_document(
         raise HTTPException(
             status_code=502, detail="Document storage failed. Please retry."
         )
+
+    # BL-OCR.3: kick off classification + extraction in the background so the
+    # upload returns immediately with ocr_status='pending'; the job advances it
+    # to 'done'/'failed'. Fail-soft inside run_extraction.
+    background_tasks.add_task(
+        run_extraction,
+        document_id=record["document_id"],
+        storage_path=record["storage_path"],
+        mime_type=mime,
+        file_name=safe_name,
+    )
+    return record
