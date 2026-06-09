@@ -94,3 +94,76 @@ def run_case_health_scan() -> Dict[str, Any]:
         "alerts": alerts,
         "errors": errors,
     }
+
+
+def _company_case_ids(company_id: str) -> set:
+    """Set of this company's case ids (as text). Safe-fails to an empty set."""
+    from sqlalchemy import text
+
+    from ...database import db
+
+    try:
+        with db.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    text("SELECT id::text AS id FROM public.relocation_cases WHERE company_id::text = :c"),
+                    {"c": str(company_id)},
+                )
+                .mappings()
+                .all()
+            )
+        return {r["id"] for r in rows}
+    except Exception:  # noqa: BLE001 — degrade rather than raise
+        logger.exception("case_health_scan: company case-id query failed")
+        return set()
+
+
+def list_behind_cases_for_company(company_id: str) -> list:
+    """AIQ-378d read layer: the open ``case_behind_schedule`` alerts whose case
+    belongs to ``company_id`` — the tenant-scoped feed for the HR "Case health"
+    panel. Read-only; **tenant-safe** (an alert for another company's case is
+    excluded); safe-fails to ``[]``; empty until the pilot raises alerts.
+    """
+    if not company_id:
+        return []
+    case_ids = _company_case_ids(company_id)
+    if not case_ids:
+        return []
+
+    import json
+
+    from .ops_notification_service import list_ops_notifications
+
+    try:
+        result = list_ops_notifications(
+            notification_type=NOTIFICATION_TYPE, open_only=True, limit=200
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("case_health_scan: list_ops_notifications failed")
+        return []
+
+    out = []
+    for n in result.get("items", []):
+        payload = n.get("payload")
+        if not payload and n.get("payload_json"):
+            try:
+                payload = json.loads(n["payload_json"])
+            except (TypeError, ValueError):
+                payload = {}
+        payload = payload or {}
+        cid = str(payload.get("case_id") or "")
+        if not cid or cid not in case_ids:
+            continue  # tenant scope: only this company's cases
+        out.append(
+            {
+                "case_id": cid,
+                "stage": payload.get("stage"),
+                "days_behind": payload.get("days_behind"),
+                "expected_date": payload.get("expected_date"),
+                "severity": payload.get("severity"),
+                "suggested_action": payload.get("suggested_action"),
+                "draft_reminder": payload.get("draft_reminder"),
+            }
+        )
+    out.sort(key=lambda c: -(c.get("days_behind") or 0))
+    return out
