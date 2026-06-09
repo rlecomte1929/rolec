@@ -239,6 +239,8 @@ function App() {
         <Route path={ROUTE_DEFS.compliance.path} element={<CompliancePage />} />
         <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
+        {/* AIQ-920: /login alias renders the same Auth screen (defaults to login mode). */}
+        <Route path={ROUTE_DEFS.login.path} element={<Auth />} />
         {/* Design preview — sandboxed Claude Design handoff bundle in iframe. Static, no auth, mock data only. */}
         <Route path="/design-preview" element={<DesignPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}
