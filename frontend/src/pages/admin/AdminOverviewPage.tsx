@@ -177,6 +177,15 @@ export const AdminOverviewPage: React.FC = () => {
         </div>
       }
     >
+      {/* Scope clarity (AIQ-915): the overview aggregates across every tenant,
+          while the detail pages it links to are scoped to a single tenant — so
+          their counts are expected to be lower, not contradictory. */}
+      <p className="mb-4 text-xs text-slate-500">
+        Platform-wide totals across <span className="font-medium text-slate-600">all tenants</span>.
+        Detail pages (Companies, Resources CMS, Provider status) are scoped to a single tenant,
+        so their counts will be lower.
+      </p>
+
       {/* ── Top stat strip ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Active Tenants"    value={stats.companies}   sub="+3 this quarter"               loading={loading} />

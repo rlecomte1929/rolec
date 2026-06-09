@@ -20,9 +20,31 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth_deps import get_current_user
+from ..db import SessionLocal
+from ..services.audit_log_service import ACTION_UPDATE, ACTOR_HUMAN, insert_audit_log
 
 router = APIRouter(prefix="/api/company", tags=["branding"])
 logger = logging.getLogger(__name__)
+
+
+def _audit_branding(user: Dict[str, Any], company_id: str, event: str) -> None:
+    """[AIQ-932] Fail-soft canonical audit for a branding-config mutation. The
+    write goes through the Supabase client (no SQLAlchemy router conn), so audit
+    runs in its own SessionLocal txn."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="company_branding",
+                entity_id=str(company_id),
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": event},
+            )
+            asession.commit()
+    except Exception:
+        logger.exception("audit: branding %s company_id=%s", event, company_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -185,6 +207,8 @@ def update_branding_config(
     except Exception as exc:
         logger.exception("Failed to update branding_config company_id=%s", company_id)
         raise HTTPException(status_code=500, detail="Failed to save branding config.") from exc
+
+    _audit_branding(user, company_id, "branding_config_updated")
 
     return BrandingConfigResponse(
         company_id=company_id,

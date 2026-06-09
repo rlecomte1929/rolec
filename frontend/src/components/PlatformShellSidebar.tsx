@@ -80,10 +80,8 @@ const SECTIONS: NavSection[] = [
         label: 'Inbox',
         to: ROUTE_DEFS.messages.path,
         toByRole: { HR: ROUTE_DEFS.hrMessages.path, ADMIN: ROUTE_DEFS.hrMessages.path },
-        // AIQ-914: no badge — the prior static '3' was a placeholder unrelated to
-        // the real thread count. No unread-thread count is fetched for the sidebar,
-        // so show nothing rather than a stale number. Wire to a real unread count
-        // here if/when one is exposed.
+        // No badge: there is no thread-count source wired yet, and a hard-coded
+        // '3' (vs 0 real threads) trained users to distrust the badge (AIQ-914).
       },
     ],
   },
@@ -102,9 +100,9 @@ const SECTIONS: NavSection[] = [
         label: 'Mobility center',
         to: ROUTE_DEFS.hrCommandCenter.path,
         exact: true,
-        // AIQ-914: no badge — the prior static '12' did not reflect the real case
-        // count. No case-count is fetched for the sidebar, so show nothing rather
-        // than a stale number. Wire to a real active-case count here when exposed.
+        // No badge: the hard-coded '12' never matched the real case count
+        // (116 in prod). No active-case count is exposed by the notification
+        // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },

@@ -458,7 +458,6 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         </div>
         <div className="mt-1.5 flex items-baseline gap-3">
           <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Companies</h1>
-          <Pill className="bg-accent-50 text-accent-700 ring-accent-200">v2 preview</Pill>
           <div className="ml-auto flex items-center gap-3">
             {onRefresh && (
               <Button unstyled

@@ -22,9 +22,39 @@ from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin_or_hr
 from ...database import db
+from ..db import SessionLocal
 from ..services import service_catalog, vendor_curation
+from ..services.audit_log_service import (
+    ACTION_DELETE,
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 
 router = APIRouter(prefix="/api/hr/catalog", tags=["hr_catalog"])
+
+
+def _audit_catalog(actor_id, entity_id, action: str, event: str,
+                   extra: "Optional[Dict[str, Any]]" = None) -> None:
+    """[AIQ-932b] Fail-soft canonical audit for an HR vendor-curation mutation.
+    vendor_curation records created_by on the row but writes no audit_logs row;
+    audit runs here in its own SessionLocal txn. (destination-request resolve is
+    already audited inside scrape_safety, so it is not re-audited here.)"""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="company_vendor_selection",
+                entity_id=str(entity_id),
+                action_type=action,
+                actor_type=ACTOR_HUMAN,
+                actor_id=actor_id,
+                new_value={"event": event, **(extra or {})},
+            )
+            asession.commit()
+    except Exception:
+        logger.exception("audit: catalog %s id=%s", event, entity_id)
 logger = logging.getLogger(__name__)
 
 
@@ -209,6 +239,9 @@ def bulk_select(
             actor_user_id=actor_id,
         )
         updated.append(row)
+    if updated:
+        _audit_catalog(actor_id, company_id, ACTION_UPDATE, "vendor_selections_updated",
+                       {"category": body.category, "count": len(updated)})
     return {"updated": len(updated), "rows": updated}
 
 
@@ -233,6 +266,8 @@ def add_custom(
         )
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
+    _audit_catalog(actor_id, (row or {}).get("id"), ACTION_INSERT, "custom_vendor_added",
+                   {"category": body.category, "name": body.name})
     return row
 
 
@@ -248,6 +283,7 @@ def delete_custom(
         raise HTTPException(status_code=400, detail=str(ex))
     if not ok:
         raise HTTPException(status_code=404, detail="Custom vendor not found")
+    _audit_catalog(user.get("id"), row_id, ACTION_DELETE, "custom_vendor_deleted")
     return {"deleted": True, "id": row_id}
 
 

@@ -145,6 +145,7 @@ from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_rout
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
 from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
+from .app.routers import admin_corrections as admin_corrections_router  # [AIQ-554] correction analytics
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import admin as admin_router
@@ -732,6 +733,7 @@ app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-la
 app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
 app.include_router(policy_summary_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(admin_corrections_router.router)  # [AIQ-554] GET /api/admin/corrections/by-reason
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)
@@ -7560,6 +7562,69 @@ def _sanitize_storage_error(exc: Exception, bucket: str) -> str:
     return msg
 
 
+def _run_policy_value_extraction(
+    *,
+    doc_id: str,
+    raw_text: Optional[str],
+    company_id: Optional[str],
+    updated_by: Optional[str],
+    request_id: Optional[str] = None,
+) -> bool:
+    """E1b (AIQ-929): run LLM value-extraction over a classified policy document's
+    raw text and persist per-field-confidence benefits keyed by the policy_document
+    id, so the config-matrix bridge (``import_extraction_to_draft``) can read them.
+
+    The advance is ``classified -> normalized`` ('normalized' is the
+    constraint-valid stage for "structured values extracted"; 'extracted' is not a
+    permitted ``processing_status`` value — see the policy_documents CHECK).
+
+    Fail-soft by contract: an LLM outage / persist hiccup is logged and recorded in
+    ``extraction_error`` but NEVER fails the upload — the doc simply stays
+    'classified' with no benefits. Returns True only when benefits were persisted.
+    """
+    try:
+        from .app.services.llm_policy_extractor import extract_policy_with_llm
+        from .app.services.policy_document_intake import STATUS_NORMALIZED
+
+        extraction = extract_policy_with_llm((raw_text or "").splitlines(), company_id=company_id)
+        benefits = (extraction or {}).get("benefits") or []
+        if not benefits:
+            # LLM unavailable (no API key / SDK / call failed) or nothing extracted.
+            # Leave the doc 'classified' so a later /reprocess can retry cleanly.
+            log.info(
+                "request_id=%s policy_extract document_id=%s benefits=0 action=skip",
+                request_id, doc_id,
+            )
+            return False
+        db.replace_policy_benefits(doc_id, benefits, updated_by=updated_by)
+        db.update_policy_document(
+            doc_id,
+            processing_status=STATUS_NORMALIZED,
+            processed_at=datetime.utcnow().isoformat(),
+            request_id=request_id,
+        )
+        log.info(
+            "request_id=%s policy_extract document_id=%s benefits=%d status=normalized",
+            request_id, doc_id, len(benefits),
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001 — extraction must never fail the upload
+        safe_msg = (str(exc) or type(exc).__name__)[:180]
+        log.warning(
+            "request_id=%s policy_extract document_id=%s action=failed exc_type=%s exc_msg=%s",
+            request_id, doc_id, type(exc).__name__, safe_msg, exc_info=True,
+        )
+        try:
+            db.update_policy_document(
+                doc_id,
+                extraction_error=f"value_extraction_failed: {safe_msg}",
+                request_id=request_id,
+            )
+        except Exception:
+            pass
+        return False
+
+
 def _run_policy_document_ingest_background(
     *,
     doc_id: str,
@@ -7651,6 +7716,18 @@ def _run_policy_document_ingest_background(
                         num_clauses = len(clauses)
                 except Exception as seg_exc:
                     log.warning("request_id=%s policy_upload stage=segment failed: %s", request_id, seg_exc)
+                # E1b (AIQ-929): after classify, run LLM value-extraction and persist
+                # per-field-confidence benefits keyed by the document id so the
+                # config-matrix import (import_extraction_to_draft) can pick them up.
+                # Fail-soft: never fails the upload (advances the doc to 'normalized'
+                # only on success).
+                _run_policy_value_extraction(
+                    doc_id=doc_id,
+                    raw_text=result.get("raw_text"),
+                    company_id=company_id,
+                    updated_by=user_id,
+                    request_id=request_id,
+                )
     except Exception as exc:
         extraction_failed = True
         safe_msg = (str(exc) or type(exc).__name__)[:200]

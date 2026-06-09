@@ -26,7 +26,10 @@ from ...database import db
 from ...schemas import UserRole
 from ...schemas_policy_caps import CapsCompareRequest
 from ..auth_deps import _effective_user, get_current_user, require_admin, require_role
-from ..services.policy_config_matrix_service import PolicyConfigMatrixService
+from ..services.policy_config_matrix_service import (
+    PolicyConfigMatrixService,
+    resolve_extraction_company_id,
+)
 from ..services.policy_config_targeting import (
     normalize_assignment_type,
     normalize_family_status,
@@ -376,9 +379,12 @@ def hr_post_policy_config_import_extraction(
             status_code=400,
             detail={"code": "validation_error", "message": "policy_id is required"},
         )
-    # Tenant scope: the extracted policy must belong to the HR user's own company.
-    pol = db.get_company_policy(policy_id)
-    if not pol or str(pol.get("company_id") or "") != str(cid):
+    # Tenant scope: the extracted lineage (policy_documents — the canonical E1b
+    # lineage — or the legacy company_policies) must belong to the HR user's own
+    # company. Resolve via either table so a policy_document id is accepted here
+    # (otherwise it would 404 before reaching the service).
+    owner_company = resolve_extraction_company_id(db, policy_id)
+    if not owner_company or owner_company != str(cid):
         raise HTTPException(
             status_code=404,
             detail={"code": "policy_not_found", "message": "Policy not found for this company"},

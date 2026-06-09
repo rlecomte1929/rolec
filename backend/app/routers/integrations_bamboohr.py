@@ -75,10 +75,36 @@ from ..services.bamboohr_client import (
     test_connection,
 )
 from ..services.supabase_client import get_supabase_admin_client
+from ..db import SessionLocal
+from ..services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations-bamboohr"])
+
+
+def _audit_bamboohr(user: Dict[str, Any], conn_id: str, action: str, event: str) -> None:
+    """[AIQ-932] Fail-soft canonical audit for a BambooHR HRIS connection
+    mutation (Supabase write — no SQLAlchemy router conn)."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type="hris_connection",
+                entity_id=str(conn_id),
+                action_type=action,
+                actor_type=ACTOR_HUMAN,
+                actor_id=user.get("id") or user.get("sub"),
+                new_value={"event": event, "provider": "bamboohr"},
+            )
+            asession.commit()
+    except Exception:
+        log.exception("audit: bamboohr %s id=%s", event, conn_id)
 
 _DEFAULT_FIELD_MAPPINGS: Dict[str, str] = {
     "customRelocationRequired": "relocation_required",
@@ -369,6 +395,7 @@ async def bamboohr_connect(
             "updated_at":    now,
         }).eq("id", conn["id"]).execute()
         conn_id = conn["id"]
+        _audit_bamboohr(user, conn_id, ACTION_UPDATE, "bamboohr_reconnected")
     else:
         conn_id = str(uuid.uuid4())
         supabase.table("hris_connections").insert({
@@ -381,6 +408,7 @@ async def bamboohr_connect(
             "created_at":   now,
             "updated_at":   now,
         }).execute()
+        _audit_bamboohr(user, conn_id, ACTION_INSERT, "bamboohr_connected")
 
     log.info("BambooHR connected: org=%s subdomain=%s", org_id, body.subdomain)
     return {"ok": True, "connection_id": conn_id, "status": "connected"}
@@ -516,6 +544,7 @@ async def bamboohr_disconnect(
         "last_error":    None,
         "updated_at":    datetime.now(timezone.utc).isoformat(),
     }).eq("id", conn["id"]).execute()
+    _audit_bamboohr(user, conn["id"], ACTION_UPDATE, "bamboohr_disconnected")
 
     log.info("BambooHR disconnected: org=%s", org_id)
     return {"ok": True, "status": "disconnected"}
@@ -593,5 +622,6 @@ async def bamboohr_update_field_mappings(
         "field_mappings": json.dumps(body.mappings),
         "updated_at":     datetime.now(timezone.utc).isoformat(),
     }).eq("id", conn["id"]).execute()
+    _audit_bamboohr(user, conn["id"], ACTION_UPDATE, "bamboohr_field_mappings_updated")
 
     return {"ok": True, "mappings": body.mappings}

@@ -31,10 +31,33 @@ from pydantic import BaseModel
 from ..services.provider_jwt import verify_provider_token
 from ..services.supabase_client import get_supabase_admin_client
 from ..services.events_tracker import track as track_event
+from ..db import SessionLocal
+from ..services.audit_log_service import ACTION_UPDATE, ACTOR_HUMAN, insert_audit_log
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["provider-portal"])
+
+
+def _audit_portal(provider_id: str, entity_type: str, entity_id: str,
+                  event: str, extra: "Optional[Dict[str, Any]]" = None) -> None:
+    """[AIQ-932b] Fail-soft canonical audit for a vendor-portal mutation. The
+    actor is the provider (vendor) from the provider JWT; track_event above is
+    analytics, not a durable audit. Runs in its own SessionLocal txn."""
+    try:
+        with SessionLocal() as asession:
+            insert_audit_log(
+                asession.connection(),
+                entity_type=entity_type,
+                entity_id=str(entity_id),
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=provider_id,
+                new_value={"event": event, "by": "provider", **(extra or {})},
+            )
+            asession.commit()
+    except Exception:
+        log.exception("audit: provider_portal %s id=%s", event, entity_id)
 
 _NOTIFY_DEBOUNCE_SECONDS = 30
 
@@ -431,6 +454,8 @@ def patch_provider_task(
 
     supa.table("provider_tasks").update(updates).eq("id", task_id).execute()
     new_status = updates.get("status", old_status)
+    _audit_portal(provider_id, "provider_task", task_id, "provider_task_updated_by_vendor",
+                  {"status": new_status})
 
     # Trigger HR notification (AIQ-4-F) if status changed
     if body.status and body.status != old_status:
@@ -574,6 +599,7 @@ def update_provider_profile(
         updates["onboarded_at"] = datetime.now(timezone.utc).isoformat()
 
     supa.table("providers").update(updates).eq("id", provider_id).execute()
+    _audit_portal(provider_id, "provider", provider_id, "provider_profile_updated_by_vendor")
     merged = {**current, **updates}
 
     return ProfileResponse(
