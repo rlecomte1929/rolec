@@ -90,37 +90,6 @@ interface TopRequestsResponse {
 
 type ReviewerRow = { id: string; label: string } & ReviewerMetrics;
 
-// ── SLA bars (placeholder — no time-series endpoint yet) ───────────────────
-
-function SlaBars({ rate }: { rate: number | undefined }) {
-  const center = typeof rate === 'number' ? rate : 95;
-  const bars = useMemo(() => {
-    const out: number[] = [];
-    let seed = 7;
-    for (let i = 0; i < 30; i++) {
-      seed = (seed * 9301 + 49297) % 233280;
-      const jitter = ((seed / 233280) - 0.5) * 12;
-      out.push(Math.max(60, Math.min(100, Math.round(center + jitter))));
-    }
-    return out;
-  }, [center]);
-  return (
-    <div className="flex h-24 items-end gap-[3px]">
-      {bars.map((v, i) => (
-        <div
-          key={i}
-          title={`${v}%`}
-          className="flex-1 rounded-t-[2px] opacity-90"
-          style={{
-            height: `${v}%`,
-            background: v >= 95 ? '#10b981' : v >= 85 ? '#1f4870' : '#f59e0b',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function CorridorRow({ code, count }: { code: string; count: number }) {
   return (
     <div className="flex items-center gap-3 border-b border-slate-100 py-2 last:border-b-0">
@@ -291,11 +260,12 @@ export function OpsAnalyticsV2Page() {
             <SectionHeading label={`SLA performance · last ${days} days`} />
             <OnHoldPill />
           </div>
-          <SlaBars rate={slaRate} />
-          <p className="mt-3 text-[11.5px] text-slate-500">
-            Per-day SLA series isn't exposed by the backend yet. Bars are illustrative
-            until <code>/api/admin/ops/sla/series</code> ships.
-          </p>
+          <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/60">
+            <p className="px-4 text-center text-[12px] text-slate-500">
+              SLA performance data will appear once the reporting endpoint
+              (<code>/api/admin/ops/sla/series</code>) ships.
+            </p>
+          </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-baseline justify-between">
