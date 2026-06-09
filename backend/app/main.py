@@ -33,6 +33,7 @@ from .routers import (
     hr_catalog,
     hr_vendor_widgets,
     hr_coordination,
+    immigration_documents,
     immigration_forms,
     immigration_gdpr,
     immigration_intake_consent,
@@ -128,6 +129,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_gdpr.router)
     app.include_router(gdpr.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
     app.include_router(immigration_forms.router)  # IMM-11 — form library + PDF pre-fill
+    app.include_router(immigration_documents.router)  # BL-OCR.2/AIQ-748 — POST /api/immigration/cases/{id}/documents
     app.include_router(immigration_retrieve.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
     app.include_router(exception_requests.router)
     app.include_router(relocation_profile.router)

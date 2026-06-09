@@ -196,6 +196,7 @@ jobs:
         run: |
           python -m pytest -q \
             backend/tests/test_admin_form_templates_router.py \
+            backend/tests/test_immigration_documents.py \
             backend/tests/test_trigger_engine.py \
             backend/tests/test_case_dossier_forms.py \
             backend/tests/test_validators_tax_id.py \
