@@ -200,6 +200,7 @@ from .app.routers import immigration_status as immigration_status_router
 from .app.routers import immigration_gdpr as immigration_gdpr_router
 from .app.routers import gdpr as gdpr_router
 from .app.routers import immigration_forms as immigration_forms_router
+from .app.routers import immigration_documents as immigration_documents_router  # BL-OCR.2/AIQ-748
 from .app.routers import immigration_retrieve as immigration_retrieve_router
 from .app.routers import analytics as analytics_router
 from .app.routers import analytics_query as analytics_query_router  # FOUNDATION-1E
@@ -757,6 +758,7 @@ app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 —
 app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
 app.include_router(gdpr_router.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
 app.include_router(immigration_forms_router.router)  # IMM-11 — form library + PDF pre-fill (2 handlers)
+app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — immigration document upload
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
