@@ -5,12 +5,14 @@ Backend login/register dispatch sync_relopass_user_to_supabase_auth with the
 plaintext password. Before this change, when the Supabase Auth user already
 existed the sync no-oped, so a backend password change never reached Supabase
 and signInWithPassword drifted to a 400 (this bit admin@ + employee@ on
-2026-06-09). These tests cover the new propagation:
+2026-06-09). Covered here:
 
-  - set_supabase_auth_password updates an existing auth user via the GoTrue
-    admin API (admin.update_user_by_id), and is idempotent + fail-soft.
-  - the create-path duplicate branch now re-syncs the password, so every login
+  - set_supabase_auth_password resolves the uid then updates the password via
+    the GoTrue admin API (admin.update_user_by_id); idempotent + fail-soft.
+  - the create-path duplicate branch re-syncs the password, so every login
     self-heals Supabase drift.
+  - _resolve_auth_user_id_by_email reads auth.users directly (the GoTrue admin
+    list_users endpoint is broken past page 1 on this project — AIQ-907 review).
 """
 from __future__ import annotations
 
@@ -26,36 +28,12 @@ if _REPO_ROOT not in sys.path:
 from backend.app.services import supabase_auth_sync as s  # noqa: E402
 
 
-class _FakeUser:
-    def __init__(self, email: str, uid: str):
-        self.email = email
-        self.id = uid
-
-
-class _FakeListResp:
-    def __init__(self, users):
-        self.users = users
-
-
-def _fake_client(users, *, update_raises: bool = False, create_exc: Exception | None = None):
+def _fake_client(*, update_raises: bool = False, create_exc: Exception | None = None):
     client = mock.MagicMock()
-    client.auth.admin.list_users.return_value = _FakeListResp(users)
     if update_raises:
         client.auth.admin.update_user_by_id.side_effect = RuntimeError("boom")
     if create_exc is not None:
         client.auth.admin.create_user.side_effect = create_exc
-    return client
-
-
-def _paginated_client(pages):
-    """Client whose admin.list_users(page,per_page) serves one page per call."""
-    client = mock.MagicMock()
-
-    def _list(page=None, per_page=None):
-        idx = (page or 1) - 1
-        return _FakeListResp(pages[idx] if 0 <= idx < len(pages) else [])
-
-    client.auth.admin.list_users.side_effect = _list
     return client
 
 
@@ -65,60 +43,105 @@ def _dup_error():
     return exc
 
 
+# ── auth.users DB-read resolver fakes ─────────────────────────────────────────
+class _FakeResult:
+    def __init__(self, row):
+        self._row = row
+
+    def fetchone(self):
+        return self._row
+
+
+class _FakeConn:
+    def __init__(self, row):
+        self._row = row
+        self.queries = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, stmt, params=None):
+        self.queries.append((str(stmt), params))
+        return _FakeResult(self._row)
+
+
+class _FakeEngine:
+    def __init__(self, row):
+        self.conn = _FakeConn(row)
+
+    def connect(self):
+        return self.conn
+
+
+class ResolveAuthUserIdTests(unittest.TestCase):
+    def _with_row(self, row):
+        import backend.database as bdb
+        return mock.patch.object(bdb.db, "engine", _FakeEngine(row))
+
+    def test_resolves_uid_from_auth_users(self):
+        with self._with_row(("5669fcbe-uid",)):
+            self.assertEqual(s._resolve_auth_user_id_by_email("Employee@X.com"), "5669fcbe-uid")
+
+    def test_returns_none_when_no_row(self):
+        with self._with_row(None):
+            self.assertIsNone(s._resolve_auth_user_id_by_email("missing@x.com"))
+
+    def test_empty_email_returns_none_without_db(self):
+        self.assertIsNone(s._resolve_auth_user_id_by_email("  "))
+
+    def test_db_error_is_fail_soft(self):
+        import backend.database as bdb
+        boom = mock.MagicMock()
+        boom.connect.side_effect = RuntimeError("db down")
+        with mock.patch.object(bdb.db, "engine", boom):
+            self.assertIsNone(s._resolve_auth_user_id_by_email("x@y.com"))  # no raise
+
+
 class SetSupabaseAuthPasswordTests(unittest.TestCase):
     def setUp(self):
-        # Ensure the sync isn't globally disabled by the ambient env.
         self._env = mock.patch.dict(os.environ, {"DISABLE_SUPABASE_AUTH_SYNC": ""})
         self._env.start()
         self.addCleanup(self._env.stop)
 
     def test_updates_existing_user_password(self):
-        client = _fake_client([_FakeUser("hr@testco.com", "uid-123")])
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+        client = _fake_client()
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value="uid-123"):
             ok = s.set_supabase_auth_password("HR@testco.com", "NewPass!1")
         self.assertTrue(ok)
-        client.auth.admin.update_user_by_id.assert_called_once_with(
-            "uid-123", {"password": "NewPass!1"}
-        )
-
-    def test_resolves_user_on_a_later_page(self):
-        # Regression (AIQ-907 live review): list_users is paginated; a user
-        # beyond page 1 must still be found and updated. Page 1 is a FULL page
-        # (== per_page) so the resolver keeps walking; the target is on page 2.
-        page1 = [_FakeUser(f"other{i}@x.com", f"uid-{i}") for i in range(s._LIST_USERS_PER_PAGE)]
-        page2 = [_FakeUser("late@testco.com", "uid-late")]
-        client = _paginated_client([page1, page2])
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
-            ok = s.set_supabase_auth_password("late@testco.com", "NewPass!1")
-        self.assertTrue(ok)
-        client.auth.admin.update_user_by_id.assert_called_once_with(
-            "uid-late", {"password": "NewPass!1"}
-        )
+        client.auth.admin.update_user_by_id.assert_called_once_with("uid-123", {"password": "NewPass!1"})
 
     def test_returns_false_when_no_matching_auth_user(self):
-        client = _fake_client([_FakeUser("someone@else.com", "uid-x")])
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+        client = _fake_client()
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value=None):
             ok = s.set_supabase_auth_password("missing@testco.com", "NewPass!1")
         self.assertFalse(ok)
         client.auth.admin.update_user_by_id.assert_not_called()
 
     def test_fail_soft_when_update_raises(self):
-        client = _fake_client([_FakeUser("hr@testco.com", "uid-123")], update_raises=True)
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+        client = _fake_client(update_raises=True)
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value="uid-123"):
             ok = s.set_supabase_auth_password("hr@testco.com", "NewPass!1")
         self.assertFalse(ok)  # did not raise
 
     def test_skips_when_sync_disabled(self):
-        client = _fake_client([_FakeUser("hr@testco.com", "uid-123")])
+        client = _fake_client()
         with mock.patch.dict(os.environ, {"DISABLE_SUPABASE_AUTH_SYNC": "1"}), \
-             mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+             mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value="uid-123"):
             ok = s.set_supabase_auth_password("hr@testco.com", "NewPass!1")
         self.assertTrue(ok)
         client.auth.admin.update_user_by_id.assert_not_called()
 
     def test_skips_short_password(self):
-        client = _fake_client([_FakeUser("hr@testco.com", "uid-123")])
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+        client = _fake_client()
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value="uid-123"):
             ok = s.set_supabase_auth_password("hr@testco.com", "abc")
         self.assertTrue(ok)
         client.auth.admin.update_user_by_id.assert_not_called()
@@ -131,22 +154,19 @@ class SyncResyncsPasswordOnDuplicateTests(unittest.TestCase):
         self.addCleanup(self._env.stop)
 
     def test_duplicate_user_triggers_password_resync(self):
-        client = _fake_client(
-            [_FakeUser("hr@testco.com", "uid-123")], create_exc=_dup_error()
-        )
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+        client = _fake_client(create_exc=_dup_error())
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value="uid-123"):
             ok = s.sync_relopass_user_to_supabase_auth(
                 "hr@testco.com", "RotatedPass!2", relopass_user_id="rp-1"
             )
-        # Create path contract: user exists -> True; and the password was re-synced.
-        self.assertTrue(ok)
-        client.auth.admin.update_user_by_id.assert_called_once_with(
-            "uid-123", {"password": "RotatedPass!2"}
-        )
+        self.assertTrue(ok)  # create-path contract: user exists -> True
+        client.auth.admin.update_user_by_id.assert_called_once_with("uid-123", {"password": "RotatedPass!2"})
 
     def test_fresh_create_does_not_call_update(self):
-        client = _fake_client([])  # create_user succeeds (no side_effect)
-        with mock.patch.object(s, "get_supabase_admin_client", return_value=client):
+        client = _fake_client()  # create_user succeeds (no side_effect)
+        with mock.patch.object(s, "get_supabase_admin_client", return_value=client), \
+             mock.patch.object(s, "_resolve_auth_user_id_by_email", return_value="uid-123"):
             ok = s.sync_relopass_user_to_supabase_auth(
                 "new@testco.com", "FreshPass!1", relopass_user_id="rp-2"
             )
