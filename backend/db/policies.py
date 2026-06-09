@@ -908,3 +908,119 @@ class PoliciesMixin:
                 params,
             )
         return bid
+
+    # ── policy_config_version publish / draft / history (AUDIT-C1.3 batch 8) ──
+
+    def publish_policy_config_version_atomic(self, version_id: str) -> None:
+        vid = str(version_id)
+        meta = self.get_policy_config_version_with_config(vid)
+        if not meta:
+            raise ValueError("policy_config_version not found")
+        st = str(meta.get("status") or "")
+        if st not in ("draft", "approved"):
+            raise ValueError(f"cannot publish version in status {st!r}")
+        cfg_id = str(meta.get("policy_config_id") or "")
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_config_versions
+                    SET status = 'archived', updated_at = :now
+                    WHERE policy_config_id = :cid AND status = 'published'
+                    """
+                ),
+                {"cid": cfg_id, "now": now},
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_config_versions
+                    SET status = 'published', published_at = :now, updated_at = :now
+                    WHERE id = :vid AND status IN ('draft', 'approved')
+                    """
+                ),
+                {"vid": vid, "now": now},
+            )
+        check = self.get_policy_config_version_row(vid)
+        if not check or str(check.get("status")) != "published":
+            raise ValueError("publish failed (version missing or not published)")
+
+    def get_latest_published_policy_config_version(
+        self, company_id: str, config_key: str
+    ) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT v.*
+                    FROM policy_config_versions v
+                    JOIN policy_configs c ON c.id = v.policy_config_id
+                    WHERE c.company_id = :cid AND c.config_key = :ck AND v.status = 'published'
+                    ORDER BY v.effective_date DESC, v.version_number DESC
+                    LIMIT 1
+                    """
+                ),
+                {"cid": str(company_id), "ck": str(config_key)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_policy_config_draft_for_config(self, policy_config_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_config_versions
+                    WHERE policy_config_id = :pid AND status = 'draft'
+                    LIMIT 1
+                    """
+                ),
+                {"pid": str(policy_config_id)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def list_policy_config_versions_history(self, policy_config_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT id, policy_config_id, version_number, status, effective_date,
+                           published_at, created_by, created_at, updated_at
+                    FROM policy_config_versions
+                    WHERE policy_config_id = :pid
+                    ORDER BY version_number DESC, created_at DESC
+                    """
+                ),
+                {"pid": str(policy_config_id)},
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def update_policy_config_version_effective_date(
+        self, version_id: str, effective_date: str, *, only_if_draft: bool = True
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        vid = str(version_id)
+        ed = str(effective_date)[:10]
+        with self.engine.begin() as conn:
+            if only_if_draft:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_config_versions
+                        SET effective_date = :ed, updated_at = :now
+                        WHERE id = :vid AND status = 'draft'
+                        """
+                    ),
+                    {"ed": ed, "now": now, "vid": vid},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_config_versions
+                        SET effective_date = :ed, updated_at = :now
+                        WHERE id = :vid
+                        """
+                    ),
+                    {"ed": ed, "now": now, "vid": vid},
+                )
