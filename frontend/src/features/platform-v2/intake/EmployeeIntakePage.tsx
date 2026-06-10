@@ -165,7 +165,11 @@ const INITIAL_DATA: IntakeData = {
   // pets are added via the "Add member" controls on step 3.
   members: [{ id: 'self', kind: 'self' }],
   job_title: '',
-  contract_type: '',
+  // Default to the first option so the controlled <select> (which has no
+  // empty placeholder, unlike salary_band) reflects committed state — otherwise
+  // it displays "Permanent" while data.contract_type stays '' and stepValid(5)
+  // silently blocks Continue. Mirrors `purpose: 'Employment'` above.
+  contract_type: 'Permanent',
   contract_start: '',
   salary_band: '',
   office_address: '',
