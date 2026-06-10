@@ -2946,6 +2946,10 @@ export interface CommandCenterCaseRow {
   household?: string | null;
   hasSpouse?: boolean | null;
   childCount?: number | null;
+  /** W2-2 timeline SLA: on_track | at_risk | overdue | null. */
+  slaStatus?: 'on_track' | 'at_risk' | 'overdue' | string | null;
+  /** Signed days to the target move date (negative = past). */
+  daysUntilMove?: number | null;
 }
 
 export type TaskOwner = 'hr' | 'employee' | 'provider' | 'joint';

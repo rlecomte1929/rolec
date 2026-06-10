@@ -13785,6 +13785,9 @@ class CommandCenterCaseRow(BaseModel):
     household: Optional[str] = None
     hasSpouse: Optional[bool] = None
     childCount: Optional[int] = None
+    # W2-2: timeline SLA — 'on_track' | 'at_risk' | 'overdue' | null; signed days to move.
+    slaStatus: Optional[str] = None
+    daysUntilMove: Optional[int] = None
 
 
 class CommandCenterCaseDetail(BaseModel):
