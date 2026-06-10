@@ -32,6 +32,7 @@ from .routers import (
     gdpr,
     privacy_consents,
     hr_case_resolve,
+    hr_case_escalation,
     hr_catalog,
     hr_vendor_widgets,
     hr_coordination,
@@ -121,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(roadmap_audit.router)
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
+    app.include_router(hr_case_escalation.router)  # W2-3 — HR case escalation
     # [Parker-J] NLG exec-summary + policy TL;DR routes
     app.include_router(nlg.router)
 
