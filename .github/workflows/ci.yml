@@ -240,7 +240,18 @@ jobs:
             backend/tests/test_eu_passport_recognizer.py \
             backend/tests/test_normalize_advances_status.py \
             backend/tests/test_database_no_duplicate_method_defs.py \
-            backend/tests/test_supabase_password_sync.py
+            backend/tests/test_supabase_password_sync.py \
+            backend/tests/test_employee_steps_alias.py \
+            backend/tests/test_hr_vendor_widgets_bare_paths.py \
+            backend/tests/test_llm_client_text.py \
+            backend/tests/test_cron_crawl_schedules.py \
+            backend/tests/test_policy_assistant_embedder_factory.py \
+            backend/tests/test_auth_deps_canonical.py \
+            backend/tests/test_plan_versions_service.py \
+            backend/tests/test_injection_envelopes.py \
+            backend/tests/test_prompt_caching.py \
+            backend/tests/test_hr_export.py \
+            scripts/tests/test_check_rls_coverage.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
