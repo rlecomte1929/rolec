@@ -14,6 +14,7 @@ import { computeAvailableNow } from '../../../utils/roadmapAvailability';
 import { SuccessProbabilityDial, FactorsPanel } from './scoring';
 import type { SuccessProbabilityResult } from './scoring';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { RoadmapActions } from './RoadmapActions';
 import {
   CONFIDENCE_TOKENS,
   resolveConfidenceLevel,
@@ -27,6 +28,8 @@ import {
 
 export interface RoadmapScreenProps {
   tracks: (RoadmapTrack & { steps: RoadmapStep[] })[];
+  /** [I-4] Case id — enables the "email this plan" / "add to calendar" actions. */
+  caseId?: string;
   /** [P1-6] Map of step id → doc chip data. Only steps with doc_count > 0 need entries. */
   docChips?: Record<string, { count: number; worstStatus: string | null }>;
   /** [P1-6] Called when the user clicks a doc chip; receives the step id. */
@@ -347,7 +350,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successScore }: RoadmapScreenProps) {
+export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successScore, caseId }: RoadmapScreenProps) {
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(tracks[0]?.id ?? null);
   const selectedTrack = tracks.find(t => t.id === selectedTrackId) ?? null;
 
@@ -384,6 +387,7 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successSco
         <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
           Track every step of your relocation journey.
         </p>
+        {caseId && <RoadmapActions caseId={caseId} />}
       </div>
 
       {/* [P2-05] Probability-of-success estimate — rendered only when available. */}

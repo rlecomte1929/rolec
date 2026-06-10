@@ -1,0 +1,23 @@
+# Corridor registry profile — France → Norway (I-3 Stage 1).
+#
+# Canonical id matches immigration_corpus_chunks.corridor ('FR_NO'). This file is
+# the single declarative source for the corridor's cross-cutting config; Stage 1
+# uses the `retrieval` block. Later stages add prompt / intake / sla sections and
+# a `pathways:` list pointing at the eligibility Corridor Agent files.
+#
+# Stage-1 values intentionally mirror the retriever's current defaults
+# (all trust tiers, IMMIGRATION_MIN_SIMILARITY=0.25) so wiring the seam changes
+# no rankings — corridors can later tighten scope (e.g. drop tier 3).
+
+corridor:
+  id: "FR_NO"
+  origin_iso: "FR"
+  destination_iso: "NO"   # quoted — bare NO is a YAML boolean (Norway problem)
+  display_name: "France → Norway"
+  aliases: ["FR→NO", "FR-NO"]
+
+  retrieval:
+    # Trust tiers to include in retrieval (1 = official, 2 = secondary, 3 = other).
+    trust_tiers: [1, 2, 3]
+    # Cosine similarity floor for the quality gate.
+    min_similarity: 0.25

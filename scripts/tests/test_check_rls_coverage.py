@@ -68,3 +68,28 @@ def test_repo_allowlist_is_fully_justified():
     """The committed allowlist must always pass the guard."""
     repo_allowlist = SCRIPTS_DIR.parent / "supabase" / "rls_allowlist.txt"
     assert crc.find_unjustified_allowlist_entries(repo_allowlist) == []
+
+
+# ── SEC-RLSh (AIQ-950): schema-aware audit (public + rce) ──────────────────────
+
+
+def test_audited_schemas_include_public_and_rce():
+    assert "public" in crc.AUDITED_SCHEMAS
+    assert "rce" in crc.AUDITED_SCHEMAS
+
+
+def test_audit_sql_scans_audited_schemas_not_just_public():
+    # The query must parameterise the schema list (= ANY(%s)), not hardcode public.
+    assert "schemaname = ANY(%s)" in crc.AUDIT_SQL
+    assert "schemaname = 'public'" not in crc.AUDIT_SQL
+
+
+def test_qualify_table_keeps_public_bare():
+    # Public tables stay bare → existing public allowlist + behaviour unchanged.
+    assert crc.qualify_table("public", "users") == "users"
+
+
+def test_qualify_table_qualifies_non_public():
+    # rce (and any non-public) tables are schema-qualified so a policy-less rce
+    # table surfaces distinctly and needs an `rce.<name>` allowlist entry.
+    assert crc.qualify_table("rce", "contradictions") == "rce.contradictions"
