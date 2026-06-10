@@ -281,7 +281,11 @@ class SupabaseContradictionStore:
                     SELECT d.document_id,
                            MAX(CASE WHEN ef.field_key = 'parent_1_name' THEN ef.value_raw END) AS parent_1_name,
                            MAX(CASE WHEN ef.field_key = 'parent_2_name' THEN ef.value_raw END) AS parent_2_name,
-                           MAX(CASE WHEN ef.field_key = 'child_name' THEN el.canonical_entity_id END) AS child_entity_id
+                           -- Postgres has no max(uuid); aggregate the child's canonical
+                           -- entity id with array_agg + [1] instead (one child per birth cert).
+                           (array_agg(el.canonical_entity_id) FILTER (
+                              WHERE ef.field_key = 'child_name' AND el.canonical_entity_id IS NOT NULL
+                            ))[1] AS child_entity_id
                     FROM rce.documents d
                     JOIN rce.document_types dt
                       ON dt.document_type_id = d.document_type_id AND dt.code = 'BIRTH_CERT'
