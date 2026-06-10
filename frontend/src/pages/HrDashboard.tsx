@@ -15,6 +15,7 @@ import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
 import { CalibrationAlertBanner } from '../components/CalibrationAlertBanner';
+import { AnswerProvenanceWidget } from '../components/AnswerProvenanceWidget';
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -256,6 +257,9 @@ export const HrDashboard: React.FC = () => {
       <div className="space-y-6">
         {/* P5-7: Policy calibration alerts — shown to HR/Admin when benefit caps need review */}
         <CalibrationAlertBanner />
+
+        {/* W2-5: Policy Assistant answer provenance (grounded% / refusal% / unverified) */}
+        <AnswerProvenanceWidget />
 
         {error && (
           <Alert variant="error">
