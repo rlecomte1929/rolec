@@ -160,6 +160,24 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
+def resolve_case_corridor(case_id: str, org_id: str = "") -> Optional[str]:
+    """Canonical corridor id ('FR_NO') for a case, or None. Best-effort — never
+    raises; a missing case / geography just yields None so callers fall back to
+    their corridor-agnostic default (I-3 Stage 3)."""
+    try:
+        details = _get_case_details(case_id, org_id)
+        if not details:
+            return None
+        origin, dest = details.get("origin_country"), details.get("dest_country")
+        if not origin or not dest:
+            return None
+        from .corridor_registry import normalize_corridor_id
+
+        return normalize_corridor_id(f"{origin}_{dest}") or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Immigration-case serializer
 # ─────────────────────────────────────────────────────────────────────────────

@@ -28,3 +28,10 @@ corridor:
   # this is inert (no behaviour change) until a corridor prompt is published.
   prompt:
     task_key: "immigration_answer"
+
+  # I-3 Stage 3: intake follow-ups. Uncomment + drop a corridor-specific
+  # question set at corridors/FR_NO/<questions_file> to override the global
+  # interview_questions.json for this corridor. Omitted today → FR_NO uses the
+  # global set (no behaviour change), matching the Stage-1/2 fallback pattern.
+  # intake:
+  #   questions_file: "interview_questions.json"

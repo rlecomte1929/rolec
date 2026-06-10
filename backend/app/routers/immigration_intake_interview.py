@@ -40,6 +40,7 @@ from ..services.immigration_service import (
     _load_or_create_session,
     _load_profile_for_case_employee,
     _load_session_for_update,
+    resolve_case_corridor,
     _save_session,
 )
 
@@ -76,7 +77,9 @@ def interview_next(
     confirmed = list(session.get("prefilled_fields") or [])
     answers = dict(session.get("answers") or {})
 
-    questions = load_questions()
+    # I-3 Stage 3: per-corridor question set (falls back to global when the
+    # corridor is unknown or declares no intake file).
+    questions = load_questions(corridor=resolve_case_corridor(case_id, current_user.get("org_id", "")))
     next_q = get_next_question(answers, vault, confirmed, questions)
 
     progress = compute_section_progress(answers, questions)
@@ -119,7 +122,8 @@ def interview_answer(
     if not _check_consent(case_id, employee_id):
         raise HTTPException(status_code=403, detail="Consent required before answering.")
 
-    questions = load_questions()
+    # I-3 Stage 3: per-corridor question set (fallback-safe to global).
+    questions = load_questions(corridor=resolve_case_corridor(case_id, current_user.get("org_id", "")))
     q_map = {q.id: q for q in questions}
     question = q_map.get(body.question_id)
     if not question:
