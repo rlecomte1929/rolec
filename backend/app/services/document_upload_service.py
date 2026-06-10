@@ -19,6 +19,7 @@ from typing import Any, Dict
 from sqlalchemy import text
 
 from ...database import db
+from .rce_document_ingest import bridge_case_document_to_rce
 from .supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
@@ -87,4 +88,17 @@ def store_immigration_document(
         "immigration_document stored document_id=%s case_id=%s size=%d mime=%s",
         doc_id, case_id, len(content), mime_type,
     )
+
+    # E-PIPE-1: bridge the upload into the rce case engine (rce.documents) so the
+    # extraction pipeline has a document to process. Fail-soft + no-ops when the
+    # case isn't in rce.cases yet, so it never affects the immigration upload.
+    bridge_case_document_to_rce(
+        case_id=case_id,
+        content=content,
+        mime_type=mime_type,
+        storage_uri=storage_path,
+        original_filename=file_name,
+        uploaded_by=uploaded_by,
+    )
+
     return {"document_id": doc_id, "storage_path": storage_path, "ocr_status": "pending"}
