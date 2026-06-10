@@ -200,7 +200,9 @@ class RagEngineEndToEndTests(unittest.TestCase):
         )
         self.assertEqual(result["answer_kind"], "answer")
         self.assertIn("USD 4,500", result["answer_text"])
-        self.assertEqual(call_count["n"], 2)  # retry happened
+        # 2 generator calls (initial + retry) + 1 grounding-verifier pass on the
+        # accepted answer (W2-5 — verify_grounding reuses the injected client).
+        self.assertEqual(call_count["n"], 3)
 
     def test_validator_retry_fails_falls_back_to_refusal(self):
         # Both attempts produce ungrounded answers → fall back to canonical refusal.
