@@ -82,21 +82,15 @@ class AnswerValidationResult:
 # ---------------------------------------------------------------------------
 
 _QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "interview_questions.json")
-_QUESTION_CACHE: Optional[List[QuestionNode]] = None
+_GLOBAL_KEY = "__global__"
+# I-3 Stage 3: cache per corridor (or global). Same shape/content as before for
+# the global key, so callers passing no corridor see identical behaviour.
+_QUESTION_CACHE: Dict[str, List[QuestionNode]] = {}
 
 
-def load_questions(force_reload: bool = False) -> List[QuestionNode]:
-    """Load and cache the question DAG from interview_questions.json."""
-    global _QUESTION_CACHE
-    if _QUESTION_CACHE is not None and not force_reload:
-        return _QUESTION_CACHE
-
-    with open(_QUESTIONS_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Build section order lookup
+def _parse_questions(data: Dict[str, Any]) -> List[QuestionNode]:
+    """Build the sorted QuestionNode DAG from a loaded questions JSON document."""
     section_order = {s["id"]: s["order"] for s in data.get("sections", [])}
-
     nodes: List[QuestionNode] = []
     for q in data.get("questions", []):
         cond_data = q.get("condition")
@@ -107,7 +101,6 @@ def load_questions(force_reload: bool = False) -> List[QuestionNode]:
                 operator=cond_data["operator"],
                 value=cond_data.get("value"),
             )
-
         # Effective sort key: (section_order, question_order)
         nodes.append(QuestionNode(
             id=q["id"],
@@ -124,9 +117,37 @@ def load_questions(force_reload: bool = False) -> List[QuestionNode]:
             option_labels=q.get("option_labels"),
             upload_endpoint=q.get("upload_endpoint"),
         ))
-
     nodes.sort(key=lambda n: n.order)
-    _QUESTION_CACHE = nodes
+    return nodes
+
+
+def load_questions(corridor: Optional[str] = None, force_reload: bool = False) -> List[QuestionNode]:
+    """Load and cache the interview question DAG.
+
+    I-3 Stage 3: when ``corridor`` is given and its registry profile declares an
+    intake ``questions_file``, that per-corridor set is used; otherwise the global
+    ``interview_questions.json``. Fallback-safe — any miss falls back to global,
+    so callers passing no corridor (or an unconfigured one) get today's behaviour.
+    Cached per resolved key.
+    """
+    global _QUESTION_CACHE
+    key = _GLOBAL_KEY
+    path = _QUESTIONS_PATH
+    if corridor:
+        from .corridor_registry import normalize_corridor_id, get_intake_questions_path
+        cid = normalize_corridor_id(corridor)
+        if cid:
+            cpath = get_intake_questions_path(cid)
+            if cpath is not None:
+                key, path = cid, str(cpath)
+
+    if key in _QUESTION_CACHE and not force_reload:
+        return _QUESTION_CACHE[key]
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    nodes = _parse_questions(data)
+    _QUESTION_CACHE[key] = nodes
     return nodes
 
 

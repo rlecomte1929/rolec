@@ -260,7 +260,8 @@ jobs:
             backend/tests/test_answer_provenance.py \
             backend/tests/test_immigration_hybrid_retriever.py \
             backend/tests/test_cases_is_sqlite.py \
-            backend/tests/test_corridor_prompt_selection.py
+            backend/tests/test_corridor_prompt_selection.py \
+            backend/tests/test_corridor_intake_questions.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route

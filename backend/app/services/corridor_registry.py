@@ -52,6 +52,16 @@ class CorridorPromptConfig:
 
 
 @dataclass(frozen=True)
+class CorridorIntakeConfig:
+    """Per-corridor intake follow-ups (I-3 Stage 3). `questions_file` is a
+    filename resolved relative to the corridor's registry directory
+    (corridors/<id>/); the interview engine falls back to the global question
+    set when it is absent or the file is missing."""
+
+    questions_file: str
+
+
+@dataclass(frozen=True)
 class CorridorProfile:
     corridor_id: str
     origin_iso: Optional[str] = None
@@ -60,6 +70,7 @@ class CorridorProfile:
     aliases: Tuple[str, ...] = ()
     retrieval: Optional[CorridorRetrievalScope] = None
     prompt: Optional[CorridorPromptConfig] = None
+    intake: Optional[CorridorIntakeConfig] = None
 
 
 def _registry_dir() -> Path:
@@ -108,6 +119,15 @@ def _coerce_prompt(raw: Any) -> Optional[CorridorPromptConfig]:
     return CorridorPromptConfig(task_key=str(task_key).strip())
 
 
+def _coerce_intake(raw: Any) -> Optional[CorridorIntakeConfig]:
+    if not isinstance(raw, Mapping):
+        return None
+    qf = raw.get("questions_file")
+    if not qf or not str(qf).strip():
+        return None
+    return CorridorIntakeConfig(questions_file=str(qf).strip())
+
+
 def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
     block = doc.get("corridor") if isinstance(doc.get("corridor"), Mapping) else doc
     aliases_raw = block.get("aliases")
@@ -120,6 +140,7 @@ def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
         aliases=aliases,
         retrieval=_coerce_scope(block.get("retrieval")),
         prompt=_coerce_prompt(block.get("prompt")),
+        intake=_coerce_intake(block.get("intake")),
     )
 
 
@@ -163,6 +184,25 @@ def get_prompt_config(corridor: str) -> Optional[CorridorPromptConfig]:
     """Convenience accessor for consumer #2 (immigration_answer_engine)."""
     profile = load_corridor_profile(corridor)
     return profile.prompt if profile is not None else None
+
+
+def get_intake_config(corridor: str) -> Optional[CorridorIntakeConfig]:
+    """Convenience accessor for consumer #3 (immigration_interview_engine)."""
+    profile = load_corridor_profile(corridor)
+    return profile.intake if profile is not None else None
+
+
+def get_intake_questions_path(corridor: str) -> Optional[Path]:
+    """Resolve a corridor's intake question file to an existing absolute Path,
+    or None (→ caller uses its global question set). Never raises."""
+    try:
+        cfg = get_intake_config(corridor)
+        if cfg is None:
+            return None
+        path = _registry_dir() / normalize_corridor_id(corridor) / cfg.questions_file
+        return path if path.is_file() else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def list_corridors() -> List[str]:

@@ -48,6 +48,7 @@ from ..services.immigration_service import (
     _now_iso,
     _serialize_imm_case,
     _ts,
+    resolve_case_corridor,
 )
 
 log = logging.getLogger(__name__)
@@ -293,7 +294,9 @@ def interview_status(
         }
 
     answers = dict(session.get("answers") or {})
-    questions = load_questions()
+    # I-3 Stage 3: match the interview's per-corridor question set so progress %
+    # is computed against the same questions the employee is answering.
+    questions = load_questions(corridor=resolve_case_corridor(case_id, current_user.get("org_id", "")))
     progress = compute_section_progress(answers, questions)
     completion = compute_completion_pct(answers, questions)
 
