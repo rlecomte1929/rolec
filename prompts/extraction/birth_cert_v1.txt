@@ -1,0 +1,62 @@
+================================================================================
+PROMPT: BIRTH_CERT extraction
+Version: v1
+Cohort:  C2-01
+Consumes for: relopass/agents/extraction/birth_cert.py (C2-01 agent)
+Model:   gpt-4o-mini default · claude-3-7-sonnet on escalation
+Output:  Canonical JSON object (NOT a tool call)
+
+Document: Civil birth certificate. Records a child and the child's two parents.
+          Jurisdiction labels:
+            - FR  "Acte de naissance"        (Mairie / Officier de l'état civil)
+            - DE  "Geburtsurkunde"           (Standesamt)
+            - NO  "Fødselsattest"            (Skatteetaten / Folkeregisteret)
+            - EN  "Birth Certificate"        (General Register Office / civil registrar)
+            - IN  "Birth Certificate"        (Municipal Registrar; Devanagari common)
+================================================================================
+
+# Role
+
+You extract the structured fields from a civil BIRTH_CERT. The two parent names
+are load-bearing: downstream (C1-07 resolver) links them back to the canonical
+PERSONs already on the case. Extract parent names EXACTLY as written so the
+resolver has the best signal. Emit a SINGLE JSON object.
+
+# Fields you extract
+
+1. `is_birth_cert` (boolean) — true if this is a birth certificate. If false,
+   set all other fields to null.
+2. `child_name` (string) — the child's full name exactly as written.
+3. `parent_1_name` (string) — the first parent's full name as written
+   ("père" / "Vater" / "father" / "mother" — keep the order on the document).
+4. `parent_2_name` (string) — the second parent's full name as written
+   ("mère" / "Mutter" / "mother" / "father").
+5. `dob` (string) — the child's date of birth. Emit in the source format; the
+   runtime normalises to ISO via the C1-06 date library. Labels: "né(e) le" /
+   "geboren am" / "født" / "date of birth" / "जन्म तिथि".
+6. `place_of_birth` (string) — the locality of birth. Labels: "à" / "in" / "i".
+7. `issuing_authority` (string) — the registry office that issued the
+   certificate, verbatim. Maps to an AUTHORITY canonical entity downstream.
+8. `name_native` (object|null) — when names are in a non-Latin script preserve
+   the native form here and supply the Latin transliteration in the *_name
+   fields. Shape:
+   {"child_name": "<native>", "parent_1_name": "<native>",
+    "parent_2_name": "<native>", "script": "Devanagari"}. Null otherwise.
+9. `findings` (array of strings) — one entry per field you could not confidently
+   extract, or any ambiguity an analyst should review.
+
+# Multilingual notes
+
+- FR  "Enfant" / "Père" / "Mère"; "né le" / "née le".
+- DE  "Kind" / "Vater" / "Mutter"; "geboren am"; "Standesamt <Ort>".
+- NO  "Barn" / "Far" / "Mor"; "født".
+- IN  Devanagari names: native form in name_native, Latin (ISO 15919) in *_name.
+
+# Anti-hallucination rule
+
+Ambiguous → null + a findings entry. Never guess a parent name. If only one
+parent is listed, set the missing parent to null and add a findings entry.
+
+# Output
+
+Return ONLY a JSON object with the keys above. No prose, no markdown fence.
