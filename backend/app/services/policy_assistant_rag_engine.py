@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from ...database import db
 from .ai_trace_logger import TraceSession
+from .immigration_answer_verifier import verify_grounding
 from .policy_assistant_llm_client import (
     DEFAULT_MODEL,
     LlmClient,
@@ -281,6 +282,22 @@ def answer_policy_question(
         cited_ids = extract_cited_chunk_ids(answer_text)
         cited_chunks = [c for c in chunks if str(c.get("id")) in cited_ids]
 
+        # 5b. W2-5 provenance: self-critique grounding check on real answers only
+        # (refusals carry no claims to ground). verify_grounding() fails OPEN — it
+        # never raises and never blocks the answer; on any verifier error/timeout
+        # it returns verification_skipped=True with a null verdict. This adds one
+        # cheap (haiku) LLM pass to the answer path on grounded answers.
+        grounding_verdict: Optional[str] = None
+        grounding_score: Optional[float] = None
+        verification_skipped = False
+        grounding_latency_ms = 0
+        if answer_kind == "answer":
+            _gv = verify_grounding(answer_text, cited_chunks, client=client)
+            grounding_verdict = _gv.get("verdict")
+            grounding_score = _gv.get("grounding_score")
+            verification_skipped = bool(_gv.get("verification_skipped"))
+            grounding_latency_ms = int(_gv.get("latency_ms") or 0)
+
         cost = estimate_cost_usd(usage, model_used)
         latency_ms = int((time.time() - started) * 1000)
 
@@ -297,6 +314,18 @@ def answer_policy_question(
             )
             tracer.set_prompt_attribution(prompt_version_id, canary_arm)
             tracer.record_citations(cited_ids)  # W3/AIQ-837 — persist on the trace
+            # W2-5: record provenance so flush() can hoist it into queryable
+            # top-level trace columns (answer_kind always; grounding only when
+            # an answer was actually verified — mirrors immigration's step name).
+            tracer.record_step("answer_provenance", latency_ms=0, answer_kind=answer_kind)
+            if answer_kind == "answer":
+                tracer.record_step(
+                    "grounding_verification",
+                    latency_ms=grounding_latency_ms,
+                    grounding_verdict=grounding_verdict,
+                    grounding_score=grounding_score,
+                    verification_skipped=verification_skipped,
+                )
         except Exception:  # noqa: BLE001 — tracing must never break the assistant
             log.debug("policy_assistant tracer record failed", exc_info=True)
 
@@ -339,6 +368,9 @@ def answer_policy_question(
             "audit_id": audit_id,
             "prompt_version_id": prompt_version_id,
             "canary_arm": canary_arm,
+            "grounding_verdict": grounding_verdict,
+            "grounding_score": grounding_score,
+            "verification_skipped": verification_skipped,
         }
     finally:
         tracer.flush()

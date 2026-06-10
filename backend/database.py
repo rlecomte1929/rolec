@@ -2441,6 +2441,10 @@ class Database(CasesMixin, PoliciesMixin):
                     prompt_version_id TEXT,
                     canary_arm TEXT,
                     cited_chunk_ids TEXT NOT NULL DEFAULT '[]',
+                    answer_kind TEXT,
+                    grounding_verdict TEXT,
+                    verification_skipped INTEGER,
+                    grounding_score REAL,
                     created_at TEXT NOT NULL
                 )
             """))
@@ -2487,6 +2491,30 @@ class Database(CasesMixin, PoliciesMixin):
             else:
                 conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS prompt_version_id TEXT"))
                 conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS canary_arm TEXT"))
+            # W2-5 provenance columns. Idempotent additive backfill for traces
+            # tables created before answer-provenance instrumentation landed.
+            _pat_w25_cols = (
+                ("answer_kind", "TEXT", "TEXT"),
+                ("grounding_verdict", "TEXT", "TEXT"),
+                ("verification_skipped", "INTEGER", "BOOLEAN"),
+                ("grounding_score", "REAL", "NUMERIC"),
+            )
+            if _is_sqlite:
+                try:
+                    _patw = conn.execute(text("PRAGMA table_info(policy_assistant_traces)")).fetchall()
+                    _patw_names = {r[1] for r in _patw}
+                    for _col, _sqlite_t, _pg_t in _pat_w25_cols:
+                        if _col not in _patw_names:
+                            conn.execute(text(
+                                f"ALTER TABLE policy_assistant_traces ADD COLUMN {_col} {_sqlite_t}"
+                            ))
+                except Exception:
+                    pass
+            else:
+                for _col, _sqlite_t, _pg_t in _pat_w25_cols:
+                    conn.execute(text(
+                        f"ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS {_col} {_pg_t}"
+                    ))
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_pa_traces_company_created
                 ON policy_assistant_traces(company_id, created_at)
@@ -11105,6 +11133,10 @@ class Database(CasesMixin, PoliciesMixin):
         prompt_version_id: Optional[str] = None,
         canary_arm: Optional[str] = None,
         cited_chunk_ids: Optional[List[str]] = None,
+        answer_kind: Optional[str] = None,
+        grounding_verdict: Optional[str] = None,
+        verification_skipped: Optional[bool] = None,
+        grounding_score: Optional[float] = None,
     ) -> None:
         """
         Persist one trace row. Called by ai_trace_logger._write_to_db().
@@ -11126,10 +11158,13 @@ class Database(CasesMixin, PoliciesMixin):
                      total_latency_ms, fallback_triggered,
                      feature_key, customer_id, tokens_in, tokens_out,
                      cost_usd_estimated, co2e_grams_estimated,
-                     prompt_version_id, canary_arm, cited_chunk_ids, created_at)
+                     prompt_version_id, canary_arm, cited_chunk_ids,
+                     answer_kind, grounding_verdict, verification_skipped,
+                     grounding_score, created_at)
                     VALUES (:id, :sid, :qh, :cid, :sj, :lms, :fb,
                             :fk, :cust, :tin, :tout, :cost, :co2e,
-                            :pvid, :arm, :cc, :now)
+                            :pvid, :arm, :cc,
+                            :ak, :gv, :vs, :gs, :now)
                     ON CONFLICT(id) DO NOTHING
                     """
                 ),
@@ -11150,9 +11185,80 @@ class Database(CasesMixin, PoliciesMixin):
                     "pvid": prompt_version_id,
                     "arm": canary_arm,
                     "cc": json.dumps(list(cited_chunk_ids or [])),
+                    "ak": answer_kind,
+                    "gv": grounding_verdict,
+                    "vs": (1 if verification_skipped else 0) if verification_skipped is not None else None,
+                    "gs": float(grounding_score) if grounding_score is not None else None,
                     "now": now,
                 },
             )
+
+    def get_answer_provenance_rollup(
+        self,
+        *,
+        company_id: str,
+        since: Optional[str] = None,
+        feature_key: str = "policy_assistant",
+    ) -> Dict[str, Any]:
+        """W2-5: per-company answer-provenance rollup over policy_assistant_traces.
+
+        Aggregates the queryable provenance columns (answer_kind / grounding_verdict
+        / verification_skipped) into counts + rates for the HR widget. Grounding
+        only runs on real answers, so grounded_rate is denominated on answered (not
+        total). Returns zeros (never raises) when the table/columns are absent.
+        """
+        zero = {
+            "total": 0,
+            "answers": 0,
+            "refusals": 0,
+            "grounded": 0,
+            "partially_grounded": 0,
+            "ungrounded": 0,
+            "unverified": 0,
+            "refusal_rate": 0.0,
+            "grounded_rate": 0.0,
+            "unverified_count": 0,
+        }
+        params: Dict[str, Any] = {"cid": company_id, "fk": feature_key}
+        where = ["company_id = :cid", "feature_key = :fk"]
+        if since:
+            where.append("created_at >= :since")
+            params["since"] = since
+        sql = (
+            "SELECT "
+            "COUNT(*) AS total, "
+            "SUM(CASE WHEN answer_kind = 'answer' THEN 1 ELSE 0 END) AS answers, "
+            "SUM(CASE WHEN answer_kind LIKE 'refusal%' THEN 1 ELSE 0 END) AS refusals, "
+            "SUM(CASE WHEN grounding_verdict = 'grounded' THEN 1 ELSE 0 END) AS grounded, "
+            "SUM(CASE WHEN grounding_verdict = 'partially_grounded' THEN 1 ELSE 0 END) AS partially_grounded, "
+            "SUM(CASE WHEN grounding_verdict = 'ungrounded' THEN 1 ELSE 0 END) AS ungrounded, "
+            "SUM(CASE WHEN verification_skipped THEN 1 ELSE 0 END) AS unverified "
+            "FROM policy_assistant_traces WHERE " + " AND ".join(where)
+        )
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(sql), params).mappings().first()
+        except Exception:
+            return dict(zero)
+        if not row:
+            return dict(zero)
+        total = int(row["total"] or 0)
+        answers = int(row["answers"] or 0)
+        refusals = int(row["refusals"] or 0)
+        grounded = int(row["grounded"] or 0)
+        unverified = int(row["unverified"] or 0)
+        return {
+            "total": total,
+            "answers": answers,
+            "refusals": refusals,
+            "grounded": grounded,
+            "partially_grounded": int(row["partially_grounded"] or 0),
+            "ungrounded": int(row["ungrounded"] or 0),
+            "unverified": unverified,
+            "refusal_rate": round(refusals / total, 4) if total else 0.0,
+            "grounded_rate": round(grounded / answers, 4) if answers else 0.0,
+            "unverified_count": unverified,
+        }
 
     def list_policy_assistant_answer_audits(
         self,

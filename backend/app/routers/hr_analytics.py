@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from ..auth_deps import get_current_user, require_admin_or_hr
+from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db as main_db
 
 router = APIRouter(prefix="/api/hr", tags=["hr-analytics"])
@@ -409,3 +409,60 @@ def dismiss_calibration_alert(
             status_code=404,
             detail="Alert not found or already dismissed",
         )
+
+
+# ── W2-5 answer provenance ────────────────────────────────────────────────
+class AnswerProvenanceResponse(BaseModel):
+    """Per-company Policy Assistant answer-provenance rollup over a recent window.
+
+    grounded_rate is denominated on answered questions (grounding only runs on
+    real answers, not refusals). refusal_rate is denominated on all questions.
+    unverified_count is the number of answers where the grounding verifier failed
+    open (could not produce a verdict).
+    """
+
+    total: int
+    answers: int
+    refusals: int
+    grounded: int
+    unverified_count: int
+    refusal_rate: float
+    grounded_rate: float
+    window_days: int
+
+
+@router.get(
+    "/answer-provenance",
+    response_model=AnswerProvenanceResponse,
+    summary="Policy Assistant answer provenance (grounded% / refusal% / unverified)",
+)
+def get_answer_provenance(
+    window_days: int = Query(30, ge=1, le=365),
+    org_id: str = Depends(get_org_id_for_hr_user),
+):
+    """W2-5: surface answer trustworthiness for the caller's company.
+
+    Reads the queryable provenance columns on policy_assistant_traces
+    (answer_kind / grounding_verdict / verification_skipped) populated by the
+    answer pipeline. Returns zeroed counts for a company with no traces in the
+    window — never errors on empty data.
+    """
+    from datetime import datetime, timedelta
+
+    if not org_id:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=403, detail="No company context")
+
+    since = (datetime.utcnow() - timedelta(days=window_days)).isoformat()
+    rollup = main_db.get_answer_provenance_rollup(company_id=org_id, since=since)
+    return AnswerProvenanceResponse(
+        total=rollup["total"],
+        answers=rollup["answers"],
+        refusals=rollup["refusals"],
+        grounded=rollup["grounded"],
+        unverified_count=rollup["unverified_count"],
+        refusal_rate=rollup["refusal_rate"],
+        grounded_rate=rollup["grounded_rate"],
+        window_days=window_days,
+    )
