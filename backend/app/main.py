@@ -25,6 +25,7 @@ from .routers import (
     employee_steps,
     exception_requests,
     hr_analytics,
+    hr_export,
     hr_case_audit,
     hr_case_detail,
     compliance,
@@ -110,6 +111,7 @@ def create_app() -> FastAPI:
     app.include_router(hr_vendor_widgets.router)  # [B16/AIQ-422] bare-path vendor widget aliases
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    app.include_router(hr_export.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
     app.include_router(hr_case_detail.router)
     # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
