@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
@@ -1603,8 +1603,17 @@ class CasesMixin:
         page: int = 1,
         limit: int = 25,
         risk_filter: Optional[str] = None,
+        sla_thresholds_for: Optional[
+            Callable[[Optional[str], Optional[str]], Optional[Tuple[int, int]]]
+        ] = None,
     ) -> List[Dict[str, Any]]:
-        """Paginated cases with task %% and risk. Prefer company_id; fallback hr_user_id; None = admin."""
+        """Paginated cases with task %% and risk. Prefer company_id; fallback hr_user_id; None = admin.
+
+        I-3 Stage 4: ``sla_thresholds_for(origin, dest) -> (window_days, pct) | None``
+        is an optional app-layer callback letting each row use a corridor-specific
+        timeline-SLA override; None (or absent) keeps the sla_rules defaults — the
+        DB layer never imports app/.
+        """
         try:
             rc_join = self._command_center_join_relocation_cases()
             wc_join = self._command_center_join_wizard_cases()
@@ -1765,8 +1774,16 @@ class CasesMixin:
                 wiz_d = m.get("wizard_dest_country")
                 display_status = self._command_center_display_status(m.get("status"), wiz_o, wiz_d)
                 # W2-2: timeline SLA from the target move date + task progress.
+                # I-3 Stage 4: corridor-specific at-risk thresholds when the
+                # injected resolver supplies them (else sla_rules defaults).
+                _sla_window = _sla_pct = None
+                if sla_thresholds_for is not None:
+                    _ovr = sla_thresholds_for(wiz_o, wiz_d)
+                    if _ovr:
+                        _sla_window, _sla_pct = _ovr
                 sla_status, days_until_move = compute_sla_status(
-                    m.get("wizard_target_move_date"), pct, display_status
+                    m.get("wizard_target_move_date"), pct, display_status,
+                    at_risk_window_days=_sla_window, at_risk_pct=_sla_pct,
                 )
                 next_d = stats["next_overdue"]
                 if not next_d and m.get("expected_start_date"):

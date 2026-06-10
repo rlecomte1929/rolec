@@ -35,3 +35,10 @@ corridor:
   # global set (no behaviour change), matching the Stage-1/2 fallback pattern.
   # intake:
   #   questions_file: "interview_questions.json"
+
+  # I-3 Stage 4: HR command-center timeline-SLA tunables. Values mirror the
+  # sla_rules defaults (30-day at-risk window, 80% completion), so wiring the
+  # seam changes no SLA verdicts — a slower corridor can later widen its window.
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
