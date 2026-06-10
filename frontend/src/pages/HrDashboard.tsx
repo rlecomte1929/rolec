@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { Card, Button, Input, Alert, Badge, Select } from '../components/antigravity';
+import { RefreshButton } from '../components/RefreshButton';
 import { hrAPI } from '../api/client';
 import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
@@ -407,7 +408,7 @@ export const HrDashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               {!isManageMode ? (
                 <>
-                  <Button variant="outline" onClick={() => loadAssignments(false)}>Refresh</Button>
+                  <RefreshButton onClick={() => loadAssignments(false)} label="Refresh" />
                   <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage cases</Button>
                 </>
               ) : (
