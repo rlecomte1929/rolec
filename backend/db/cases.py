@@ -28,6 +28,17 @@ from ..sla_rules import compute_sla_status
 
 log = logging.getLogger(__name__)
 
+# CasesMixin methods branch on `_is_sqlite` for SQLite-vs-Postgres SQL. The C1
+# mixin extraction left these references pointing at a module global that only
+# existed in backend/database.py, so every such method raised
+# NameError("name '_is_sqlite' is not defined") at runtime (e.g. the intake
+# autosave 500). Derive it here from the same single source database.py uses
+# (db_config.DATABASE_URL) — db_config imports nothing from backend/db, so this
+# is circular-import-safe, unlike `from ..database import _is_sqlite`.
+from ..db_config import DATABASE_URL as _raw_url
+
+_is_sqlite = _raw_url.startswith("sqlite")
+
 
 class CasesMixin:
     """Cases-domain methods mixed into :class:`backend.database.Database`."""
