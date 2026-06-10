@@ -103,9 +103,20 @@ class AnthropicClient:
         from .pii_masker import mask_pii
         masked_user_message = mask_pii(req.user_message)
 
+        # W3-5: enable Anthropic prompt caching on the (large, static, reused)
+        # system prompt. Passing it as a cache_control block lets repeated calls
+        # (every immigration answer + grounding/factual verifier reuses the same
+        # system text) read it from cache instead of re-billing input tokens.
+        # Harmless if the block is below the model's min-cacheable size.
+        system_param = (
+            [{"type": "text", "text": req.system, "cache_control": {"type": "ephemeral"}}]
+            if req.system
+            else req.system
+        )
+
         resp = self._client.messages.create(
             model=req.model,
-            system=req.system,
+            system=system_param,
             messages=[{"role": "user", "content": masked_user_message}],
             temperature=req.temperature,
             max_tokens=req.max_tokens,
@@ -125,6 +136,9 @@ class AnthropicClient:
             "usage": {
                 "input_tokens": getattr(usage, "input_tokens", 0) if usage else 0,
                 "output_tokens": getattr(usage, "output_tokens", 0) if usage else 0,
+                # W3-5: surface cache accounting so savings are observable.
+                "cache_creation_input_tokens": getattr(usage, "cache_creation_input_tokens", 0) if usage else 0,
+                "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0) if usage else 0,
             },
         }
 
