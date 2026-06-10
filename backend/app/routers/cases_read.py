@@ -45,6 +45,7 @@ from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
 from ..services.roadmap_staleness import annotate_staleness
 from ..services.case_roadmap_profile import generate_ai_roadmap_for_case
+from ..services.plan_versions_service import persist_generated_plan
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -914,6 +915,15 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
             candidate = gate_roadmap_for_case(case_id, candidate)
             candidate = annotate_staleness(candidate, now=_dt.datetime.now(_dt.timezone.utc))
             candidate["ai_roadmap_eligible"] = True
+            # W1-2: durably record the generated roadmap as an immutable plan
+            # version (idempotent + best-effort; never breaks the response).
+            persist_generated_plan(
+                case_id,
+                candidate,
+                model=candidate.get("model"),
+                corridor=candidate.get("corridor"),
+                created_by=user.get("auth_uuid") or user.get("id"),
+            )
             return candidate
     return derive_roadmap(case_dict)
 
