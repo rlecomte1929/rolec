@@ -155,8 +155,18 @@ class OpenAILLMResolver:
                 },
             )
             data = json.loads(resp.choices[0].message.content)
+            match = data.get("match")
+            # Defense-in-depth: the returned id becomes rce.entity_links.canonical_entity_id,
+            # and the candidate/hit fields are derived from uploaded-document content (attacker-
+            # influenceable). Trust `match` only if it is one of the canonicals we actually
+            # offered this call — never an arbitrary/hallucinated/cross-case id. Otherwise treat
+            # as no-match so the resolver creates a fresh canonical instead.
+            offered = {h.canonical_entity_id for h in top_hits}
+            if match is not None and match not in offered:
+                log.warning("rce LLM resolver returned an unoffered match id — treating as no-match")
+                return LLMResolverVerdict(match=None, confidence=0.0, reasoning="match not in offered slate")
             return LLMResolverVerdict(
-                match=data.get("match"),
+                match=match,
                 confidence=float(data.get("confidence", 0.0)),
                 reasoning=data.get("reasoning"),
             )

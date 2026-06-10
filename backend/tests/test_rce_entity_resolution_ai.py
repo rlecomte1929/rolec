@@ -102,3 +102,22 @@ def test_resolver_parses_match(monkeypatch):
     verdict = ai.OpenAILLMResolver().resolve(_person(), [_hit()])
     assert verdict.match == "ce-1"
     assert verdict.confidence == 0.91
+
+
+def test_resolver_rejects_unoffered_match_id(monkeypatch):
+    # Defense-in-depth: an LLM-returned id not among the offered hits (hallucinated /
+    # prompt-injected / cross-case) must be dropped to no-match.
+    import json
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(model, messages, response_format):
+                    content = json.dumps({"match": "ce-EVIL", "confidence": 0.99, "reasoning": "x"})
+                    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+    monkeypatch.setattr(ai, "_openai_client", lambda: _Client())
+    verdict = ai.OpenAILLMResolver().resolve(_person(), [_hit(cid="ce-1")])
+    assert verdict.match is None  # "ce-EVIL" was never offered
+    assert verdict.confidence == 0.0
