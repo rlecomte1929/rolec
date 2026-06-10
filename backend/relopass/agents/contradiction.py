@@ -42,6 +42,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -81,6 +82,13 @@ ContradictionType = Literal[
     "TEMPORAL_INCONSISTENCY",
     "FORMAT_MISMATCH",
     "UNIT_MISMATCH",
+    # Cohort 2 family-field + nationality types (C2-09). The live rce.contradictions
+    # schema (20260602000000) has no contradiction_type CHECK, so these need no
+    # migration to persist — they are additive at the application layer only.
+    "CONTRADICTION_MARRIAGE_DATE",
+    "CONTRADICTION_CHILD_DOB",
+    "CONTRADICTION_CHILD_PARENT",
+    "CONTRADICTION_NATIONALITY",
 ]
 
 ResolutionStatus = Literal[
@@ -100,6 +108,19 @@ COHORT_1_FIELD_KEYS: Tuple[str, ...] = (
     "employer_legal_name",
     "gross_salary_annual",
 )
+
+# Cohort 2 family-field set handled by the per-field bucket dispatch (C2-09).
+# marriage_date (marriage_cert ↔ application form) and nationality_iso3
+# (passport ↔ id_card ↔ birth_cert) are simple cross-document field comparisons.
+# child_dob and child_parent are NOT here — they need cross-field / family-graph
+# context and run in the dedicated family pass (see detect_contradictions).
+COHORT_2_FIELD_KEYS: Tuple[str, ...] = (
+    "marriage_date",
+    "nationality_iso3",
+)
+
+# Default scan set: Cohort 1 + the Cohort 2 field-bucket keys.
+ALL_FIELD_KEYS: Tuple[str, ...] = COHORT_1_FIELD_KEYS + COHORT_2_FIELD_KEYS
 
 # Salary tolerance per §3.6 (absorbs bonus / holiday-pay annualisation).
 SALARY_RELATIVE_TOLERANCE = Decimal("0.05")  # ±5 %
@@ -146,6 +167,50 @@ class Contradiction(BaseModel):
     content_hash: str
     detected_at: datetime
     detected_by: str = "agent_contradiction_v1"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Family graph context (C2-09) — the cross-field / family inputs the child_dob
+# and child_parent comparators need beyond the flat ExtractedField list.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class FamilyMemberRef:
+    """A case family member tied to a canonical PERSON entity."""
+
+    canonical_entity_id: UUID
+    relationship_type: str  # 'SPOUSE' | 'CHILD' | 'DEPENDENT_PARENT'
+
+
+@dataclass(frozen=True)
+class CanonicalPersonRef:
+    """A canonical PERSON already on the case (resolution target)."""
+
+    canonical_entity_id: UUID
+    display_name: str
+    issuing_state_iso3: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class BirthCertParentClaim:
+    """The parents a BIRTH_CERT names, plus the child it establishes."""
+
+    document_id: UUID
+    parent_names: Tuple[str, ...]
+    child_entity_id: Optional[UUID] = None
+
+
+@dataclass(frozen=True)
+class FamilyContext:
+    """Everything the family pass needs for one case. Empty == no family scope."""
+
+    members: Tuple[FamilyMemberRef, ...] = ()
+    canonical_persons: Tuple[CanonicalPersonRef, ...] = ()
+    birth_cert_claims: Tuple[BirthCertParentClaim, ...] = ()
+    # Children whose parent-resolution check is suppressed because a
+    # FOSTER_CARE_ORDER establishes a non-biological relationship.
+    foster_suppressed_child_ids: "frozenset[UUID]" = frozenset()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -198,6 +263,14 @@ class ContradictionStore(Protocol):
         """
         ...
 
+    def get_family_context(self, case_id: UUID) -> Optional[FamilyContext]:
+        """Family graph for the case, or None when the case has no family
+        scope. Drives the child_dob + child_parent comparators (C2-09). The
+        production adapter joins rce.family_members / rce.entity_links /
+        rce.document_types; the Cohort-1 detector returns None here.
+        """
+        ...
+
 
 @dataclass
 class InMemoryContradictionStore:
@@ -209,6 +282,11 @@ class InMemoryContradictionStore:
     contradictions: List[Contradiction] = field(default_factory=list)
     # Idempotency-key set: (case_id, canonical_entity_id, field_key, content_hash)
     _seen: set = field(default_factory=set)
+    # Family graph (C2-09). Empty by default → get_family_context returns None.
+    family_members: List[FamilyMemberRef] = field(default_factory=list)
+    canonical_persons: List[CanonicalPersonRef] = field(default_factory=list)
+    birth_cert_claims: List[BirthCertParentClaim] = field(default_factory=list)
+    foster_suppressed_child_ids: set = field(default_factory=set)
 
     def list_extracted_fields_for_case(
         self, case_id: UUID
@@ -241,7 +319,47 @@ class InMemoryContradictionStore:
             inserted += 1
         return inserted, skipped
 
+    def get_family_context(self, case_id: UUID) -> Optional[FamilyContext]:
+        if not (self.family_members or self.birth_cert_claims):
+            return None
+        return FamilyContext(
+            members=tuple(self.family_members),
+            canonical_persons=tuple(self.canonical_persons),
+            birth_cert_claims=tuple(self.birth_cert_claims),
+            foster_suppressed_child_ids=frozenset(self.foster_suppressed_child_ids),
+        )
+
     # ---- Test helpers ----
+
+    def add_family_member(
+        self, canonical_entity_id: UUID, relationship_type: str
+    ) -> None:
+        self.family_members.append(
+            FamilyMemberRef(canonical_entity_id, relationship_type)
+        )
+
+    def add_canonical_person(
+        self,
+        canonical_entity_id: UUID,
+        display_name: str,
+        issuing_state_iso3: Optional[str] = None,
+    ) -> None:
+        self.canonical_persons.append(
+            CanonicalPersonRef(canonical_entity_id, display_name, issuing_state_iso3)
+        )
+
+    def add_birth_cert_claim(
+        self,
+        document_id: UUID,
+        parent_names: Sequence[str],
+        child_entity_id: Optional[UUID] = None,
+    ) -> None:
+        self.birth_cert_claims.append(
+            BirthCertParentClaim(document_id, tuple(parent_names), child_entity_id)
+        )
+
+    def suppress_foster_child(self, child_entity_id: UUID) -> None:
+        self.foster_suppressed_child_ids.add(child_entity_id)
 
     def add_field(
         self,
@@ -493,22 +611,74 @@ def _given_names_comparator(candidates: Sequence[Candidate]) -> bool:
     )
 
 
+def _compare_marriage_date(candidates: Sequence[Candidate]) -> bool:
+    """Zero-tolerance exact-match on marriage_date across documents (C2-09).
+
+    marriage_cert.marriage_date ↔ any application form's stated marriage_date.
+    Returns True when all present values are byte-identical after trim (the
+    agents already normalise to ISO), False on any divergence.
+    """
+    if len(candidates) <= 1:
+        return True
+    values = {str(c.value).strip() for c in candidates if c.value not in (None, "")}
+    return len(values) <= 1
+
+
+def _split_iso3(value: Any) -> "frozenset[str]":
+    """Split a nationality field into its set of ICAO 3-letter codes.
+
+    A single document may declare more than one nationality (dual nationals);
+    such values arrive joined by a separator (``,`` ``;`` ``/`` or whitespace).
+    """
+    return frozenset(
+        code.strip().upper()
+        for code in re.split(r"[,;/ ]+", str(value))
+        if code.strip()
+    )
+
+
+def _compare_nationality(candidates: Sequence[Candidate]) -> bool:
+    """ICAO nationality agreement across documents (C2-09).
+
+    Each candidate's value is a set of declared ICAO codes. A contradiction
+    fires only when two documents declare *disjoint* nationality sets — i.e.
+    they cannot share any nationality. This honours the dual-nationality
+    carve-out: a passport declaring {FRA, GBR} is consistent with an id card
+    declaring {FRA} (they overlap on FRA), but {DEU} vs {FRA} is a real clash.
+    """
+    sets = [_split_iso3(c.value) for c in candidates if c.value not in (None, "")]
+    sets = [s for s in sets if s]
+    if len(sets) <= 1:
+        return True
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            if sets[i].isdisjoint(sets[j]):
+                return False
+    return True
+
+
 COMPARATORS: Mapping[str, ComparatorFn] = {
     "surname": _surname_comparator,
     "given_names": _given_names_comparator,
     "date_of_birth": _compare_dob,
     "employer_legal_name": _compare_employer,
     "gross_salary_annual": _compare_salary,
+    # Cohort 2 (C2-09)
+    "marriage_date": _compare_marriage_date,
+    "nationality_iso3": _compare_nationality,
 }
 
 
-# Map field_key → ContradictionType (Cohort 1: only DIRECT_CONTRADICTION fires).
+# Map field_key → ContradictionType.
 DEFAULT_CONTRADICTION_TYPE: Mapping[str, ContradictionType] = {
     "surname": "DIRECT_CONTRADICTION",
     "given_names": "DIRECT_CONTRADICTION",
     "date_of_birth": "DIRECT_CONTRADICTION",
     "employer_legal_name": "DIRECT_CONTRADICTION",
     "gross_salary_annual": "DIRECT_CONTRADICTION",
+    # Cohort 2 (C2-09)
+    "marriage_date": "CONTRADICTION_MARRIAGE_DATE",
+    "nationality_iso3": "CONTRADICTION_NATIONALITY",
 }
 
 
@@ -536,18 +706,143 @@ def _candidate_from_field(
     )
 
 
+def _new_contradiction(
+    *,
+    case_id: UUID,
+    canonical_entity_id: Optional[UUID],
+    field_key: str,
+    type_: ContradictionType,
+    candidates: Tuple[Candidate, ...],
+) -> Contradiction:
+    return Contradiction(
+        contradiction_id=uuid4(),
+        case_id=case_id,
+        canonical_entity_id=canonical_entity_id,
+        field_key=field_key,
+        type=type_,
+        candidates=candidates,
+        resolution_status="Requires attention",
+        suggested_winner=None,
+        content_hash=_content_hash(candidates),
+        detected_at=datetime.now(tz=timezone.utc),
+    )
+
+
+def _detect_child_dob(
+    case_id: UUID,
+    store: ContradictionStore,
+    all_fields: Sequence[ExtractedField],
+    family: FamilyContext,
+) -> List[Contradiction]:
+    """CONTRADICTION_CHILD_DOB — birth_cert.dob ≠ passport.dob for a CHILD.
+
+    Can't ride the per-field bucket because the two sources use different field
+    keys (BIRTH_CERT emits ``dob``; PASSPORT_TD3 emits ``date_of_birth``), so we
+    gather both keys for each canonical entity that is a CHILD and compare exact.
+    """
+    child_ids = {
+        m.canonical_entity_id
+        for m in family.members
+        if m.relationship_type == "CHILD"
+    }
+    if not child_ids:
+        return []
+
+    out: List[Contradiction] = []
+    for child_id in child_ids:
+        candidates = [
+            _candidate_from_field(
+                f, document_type_code=store.get_document_type(f.document_id)
+            )
+            for f in all_fields
+            if f.field_key in ("dob", "date_of_birth")
+            and store.get_canonical_entity_for_field(_synthetic_field_id(f)) == child_id
+        ]
+        if len(candidates) <= 1:
+            continue
+        values = {str(c.value).strip() for c in candidates if c.value not in (None, "")}
+        if len(values) <= 1:
+            continue  # all agree (zero tolerance) — no contradiction
+        out.append(
+            _new_contradiction(
+                case_id=case_id,
+                canonical_entity_id=child_id,
+                field_key="dob",
+                type_="CONTRADICTION_CHILD_DOB",
+                candidates=tuple(candidates),
+            )
+        )
+    return out
+
+
+def _detect_child_parent(
+    case_id: UUID, family: FamilyContext
+) -> List[Contradiction]:
+    """CONTRADICTION_CHILD_PARENT — a BIRTH_CERT's parent names don't resolve to
+    any canonical PERSON on the case (via the C2-01 family resolver).
+
+    Fires only when at least one parent name is present and there is a canonical
+    set to resolve against, and NONE of the named parents resolve. Suppressed for
+    a child covered by a FOSTER_CARE_ORDER (non-biological relationship).
+    """
+    # Local import keeps the module import graph acyclic at load time and avoids
+    # pulling the resolver in for the Cohort-1-only path.
+    from .family_entity_resolution import CanonicalPerson, FamilyEntityResolver
+
+    if not family.canonical_persons:
+        return []
+    resolver = FamilyEntityResolver(
+        canonical_persons=[
+            CanonicalPerson(
+                canonical_entity_id=p.canonical_entity_id,
+                display_name=p.display_name,
+                issuing_state_iso3=p.issuing_state_iso3,
+            )
+            for p in family.canonical_persons
+        ]
+    )
+
+    out: List[Contradiction] = []
+    for claim in family.birth_cert_claims:
+        if claim.child_entity_id in family.foster_suppressed_child_ids:
+            continue  # foster order establishes the relationship — suppress
+        names = [n for n in claim.parent_names if n and n.strip()]
+        if not names:
+            continue
+        if any(resolver.resolve(n).matched for n in names):
+            continue  # at least one parent resolved — no contradiction
+        candidates = tuple(
+            Candidate(value=n, document_id=claim.document_id, document_type_code="BIRTH_CERT")
+            for n in names
+        )
+        out.append(
+            _new_contradiction(
+                case_id=case_id,
+                canonical_entity_id=claim.child_entity_id,
+                field_key="parent_names",
+                type_="CONTRADICTION_CHILD_PARENT",
+                candidates=candidates,
+            )
+        )
+    return out
+
+
 def detect_contradictions(
     case_id: UUID,
     store: ContradictionStore,
     *,
-    field_keys: Sequence[str] = COHORT_1_FIELD_KEYS,
+    field_keys: Sequence[str] = ALL_FIELD_KEYS,
 ) -> Tuple[Contradiction, ...]:
     """Detect contradictions across documents for a single case.
 
-    For each ``field_key`` in the Cohort 1 fixed set, group all
-    ExtractedField rows by ``canonical_entity_id``, build Candidate lists,
-    and run the per-field comparator. Comparator returning False emits a
-    Contradiction row.
+    For each ``field_key`` in the scan set (Cohort 1 + the Cohort 2 field-bucket
+    keys by default), group all ExtractedField rows by ``canonical_entity_id``,
+    build Candidate lists, and run the per-field comparator. A comparator
+    returning False emits a Contradiction row.
+
+    Then, when the store exposes a family graph (C2-09), run the cross-field
+    family pass — child_dob and child_parent — which can't be expressed as a
+    single-field bucket.
 
     Returns the contradictions that were freshly inserted. Re-runs against
     unchanged data are idempotent — the store dedupes via
@@ -574,19 +869,22 @@ def detect_contradictions(
             # Equivalent under allowed-variation — no contradiction.
             continue
         candidates_tuple = tuple(candidates)
-        contradiction = Contradiction(
-            contradiction_id=uuid4(),
-            case_id=case_id,
-            canonical_entity_id=eid,
-            field_key=field_key,
-            type=DEFAULT_CONTRADICTION_TYPE.get(field_key, "DIRECT_CONTRADICTION"),
-            candidates=candidates_tuple,
-            resolution_status="Requires attention",
-            suggested_winner=None,
-            content_hash=_content_hash(candidates_tuple),
-            detected_at=datetime.now(tz=timezone.utc),
+        detected.append(
+            _new_contradiction(
+                case_id=case_id,
+                canonical_entity_id=eid,
+                field_key=field_key,
+                type_=DEFAULT_CONTRADICTION_TYPE.get(field_key, "DIRECT_CONTRADICTION"),
+                candidates=candidates_tuple,
+            )
         )
-        detected.append(contradiction)
+
+    # Cohort 2 family pass (C2-09) — only when the store carries a family graph.
+    get_family = getattr(store, "get_family_context", None)
+    family = get_family(case_id) if callable(get_family) else None
+    if family is not None:
+        detected.extend(_detect_child_dob(case_id, store, all_fields, family))
+        detected.extend(_detect_child_parent(case_id, family))
 
     inserted, _skipped = store.upsert_contradictions(detected)
     # Only return rows that were actually inserted this call.
@@ -600,10 +898,16 @@ def detect_contradictions(
 
 __all__ = [
     "COHORT_1_FIELD_KEYS",
+    "COHORT_2_FIELD_KEYS",
+    "ALL_FIELD_KEYS",
     "Candidate",
     "Contradiction",
     "ContradictionStore",
     "ContradictionType",
+    "FamilyContext",
+    "FamilyMemberRef",
+    "CanonicalPersonRef",
+    "BirthCertParentClaim",
     "InMemoryContradictionStore",
     "ResolutionStatus",
     "SALARY_RELATIVE_TOLERANCE",
