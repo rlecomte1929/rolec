@@ -142,6 +142,12 @@ class OpenAIEmbedder:
 
 # --- Factory ---------------------------------------------------------------
 
+def _is_production() -> bool:
+    """Canonical prod detection (matches db_config / CLAUDE.md): Render injects
+    RENDER; explicit ENV=production also counts."""
+    return bool(os.environ.get("RENDER")) or os.environ.get("ENV") == "production"
+
+
 def get_default_embedder() -> Embedder:
     """
     Pick an embedder based on environment.
@@ -152,21 +158,44 @@ def get_default_embedder() -> Embedder:
 
     Without the override:
       - OPENAI_API_KEY present -> OpenAIEmbedder
-      - Otherwise               -> HashEmbedder
+      - Otherwise               -> HashEmbedder (dev/test only)
+
+    Fail-loud in production (W0-1): silently falling back to the HashEmbedder in
+    prod poisons retrieval invisibly (non-semantic vectors written/queried with
+    no error). In production we therefore REQUIRE a working OpenAIEmbedder unless
+    HashEmbedder is *explicitly* forced via POLICY_ASSISTANT_EMBEDDER=hash. In
+    dev/test the silent hash fallback is preserved.
     """
     forced = (os.environ.get("POLICY_ASSISTANT_EMBEDDER") or "").strip().lower()
     if forced == "hash":
+        # Explicit operator choice — honored everywhere, including prod.
         return HashEmbedder()
     if forced == "openai":
         return OpenAIEmbedder()
+
+    prod = _is_production()
     if os.environ.get("OPENAI_API_KEY"):
         try:
             return OpenAIEmbedder()
         except Exception as e:
+            if prod:
+                # Do NOT degrade to hash vectors in prod — fail loud.
+                raise RuntimeError(
+                    "OpenAIEmbedder unavailable in production "
+                    f"({e}); refusing to fall back to HashEmbedder. Set "
+                    "POLICY_ASSISTANT_EMBEDDER=hash only if degraded retrieval "
+                    "is intentional."
+                ) from e
             log.warning(
                 "OpenAIEmbedder unavailable (%s); falling back to HashEmbedder.", e
             )
             return HashEmbedder()
+    if prod:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set in production; refusing to fall back to "
+            "the non-semantic HashEmbedder (would silently poison retrieval). "
+            "Set OPENAI_API_KEY, or POLICY_ASSISTANT_EMBEDDER=hash to opt in."
+        )
     return HashEmbedder()
 
 
