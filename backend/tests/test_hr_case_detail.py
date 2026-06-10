@@ -23,7 +23,7 @@ from backend.main import app, UserRole
 # the wrong one leaves the real auth path running (and the tenant-scoping tests
 # passing for the wrong reasons). Key the override on the dependency the router
 # actually uses. (Reviewer-flagged on AIQ-567 / C1-11c-be.)
-from backend.app.auth_deps import get_current_user
+from backend.app.auth_deps import get_current_user, get_org_id_for_hr_user
 
 # ---------------------------------------------------------------------------
 # Fake users + cases
@@ -244,6 +244,102 @@ class TestContradictionHistoryEndpoint(_BaseCase):
             )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json(), {"corrections": []})
+
+
+# ---------------------------------------------------------------------------
+# C2-09c · POST /contradictions/detect — trigger the detector for a case
+# ---------------------------------------------------------------------------
+
+
+# A real UUID case (the detect route converts case_id → UUID for the rce engine).
+_CASE_UUID = "00df5cd6-8226-543d-8d68-91cbf1dd1103"
+_CASE_A_UUID: Dict[str, Any] = {**_CASE_A, "id": _CASE_UUID}
+
+
+class _FakeContradiction:
+    def __init__(self, ctype: str) -> None:
+        self.type = ctype
+
+
+class TestDetectContradictionsEndpoint(_BaseCase):
+    """Override get_org_id_for_hr_user directly so the org→case tenant check in
+    _require_case_access is exercised deterministically (independent of the
+    db.get_hr_company_id seed path)."""
+
+    def _client_as(self, fake_user: Dict[str, Any], org_id: str) -> TestClient:
+        client = self._client_for(fake_user)
+        app.dependency_overrides[get_org_id_for_hr_user] = lambda: org_id
+        return client
+
+    def test_detect_runs_and_returns_counts_for_own_company(self) -> None:
+        client = self._client_as(_HR_A, "company-a")
+        with (
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_relocation_case",
+                side_effect=lambda cid: _CASE_A_UUID if cid == _CASE_UUID else None,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.run_contradiction_detection_for_case",
+                return_value=(
+                    _FakeContradiction("CONTRADICTION_NATIONALITY"),
+                    _FakeContradiction("CONTRADICTION_MARRIAGE_DATE"),
+                ),
+            ) as mock_run,
+        ):
+            resp = client.post(
+                f"/api/hr/cases/{_CASE_UUID}/contradictions/detect",
+                headers={"Authorization": "Bearer hr-a-token"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["case_id"], _CASE_UUID)
+        self.assertEqual(body["detected"], 2)
+        self.assertEqual(
+            body["contradiction_types"],
+            ["CONTRADICTION_MARRIAGE_DATE", "CONTRADICTION_NATIONALITY"],
+        )
+        mock_run.assert_called_once()
+
+    def test_detect_returns_404_and_does_not_run_for_cross_tenant(self) -> None:
+        # HR-B (company-b) triggers detection on company-a's case → 404, detector NEVER runs.
+        client = self._client_as(_HR_B, "company-b")
+        with (
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_relocation_case",
+                return_value=_CASE_A_UUID,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.run_contradiction_detection_for_case",
+            ) as mock_run,
+        ):
+            resp = client.post(
+                f"/api/hr/cases/{_CASE_UUID}/contradictions/detect",
+                headers={"Authorization": "Bearer hr-b-token"},
+            )
+        self.assertEqual(resp.status_code, 404)
+        self.assertNotIn("company-a", resp.text)
+        mock_run.assert_not_called()
+
+    def test_detect_non_uuid_case_id_degrades_to_zero(self) -> None:
+        # A legacy non-UUID case id owned by the org → no rce case → detected 0,
+        # detector not invoked (no UUID to pass).
+        client = self._client_as(_HR_A, "company-a")
+        with (
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_relocation_case",
+                side_effect=lambda cid: {**_CASE_A, "id": "case-a"} if cid == "case-a" else None,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.run_contradiction_detection_for_case",
+            ) as mock_run,
+        ):
+            resp = client.post(
+                "/api/hr/cases/case-a/contradictions/detect",
+                headers={"Authorization": "Bearer hr-a-token"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["detected"], 0)
+        mock_run.assert_not_called()
 
 
 if __name__ == "__main__":

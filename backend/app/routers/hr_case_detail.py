@@ -26,12 +26,14 @@ for engine-derived data.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
+from ..services.contradiction_store_pg import run_contradiction_detection_for_case
 from ...database import db
 
 
@@ -636,6 +638,49 @@ def get_contradiction_history(
         corrections = []
 
     return CorrectionHistoryResponse(corrections=corrections)
+
+
+# ---------------------------------------------------------------------------
+# 7. POST /contradictions/detect  (C2-09c — trigger the detector for a case)
+# ---------------------------------------------------------------------------
+
+
+class ContradictionDetectResponse(BaseModel):
+    case_id: str
+    # Number of contradictions freshly detected this run (idempotent — re-runs on
+    # unchanged data return 0 because the store dedups on content_hash).
+    detected: int
+    contradiction_types: List[str] = Field(default_factory=list)
+
+
+@router.post("/{case_id}/contradictions/detect", response_model=ContradictionDetectResponse)
+def detect_case_contradictions(
+    case_id: str,
+    _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> ContradictionDetectResponse:
+    """Run the C1-08/C2-09 contradiction detector across this case's extracted
+    fields and persist any findings to rce.contradictions (which the GET
+    /contradictions routes above read back).
+
+    Idempotent: the SupabaseContradictionStore dedups on
+    (case_id, canonical_entity_id, field_key, content_hash), so this is safe to
+    call repeatedly — e.g. after a new document is extracted, or as a manual
+    HR "re-check". Tenant-scoped via _require_case_access (404 on mismatch).
+    """
+    _require_case_access(case_id, org_id)
+    try:
+        case_uuid = UUID(case_id)
+    except ValueError:
+        # Legacy relocation_cases ids can be non-UUID text; such a case has no
+        # rce.cases row to detect against, so there is nothing to do.
+        return ContradictionDetectResponse(case_id=case_id, detected=0, contradiction_types=[])
+    detected = run_contradiction_detection_for_case(case_uuid)
+    return ContradictionDetectResponse(
+        case_id=case_id,
+        detected=len(detected),
+        contradiction_types=sorted({c.type for c in detected}),
+    )
 
 
 @router.get("/behind-schedule")
