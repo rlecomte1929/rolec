@@ -18,6 +18,7 @@ from .routers import (
     case_forms_adhoc,
     cases,
     cases_admin,
+    case_integrations,
     cases_read,
     cases_write,
     conjoint,
@@ -91,6 +92,7 @@ def create_app() -> FastAPI:
     # Original cases.py is retained as a support module for Pydantic models + private
     # helpers that cases_write.py still imports from. Its router is no longer wired.
     app.include_router(cases_read.router)
+    app.include_router(case_integrations.router)  # I-4 — email plan + calendar .ics
     app.include_router(cases_write.router)
     app.include_router(cases_admin.router)
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"

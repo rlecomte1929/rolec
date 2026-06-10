@@ -151,6 +151,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
         docChips={docChips}
         onStepDocChipClick={handleDocChipClick}
         successScore={successScore}
+        caseId={caseId}
       />
     </AppShell>
   );
