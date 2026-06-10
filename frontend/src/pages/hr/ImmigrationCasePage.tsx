@@ -11,6 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Badge, Button, Card } from '../../components/antigravity';
 import { buildRoute } from '../../navigation/routes';
+import { CaseDocumentsPanel } from '../../components/case/CaseDocumentsPanel';
 import api from '../../api/client';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -263,6 +264,14 @@ export const ImmigrationCasePage: React.FC = () => {
               </dd>
             </div>
           </dl>
+        </Card>
+
+        {/* BL-OCR.4 / AIQ-750 — uploaded documents + AI extraction status */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+            Documents
+          </h2>
+          <CaseDocumentsPanel caseId={immCase.case_id} />
         </Card>
 
         {/* Actions */}

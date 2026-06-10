@@ -1,4 +1,4 @@
-"""BL-OCR.2 / AIQ-748 — immigration document upload endpoint.
+"""BL-OCR.2 / AIQ-748 — immigration document upload + list endpoints.
 
 POST /api/immigration/cases/{case_id}/documents
   Auth: any authenticated user assigned to the case (employee or HR via
@@ -7,6 +7,10 @@ POST /api/immigration/cases/{case_id}/documents
   size+MIME (upload_validator, libmagic), uploads to the private bucket, inserts
   an immigration_documents row, and returns {document_id, storage_path,
   ocr_status:'pending'}.
+
+GET /api/immigration/cases/{case_id}/documents
+  Same access scoping; returns the case's documents (newest first) with their
+  OCR status + result for the employee/HR document viewer (BL-OCR.4 / AIQ-750).
 
 WIRED (CLAUDE.md hard gate): registered in BOTH backend/main.py and
 backend/app/main.py.
@@ -111,3 +115,44 @@ async def upload_immigration_document(
         file_name=safe_name,
     )
     return record
+
+
+@router.get("/cases/{case_id}/documents")
+def list_immigration_documents(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """List a case's uploaded documents (newest first) for the document viewer.
+
+    Access is scoped identically to the upload endpoint — assigned employee/HR
+    or admin — so 404 is returned for any case the caller can't see, never a
+    leak of another tenant's documents.
+    """
+    resolved_case_id = _resolve_accessible_case(case_id, user)
+
+    with db.engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT id, file_name, mime_type, file_size_bytes, ocr_status, "
+                "       ocr_result, uploaded_by, created_at "
+                "FROM public.immigration_documents "
+                "WHERE case_id = :cid "
+                "ORDER BY created_at DESC"
+            ),
+            {"cid": resolved_case_id},
+        ).mappings().all()
+
+    documents = [
+        {
+            "document_id": r["id"],
+            "file_name": r["file_name"],
+            "mime_type": r["mime_type"],
+            "file_size_bytes": r["file_size_bytes"],
+            "ocr_status": r["ocr_status"],
+            "ocr_result": r["ocr_result"],
+            "uploaded_by": r["uploaded_by"],
+            "uploaded_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in rows
+    ]
+    return {"case_id": resolved_case_id, "documents": documents}

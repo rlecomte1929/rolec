@@ -12,6 +12,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Badge, Button, Card } from '../../components/antigravity';
 import { buildRoute } from '../../navigation/routes';
+import { CaseDocumentsPanel } from '../../components/case/CaseDocumentsPanel';
 import api from '../../api/client';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -234,6 +235,12 @@ export const ImmigrationChecklistPage: React.FC = () => {
           Document status is updated by your HR team and immigration partner. Use the Upload
           button to flag a document as ready — your partner will verify it.
         </p>
+
+        {/* BL-OCR.4 / AIQ-750 — upload documents + AI extraction status */}
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold text-[#f1f5f9] mb-3">Upload documents</h2>
+          <CaseDocumentsPanel caseId={caseId!} canUpload />
+        </section>
 
         <div className="mt-6">
           <Button
