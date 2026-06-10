@@ -250,6 +250,33 @@ class AnswerConfidenceIntegrationTests(unittest.TestCase):
         self.assertEqual(res["confidence"], "high")
         self.assertGreaterEqual(len(res["cited_sources"]), 2)
 
+    def test_verification_skipped_surfaces_unverified_caveat(self):
+        # W0-3: when the grounding verifier fails open (skipped), the answer is
+        # not silently passed as verified — it carries the flag AND a visible
+        # "pending review" caveat, while still being served (fail-open kept).
+        from backend.app.services import immigration_answer_engine as eng
+        mockc = MockClient(default_response="Permit required [source: https://a.example/1].")
+        chunks = [_scored_chunk(0.85, source_url="https://a.example/1", source_ref="https://a.example/1")]
+        skipped = {"verdict": None, "grounding_score": None, "unsupported_claims": [],
+                   "verification_skipped": True, "latency_ms": 0}
+        with mock.patch.object(eng, "verify_grounding", return_value=skipped):
+            res = generate_immigration_answer(_payload(chunks), "q", "FR→NO", client=mockc)
+        self.assertEqual(res["answer_kind"], "answer")          # not blocked
+        self.assertTrue(res["verification_skipped"])             # flag surfaced
+        self.assertIn(eng._UNVERIFIED_CAVEAT, res["answer_text"])  # visible to consumers
+
+    def test_verified_answer_has_no_unverified_caveat(self):
+        # Negative: a successfully verified answer must NOT carry the caveat.
+        from backend.app.services import immigration_answer_engine as eng
+        mockc = MockClient(default_response="Permit required [source: https://a.example/1].")
+        chunks = [_scored_chunk(0.85, source_url="https://a.example/1", source_ref="https://a.example/1")]
+        verdict = {"verdict": "grounded", "grounding_score": 0.9, "unsupported_claims": [],
+                   "verification_skipped": False, "latency_ms": 0}
+        with mock.patch.object(eng, "verify_grounding", return_value=verdict):
+            res = generate_immigration_answer(_payload(chunks), "q", "FR→NO", client=mockc)
+        self.assertFalse(res["verification_skipped"])
+        self.assertNotIn(eng._UNVERIFIED_CAVEAT, res["answer_text"])
+
 
 class CitedChunkIdRecordingTests(unittest.TestCase):
     """N8-FU/AIQ-856 — the engine records the immigration_corpus_chunks ids it cited

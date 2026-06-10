@@ -45,6 +45,17 @@ _PARTIALLY_GROUNDED_CAVEAT = (
     "\n\nSome details could not be verified against current official sources."
 )
 
+# W0-3 — appended when the grounding verifier could not run (errored/timed out
+# → verification_skipped). The verifier fails OPEN by design (never blocks the
+# answer), but the skip must be VISIBLE rather than passing silently as if the
+# answer were verified. Distinct from the partial-grounding caveat (which means
+# the verifier ran and found gaps).
+_UNVERIFIED_CAVEAT = (
+    "\n\n⚠️ This answer could not be automatically verified against the source "
+    "documents and is pending review. Treat it as provisional and confirm with "
+    "the relevant immigration authority before acting."
+)
+
 # Verbatim per the N4 spec — do not paraphrase.
 SYSTEM_PROMPT = """You are an immigration guidance assistant for ReloPass.
 You answer questions about work permit and visa requirements ONLY from the provided source documents.
@@ -285,6 +296,12 @@ def generate_immigration_answer(
             tracer.mark_fallback("ungrounded")
         elif grounding_verdict == "partially_grounded":
             answer_text = answer_text + _PARTIALLY_GROUNDED_CAVEAT
+        # W0-3: verifier failed open (errored/timed out). Surface the skip in the
+        # answer itself so it is never mistaken for a verified answer. answer_kind
+        # stays "answer" (we don't block) — verification_skipped is only true when
+        # grounding_verdict is None, so this never collides with the branches above.
+        if verification_skipped and answer_kind == "answer":
+            answer_text = answer_text + _UNVERIFIED_CAVEAT
 
     # N9/AIQ-849: float signal from cross-tier source agreement of the kept chunks.
     agreement_confidence = confidence_from_agreement(chunks)
