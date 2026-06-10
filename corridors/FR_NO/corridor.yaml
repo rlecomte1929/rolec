@@ -21,3 +21,10 @@ corridor:
     trust_tiers: [1, 2, 3]
     # Cosine similarity floor for the quality gate.
     min_similarity: 0.25
+
+  # I-3 Stage 2: prompt selection. task_key names the prompt_registry task whose
+  # active version the immigration answer engine uses; until a version is
+  # registered for this key the engine falls back to its module SYSTEM_PROMPT, so
+  # this is inert (no behaviour change) until a corridor prompt is published.
+  prompt:
+    task_key: "immigration_answer"

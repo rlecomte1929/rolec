@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .ai_trace_logger import TraceSession
 from .immigration_answer_verifier import verify_grounding
@@ -25,6 +25,7 @@ from .immigration_contradiction_detector import (
     CONFLICTING_OFFICIAL_SOURCES_NOTE,
     detect_and_resolve_conflicts,
 )
+from . import corridor_registry
 from .immigration_retriever import IMMIGRATION_CORPUS_COMPANY_ID
 from .immigration_source_reconciler import confidence_from_agreement
 from .policy_assistant_llm_client import (
@@ -180,6 +181,27 @@ def _calibrated_confidence(
     return level, factors
 
 
+def _resolve_corridor_prompt(corridor: str) -> Tuple[str, str]:
+    """Return (base_system_prompt, model) for this corridor (I-3 Stage 2).
+
+    The corridor's registry profile names a prompt_registry ``task_key`` whose
+    active version supplies the base prompt + model. Fallback-safe at every step
+    (no profile / no task_key / no registered version / any error) → the module
+    SYSTEM_PROMPT + _MODEL. Never raises.
+    """
+    try:
+        pcfg = corridor_registry.get_prompt_config(corridor)
+        if pcfg is not None:
+            from .prompt_registry import get_active_prompt
+
+            active = get_active_prompt(pcfg.task_key)
+            if active is not None:
+                return active.system_prompt, (active.model_name or _MODEL)
+    except Exception:  # noqa: BLE001 — prompt selection must never break answering
+        log.debug("corridor prompt resolution failed for %s", corridor, exc_info=True)
+    return SYSTEM_PROMPT, _MODEL
+
+
 def generate_immigration_answer(
     chunks_payload: Dict[str, Any],
     query: str,
@@ -247,19 +269,23 @@ def generate_immigration_answer(
     conflict_result = detect_and_resolve_conflicts(chunks, client=client)
     chunks = conflict_result["kept_chunks"] or chunks
 
-    system = SYSTEM_PROMPT + _INJECTION_GUARD + (_STALE_CAVEAT_HINT if all_stale else "")
+    # I-3 Stage 2: per-corridor prompt selection (registry → prompt_registry),
+    # fallback-safe to the module SYSTEM_PROMPT + _MODEL. The injection guard +
+    # stale/conflict caveats are still appended regardless.
+    base_prompt, requested_model = _resolve_corridor_prompt(corridor)
+    system = base_prompt + _INJECTION_GUARD + (_STALE_CAVEAT_HINT if all_stale else "")
     if conflict_result["escalations"]:
         system += "\n\n" + CONFLICTING_OFFICIAL_SOURCES_NOTE
     user_message = _build_user_message(chunks, query, corridor)
 
-    resp = client.complete(LlmRequest(system=system, user_message=user_message, model=_MODEL, max_tokens=800))
+    resp = client.complete(LlmRequest(system=system, user_message=user_message, model=requested_model, max_tokens=800))
     answer_text = (resp.get("text") or "").strip()
     usage = resp.get("usage") or {}
-    model = resp.get("model") or _MODEL
+    model = resp.get("model") or requested_model
     stop_reason = resp.get("stop_reason")
     # Price by the requested alias, not the API-echoed (possibly date-suffixed)
     # model id, which would miss the alias-keyed pricing table and log $0.
-    cost = estimate_cost_usd(usage, _MODEL)
+    cost = estimate_cost_usd(usage, requested_model)
     tracer.record_llm_call(model, int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0)), 0)
 
     # Classify. Empty output is treated as an insufficient-context refusal (never

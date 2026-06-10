@@ -42,6 +42,16 @@ class CorridorRetrievalScope:
 
 
 @dataclass(frozen=True)
+class CorridorPromptConfig:
+    """Per-corridor prompt selection (I-3 Stage 2). `task_key` names the
+    prompt_registry task whose active version the immigration answer engine
+    should use; the engine falls back to its module SYSTEM_PROMPT when the key
+    is absent or has no registered version."""
+
+    task_key: str
+
+
+@dataclass(frozen=True)
 class CorridorProfile:
     corridor_id: str
     origin_iso: Optional[str] = None
@@ -49,6 +59,7 @@ class CorridorProfile:
     display_name: Optional[str] = None
     aliases: Tuple[str, ...] = ()
     retrieval: Optional[CorridorRetrievalScope] = None
+    prompt: Optional[CorridorPromptConfig] = None
 
 
 def _registry_dir() -> Path:
@@ -88,6 +99,15 @@ def _coerce_scope(raw: Any) -> Optional[CorridorRetrievalScope]:
     return CorridorRetrievalScope(trust_tiers=tiers, min_similarity=min_sim)
 
 
+def _coerce_prompt(raw: Any) -> Optional[CorridorPromptConfig]:
+    if not isinstance(raw, Mapping):
+        return None
+    task_key = raw.get("task_key")
+    if not task_key or not str(task_key).strip():
+        return None
+    return CorridorPromptConfig(task_key=str(task_key).strip())
+
+
 def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
     block = doc.get("corridor") if isinstance(doc.get("corridor"), Mapping) else doc
     aliases_raw = block.get("aliases")
@@ -99,6 +119,7 @@ def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
         display_name=(str(block["display_name"]) if block.get("display_name") else None),
         aliases=aliases,
         retrieval=_coerce_scope(block.get("retrieval")),
+        prompt=_coerce_prompt(block.get("prompt")),
     )
 
 
@@ -136,6 +157,12 @@ def get_retrieval_scope(corridor: str) -> Optional[CorridorRetrievalScope]:
     """Convenience accessor for consumer #1 (immigration_retriever)."""
     profile = load_corridor_profile(corridor)
     return profile.retrieval if profile is not None else None
+
+
+def get_prompt_config(corridor: str) -> Optional[CorridorPromptConfig]:
+    """Convenience accessor for consumer #2 (immigration_answer_engine)."""
+    profile = load_corridor_profile(corridor)
+    return profile.prompt if profile is not None else None
 
 
 def list_corridors() -> List[str]:
