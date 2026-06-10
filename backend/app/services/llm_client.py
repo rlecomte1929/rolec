@@ -277,6 +277,14 @@ async def claude_complete(
         "input_schema": schema or {"type": "object", "properties": {}, "additionalProperties": True},
     }
 
+    # W3-5: prompt-cache the (static, reused) system prompt so repeated calls read
+    # it from cache instead of re-billing input tokens. Harmless below min size.
+    system_param = (
+        [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+        if system
+        else system
+    )
+
     last_exc: Exception = RuntimeError("No attempts were made")
     for attempt in range(max_retries + 1):
         t0 = time.monotonic()
@@ -285,7 +293,7 @@ async def claude_complete(
                 asyncio.to_thread(
                     sync_client.messages.create,
                     model=model,
-                    system=system,
+                    system=system_param,
                     messages=[{"role": "user", "content": user}],
                     max_tokens=4096,
                     tools=[tool_def],
