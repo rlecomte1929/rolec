@@ -1,16 +1,17 @@
-"""E-PIPE-5 (v1, deterministic) · Production CanonicalStore + entity-link writer.
+"""E-PIPE-5 · Production CanonicalStore + entity-link writer (full 5-stage resolver).
 
 Implements the C1-07 ``CanonicalStore`` Protocol
 (:mod:`backend.relopass.agents.entity_resolution`) over the live ``rce.*`` schema so
 extracted persons resolve to canonical PERSON entities and ``rce.entity_links`` rows
 get written — the data the C2-09 nationality / child-parent checks join on.
 
-Scope (v1 — deterministic): implements the cheap, auditable stages of the 5-stage
-resolver — Stage 1 MRZ doc-number, Stage 2 surname/dob/nationality block, Stage 5
-create-new. ``ann_search`` returns ``[]`` (Stage 3 pgvector ANN is deferred to
-E-PIPE-5b, which adds OpenAI 768-dim embeddings); with no ANN hits the resolver never
-reaches Stage 4 (LLM), so no vendor calls and no migration are needed here
-(pgvector + the nullable ``vector(768)`` embedding column already exist on prod).
+Stages: 1 MRZ doc-number, 2 surname/dob/nationality block, **3 pgvector cosine ANN**
+(E-PIPE-5b), **4 LLM fuzzy-match** (E-PIPE-5b, cosine band 0.80–0.92), 5 create-new.
+The fuzzy stages (3–4) catch name typos / ICAO transliteration variants so one person
+isn't duplicated across documents; they **degrade to deterministic-only when
+``OPENAI_API_KEY`` is unset** (no embedding → ANN/LLM skipped — see
+``rce_entity_resolution_ai``). No migration: pgvector + the nullable ``vector(768)``
+embedding column already exist on prod.
 
 Case-scoping: ``rce.canonical_entities`` has no ``case_id`` column, so the case is
 stored inside ``canonical_form`` (JSONB) and filtered there — matching
@@ -36,14 +37,6 @@ from backend.relopass.agents.entity_resolution import (
 )
 
 log = logging.getLogger(__name__)
-
-
-class _NoLLMResolver:
-    """v1 has no ANN hits → the resolver never reaches the LLM stage. This guards
-    that invariant: if it is ever called, the v1 assumption was violated."""
-
-    def resolve(self, candidate: ExtractedPerson, top_hits: Sequence[AnnHit]):  # noqa: ANN201
-        raise AssertionError("LLM resolver should not run in deterministic v1 (ann_search returns [])")
 
 
 def _canonical_form(p: "ExtractedPerson | CanonicalPerson", *, doc_numbers: Sequence[str]) -> dict:
@@ -121,9 +114,34 @@ class SupabaseCanonicalStore:
         ).mappings().all()
         return [_row_to_canonical(r["canonical_entity_id"], r["canonical_form"]) for r in rows]
 
-    # ── Stage 3: pgvector ANN — DEFERRED to E-PIPE-5b ────────────────────────
+    # ── Stage 3: pgvector cosine ANN (E-PIPE-5b) ─────────────────────────────
     def ann_search(self, case_id: str, embedding: Sequence[float], top_k: int) -> List[AnnHit]:
-        return []  # no embeddings generated yet → resolver skips ANN + LLM stages
+        if not embedding:
+            return []
+        q = "[" + ",".join(str(float(x)) for x in embedding) + "]"
+        rows = self._conn.execute(
+            text(
+                """
+                SELECT canonical_entity_id, canonical_form,
+                       1 - (embedding <=> CAST(:q AS vector)) AS cosine_sim
+                FROM rce.canonical_entities
+                WHERE entity_type = 'PERSON'
+                  AND canonical_form->>'case_id' = :cid
+                  AND embedding IS NOT NULL
+                ORDER BY embedding <=> CAST(:q AS vector)
+                LIMIT :k
+                """
+            ),
+            {"q": q, "cid": case_id, "k": top_k},
+        ).mappings().all()
+        return [
+            AnnHit(
+                canonical_entity_id=str(r["canonical_entity_id"]),
+                cosine_sim=float(r["cosine_sim"]),
+                canonical=_row_to_canonical(r["canonical_entity_id"], r["canonical_form"]),
+            )
+            for r in rows
+        ]
 
     # ── Human override — DEFERRED (rce.corrections wiring) ───────────────────
     def get_override(self, case_id: str, candidate_signature: str) -> Optional[CanonicalPerson]:
@@ -151,14 +169,23 @@ class SupabaseCanonicalStore:
 
 
 def resolve_and_link(candidate: ExtractedPerson, *, conn: Any) -> LinkDecision:
-    """Resolve one extracted person to a canonical PERSON (deterministic cascade)
+    """Resolve one extracted person to a canonical PERSON (full 5-stage cascade)
     and persist the rce.entity_links row. Returns the LinkDecision.
 
-    Idempotent on (extracted_field_id, canonical_entity_id) when an
-    extracted_field_id is present — re-running the same field is a no-op link.
+    Generates the candidate's 768-dim identity embedding first (E-PIPE-5b) so the
+    pgvector ANN + LLM fuzzy stages can run; when OPENAI_API_KEY is unset the
+    embedding is None and the cascade stays deterministic. Idempotent on
+    (extracted_field_id, canonical_entity_id) when an extracted_field_id is present.
     """
+    from .rce_entity_resolution_ai import OpenAILLMResolver, embed_person_768
+
+    if candidate.embedding is None:
+        embedding = embed_person_768(candidate)
+        if embedding is not None:
+            candidate = candidate.model_copy(update={"embedding": embedding})
+
     store = SupabaseCanonicalStore(conn)
-    decision = resolve_person_entity(candidate, store=store, llm=_NoLLMResolver())
+    decision = resolve_person_entity(candidate, store=store, llm=OpenAILLMResolver())
 
     if candidate.extracted_field_id:
         conn.execute(

@@ -67,8 +67,26 @@ def test_canonical_form_roundtrips_through_row_to_canonical():
 # ── store methods ────────────────────────────────────────────────────────────
 
 
-def test_ann_search_returns_empty_v1():
-    assert SupabaseCanonicalStore(_FakeConn()).ann_search("case-1", [0.1] * 768, 5) == []
+def test_ann_search_empty_embedding_short_circuits():
+    conn = _FakeConn()
+    assert SupabaseCanonicalStore(conn).ann_search("case-1", [], 5) == []
+    assert conn.calls == []  # no DB hit when there's no embedding
+
+
+def test_ann_search_maps_rows_with_cosine():
+    form = _canonical_form(_person(), doc_numbers=[])
+    conn = _FakeConn([_FakeResult([
+        {"canonical_entity_id": "ce-7", "canonical_form": form, "cosine_sim": 0.94},
+    ])])
+    hits = SupabaseCanonicalStore(conn).ann_search("case-1", [0.1] * 768, 5)
+    assert len(hits) == 1
+    assert hits[0].canonical_entity_id == "ce-7"
+    assert hits[0].cosine_sim == 0.94
+    # the query bound the vector literal + case id
+    sql, params = conn.calls[-1]
+    assert "embedding <=>" in sql
+    assert params["cid"] == "case-1"
+    assert params["q"].startswith("[")
 
 
 def test_get_override_returns_none_without_sql():
@@ -98,10 +116,15 @@ def test_create_new_builds_canonical_and_inserts_form():
 
 # ── resolve_and_link wiring (resolver cascade → create_new → link) ─────────────
 
+# resolve_and_link generates an embedding first (E-PIPE-5b). Stub it to None so the
+# cascade stays deterministic and no OpenAI call is attempted (env-independent).
+import backend.app.services.rce_entity_resolution_ai as _ai
 
-def test_resolve_and_link_new_person_creates_and_links():
-    # No doc number → resolver: get_override(no SQL) → block_hits(empty) →
-    # ann_search([]) → create_new(INSERT). Then resolve_and_link writes the link.
+
+def test_resolve_and_link_new_person_creates_and_links(monkeypatch):
+    monkeypatch.setattr(_ai, "embed_person_768", lambda person: None)
+    # No doc number, no embedding → resolver: get_override(no SQL) → block_hits(empty)
+    # → (ANN skipped, embedding None) → create_new(INSERT). Then writes the link.
     conn = _FakeConn([
         _FakeResult([]),      # block_hits → no match
         _FakeResult(),        # create_new INSERT
@@ -116,7 +139,26 @@ def test_resolve_and_link_new_person_creates_and_links():
     assert link_params["method"]  # DETERMINISTIC
 
 
-def test_resolve_and_link_skips_link_without_extracted_field_id():
+def test_resolve_and_link_skips_link_without_extracted_field_id(monkeypatch):
+    monkeypatch.setattr(_ai, "embed_person_768", lambda person: None)
     conn = _FakeConn([_FakeResult([]), _FakeResult()])  # block_hits empty, create_new
     resolve_and_link(_person(extracted_field_id=None), conn=conn)
     assert not any("entity_links" in sql for sql, _ in conn.calls)
+
+
+def test_resolve_and_link_ann_high_gate_links_to_existing(monkeypatch):
+    # Embedding present + an ANN hit >= 0.92 → resolver links to the existing
+    # canonical (Stage 3 ANN_HIGH), no create_new.
+    monkeypatch.setattr(_ai, "embed_person_768", lambda person: [0.2] * 768)
+    form = _canonical_form(_person(), doc_numbers=[])
+    conn = _FakeConn([
+        _FakeResult([]),  # block_hits → no exact block match
+        _FakeResult([{"canonical_entity_id": "ce-existing", "canonical_form": form, "cosine_sim": 0.97}]),  # ann_search
+        _FakeResult(),    # entity_links INSERT
+    ])
+    decision = resolve_and_link(_person(extracted_field_id="22222222-2222-2222-2222-222222222222"), conn=conn)
+    assert decision.canonical_entity_id == "ce-existing"
+    # no create_new INSERT into canonical_entities
+    assert not any("INSERT INTO rce.canonical_entities" in sql for sql, _ in conn.calls)
+    link_params = conn.calls[-1][1]
+    assert link_params["ceid"] == "ce-existing"
