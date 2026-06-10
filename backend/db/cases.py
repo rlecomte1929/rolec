@@ -275,7 +275,12 @@ class CasesMixin:
             sql = (
                 "UPDATE case_assignments "
                 "SET intake_draft = CAST(:draft AS jsonb), "
-                "    intake_updated_at = :now, updated_at = :now "
+                # intake_updated_at / updated_at are timestamptz in prod; the
+                # bound :now is ISO text, and Postgres has no implicit text→
+                # timestamptz cast for a parameter (it 500s the autosave). Cast
+                # explicitly. SQLite (TEXT columns) keeps the un-cast branch above.
+                "    intake_updated_at = CAST(:now AS timestamptz), "
+                "    updated_at = CAST(:now AS timestamptz) "
                 "WHERE id = :id AND employee_user_id = :uid "
                 "RETURNING intake_updated_at"
             )
