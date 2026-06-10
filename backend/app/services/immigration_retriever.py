@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Protocol, Sequence
 from sqlalchemy import text
 
 from ...database import db
+from . import corridor_registry
 from . import source_reliability_config as _rel_cfg
 from .policy_assistant_embedder import Embedder, cosine_similarity, get_default_embedder
 
@@ -133,6 +134,15 @@ def retrieve_for_profile(
     # the arrow form ('FR→NO'). Normalize for the query.
     corridor_db = corridor.replace("→", "_")
     query = _build_query(profile, classification, corridor)
+
+    # I-3 Stage 1: pull retrieval scope from the corridor registry. Fallback-safe
+    # — only fills params the caller left unset; no profile → unchanged defaults.
+    _scope = corridor_registry.get_retrieval_scope(corridor_db)
+    if _scope is not None:
+        if trust_tiers is None and _scope.trust_tiers is not None:
+            trust_tiers = _scope.trust_tiers
+        if min_similarity_score is None and _scope.min_similarity is not None:
+            min_similarity_score = _scope.min_similarity
 
     embedder = embedder or get_default_embedder()
     q_emb = embedder.embed(query)

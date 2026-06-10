@@ -2,10 +2,12 @@
  * [P1-6] Employee Roadmap page — /employee/case/:caseId/roadmap
  * Wraps the platform-v2 RoadmapScreen with live CaseForm doc counts per step.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import RoadmapScreen from '../../features/platform-v2/roadmap/RoadmapScreen';
+import { useTextSelection } from '../../hooks/useTextSelection';
+import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
@@ -83,6 +85,9 @@ function adaptTracks(v2Tracks: RoadmapV2Track[]): (RoadmapTrack & { steps: Roadm
 export const EmployeeCaseRoadmapPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
+  // I-6: select a term inside the roadmap → "explain this term" popover.
+  const selectionRef = useRef<HTMLDivElement>(null);
+  const { selection, clear } = useTextSelection(selectionRef);
   const [tracks, setTracks] = useState<(RoadmapTrack & { steps: RoadmapStep[] })[]>([]);
   const [successScore, setSuccessScore] = useState<SuccessProbabilityResult | null>(null);
   const [docChips, setDocChips] = useState<Record<string, { count: number; worstStatus: string | null }>>({});
@@ -146,12 +151,18 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   return (
     <AppShell>
-      <RoadmapScreen
-        tracks={tracks}
-        docChips={docChips}
-        onStepDocChipClick={handleDocChipClick}
-        successScore={successScore}
-      />
+      <div ref={selectionRef}>
+        <RoadmapScreen
+          tracks={tracks}
+          docChips={docChips}
+          onStepDocChipClick={handleDocChipClick}
+          successScore={successScore}
+          caseId={caseId}
+        />
+      </div>
+      {selection && (
+        <ExplainTermPopover selection={selection} assignmentId={caseId ?? ''} onClose={clear} />
+      )}
     </AppShell>
   );
 };

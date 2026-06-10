@@ -92,7 +92,10 @@ def store_immigration_document(
     # E-PIPE-1: bridge the upload into the rce case engine (rce.documents) so the
     # extraction pipeline has a document to process. Fail-soft + no-ops when the
     # case isn't in rce.cases yet, so it never affects the immigration upload.
-    bridge_case_document_to_rce(
+    # E-PIPE-7: capture the rce.documents id so the router can trigger the rce
+    # extraction pipeline (process_rce_document) in the background. None when the
+    # bridge skipped (case not in rce.cases) → no pipeline trigger.
+    rce_document_id = bridge_case_document_to_rce(
         case_id=case_id,
         content=content,
         mime_type=mime_type,
@@ -101,4 +104,9 @@ def store_immigration_document(
         uploaded_by=uploaded_by,
     )
 
-    return {"document_id": doc_id, "storage_path": storage_path, "ocr_status": "pending"}
+    return {
+        "document_id": doc_id,
+        "storage_path": storage_path,
+        "ocr_status": "pending",
+        "rce_document_id": rce_document_id,
+    }

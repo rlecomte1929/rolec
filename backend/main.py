@@ -130,6 +130,7 @@ from .app.services.events_tracker import track as track_event  # FOUNDATION-1C
 from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router  # noqa: F401 — kept for backwards-compat re-exports; router itself no longer wired (AUDIT-B9-cases-6)
 from .app.routers import cases_read as cases_read_router
+from .app.routers import case_integrations as case_integrations_router
 from .app.routers import cases_write as cases_write_router
 from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
@@ -717,6 +718,7 @@ app.add_middleware(QueryCountMiddleware, threshold=10)
 app.include_router(auth_router.router)  # [AUDIT-C2.3] re-added — auth routes must be in deployed main.py
 app.include_router(compat_router.router)
 app.include_router(cases_read_router.router)  # [AUDIT-B9-cases-6] split 1/3 — 20 GET handlers (formerly cases.router)
+app.include_router(case_integrations_router.router)  # I-4 — email plan + calendar .ics
 app.include_router(cases_write_router.router)  # [AUDIT-B9-cases-6] split 2/3 — 14 POST/PATCH/PUT mutation handlers
 app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 — 1 DELETE (delete_dossier) — re-scoped from empty admin bucket
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL

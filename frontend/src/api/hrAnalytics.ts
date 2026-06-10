@@ -65,3 +65,31 @@ export async function getPolicyComplianceMatrix(params?: {
     `/api/hr/policy-compliance-matrix${query ? `?${query}` : ''}`,
   );
 }
+
+/**
+ * W2-5: Policy Assistant answer-provenance rollup for the caller's company.
+ *
+ * grounded_rate is over answered questions (grounding only runs on real
+ * answers); refusal_rate is over all questions; unverified_count is answers
+ * where the grounding verifier failed open. Requires admin or HR role.
+ */
+export interface AnswerProvenanceResponse {
+  total: number;
+  answers: number;
+  refusals: number;
+  grounded: number;
+  unverified_count: number;
+  /** 0–1 share of all questions that were refused */
+  refusal_rate: number;
+  /** 0–1 share of answered questions verified as grounded */
+  grounded_rate: number;
+  window_days: number;
+}
+
+export async function getAnswerProvenance(
+  windowDays = 30,
+): Promise<AnswerProvenanceResponse> {
+  return apiGet<AnswerProvenanceResponse>(
+    `/api/hr/answer-provenance?window_days=${windowDays}`,
+  );
+}

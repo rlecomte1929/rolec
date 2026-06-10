@@ -27,6 +27,7 @@ from ..auth_deps import get_current_user
 from ...database import db
 from ..services.document_extraction_queue import run_extraction
 from ..services.document_upload_service import store_immigration_document
+from ..services.rce_pipeline_worker import process_rce_document
 
 router = APIRouter(prefix="/api/immigration", tags=["immigration-documents"])
 log = logging.getLogger(__name__)
@@ -114,6 +115,12 @@ async def upload_immigration_document(
         mime_type=mime,
         file_name=safe_name,
     )
+    # E-PIPE-7: if the upload was bridged into the rce case engine (E-PIPE-1),
+    # kick the rce extraction pipeline (OCR→extract→resolve→detect) in the
+    # background too. None when the case isn't in rce.cases → no trigger.
+    # process_rce_document is fail-soft and never affects this response.
+    if record.get("rce_document_id"):
+        background_tasks.add_task(process_rce_document, record["rce_document_id"])
     return record
 
 
