@@ -82,13 +82,26 @@ def test_parse_stored_passport_happy_path():
     assert "ERIKSSON" in out.parsed_document.text
 
 
-def test_parse_stored_general_type_is_failsoft_empty(  # Criterion 2 (no general OCR engine yet)
-):
+def test_parse_stored_general_type_uses_mistral_ocr():  # E-PIPE-OCR happy path
+    out = asyncio.run(parse_stored_document(
+        document_id=uuid4(), storage_path="c/marriage.pdf", mime_type="application/pdf",
+        document_type="MARRIAGE_CERT",
+        downloader=lambda path: b"pdf-bytes",
+        general_ocr=lambda content, mime: "Certificate of Marriage\nAnna & Erik",
+    ))
+    assert out.ok is True
+    assert out.ocr_engine == "mistral_ocr"
+    assert "Certificate of Marriage" in out.parsed_document.text
+    assert out.mrz_text is None  # general docs carry no MRZ
+    assert out.document_type == "MARRIAGE_CERT"
+
+
+def test_parse_stored_general_type_no_text_is_failsoft_empty():  # MISTRAL_API_KEY unset / blank doc
     out = asyncio.run(parse_stored_document(
         document_id=uuid4(), storage_path="c/contract.pdf", mime_type="application/pdf",
         document_type="CONTRACT",
         downloader=lambda path: b"never-used",
-        passport_ocr=None,
+        general_ocr=lambda content, mime: "",  # engine disabled → empty
     ))
     # A valid ParsedDocument is still returned (empty), fail-soft, no MRZ.
     assert isinstance(out.parsed_document, ParsedDocument)
@@ -96,6 +109,21 @@ def test_parse_stored_general_type_is_failsoft_empty(  # Criterion 2 (no general
     assert out.mrz_text is None
     assert out.ok is False
     assert out.ocr_engine == "none"
+
+
+def test_parse_stored_general_ocr_failure_is_failsoft():  # Mistral API error → fail-soft
+    def _boom(content, mime):
+        raise RuntimeError("Mistral 503")
+
+    out = asyncio.run(parse_stored_document(
+        document_id=uuid4(), storage_path="c/diploma.pdf", mime_type="application/pdf",
+        document_type="DIPLOMA",
+        downloader=lambda path: b"pdf-bytes",
+        general_ocr=_boom,
+    ))
+    assert out.ok is False
+    assert out.ocr_engine == "none"
+    assert isinstance(out.parsed_document, ParsedDocument)
 
 
 def test_parse_stored_ocr_failure_is_failsoft(  # Criterion 3
