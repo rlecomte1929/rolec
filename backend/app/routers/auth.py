@@ -279,7 +279,10 @@ def register(body: RegisterRequest, request: Request):
         company_id: Optional[str] = None
         company_name = (body.company_name or "").strip()
         if company_name:
-            company_id = db.find_or_create_company_by_name(company_name)
+            # AIQ-829: capture the HR signup's headcount band onto the company.
+            company_id = db.find_or_create_company_by_name(
+                company_name, company_size=(body.company_size or "").strip() or None
+            )
             if company_id:
                 db.set_profile_company(user_id, company_id)
 

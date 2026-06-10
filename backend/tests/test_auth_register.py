@@ -66,7 +66,7 @@ class TestRegisterCompanyLink(unittest.TestCase):
                                     json=_register_body(company_name="Brand New Co"))
 
         self.assertEqual(resp.status_code, 200, resp.text)
-        db.find_or_create_company_by_name.assert_called_once_with("Brand New Co")
+        db.find_or_create_company_by_name.assert_called_once_with("Brand New Co", company_size=None)
         # profile linked to the resolved company id
         args, kwargs = db.set_profile_company.call_args
         self.assertEqual(args[1] if len(args) > 1 else kwargs["company_id"], "company-new-1")
@@ -85,9 +85,23 @@ class TestRegisterCompanyLink(unittest.TestCase):
                                     json=_register_body(company_name="Test company"))
 
         self.assertEqual(resp.status_code, 200, resp.text)
-        db.find_or_create_company_by_name.assert_called_once_with("Test company")
+        db.find_or_create_company_by_name.assert_called_once_with("Test company", company_size=None)
         db.set_profile_company.assert_called_once()
         self.assertEqual(resp.json()["user"]["company"], "existing-test-co")
+
+    # ------------------------------------------------------------------
+    # AIQ-829: HR signup forwards company_size → company create-or-link path
+    # ------------------------------------------------------------------
+    def test_register_hr_forwards_company_size(self):
+        db = _base_db_mock()
+        db.find_or_create_company_by_name.return_value = "company-sized-1"
+        with patch("backend.app.routers.auth.db", db):
+            resp = self.client.post(
+                "/api/auth/register",
+                json=_register_body(company_name="Sized Co", company_size="51-500"),
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        db.find_or_create_company_by_name.assert_called_once_with("Sized Co", company_size="51-500")
 
     # ------------------------------------------------------------------
     # Scenario 3: no company_name → no link attempt (unchanged legacy path)

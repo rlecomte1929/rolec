@@ -201,9 +201,10 @@ class RegisterRequest(BaseModel):
     role: UserRole
     name: Optional[str] = None
     company_name: Optional[str] = None
+    company_size: Optional[str] = None  # AIQ-829 — HR headcount band → companies.size_band
 
     # XSS defence: strip HTML from user-supplied text before storage
-    @field_validator("name", "company_name", mode="before")
+    @field_validator("name", "company_name", "company_size", mode="before")
     @classmethod
     def _sanitize_name(cls, v: Optional[str]) -> Optional[str]:
         return _escape_html(v)
