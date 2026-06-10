@@ -72,6 +72,16 @@ class CorridorSlaConfig:
 
 
 @dataclass(frozen=True)
+class CorridorPathway:
+    """An eligibility Corridor Agent pathway under a corridor (I-3 Stage 5).
+    `file` is resolved relative to the corridor's registry directory and loaded
+    by the dependency-free backend/relopass/corridors loader."""
+
+    id: str
+    file: str
+
+
+@dataclass(frozen=True)
 class CorridorProfile:
     corridor_id: str
     origin_iso: Optional[str] = None
@@ -82,6 +92,7 @@ class CorridorProfile:
     prompt: Optional[CorridorPromptConfig] = None
     intake: Optional[CorridorIntakeConfig] = None
     sla: Optional[CorridorSlaConfig] = None
+    pathways: Tuple[CorridorPathway, ...] = ()
 
 
 def _registry_dir() -> Path:
@@ -158,6 +169,18 @@ def _coerce_sla(raw: Any) -> Optional[CorridorSlaConfig]:
     return CorridorSlaConfig(at_risk_window_days=window, at_risk_pct=pct)
 
 
+def _coerce_pathways(raw: Any) -> Tuple[CorridorPathway, ...]:
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    out = []
+    for item in raw:
+        if isinstance(item, Mapping):
+            pid, pfile = item.get("id"), item.get("file")
+            if pid and str(pid).strip() and pfile and str(pfile).strip():
+                out.append(CorridorPathway(id=str(pid).strip(), file=str(pfile).strip()))
+    return tuple(out)
+
+
 def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
     block = doc.get("corridor") if isinstance(doc.get("corridor"), Mapping) else doc
     aliases_raw = block.get("aliases")
@@ -172,6 +195,7 @@ def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
         prompt=_coerce_prompt(block.get("prompt")),
         intake=_coerce_intake(block.get("intake")),
         sla=_coerce_sla(block.get("sla")),
+        pathways=_coerce_pathways(block.get("pathways")),
     )
 
 
@@ -227,6 +251,28 @@ def get_sla_config(corridor: str) -> Optional[CorridorSlaConfig]:
     """Convenience accessor for consumer #4 (HR command-center timeline SLA)."""
     profile = load_corridor_profile(corridor)
     return profile.sla if profile is not None else None
+
+
+def get_pathways(corridor: str) -> Tuple[CorridorPathway, ...]:
+    """Eligibility pathways declared for a corridor (I-3 Stage 5). Empty when the
+    corridor is unknown or declares none."""
+    profile = load_corridor_profile(corridor)
+    return profile.pathways if profile is not None else ()
+
+
+def get_pathway_file(corridor: str, pathway_id: str) -> Optional[Path]:
+    """Resolve a corridor pathway's spec file to an existing absolute Path, or
+    None. The single source for where an eligibility Corridor Agent file lives;
+    the dependency-free loader then loads it. Never raises."""
+    try:
+        cid = normalize_corridor_id(corridor)
+        for p in get_pathways(cid):
+            if p.id == pathway_id:
+                path = _registry_dir() / cid / p.file
+                return path if path.is_file() else None
+        return None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def get_intake_questions_path(corridor: str) -> Optional[Path]:

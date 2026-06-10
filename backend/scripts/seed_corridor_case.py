@@ -14,6 +14,7 @@ import uuid
 from datetime import date
 from pathlib import Path
 
+from backend.app.services import corridor_registry
 from backend.app.services.corridor_persistence import persist_corridor_case
 from backend.relopass.corridors import load_corridor
 
@@ -21,7 +22,9 @@ from backend.relopass.corridors import load_corridor
 _NS = uuid.uuid5(uuid.NAMESPACE_URL, "https://relopass.com/rce")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CORRIDOR_PATH = REPO_ROOT / "corridors" / "IN_DE_BLUECARD_2026" / "v1.yaml"
+# I-3 Stage 5: resolve the eligibility pathway file via the registry (single
+# source for where corridor pathway specs live) rather than a hardcoded path.
+CORRIDOR_PATH = corridor_registry.get_pathway_file("IN_DE", "BLUECARD_2026")
 
 # Priya Sharma — Bengaluru SWE → Munich Blue Card (Architecture Report §4.1 demo).
 PRIYA_CASE_ID = uuid.uuid5(_NS, "case:IN_DE_BLUECARD_2026:priya_sharma")

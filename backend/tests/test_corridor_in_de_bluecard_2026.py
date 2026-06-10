@@ -36,7 +36,7 @@ from backend.relopass.corridors.loader import _yaml_parse  # noqa: PLC2701 — i
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CORRIDOR_PATH = REPO_ROOT / "corridors" / "IN_DE_BLUECARD_2026" / "v1.yaml"
+CORRIDOR_PATH = REPO_ROOT / "corridors" / "IN_DE" / "pathways" / "BLUECARD_2026" / "v1.yaml"
 
 
 @pytest.fixture(scope="module")
