@@ -16,7 +16,12 @@
 name: RAG eval reports (live)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      hybrid:
+        description: "Run with IMMIGRATION_HYBRID_RETRIEVAL=on (exercises the Postgres FTS path; writes *_hybrid.json so it does not overwrite the vector run)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -55,14 +60,23 @@ jobs:
           fi
 
       - name: Generate eval reports (report-only — no --ci gate)
+        env:
+          # Quoted env (not inlined into run:) per workflow-injection guidance.
+          HYBRID: ${{ github.event.inputs.hybrid }}
         run: |
           set -euo pipefail
           DATE="$(date +%Y%m%d)"
+          SUFFIX=""
+          if [ "${HYBRID:-false}" = "true" ]; then
+            export IMMIGRATION_HYBRID_RETRIEVAL=on
+            SUFFIX="_hybrid"
+            echo "Running eval with IMMIGRATION_HYBRID_RETRIEVAL=on (Postgres FTS path)."
+          fi
           mkdir -p audit/rag_eval
           python backend/scripts/eval_rag_context_precision.py \
-            --out "audit/rag_eval/context_precision_${DATE}.json"
+            --out "audit/rag_eval/context_precision_${DATE}${SUFFIX}.json"
           python backend/scripts/eval_factual_consistency.py \
-            --out "audit/rag_eval/factual_consistency_${DATE}.json"
+            --out "audit/rag_eval/factual_consistency_${DATE}${SUFFIX}.json"
 
       - name: Commit reports if changed
         run: |
