@@ -254,7 +254,8 @@ jobs:
             scripts/tests/test_check_rls_coverage.py \
             backend/tests/test_sla_rules.py \
             backend/tests/test_case_escalation_service.py \
-            backend/tests/test_hr_escalation_router.py
+            backend/tests/test_hr_escalation_router.py \
+            backend/tests/test_i4_case_plan_delivery.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
