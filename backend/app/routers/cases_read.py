@@ -1907,6 +1907,77 @@ def get_dossier_pdf(
 # §5 Shared reads — Budget summary, messages, vendors, budget lines
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Bridge the intake service vocabulary (housing / moving / immigration / …) to the
+# canonical policy_config benefit keys. HR sets caps in the policy_config matrix
+# (surfaced by /api/policy-config/caps via caps_payload); the legacy hr_policies
+# table this endpoint used to read is dead, so caps always came back unset. This
+# map lets each selected intake service roll up the published caps HR actually set.
+_INTAKE_SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
+    "housing": ["host_housing_cap"],
+    "temp_housing": ["temporary_living"],
+    "moving": ["shipment_of_goods", "removal_expenses", "storage"],
+    "immigration": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
+    "schools": ["child_education_support"],
+    "tax": ["tax_equalisation"],
+    "spouse_career": ["spouse_partner_assistance", "dual_career_support"],
+    "language": ["settling_in_services"],
+}
+
+
+def _budget_categories_from_policy_config(
+    company_id: str,
+    selected_services: List[str],
+    assignment_type: Optional[str],
+    family_status: Optional[str],
+) -> List[Dict[str, Any]]:
+    """Build the per-service budget rows from the company's published policy_config
+    caps. Each intake service sums the currency caps of its mapped benefit keys.
+    Falls back to ``no_cap`` rows when the company has no published config (or no
+    cap is set for that service)."""
+    services = selected_services or ["housing", "moving", "immigration"]
+
+    caps_by_key: Dict[str, Dict[str, Any]] = {}
+    if company_id:
+        try:
+            from ..services.policy_config_matrix_service import PolicyConfigMatrixService
+            svc = PolicyConfigMatrixService(main_db)
+            bundle = svc.caps_payload(
+                company_id,
+                assignment_type=assignment_type,
+                family_status=family_status,
+                benefit_keys=None,
+            )
+            caps_by_key = {
+                str(c.get("benefit_key")): c for c in (bundle.get("caps") or [])
+            }
+        except Exception:
+            logger.exception("budget-summary: policy_config caps read failed company=%s", company_id)
+
+    from ..services.policy_config_cap_compare import NORMALIZED_CURRENCY_AMOUNT
+
+    categories: List[Dict[str, Any]] = []
+    for svc_name in services:
+        total: Optional[float] = None
+        currency = "EUR"
+        for key in _INTAKE_SERVICE_BENEFIT_KEYS.get(svc_name, []):
+            cap = caps_by_key.get(key)
+            if (
+                cap
+                and cap.get("normalized_cap_type") == NORMALIZED_CURRENCY_AMOUNT
+                and cap.get("normalized_amount") is not None
+            ):
+                total = (total or 0.0) + float(cap["normalized_amount"])
+                currency = cap.get("currency_code") or currency
+        categories.append({
+            "name": svc_name,
+            "cap_amount": total,
+            "cap_currency": currency,
+            "estimated_amount": None,
+            "status": "within_budget" if total is not None else "no_cap",
+        })
+    return categories
+
+
 @router.get("/{case_id}/budget-summary")
 def get_budget_summary(
     case_id: str,
@@ -1924,10 +1995,28 @@ def get_budget_summary(
     """
     _assert_case_access(user, case_id)
 
-    # Resolve company — hr_users-first so legacy/text HR ids (NULL profiles.company_id
-    # but a valid hr_users row) still get their published policy's budget caps.
-    uid = user.get("id")
-    company_id: str = (main_db.get_hr_company_id(uid) if uid else None) or (main_db.get_profile_record(uid) or {}).get("company_id") or user.get("company") or ""
+    # Resolve company + employee context from the CASE itself — caps belong to the
+    # company that owns this case, and the employee's assignment_type / family_status
+    # determine which targeted caps apply. Mirrors the case_id branch of
+    # _policy_matrix_resolve_company_caps in the policy_config router.
+    company_id: str = ""
+    assignment_type: Optional[str] = None
+    family_status: Optional[str] = None
+    try:
+        assignment = main_db.get_assignment_by_case_id(case_id)
+        if assignment:
+            assignment_type = assignment.get("assignment_type")
+            family_status = assignment.get("family_status")
+            aid = assignment.get("id")
+            if aid:
+                company_id = main_db.get_company_id_for_assignment_id(str(aid)) or ""
+    except Exception:
+        logger.exception("budget-summary: company/context resolve failed case=%s", case_id)
+
+    # Fall back to caller-based resolution (legacy HR text ids / profile / token claim).
+    if not company_id:
+        uid = user.get("id")
+        company_id = (main_db.get_hr_company_id(uid) if uid else None) or (main_db.get_profile_record(uid) or {}).get("company_id") or user.get("company") or ""
 
     # Pull selected services from the case draft_json
     selected_services: List[str] = []
@@ -1940,45 +2029,9 @@ def get_budget_summary(
     except Exception:
         pass
 
-    # Pull published HR policy budget caps
-    categories: List[Dict[str, Any]] = []
-    if company_id:
-        try:
-            policies = main_db.list_hr_policies_by_company(company_id)
-            published = next(
-                (p for p in policies if (p.get("status") or "").lower() == "published"),
-                None,
-            )
-            if published:
-                policy_data = json.loads(published.get("policy_json") or "{}")
-                # Try common key variants for budget caps
-                caps = (
-                    policy_data.get("budget_caps")
-                    or policy_data.get("categories")
-                    or {}
-                )
-                if isinstance(caps, dict):
-                    for svc, cap in caps.items():
-                        categories.append({
-                            "name": svc,
-                            "cap_amount": cap.get("amount") if isinstance(cap, dict) else cap,
-                            "cap_currency": (cap.get("currency", "EUR") if isinstance(cap, dict) else "EUR"),
-                            "estimated_amount": None,
-                            "status": "within_budget",
-                        })
-        except Exception:
-            logger.exception("budget-summary: failed to read policy company=%s", company_id)
-
-    # Fall back: return selected services with no_cap when no policy exists
-    if not categories:
-        for svc in (selected_services or ["housing", "moving", "immigration"]):
-            categories.append({
-                "name": svc,
-                "cap_amount": None,
-                "cap_currency": "EUR",
-                "estimated_amount": None,
-                "status": "no_cap",
-            })
+    categories = _budget_categories_from_policy_config(
+        company_id, selected_services, assignment_type, family_status
+    )
 
     return {"case_id": case_id, "categories": categories}
 
