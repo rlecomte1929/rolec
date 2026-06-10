@@ -198,6 +198,7 @@ class TraceSession:
                 "prompt_version_id": self.prompt_version_id,
                 "canary_arm": self.canary_arm,
                 "cited_chunk_ids": self.cited_chunk_ids,
+                **self._hoist_provenance(),
                 **econ,
             }
             # 1. Structured JSON log — always on, zero extra deps.
@@ -208,6 +209,34 @@ class TraceSession:
             _forward_to_langsmith(payload)
         except Exception:
             log.debug("ai_trace flush failed", exc_info=True)
+
+    # W2-5 provenance keys promoted from step payloads onto the trace row so an
+    # HR rollup can query them without JSON-walking steps_json. Both answer
+    # pipelines record these into steps (policy: answer_provenance +
+    # grounding_verification; immigration: grounding_verification), so a single
+    # hoist here covers both surfaces.
+    _PROVENANCE_KEYS = (
+        "answer_kind",
+        "grounding_verdict",
+        "verification_skipped",
+        "grounding_score",
+    )
+
+    def _hoist_provenance(self) -> Dict[str, Any]:
+        """Pull provenance signals out of the recorded steps into top-level keys.
+
+        Last writer wins if two steps carry the same key. Any key never recorded
+        stays absent → the column is left NULL. Best-effort: never raises.
+        """
+        hoisted: Dict[str, Any] = {}
+        try:
+            for step in self._steps:
+                for k in self._PROVENANCE_KEYS:
+                    if k in step.payload and step.payload[k] is not None:
+                        hoisted[k] = step.payload[k]
+        except Exception:
+            log.debug("ai_trace provenance hoist failed", exc_info=True)
+        return hoisted
 
     def _compute_unit_economics(self) -> Dict[str, Any]:
         """Sum tokens, USD cost and estimated CO2e across this trace's llm_call steps.
@@ -283,6 +312,10 @@ def _write_to_db(payload: Dict[str, Any], company_id: str) -> None:
                 prompt_version_id=payload.get("prompt_version_id"),
                 canary_arm=payload.get("canary_arm"),
                 cited_chunk_ids=payload.get("cited_chunk_ids"),
+                answer_kind=payload.get("answer_kind"),
+                grounding_verdict=payload.get("grounding_verdict"),
+                verification_skipped=payload.get("verification_skipped"),
+                grounding_score=payload.get("grounding_score"),
             )
     except Exception:
         log.debug("ai_trace db write failed", exc_info=True)
