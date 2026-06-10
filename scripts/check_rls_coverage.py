@@ -3,9 +3,11 @@
 RLS coverage check — AUDIT-A3 (audit/02-expert-security.md SEC-2).
 
 Joins `pg_tables` × `pg_policies` against the live Supabase Postgres DB and
-lists every table in the `public` schema with zero RLS policies. Compares the
-result against `supabase/rls_allowlist.txt` (one tablename per line, comments
-starting with `#`).
+lists every table in the audited schemas (`public` and `rce`) with zero RLS
+policies. Compares the result against `supabase/rls_allowlist.txt` (one name per
+line, comments starting with `#`). `public` tables are listed bare; non-public
+schemas are qualified as `schema.table` (e.g. `rce.foo`), so an rce allowlist
+entry would read `rce.foo`. `rce` needs 0 entries today (29/29 tables covered).
 
 Exit codes:
   0 — all policy-less tables are on the allowlist (or there are none)
@@ -33,19 +35,31 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ALLOWLIST_FILE = REPO_ROOT / "supabase" / "rls_allowlist.txt"
 
-# Audit query: list every table in `public` schema with zero policies.
-# pg_policies.tablename matches pg_tables.tablename for the same schema.
+# Schemas audited for RLS coverage. `public` is exposed via PostgREST + the anon
+# key; `rce` is service-role-only today but a future policy-less rce table should
+# still fail CI (SEC-RLSh / AIQ-950).
+AUDITED_SCHEMAS = ("public", "rce")
+
+# Audit query: list every (schema, table) in the audited schemas with zero
+# policies. pg_policies.(schemaname, tablename) matches pg_tables for the same row.
 AUDIT_SQL = """
-SELECT t.tablename
+SELECT t.schemaname, t.tablename
 FROM pg_tables t
 LEFT JOIN pg_policies p
        ON p.schemaname = t.schemaname
       AND p.tablename  = t.tablename
-WHERE t.schemaname = 'public'
-GROUP BY t.tablename
+WHERE t.schemaname = ANY(%s)
+GROUP BY t.schemaname, t.tablename
 HAVING COUNT(p.policyname) = 0
-ORDER BY t.tablename;
+ORDER BY t.schemaname, t.tablename;
 """
+
+
+def qualify_table(schemaname: str, tablename: str) -> str:
+    """Display/allowlist name for a policy-less table. `public` tables stay BARE
+    so the existing public allowlist and its behaviour are unchanged; non-public
+    schemas are qualified as ``schema.table`` (e.g. ``rce.foo``)."""
+    return tablename if schemaname == "public" else f"{schemaname}.{tablename}"
 
 
 def load_allowlist(path: Path) -> set[str]:
@@ -109,12 +123,12 @@ def query_policy_less_tables(db_url: str) -> list[str]:
 
     try:
         with conn.cursor() as cur:
-            cur.execute(AUDIT_SQL)
+            cur.execute(AUDIT_SQL, (list(AUDITED_SCHEMAS),))
             rows = cur.fetchall()
     finally:
         conn.close()
 
-    return [r[0] for r in rows]
+    return [qualify_table(schemaname, tablename) for schemaname, tablename in rows]
 
 
 def write_allowlist(path: Path, tables: Iterable[str]) -> None:
@@ -199,7 +213,7 @@ def main() -> int:
             "pass": len(missing) == 0,
         }, indent=2))
     else:
-        print(f"[rls-coverage] policy-less tables in public schema: {len(policy_less)}")
+        print(f"[rls-coverage] policy-less tables in {'+'.join(AUDITED_SCHEMAS)} schemas: {len(policy_less)}")
         print(f"[rls-coverage] allowlist entries: {len(allowlist)}")
         if missing:
             print(f"\n[rls-coverage] FAIL — {len(missing)} tables have no policy and are NOT on the allowlist:")
