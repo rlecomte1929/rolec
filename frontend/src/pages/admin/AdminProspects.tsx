@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { AdminLayout } from './AdminLayout';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
+import { RefreshButton } from '../../components/RefreshButton';
 import {
   adminProspectsAPI,
   API_BASE_URL,
@@ -374,9 +375,7 @@ export const AdminProspects: React.FC = () => {
                   : `Re-enrich ${failedCount} failed`}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              {loading ? 'Loading…' : 'Refresh'}
-            </Button>
+            <RefreshButton onClick={load} loading={loading} label="Refresh" />
             <Button variant="secondary" size="sm" onClick={exportApproved}>
               Export approved CSV
             </Button>

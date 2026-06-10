@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/antigravity';
+import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../features/services/ServicesFlowContext';
@@ -812,9 +813,7 @@ export const EmployeeJourney: React.FC = () => {
             <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking…">
               Link case
             </LoadingButton>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Refresh page
-            </Button>
+            <RefreshButton onClick={() => window.location.reload()} label="Refresh page" />
           </div>
         </Card>
       ) : null}
@@ -862,9 +861,7 @@ export const EmployeeJourney: React.FC = () => {
                 <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking…">
                   Link case
                 </LoadingButton>
-                <Button variant="outline" onClick={() => void refetchAssignment()}>
-                  Refresh assignments
-                </Button>
+                <RefreshButton onClick={() => void refetchAssignment()} label="Refresh assignments" />
               </div>
             </div>
           ) : null}

@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../components/antigravity';
+import { RefreshButton } from '../components/RefreshButton';
 import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
@@ -296,7 +297,7 @@ export const ProvidersPage: React.FC = () => {
             <Button onClick={() => navigate(buildRoute('employeeJourney'))}>
               Start relocation setup
             </Button>
-            <Button variant="outline" onClick={() => refetch()}>Refresh assignment</Button>
+            <RefreshButton onClick={() => refetch()} label="Refresh assignment" />
             <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
               Back to Dashboard
             </Button>
