@@ -18,7 +18,7 @@ from backend.relopass.corridors import load_corridor
 from backend.relopass.corridors.scheduler import compute_deadlines, schedule_steps
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CORRIDOR_PATH = REPO_ROOT / "corridors" / "IN_DE_BLUECARD_2026" / "v1.yaml"
+CORRIDOR_PATH = REPO_ROOT / "corridors" / "IN_DE" / "pathways" / "BLUECARD_2026" / "v1.yaml"
 ARRIVAL = date(2026, 9, 1)
 
 

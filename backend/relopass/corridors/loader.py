@@ -1,8 +1,10 @@
 """Corridor YAML loader and structural validator (C1-09).
 
-Loads a corridor agent config file (e.g. ``corridors/IN_DE_BLUECARD_2026/v1.yaml``)
-into a typed dataclass tree. Catches malformed corridor files at module-load
-time instead of inside a long-running pipeline.
+Loads a corridor agent config file (e.g.
+``corridors/IN_DE/pathways/BLUECARD_2026/v1.yaml``) into a typed dataclass tree.
+Catches malformed corridor files at module-load time instead of inside a
+long-running pipeline. The file's location is resolved via the corridor registry
+(``corridor_registry.get_pathway_file``); this loader stays path-only + app-free.
 
 The evaluator that runs a Case against a loaded :class:`CorridorAgent` lives
 in C1-05 (the Extraction Agent / Corridor runtime). When that lands, the
@@ -11,7 +13,7 @@ public API will be::
     from backend.relopass.corridors import load_corridor
     from backend.relopass.agents.corridor_runtime import evaluate
 
-    corridor = load_corridor("corridors/IN_DE_BLUECARD_2026/v1.yaml")
+    corridor = load_corridor("corridors/IN_DE/pathways/BLUECARD_2026/v1.yaml")
     result = evaluate(corridor, case)
     # result.verdict ∈ {ELIGIBLE, ALTERNATE_PATHWAY, NOT_ELIGIBLE}
     # result.citations is List[RuleCitation]

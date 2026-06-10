@@ -1,0 +1,24 @@
+# Corridor registry profile — India → Germany (I-3 Stage 5).
+#
+# The capstone of the corridor-registry unification: the eligibility "Corridor
+# Agent" pathway spec (formerly corridors/IN_DE_BLUECARD_2026/v1.yaml) now lives
+# under THIS corridor identity, and the registry is the single source for where a
+# pathway's file is. The pathway file's internal corridor_id stays
+# "IN_DE_BLUECARD_2026" (it keys rce.* rows) — only its location moved.
+#
+# Cross-cutting blocks (retrieval / prompt / intake / sla) are omitted here →
+# IN_DE falls back to the module defaults, exactly like an unconfigured corridor.
+
+corridor:
+  id: "IN_DE"
+  origin_iso: "IN"
+  destination_iso: "DE"
+  display_name: "India → Germany"
+
+  # I-3 Stage 5: eligibility Corridor Agent pathways. Each entry maps a pathway id
+  # to its spec file (resolved relative to this corridor directory). Loaded by the
+  # dependency-free backend/relopass/corridors loader via the registry's
+  # get_pathway_file() accessor.
+  pathways:
+    - id: "BLUECARD_2026"
+      file: "pathways/BLUECARD_2026/v1.yaml"
