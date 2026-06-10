@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
@@ -10,6 +9,8 @@ import { ROUTE_DEFS } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
 import { MultiChip } from './MultiChip';
+import { PrivacyNotice } from '../../privacy/PrivacyNotice';
+import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1523,16 +1524,15 @@ export function EmployeeIntakePage() {
                   <BudgetSummaryPanel caseId={caseIdRef.current} services={data.services} />
                 )}
                 <CaseMessagesPanel caseId={caseIdRef.current} />
-                <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
-                  <Checkbox checked={data.consent} id="consent-cb"
-                    onChange={(e) => setField('consent', e.target.checked)}
-                    className="mt-0.5 accent-accent-600" />
-                  <label htmlFor="consent-cb" className="cursor-pointer">
-                    <div className="text-sm font-semibold text-gray-900">I agree to ReloPass storing this information to generate my relocation roadmap.</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      Your personal data is processed in accordance with our Privacy policy and Terms of service. You can request export or deletion any time from your profile.
-                    </div>
-                  </label>
+                {/* PRIV-005 / AIQ-473 — Art. 13 notice at the point of collection.
+                    Acknowledging records a privacy_consents row and unblocks submit. */}
+                <div className="mt-5">
+                  <PrivacyNotice
+                    noticeVersion={PRIVACY_NOTICE_VERSION}
+                    context="onboarding"
+                    checked={data.consent}
+                    onChange={(v) => setField('consent', v)}
+                  />
                 </div>
               </>
             )}
