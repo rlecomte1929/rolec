@@ -1336,6 +1336,18 @@ async def get_current_user(
         ),
     )
 
+    # W0-2: resolve admin identity so this (legacy/monolith) get_current_user
+    # matches app/auth_deps.get_current_user. Without this, require_admin /
+    # require_role below silently 403 admins who are resolved via the allowlist
+    # or profiles.role rather than a role claim on the token. Run the DB-touching
+    # check in a thread to keep the event loop unblocked.
+    is_admin = await loop.run_in_executor(None, _is_admin_user, user)
+    if is_admin:
+        user["role"] = UserRole.ADMIN.value
+        user["is_admin"] = True
+    else:
+        user["is_admin"] = False
+
     request.state.user_id = user["id"]
     return user
 
