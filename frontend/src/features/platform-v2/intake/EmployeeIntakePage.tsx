@@ -1514,7 +1514,7 @@ export function EmployeeIntakePage() {
                   </div>
                 )}
                 {data.services.length > 0 && (
-                  <QuoteRequestPanel caseId={caseIdRef.current} services={data.services} />
+                  <QuoteRequestPanel caseId={assignmentId ?? ''} services={data.services} />
                 )}
               </>
             )}
@@ -1525,9 +1525,9 @@ export function EmployeeIntakePage() {
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
                 <ReviewSummary data={data} goTo={goTo} />
                 {data.services.length > 0 && (
-                  <BudgetSummaryPanel caseId={caseIdRef.current} services={data.services} />
+                  <BudgetSummaryPanel caseId={assignmentId ?? ''} services={data.services} />
                 )}
-                <CaseMessagesPanel caseId={caseIdRef.current} />
+                <CaseMessagesPanel caseId={assignmentId ?? ''} />
                 {/* PRIV-005 / AIQ-473 — Art. 13 notice at the point of collection.
                     Acknowledging records a privacy_consents row and unblocks submit. */}
                 <div className="mt-5">
