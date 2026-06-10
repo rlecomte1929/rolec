@@ -6,6 +6,7 @@ import { getAuthItem } from '../utils/demo';
 import { Card } from '../components/antigravity';
 import { KPICard } from '../components/command-center/KPICard';
 import { RiskBadge } from '../components/command-center/RiskBadge';
+import { SLABadge } from '../components/command-center/SLABadge';
 import { hrAPI } from '../api/client';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { HrExceptionsQueueCard } from '../features/exceptions/HrExceptionsQueueCard';
@@ -21,6 +22,8 @@ type CaseRow = {
   budgetLimit?: number | null;
   budgetEstimated?: number | null;
   nextDeadline?: string | null;
+  slaStatus?: 'on_track' | 'at_risk' | 'overdue' | string | null;
+  daysUntilMove?: number | null;
 };
 
 export const HrCommandCenter: React.FC = () => {
@@ -153,6 +156,7 @@ export const HrCommandCenter: React.FC = () => {
                     <th className="py-3 pr-4 font-medium">Country</th>
                     <th className="py-3 pr-4 font-medium">Status</th>
                     <th className="py-3 pr-4 font-medium">Risk</th>
+                    <th className="py-3 pr-4 font-medium">SLA</th>
                     <th className="py-3 pr-4 font-medium">Tasks Done %</th>
                     <th className="py-3 pr-4 font-medium">Budget</th>
                     <th className="py-3 font-medium">Next Deadline</th>
@@ -172,6 +176,9 @@ export const HrCommandCenter: React.FC = () => {
                       <td className="py-3 pr-4 text-[#4b5563]">{row.status}</td>
                       <td className="py-3 pr-4">
                         <RiskBadge status={row.riskStatus as 'green' | 'yellow' | 'red'} size="sm" />
+                      </td>
+                      <td className="py-3 pr-4">
+                        <SLABadge status={row.slaStatus} daysUntilMove={row.daysUntilMove} size="sm" />
                       </td>
                       <td className="py-3 pr-4 text-[#4b5563]">{row.tasksDonePercent}%</td>
                       <td className="py-3 pr-4 text-[#4b5563]">
