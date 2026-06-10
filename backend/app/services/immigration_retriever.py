@@ -24,7 +24,9 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+import math
+import re
+from typing import Any, Dict, List, Optional, Protocol, Sequence
 
 from sqlalchemy import text
 
@@ -37,6 +39,23 @@ log = logging.getLogger(__name__)
 # N3/AIQ-842 retrieval quality gates.
 _IMMIGRATION_MIN_SIMILARITY = float(os.getenv("IMMIGRATION_MIN_SIMILARITY", "0.25"))
 _TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
+
+# W3-2 hybrid retrieval. When enabled, a BM25/keyword leg (Postgres FTS or, on
+# the sqlite eval/test path, an in-Python BM25) is fused with the pgvector cosine
+# leg via Reciprocal Rank Fusion. Ships OFF (vector-only, byte-identical to the
+# prior behaviour); flip the env flag on after the evals confirm no regression —
+# mirrors the dormant IMMIGRATION_RELIABILITY_WEIGHT rollout pattern.
+_RRF_C = int(os.getenv("IMMIGRATION_RRF_C", "60"))  # RRF damping constant
+_BM25_K1 = 1.5
+_BM25_B = 0.75
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _hybrid_enabled() -> bool:
+    """Read the flag at call time so tests can toggle it via monkeypatch/env."""
+    return os.getenv("IMMIGRATION_HYBRID_RETRIEVAL", "").strip().lower() in (
+        "1", "true", "on", "yes",
+    )
 
 # Synthetic corpus owner: immigration rules are corridor-scoped, not
 # company-scoped, but policy_chunk_retriever requires a company_id. The
@@ -122,15 +141,22 @@ def retrieve_for_profile(
     # Over-fetch a little so the tier/freshness re-rank can promote within-floor chunks.
     fetch_k = min(50, max(k, k * 3))
 
-    if engine.dialect.name == "sqlite":
-        raw = _retrieve_corpus_sqlite(engine, corridor_db, q_emb, fetch_k, trust_tiers=trust_tiers, include_embedding=include_embedding)
-    else:
-        raw = _retrieve_corpus_postgres(engine, corridor_db, q_emb, fetch_k, trust_tiers=trust_tiers, include_embedding=include_embedding)
+    # W3-2: hybrid (vector + BM25 keyword, RRF-fused) behind a flag; default OFF
+    # → VectorRetriever, byte-identical to the prior path. When fused, the RRF
+    # score is the relevance base the quality gates scale.
+    hybrid = _hybrid_enabled()
+    retriever: RetrieverProtocol = HybridRetriever() if hybrid else VectorRetriever()
+    raw = retriever.candidates(
+        engine=engine, corridor_db=corridor_db, q_emb=q_emb, query=query,
+        fetch_k=fetch_k, trust_tiers=trust_tiers, include_embedding=include_embedding,
+    )
 
     # Corridor hard-filter (belt-and-suspenders; the query already scopes corridor).
     raw = [c for c in raw if c.get("corridor") == corridor_db]
     min_sim = _IMMIGRATION_MIN_SIMILARITY if min_similarity_score is None else min_similarity_score
-    result = _apply_quality_gates(raw, min_similarity=min_sim, top_k=k)
+    result = _apply_quality_gates(
+        raw, min_similarity=min_sim, top_k=k, rank_base=("rrf_score" if hybrid else None),
+    )
 
     log.info(
         "immigration_retriever corridor=%s pathway=%s returned=%d min_sim=%.2f",
@@ -206,9 +232,17 @@ def _days_old(fetched_at: Any, now: datetime) -> int:
 
 
 def _apply_quality_gates(
-    chunks: List[Dict[str, Any]], *, min_similarity: float, top_k: int, now: Optional[datetime] = None
+    chunks: List[Dict[str, Any]], *, min_similarity: float, top_k: int,
+    now: Optional[datetime] = None, rank_base: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Similarity floor + trust_tier boost + freshness decay; re-sort by adjusted_score."""
+    """Similarity floor + trust_tier boost + freshness decay; re-sort by adjusted_score.
+
+    The similarity floor always applies to the cosine `score` (so semantically
+    irrelevant keyword-only matches are still dropped). `rank_base` selects the
+    relevance base the tier/freshness/reliability multipliers scale: None →
+    cosine `score` (vector default, unchanged); a key name (e.g. "rrf_score") →
+    that fused signal (W3-2 hybrid).
+    """
     now = now or datetime.now(timezone.utc)
     out: List[Dict[str, Any]] = []
     for c in chunks:
@@ -226,8 +260,9 @@ def _apply_quality_gates(
         # N8/AIQ-848: feedback-loop reliability is the 4th ranking factor, blended
         # by RELIABILITY_WEIGHT (0 = dormant/no effect; ships off by default).
         factor = _rel_cfg.reliability_factor(c.get("reliability_score"))
+        base = float(c.get(rank_base) or 0.0) if rank_base else raw
         out.append({**c, "raw_score": raw,
-                    "adjusted_score": raw * boost * freshness * factor, "is_stale": days > 180})
+                    "adjusted_score": base * boost * freshness * factor, "is_stale": days > 180})
     out.sort(key=lambda x: x["adjusted_score"], reverse=True)
     return out[: max(1, top_k)]
 
@@ -341,3 +376,188 @@ def _build_query(
         f"{classification.pathway_type} immigration requirements for a "
         f"{eea} {profile.nationality} national relocating {corridor}"
     )
+
+
+# ── W3-2 hybrid retrieval ──────────────────────────────────────────────────
+
+
+class RetrieverProtocol(Protocol):
+    """A corridor-scoped candidate source. Returns shaped chunk dicts (see
+    `_shape`) ordered by the leg's native relevance. Every candidate carries a
+    cosine `score` regardless of which leg surfaced it, so the shared similarity
+    floor in `_apply_quality_gates` stays meaningful across legs."""
+
+    def candidates(
+        self, *, engine, corridor_db: str, q_emb: List[float], query: str, fetch_k: int,
+        trust_tiers: Optional[Sequence[int]] = None, include_embedding: bool = False,
+    ) -> List[Dict[str, Any]]:
+        ...
+
+
+class VectorRetriever:
+    """pgvector cosine leg (Postgres) / in-Python cosine (sqlite) — the prior
+    default behaviour, unchanged."""
+
+    def candidates(self, *, engine, corridor_db, q_emb, query, fetch_k,
+                   trust_tiers=None, include_embedding=False):
+        fn = _retrieve_corpus_sqlite if engine.dialect.name == "sqlite" else _retrieve_corpus_postgres
+        return fn(engine, corridor_db, q_emb, fetch_k,
+                  trust_tiers=trust_tiers, include_embedding=include_embedding)
+
+
+class KeywordRetriever:
+    """BM25/keyword leg. Postgres uses native FTS (`ts_rank` over the `chunk_tsv`
+    generated column); sqlite uses an in-Python BM25 over `chunk_text` so the
+    eval/test path (hash embedder + sqlite fixtures) exercises hybrid too."""
+
+    def candidates(self, *, engine, corridor_db, q_emb, query, fetch_k,
+                   trust_tiers=None, include_embedding=False):
+        if engine.dialect.name == "sqlite":
+            return _retrieve_keyword_sqlite(engine, corridor_db, q_emb, query, fetch_k,
+                                            trust_tiers=trust_tiers, include_embedding=include_embedding)
+        return _retrieve_keyword_postgres(engine, corridor_db, q_emb, query, fetch_k,
+                                          trust_tiers=trust_tiers, include_embedding=include_embedding)
+
+
+class HybridRetriever:
+    """Reciprocal-Rank-Fusion of the vector + keyword legs."""
+
+    def __init__(self, vector: Optional[RetrieverProtocol] = None,
+                 keyword: Optional[RetrieverProtocol] = None, c: int = _RRF_C):
+        self._vec = vector or VectorRetriever()
+        self._kw = keyword or KeywordRetriever()
+        self._c = c
+
+    def candidates(self, *, engine, corridor_db, q_emb, query, fetch_k,
+                   trust_tiers=None, include_embedding=False):
+        common = dict(engine=engine, corridor_db=corridor_db, q_emb=q_emb, query=query,
+                      fetch_k=fetch_k, trust_tiers=trust_tiers, include_embedding=include_embedding)
+        vec = self._vec.candidates(**common)
+        kw = self._kw.candidates(**common)
+        return _rrf_fuse(vec, kw, c=self._c)
+
+
+def _rrf_fuse(vec_list, kw_list, *, c: int = _RRF_C) -> List[Dict[str, Any]]:
+    """Reciprocal Rank Fusion: score(d) = Σ_legs 1/(c + rank_d) (0-based rank +1).
+    Higher = better. Union of both legs; the first-seen shaped dict wins (the
+    vector leg carries the embedding when requested)."""
+    rrf: Dict[str, float] = {}
+    shaped: Dict[str, Dict[str, Any]] = {}
+    for lst in (vec_list, kw_list):
+        for rank, ch in enumerate(lst):
+            cid = str(ch.get("id"))
+            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (c + rank + 1)
+            shaped.setdefault(cid, ch)
+    fused: List[Dict[str, Any]] = []
+    for cid, score in rrf.items():
+        ch = dict(shaped[cid])
+        ch["rrf_score"] = score
+        fused.append(ch)
+    fused.sort(key=lambda x: x["rrf_score"], reverse=True)
+    return fused
+
+
+def _tokenize(t: str) -> List[str]:
+    return _WORD_RE.findall((t or "").lower())
+
+
+def _bm25_scores(query: str, docs: List[str]) -> List[float]:
+    """Deterministic BM25 over a small candidate doc set (a corridor's chunks).
+    sqlite path only; Postgres uses native ts_rank."""
+    q_terms = set(_tokenize(query))
+    if not q_terms or not docs:
+        return [0.0] * len(docs)
+    tokenized = [_tokenize(d) for d in docs]
+    lengths = [len(toks) for toks in tokenized]
+    avgdl = (sum(lengths) / len(lengths)) or 1.0
+    n_docs = len(docs)
+    df = {t: 0 for t in q_terms}
+    for toks in tokenized:
+        present = set(toks)
+        for t in q_terms:
+            if t in present:
+                df[t] += 1
+    scores: List[float] = []
+    for toks, dl in zip(tokenized, lengths):
+        tf: Dict[str, int] = {}
+        for tok in toks:
+            if tok in q_terms:
+                tf[tok] = tf.get(tok, 0) + 1
+        s = 0.0
+        for t, f in tf.items():
+            n_t = df.get(t, 0)
+            idf = math.log(1 + (n_docs - n_t + 0.5) / (n_t + 0.5))
+            denom = f + _BM25_K1 * (1 - _BM25_B + _BM25_B * dl / avgdl)
+            s += idf * (f * (_BM25_K1 + 1)) / (denom or 1.0)
+        scores.append(s)
+    return scores
+
+
+def _fetch_corridor_rows_sqlite(engine, corridor_db, *, trust_tiers=None):
+    base = ("SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, "
+            "embedding{rel} FROM immigration_corpus_chunks WHERE corridor = :corridor AND is_active = 1"
+            + _tier_filter_sql(trust_tiers))
+    with engine.begin() as conn:
+        try:
+            return conn.execute(text(base.format(rel=", reliability_score")), {"corridor": corridor_db}).mappings().all()
+        except Exception:
+            return conn.execute(text(base.format(rel="")), {"corridor": corridor_db}).mappings().all()
+
+
+def _retrieve_keyword_sqlite(engine, corridor_db, q_emb, query, k, *, trust_tiers=None, include_embedding=False):
+    """sqlite keyword leg: rank the corridor's chunks by in-Python BM25 over
+    chunk_text. Only genuine keyword matches (BM25 > 0) earn a keyword rank.
+    Each kept chunk still carries a cosine `score` for the shared floor."""
+    rows = _fetch_corridor_rows_sqlite(engine, corridor_db, trust_tiers=trust_tiers)
+    if not rows:
+        return []
+    bm25 = _bm25_scores(query, [r["chunk_text"] or "" for r in rows])
+    ranked = []
+    for r, kw in zip(rows, bm25):
+        if kw <= 0.0:
+            continue
+        emb_raw = r["embedding"]
+        emb = json.loads(emb_raw) if isinstance(emb_raw, str) and emb_raw else (emb_raw or [])
+        ch = _shape(
+            r["chunk_metadata"], id_=r["id"], source_url=r["source_url"], chunk_text=r["chunk_text"],
+            corridor=r["corridor"], trust_tier=r["trust_tier"], fetched_at=r["fetched_at"],
+            score=cosine_similarity(q_emb, emb), reliability_score=r.get("reliability_score"),
+            embedding=(list(emb) if include_embedding else None),
+        )
+        ranked.append((kw, ch))
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return [ch for _, ch in ranked[:k]]
+
+
+def _retrieve_keyword_postgres(engine, corridor_db, q_emb, query, k, *, trust_tiers=None, include_embedding=False):
+    """Postgres keyword leg: FTS `ts_rank` over the `chunk_tsv` generated column.
+    The same row returns the cosine distance so kept chunks carry a `score` for
+    the shared similarity floor."""
+    q = "[" + ",".join(f"{x:.6f}" for x in q_emb) + "]"
+    emb_col = ", embedding::text AS emb_text " if include_embedding else " "
+    sql = text(
+        "SELECT id, corridor, source_url, chunk_text, chunk_metadata, trust_tier, fetched_at, "
+        "       reliability_score, (embedding <=> CAST(:q AS vector)) AS distance, "
+        "       ts_rank(chunk_tsv, websearch_to_tsquery('english', :kq)) AS kw_rank" + emb_col +
+        "FROM immigration_corpus_chunks "
+        "WHERE corridor = :corridor AND is_active = true "
+        "  AND chunk_tsv @@ websearch_to_tsquery('english', :kq)" + _tier_filter_sql(trust_tiers) + " "
+        "ORDER BY kw_rank DESC LIMIT :k"
+    )
+    with engine.begin() as conn:
+        rows = conn.execute(sql, {"q": q, "kq": query, "corridor": corridor_db, "k": k}).mappings().all()
+    out = []
+    for r in rows:
+        dist = float(r["distance"] if r["distance"] is not None else 1.0)
+        emb = None
+        if include_embedding and r.get("emb_text"):
+            try:
+                emb = json.loads(r["emb_text"])
+            except Exception:
+                emb = None
+        out.append(_shape(
+            r["chunk_metadata"], id_=r["id"], source_url=r["source_url"], chunk_text=r["chunk_text"],
+            corridor=r["corridor"], trust_tier=r["trust_tier"], fetched_at=r["fetched_at"],
+            score=1.0 - (dist / 2.0), reliability_score=r["reliability_score"], embedding=emb,
+        ))
+    return out
