@@ -209,6 +209,7 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
 from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
@@ -14083,6 +14084,7 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
 # GAP 10: Company branding config
