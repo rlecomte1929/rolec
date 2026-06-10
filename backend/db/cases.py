@@ -24,6 +24,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
+from ..sla_rules import compute_sla_status
+
 log = logging.getLogger(__name__)
 
 
@@ -1746,6 +1748,10 @@ class CasesMixin:
                 wiz_o = m.get("wizard_origin_country")
                 wiz_d = m.get("wizard_dest_country")
                 display_status = self._command_center_display_status(m.get("status"), wiz_o, wiz_d)
+                # W2-2: timeline SLA from the target move date + task progress.
+                sla_status, days_until_move = compute_sla_status(
+                    m.get("wizard_target_move_date"), pct, display_status
+                )
                 next_d = stats["next_overdue"]
                 if not next_d and m.get("expected_start_date"):
                     next_d = m.get("expected_start_date")
@@ -1826,6 +1832,9 @@ class CasesMixin:
                     "household": household_label,
                     "hasSpouse": has_spouse,
                     "childCount": child_count,
+                    # W2-2: timeline SLA (on_track | at_risk | overdue | None) + signed days to move.
+                    "slaStatus": sla_status,
+                    "daysUntilMove": days_until_move,
                     # [P4-1] dossier health
                     **{
                         "dossierTotalForms": dh.get("total_forms", 0),
