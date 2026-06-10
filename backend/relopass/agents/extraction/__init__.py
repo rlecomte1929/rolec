@@ -15,6 +15,20 @@ from .diploma import (
     infer_isced_level_from_title,
     load_diploma_prompt,
 )
+from .passport_td3 import (
+    DI_FIELD_KEYS,
+    LLM_FIELD_KEYS,
+    MRZ_FIELD_KEYS,
+    PASSPORT_TD3_AGENT,
+    PASSPORT_TD3_AGENT_NAME,
+    PHI_CLASS_BIOMETRIC,
+    AzureDiPassportOutput,
+    Bbox,
+    NullAzureDIProvider,
+    PassportTd3Agent,
+    PassportTd3Result,
+    load_passport_td3_prompt,
+)
 from .tax_cert_de import (
     TAX_CERT_DE_AGENT_NAME,
     TaxCertDeAgent,
@@ -88,6 +102,20 @@ __all__ = [
     "DiplomaResult",
     "infer_isced_level_from_title",
     "load_diploma_prompt",
+    # passport_td3 (C1-05b) — MRZ+DI+LLM orchestrator; not in EXTRACTION_AGENT_REGISTRY
+    # (its construction contract differs from the family agents' registry+sink path).
+    "DI_FIELD_KEYS",
+    "LLM_FIELD_KEYS",
+    "MRZ_FIELD_KEYS",
+    "PASSPORT_TD3_AGENT",
+    "PASSPORT_TD3_AGENT_NAME",
+    "PHI_CLASS_BIOMETRIC",
+    "AzureDiPassportOutput",
+    "Bbox",
+    "NullAzureDIProvider",
+    "PassportTd3Agent",
+    "PassportTd3Result",
+    "load_passport_td3_prompt",
     # tax_cert (C2-02b)
     "TAX_CERT_FR_AGENT_NAME",
     "TaxCertFrAgent",
