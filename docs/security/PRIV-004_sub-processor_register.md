@@ -17,6 +17,7 @@
 | **Cloudflare** | DNS / CDN (frontend) | Global edge; US entity | Cloudflare customer DPA (SCCs) | ⬜ Confirm in account Legal | `README.md`, `README_DEPLOY_CLOUDFLARE.md` |
 | **OpenAI** | LLM — embeddings + policy extraction/Q&A | **US** | DPA + DPF/SCCs | ⬜ Confirm on platform | `openai==1.51.2`; `policy_assistant_embedder.py`, `llm_client.py` |
 | **Anthropic** | LLM — Policy Assistant, roadmap, entity resolution | **US** | DPA (Commercial Terms) + SCCs | ⬜ Confirm Commercial plan | `anthropic==0.39.0`; `llm_client.py`, `policy_assistant_llm_client.py`, `roadmap_generator.py` |
+| **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
 | **PostHog** | Product analytics | **US host by default** (`us.i.posthog.com`) | EU Cloud option or SCCs | ⬜ Conditional — see note | `frontend/src/analytics.ts` (`posthog-js`) |
 
@@ -32,6 +33,12 @@
   AI features. DPA is auto-incorporated on Anthropic Commercial Terms — confirm the account is on the
   paid/Commercial API plan.
 - **Supabase region confirmed EU** — no migration required.
+- **Mistral AI added (E-PIPE-OCR).** General OCR engine for the rce extraction pipeline — receives the raw
+  document image/PDF (marriage/birth certs, foster orders, tax certs, diplomas). OCR inherently sends the
+  document content (you cannot `mask_pii` an image you must read), mirroring the existing GPT-4o passport
+  path. Mistral is **EU-hosted (France)** so no transfer mechanism is required. Gated on `MISTRAL_API_KEY`
+  — disabled (no OCR, fail-soft empty text) until the key is provisioned. Confirm the DPA on the Mistral
+  console before processing real customer documents.
 
 ## PII-in-prompts posture (criterion 5)
 

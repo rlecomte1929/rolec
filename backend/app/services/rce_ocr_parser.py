@@ -4,18 +4,18 @@ Turns a stored case document into the relopass extraction runtime's input shape
 (:class:`backend.relopass.agents.models.ParsedDocument`) plus, for TD documents,
 the ``mrz_text`` string the PASSPORT_TD3 / ID_CARD agents take in ``run(...)``.
 
-OCR-engine reality (2026-06-10): the only document OCR wired in prod is
+OCR-engine routing: passport/ID MRZ documents go through
 ``ocr_passport_extractor.extract_passport`` (GPT-4o vision → PassportExtractionResult
-with MRZ lines + identity fields). There is **no** general OCR engine yet — Mistral
-Document AI is the stated direction (audit 2026-04-15) but unintegrated. So this
-adapter:
+with MRZ lines + identity fields); every other type goes through Mistral Document AI
+(``mistral_ocr_client.mistral_ocr_text``, E-PIPE-OCR) for real text. So this adapter:
   - maps a passport OCR result → ParsedDocument (+ mrz_text), and
-  - is **fail-soft** for every other type: returns an empty-but-valid ParsedDocument
-    and records why, so the downstream orchestrator (E-PIPE-4) never crashes and the
-    document simply yields no fields until a general OCR engine lands.
+  - maps general OCR text → ParsedDocument for all other types, and
+  - is **fail-soft** throughout: any failure (or an unset MISTRAL_API_KEY) returns an
+    empty-but-valid ParsedDocument and records why, so the downstream orchestrator
+    (E-PIPE-4) never crashes and the document simply yields no fields.
 
-No new LLM/vendor call is added here (the GPT-4o call lives in extract_passport,
-which already governs its own PII handling); this module only maps + orchestrates.
+The vendor calls live in extract_passport / mistral_ocr_client, which govern their
+own PII handling (you cannot mask an image you must OCR); this module maps + routes.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class OcrParseResult:
     parsed_document: ParsedDocument
     mrz_text: Optional[str]          # for TD docs; None otherwise
     document_type: str               # PASSPORT / CONTRACT / OTHER / ...
-    ocr_engine: str                  # 'gpt4o_passport' | 'none'
+    ocr_engine: str                  # 'gpt4o_passport' | 'mistral_ocr' | 'none'
     ok: bool                         # False when no engine ran / OCR failed (fail-soft)
 
 
@@ -130,6 +130,7 @@ async def parse_stored_document(
     document_type: Optional[str] = None,
     downloader: Optional[Callable[[str], bytes]] = None,
     passport_ocr: Optional[Callable[[bytes, str], Awaitable[Any]]] = None,
+    general_ocr: Optional[Callable[[bytes, str], str]] = None,
 ) -> OcrParseResult:
     """Download a stored document and produce its ParsedDocument (+ mrz_text).
 
@@ -137,28 +138,37 @@ async def parse_stored_document(
     empty-but-valid ParsedDocument with ``ok=False`` and a logged reason — never
     raises into the caller (mirrors document_extraction_queue's detached contract).
 
-    ``downloader`` / ``passport_ocr`` are injectable for testing; defaults use the
-    Supabase admin client and ocr_passport_extractor.extract_passport.
+    ``downloader`` / ``passport_ocr`` / ``general_ocr`` are injectable for testing;
+    defaults use the Supabase admin client, ocr_passport_extractor.extract_passport,
+    and mistral_ocr_client.mistral_ocr_text respectively.
     """
     doc_type = (document_type or _classify(file_name, mime_type)).upper()
     try:
-        if doc_type not in _MRZ_DOC_TYPES and doc_type != "PASSPORT":
-            # No general OCR engine yet (Mistral unintegrated). Fail-soft empty doc.
+        content = (downloader or _default_downloader)(storage_path)
+
+        if doc_type in _MRZ_DOC_TYPES or doc_type == "PASSPORT":
+            result = await (passport_ocr or _default_passport_ocr)(content, mime_type)
+            return passport_result_to_parsed_document(
+                result, document_id=document_id, case_id=case_id, mime_type=mime_type
+            )
+
+        # General OCR (Mistral Document AI) for every non-MRZ type.
+        text = (general_ocr or _default_general_ocr)(content, mime_type)
+        if not text:
+            # No engine ran (MISTRAL_API_KEY unset) or the document was blank.
             log.info(
-                "rce_ocr_parser: no OCR engine for document_type=%s (doc=%s) — "
-                "empty ParsedDocument until general OCR lands", doc_type, document_id,
+                "rce_ocr_parser: general OCR returned no text for document_type=%s "
+                "(doc=%s) — MISTRAL_API_KEY unset or empty document", doc_type, document_id,
             )
             return OcrParseResult(
                 _empty_parsed_document(document_id=document_id, case_id=case_id, mime_type=mime_type),
                 None, doc_type, "none", False,
             )
-
-        content = (downloader or _default_downloader)(storage_path)
-        ocr = passport_ocr or _default_passport_ocr
-        result = await ocr(content, mime_type)
-        return passport_result_to_parsed_document(
-            result, document_id=document_id, case_id=case_id, mime_type=mime_type
+        parsed = ParsedDocument(
+            document_id=document_id, case_id=case_id, mime_type=mime_type,
+            language=None, text=text, words=(),
         )
+        return OcrParseResult(parsed, None, doc_type, "mistral_ocr", True)
     except Exception as exc:  # never raise into the pipeline
         log.warning(
             "rce_ocr_parser failed-soft for doc=%s type=%s: %s", document_id, doc_type, exc
@@ -186,3 +196,9 @@ async def _default_passport_ocr(content: bytes, mime_type: str) -> Any:
     from .ocr_passport_extractor import extract_passport
 
     return await extract_passport(content, mime_type)
+
+
+def _default_general_ocr(content: bytes, mime_type: str) -> str:
+    from .mistral_ocr_client import mistral_ocr_text
+
+    return mistral_ocr_text(content, mime_type)
