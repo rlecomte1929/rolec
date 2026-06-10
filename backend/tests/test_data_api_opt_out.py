@@ -94,11 +94,18 @@ def migration_sql() -> str:
 
 
 @pytest.fixture(scope="module")
-def active_sql(migration_sql: str) -> str:
-    """Migration SQL with the commented-out ROLLBACK block stripped, so the
-    static assertions only see statements that actually execute."""
-    lines = [ln for ln in migration_sql.splitlines() if not ln.lstrip().startswith("--")]
-    return "\n".join(lines)
+def revoke_pairs(migration_sql: str):
+    """The (table, role) pairs the migration actually revokes.
+
+    FRIDAY-003b rewrote the flat ``REVOKE … FROM …;`` statements into a
+    ``to_regclass``-guarded ``do`` block that drives the REVOKEs from a
+    ``(tbl, role_name, priv)`` VALUES list (replay-safe against missing tables).
+    The source of truth is therefore that VALUES list, not literal REVOKE text —
+    parse it. The commented-out ROLLBACK block uses ``GRANT … TO`` (a different
+    shape), so it can't match this 3-tuple pattern.
+    """
+    pat = r"\(\s*'([a-z_]+)'\s*,\s*'(anon|authenticated)'\s*,\s*'(?:ALL|SELECT)'\s*\)"
+    return {(tbl, role) for tbl, role in re.findall(pat, migration_sql)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -107,36 +114,33 @@ def active_sql(migration_sql: str) -> str:
 
 class TestStaticMigration:
     @pytest.mark.parametrize("table", ANON_REVOKE_TABLES)
-    def test_anon_revoke_present(self, active_sql: str, table: str) -> None:
-        pat = rf"REVOKE\s+.+\s+ON\s+public\.{re.escape(table)}\b.+FROM\s+anon\s*;"
-        assert re.search(pat, active_sql, re.IGNORECASE), (
-            f"Missing anon REVOKE for public.{table}"
-        )
+    def test_anon_revoke_present(self, revoke_pairs, table: str) -> None:
+        assert (table, "anon") in revoke_pairs, f"Missing anon REVOKE for public.{table}"
 
     @pytest.mark.parametrize("table", AUTHENTICATED_REVOKE_TABLES)
-    def test_authenticated_revoke_present(self, active_sql: str, table: str) -> None:
-        pat = rf"REVOKE\s+.+\s+ON\s+public\.{re.escape(table)}\b.+FROM\s+authenticated\s*;"
-        assert re.search(pat, active_sql, re.IGNORECASE), (
+    def test_authenticated_revoke_present(self, revoke_pairs, table: str) -> None:
+        assert (table, "authenticated") in revoke_pairs, (
             f"Missing authenticated REVOKE for public.{table}"
         )
 
     @pytest.mark.parametrize("table", KEEP_TABLES)
-    def test_keep_tables_not_revoked(self, active_sql: str, table: str) -> None:
-        pat = rf"REVOKE\s+.+\s+ON\s+public\.{re.escape(table)}\b"
-        assert not re.search(pat, active_sql, re.IGNORECASE), (
-            f"public.{table} is a KEEP table but appears in a REVOKE statement"
+    def test_keep_tables_not_revoked(self, revoke_pairs, table: str) -> None:
+        revoked = {t for t, _ in revoke_pairs}
+        assert table not in revoked, (
+            f"public.{table} is a KEEP table but appears in the revoke list"
         )
 
     @pytest.mark.parametrize("table", VERIFY_TABLES)
-    def test_verify_tables_deferred(self, active_sql: str, table: str) -> None:
-        pat = rf"REVOKE\s+.+\s+ON\s+public\.{re.escape(table)}\b"
-        assert not re.search(pat, active_sql, re.IGNORECASE), (
-            f"public.{table} is a VERIFY table (deferred) but appears in a REVOKE"
+    def test_verify_tables_deferred(self, revoke_pairs, table: str) -> None:
+        revoked = {t for t, _ in revoke_pairs}
+        assert table not in revoked, (
+            f"public.{table} is a VERIFY table (deferred) but appears in the revoke list"
         )
 
-    def test_revoke_count_is_24(self, active_sql: str) -> None:
-        count = len(re.findall(r"\bREVOKE\b", active_sql, re.IGNORECASE))
-        assert count == 24, f"Expected exactly 24 active REVOKE statements, found {count}"
+    def test_revoke_count_is_24(self, revoke_pairs) -> None:
+        assert len(revoke_pairs) == 24, (
+            f"Expected exactly 24 (table, role) revoke pairs, found {len(revoke_pairs)}"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
