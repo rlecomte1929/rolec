@@ -1,0 +1,58 @@
+name: Daily source-reliability recompute
+
+# [W3-3 / N8 AIQ-848] Calls POST /api/crons/recompute-source-reliability once a
+# day so immigration_corpus_chunks.reliability_score reflects the latest feedback
+# loop (chunks cited in REJECTED answers get down-ranked). Full recompute —
+# idempotent; up to 24h staleness is acceptable, so it never runs on the answer
+# path. The ranking effect stays OFF until IMMIGRATION_RELIABILITY_WEIGHT is
+# ramped above 0 in the backend env — this job only refreshes the stored scores.
+#
+# Gated behind `vars.RELIABILITY_CRON_ENABLED` so it is a no-op until the repo
+# var + secrets are configured. Endpoint auth is the shared CRON_SECRET (Bearer),
+# the same the other /api/crons/* endpoints use.
+
+on:
+  schedule:
+    # 05:00 UTC every day — after the crawler (03:00), compliance (04:00) and
+    # case-health (04:30) so any same-night feedback/traces are already written.
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: reliability-recompute-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  recompute:
+    name: Recompute source reliability
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.RELIABILITY_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.RELIABILITY_API_BASE }}        # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/recompute-source-reliability
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/recompute-source-reliability")
+          echo "$response"
+          {
+            echo "## Source-reliability recompute"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
