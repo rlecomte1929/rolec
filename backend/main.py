@@ -13842,8 +13842,12 @@ def list_command_center_cases(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     company_id, hr_user_id = _command_center_scope(user)
+    # I-3 Stage 4: inject the corridor-aware SLA-threshold resolver (app layer)
+    # so per-corridor at-risk overrides apply without the DB layer importing app/.
+    from .app.services.sla_corridor import sla_thresholds_for_corridor
     rows = db.list_command_center_cases(
-        company_id=company_id, hr_user_id=hr_user_id, page=page, limit=limit, risk_filter=risk_filter
+        company_id=company_id, hr_user_id=hr_user_id, page=page, limit=limit, risk_filter=risk_filter,
+        sla_thresholds_for=sla_thresholds_for_corridor,
     )
     return [CommandCenterCaseRow(**r) for r in rows]
 

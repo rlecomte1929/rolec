@@ -62,6 +62,16 @@ class CorridorIntakeConfig:
 
 
 @dataclass(frozen=True)
+class CorridorSlaConfig:
+    """Per-corridor timeline-SLA tunables (I-3 Stage 4). Override the
+    sla_rules module defaults (AT_RISK_WINDOW_DAYS / AT_RISK_PCT) for the HR
+    command-center timeline lens. Either field None → keep the module default."""
+
+    at_risk_window_days: Optional[int] = None
+    at_risk_pct: Optional[int] = None
+
+
+@dataclass(frozen=True)
 class CorridorProfile:
     corridor_id: str
     origin_iso: Optional[str] = None
@@ -71,6 +81,7 @@ class CorridorProfile:
     retrieval: Optional[CorridorRetrievalScope] = None
     prompt: Optional[CorridorPromptConfig] = None
     intake: Optional[CorridorIntakeConfig] = None
+    sla: Optional[CorridorSlaConfig] = None
 
 
 def _registry_dir() -> Path:
@@ -128,6 +139,25 @@ def _coerce_intake(raw: Any) -> Optional[CorridorIntakeConfig]:
     return CorridorIntakeConfig(questions_file=str(qf).strip())
 
 
+def _coerce_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_sla(raw: Any) -> Optional[CorridorSlaConfig]:
+    if not isinstance(raw, Mapping):
+        return None
+    window = _coerce_int(raw.get("at_risk_window_days"))
+    pct = _coerce_int(raw.get("at_risk_pct"))
+    if window is None and pct is None:
+        return None
+    return CorridorSlaConfig(at_risk_window_days=window, at_risk_pct=pct)
+
+
 def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
     block = doc.get("corridor") if isinstance(doc.get("corridor"), Mapping) else doc
     aliases_raw = block.get("aliases")
@@ -141,6 +171,7 @@ def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
         retrieval=_coerce_scope(block.get("retrieval")),
         prompt=_coerce_prompt(block.get("prompt")),
         intake=_coerce_intake(block.get("intake")),
+        sla=_coerce_sla(block.get("sla")),
     )
 
 
@@ -190,6 +221,12 @@ def get_intake_config(corridor: str) -> Optional[CorridorIntakeConfig]:
     """Convenience accessor for consumer #3 (immigration_interview_engine)."""
     profile = load_corridor_profile(corridor)
     return profile.intake if profile is not None else None
+
+
+def get_sla_config(corridor: str) -> Optional[CorridorSlaConfig]:
+    """Convenience accessor for consumer #4 (HR command-center timeline SLA)."""
+    profile = load_corridor_profile(corridor)
+    return profile.sla if profile is not None else None
 
 
 def get_intake_questions_path(corridor: str) -> Optional[Path]:
