@@ -5,8 +5,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
-import { servicesAPI } from '../../api/client';
+import { servicesAPI, apiGet } from '../../api/client';
 import type { EmployeeTask } from '../../api/client';
+import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
+import { PRIVACY_NOTICE_VERSION } from '../../features/privacy/privacyNoticeContent';
 
 // ── Status colours ────────────────────────────────────────────────────────────
 
@@ -29,13 +31,16 @@ const STATUS_LABEL: Record<EmployeeTask['status'], string> = {
 interface TaskCardProps {
   task: EmployeeTask;
   onSubmit: (task: EmployeeTask) => void;
+  /** PRIV-005: block submission until the Art. 13 notice is acknowledged. */
+  submitDisabled: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled }) => {
   const [submitting, setSubmitting] = useState(false);
   const [note, setNote] = useState('');
 
   const handleSubmit = async () => {
+    if (submitDisabled) return;
     setSubmitting(true);
     try {
       const updated = await servicesAPI.submitTask(task.id, { submission_data: { note } });
@@ -90,11 +95,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit }) => {
           />
           <Button unstyled
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || submitDisabled}
             className="px-4 py-1.5 rounded bg-[#0b2b43] text-white text-sm font-medium hover:bg-[#0d3456] disabled:opacity-50"
           >
             {submitting ? 'Submitting…' : 'Submit'}
           </Button>
+          {submitDisabled && (
+            <p className="text-xs text-slate-400 mt-2">
+              Acknowledge the privacy notice above to submit.
+            </p>
+          )}
         </>
       )}
     </div>
@@ -107,6 +117,17 @@ export const EmployeeTaskPage: React.FC = () => {
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // PRIV-005: one-time persistent privacy-notice gate. Submission stays blocked
+  // until the current notice version is acknowledged; a version bump re-prompts.
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  useEffect(() => {
+    void apiGet<{ acknowledged: boolean }>(
+      `/api/privacy/consents?notice_version=${encodeURIComponent(PRIVACY_NOTICE_VERSION)}`,
+    )
+      .then((res) => setAcknowledged(res.acknowledged))
+      .catch(() => setAcknowledged(false));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,6 +169,18 @@ export const EmployeeTaskPage: React.FC = () => {
           </div>
         )}
 
+        {!acknowledged && !loading && pending.length > 0 && (
+          <div className="mb-6">
+            <PrivacyNotice
+              noticeVersion={PRIVACY_NOTICE_VERSION}
+              context="task_submission"
+              variant="banner"
+              checked={acknowledged}
+              onChange={setAcknowledged}
+            />
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-16 text-sm text-slate-400">Loading your tasks…</div>
         ) : tasks.length === 0 && !error ? (
@@ -162,7 +195,7 @@ export const EmployeeTaskPage: React.FC = () => {
                   Action needed · {pending.length}
                 </h2>
                 <div className="space-y-3">
-                  {pending.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} />)}
+                  {pending.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} />)}
                 </div>
               </section>
             )}
@@ -172,7 +205,7 @@ export const EmployeeTaskPage: React.FC = () => {
                   Awaiting review · {submitted.length}
                 </h2>
                 <div className="space-y-3">
-                  {submitted.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} />)}
+                  {submitted.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} />)}
                 </div>
               </section>
             )}
@@ -182,7 +215,7 @@ export const EmployeeTaskPage: React.FC = () => {
                   Done · {approved.length}
                 </h2>
                 <div className="space-y-3">
-                  {approved.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} />)}
+                  {approved.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} />)}
                 </div>
               </section>
             )}
