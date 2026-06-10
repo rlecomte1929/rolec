@@ -399,6 +399,28 @@ def maximum_budget_explanation(b: Dict[str, Any]) -> str:
     return "Not covered under this policy configuration."
 
 
+def _extraction_draft_note(b: Dict[str, Any]) -> str:
+    """Build the draft `notes` for an imported extracted benefit (AIQ-938-FU).
+
+    Combines the extracted free-text eligibility/limits with the extraction
+    citation (``source_quote``). policy_config_benefits has no dedicated
+    citation column, so the source quote rides in notes as a ``Source: "…"``
+    line — that is what lets the HR review UI show *what text* the value came
+    from alongside the confidence + N11 low-confidence marker.
+    """
+    parts = [
+        str(s).strip()
+        for s in (b.get("eligibility"), b.get("limits"))
+        if s and str(s).strip()
+    ]
+    quote = str(b.get("source_quote") or "").strip()
+    if quote:
+        if len(quote) > 300:
+            quote = quote[:297].rstrip() + "…"
+        parts.append(f'Source: "{quote}"')
+    return " — ".join(parts).strip()
+
+
 class PolicyConfigMatrixService:
     def __init__(self, database: Database) -> None:
         self._db = database
@@ -1445,8 +1467,10 @@ class PolicyConfigMatrixService:
         changed_by: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        AIQ-873: bridge extracted policy benefits (policy_benefits — the document /
-        PUBLISH subsystem) into the company's config-matrix draft.
+        AIQ-873: bridge extracted policy benefits (policy_extracted_benefits — the
+        LLM value-extraction output, via db.list_policy_benefits) into the
+        company's config-matrix draft. Per-field confidence + the source_quote
+        citation ride through to the draft (AIQ-938-FU).
 
         For each extracted benefit whose key maps to a canonical matrix key
         (EXTRACTION_TO_MATRIX_BENEFIT_KEY), insert an `extracted_llm` row into the
@@ -1515,11 +1539,9 @@ class PolicyConfigMatrixService:
             }
 
         def _apply(row: Dict[str, Any], b: Dict[str, Any]) -> None:
-            note = " — ".join(
-                str(s).strip()
-                for s in (b.get("eligibility"), b.get("limits"))
-                if s and str(s).strip()
-            ).strip()
+            # AIQ-938-FU: notes now carry the extraction citation (source_quote)
+            # in addition to eligibility/limits, so the HR review UI surfaces it.
+            note = _extraction_draft_note(b)
             row["covered"] = True
             row["notes"] = note or row.get("notes")
             row["field_confidence"] = b.get("confidence")
