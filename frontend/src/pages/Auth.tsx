@@ -125,6 +125,7 @@ export const Auth: React.FC = () => {
   const [role, setRole] = useState<UserRole>('EMPLOYEE');
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [companySize, setCompanySize] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
@@ -280,6 +281,7 @@ export const Auth: React.FC = () => {
         password, role,
         name: name.trim() || undefined,
         company_name: role !== 'EMPLOYEE' ? (companyName.trim() || undefined) : undefined,
+        company_size: role === 'HR' ? (companySize || undefined) : undefined,
       });
     } catch (err: any) {
       const transport = getClientTransportErrorMessage(err);
@@ -586,15 +588,41 @@ export const Auth: React.FC = () => {
                     <EyeIcon open={showPassword} />
                   </Button>
                 </div>
-                <Select value={role} onChange={(v) => setRole(v as UserRole)} label="Role"
-                  options={[
-                    { value: 'HR', label: 'HR manager' },
-                    { value: 'EMPLOYEE', label: 'Employee' },
-                    { value: 'ADMIN', label: 'Admin (full access)' },
-                  ]} fullWidth />
-                {role !== 'EMPLOYEE' && (
-                  <Input value={companyName} onChange={setCompanyName} label="Company"
-                    placeholder="Your company name" fullWidth />
+                {/* AIQ-829 — one routing question bifurcates onboarding. ADMIN is
+                    intentionally not self-selectable: @relopass.com allowlisted users
+                    are auto-promoted to admin on login (backend auth_deps._is_admin_user). */}
+                <div>
+                  <span id="signup-routing-label" className="block text-sm font-medium text-slate-700 mb-2">I am…</span>
+                  <div role="radiogroup" aria-labelledby="signup-routing-label" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([
+                      { value: 'HR' as UserRole, icon: '🏢', title: 'An HR or mobility manager', sub: 'Set up policies and manage relocations' },
+                      { value: 'EMPLOYEE' as UserRole, icon: '✈️', title: 'An employee being relocated', sub: 'Track your move and tasks' },
+                    ]).map((opt) => {
+                      const selected = role === opt.value;
+                      return (
+                        <Button unstyled key={opt.value} type="button" role="radio" aria-checked={selected}
+                          onClick={() => setRole(opt.value)}
+                          className={`p-4 text-left rounded-xl border-2 transition-colors cursor-pointer ${selected ? 'border-[#0b2b43] bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                          <span aria-hidden="true" className="block text-2xl mb-1">{opt.icon}</span>
+                          <span className="block text-sm font-semibold text-slate-900">{opt.title}</span>
+                          <span className="block text-xs text-slate-500 mt-0.5">{opt.sub}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {role === 'HR' && (
+                  <>
+                    <Input value={companyName} onChange={setCompanyName} label="Company"
+                      placeholder="Your company name" fullWidth />
+                    <Select value={companySize} onChange={setCompanySize} label="Company size"
+                      options={[
+                        { value: '', label: 'Select company size…' },
+                        { value: '1-50', label: '1–50 employees' },
+                        { value: '51-500', label: '51–500 employees' },
+                        { value: '500+', label: '500+ employees' },
+                      ]} fullWidth />
+                  </>
                 )}
                 <LoadingButton type="submit" fullWidth loading={isLoading}
                   loadingLabel="Creating account…"

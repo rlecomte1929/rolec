@@ -7857,12 +7857,18 @@ class Database(CasesMixin, PoliciesMixin):
             ).fetchone()
         return self._row_to_dict(row)
 
-    def find_or_create_company_by_name(self, name: str) -> Optional[str]:
+    def find_or_create_company_by_name(
+        self, name: str, company_size: Optional[str] = None
+    ) -> Optional[str]:
         """Return the company_id for ``name``, creating the company if none exists.
 
         Match is case-insensitive on the trimmed name so self-serve HR signups
         reuse an existing workspace instead of spawning duplicates (the "17 Test
         company" problem). Returns None when ``name`` is blank.
+
+        ``company_size`` (AIQ-829) is the HR signup's headcount band; it is stored
+        as ``size_band`` only when a NEW company is created — an existing workspace
+        keeps its current value rather than being overwritten by a later signup.
         """
         cleaned = (name or "").strip()
         if not cleaned:
@@ -7875,7 +7881,10 @@ class Database(CasesMixin, PoliciesMixin):
         if row is not None:
             return self._row_to_dict(row)["id"]
         company_id = str(uuid.uuid4())
-        self.create_company(company_id=company_id, name=cleaned, status="active", plan_tier="starter")
+        self.create_company(
+            company_id=company_id, name=cleaned, status="active", plan_tier="starter",
+            size_band=company_size,
+        )
         return company_id
 
     TEST_COMPANY_FIXED_ID = "110854ad-3c85-4291-a484-0b43effb680e"

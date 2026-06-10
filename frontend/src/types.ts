@@ -59,6 +59,8 @@ export interface RegisterRequest {
   role: UserRole;
   name?: string;
   company_name?: string;
+  /** HR signup only — headcount band, persisted to companies.size_band (AIQ-829). */
+  company_size?: string;
 }
 
 export type UserRole = 'HR' | 'EMPLOYEE' | 'ADMIN';
