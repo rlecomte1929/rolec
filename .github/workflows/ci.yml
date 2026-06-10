@@ -264,7 +264,8 @@ jobs:
             backend/tests/test_corridor_intake_questions.py \
             backend/tests/test_corridor_sla.py \
             backend/tests/test_corridor_pathways.py \
-            backend/tests/test_budget_summary_policy_config.py
+            backend/tests/test_budget_summary_policy_config.py \
+            backend/tests/test_rag_eval_fixture_precision.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
