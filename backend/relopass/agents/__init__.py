@@ -40,12 +40,21 @@ from .runtime import (
     ExtractionRuntimeError,
     SchemaValidationError,
 )
+from .family_entity_resolution import (
+    CanonicalPerson,
+    EntityLinkRecord,
+    FamilyEntityResolver,
+    InMemoryEntityLinkSink,
+    ResolutionResult,
+)
 
 __all__ = [
     "VERSIONED_FIELDS",
     "AgentRegistry",
     "AgentRegistryError",
     "AgentStorage",
+    "CanonicalPerson",
+    "EntityLinkRecord",
     "ExtractedField",
     "ExtractionAgent",
     "ExtractionAgentExample",
@@ -53,9 +62,12 @@ __all__ = [
     "ExtractionRunResult",
     "ExtractionRunner",
     "ExtractionRuntimeError",
+    "FamilyEntityResolver",
     "InMemoryAgentStorage",
+    "InMemoryEntityLinkSink",
     "ParsedDocument",
     "ParsedWord",
+    "ResolutionResult",
     "SchemaValidationError",
     "VersionedFieldSnapshot",
     "compute_version_hash",
