@@ -239,11 +239,13 @@ def test_registry_wires_all_three_document_types():
         get_extraction_agent_class(FOSTER_CARE_ORDER_DOCUMENT_TYPE)
         is FosterCareOrderAgent
     )
-    assert set(EXTRACTION_AGENT_REGISTRY) == {
+    # The three family doc types must be wired. Other agents (e.g. ID_CARD,
+    # C2-02) may also be registered, so this is a subset check, not equality.
+    assert {
         MARRIAGE_CERT_DOCUMENT_TYPE,
         BIRTH_CERT_DOCUMENT_TYPE,
         FOSTER_CARE_ORDER_DOCUMENT_TYPE,
-    }
+    } <= set(EXTRACTION_AGENT_REGISTRY)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

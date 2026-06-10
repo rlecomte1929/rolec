@@ -44,6 +44,13 @@ from .tax_cert_no import (
     TaxCertNoAgent,
     load_tax_cert_no_prompt,
 )
+from .id_card import (
+    ID_CARD_AGENT_NAME,
+    ID_CARD_DOCUMENT_TYPE,
+    IdCardAgent,
+    IdCardResult,
+    load_id_card_prompt,
+)
 from .marriage_cert import (
     MARRIAGE_CERT_AGENT_NAME,
     MARRIAGE_CERT_DOCUMENT_TYPE,
@@ -82,6 +89,7 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
     MARRIAGE_CERT_DOCUMENT_TYPE: MarriageCertAgent,
     BIRTH_CERT_DOCUMENT_TYPE: BirthCertAgent,
     FOSTER_CARE_ORDER_DOCUMENT_TYPE: FosterCareOrderAgent,
+    ID_CARD_DOCUMENT_TYPE: IdCardAgent,
 }
 
 
@@ -126,6 +134,12 @@ __all__ = [
     "TAX_CERT_NO_AGENT_NAME",
     "TaxCertNoAgent",
     "load_tax_cert_no_prompt",
+    # id_card (C2-02 / C2-09 nationality source) — MRZ-deterministic
+    "ID_CARD_AGENT_NAME",
+    "ID_CARD_DOCUMENT_TYPE",
+    "IdCardAgent",
+    "IdCardResult",
+    "load_id_card_prompt",
     # marriage_cert (C2-01)
     "MARRIAGE_CERT_AGENT_NAME",
     "MARRIAGE_CERT_DOCUMENT_TYPE",
