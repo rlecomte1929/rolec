@@ -96,7 +96,11 @@ class MiscMixin:
         return result
 
     def _db_healthcheck(self, conn) -> None:
-        info = Database.get_db_info()
+        # [AUDIT-C1.6b fix] get_db_info is a @staticmethod on this mixin; resolve
+        # it via self. The pre-fix `Database.get_db_info()` NameError'd because
+        # `Database` is not imported into this extracted module -> 500 on every
+        # endpoint that calls ensure_initialized() (e.g. GET /api/hr/assignments).
+        info = self.get_db_info()
         host = info.get("db_host") or "(local)"
         log.info("DB healthcheck: scheme=%s host=%s", info.get("db_url_scheme"), host)
         conn.execute(text("SELECT 1"))

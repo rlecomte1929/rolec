@@ -20,10 +20,22 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
+# [AUDIT-C1 fix] These helpers were referenced by the extracted CasesMixin
+# methods but never imported into this module, so the relevant code paths
+# raised NameError at runtime (same class as the `_is_sqlite` extraction bug).
+# Source-of-truth imports mirror the pre-extraction backend/database.py.
+from ..identity_normalize import normalize_invite_key
+from ..readiness_service import (
+    extract_destination_from_case_profile,
+    extract_destination_from_profile,
+    normalize_destination_key,
+    resolve_readiness_route_key,
+)
 from ..sla_rules import compute_sla_status
 
 log = logging.getLogger(__name__)
@@ -38,6 +50,9 @@ log = logging.getLogger(__name__)
 from ..db_config import DATABASE_URL as _raw_url
 
 _is_sqlite = _raw_url.startswith("sqlite")
+# JSONB cast suffix, mirroring backend/database.py (empty on SQLite). Referenced
+# by extracted CasesMixin methods that build jsonb SQL.
+_jb = "" if _is_sqlite else "::jsonb"
 
 
 class CasesMixin:
