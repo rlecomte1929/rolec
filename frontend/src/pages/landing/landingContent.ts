@@ -18,6 +18,30 @@ export const landingContent = {
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
+  // FRIDAY-004c locked proof block — verbatim from audit/gtm/proof_block_v1.md §1.
+  // Each line is ≤14 words (13/13/14) and maps to a distinct EU AI Act article
+  // (Art. 12 record-keeping · Arts. 10+9 data + risk · Art. 14 human oversight).
+  // Do not rephrase — these 3 lines are locked/approved copy.
+  proofBlock: {
+    items: [
+      {
+        icon: 'FileSearch',
+        article: 'EU AI Act · Article 12',
+        text: 'Every AI decision is logged, timestamped, and tied to the source document it read.',
+      },
+      {
+        icon: 'ScanLine',
+        article: 'EU AI Act · Articles 10 & 9',
+        text: 'Shadow-run every extraction against a second model — disagreements surface, never hide.',
+      },
+      {
+        icon: 'UserCheck',
+        article: 'EU AI Act · Article 14',
+        text: 'No AI ships a single value to a form without a person confirming it.',
+      },
+    ],
+  },
+
   problem: {
     title: 'Relocation still runs on email and spreadsheets.',
     cards: [

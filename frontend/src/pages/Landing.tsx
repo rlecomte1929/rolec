@@ -4,6 +4,7 @@ import {
   Section,
   SectionHeader,
   HeroSurface,
+  ProofBlock,
   FeatureCard,
   CTAPanel,
   CTAButton,
@@ -22,10 +23,65 @@ export const Landing: React.FC = () => {
     { label: 'See the platform', routeKey: 'platform' },
   ]);
 
+  // FRIDAY-004d locked SEO meta stack — verbatim from audit/gtm/seo_meta_spec_v1.md.
+  // Strings mirror the locked 004b hero. Ship verbatim; do not rephrase.
   usePageMeta({
-    title: 'ReloPass · The operating layer for cross-border relocation',
-    description: 'Cases, documents, providers, and status on one record. Built for HR and mobility teams.',
-    ogUrl: 'https://www.relopass.com',
+    title: 'ReloPass · Mobility AI your auditor will trust', // §2 — 50 chars
+    description:
+      "Mobility AI your auditor will trust. Every step in your employee's relocation — logged, cited, and EU AI Act–ready. See how ReloPass moves people across borders.", // §3 — 165-char long version (deliberate trade-off, §9)
+    ogTitle: 'Mobility AI your auditor will trust', // §4 — brand prefix stripped for share cards
+    ogDescription:
+      "Every step in your employee's relocation — every document, every decision — logged, cited, and EU AI Act–ready.", // §4 — full sub-hero verbatim
+    ogUrl: 'https://relopass.com/',
+    // TODO [FRIDAY-004e hand-off]: og:image asset is a designer commission and does
+    // NOT exist yet (1200×630 spec in FRIDAY-004d §5). This path 404s until the asset
+    // ships — confirm filename/path with the designer before relying on link previews.
+    ogImage: 'https://relopass.com/og/og-default-1200x630.png',
+    ogImageWidth: '1200',
+    ogImageHeight: '630',
+    ogImageAlt: 'ReloPass — Mobility AI your auditor will trust',
+    ogLocale: 'en_GB',
+    // TODO [FRIDAY-004e hand-off]: confirm the @relopass X handle exists; if not,
+    // drop twitterSite/twitterCreator (FRIDAY-004d §6).
+    twitterSite: '@relopass',
+    twitterCreator: '@relopass',
+    // schema.org Organization (FRIDAY-004d §7). TODO [Romain to confirm before merge]:
+    //   - foundingDate: 2024 or 2025?
+    //   - sameAs[0] LinkedIn company slug
+    //   - sameAs[1] X handle (remove if no account)
+    //   - sameAs[2] whether to expose the personal GitHub or omit
+    //   - contactPoint emails (sales@/support@) must exist + be monitored, else drop the array
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'ReloPass',
+      alternateName: 'ReloPass — Mobility AI',
+      url: 'https://relopass.com/',
+      logo: 'https://relopass.com/brand/logo-512.png',
+      description:
+        "Mobility AI your auditor will trust. Every step in your employee's relocation — logged, cited, and EU AI Act–ready.",
+      foundingDate: '2025', // TODO [Romain]: confirm 2024 vs 2025
+      sameAs: [
+        'https://www.linkedin.com/company/relopass/', // TODO [Romain]: confirm slug
+        'https://x.com/relopass', // TODO [Romain]: confirm handle / remove if none
+        'https://github.com/rlecomte1929', // TODO [Romain]: confirm whether to expose
+      ],
+      contactPoint: [
+        // TODO [Romain]: confirm these inboxes exist + are monitored, else drop contactPoint
+        {
+          '@type': 'ContactPoint',
+          contactType: 'sales',
+          email: 'sales@relopass.com',
+          availableLanguage: ['English', 'French'],
+        },
+        {
+          '@type': 'ContactPoint',
+          contactType: 'customer support',
+          email: 'support@relopass.com',
+          availableLanguage: ['English', 'French'],
+        },
+      ],
+    },
   });
 
   const { open: openDemoBooking } = useDemoBooking();
@@ -69,6 +125,13 @@ export const Landing: React.FC = () => {
             />
           }
         />
+      </Section>
+
+      {/* 1b. PROOF BLOCK: 3 EU AI Act credibility lines, directly under the hero (FRIDAY-004c) */}
+      <Section spacing="sm" background="transparent">
+        <FadeIn>
+          <ProofBlock items={c.proofBlock.items} className="max-w-5xl mx-auto" />
+        </FadeIn>
       </Section>
 
       {/* 2. PROBLEM: 3 cards */}

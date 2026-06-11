@@ -68,7 +68,7 @@ export const PublicFooter: React.FC = () => {
               <li className="pt-2">
                 <a
                   href={CONTACT_EMAIL}
-                  className="text-sm text-marketing-text-subtle hover:text-marketing-text-muted transition-colors"
+                  className="text-sm text-marketing-text-muted hover:text-marketing-primary transition-colors"
                 >
                   contact@relopass.com
                 </a>
@@ -100,7 +100,7 @@ export const PublicFooter: React.FC = () => {
             ReloPass — Global mobility infrastructure.
           </p>
           <div className="flex items-center gap-4">
-            <p className="text-xs text-marketing-text-subtle">
+            <p className="text-xs text-marketing-text-muted">
               © {new Date().getFullYear()} ReloPass. All rights reserved.
             </p>
             <img
