@@ -260,6 +260,7 @@ jobs:
             backend/tests/test_answer_provenance.py \
             backend/tests/test_immigration_hybrid_retriever.py \
             backend/tests/test_cases_is_sqlite.py \
+            backend/tests/test_db_healthcheck_regression.py \
             backend/tests/test_corridor_prompt_selection.py \
             backend/tests/test_corridor_intake_questions.py \
             backend/tests/test_corridor_sla.py \
