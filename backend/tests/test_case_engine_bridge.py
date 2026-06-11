@@ -125,11 +125,17 @@ _REPO_ROOT = __import__("os").path.dirname(
 
 
 def _read_def(marker: str) -> str:
-    """Source of a Database/CasesMixin method, searching BOTH backend/database.py
-    and the extracted backend/db/cases.py (AUDIT-C1.2 moved cases methods out of
-    the monolith into a mixin; these source guards must follow them)."""
+    """Source of a Database mixin method, searching backend/database.py and the
+    extracted backend/db/*.py mixins (AUDIT-C1.2+ moved domain methods out of the
+    monolith into mixins; these source guards must follow them — e.g. C1.5 moved
+    apply_wizard_patch_side_effects into backend/db/intake.py)."""
     import os
-    for parts in (("backend", "database.py"), ("backend", "db", "cases.py")):
+    for parts in (
+        ("backend", "database.py"),
+        ("backend", "db", "cases.py"),
+        ("backend", "db", "intake.py"),
+        ("backend", "db", "hr.py"),
+    ):
         with open(os.path.join(_REPO_ROOT, *parts), "r", encoding="utf-8") as fh:
             src = fh.read()
         if marker in src:
@@ -137,7 +143,7 @@ def _read_def(marker: str) -> str:
             rest = src[start + 1:]
             end = start + 1 + rest.index("\n    def ") if "\n    def " in rest else len(src)
             return src[start:end]
-    raise AssertionError(f"{marker!r} not found in backend/database.py or backend/db/cases.py")
+    raise AssertionError(f"{marker!r} not found in backend/database.py or backend/db/*.py mixins")
 
 
 class CanonicalCaseBridgeCompanyFallbackGuardTests(unittest.TestCase):
