@@ -23,3 +23,4 @@ export { StepRail } from './StepRail';
 export type { RailStep, StepStatus } from './StepRail';
 export { SegmentedOptionCards } from './SegmentedOptionCards';
 export type { SegmentedOption } from './SegmentedOptionCards';
+export { AutosaveChip } from './AutosaveChip';
