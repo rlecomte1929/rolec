@@ -24,3 +24,5 @@ export type { RailStep, StepStatus } from './StepRail';
 export { SegmentedOptionCards } from './SegmentedOptionCards';
 export type { SegmentedOption } from './SegmentedOptionCards';
 export { AutosaveChip } from './AutosaveChip';
+export { ConfirmFromIntake } from './ConfirmFromIntake';
+export type { ConfirmRow } from './ConfirmFromIntake';
