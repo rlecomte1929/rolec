@@ -1,0 +1,6 @@
+# ReloPass — allow all crawlers.
+# Added for FRIDAY-004e (AIQ-769): the marketing app shipped without a robots.txt,
+# so /robots.txt fell through to the SPA index.html and failed Lighthouse SEO.
+# TODO [FRIDAY-004d §11 follow-up]: add a Sitemap: line once sitemap.xml ships.
+User-agent: *
+Allow: /

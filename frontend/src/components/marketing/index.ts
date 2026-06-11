@@ -7,6 +7,7 @@ export { AccessOptionCard } from './AccessOptionCard';
 export { SectionHeader } from './SectionHeader';
 export { CTAButton } from './CTAButton';
 export { HeroSurface } from './HeroSurface';
+export { ProofBlock, type ProofItem } from './ProofBlock';
 export { FeatureCard } from './FeatureCard';
 export { TrustStrip } from './TrustStrip';
 export { QuoteBlock } from './QuoteBlock';

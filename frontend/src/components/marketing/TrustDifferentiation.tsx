@@ -32,8 +32,11 @@ export const TrustDifferentiation: React.FC<TrustDifferentiationProps> = ({
       <div className="rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8">
         <ul className="space-y-3" role="list">
           {checklist.map((item, i) => (
-            <FadeIn key={i} delay={i * 80}>
-              <li className="flex gap-3 items-center">
+            // <li> must be a direct child of <ul> for valid list semantics
+            // (Lighthouse a11y `listitem`); the FadeIn moves inside the <li> and
+            // carries the flex layout, so the entrance animation is preserved.
+            <li key={i}>
+              <FadeIn delay={i * 80} className="flex gap-3 items-center">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full bg-marketing-accent"
                   aria-hidden
@@ -41,8 +44,8 @@ export const TrustDifferentiation: React.FC<TrustDifferentiationProps> = ({
                 <span className="text-sm text-marketing-text leading-relaxed">
                   {item}
                 </span>
-              </li>
-            </FadeIn>
+              </FadeIn>
+            </li>
           ))}
         </ul>
       </div>
