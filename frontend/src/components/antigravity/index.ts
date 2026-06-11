@@ -21,3 +21,5 @@ export { PhaseContextBar } from './PhaseContextBar';
 export type { Phase, PhaseStatus } from './PhaseContextBar';
 export { StepRail } from './StepRail';
 export type { RailStep, StepStatus } from './StepRail';
+export { SegmentedOptionCards } from './SegmentedOptionCards';
+export type { SegmentedOption } from './SegmentedOptionCards';
