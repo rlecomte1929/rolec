@@ -192,6 +192,16 @@ jobs:
       - name: Dual-layer router registration guard
         run: python scripts/check_router_registrations.py
 
+      # Catches the AUDIT-C1 mixin-extraction NameError class: methods moved into
+      # backend/db/*.py that reference names (Database, helpers, exceptions) never
+      # imported into the extracted module -> NameError 500 at runtime. F821 =
+      # undefined name. This class has shipped to prod twice (_is_sqlite; and
+      # _db_healthcheck's `Database.get_db_info()` -> 500 on GET /api/hr/assignments).
+      - name: Backend db undefined-name guard (ruff F821)
+        run: |
+          pip install ruff
+          ruff check --select F821 backend/db/
+
       - name: Pytest (P1 deterministic suite)
         run: |
           python -m pytest -q \
