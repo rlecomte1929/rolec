@@ -15,3 +15,5 @@ export { Alert } from './Alert';
 export { Container } from './Container';
 export { StalenessBadge, isSourceStale } from './StalenessBadge';
 export { CountryFlag } from './CountryFlag';
+export { StatusPill } from './StatusPill';
+export type { JourneyStatus } from './StatusPill';
