@@ -17,3 +17,5 @@ export { StalenessBadge, isSourceStale } from './StalenessBadge';
 export { CountryFlag } from './CountryFlag';
 export { StatusPill } from './StatusPill';
 export type { JourneyStatus } from './StatusPill';
+export { PhaseContextBar } from './PhaseContextBar';
+export type { Phase, PhaseStatus } from './PhaseContextBar';
