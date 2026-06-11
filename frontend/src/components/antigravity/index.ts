@@ -19,3 +19,5 @@ export { StatusPill } from './StatusPill';
 export type { JourneyStatus } from './StatusPill';
 export { PhaseContextBar } from './PhaseContextBar';
 export type { Phase, PhaseStatus } from './PhaseContextBar';
+export { StepRail } from './StepRail';
+export type { RailStep, StepStatus } from './StepRail';
