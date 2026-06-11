@@ -2,6 +2,8 @@
    The previous Google Fonts @import was removed to stop leaking visitor IPs
    to Google's CDN (GDPR). */
 
+@import 'flag-icons/css/flag-icons.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
