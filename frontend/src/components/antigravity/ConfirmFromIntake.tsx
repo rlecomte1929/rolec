@@ -37,7 +37,7 @@ export const ConfirmFromIntake: React.FC<ConfirmFromIntakeProps> = ({ title, sub
               {r.flag ? <CountryFlag country={r.flag} label={r.value} /> : r.value}
             </dd>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 px-2.5 py-1 text-[11.5px] font-semibold text-accent-600">✓ On file</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 px-2.5 py-1 text-[11.5px] font-semibold text-accent-600" aria-hidden="true">✓ On file</span>
         </div>
       ))}
     </dl>

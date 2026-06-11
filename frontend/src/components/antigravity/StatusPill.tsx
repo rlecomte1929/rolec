@@ -4,6 +4,9 @@ export type JourneyStatus =
   | 'done' | 'in-progress' | 'upcoming' | 'blocked'
   | 'action' | 'ready' | 'submitted' | 'in-review';
 
+// NOTE: the amber (blocked/action) and neutral (upcoming/in-review) treatments
+// intentionally mirror Badge.tsx's 'warning'/'neutral' variants. Keep them in
+// sync if Badge's palette changes.
 const STYLES: Record<JourneyStatus, string> = {
   done:          'bg-navy-50 text-navy-800',
   'in-progress': 'bg-accent-50 text-accent-600',
