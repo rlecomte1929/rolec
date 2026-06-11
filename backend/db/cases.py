@@ -3119,3 +3119,301 @@ class CasesMixin:
             "orphans_without_person": orphans_no_person,
         }
         return items, summary
+
+    def list_employee_tasks(
+        self,
+        employee_id: str,
+        case_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return all tasks for an employee, ordered by due_date ASC NULLS LAST then created_at.
+        If case_id is provided, scoped to that case; otherwise returns all tasks for the employee.
+        """
+        try:
+            with self.engine.connect() as conn:
+                params: Dict[str, Any] = {"eid": employee_id}
+                if case_id:
+                    where = "WHERE employee_id = :eid AND case_id = :cid"
+                    params["cid"] = case_id
+                else:
+                    where = "WHERE employee_id = :eid"
+                sql = f"""
+                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                           due_date, status, required_file_upload, submission_data,
+                           file_url, submitted_at, reviewed_by, reviewed_at, review_note,
+                           created_at, updated_at
+                    FROM employee_tasks
+                    {where}
+                    ORDER BY due_date ASC NULLS LAST, created_at ASC
+                """
+                rows = conn.execute(text(sql), params).fetchall()
+                result = []
+                for row in rows:
+                    d = dict(row._mapping)
+                    # Dates to ISO strings
+                    for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                        if d.get(k) is not None:
+                            d[k] = str(d[k])
+                    result.append(d)
+                return result
+        except Exception as e:
+            log.warning("list_employee_tasks employee_id=%s: %s", employee_id, e)
+            return []
+
+    def get_employee_task(
+        self,
+        task_id: str,
+        employee_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch a single task, verifying it belongs to the given employee.
+        Returns None if not found or not owned by employee.
+        """
+        try:
+            with self.engine.connect() as conn:
+                sql = """
+                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                           due_date, status, required_file_upload, submission_data,
+                           file_url, submitted_at, reviewed_at, reviewed_by, review_note,
+                           created_at, updated_at
+                    FROM employee_tasks
+                    WHERE id = :tid AND employee_id = :eid
+                    LIMIT 1
+                """
+                row = conn.execute(text(sql), {"tid": task_id, "eid": employee_id}).fetchone()
+                if row is None:
+                    return None
+                d = dict(row._mapping)
+                for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                    if d.get(k) is not None:
+                        d[k] = str(d[k])
+                return d
+        except Exception as e:
+            log.warning("get_employee_task task_id=%s: %s", task_id, e)
+            return None
+
+    def submit_employee_task(
+        self,
+        task_id: str,
+        employee_id: str,
+        submission_data: Optional[Dict[str, Any]] = None,
+        file_url: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Mark a task as submitted (status='submitted') and persist submission payload.
+        Returns updated task or None if task not found / not owned by employee.
+        Only updates tasks in status 'pending' or 'revision_requested'.
+        """
+        try:
+            with self.engine.begin() as conn:
+                # Verify ownership + eligible status
+                check = conn.execute(
+                    text("""
+                        SELECT id, status FROM employee_tasks
+                        WHERE id = :tid AND employee_id = :eid
+                        LIMIT 1
+                    """),
+                    {"tid": task_id, "eid": employee_id},
+                ).fetchone()
+                if check is None:
+                    return None
+                current_status = check._mapping["status"]
+                if current_status not in ("pending", "revision_requested"):
+                    # Already submitted/approved — return current state
+                    return self.get_employee_task(task_id, employee_id)
+
+                sub_data_json = json.dumps(submission_data) if submission_data else None
+                now = datetime.utcnow().isoformat()
+
+                conn.execute(
+                    text("""
+                        UPDATE employee_tasks
+                        SET status       = 'submitted',
+                            submission_data = COALESCE(:sub_data::jsonb, submission_data),
+                            file_url     = COALESCE(:file_url, file_url),
+                            submitted_at = :now,
+                            updated_at   = :now
+                        WHERE id = :tid AND employee_id = :eid
+                    """),
+                    {
+                        "sub_data": sub_data_json,
+                        "file_url": file_url,
+                        "now": now,
+                        "tid": task_id,
+                        "eid": employee_id,
+                    },
+                )
+            return self.get_employee_task(task_id, employee_id)
+        except Exception as e:
+            log.error("submit_employee_task task_id=%s: %s", task_id, e, exc_info=True)
+            return None
+
+    def review_employee_task(
+        self,
+        task_id: str,
+        case_id: str,
+        hr_user_id: str,
+        action: str,        # 'approved' | 'revision_requested'
+        review_note: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        HR approves or requests revision on a submitted employee task.
+
+        Only acts on tasks in status 'submitted'. Returns updated task or None.
+        `action` must be 'approved' or 'revision_requested'.
+        """
+        if action not in ("approved", "revision_requested"):
+            return None
+        try:
+            with self.engine.begin() as conn:
+                check = conn.execute(
+                    text("""
+                        SELECT id, status FROM employee_tasks
+                        WHERE id = :tid AND case_id = :cid
+                        LIMIT 1
+                    """),
+                    {"tid": task_id, "cid": case_id},
+                ).fetchone()
+                if check is None:
+                    return None
+                current_status = check._mapping["status"]
+                if current_status != "submitted":
+                    # Already reviewed — return current state without change
+                    pass
+                else:
+                    now = datetime.utcnow().isoformat()
+                    conn.execute(
+                        text("""
+                            UPDATE employee_tasks
+                            SET status       = :action,
+                                reviewed_by  = :hr,
+                                reviewed_at  = :now,
+                                review_note  = :note,
+                                updated_at   = :now
+                            WHERE id = :tid AND case_id = :cid
+                        """),
+                        {
+                            "action": action,
+                            "hr": hr_user_id,
+                            "now": now,
+                            "note": review_note,
+                            "tid": task_id,
+                            "cid": case_id,
+                        },
+                    )
+            # Return fresh read
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text("""
+                        SELECT * FROM employee_tasks
+                        WHERE id = :tid AND case_id = :cid LIMIT 1
+                    """),
+                    {"tid": task_id, "cid": case_id},
+                ).fetchone()
+                if row is None:
+                    return None
+                d = dict(row._mapping)
+                for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                    if d.get(k) is not None:
+                        d[k] = str(d[k])
+                return d
+        except Exception as e:
+            log.error("review_employee_task task_id=%s: %s", task_id, e, exc_info=True)
+            return None
+
+    def create_employee_task_for_case(
+        self,
+        case_id: str,
+        employee_id: str,
+        org_id: str,
+        task_type: str,
+        title: str,
+        description: Optional[str] = None,
+        due_date: Optional[str] = None,
+        required_file_upload: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        HR creates a new task on an existing case (mid-case assignment).
+        Returns the created task row or None on error.
+        """
+        try:
+            new_id = str(uuid.uuid4())
+            now = datetime.utcnow().isoformat()
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO employee_tasks
+                            (id, case_id, employee_id, org_id, type, title, description,
+                             due_date, status, required_file_upload, created_at, updated_at)
+                        VALUES
+                            (:id, :cid, :eid, :oid, :type, :title, :desc,
+                             :due, 'pending', :req_file, :now, :now)
+                    """),
+                    {
+                        "id": new_id,
+                        "cid": case_id,
+                        "eid": employee_id,
+                        "oid": org_id,
+                        "type": task_type,
+                        "title": title,
+                        "desc": description,
+                        "due": due_date,
+                        "req_file": required_file_upload,
+                        "now": now,
+                    },
+                )
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text("SELECT * FROM employee_tasks WHERE id = :id LIMIT 1"),
+                    {"id": new_id},
+                ).fetchone()
+                if row is None:
+                    return None
+                d = dict(row._mapping)
+                for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                    if d.get(k) is not None:
+                        d[k] = str(d[k])
+                return d
+        except Exception as e:
+            log.error("create_employee_task_for_case case_id=%s: %s", case_id, e, exc_info=True)
+            return None
+
+    def list_employee_tasks_for_case_hr(
+        self,
+        case_id: str,
+    ) -> List[Dict[str, Any]]:
+        """
+        HR view: all tasks for a case, used by AIQ-34-C.
+        Returns all tasks ordered by status (pending first) then due_date.
+        """
+        try:
+            with self.engine.connect() as conn:
+                sql = """
+                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                           due_date, status, required_file_upload, submission_data,
+                           file_url, submitted_at, reviewed_by, reviewed_at, review_note,
+                           created_at, updated_at
+                    FROM employee_tasks
+                    WHERE case_id = :cid
+                    ORDER BY
+                        CASE status
+                            WHEN 'pending'             THEN 1
+                            WHEN 'revision_requested'  THEN 2
+                            WHEN 'submitted'           THEN 3
+                            WHEN 'approved'            THEN 4
+                            ELSE 5
+                        END,
+                        due_date ASC NULLS LAST
+                """
+                rows = conn.execute(text(sql), {"cid": case_id}).fetchall()
+                result = []
+                for row in rows:
+                    d = dict(row._mapping)
+                    for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                        if d.get(k) is not None:
+                            d[k] = str(d[k])
+                    result.append(d)
+                return result
+        except Exception as e:
+            log.warning("list_employee_tasks_for_case_hr case_id=%s: %s", case_id, e)
+            return []

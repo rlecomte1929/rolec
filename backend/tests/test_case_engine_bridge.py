@@ -129,14 +129,12 @@ def _read_def(marker: str) -> str:
     extracted backend/db/*.py mixins (AUDIT-C1.2+ moved domain methods out of the
     monolith into mixins; these source guards must follow them — e.g. C1.5 moved
     apply_wizard_patch_side_effects into backend/db/intake.py)."""
+    import glob
     import os
-    for parts in (
-        ("backend", "database.py"),
-        ("backend", "db", "cases.py"),
-        ("backend", "db", "intake.py"),
-        ("backend", "db", "hr.py"),
-    ):
-        with open(os.path.join(_REPO_ROOT, *parts), "r", encoding="utf-8") as fh:
+    search = [os.path.join(_REPO_ROOT, "backend", "database.py")]
+    search += sorted(glob.glob(os.path.join(_REPO_ROOT, "backend", "db", "*.py")))
+    for path in search:
+        with open(path, "r", encoding="utf-8") as fh:
             src = fh.read()
         if marker in src:
             start = src.index(marker)
