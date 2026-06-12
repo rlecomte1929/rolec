@@ -70,7 +70,12 @@ const SECTIONS: NavSection[] = [
         // Admins keep it visible so they can preview the form.
         hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
       },
-      { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path, badge: { kind: 'static-count', count: 3 } },
+      // No badge: the roadmap item count isn't wired into the sidebar's
+      // NotifContext, and the hard-coded '3' showed even when the roadmap was
+      // empty (buttons disabled, no items) — the same distrust-training problem
+      // AIQ-914 fixed for the other items. Re-add a `dynamic` badge once a real
+      // roadmap-item count is exposed to the sidebar. (AIQ-979)
+      { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'documents', label: 'Tasks', hint: 'Documents and actions requested by your HR team', to: ROUTE_DEFS.employeeTaskPage.path },
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'service-providers', label: 'Service providers', to: ROUTE_DEFS.services.path },
