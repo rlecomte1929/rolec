@@ -31,6 +31,10 @@ export interface LoadedBenefitValue {
   lump_inc: CanvasLumpInc | null;
   cap: boolean;
   conditions: boolean;
+  // Provenance + extraction confidence (AIQ-991): only meaningful for AI-extracted
+  // rows (source='extracted_llm'); used to badge confidence in the builder.
+  source?: string | null;
+  field_confidence?: number | null;
 }
 
 // A reconstructed tier WITHOUT page-only chrome (id / color / emp), which the
@@ -61,6 +65,8 @@ export interface DraftBenefitRow {
   notes?: string | null;
   cap_rule_json?: Record<string, unknown> | null;
   conditions_json?: Record<string, unknown> | null;
+  source?: string | null;
+  field_confidence?: number | null;
   assignment_types?: string[] | null;
   family_statuses?: string[] | null;
   employee_levels?: string[] | null;
@@ -147,6 +153,8 @@ function rowToBenefitValue(row: DraftBenefitRow, isLump: boolean): LoadedBenefit
     lump_inc: isLump ? 'included' : null,
     cap,
     conditions,
+    source: row.source ?? null,
+    field_confidence: typeof row.field_confidence === 'number' ? row.field_confidence : null,
   };
 }
 

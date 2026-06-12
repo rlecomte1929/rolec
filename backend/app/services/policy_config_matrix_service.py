@@ -536,6 +536,11 @@ class PolicyConfigMatrixService:
                 "benefit_key": b.get("benefit_key"),
                 "benefit_label": b.get("benefit_label"),
                 "covered": bool(b.get("covered")),
+                # Provenance + per-field extraction confidence so the builder can
+                # badge AI-extracted rows (source='extracted_llm') with a
+                # confidence indicator. See AIQ-991.
+                "source": b.get("source"),
+                "field_confidence": b.get("field_confidence"),
                 "value_type": b.get("value_type") or "none",
                 "amount_value": b.get("amount_value"),
                 "currency_code": b.get("currency_code"),
