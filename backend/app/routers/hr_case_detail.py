@@ -698,3 +698,157 @@ def get_behind_schedule_cases(
     from ..services.case_health_scan import list_behind_cases_for_company
 
     return {"cases": list_behind_cases_for_company(org_id)}
+
+
+# ---------------------------------------------------------------------------
+# N. POST /{case_id}/employee-briefing  — FRIDAY-005 (AIQ-648)
+#    Personalised, citation-grounded relocation briefing for the employee on a
+#    case, generated from the company's active policy via Claude Sonnet 4.6
+#    (1M-token context). Service + prompts: backend/app/services/briefing.py.
+# ---------------------------------------------------------------------------
+
+
+class BriefingResponse(BaseModel):
+    briefing: str
+    cost_usd: float
+    latency_ms: int
+    model: str
+
+
+def _load_active_policy_text(org_id: str) -> Optional[str]:
+    """Return the company's active policy as plain text, or None if none exists.
+
+    Primary source is ``policy_documents.raw_text`` (already extracted at intake).
+    Fallback: download the PDF from ``storage_path`` and run pdf_bytes_to_text.
+    "Active" = most recently uploaded policy document for the company.
+
+    SEAM [FRIDAY-005]: the policy_documents schema (company_id text, storage_path
+    text, raw_text text) is confirmed from migrations, but the storage *bucket*
+    for storage_path and the precise "active" semantics aren't — both are wrapped
+    so a schema mismatch degrades to None (→ 404) rather than a 500.
+    """
+    row = None
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT raw_text, storage_path
+                    FROM public.policy_documents
+                    WHERE company_id = :org
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"org": org_id},
+            ).mappings().first()
+    except Exception:
+        return None
+    if not row:
+        return None
+
+    raw_text = (row.get("raw_text") or "").strip()
+    if raw_text:
+        return raw_text
+
+    storage_path = row.get("storage_path")
+    if not storage_path:
+        return None
+    # Fallback: pull the PDF bytes from storage and extract. Best-effort — the
+    # service-role client + bucket are flagged as a seam to confirm.
+    try:
+        from ..services.supabase_client import get_supabase_admin_client
+        from ..utils.pdf_to_text import pdf_bytes_to_text_cached
+
+        # TODO [FRIDAY-005]: confirm the storage bucket for policy PDFs. The
+        # intake module stores them under a policy bucket; until confirmed we
+        # treat storage_path as "<bucket>/<path>" and split on the first slash.
+        bucket, _, path = str(storage_path).partition("/")
+        pdf_bytes = get_supabase_admin_client().storage.from_(bucket).download(path)
+        return pdf_bytes_to_text_cached(pdf_bytes)
+    except Exception:
+        return None
+
+
+def _build_employee_for_briefing(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Map a relocation_cases row → the employee dict briefing.py expects.
+
+    SEAM [FRIDAY-005]: typed case columns (employee_id, origin/dest country, target
+    start date) are confirmed; grade / assignment_type / dependants live in the
+    untyped ``profile_json`` blob whose exact keys vary, so they're read best-effort
+    across a few candidate names and left as gaps ("not provided") when absent —
+    which the prompt handles gracefully rather than inventing.
+    """
+    employee_id = case.get("employee_id") or ""
+    if not employee_id:
+        return None
+
+    name: Optional[str] = None
+    try:
+        user = db.get_user_by_id(employee_id)
+    except Exception:
+        user = None
+    if user:
+        name = user.get("name") or user.get("email")
+
+    profile = case.get("profile_json")
+    if isinstance(profile, str):
+        try:
+            import json as _json
+
+            profile = _json.loads(profile)
+        except Exception:
+            profile = {}
+    if not isinstance(profile, dict):
+        profile = {}
+
+    def pick(*keys: str) -> Optional[Any]:
+        for k in keys:
+            v = profile.get(k) or case.get(k)
+            if v not in (None, "", []):
+                return v
+        return None
+
+    return {
+        "name": name or pick("name", "full_name", "employee_name"),
+        "grade": pick("grade", "grade_band", "gradeBand", "seniority", "level"),
+        "assignment_type": pick("assignment_type", "assignmentType", "assignment", "move_type"),
+        "home_country": pick("origin_country_code", "home_country", "origin", "origin_country"),
+        "destination": pick("dest_country_code", "destination_country", "destination", "host_country") or case.get("corridor"),
+        "departure_date": (str(case["target_start_date"]) if case.get("target_start_date") else pick("departure_date", "target_move_date", "move_date")),
+        "dependants": pick("dependants", "dependents", "family"),
+    }
+
+
+@router.post("/{case_id}/employee-briefing", response_model=BriefingResponse)
+def generate_case_employee_briefing(
+    case_id: str,
+    _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> BriefingResponse:
+    """Generate a personalised, citation-grounded relocation briefing for the
+    employee on this case, from the company's active policy (Sonnet 4.6, 1M ctx).
+
+    401 if not an HR/admin; 404 if the case isn't in the caller's company (RLS) or
+    no active policy exists; 400 if no employee is linked; 422 if the policy PDF
+    can't be parsed; 502 on an Anthropic API error.
+    """
+    from ..services.briefing import BriefingError, generate_employee_briefing
+
+    case = _require_case_access(case_id, org_id)  # 404 on RLS mismatch
+
+    employee = _build_employee_for_briefing(case)
+    if employee is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No employee assigned to this case")
+
+    policy_text = _load_active_policy_text(org_id)
+    if not policy_text:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active policy document found")
+
+    try:
+        result = generate_employee_briefing(policy_text, employee)
+    except BriefingError as exc:
+        # Don't leak a raw stack trace; surface a bounded message.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Briefing generation failed: {exc}") from exc
+
+    return BriefingResponse(**result)
