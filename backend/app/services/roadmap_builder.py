@@ -18,7 +18,14 @@ import logging
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
+from .immigration_regime import ImmigrationRegimeRouter
+from .wizard_draft_mapper import extract_profile_from_wizard_draft
+
 logger = logging.getLogger(__name__)
+
+# Regimes that require no visa/permit — the Visa & Permit track is omitted for
+# these (EU/EEA free movement, and same-country domestic moves).
+_NO_VISA_REGIMES = frozenset({"eu_free_movement", "domestic"})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -377,6 +384,30 @@ def _build_settlement_track(case: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Requirements gating
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _visa_track_required(draft: Dict[str, Any]) -> bool:
+    """
+    AIQ-972: requirements-driven roadmap. Detect the immigration regime from the
+    wizard draft and decide whether the Visa & Permit track applies.
+
+    Returns False for EU/EEA free-movement and domestic (same-country) moves —
+    those need registration only, not a visa/permit — so the visa track is
+    dropped, yielding a lighter, accurate plan. Returns True otherwise (incl.
+    "unknown", so an incomplete draft keeps the visa track — fail-open).
+    """
+    profile = extract_profile_from_wizard_draft(draft)
+    regime = ImmigrationRegimeRouter().detect_regime(
+        nationality=profile.get("nationality"),
+        destination_country=profile.get("destination_country"),
+        origin_country=profile.get("origin_country"),
+        contract_type=profile.get("contract_type"),
+    )
+    return regime.regime_id not in _NO_VISA_REGIMES
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -394,11 +425,12 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
     has_kids = marital in ("partner_kids", "kids_only")
     has_spouse = marital in ("partner", "partner_kids")
 
-    # Build tracks
-    tracks = [
-        _build_visa_track(case),
-        _build_civil_track(case),
-    ]
+    # Build tracks. AIQ-972: the Visa & Permit track is requirements-driven —
+    # omitted for EU/EEA free-movement and domestic moves (no visa/permit needed).
+    tracks: List[Dict[str, Any]] = []
+    if _visa_track_required(draft):
+        tracks.append(_build_visa_track(case))
+    tracks.append(_build_civil_track(case))
     family_track = _build_family_track(case)
     if family_track:
         tracks.append(family_track)
