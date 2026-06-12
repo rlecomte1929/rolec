@@ -7,7 +7,7 @@ import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
-import { WizardSidebar } from '../../components/case/WizardSidebar';
+import { WizardStepRail } from '../../features/employee-journey/WizardStepRail';
 import { Card } from '../../components/antigravity';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { patchCase, startResearch } from '../../api/cases';
@@ -664,37 +664,19 @@ export const CaseWizardPage: React.FC = () => {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-6">
-          <div className="space-y-6">
-            <WizardSidebar
-              currentStep={currentStep}
-              completedSteps={completedSteps}
-              onSelect={(stepNumber) => {
-                if (stepNumber > stepCompletion.maxUnlocked) {
-                  setError('Complete the previous steps first.');
-                  return;
-                }
-                navigate(`/employee/case/${assignmentId}/wizard/${stepNumber}`);
-              }}
-            />
-            <Card padding="md">
-              <div className="text-sm font-semibold text-[#0b2b43]">Need help?</div>
-              <div className="text-xs text-[#6b7280] mt-1">Our team can guide you through the wizard.</div>
-              <Button unstyled className="mt-3 text-xs text-[#0b2b43] underline">Contact support</Button>
-              {enableTestFill && (
-                <div className="mt-4 border-t border-[#e2e8f0] pt-3">
-                  <Button unstyled
-                    type="button"
-                    onClick={handleFillForTest}
-                    title="Demo only — fills the wizard with deterministic answers."
-                    className="text-xs text-[#94a3b8] hover:text-[#0b2b43] hover:underline"
-                  >
-                    Fill for test (demo)
-                  </Button>
-                </div>
-              )}
-            </Card>
-          </div>
+        <div className="space-y-6">
+          <WizardStepRail
+            currentStep={currentStep}
+            completedSteps={completedSteps}
+            maxUnlocked={stepCompletion.maxUnlocked}
+            onSelect={(stepNumber) => {
+              if (stepNumber > stepCompletion.maxUnlocked) {
+                setError('Complete the previous steps first.');
+                return;
+              }
+              navigate(`/employee/case/${assignmentId}/wizard/${stepNumber}`);
+            }}
+          />
           <div>
             {caseHydrating ? (
               <Card padding="lg" className="min-h-[280px]">
@@ -712,6 +694,23 @@ export const CaseWizardPage: React.FC = () => {
               stepNode
             )}
           </div>
+          <Card padding="md">
+            <div className="text-sm font-semibold text-[#0b2b43]">Need help?</div>
+            <div className="text-xs text-[#6b7280] mt-1">Our team can guide you through the wizard.</div>
+            <Button unstyled className="mt-3 text-xs text-[#0b2b43] underline">Contact support</Button>
+            {enableTestFill && (
+              <div className="mt-4 border-t border-[#e2e8f0] pt-3">
+                <Button unstyled
+                  type="button"
+                  onClick={handleFillForTest}
+                  title="Demo only — fills the wizard with deterministic answers."
+                  className="text-xs text-[#94a3b8] hover:text-[#0b2b43] hover:underline"
+                >
+                  Fill for test (demo)
+                </Button>
+              </div>
+            )}
+          </Card>
         </div>
       </div>
       </PolicyAssistantDockedShell>
