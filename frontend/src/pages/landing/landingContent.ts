@@ -57,10 +57,9 @@ export const landingContent = {
         title: 'Every delay is a compliance, cost, or employee risk.',
         body: 'Handoffs are untracked. Deadlines are missed before anyone notices.',
       },
-      {
-        title: 'Status lives in inboxes, not in systems.',
-        body: 'Nothing is auditable. Nothing is proactive.',
-      },
+      // AIQ-983: removed a duplicate 4th card — its title repeated card 1's body
+      // ("Status lives in inboxes, not in systems.") and left a lone card on a
+      // second row in the 3-column grid.
     ],
   },
 

@@ -96,8 +96,11 @@ export const Landing: React.FC = () => {
 
   return (
     <PublicLayout>
-      {/* 1. HERO: Two columns: text + CTAs left, visual right */}
-      <Section spacing="lg" background="transparent" fillViewport>
+      {/* 1. HERO: Two columns: text + CTAs left, visual right.
+          AIQ-981: dropped `fillViewport` — it forced min-h-screen + vertical
+          centering, which pushed the headline down and left blank space above
+          the hero on tall viewports. The hero now starts directly below the nav. */}
+      <Section spacing="lg" background="transparent">
         <HeroSurface
           eyebrow={c.hero.eyebrow}
           title={c.hero.headline}
@@ -127,8 +130,10 @@ export const Landing: React.FC = () => {
         />
       </Section>
 
-      {/* 1b. PROOF BLOCK: 3 EU AI Act credibility lines, directly under the hero (FRIDAY-004c) */}
-      <Section spacing="sm" background="transparent">
+      {/* 1b. PROOF BLOCK: 3 EU AI Act credibility lines, directly under the hero (FRIDAY-004c).
+          AIQ-982: drop the proof block's top padding so it sits tight under the
+          hero CTAs (the hero's bottom padding already provides the gap). */}
+      <Section spacing="sm" background="transparent" className="pt-0">
         <FadeIn>
           <ProofBlock items={c.proofBlock.items} className="max-w-5xl mx-auto" />
         </FadeIn>
@@ -216,8 +221,9 @@ export const Landing: React.FC = () => {
         </FadeIn>
       </Section>
 
-      {/* 5. FINAL CTA: Centered, compact, decisive */}
-      <Section spacing="lg" background="transparent">
+      {/* 5. FINAL CTA: Centered, compact, decisive.
+          AIQ-989: trim the bottom padding so the gap to the footer isn't oversized. */}
+      <Section spacing="lg" background="transparent" className="pb-12 sm:pb-16">
         <FadeIn>
           <CTAPanel
             title={c.finalCta.headline}
