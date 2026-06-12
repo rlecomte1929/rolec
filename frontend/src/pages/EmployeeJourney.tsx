@@ -477,7 +477,7 @@ export const EmployeeJourney: React.FC = () => {
     if (hasLinked) {
       return (
         <Badge variant="success" size="sm">
-          {linkedCount === 1 ? 'Linked: case on this account' : `Linked: ${linkedCount} assignments on this account`}
+          {linkedCount === 1 ? 'Linked to you: 1 case' : `Linked to you: ${linkedCount} cases`}
         </Badge>
       );
     }
