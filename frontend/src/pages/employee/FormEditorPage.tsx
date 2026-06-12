@@ -30,6 +30,7 @@ import React, {
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
+import { Alert } from '../../components/antigravity';
 import { AppShell } from '../../components/AppShell';
 import { logger } from '../../lib/logger';
 import { buildRoute } from '../../navigation/routes';
@@ -491,6 +492,13 @@ export const FormEditorPage: React.FC = () => {
 
         {/* Right: Field editor (60%) */}
         <div className="flex-1 overflow-y-auto px-6 py-4 pb-24">
+          {/* Content-honesty disclaimer — this is the submission surface and the
+              form template is representative, not legally verified, so remind the
+              employee to confirm with the issuing authority before submitting. */}
+          <Alert variant="warning" className="mb-4">
+            Indicative — always confirm details with the issuing authority before you submit.
+            This form is representative and may differ from the latest official version.
+          </Alert>
           {sections.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-sm">
               No fields defined for this form yet.
