@@ -83,6 +83,51 @@ class ExtractDeliverablePathsTests(unittest.TestCase):
             ["supabase/migrations/20260605500000_rce_tenant_rls.sql"],
         )
 
+    def test_what_was_built_section_numbered_bullets(self):
+        # The Cowork phantom pattern (AI-003 cluster): deliverables listed as
+        # numbered bullets under "## What was built" with NO CREATED: marker.
+        text = (
+            "## What was built\n\n"
+            "Three deliverables closing the Tier-3 gaps:\n\n"
+            "1. outputs/ai-003d_iso_42001_gap_analysis.md — walk of all 7 clauses\n"
+            "2. audit/eu_ai_act/article_14_self_assessment.md — self-assessment\n"
+        )
+        self.assertEqual(
+            cdi.extract_deliverable_paths(text),
+            [
+                "outputs/ai-003d_iso_42001_gap_analysis.md",
+                "audit/eu_ai_act/article_14_self_assessment.md",
+            ],
+        )
+
+    def test_outputs_root_is_recognized(self):
+        # outputs/ is a real deliverable root (productionised-spike / Cowork scratch).
+        text = "CREATED: outputs/friday_005_policy_ingestion_spike.py"
+        self.assertEqual(
+            cdi.extract_deliverable_paths(text),
+            ["outputs/friday_005_policy_ingestion_spike.py"],
+        )
+
+    def test_empty_basename_prose_capture_is_skipped(self):
+        # Prose like "11 backend/db/.py mixins" must not yield "backend/db/.py"
+        # (a basename that is just an extension is never a real deliverable).
+        text = "## What was built\nThe monolith is now 11 backend/db/.py mixins.\n"
+        self.assertEqual(cdi.extract_deliverable_paths(text), [])
+
+    def test_non_claim_heading_closes_the_section(self):
+        # A "Reviewer steps" heading is NOT a claim section — paths under it
+        # (example commands / prose) must not be captured.
+        text = (
+            "## What was built\n"
+            "1. outputs/real_deliverable.md — yes\n"
+            "## Reviewer steps\n"
+            "run `cat outputs/should_not_capture.md` to inspect\n"
+        )
+        self.assertEqual(
+            cdi.extract_deliverable_paths(text),
+            ["outputs/real_deliverable.md"],
+        )
+
 
 class CheckTasksTests(unittest.TestCase):
     def setUp(self):
