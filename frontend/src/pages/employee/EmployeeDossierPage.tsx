@@ -14,7 +14,7 @@ import { Button } from '../../components/antigravity/Button';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
-import { isSourceStale } from '../../components/antigravity';
+import { Alert, isSourceStale } from '../../components/antigravity';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
 
@@ -173,6 +173,19 @@ export const EmployeeDossierPage: React.FC = () => {
             </Button>
           </div>
         </header>
+
+        {/* Content-honesty disclaimer — form templates are representative, not
+            legally verified, so always remind the employee to confirm with the
+            issuing authority before submitting (per the design brief's content
+            honesty rule). */}
+        {forms.length > 0 && (
+          <div data-testid="dossier-honesty-banner" className="mb-4">
+            <Alert variant="warning">
+              Indicative — always confirm details with the issuing authority before you submit.
+              Forms shown here are representative and may differ from the latest official version.
+            </Alert>
+          </div>
+        )}
 
         {/* [P1-6] Roadmap-step scope banner — shown when arriving from a
             roadmap Documents chip. Explains why the list is narrowed and
