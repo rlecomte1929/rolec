@@ -387,7 +387,10 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successSco
         <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
           Track every step of your relocation journey.
         </p>
-        {caseId && <RoadmapActions caseId={caseId} />}
+        {/* AIQ-986: only offer the email/calendar delivery actions once a
+            roadmap actually exists — with no tracks there's nothing to email
+            or add to a calendar, so the buttons would silently do nothing. */}
+        {caseId && tracks.length > 0 && <RoadmapActions caseId={caseId} />}
       </div>
 
       {/* [P2-05] Probability-of-success estimate — rendered only when available. */}
