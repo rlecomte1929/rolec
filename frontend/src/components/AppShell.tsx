@@ -41,7 +41,10 @@ const LogoutButton: React.FC = () => {
         setIsLoggingOut(true);
         try {
           await authAPI.logout();
-          window.location.replace(buildRoute('landing'));
+          // AIQ-990: land on the login page after sign-out, not the marketing
+          // homepage — the user just left the app and most likely wants to sign
+          // back in, not read the landing page.
+          window.location.replace(buildRoute('login'));
         } catch {
           setIsLoggingOut(false);
         }
