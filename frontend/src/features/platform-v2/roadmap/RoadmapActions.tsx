@@ -10,12 +10,17 @@ import { emailRoadmapPlan, downloadCaseCalendar } from '../../../api/roadmapInte
 
 export interface RoadmapActionsProps {
   caseId: string;
+  /** Whether a roadmap has actually been generated. When false the actions are
+   *  disabled — there's no plan to email or deadlines to export yet. */
+  hasRoadmap?: boolean;
 }
 
-export function RoadmapActions({ caseId }: RoadmapActionsProps) {
+export function RoadmapActions({ caseId, hasRoadmap = true }: RoadmapActionsProps) {
   const [confirmEmail, setConfirmEmail] = useState(false);
   const [busy, setBusy] = useState<null | 'email' | 'calendar'>(null);
   const [notice, setNotice] = useState<{ variant: 'success' | 'error'; msg: string } | null>(null);
+  const disabled = busy !== null || !hasRoadmap;
+  const disabledTitle = !hasRoadmap ? 'Available once your roadmap is generated' : undefined;
 
   const sendEmail = async () => {
     setConfirmEmail(false);
@@ -47,10 +52,10 @@ export function RoadmapActions({ caseId }: RoadmapActionsProps) {
   return (
     <div style={{ marginTop: '12px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <Button variant="secondary" size="sm" onClick={() => setConfirmEmail(true)} disabled={busy !== null}>
+        <Button variant="secondary" size="sm" onClick={() => setConfirmEmail(true)} disabled={disabled} title={disabledTitle}>
           {busy === 'email' ? 'Sending…' : '✉ Email this plan'}
         </Button>
-        <Button variant="secondary" size="sm" onClick={downloadCalendar} disabled={busy !== null}>
+        <Button variant="secondary" size="sm" onClick={downloadCalendar} disabled={disabled} title={disabledTitle}>
           {busy === 'calendar' ? 'Preparing…' : '📅 Add deadlines to calendar'}
         </Button>
       </div>
