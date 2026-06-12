@@ -61,7 +61,7 @@ _FILE_PRODUCING_TYPES = {
 # as a candidate deliverable when it starts with one of these and ends in a file
 # extension — keeps prose ("the cases domain") from being mistaken for a path.
 _KNOWN_ROOTS = (
-    "backend", "prompts", "scripts", "supabase/migrations",
+    "outputs", "backend", "prompts", "scripts", "supabase/migrations",
     "audit", "docs", "frontend/src", "apps", "lib", ".github",
 )
 
@@ -75,6 +75,18 @@ _PATH_RE = re.compile(
 # as deliverable claims (the Execution-Notes "Files changed" convention).
 _CLAIM_MARKER_RE = re.compile(r"\b(CREATED|MODIFIED|ADDED|NEW FILE)\b", re.IGNORECASE)
 
+# A markdown heading line, and the subset of headings that open a "claimed
+# deliverables" section. Cowork lists its outputs as numbered bullets under a
+# "What was built" / "Files created" heading WITHOUT a CREATED: marker (e.g.
+# "1. outputs/foo.md — ..."), so paths under such a heading also count as claims.
+# A non-matching heading closes the section (reviewer-steps prose is excluded).
+_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
+_CLAIM_SECTION_RE = re.compile(
+    r"#{1,6}\s*(?:what was built|files?\s+(?:created|changed|added)"
+    r"|new files?|deliverables?)\b",
+    re.IGNORECASE,
+)
+
 
 # --------------------------------------------------------------------------- #
 # Pure helpers (unit-tested without network)                                  #
@@ -84,22 +96,33 @@ _CLAIM_MARKER_RE = re.compile(r"\b(CREATED|MODIFIED|ADDED|NEW FILE)\b", re.IGNOR
 def extract_deliverable_paths(note_text: str) -> List[str]:
     """Return the repo-relative deliverable paths a task CLAIMS it produced.
 
-    Only paths on a line bearing a ``CREATED:`` or ``MODIFIED:`` marker (the
-    Execution-Notes "Files changed" convention) count as deliverable claims.
-    Paths mentioned anywhere else in the notes — reviewer-steps prose like
-    "move X into `scripts/Y`", example commands, or "see also `path`" — are NOT
-    claims and were the dominant false-positive source on the first live run
-    (a file that landed at a slightly different path than the prose mentioned).
-    Order-preserving and de-duplicated.
+    A path counts as a deliverable claim when it appears EITHER:
+      * on a line bearing a ``CREATED:``/``MODIFIED:`` marker (the Execution-Notes
+        "Files changed" convention), OR
+      * under a "What was built" / "Files created" / "Deliverables" heading — the
+        Cowork numbered-bullet convention (``1. outputs/foo.md — ...``) that carries
+        no marker. A subsequent non-claim heading closes the section.
+    Paths mentioned anywhere else — reviewer-steps prose like "move X into
+    `scripts/Y`", example commands, or "see also `path`" — are NOT claims and were
+    the dominant false-positive source on the first live run (a file that landed at
+    a slightly different path than the prose mentioned). Order-preserving and
+    de-duplicated.
     """
     seen: Set[str] = set()
     out: List[str] = []
+    in_claim_section = False
     for line in (note_text or "").splitlines():
-        if not _CLAIM_MARKER_RE.search(line):
+        if _HEADING_RE.match(line):
+            in_claim_section = bool(_CLAIM_SECTION_RE.search(line))
+        if not (in_claim_section or _CLAIM_MARKER_RE.search(line)):
             continue
         for m in _PATH_RE.finditer(line):
             p = m.group(1).rstrip(".,);:")
-            if p and p not in seen:
+            # Skip captures whose basename is just an extension (e.g. prose like
+            # "11 backend/db/.py mixins" → "backend/db/.py"): not a real file.
+            if not p or p.rsplit("/", 1)[-1].startswith("."):
+                continue
+            if p not in seen:
                 seen.add(p)
                 out.append(p)
     return out
