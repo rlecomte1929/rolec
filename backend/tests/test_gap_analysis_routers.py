@@ -124,6 +124,58 @@ class TestRelocationProfile(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# GAP 1b — rich_profile (verbatim platform-v2 ProfileData store)
+# ═══════════════════════════════════════════════════════════════════════════════
+class TestRichProfile(unittest.TestCase):
+    def _mod(self):
+        from backend.app.routers import relocation_profile as m
+        return m
+
+    def test_get_returns_empty_when_no_row(self):
+        m = self._mod()
+        with mock.patch.object(m, "_get_rich_from_db", return_value=None):
+            resp = m.get_rich_profile("case-xyz", user=_MOCK_USER)
+        self.assertEqual(resp.case_id, "case-xyz")
+        self.assertEqual(resp.data, {})
+        self.assertIsNone(resp.last_updated_at)
+
+    def test_get_returns_stored_data(self):
+        m = self._mod()
+        row = {"data": {"housing_type": "Apartment", "bedrooms_needed": 3},
+               "updated_at": "2026-06-12T00:00:00Z"}
+        with mock.patch.object(m, "_get_rich_from_db", return_value=row):
+            resp = m.get_rich_profile("case-xyz", user=_MOCK_USER)
+        self.assertEqual(resp.data["bedrooms_needed"], 3)
+        self.assertEqual(resp.last_updated_at, "2026-06-12T00:00:00Z")
+
+    def test_put_persists_and_echoes_payload(self):
+        m = self._mod()
+        payload = {
+            "housing_type": "House",
+            "must_haves": ["Parking"],
+            "neighborhood_priorities": {"safety": 5},
+        }
+        captured = {}
+
+        def fake_upsert(case_id, user_id, data):
+            captured.update(case_id=case_id, user_id=user_id, data=data)
+            return {"updated_at": "2026-06-12T01:00:00Z"}
+
+        with mock.patch.object(m, "_upsert_rich_to_db", side_effect=fake_upsert):
+            resp = m.put_rich_profile("case-xyz", payload=payload, user=_MOCK_USER)
+        self.assertEqual(captured["case_id"], "case-xyz")
+        self.assertEqual(captured["user_id"], "user-001")
+        self.assertEqual(captured["data"]["must_haves"], ["Parking"])
+        self.assertEqual(resp.data["neighborhood_priorities"]["safety"], 5)
+        self.assertEqual(resp.last_updated_at, "2026-06-12T01:00:00Z")
+
+    def test_rich_profile_routes_registered(self):
+        from backend.app.routers.relocation_profile import router
+        paths = {r.path for r in router.routes}
+        self.assertIn("/api/employee/cases/{case_id}/rich-profile", paths)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # GAP 3 — hr_analytics (compliance matrix)
 # ═══════════════════════════════════════════════════════════════════════════════
 class TestHrAnalytics(unittest.TestCase):

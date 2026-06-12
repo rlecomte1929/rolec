@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..auth_deps import get_current_user
@@ -214,4 +214,83 @@ def put_relocation_profile(
         profile=payload,
         completion_pct=_compute_completion(data),
         last_updated_at=None,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rich profile — verbatim store for the platform-v2 EmployeeRichProfilePage.
+#
+# The platform-v2 "Profile & Preferences" page collects a richer / differently
+# shaped ProfileData (flat section A–G fields) than the strongly-typed
+# RelocationProfilePayload above. Rather than lossily map between the two, we
+# persist the page's payload verbatim as opaque JSONB in the sibling
+# ``rich_profiles`` table (case_id PK), keeping the two profiles independent.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RichProfileResponse(BaseModel):
+    case_id: str
+    data: Dict[str, Any]
+    last_updated_at: Optional[str] = None
+
+
+def _get_rich_from_db(case_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch the rich_profiles row from Supabase."""
+    try:
+        from ..services.supabase_client import get_supabase_admin_client
+        sb = get_supabase_admin_client()
+        result = sb.table("rich_profiles").select("*").eq("case_id", case_id).maybe_single().execute()
+        if result and result.data:
+            return result.data
+    except Exception:
+        logger.exception("Failed to fetch rich_profile case_id=%s", case_id)
+    return None
+
+
+def _upsert_rich_to_db(case_id: str, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Upsert the rich_profiles row in Supabase."""
+    from ..services.supabase_client import get_supabase_admin_client
+    from datetime import datetime, timezone
+    sb = get_supabase_admin_client()
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "case_id": case_id,
+        "user_id": user_id,
+        "data": data,
+        "updated_at": now,
+    }
+    result = sb.table("rich_profiles").upsert(row, on_conflict="case_id").execute()
+    if result and result.data:
+        return result.data[0]
+    raise HTTPException(status_code=500, detail="Failed to save rich profile")
+
+
+@router.get("/{case_id}/rich-profile", response_model=RichProfileResponse)
+def get_rich_profile(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Return the verbatim platform-v2 preference profile for a case (empty {} if none)."""
+    row = _get_rich_from_db(case_id)
+    if not row:
+        return RichProfileResponse(case_id=case_id, data={}, last_updated_at=None)
+    return RichProfileResponse(
+        case_id=case_id,
+        data=row.get("data") or {},
+        last_updated_at=row.get("updated_at"),
+    )
+
+
+@router.put("/{case_id}/rich-profile", response_model=RichProfileResponse)
+def put_rich_profile(
+    case_id: str,
+    payload: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Save / overwrite the verbatim platform-v2 preference profile for a case."""
+    user_id = str(user.get("id", ""))
+    row = _upsert_rich_to_db(case_id, user_id, payload)
+    return RichProfileResponse(
+        case_id=case_id,
+        data=payload,
+        last_updated_at=row.get("updated_at") if isinstance(row, dict) else None,
     )
