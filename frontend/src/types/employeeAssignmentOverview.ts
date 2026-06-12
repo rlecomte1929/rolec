@@ -45,3 +45,30 @@ export type EmployeePendingOverviewRow = {
   created_at?: string | null;
   claim?: EmployeePendingClaimInfo;
 };
+
+/**
+ * Human-readable destination for an assignment row. Prefers the API-provided
+ * `label`, then composes "city, country" from the host fields, and finally
+ * falls back to "Not set yet" so an unset destination reads as deliberate
+ * rather than a system placeholder ("Destination TBD"). (AIQ-977)
+ */
+export function formatDestinationLabel(dest?: EmployeeOverviewDestination | null): string {
+  const label = dest?.label?.trim();
+  if (label) return label;
+  const city = dest?.host_city?.trim();
+  const country = dest?.host_country?.trim();
+  if (city && country) return `${city}, ${country}`;
+  if (country) return country;
+  if (city) return city;
+  return 'Not set yet';
+}
+
+/**
+ * Short, stable per-case reference (last 8 chars of the case/assignment id,
+ * upper-cased) used to distinguish otherwise-identical rows — e.g. multiple
+ * cases that share a company and have no destination set yet. (AIQ-977)
+ */
+export function formatCaseReference(row: { case_id?: string | null; assignment_id?: string | null }): string {
+  const id = (row.case_id || row.assignment_id || '').trim();
+  return id ? id.slice(-8).toUpperCase() : '';
+}

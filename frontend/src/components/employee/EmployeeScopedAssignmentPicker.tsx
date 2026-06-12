@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../antigravity';
 import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
+import { formatDestinationLabel, formatCaseReference } from '../../types/employeeAssignmentOverview';
 import { setPreferredEmployeeAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 import { buildRoute } from '../../navigation/routes';
 
@@ -37,7 +38,10 @@ export function EmployeeScopedAssignmentPicker({
             >
               <span className="block font-medium text-[#0b2b43]">{row.company?.name || 'Company'}</span>
               <span className="block text-sm text-[#64748b] font-normal">
-                {row.destination?.label || 'Destination TBD'}
+                {formatDestinationLabel(row.destination)}
+                {formatCaseReference(row) ? (
+                  <span className="text-[#94a3b8]"> · Ref {formatCaseReference(row)}</span>
+                ) : null}
               </span>
             </Button>
           </li>

@@ -10,6 +10,7 @@ import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
+import { formatDestinationLabel, formatCaseReference } from '../types/employeeAssignmentOverview';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { formatRichMessage } from '../utils/richMessage';
 import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
@@ -613,11 +614,17 @@ export const EmployeeJourney: React.FC = () => {
                   >
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="font-semibold text-[#0b2b43]">{row.company?.name || 'Company'}</div>
-                      <div className="text-sm text-[#64748b]">{row.destination?.label || 'Destination TBD'}</div>
+                      <div className="text-sm text-[#64748b]">{formatDestinationLabel(row.destination)}</div>
                       <div className="text-sm text-[#334155]">
                         <span className="text-[#64748b]">Status</span>{' '}
                         <span className="font-medium text-[#0b2b43]">{linkedStatusLabel(row)}</span>
                       </div>
+                      {formatCaseReference(row) ? (
+                        <div className="text-sm text-[#334155]">
+                          <span className="text-[#64748b]">Reference</span>{' '}
+                          <span className="font-mono font-medium text-[#0b2b43]">{formatCaseReference(row)}</span>
+                        </div>
+                      ) : null}
                       <div className="text-sm text-[#334155] flex flex-wrap items-center gap-2">
                         <span className="text-[#64748b]">Intake form</span>{' '}
                         {intakeSubmitted ? (
@@ -690,11 +697,17 @@ export const EmployeeJourney: React.FC = () => {
                       </Badge>
                     </div>
                     <div className="font-semibold text-[#0b2b43] pt-1">{row.company?.name || 'Company'}</div>
-                    <div className="text-sm text-[#64748b]">{row.destination?.label || 'Destination TBD'}</div>
+                    <div className="text-sm text-[#64748b]">{formatDestinationLabel(row.destination)}</div>
                     <div className="text-sm text-[#334155]">
                       <span className="text-[#64748b]">Created</span>{' '}
                       <span className="font-medium text-[#0b2b43]">{formatOverviewDate(row.created_at)}</span>
                     </div>
+                    {formatCaseReference(row) ? (
+                      <div className="text-sm text-[#334155]">
+                        <span className="text-[#64748b]">Reference</span>{' '}
+                        <span className="font-mono font-medium text-[#0b2b43]">{formatCaseReference(row)}</span>
+                      </div>
+                    ) : null}
                     {st ? (
                       <div className="text-xs text-[#94a3b8]">{claimStateLabel(st)}</div>
                     ) : null}
