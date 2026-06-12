@@ -5,7 +5,7 @@ import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/
 import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { useServicesFlow } from '../features/services/ServicesFlowContext';
+import { JourneyPhases } from '../features/employee-journey/JourneyPhases';
 import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
@@ -37,15 +37,6 @@ function openCaseHref(assignmentId: string, status?: string | null): string {
   }
   return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
 }
-
-type FlowStep = {
-  label: string;
-  /** When set, the step renders as a Link to this path. */
-  href?: string;
-  /** When false, the step renders as a non-clickable muted pill with `mutedHint` as title. */
-  enabled?: boolean;
-  mutedHint?: string;
-};
 
 /** Pattern to detect a case code pasted into the wrong field. */
 const ASSIGNMENT_ID_PATTERN =
@@ -432,67 +423,6 @@ export const EmployeeJourney: React.FC = () => {
     }
   };
 
-  const { recommendations: servicesRecommendations } = useServicesFlow();
-  const hasRecommendations = Boolean(
-    servicesRecommendations && Object.keys(servicesRecommendations).length > 0,
-  );
-  const flowSteps: FlowStep[] = useMemo(
-    () => [
-      // Step 1: when the user has a linked case, surface a direct link to the
-      // detailed intake wizard. Without a linked case there is nothing to fill
-      // yet, so the pill stays decorative — the per-row "Open case" button on
-      // the cases list is the canonical entry point in that scenario.
-      {
-        label: '1. Fill your case',
-        href: hasLinked ? buildRoute('employeeIntake') : undefined,
-      },
-      { label: '2. Choose services', href: buildRoute('services') },
-      {
-        label: '3. Review budget vs policy',
-        href: hasRecommendations ? buildRoute('servicesEstimate') : undefined,
-      },
-      {
-        label: '4. Request quotes',
-        href: buildRoute('employeeQuoteRequest'),
-        enabled: true,
-      },
-      { label: '5. Exchange with HR' },
-    ],
-    [hasRecommendations, hasLinked],
-  );
-
-  // Pill base style is shared so clickable + decorative steps line up visually.
-  // Clickable variants add the same hover/cursor/focus-visible affordance used
-  // on the HR cases-list rows for consistency with other interactive elements.
-  const PILL_BASE = 'rounded-full border border-[#cbd5f5] bg-[#eef4f8] px-3 py-1 font-medium';
-  const PILL_INTERACTIVE =
-    'cursor-pointer hover:bg-[#dbeafe] focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none transition-colors';
-  const PILL_MUTED = 'opacity-60 text-[#64748b]';
-
-  const flowchart = useMemo(() => {
-    return (
-      <div className="flex flex-wrap items-center gap-2 text-sm text-[#0b2b43]">
-        {flowSteps.map((step, idx) => (
-          <div key={step.label} className="flex items-center gap-2">
-            {step.href ? (
-              <Link to={step.href} className={`${PILL_BASE} ${PILL_INTERACTIVE}`}>
-                {step.label}
-              </Link>
-            ) : (
-              <div
-                className={`${PILL_BASE} ${step.enabled === false ? PILL_MUTED : ''}`}
-                title={step.mutedHint}
-                aria-disabled={step.enabled === false ? true : undefined}
-              >
-                {step.label}
-              </div>
-            )}
-            {idx < flowSteps.length - 1 && <span className="text-[#94a3b8]">→</span>}
-          </div>
-        ))}
-      </div>
-    );
-  }, [flowSteps]);
 
 
   const linkAlerts = useMemo(() => {
@@ -641,8 +571,14 @@ export const EmployeeJourney: React.FC = () => {
                 ? 'HR has set up a case for you. Accept it below to get started.'
                 : 'Sign in with the email HR used for your move, or enter the case code HR sent you.'}
           </p>
-          <div className="text-lg font-semibold text-[#0b2b43] mb-2">Typical flow</div>
-          {flowchart}
+          {linkedSummaries.length > 0 ? (
+            <JourneyPhases
+              intakeStep={linkedSummaries[0].intake_step ?? 0}
+              intakeTotalSteps={linkedSummaries[0].intake_total_steps ?? 5}
+              onContinueIntake={() => navigate(buildRoute('employeeIntake'))}
+              onPreviewBenefits={() => navigate(buildRoute('employeeBenefitsComparison'))}
+            />
+          ) : null}
         </Card>
       ) : null}
 
