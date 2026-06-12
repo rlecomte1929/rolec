@@ -387,7 +387,7 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successSco
         <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
           Track every step of your relocation journey.
         </p>
-        {caseId && <RoadmapActions caseId={caseId} />}
+        {caseId && <RoadmapActions caseId={caseId} hasRoadmap={tracks.some(t => t.steps.length > 0)} />}
       </div>
 
       {/* [P2-05] Probability-of-success estimate — rendered only when available. */}
