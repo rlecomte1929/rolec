@@ -296,7 +296,10 @@ async function suiteCases() {
   }
 
   r = await req('GET', '/api/hr/assignments', null, T, 8000);
-  record('CT5','GET /api/hr/assignments responds <8s (B1)','Cases','<8000ms',r.error?.includes('abort')?'TIMEOUT':String(r.status), r.error?.includes('abort') ? 'FAIL': r.ok ? 'PASS':'WARN', r.ms, r.error||`count=${Array.isArray(r.data)?r.data.length:'n/a'}`);
+  // GET /api/hr/assignments returns the paginated shape { assignments: [...], total: N }.
+  // Accept a bare array too for backward-compat with older API versions.
+  const _assignCount = Array.isArray(r.data) ? r.data.length : (r.data?.assignments?.length ?? r.data?.total ?? 'n/a');
+  record('CT5','GET /api/hr/assignments responds <8s (B1)','Cases','<8000ms',r.error?.includes('abort')?'TIMEOUT':String(r.status), r.error?.includes('abort') ? 'FAIL': r.ok ? 'PASS':'WARN', r.ms, r.error||`count=${_assignCount}`);
 }
 
 // ─────────────────────────────────────────────────────────────
