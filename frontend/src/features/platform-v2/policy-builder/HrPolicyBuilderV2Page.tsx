@@ -16,6 +16,8 @@ import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssis
 import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
 import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
+import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
+import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';
@@ -31,6 +33,10 @@ interface BenefitValue {
   lump_inc: LumpInc | null;
   cap: boolean;
   conditions: boolean;
+  // Provenance + extraction confidence (AIQ-991) — only set on AI-extracted rows
+  // loaded from the config-matrix; used to badge confidence in the matrix cell.
+  source?: string | null;
+  field_confidence?: number | null;
 }
 
 interface Targeting {
@@ -906,6 +912,15 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
   );
 }
 
+// Map a 0–1 extraction confidence score to the shared 4-level confidence scale
+// (HIGH ≥0.85, MEDIUM ≥0.6, LOW >0 — the low-confidence "review me" signal — else UNKNOWN).
+function confidenceLevel(score: number): ConfidenceLevel {
+  if (score >= 0.85) return 'HIGH';
+  if (score >= 0.6) return 'MEDIUM';
+  if (score > 0) return 'LOW';
+  return 'UNKNOWN';
+}
+
 // ─── Cell ─────────────────────────────────────────────────────────────────────
 interface CellProps {
   bk: string;
@@ -977,6 +992,9 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
           {v.value_type === 'none' && <span className="text-[10.5px] text-gray-400 flex-1">Service</span>}
           {v.cap && <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0 rounded" title="Cap rule attached">CAP</span>}
           {v.conditions && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0 rounded" title="Conditional">IF</span>}
+          {v.source === 'extracted_llm' && typeof v.field_confidence === 'number' && (
+            <ConfidenceBadge level={confidenceLevel(v.field_confidence)} score={v.field_confidence} size="sm"/>
+          )}
         </>
       )}
       <Button unstyled className="ml-auto opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 flex-shrink-0">

@@ -71,6 +71,29 @@ describe('configDraftToCanvasPolicy (round-trip)', () => {
     expect(dir.benefits.relocation_allowance_assignee_partner.lump_inc).toBe('included');
   });
 
+  it('carries source + field_confidence onto AI-extracted benefit values (AIQ-991)', () => {
+    const payload: DraftPayload = {
+      status: 'draft',
+      categories: [{
+        category_key: 'compensation_allowances',
+        benefits: [{
+          benefit_key: 'host_housing_cap',
+          covered: true,
+          value_type: 'currency',
+          amount_value: 2400,
+          unit_frequency: 'monthly',
+          source: 'extracted_llm',
+          field_confidence: 0.92,
+          employee_levels: ['manager'],
+        }],
+      }],
+    };
+    const { tiers } = configDraftToCanvasPolicy(payload);
+    const bv = tiers[0].benefits.host_housing_cap;
+    expect(bv.source).toBe('extracted_llm');
+    expect(bv.field_confidence).toBe(0.92);
+  });
+
   it('returns empty tiers for a payload with no rows (fresh company)', () => {
     expect(configDraftToCanvasPolicy({ categories: [] }).tiers).toHaveLength(0);
     expect(configDraftToCanvasPolicy(null).tiers).toHaveLength(0);
