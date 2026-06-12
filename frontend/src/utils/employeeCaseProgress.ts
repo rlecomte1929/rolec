@@ -82,3 +82,27 @@ export function clearLastVisited(assignmentId: string): void {
     // ignore
   }
 }
+
+/**
+ * Resolve where to send the user when they click "Open case" (or the
+ * Continue / Start links) on the dashboard. Honor the last route they
+ * visited inside this assignment so re-entering doesn't force them through
+ * the wizard again; fall back to the case summary page otherwise.
+ *
+ * Both `assigned` (fresh assignment from HR, intake not started) and
+ * `awaiting_intake` (intake started but not submitted) are pre-intake
+ * states whose entry point is the wizard — send both to step 1 rather than
+ * the (empty) summary or a stale last-visited URL.
+ *
+ * AIQ-976: the pre-intake target must be the case-scoped wizard, not the
+ * generic `/employee/intake` route — that page reads the *primary* case
+ * from EmployeeAssignmentContext, so for a multi-case employee every row
+ * opened the same (first) case. Routing to `/employee/case/{id}/wizard`
+ * opens the row that was actually clicked.
+ */
+export function openCaseHref(assignmentId: string, status?: string | null): string {
+  if (status === 'awaiting_intake' || status === 'assigned') {
+    return `/employee/case/${assignmentId}/wizard`;
+  }
+  return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
+}

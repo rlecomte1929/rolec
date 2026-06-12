@@ -17,26 +17,7 @@ import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentL
 import { statusLabel } from '../lib/statusLabel';
 import { getApiErrorCode } from '../utils/apiDetail';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
-import { getLastVisited } from '../utils/employeeCaseProgress';
-
-/**
- * Resolve where to send the user when they click "Open case" on the
- * dashboard. Honor the last route they visited inside this assignment
- * (so re-entering doesn't force them through the wizard again). Falls
- * back to the case summary page when no last-visited is recorded.
- *
- * Both `assigned` (fresh assignment from HR, employee hasn't started
- * intake yet) and `awaiting_intake` (employee started intake but hasn't
- * submitted) are pre-intake states whose entry point is the wizard.
- * Send both straight to step 1 rather than the summary (empty for a
- * fresh case) or any stale last-visited URL.
- */
-function openCaseHref(assignmentId: string, status?: string | null): string {
-  if (status === 'awaiting_intake' || status === 'assigned') {
-    return buildRoute('employeeIntake');
-  }
-  return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
-}
+import { openCaseHref } from '../utils/employeeCaseProgress';
 
 /** Pattern to detect a case code pasted into the wrong field. */
 const ASSIGNMENT_ID_PATTERN =
@@ -628,7 +609,7 @@ export const EmployeeJourney: React.FC = () => {
                               {currentStep} / {totalSteps} steps
                             </Badge>
                             <Link
-                              to={buildRoute('employeeIntake')}
+                              to={openCaseHref(row.assignment_id, row.status)}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Continue
@@ -638,7 +619,7 @@ export const EmployeeJourney: React.FC = () => {
                           <>
                             <Badge variant="warning" size="sm">Not started</Badge>
                             <Link
-                              to={buildRoute('employeeIntake')}
+                              to={openCaseHref(row.assignment_id, row.status)}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Start
