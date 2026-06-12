@@ -505,6 +505,19 @@ def route_llm(
         )
 
     model = decision.escalate_model if escalate and decision.escalate_model else decision.default_model
+
+    # FD-2/AIQ-994: staged Claude Fable 5 migration for policy-clause extraction.
+    # OFF by default — only when POLICY_PARSING_FABLE5 is truthy does this route
+    # policy_clause_extraction to claude-fable-5 (1M context, whole-manual single
+    # pass). Gated so the live cost+accuracy benchmark (scripts/benchmark_policy_fable5.py)
+    # justifies the switch before it reaches prod; the chunking fallback stays the
+    # default path until then. Fable 5 is ~3.3x Sonnet's price — do not enable blindly.
+    if (
+        resolved == "policy_clause_extraction"
+        and os.environ.get("POLICY_PARSING_FABLE5", "").strip().lower() in ("1", "true", "yes")
+    ):
+        model = "claude-fable-5"
+
     budget = token_budget if token_budget is not None else _DEFAULT_TOKEN_BUDGETS[resolved]
 
     # Validate pricing up-front so misconfiguration fails fast.

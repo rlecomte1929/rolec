@@ -11,6 +11,18 @@ claude-3-7-sonnet:
   in_per_million: 3.00
   out_per_million: 15.00
 
+# Claude Sonnet 4.6 — current "sonnet" tier and the FD-2/AIQ-994 benchmark
+# baseline (the routing table still names the retired claude-3-7-sonnet). $3/$15.
+claude-sonnet-4-6:
+  in_per_million: 3.00
+  out_per_million: 15.00
+
+# Claude Fable 5 (FD-2/AIQ-994) — 1M context, 128K output. ~3.3x Sonnet's price,
+# which is exactly why the Sonnet→Fable 5 policy-parse switch is benchmark-gated.
+claude-fable-5:
+  in_per_million: 10.00
+  out_per_million: 50.00
+
 gpt-4o:
   in_per_million: 2.50
   out_per_million: 10.00
