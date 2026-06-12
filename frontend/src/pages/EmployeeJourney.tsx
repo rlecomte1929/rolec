@@ -28,13 +28,17 @@ import { getLastVisited } from '../utils/employeeCaseProgress';
  *
  * Both `assigned` (fresh assignment from HR, employee hasn't started
  * intake yet) and `awaiting_intake` (employee started intake but hasn't
- * submitted) are pre-intake states whose entry point is the wizard.
- * Send both straight to step 1 rather than the summary (empty for a
- * fresh case) or any stale last-visited URL.
+ * submitted) are pre-intake states whose entry point is the intake wizard.
+ *
+ * AIQ-976: route pre-intake to the CASE-SCOPED intake (/employee/case/{id}/intake)
+ * rather than the bare /employee/intake. The bare route renders the v2
+ * EmployeeIntakePage against the *primary* case from EmployeeAssignmentContext,
+ * so for a multi-case employee every row opened the same (first) case. The
+ * case-scoped route makes EmployeeIntakePage read the clicked case from the URL.
  */
 function openCaseHref(assignmentId: string, status?: string | null): string {
   if (status === 'awaiting_intake' || status === 'assigned') {
-    return buildRoute('employeeIntake');
+    return `/employee/case/${assignmentId}/intake`;
   }
   return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
 }
@@ -576,7 +580,7 @@ export const EmployeeJourney: React.FC = () => {
             <JourneyPhases
               intakeStep={linkedSummaries[0].intake_step ?? 0}
               intakeTotalSteps={linkedSummaries[0].intake_total_steps ?? 5}
-              onContinueIntake={() => navigate(buildRoute('employeeIntake'))}
+              onContinueIntake={() => navigate(`/employee/case/${linkedSummaries[0].assignment_id}/intake`)}
               onPreviewBenefits={() => navigate(buildRoute('employeeBenefitsComparison'))}
             />
           ) : null}
@@ -635,7 +639,7 @@ export const EmployeeJourney: React.FC = () => {
                               {currentStep} / {totalSteps} steps
                             </Badge>
                             <Link
-                              to={buildRoute('employeeIntake')}
+                              to={`/employee/case/${row.assignment_id}/intake`}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Continue
@@ -645,7 +649,7 @@ export const EmployeeJourney: React.FC = () => {
                           <>
                             <Badge variant="warning" size="sm">Not started</Badge>
                             <Link
-                              to={buildRoute('employeeIntake')}
+                              to={`/employee/case/${row.assignment_id}/intake`}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Start

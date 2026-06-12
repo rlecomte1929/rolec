@@ -281,6 +281,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     if (item.id === 'dossier' && effectiveCaseId) {
       return buildRoute('employeeCaseDossier', { caseId: effectiveCaseId });
     }
+    // AIQ-976: case-scope the intake link so the sidebar opens the active case
+    // in the v2 wizard, consistent with roadmap/dossier above.
+    if (item.id === 'detailed-intake' && effectiveCaseId) {
+      return buildRoute('employeeCaseIntake', { caseId: effectiveCaseId });
+    }
     return item.toByRole?.[role] ?? item.to;
   };
 

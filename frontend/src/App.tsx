@@ -259,6 +259,8 @@ function App() {
         <Route path={ROUTE_DEFS.employeeTaskPage.path} element={<RequireEmployeeRoute><EmployeeTaskPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeRichProfile.path} element={<RequireEmployeeRoute><EmployeeRichProfilePage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeIntake.path} element={<RequireEmployeeRoute><EmployeeIntakePage /></RequireEmployeeRoute>} />
+        {/* AIQ-976: case-scoped intake — same page, but opens the case from the URL. */}
+        <Route path={ROUTE_DEFS.employeeCaseIntake.path} element={<RequireEmployeeRoute><EmployeeIntakePage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<RequireHrRoute><HrDashboard /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAnalytics.path} element={<RequireHrRoute><HrAnalytics /></RequireHrRoute>} />
