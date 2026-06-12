@@ -15,6 +15,7 @@ import { policyConfigMatrixAPI } from '../../../api/client';
 import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssistantDockedShell';
 import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
+import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';
@@ -249,6 +250,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const [rulesDrawerFor, setRulesDrawerFor] = useState<string | null>(null);
   const [savedAt, setSavedAt]         = useState<number | null>(null);
   const [version, setVersion]         = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState(true);
   const [ctxOpen, setCtxOpen]         = useState(false);
   const [currency, setCurrency]       = useState('EUR');
   const [focusedBenefit]              = useState('host_housing_cap');
@@ -273,6 +275,51 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
     if (e instanceof Error) return e.message;
     return fallback;
   };
+
+  // On mount, load the company's existing config-matrix draft/published policy
+  // (GET /api/hr/policy-config) and reconstruct the canvas tiers from it, so HR
+  // sees their real policy instead of a blank template. A company with no policy
+  // yet returns an empty scaffold (no rows) → tiers stay [] and the template
+  // picker shows as before.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const payload = (await policyConfigMatrixAPI.hrGet()) as {
+          policy_version?: string | null;
+          status?: string | null;
+          categories?: unknown;
+        };
+        const { tiers: loaded } = configDraftToCanvasPolicy(payload as never);
+        if (!alive || loaded.length === 0) return;
+        const fullTiers: Tier[] = loaded.map((lt, i) => ({
+          id: `loaded-${i}`,
+          name: lt.name,
+          color: TIER_PALETTE[i % TIER_PALETTE.length],
+          targeting: lt.targeting,
+          mode: lt.mode,
+          lump: lt.lump,
+          emp: 0,
+          // Loaded rows are the source of truth; the default scaffold only fills
+          // any catalog key the payload happens to omit so every benefit renders.
+          benefits: { ...buildDefaultBenefits(lt.name, lt.mode === 'lump'), ...lt.benefits },
+        }));
+        setTiers(fullTiers);
+        const status = String(payload.status || '');
+        if (status === 'published') {
+          setVersion('published');
+        } else if (payload.policy_version) {
+          setDraftVersionId(payload.policy_version);
+        }
+        setSavedAt(Date.now());
+      } catch {
+        // Non-fatal: fall back to the template flow (tiers stay []).
+      } finally {
+        if (alive) setLoadingDraft(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // Ensure a policy_config draft exists, returning its version id.
   const ensureDraftId = async (): Promise<string> => {
@@ -433,8 +480,16 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
         </div>
       )}
 
+      {/* ── Loading the company's existing policy (avoids a template-picker flash) ── */}
+      {loadingDraft && tiers.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 gap-3 text-center text-gray-400">
+          <Clock size={20} className="animate-pulse"/>
+          <p className="text-sm">Loading your policy…</p>
+        </div>
+      )}
+
       {/* ── Empty state — template ── */}
-      {mode === 'template' && tiers.length === 0 && (
+      {!loadingDraft && mode === 'template' && tiers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <h2 className="text-xl font-semibold text-gray-900">No tiers yet</h2>
           <p className="text-sm text-gray-500 max-w-sm">Start from a template to get set up in minutes, or build a custom tier structure from scratch.</p>
@@ -452,7 +507,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       )}
 
       {/* ── Empty state — document ── */}
-      {mode === 'document' && tiers.length === 0 && (
+      {!loadingDraft && mode === 'document' && tiers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <svg viewBox="0 0 96 96" width={96} height={96}>
             <path d="M20 14h40l20 20v48H20z" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5"/>
