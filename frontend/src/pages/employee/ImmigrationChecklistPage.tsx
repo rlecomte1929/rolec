@@ -10,7 +10,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Badge, Button, Card } from '../../components/antigravity';
+import { Alert, Button, Card, StatusPill } from '../../components/antigravity';
+import type { JourneyStatus } from '../../components/antigravity';
 import { buildRoute } from '../../navigation/routes';
 import { CaseDocumentsPanel } from '../../components/case/CaseDocumentsPanel';
 import api from '../../api/client';
@@ -74,10 +75,11 @@ const PERMIT_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
-const STATUS_CONFIG: Record<DocStatus, { label: string; variant: 'neutral' | 'success' | 'info' }> = {
-  not_started: { label: 'Not started', variant: 'neutral' },
-  uploaded: { label: 'Uploaded', variant: 'info' },
-  verified: { label: 'Verified', variant: 'success' },
+// Map each DocStatus → an antigravity StatusPill status + label (E light language).
+const STATUS_CONFIG: Record<DocStatus, { label: string; status: JourneyStatus }> = {
+  not_started: { label: 'Action needed', status: 'action' },
+  uploaded: { label: 'Uploaded', status: 'submitted' },
+  verified: { label: 'Verified', status: 'ready' },
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -117,7 +119,7 @@ export const ImmigrationChecklistPage: React.FC = () => {
   if (loading) {
     return (
       <AppShell title="Document checklist">
-        <p className="text-[#94a3b8] p-8">Loading your document checklist…</p>
+        <p className="text-[#6b7280] p-8">Loading your document checklist…</p>
       </AppShell>
     );
   }
@@ -126,9 +128,9 @@ export const ImmigrationChecklistPage: React.FC = () => {
     return (
       <AppShell title="Document checklist">
         <div className="p-8">
-          <p className="text-[#fca5a5]">
+          <Alert variant="error">
             {error ?? 'No immigration case found for this relocation. Contact your HR team.'}
-          </p>
+          </Alert>
           <Button
             className="mt-4"
             variant="ghost"
@@ -152,33 +154,49 @@ export const ImmigrationChecklistPage: React.FC = () => {
       <div className="max-w-xl mx-auto py-8 px-4">
 
         {/* Header */}
-        <h1 className="text-2xl font-semibold text-[#f1f5f9] mb-1">
+        <h1 className="text-2xl font-semibold text-navy-800 mb-1">
           Your document checklist
         </h1>
-        <p className="text-[#94a3b8] text-sm mb-1">
-          {immCase.corridor_from} → {immCase.corridor_to} ·{' '}
-          {PERMIT_LABELS[immCase.permit_type] ?? immCase.permit_type}
-        </p>
 
-        {/* Progress indicator */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="flex-1 h-2 rounded-full bg-[#1e293b] overflow-hidden">
+        {/* Permit context card */}
+        <Card className="p-4 mb-6">
+          <p className="text-sm text-[#6b7280]">Your permit</p>
+          <p className="text-lg font-semibold text-navy-800">
+            {PERMIT_LABELS[immCase.permit_type] ?? immCase.permit_type}
+          </p>
+          <p className="text-sm text-[#374151] mt-0.5">
+            {immCase.corridor_from} → {immCase.corridor_to}
+          </p>
+          <p className="text-xs text-[#9aa6b2] mt-2">
+            Based on your role and salary — confirmed by your relocation team.
+          </p>
+        </Card>
+
+        {/* Completion strip */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-2 rounded-full bg-[#e2e8f0] overflow-hidden">
             <div
-              className="h-full bg-[#3b82f6] rounded-full transition-all"
+              className="h-full bg-[#0b2b43] rounded-full transition-all"
               style={{ width: `${docs.length ? (completedCount / docs.length) * 100 : 0}%` }}
-              aria-label={`${completedCount} of ${docs.length} documents complete`}
+              aria-label={`${completedCount} of ${docs.length} documents ready`}
             />
           </div>
-          <span className="text-sm text-[#94a3b8] whitespace-nowrap">
-            {completedCount} of {docs.length} documents
+          <span className="text-sm text-[#6b7280] whitespace-nowrap">
+            {completedCount} of {docs.length} documents ready
           </span>
         </div>
+
+        {/* Content-honesty note */}
+        <Alert variant="warning" className="mb-8">
+          Indicative — your case officer confirms the final document requirements with the
+          immigration authority.
+        </Alert>
 
         {/* Toast */}
         {uploadToast && (
           <div
             role="status"
-            className="mb-4 rounded-lg bg-[#1e3a5f] border border-[#1d4ed8] text-[#93c5fd] px-4 py-3 text-sm"
+            className="mb-4 rounded-lg bg-[#eef4f8] border border-[#c7d8e6] text-[#0b2b43] px-4 py-3 text-sm"
           >
             {uploadToast}
           </div>
@@ -193,26 +211,11 @@ export const ImmigrationChecklistPage: React.FC = () => {
             return (
               <Card key={idx} className="p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={[
-                        'mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs',
-                        docStatus === 'verified'
-                          ? 'bg-[#14532d] border-[#22c55e] text-[#4ade80]'
-                          : docStatus === 'uploaded'
-                          ? 'bg-[#1e3a5f] border-[#3b82f6] text-[#60a5fa]'
-                          : 'bg-transparent border-[#475569]',
-                      ].join(' ')}
-                      aria-hidden="true"
-                    >
-                      {docStatus === 'verified' ? '✓' : docStatus === 'uploaded' ? '↑' : ''}
-                    </span>
-                    <div>
-                      <p className="text-sm text-[#e2e8f0] font-medium">{doc}</p>
-                      <Badge variant={cfg.variant} size="sm">
-                        {cfg.label}
-                      </Badge>
-                    </div>
+                  <div>
+                    <p className="text-sm text-navy-800 font-medium">{doc}</p>
+                    <StatusPill status={cfg.status} className="mt-1.5">
+                      {cfg.label}
+                    </StatusPill>
                   </div>
                   {docStatus === 'not_started' && (
                     <Button
@@ -231,14 +234,15 @@ export const ImmigrationChecklistPage: React.FC = () => {
         </div>
 
         {/* Footer note */}
-        <p className="mt-6 text-xs text-[#64748b]">
-          Document status is updated by your HR team and immigration partner. Use the Upload
-          button to flag a document as ready — your partner will verify it.
+        <p className="mt-6 text-xs text-[#6b7280]">
+          Upload securely — only your relocation team can see these documents. Document status is
+          updated by your HR team and immigration partner; use the Upload button to flag a document
+          as ready and your partner will verify it.
         </p>
 
         {/* BL-OCR.4 / AIQ-750 — upload documents + AI extraction status */}
         <section className="mt-8">
-          <h2 className="text-sm font-semibold text-[#f1f5f9] mb-3">Upload documents</h2>
+          <h2 className="text-sm font-semibold text-navy-800 mb-3">Upload documents</h2>
           <CaseDocumentsPanel caseId={caseId!} canUpload />
         </section>
 
