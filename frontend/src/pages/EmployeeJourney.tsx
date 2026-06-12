@@ -477,7 +477,9 @@ export const EmployeeJourney: React.FC = () => {
     if (hasLinked) {
       return (
         <Badge variant="success" size="sm">
-          {linkedCount === 1 ? 'Linked: case on this account' : `Linked: ${linkedCount} assignments on this account`}
+          {/* AIQ-985: linkedCount is the employee's own claimed cases (from
+              useEmployeeAssignment), not a company-wide total — say so clearly. */}
+          {linkedCount === 1 ? '1 case linked to you' : `${linkedCount} cases linked to you`}
         </Badge>
       );
     }
