@@ -1,7 +1,9 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
+import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
+import { getRichProfile, saveRichProfile } from '../../../api/relocationProfile';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,50 +97,47 @@ const MEMBERS: HouseholdMember[] = [
   { id: 'c2',      kind: 'child',   name: 'Hugo',  dob: '2019-10-28' },
 ];
 
-const SEED: ProfileData = {
-  origin_housing_status: 'Renting',
-  lease_end_date: '2026-08-31',
-  has_break_clause: 'Yes',
+const DEFAULTS: ProfileData = {
+  origin_housing_status: '',
+  lease_end_date: '',
+  has_break_clause: '',
   is_selling: '',
   sale_date: '',
-  household_volume: '3-bed',
-  vehicles_to_ship: ['1 car'],
-  important_docs: ['Diplomas & certificates', 'Birth certificates', 'Marriage certificate'],
+  household_volume: '',
+  vehicles_to_ship: [],
+  important_docs: [],
 
-  intent_rent_or_buy: 'Rent',
-  housing_type: 'Apartment',
-  bedrooms_needed: 3,
-  must_haves: ['Parking', 'Pets allowed', 'Close to international school'],
-  neighborhood_priorities: { commute: 5, intl_school: 5, parks: 3, expat: 4, nightlife: 2, safety: 5, transit: 4 },
-  monthly_budget_min: 1500,
-  monthly_budget_max: 3000,
-  policy_cap: 3500,
+  intent_rent_or_buy: '',
+  housing_type: '',
+  bedrooms_needed: 0,
+  must_haves: [],
+  neighborhood_priorities: { commute: 0, intl_school: 0, parks: 0, expat: 0, nightlife: 0, safety: 0, transit: 0 },
+  monthly_budget_min: '',
+  monthly_budget_max: '',
+  policy_cap: 0,
 
-  spouse_employment: 'Working',
-  spouse_sector: 'Technology',
-  spouse_contract: 'Permanent',
-  spouse_resigning: 'Not sure',
-  spouse_lang_level: 'Beginner',
-  spouse_wants_lang: 'Yes',
-  spouse_right_to_work: 'No',
-  spouse_needs_dep_visa: 'Yes',
-  spouse_credentials_ok: 'Not sure',
+  spouse_employment: '',
+  spouse_sector: '',
+  spouse_contract: '',
+  spouse_resigning: '',
+  spouse_lang_level: '',
+  spouse_wants_lang: '',
+  spouse_right_to_work: '',
+  spouse_needs_dep_visa: '',
+  spouse_credentials_ok: '',
 
-  children_extra: {
-    c1: { school_pref: 'International', lang: 'English', special_needs: 'No', curriculum: 'IB' },
-    c2: { school_pref: 'International', lang: 'English', special_needs: 'No', curriculum: 'French' },
-  },
+  children_extra: {},
   pets_extra: {},
 
-  temp_needed: 'Yes',
-  temp_duration: '1–3 months',
-  temp_type: 'Serviced apartment',
+  temp_needed: '',
+  temp_duration: '',
+  temp_type: '',
 
-  dual_tax: 'Yes',
-  has_corporate_tax_support: 'Yes',
-  need_bank_account: 'Yes',
-  need_fx_transfer: 'Yes',
-  fx_amount_range: '€50k–100k',
+  dual_tax: '',
+  has_corporate_tax_support: '',
+  need_bank_account: '',
+  need_fx_transfer: '',
+  fx_amount_range: '',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -448,13 +447,43 @@ function CompletionRing({ pct, size = 72 }: { pct: number; size?: number }) {
 
 export function EmployeeRichProfilePage() {
   const tier: Tier = 'standard';
-  const [profile, setProfile] = useState<ProfileData>(SEED);
+  const { primaryCaseId } = useEmployeeAssignment();
+  const [profile, setProfile] = useState<ProfileData>(DEFAULTS);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ B: true });
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const set = useCallback(<K extends keyof ProfileData>(k: K, v: ProfileData[K]) => {
     setProfile((p) => ({ ...p, [k]: v }));
+    setSaveState((s) => (s === 'saving' ? s : 'idle'));
   }, []);
+
+  // Load the saved profile for this case; keep DEFAULTS if none / on error.
+  useEffect(() => {
+    if (!primaryCaseId) return;
+    let cancelled = false;
+    getRichProfile(primaryCaseId)
+      .then((res) => {
+        if (cancelled) return;
+        const stored = res?.data;
+        if (stored && typeof stored === 'object' && Object.keys(stored).length > 0) {
+          setProfile((prev) => ({ ...prev, ...(stored as Partial<ProfileData>) }));
+        }
+      })
+      .catch(() => { /* keep DEFAULTS — empty-first */ });
+    return () => { cancelled = true; };
+  }, [primaryCaseId]);
+
+  const handleSave = useCallback(async () => {
+    if (!primaryCaseId) return;
+    setSaveState('saving');
+    try {
+      await saveRichProfile(primaryCaseId, profile);
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
+  }, [primaryCaseId, profile]);
 
   const partner = MEMBERS.find((m) => m.kind === 'partner');
   const children = MEMBERS.filter((m) => m.kind === 'child');
@@ -503,9 +532,19 @@ export function EmployeeRichProfilePage() {
           </div>
           <div className="flex items-end justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Your profile &amp; preferences</h1>
-            <Button unstyled className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              ↓ Export data
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                unstyled
+                onClick={handleSave}
+                disabled={!primaryCaseId || saveState === 'saving'}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved ✓' : saveState === 'error' ? 'Retry save' : 'Save'}
+              </Button>
+              <Button unstyled className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                ↓ Export data
+              </Button>
+            </div>
           </div>
           <p className="mt-2 text-sm text-gray-500 max-w-2xl">
             Each completed section unlocks smarter recommendations and adds milestones to your roadmap. None of this blocks your case.
@@ -958,6 +997,4 @@ export function EmployeeRichProfilePage() {
       </div>
     </AppShell>
   );
-  // TODO: load real profile from API:
-  // const { data } = await employeeAPI.getProfile(caseId);
 }

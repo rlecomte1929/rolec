@@ -122,3 +122,25 @@ export async function putRelocationProfile(
 ): Promise<RelocationProfileResponse> {
   return apiPut<RelocationProfileResponse>(`/api/employee/cases/${caseId}/relocation-profile`, data);
 }
+
+/**
+ * Rich profile — the verbatim platform-v2 EmployeeRichProfilePage payload.
+ *
+ * Stored opaquely (the page owns its own ProfileData shape) in the sibling
+ * rich_profiles table, separate from the strongly-typed relocation-profile above.
+ */
+export interface RichProfileResponse {
+  case_id: string;
+  data: unknown;
+  last_updated_at: string | null;
+}
+
+/** Fetch the verbatim platform-v2 preference profile for a case (empty {} if none). */
+export async function getRichProfile(caseId: string): Promise<RichProfileResponse> {
+  return apiGet<RichProfileResponse>(`/api/employee/cases/${caseId}/rich-profile`);
+}
+
+/** Save / overwrite the verbatim platform-v2 preference profile for a case. */
+export async function saveRichProfile(caseId: string, data: unknown): Promise<RichProfileResponse> {
+  return apiPut<RichProfileResponse>(`/api/employee/cases/${caseId}/rich-profile`, data);
+}
