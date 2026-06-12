@@ -4,20 +4,14 @@ import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getRichProfile, saveRichProfile } from '../../../api/relocationProfile';
+import { getCaseDetailsByAssignmentId } from '../../../api/caseDetails';
+import type { FamilyMembersDTO } from '../../../types';
+import { draftToMembers, type HouseholdMember } from './householdRoster';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Tier = 'basic' | 'standard' | 'premium';
 type SectionState = 'complete' | 'partial' | 'empty' | 'na';
-
-interface HouseholdMember {
-  id: string;
-  kind: 'self' | 'partner' | 'child' | 'pet';
-  name?: string;
-  dob?: string;
-  pet_type?: string;
-  breed?: string;
-}
 
 interface ChildExtra {
   school_pref?: string;
@@ -88,14 +82,6 @@ interface ProfileData {
   fx_amount_range: string;
 }
 
-// ─── Mock seed data (Marc Bouchard — France → Norway, family) ────────────────
-
-const MEMBERS: HouseholdMember[] = [
-  { id: 'self',    kind: 'self',    name: 'Marc Bouchard' },
-  { id: 'partner', kind: 'partner', name: 'Isabelle Bouchard' },
-  { id: 'c1',      kind: 'child',   name: 'Léa',   dob: '2016-05-12' },
-  { id: 'c2',      kind: 'child',   name: 'Hugo',  dob: '2019-10-28' },
-];
 
 const DEFAULTS: ProfileData = {
   origin_housing_status: '',
@@ -447,8 +433,9 @@ function CompletionRing({ pct, size = 72 }: { pct: number; size?: number }) {
 
 export function EmployeeRichProfilePage() {
   const tier: Tier = 'standard';
-  const { primaryCaseId } = useEmployeeAssignment();
+  const { primaryCaseId, assignmentId } = useEmployeeAssignment();
   const [profile, setProfile] = useState<ProfileData>(DEFAULTS);
+  const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ B: true });
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -474,6 +461,20 @@ export function EmployeeRichProfilePage() {
     return () => { cancelled = true; };
   }, [primaryCaseId]);
 
+  // Ask-once: load the household roster from the wizard intake (read-only).
+  useEffect(() => {
+    if (!assignmentId) return;
+    let cancelled = false;
+    getCaseDetailsByAssignmentId(assignmentId)
+      .then((res) => {
+        if (cancelled || !res?.data) return;
+        const fm = res.data.case?.draft?.familyMembers as FamilyMembersDTO | undefined;
+        setMembers(draftToMembers(fm, res.data.assignment?.employee_full_name ?? undefined));
+      })
+      .catch(() => { /* no roster — sections that need members render as N/A */ });
+    return () => { cancelled = true; };
+  }, [assignmentId]);
+
   const handleSave = useCallback(async () => {
     if (!primaryCaseId) return;
     setSaveState('saving');
@@ -485,9 +486,9 @@ export function EmployeeRichProfilePage() {
     }
   }, [primaryCaseId, profile]);
 
-  const partner = MEMBERS.find((m) => m.kind === 'partner');
-  const children = MEMBERS.filter((m) => m.kind === 'child');
-  const pets = MEMBERS.filter((m) => m.kind === 'pet');
+  const partner = members.find((m) => m.kind === 'partner');
+  const children = members.filter((m) => m.kind === 'child');
+  const pets = members.filter((m) => m.kind === 'pet');
 
   const toggle = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
   const focusSection = (id: string) => {
@@ -508,13 +509,13 @@ export function EmployeeRichProfilePage() {
   ].filter((s) => s.show);
 
   const totalCompletion = useMemo(() => {
-    const states = SECTIONS.map((s) => sectionCompletionState(s.id, profile, MEMBERS));
+    const states = SECTIONS.map((s) => sectionCompletionState(s.id, profile, members));
     const scored = states.map((st) => (st === 'complete' ? 1 : st === 'partial' ? 0.5 : 0));
     return Math.round(((scored as number[]).reduce((a, b) => a + b, 0) / SECTIONS.length) * 100);
   }, [profile, SECTIONS]);
 
   const completeCount = SECTIONS.filter(
-    (s) => sectionCompletionState(s.id, profile, MEMBERS) === 'complete',
+    (s) => sectionCompletionState(s.id, profile, members) === 'complete',
   ).length;
 
   // ── Grid helper: 2-column responsive grid ───────────────────────
@@ -590,7 +591,7 @@ export function EmployeeRichProfilePage() {
             {/* ToC */}
             <div className="bg-white border border-gray-100 rounded-xl p-2 flex flex-col gap-0.5">
               {SECTIONS.map((s) => {
-                const st = sectionCompletionState(s.id, profile, MEMBERS);
+                const st = sectionCompletionState(s.id, profile, members);
                 return (
                   <Button unstyled
                     key={s.id}
@@ -622,7 +623,7 @@ export function EmployeeRichProfilePage() {
                 <SectionCard
                   id="A" marker="A" title="Origin details"
                   sub="Help us build the outbound leg of your roadmap."
-                  state={sectionCompletionState('A', profile, MEMBERS)}
+                  state={sectionCompletionState('A', profile, members)}
                   est={2} unlocks="Estate agent or lease-break milestones"
                   expanded={!!expanded.A} onToggle={() => toggle('A')}
                   cardRef={(el) => { sectionRefs.current.A = el; }}
@@ -682,7 +683,7 @@ export function EmployeeRichProfilePage() {
               <SectionCard
                 id="B" marker="B" title="Destination housing preferences"
                 sub="The more you tell us here, the sharper your shortlist."
-                state={sectionCompletionState('B', profile, MEMBERS)}
+                state={sectionCompletionState('B', profile, members)}
                 est={3} unlocks="Housing shortlist with commute + neighborhood scoring"
                 expanded={!!expanded.B} onToggle={() => toggle('B')}
                 cardRef={(el) => { sectionRefs.current.B = el; }}
@@ -758,7 +759,7 @@ export function EmployeeRichProfilePage() {
               <SectionCard
                 id="C" marker="C" title="Spouse / partner full profile"
                 sub={`Building ${partner.name ?? 'your partner'}'s parallel relocation track.`}
-                state={sectionCompletionState('C', profile, MEMBERS)}
+                state={sectionCompletionState('C', profile, members)}
                 est={3} unlocks="Partner immigration milestones + career services"
                 expanded={!!expanded.C} onToggle={() => toggle('C')}
                 cardRef={(el) => { sectionRefs.current.C = el; }}
@@ -817,7 +818,7 @@ export function EmployeeRichProfilePage() {
               <SectionCard
                 id="D" marker="D" title="Children details"
                 sub="One card per child. We use this for school search and enrollment timing."
-                state={sectionCompletionState('D', profile, MEMBERS)}
+                state={sectionCompletionState('D', profile, members)}
                 est={2} unlocks="School search + enrollment deadlines"
                 urgent urgentReason="Sep 1 enrollment"
                 expanded={!!expanded.D} onToggle={() => toggle('D')}
@@ -872,7 +873,7 @@ export function EmployeeRichProfilePage() {
               <SectionCard
                 id="E" marker="E" title="Pet relocation details"
                 sub={`Health certs, microchips, quarantine prep for ${pets.length} pet${pets.length > 1 ? 's' : ''}.`}
-                state={sectionCompletionState('E', profile, MEMBERS)}
+                state={sectionCompletionState('E', profile, members)}
                 est={3} unlocks="Pet transport providers + health-cert milestones"
                 expanded={!!expanded.E} onToggle={() => toggle('E')}
                 cardRef={(el) => { sectionRefs.current.E = el; }}
@@ -927,7 +928,7 @@ export function EmployeeRichProfilePage() {
               <SectionCard
                 id="F" marker="F" title="Temporary housing on arrival"
                 sub="Where you stay before your permanent home."
-                state={sectionCompletionState('F', profile, MEMBERS)}
+                state={sectionCompletionState('F', profile, members)}
                 est={1} unlocks="Arrival sequence + temp housing providers"
                 expanded={!!expanded.F} onToggle={() => toggle('F')}
                 cardRef={(el) => { sectionRefs.current.F = el; }}
@@ -959,7 +960,7 @@ export function EmployeeRichProfilePage() {
                 <SectionCard
                   id="G" marker="G" title="Financial & tax context"
                   sub="Surface tax & banking services at the right time."
-                  state={sectionCompletionState('G', profile, MEMBERS)}
+                  state={sectionCompletionState('G', profile, members)}
                   est={2} unlocks="Tax advisor + banking services"
                   expanded={!!expanded.G} onToggle={() => toggle('G')}
                   cardRef={(el) => { sectionRefs.current.G = el; }}
