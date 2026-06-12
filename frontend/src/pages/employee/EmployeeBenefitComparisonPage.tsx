@@ -1,9 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Button, Card, Container } from '../../components/antigravity';
+import { Button, Card, Container, PhaseContextBar } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useResilientQuery } from '../../hooks/useResilientQuery';
+import { buildRoute } from '../../navigation/routes';
+import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
+import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
+import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import {
   BenefitComparisonDashboard,
   type PolicyFooter,
@@ -28,6 +33,8 @@ interface ComparisonData {
 
 export const EmployeeBenefitComparisonPage: React.FC = () => {
   const { assignmentId, isLoading: assignmentLoading, linkedCount } = useEmployeeAssignment();
+  const navigate = useNavigate();
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   const { data, error, loading, isOffline, retry } = useResilientQuery<ComparisonData>(
     async () => {
@@ -113,9 +120,42 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
       title="Benefit comparison"
       subtitle="What's covered, what you'd owe, and what you can request"
     >
-      <Container maxWidth="xl" className="py-8">
-        {body}
-      </Container>
+      <PolicyAssistantDockedShell
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        title="Ask about your policy"
+        subtitle="Bounded Q&A on your published policy."
+        titleId="employee-benefits-assistant-shell-title"
+        assistant={() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={assignmentId}
+            assignmentLoading={assignmentLoading}
+            variant="embedded"
+          />
+        )}
+      >
+        <Container maxWidth="xl" className="py-8">
+          {/* Phase-2 journey context: Intake done -> Services & policy (here) -> Roadmap. */}
+          <div className="mb-6">
+            <PhaseContextBar
+              phases={[
+                { key: 'intake', label: 'Intake', status: 'done' },
+                { key: 'services', label: 'Services & policy', status: 'current' },
+                { key: 'roadmap', label: 'Roadmap', status: 'upcoming' },
+              ]}
+              onSelect={(key) => {
+                if (key === 'intake') navigate(buildRoute('employeeIntake'));
+              }}
+            />
+          </div>
+          {body}
+        </Container>
+      </PolicyAssistantDockedShell>
+      <PolicyAssistantFab
+        label="Ask about your policy"
+        isPanelOpen={assistantOpen}
+        onClick={() => setAssistantOpen((v) => !v)}
+      />
     </AppShell>
   );
 };
