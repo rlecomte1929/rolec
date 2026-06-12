@@ -1014,7 +1014,11 @@ export function EmployeeIntakePage() {
   // AIQ-289: insert a dimmed "Pets" tab between My People and Work & Place.
   // The tab is visible but on-hold — index 3 of STEP_ON_HOLD marks it.
   const STEP_LABELS = ['Journey', 'About You', 'My People', 'Pets', 'Work & Place', 'My Needs', 'Review'];
-  const STEP_ICONS  = ['🛫', '👤', '👪', '🐾', '🗺️', '✅', '📋'];
+  // AIQ-978: step 6 ("My Needs") previously used a ✅ checkmark emoji as its
+  // icon, which read as "already complete" on a fresh wizard. The real
+  // completion state is the numbered circle (✓ only when stepValid && n < step);
+  // use a non-checkmark icon here so the decorative glyph can't imply progress.
+  const STEP_ICONS  = ['🛫', '👤', '👪', '🐾', '🗺️', '🎯', '📋'];
   const STEP_ON_HOLD: Record<number, boolean> = {};  // AIQ-160-C: step 4 (Pets) is now active
   const TOTAL_STEPS = STEP_LABELS.length;
 
