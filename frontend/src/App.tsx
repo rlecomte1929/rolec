@@ -27,6 +27,7 @@ import { AdminViewingCompanyProvider } from './features/admin/AdminViewingCompan
 // V2Gate removed — all promoted flags now render V2 unconditionally
 import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
 import { RequireHrRoute } from './features/hr/RequireHrRoute';
+import { NotFoundRedirect } from './components/NotFoundRedirect';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -493,7 +494,10 @@ function App() {
             <Route path="/debug/assignment" element={<AssignmentDebugPage />} />
           </>
         )}
-        <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
+        {/* AIQ-980: keep authenticated users in-app on their role dashboard for
+            unmatched URLs (e.g. employee → /hr/assignments) instead of dumping
+            them on the public marketing homepage. Anonymous → landing. */}
+        <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
       </ResilientRoute>
       </AppErrorBoundary>
