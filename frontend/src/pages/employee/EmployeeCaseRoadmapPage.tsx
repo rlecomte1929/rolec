@@ -11,6 +11,8 @@ import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
+import { PhaseContextBar } from '../../components/antigravity';
+import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
 import {
   successProbability,
   type ConfidenceLevel,
@@ -124,6 +126,24 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     navigate(`${base}?roadmap_step=${stepId}`);
   };
 
+  const phaseBar = (
+    <div className="mx-auto max-w-5xl px-6 pt-6">
+      <PhaseContextBar
+        phases={[
+          { key: 'intake', label: 'Intake', status: 'done' },
+          { key: 'services', label: 'Services & policy', status: 'done' },
+          { key: 'roadmap', label: 'Roadmap', status: 'current' },
+        ]}
+        onSelect={(key) => {
+          if (key === 'intake') navigate(buildRoute('employeeIntake'));
+          if (key === 'services') navigate(buildRoute('services'));
+        }}
+      />
+    </div>
+  );
+
+  const isEmpty = tracks.length === 0;
+
   if (loading) {
     return (
       <AppShell>
@@ -131,19 +151,12 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
       </AppShell>
     );
   }
-  if (error) {
+  if (error || isEmpty) {
     return (
       <AppShell>
-        <div className="px-6 py-8 max-w-xl mx-auto">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 px-6 py-10 text-center">
-            <svg className="mx-auto h-10 w-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-            <p className="text-sm font-medium text-slate-700">Your roadmap is being set up</p>
-            <p className="mt-1 text-xs text-slate-400 max-w-xs mx-auto">
-              Your relocation roadmap will appear here once your HR team has configured the milestones for this assignment.
-            </p>
-          </div>
+        {phaseBar}
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <RoadmapBeingBuilt onMessageTeam={() => navigate(buildRoute('messages'))} />
         </div>
       </AppShell>
     );
@@ -151,6 +164,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   return (
     <AppShell>
+      {phaseBar}
       <div ref={selectionRef}>
         <RoadmapScreen
           tracks={tracks}
