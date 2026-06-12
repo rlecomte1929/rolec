@@ -24,6 +24,9 @@ export const ROUTE_DEFS = {
   employeeDocuments: { path: '/employee/documents', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Relocation task checklist (per assignment). */
   employeeCasePlan: { path: '/employee/case/:caseId/plan', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** [AIQ-976] Case-scoped intake wizard — opens the clicked case (vs the bare
+   *  /employee/intake which resolves the primary case from context). */
+  employeeCaseIntake: { path: '/employee/case/:caseId/intake', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Immigration intake flow (consent → OCR → interview). */
   employeeCaseImmigration: { path: '/employee/case/:caseId/immigration', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** [IMM-19] GDPR data-management screen (view / export / delete). */

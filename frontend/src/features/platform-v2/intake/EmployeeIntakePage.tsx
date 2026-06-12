@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
@@ -932,8 +932,13 @@ export function EmployeeIntakePage() {
   const [locks, setLocks] = useState({ dest: false, destCity: false, email: false, job: false, contractType: false, contractStart: false, salary: false, office: false });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savedAt, setSavedAt] = useState(Date.now());
+  // AIQ-976: case-scoped intake — when opened via /employee/case/:caseId/intake,
+  // the clicked case drives the whole session (draft hydration, autosave, and the
+  // services patch below). The bare /employee/intake route has no param, so it
+  // falls back to a fresh session id / the primary linked case from context.
+  const { caseId: routeCaseId } = useParams<{ caseId: string }>();
   // Stable case ID for the duration of this intake session.
-  const caseIdRef = useRef<string>(crypto.randomUUID());
+  const caseIdRef = useRef<string>(routeCaseId ?? crypto.randomUUID());
   // Latest assignment id captured in a ref so the debounced autosave
   // (set up inside `setField`'s closure) always posts to the *current*
   // linked assignment, even if it resolves after the wizard mounts.
@@ -1035,7 +1040,11 @@ export function EmployeeIntakePage() {
   // Form data itself (other fields) is still ephemeral and lives in
   // component state until final submit — the step counter is the only
   // value persisted server-side today.
-  const { assignmentId, linkedSummaries } = useEmployeeAssignment();
+  // AIQ-976: the clicked case (routeCaseId, resolved above) wins; the bare
+  // /employee/intake route falls back to the primary linked case from context.
+  // Everything downstream uses `assignmentId`.
+  const { assignmentId: contextAssignmentId, linkedSummaries } = useEmployeeAssignment();
+  const assignmentId = routeCaseId ?? contextAssignmentId;
   const hydratedStepRef = useRef(false);
   const lastPersistedStepRef = useRef<number | null>(null);
 
