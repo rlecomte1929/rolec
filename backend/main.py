@@ -4119,6 +4119,8 @@ def _dispatch_hr_assign_side_effects(
     # so running them here is safe.
     employee_user_id: Optional[str] = None,
     hr_company_id: Optional[str] = None,
+    employee_first_name: Optional[str] = None,
+    employee_last_name: Optional[str] = None,
 ) -> None:
     """Run the deferred ensure_*, case-participant, case-event and message draft
     in a background thread. Each step is best-effort and logs its own warning
@@ -4129,6 +4131,38 @@ def _dispatch_hr_assign_side_effects(
 
     def _run() -> None:
         run_assignment_post_creation_hooks(db, assignment_id, request_id=request_id)
+
+        # Transactional invite email — actively notify the employee that HR set up
+        # their case (previously only a DB pending-claim token existed → no notice).
+        # Best-effort: assignment is already committed and the response returned;
+        # an email failure must never roll it back. account_exists drives login vs
+        # register link; employee_user_id resolved upstream from users/profiles.
+        try:
+            if "@" in (employee_identifier_raw or ""):
+                from .app.services.assignment_invite_email import send_assignment_invite_email
+
+                _company = db.get_company(hr_company_id) if hr_company_id else None
+                _hr = db.get_user_by_id(hr_user_id) if hr_user_id else None
+                _emp_name = " ".join(
+                    p for p in (employee_first_name, employee_last_name) if p
+                ).strip() or None
+                send_assignment_invite_email(
+                    to_email=employee_identifier_raw,
+                    employee_name=_emp_name,
+                    hr_name=(_hr or {}).get("name")
+                    or (_hr or {}).get("full_name")
+                    or (_hr or {}).get("username"),
+                    company_name=(_company or {}).get("name"),
+                    invite_token=invite_token,
+                    account_exists=employee_user_id is not None,
+                    request_id=request_id,
+                )
+        except Exception as exc:
+            log.warning(
+                "assignment invite email skipped assignment_id=%s error=%s",
+                assignment_id,
+                exc,
+            )
 
         # B3-perf: ensure employee profile company_id and employees row (deferred).
         if employee_user_id and hr_company_id:
@@ -4446,6 +4480,8 @@ def assign_case(
             request_id=request_id,
             employee_user_id=employee_user["id"] if employee_user else None,
             hr_company_id=hr_company_id,
+            employee_first_name=employee_first_name,
+            employee_last_name=employee_last_name,
         )
         side_effects_dispatched = True
 

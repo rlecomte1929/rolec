@@ -201,6 +201,10 @@ export const Auth: React.FC = () => {
   useEffect(() => {
     const nextMode = searchParams.get('mode');
     if (nextMode === 'register' || nextMode === 'login') setMode(nextMode);
+    // Pre-fill email from ?email= (assignment invite link). Only seed when the
+    // field is still empty so we never clobber what the user is typing.
+    const qpEmail = searchParams.get('email');
+    if (qpEmail) setEmail((prev) => prev || qpEmail);
   }, [searchParams]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
