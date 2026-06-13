@@ -31,6 +31,7 @@ _STEPS = [
         "source_url": "https://anabin.kmk.org",
         "confidence": "high",
         "requires_expert_review": False,
+        "phase": "immigration",
     },
     {
         "order": 2,
@@ -38,6 +39,7 @@ _STEPS = [
         "description": None,
         "confidence": "high",
         "requires_expert_review": True,
+        # no phase → defaults to pre_departure
     },
     {"order": 3, "title": "   ", "description": "blank title — dropped"},
 ]
@@ -48,7 +50,8 @@ class MapGeneratedStepsTests(unittest.TestCase):
         rows = map_generated_steps_to_milestones(_STEPS, "IN→DE")
         # The blank-title step is dropped.
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["milestone_type"], "ai_01")
+        # milestone_type encodes the phase so the plan service buckets it.
+        self.assertEqual(rows[0]["milestone_type"], "immigration_ai_01")
         self.assertEqual(rows[0]["title"], "Verify qualification via Anabin")
         self.assertEqual(rows[0]["description"], "Check the German Anabin database for H+ status.")
         self.assertEqual(rows[0]["sort_order"], 1)
@@ -56,14 +59,23 @@ class MapGeneratedStepsTests(unittest.TestCase):
         self.assertEqual(rows[0]["owner"], "employee")
         self.assertIn("corridor: IN→DE", rows[0]["notes"])
         self.assertIn("source: https://anabin.kmk.org", rows[0]["notes"])
-        self.assertEqual(rows[1]["milestone_type"], "ai_02")
+        # No phase on the step → pre_departure default.
+        self.assertEqual(rows[1]["milestone_type"], "pre_departure_ai_02")
         self.assertIsNone(rows[1]["description"])
 
-    def test_falls_back_to_index_when_order_missing(self):
+    def test_phase_drives_milestone_type_prefix(self):
+        rows = map_generated_steps_to_milestones(
+            [{"order": 1, "title": "Anmeldung", "phase": "arrival"}], "IN→DE"
+        )
+        self.assertEqual(rows[0]["milestone_type"], "arrival_ai_01")
+
+    def test_falls_back_to_index_and_pre_departure(self):
         rows = map_generated_steps_to_milestones(
             [{"title": "A"}, {"title": "B"}], "FR→NO"
         )
-        self.assertEqual([r["milestone_type"] for r in rows], ["ai_01", "ai_02"])
+        self.assertEqual(
+            [r["milestone_type"] for r in rows], ["pre_departure_ai_01", "pre_departure_ai_02"]
+        )
         self.assertEqual([r["sort_order"] for r in rows], [1, 2])
 
     def test_empty_steps_maps_to_nothing(self):
@@ -80,7 +92,7 @@ class PersistGeneratedMilestonesTests(unittest.TestCase):
         self.assertEqual(db.upsert_case_milestone.call_count, 2)
         first = db.upsert_case_milestone.call_args_list[0].kwargs
         self.assertEqual(first["case_id"], "case-1")
-        self.assertEqual(first["milestone_type"], "ai_01")
+        self.assertEqual(first["milestone_type"], "immigration_ai_01")
         self.assertEqual(first["request_id"], "rq")
 
     def test_no_op_when_no_usable_steps_does_not_delete(self):
@@ -89,6 +101,42 @@ class PersistGeneratedMilestonesTests(unittest.TestCase):
         self.assertEqual(written, 0)
         db.delete_case_milestones.assert_not_called()
         db.upsert_case_milestone.assert_not_called()
+
+
+class SyntheticPhaseParsingTests(unittest.TestCase):
+    """The {phase}_ai_{NN} convention must round-trip through the plan service's
+    synthetic-entry fallback into the right phase block + in-phase order."""
+
+    def test_parses_known_phase_and_sequence(self):
+        from backend.relocation_plan_service import _phase_and_seq_from_synthetic_code
+
+        self.assertEqual(_phase_and_seq_from_synthetic_code("arrival_ai_03"), ("arrival", 3))
+        self.assertEqual(
+            _phase_and_seq_from_synthetic_code("post_arrival_ai_10"), ("post_arrival", 10)
+        )
+        self.assertEqual(
+            _phase_and_seq_from_synthetic_code("pre_departure_ai_01"), ("pre_departure", 1)
+        )
+
+    def test_unknown_or_legacy_code_keeps_pre_departure_default(self):
+        from backend.relocation_plan_service import _phase_and_seq_from_synthetic_code
+
+        # Unknown phase prefix → default.
+        self.assertEqual(_phase_and_seq_from_synthetic_code("settlement_ai_01"), ("pre_departure", 999))
+        # Legacy custom milestone (no _ai_ marker) → unchanged behaviour.
+        self.assertEqual(_phase_and_seq_from_synthetic_code("some_custom_task"), ("pre_departure", 999))
+
+    def test_ai_steps_distribute_across_phase_blocks_end_to_end(self):
+        from backend.relocation_plan_service import build_phased_plan_from_milestones
+
+        milestones = [
+            {"id": "m1", "milestone_type": "immigration_ai_01", "title": "Apply for Blue Card", "status": "pending"},
+            {"id": "m2", "milestone_type": "arrival_ai_02", "title": "Anmeldung", "status": "pending"},
+            {"id": "m3", "milestone_type": "post_arrival_ai_03", "title": "Collect eAT", "status": "pending"},
+        ]
+        blocks = build_phased_plan_from_milestones(milestones)
+        phases_with_tasks = {b.phase_key for b in blocks if b.tasks}
+        self.assertEqual(phases_with_tasks, {"immigration", "arrival", "post_arrival"})
 
 
 if __name__ == "__main__":

@@ -88,8 +88,12 @@ def map_generated_steps_to_milestones(
     steps: Sequence[Dict[str, Any]], corridor: Optional[str]
 ) -> List[Dict[str, Any]]:
     """Map assembled generator steps (emit_case_roadmap shape: order/title/
-    description/source_url/confidence/requires_expert_review) to case_milestone
-    upsert kwargs. Steps without a title are dropped. Pure — no DB."""
+    description/phase/source_url/confidence/requires_expert_review) to
+    case_milestone upsert kwargs. Steps without a title are dropped. Pure — no DB.
+
+    milestone_type is ``{phase}_ai_{NN}`` so relocation_plan_service places each
+    step in its real phase block (the synthetic-entry parser reads the prefix);
+    an absent/unknown phase falls back to ``pre_departure``."""
     stamp = datetime.now(timezone.utc).date().isoformat()
     rows: List[Dict[str, Any]] = []
     for idx, step in enumerate(steps):
@@ -98,13 +102,14 @@ def map_generated_steps_to_milestones(
             continue
         order = step.get("order")
         order = order if isinstance(order, int) and order > 0 else idx + 1
+        phase = str(step.get("phase") or "").strip() or "pre_departure"
         note = f"AI-generated {stamp} | corridor: {corridor or '?'}"
         src = step.get("source_url")
         if src:
             note += f" | source: {src}"
         rows.append(
             {
-                "milestone_type": f"ai_{order:02d}",
+                "milestone_type": f"{phase}_ai_{order:02d}",
                 "title": title,
                 "description": step.get("description") or None,
                 "status": "pending",

@@ -105,13 +105,31 @@ def _criticality_to_priority(criticality: Optional[str]) -> str:
     return "critical" if (criticality or "").strip().lower() == "critical" else "standard"
 
 
+def _phase_and_seq_from_synthetic_code(code: str) -> Tuple[str, int]:
+    """AI-persisted milestones use the convention ``{phase}_ai_{NN}`` (see
+    persist_generated_milestones) so each step lands in its real phase block
+    instead of all defaulting to pre_departure. Parse the phase prefix (only
+    when it is a known PHASE_ORDER value) and the numeric suffix for in-phase
+    ordering. Any other code keeps the legacy pre_departure / 999 default."""
+    if "_ai_" in code:
+        prefix, _, suffix = code.partition("_ai_")
+        if prefix in PHASE_ORDER:
+            try:
+                seq = int(suffix)
+            except (TypeError, ValueError):
+                seq = 999
+            return prefix, seq
+    return "pre_departure", 999
+
+
 def _synthetic_entry_for_unknown_milestone(milestone_type: str, title: str) -> TaskLibraryEntry:
     """Fallback for legacy or custom milestone rows not in the MVP library."""
     safe_code = (milestone_type or "unknown_task").strip() or "unknown_task"
+    phase_key, seq = _phase_and_seq_from_synthetic_code(safe_code)
     return TaskLibraryEntry(
         task_code=safe_code,
         milestone_type=milestone_type,
-        phase_key="pre_departure",
+        phase_key=phase_key,
         title=title or milestone_type,
         short_label=title or milestone_type,
         default_owner="joint",
@@ -121,7 +139,7 @@ def _synthetic_entry_for_unknown_milestone(milestone_type: str, title: str) -> T
         why_this_matters="",
         instructions=(),
         required_inputs=(),
-        sequence_in_phase=999,
+        sequence_in_phase=seq,
     )
 
 
