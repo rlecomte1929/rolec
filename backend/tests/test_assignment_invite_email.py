@@ -94,5 +94,33 @@ class TestSend(unittest.TestCase):
         self.assertEqual(res["status"], "error")  # suppressed, not raised
 
 
+class TestSmokeTest(unittest.TestCase):
+    """The admin smoke test uses the same Resend path as the HR invite."""
+
+    def test_skips_when_no_email(self):
+        self.assertEqual(m.send_smoke_test_email("")["status"], "skipped")
+
+    def test_no_key_reports_no_key(self):
+        import os
+        with mock.patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("RESEND_API_KEY", None)
+            res = m.send_smoke_test_email("admin@relopass.com")
+        self.assertEqual(res["status"], "no_key")
+
+    def test_sent_via_same_resend_endpoint(self):
+        fake_resp = mock.MagicMock(ok=True, status_code=200)
+        with mock.patch.dict("os.environ", {"RESEND_API_KEY": "re_test"}, clear=False), \
+             mock.patch.object(m.http_requests, "post", return_value=fake_resp) as post:
+            res = m.send_smoke_test_email("admin@relopass.com")
+        self.assertEqual(res["status"], "sent")
+        self.assertEqual(post.call_args.args[0], "https://api.resend.com/emails")
+
+    def test_never_raises(self):
+        with mock.patch.dict("os.environ", {"RESEND_API_KEY": "re_test"}, clear=False), \
+             mock.patch.object(m.http_requests, "post", side_effect=RuntimeError("down")):
+            res = m.send_smoke_test_email("admin@relopass.com")
+        self.assertEqual(res["status"], "error")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
