@@ -5605,6 +5605,28 @@ def _async_generate_and_persist_roadmap(case_id: str, request_id: str) -> None:
         )
 
 
+def _async_seed_and_generate_roadmap(case_id: str, assignment_id: str, request_id: str) -> None:
+    """Background relocation-plan build, fired after intake submit so the submit
+    response stays fast: seed the deterministic milestones, THEN generate +
+    persist the AI roadmap (which replaces the seed).
+
+    Run as ONE chained task — NOT two separate executor tasks — so the seeding
+    always lands before generation's delete+rewrite. Dispatched separately they
+    would race on the max_workers=4 pool: if the slow (~8s, ~16 upserts) seeding
+    finished after generation's delete_case_milestones, the seed would be
+    written on top of the AI steps, leaving a mixed plan. Both steps are
+    independently best-effort; submit has already returned."""
+    try:
+        created = _ensure_default_milestones_for_case(case_id, assignment_id, request_id)
+        if created:
+            log.info("submit bg: seeded %d default milestones case_id=%s", created, case_id)
+    except Exception:
+        log.warning(
+            "submit bg: default milestone seeding failed case_id=%s", case_id, exc_info=True
+        )
+    _async_generate_and_persist_roadmap(case_id, request_id)
+
+
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     _deny_if_impersonating(user)
@@ -5707,31 +5729,20 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
     # timeline. Idempotent + best-effort: a seeding failure must never fail the
     # submit the employee just completed.
     if case_id:
-        try:
-            seeded = _ensure_default_milestones_for_case(case_id, assignment_id)
-            if seeded:
-                log.info(
-                    "submit_assignment: seeded %d default milestones case_id=%s",
-                    seeded, case_id,
-                )
-        except Exception as exc:
-            log.warning(
-                "submit_assignment: default milestone seeding failed case_id=%s: %s",
-                case_id, str(exc), exc_info=True,
-            )
-
-        # Kick off AI roadmap generation in the background so corridor-specific
-        # content replaces the deterministic seed within ~30s — without blocking
-        # the submit response (generation is a ~5-15s LLM call) and without a
-        # manual admin trigger. Fire-and-forget on the side-effects pool;
-        # corpus-less corridors are a fast no-op and any failure keeps the seed.
+        # Build the relocation plan entirely in the background so the submit
+        # response stays fast (the deterministic seeding is ~16 Supabase upserts,
+        # ~8s synchronously). One chained task seeds the deterministic milestones
+        # then generates + persists the AI roadmap — chained (not two separate
+        # tasks) so seeding lands before generation's delete+rewrite. The plan
+        # view is read seconds later and tolerates the brief build window; both
+        # steps are best-effort, so this can never fail the submit.
         try:
             _hr_assign_side_effects_executor.submit(
-                _async_generate_and_persist_roadmap, case_id, str(uuid.uuid4())
+                _async_seed_and_generate_roadmap, case_id, assignment_id, str(uuid.uuid4())
             )
         except Exception as exc:
             log.warning(
-                "submit_assignment: could not enqueue AI roadmap generation case_id=%s: %s",
+                "submit_assignment: could not enqueue background plan build case_id=%s: %s",
                 case_id, str(exc),
             )
 
