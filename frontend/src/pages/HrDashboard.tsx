@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { Card, Button, Input, Alert, Badge, Select } from '../components/antigravity';
 import { RefreshButton } from '../components/RefreshButton';
-import { hrAPI } from '../api/client';
+import { hrAPI, policyConfigMatrixAPI } from '../api/client';
 import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
 import { trackAuthPerf } from '../perf/authPerf';
@@ -36,6 +36,11 @@ export const HrDashboard: React.FC = () => {
   const [employeeLevel, setEmployeeLevel] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  // Has this company published a benefits policy? null = unknown/loading.
+  const [policyPublished, setPolicyPublished] = useState<boolean | null>(null);
+  const [policyBannerDismissed, setPolicyBannerDismissed] = useState<boolean>(
+    () => localStorage.getItem('relopass_hr_policy_publish_banner_dismissed') === '1',
+  );
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -56,6 +61,33 @@ export const HrDashboard: React.FC = () => {
   useEffect(() => {
     offsetRef.current = offset;
   }, [offset]);
+
+  // Detect whether this company has published a benefits policy. When not, we
+  // surface a dismissible nudge — employees can't compare services until then.
+  useEffect(() => {
+    let cancelled = false;
+    policyConfigMatrixAPI
+      .hrPublished()
+      .then((resp) => {
+        if (cancelled) return;
+        const r = (resp || {}) as { version_number?: number | null; published_at?: string | null };
+        const published =
+          Boolean(r.published_at) || (typeof r.version_number === 'number' && r.version_number > 0);
+        setPolicyPublished(published);
+      })
+      .catch(() => {
+        // Unknown on error — don't nag if we couldn't determine status.
+        if (!cancelled) setPolicyPublished(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissPolicyBanner = useCallback(() => {
+    localStorage.setItem('relopass_hr_policy_publish_banner_dismissed', '1');
+    setPolicyBannerDismissed(true);
+  }, []);
 
   useEffect(() => {
     routePerfStartedAt.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -261,6 +293,23 @@ export const HrDashboard: React.FC = () => {
 
         {/* W2-5: Policy Assistant answer provenance (grounded% / refusal% / unverified) */}
         <AnswerProvenanceWidget />
+
+        {/* Nudge HR to publish a benefits policy — employees can't compare services until they do. */}
+        {policyPublished === false && !policyBannerDismissed && (
+          <Alert variant="warning" title="You haven't published a benefits policy">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-relaxed">
+                Employees won&rsquo;t be able to compare services against your policy until you publish one.
+              </p>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button onClick={() => navigate(buildRoute('hrPolicy'))}>Publish policy →</Button>
+                <Button variant="outline" onClick={dismissPolicyBanner}>
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </Alert>
+        )}
 
         {error && (
           <Alert variant="error">
