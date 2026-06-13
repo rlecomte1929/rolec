@@ -91,3 +91,6 @@ skills/
 
 # FRIDAY-004e local Lighthouse artifacts (not committed)
 lighthouse-hero-report*
+
+# GStack local tooling state
+.gstack/
