@@ -234,6 +234,9 @@ function App() {
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
         <Route path={ROUTE_DEFS.why.path} element={<WhyReloPassPage />} />
+        {/* Alias: /why-relopass (used in marketing/audit links) renders the same page
+            instead of falling through to the homepage redirect. */}
+        <Route path="/why-relopass" element={<WhyReloPassPage />} />
         <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
         <Route path={ROUTE_DEFS.getStarted.path} element={<GetStartedPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />

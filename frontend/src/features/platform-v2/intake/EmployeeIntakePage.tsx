@@ -923,11 +923,17 @@ export function EmployeeIntakePage() {
   // Form data itself (other fields) is still ephemeral and lives in
   // component state until final submit — the step counter is the only
   // value persisted server-side today.
-  // AIQ-976: the clicked case (routeCaseId, resolved above) wins; the bare
-  // /employee/intake route falls back to the primary linked case from context.
-  // Everything downstream uses `assignmentId`.
+  // AIQ-976: the clicked case (routeCaseId) drives the session; the bare
+  // /employee/intake route falls back to the primary linked assignment.
+  // The intake endpoints are ASSIGNMENT-scoped (/api/employee/assignments/{id}/…),
+  // so `routeCaseId` (a case_id) must be resolved to its assignment_id via
+  // linkedSummaries — passing the case_id 404s (broke autosave/hydration/prefill
+  // and logged console 404s). Stay null until resolved so the guarded effects
+  // below never fire a request with the wrong id.
   const { assignmentId: contextAssignmentId, linkedSummaries } = useEmployeeAssignment();
-  const assignmentId = routeCaseId ?? contextAssignmentId;
+  const assignmentId = routeCaseId
+    ? (linkedSummaries.find((r) => r.case_id === routeCaseId)?.assignment_id ?? null)
+    : contextAssignmentId;
   const hydratedStepRef = useRef(false);
   const lastPersistedStepRef = useRef<number | null>(null);
 
@@ -1049,11 +1055,16 @@ export function EmployeeIntakePage() {
           </p>
         </div>
 
-        {/* Pre-fill banner */}
-        <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-          <span className="flex-shrink-0">ℹ</span>
-          <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click "Edit" on any pre-filled field if anything looks wrong.</div>
-        </div>
+        {/* Pre-fill banner — only when HR actually pre-filled at least one field
+            (locks.* are set during hydration only when the case carried a value;
+            e.g. an empty destination leaves locks.dest false). Hidden otherwise so
+            we never claim "destination pre-filled" on a case with no destination. */}
+        {Object.values(locks).some(Boolean) && (
+          <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+            <span className="flex-shrink-0">ℹ</span>
+            <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click "Edit" on any pre-filled field if anything looks wrong.</div>
+          </div>
+        )}
 
         {/* Wizard frame */}
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
