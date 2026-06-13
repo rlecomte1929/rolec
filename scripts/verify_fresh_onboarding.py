@@ -45,6 +45,8 @@ import urllib.error
 import urllib.request
 
 API = os.environ.get("RELOPASS_API_BASE", "https://api.relopass.com")
+from _prod_write_guard import guard_prod_writes  # noqa: E402
+guard_prod_writes(API)  # AIQ-913: refuse to seed prod by accident
 ADMIN_EMAIL = os.environ.get("RELOPASS_ADMIN_EMAIL", "admin@relopass.com")
 ADMIN_PASS = os.environ.get("RELOPASS_ADMIN_PASSWORD", "Passw0rd!")
 UA = {"User-Agent": "relopass-fresh-onboarding/1.0", "Content-Type": "application/json"}

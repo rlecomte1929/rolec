@@ -27,6 +27,8 @@ import urllib.error
 import urllib.request
 
 API = os.environ.get("RELOPASS_API_BASE", "https://api.relopass.com")
+from _prod_write_guard import guard_prod_writes  # noqa: E402
+guard_prod_writes(API)  # AIQ-913: refuse to seed prod by accident
 UA = {"User-Agent": "relopass-tenant-isolation/1.0", "Content-Type": "application/json"}
 GREEN, RED, GRY, RESET = "\033[92m", "\033[91m", "\033[90m", "\033[0m"
 
