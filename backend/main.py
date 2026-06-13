@@ -5561,6 +5561,50 @@ def _ensure_default_milestones_for_case(
     return created
 
 
+def _async_generate_and_persist_roadmap(case_id: str, request_id: str) -> None:
+    """Best-effort background AI roadmap generation + persist, fired after intake
+    submit so corridor-specific content (Blue Card, Anabin, Anmeldung…) replaces
+    the deterministic seed in the plan/roadmap WITHOUT a manual admin call.
+
+    Runs on the side-effects thread pool so the submit response stays fast
+    (generation is a ~5-15s LLM call). A corpus-less corridor returns
+    RULE_NOT_FOUND fast (no LLM) and is a no-op that leaves the deterministic
+    seed intact. Never raises."""
+    from .app.services.case_roadmap_profile import (
+        generate_ai_roadmap_for_case,
+        persist_generated_milestones,
+    )
+    try:
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if not case:
+                return
+            try:
+                draft = json.loads(case.draft_json or "{}")
+            except (json.JSONDecodeError, TypeError, ValueError):
+                draft = {}
+            case_dict = {"id": case_id, "status": case.status, "draft": draft}
+        roadmap = generate_ai_roadmap_for_case(case_dict)
+        if roadmap and roadmap.get("result") == "OK" and roadmap.get("steps"):
+            written = persist_generated_milestones(
+                db, case_id, roadmap["steps"], roadmap.get("corridor"), request_id
+            )
+            log.info(
+                "submit auto-roadmap: persisted %d AI milestones case=%s approved=%s",
+                written, case_id, roadmap.get("approved"),
+            )
+        else:
+            log.info(
+                "submit auto-roadmap: no AI steps for case=%s (result=%s) — deterministic seed kept",
+                case_id, (roadmap or {}).get("result"),
+            )
+    except Exception:
+        log.warning(
+            "submit auto-roadmap: generation/persist failed case=%s (deterministic seed kept)",
+            case_id, exc_info=True,
+        )
+
+
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     _deny_if_impersonating(user)
@@ -5674,6 +5718,21 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             log.warning(
                 "submit_assignment: default milestone seeding failed case_id=%s: %s",
                 case_id, str(exc), exc_info=True,
+            )
+
+        # Kick off AI roadmap generation in the background so corridor-specific
+        # content replaces the deterministic seed within ~30s — without blocking
+        # the submit response (generation is a ~5-15s LLM call) and without a
+        # manual admin trigger. Fire-and-forget on the side-effects pool;
+        # corpus-less corridors are a fast no-op and any failure keeps the seed.
+        try:
+            _hr_assign_side_effects_executor.submit(
+                _async_generate_and_persist_roadmap, case_id, str(uuid.uuid4())
+            )
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: could not enqueue AI roadmap generation case_id=%s: %s",
+                case_id, str(exc),
             )
 
     track_event(
