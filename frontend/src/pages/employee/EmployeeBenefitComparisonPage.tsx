@@ -111,6 +111,29 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
         </Button>
       </Card>
     );
+  } else if (comp && comp.resolved_policy === null) {
+    // No published policy → friendly employee-facing onboarding nudge (not a blank
+    // page or raw "no policy" error). HR is prompted to publish on their side.
+    body = (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="mb-1 text-sm font-medium text-[#0b2b43]">No benefits policy published yet</p>
+        <p className="text-sm text-[#64748b]">
+          Your HR team hasn&rsquo;t published a benefits policy yet. Once they do, you&rsquo;ll see which
+          services are covered — and what you&rsquo;d owe — right here. No action is needed on your part.
+        </p>
+      </Card>
+    );
+  } else if (comp && rows.length === 0) {
+    // Policy resolved, but no services matched to it yet.
+    body = (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="mb-1 text-sm font-medium text-[#0b2b43]">Your benefits policy is published</p>
+        <p className="text-sm text-[#64748b]">
+          No services have been matched to it yet — check back after you complete your intake, and
+          we&rsquo;ll show which services are covered and what you&rsquo;d owe.
+        </p>
+      </Card>
+    );
   } else {
     body = <BenefitComparisonDashboard rows={rows} caseId={caseId} policy={policy} />;
   }
