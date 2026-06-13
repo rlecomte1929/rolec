@@ -245,6 +245,93 @@ def _load_profile_for_case_employee(case_id: str, employee_id: str) -> Optional[
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Canonical intake resolution (AIQ-973 · ASK-ONCE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _resolve_canonical_intake_fields(case_id: str) -> Dict[str, Any]:
+    """ASK-ONCE: resolve already-provided identity/passport/spouse fields from the
+    canonical intake store (``cases.intake_data``) and map them to the immigration
+    interview's ``vault_field`` names. Used as a READ-TIME overlay so the interview
+    surfaces these as pre-filled 'confirm' values instead of re-asking them as
+    blank required questions. Returns ``{vault_field: value}`` for non-empty values
+    only.
+
+    Mirrors ``prefill_engine._build_context``'s intake sub-key fallbacks so the two
+    inlets resolve the same source of truth. Conflict rule: the caller overlays
+    this UNDER the real vault, so an OCR'd / already-answered value always wins.
+    """
+    import json as _json
+
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT intake_data FROM public.cases WHERE id = :id"),
+                {"id": case_id},
+            ).mappings().first()
+    except Exception:  # noqa: BLE001 — best-effort; fall back to no prefill
+        return {}
+    if not row or not row.get("intake_data"):
+        return {}
+    raw = row.get("intake_data")
+    if isinstance(raw, dict):
+        intake = raw
+    else:
+        try:
+            intake = _json.loads(raw)
+        except (TypeError, ValueError):
+            return {}
+    if not isinstance(intake, dict):
+        return {}
+    return _map_intake_to_vault_fields(intake)
+
+
+def _map_intake_to_vault_fields(intake: Dict[str, Any]) -> Dict[str, Any]:
+    """Pure mapping (no I/O): intake_data dict → {interview vault_field: value} for
+    the already-known identity/passport/spouse fields. Split out from the DB read
+    so it's unit-testable. See :func:`_resolve_canonical_intake_fields`."""
+    if not isinstance(intake, dict):
+        return {}
+
+    # profile sub-keys — same fallbacks as prefill_engine, plus wizard paths
+    profile = (
+        intake.get("profile")
+        or intake.get("employee")
+        or intake.get("personalDetails")
+        or intake.get("employeeProfile")
+        or intake.get("primaryApplicant")
+        or {}
+    )
+    basics = intake.get("relocationBasics") or {}
+    full_name = (
+        profile.get("legal_full_name") or profile.get("legalFullName")
+        or profile.get("full_name") or profile.get("fullName")
+    )
+    fam = intake.get("familyMembers") or intake.get("family") or {}
+    spouse = fam.get("spouse") or {}
+
+    out: Dict[str, Any] = {}
+    # Name → first/last is a best-effort split, surfaced for CONFIRMATION (the user
+    # can correct it), never silently committed.
+    if full_name and str(full_name).strip():
+        parts = str(full_name).strip().split()
+        out["legal_first_name"] = parts[0]
+        if len(parts) > 1:
+            out["legal_last_name"] = " ".join(parts[1:])
+    for vault_field, value in (
+        ("date_of_birth", profile.get("date_of_birth") or profile.get("dateOfBirth")),
+        ("nationality", profile.get("nationality") or basics.get("nationality")),
+        ("passport_number", profile.get("passport_number") or profile.get("passportNumber")),
+        ("passport_expiry", profile.get("passport_expiry") or profile.get("passportExpiry")),
+        ("spouse_name", spouse.get("full_name") or spouse.get("fullName") or spouse.get("name")),
+        ("spouse_dob", spouse.get("date_of_birth") or spouse.get("dateOfBirth")),
+        ("spouse_nationality", spouse.get("nationality")),
+    ):
+        if value is not None and str(value).strip() != "":
+            out[vault_field] = value
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Interview session lifecycle
 # ─────────────────────────────────────────────────────────────────────────────
 

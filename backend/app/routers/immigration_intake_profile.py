@@ -37,6 +37,7 @@ from ..services.immigration_service import (
     _load_profile_for_case_employee,
     _log_access,
     _now_iso,
+    _resolve_canonical_intake_fields,
 )
 from ..services.ocr_passport_extractor import (
     ConflictRecord,
@@ -264,8 +265,16 @@ def get_profile_employee(
                    "Please complete the consent step first.",
         )
 
+    # AIQ-973 (ASK-ONCE): canonical intake values the user already gave, surfaced
+    # so the profile form pre-fills them to confirm instead of asking again.
+    canonical = _resolve_canonical_intake_fields(case_id)
+
     profile = _load_profile_for_case_employee(case_id, employee_id)
     if not profile:
+        # No vault row yet — still surface what intake knows, so it's a confirm,
+        # not a blank form. (Empty canonical → genuinely nothing to show.)
+        if canonical:
+            return {"profile": canonical, "prefilled_from_intake": True}
         return {"profile": None}
 
     _log_access(
@@ -277,8 +286,14 @@ def get_profile_employee(
         fields=["full_profile"],
     )
 
+    # Overlay canonical intake UNDER the real vault: a non-null vault value always
+    # wins (OCR'd / already-entered), canonical only fills fields still blank.
+    p = dict(canonical)
+    for _k, _v in dict(profile).items():
+        if _v is not None:
+            p[_k] = _v
+
     # Decrypt passport_number for the employee's own view
-    p = dict(profile)
     if p.get("passport_number"):
         try:
             enc_key = _get_encryption_key()
