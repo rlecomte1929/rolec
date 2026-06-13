@@ -11,8 +11,9 @@ truth. The Notion task brief (AIQ-224) calls out four invariants:
   3. **Atomic archive + publish** — the previously published version (if any)
      and the new version must transition in a single transaction. At most
      one row per policy may have status='published' at any time.
-  4. **Auditable** — every publish is logged to `public.audit_log` with
-     action_type='policy.published'.
+  4. **Auditable** — every publish is logged to the canonical
+     `public.audit_logs` table (action_type='update', with the semantic
+     event name 'policy.published' in new_value_json.event).
 
 Endpoints
 ─────────
@@ -34,7 +35,6 @@ Tests live in `backend/tests/test_policy_publish.py`.
 """
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from datetime import date, datetime, timezone
@@ -45,6 +45,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
+from ..services.audit_log_service import insert_audit_log
 from ...database import db
 
 
@@ -249,41 +250,39 @@ def _write_audit_log(
     archived_version_id: Optional[str],
     notes: Optional[str],
 ) -> str:
-    """Append to public.audit_log. Returns the new row id.
+    """Append the publish event to the canonical public.audit_logs table.
+    Returns the new row id.
 
-    The audit_log table is the legacy text-shape (created 2026-02-21) with
-    a metadata_json TEXT column — we serialise the payload to JSON.
-    Audit-write failures are logged but never raised: a missing audit row
-    must not roll back a successful publish (re-publishing is destructive).
+    Consolidated onto audit_logs (AIQ-942) so policy-publish events land in the
+    same table downstream queries and admin tooling already read — previously
+    they went to the orphaned legacy `audit_log` and were invisible there.
+    The audit_logs.action_type CHECK only permits insert/update/delete, so the
+    semantic event name ('policy.published') is carried in new_value_json.event.
+    Audit-write failures are logged but never raised: a missing audit row must
+    not roll back a successful publish (re-publishing is destructive).
     """
     new_id = str(uuid.uuid4())
     try:
-        conn.execute(
-            text(
-                f"INSERT INTO {_t('audit_log')} "
-                f"  (id, actor_user_id, action_type, target_type, target_id, "
-                f"   reason, metadata_json, created_at) "
-                f"VALUES (:id, :actor, 'policy.published', 'policy_version', "
-                f"        :target, :reason, :meta, :now)"
-            ),
-            {
-                "id": new_id,
-                "actor": actor_id,
-                "target": version_id,
-                "reason": notes,
-                "meta": json.dumps({
-                    "company_id": company_id,
-                    "policy_id": policy_id,
-                    "version_id": version_id,
-                    "version_number": version_number,
-                    "archived_version_id": archived_version_id,
-                }),
-                "now": _now_iso(),
+        new_id = insert_audit_log(
+            conn,
+            entity_type="policy_version",
+            entity_id=version_id,
+            action_type="update",
+            new_value={
+                "event": "policy.published",
+                "company_id": company_id,
+                "policy_id": policy_id,
+                "version_id": version_id,
+                "version_number": version_number,
+                "archived_version_id": archived_version_id,
+                "notes": notes,
             },
+            actor_type="human",
+            actor_id=actor_id,
         )
     except Exception:
         logger.warning(
-            "policy_publish: audit_log write failed version_id=%s", version_id,
+            "policy_publish: audit_logs write failed version_id=%s", version_id,
             exc_info=True,
         )
     return new_id

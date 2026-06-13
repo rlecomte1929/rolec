@@ -97,15 +97,15 @@ CREATE TABLE policy_values (
     cap_unit    TEXT,
     cap_currency TEXT NOT NULL DEFAULT 'EUR'
 );
-CREATE TABLE audit_log (
-    id            TEXT NOT NULL,
-    actor_user_id TEXT NOT NULL,
-    action_type   TEXT NOT NULL,
-    target_type   TEXT NOT NULL,
-    target_id     TEXT,
-    reason        TEXT,
-    metadata_json TEXT,
-    created_at    TEXT NOT NULL
+CREATE TABLE audit_logs (
+    id             TEXT NOT NULL,
+    entity_type    TEXT NOT NULL,
+    entity_id      TEXT NOT NULL,
+    action_type    TEXT NOT NULL,
+    old_value_json TEXT,
+    new_value_json TEXT,
+    actor_type     TEXT,
+    actor_id       TEXT
 );
 """
 
@@ -243,10 +243,13 @@ class PolicyPublishTests(unittest.TestCase):
         return dict(row) if row else {}
 
     def _count_audit_rows(self, version_id: str) -> int:
+        # Publish events now land in the canonical audit_logs table with
+        # action_type='update' and the semantic event in new_value_json.event.
         with self.engine.connect() as conn:
             return conn.execute(text(
-                "SELECT count(*) FROM audit_log "
-                "WHERE action_type = 'policy.published' AND target_id = :id"
+                "SELECT count(*) FROM audit_logs "
+                "WHERE entity_type = 'policy_version' AND entity_id = :id "
+                "AND new_value_json LIKE '%policy.published%'"
             ), {"id": version_id}).scalar()
 
     # ── 14-category completeness ─────────────────────────────────────────────
