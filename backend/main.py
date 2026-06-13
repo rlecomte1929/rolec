@@ -950,6 +950,40 @@ def debug_kv_get(
     return result
 
 
+@app.get("/api/admin/email-smoke-test")
+def admin_email_smoke_test(
+    request: Request,
+    user: Dict[str, Any] = Depends(_require_admin_v2),
+):
+    """
+    Admin-only: send a test email to the requesting admin's own address via the
+    SAME Resend path as the HR invite (assignment_invite_email._resend_send), to
+    confirm live delivery from the Render shell without creating a full case.
+
+    Returns:
+      {status: sent, to, provider: resend}          — delivered via Resend
+      {status: no_key, message: "..."}              — RESEND_API_KEY not configured
+      {status: failed|error, to, provider, detail}  — Resend rejected / exception
+    """
+    to_email = (user.get("email") or "").strip()
+    if not to_email:
+        raise HTTPException(status_code=400, detail="No email on the requesting admin account.")
+    from .app.services.assignment_invite_email import send_smoke_test_email
+
+    request_id = getattr(request.state, "request_id", None)
+    res = send_smoke_test_email(to_email, request_id=request_id)
+    if res.get("status") == "no_key":
+        return {"status": "no_key", "message": "RESEND_API_KEY not configured"}
+    if res.get("status") == "sent":
+        return {"status": "sent", "to": to_email, "provider": "resend"}
+    return {
+        "status": res.get("status", "error"),
+        "to": to_email,
+        "provider": "resend",
+        "detail": res.get("http_status"),
+    }
+
+
 # Global orchestrator
 orchestrator = IntakeOrchestrator()
 compliance_engine = ComplianceEngine()

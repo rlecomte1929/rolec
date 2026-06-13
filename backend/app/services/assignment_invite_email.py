@@ -104,6 +104,44 @@ def render_assignment_invite_email(
     return subject, plain, html
 
 
+def _resend_send(
+    *,
+    to_email: str,
+    subject: str,
+    plain: str,
+    html: Optional[str] = None,
+    request_id: Optional[str] = None,
+    context: str = "email",
+) -> Dict[str, Any]:
+    """
+    The single Resend delivery path, shared by the HR invite and the admin
+    smoke test so both exercise the identical env/provider/POST. Never raises.
+
+    Returns status: no_key (RESEND_API_KEY absent — logged, not sent) | sent |
+    failed (Resend non-2xx) | error (exception, suppressed). Includes ``from``.
+    """
+    resend_key = os.getenv("RESEND_API_KEY", "")
+    from_addr = os.getenv("EMAIL_FROM", "noreply@relopass.com")
+    if not resend_key:
+        log.info("%s (no RESEND_API_KEY — logged, not sent): to=%s subject=%r\n\n%s", context, to_email, subject, plain)
+        return {"status": "no_key", "from": from_addr}
+    try:
+        resp = http_requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+            json={"from": from_addr, "to": [to_email], "subject": subject, "text": plain, "html": html},
+            timeout=10,
+        )
+        if resp.ok:
+            log.info("%s sent to=%s request_id=%s", context, to_email, request_id)
+            return {"status": "sent", "from": from_addr}
+        log.error("%s delivery failed: %s %s", context, resp.status_code, resp.text[:200])
+        return {"status": "failed", "http_status": resp.status_code, "from": from_addr}
+    except Exception as exc:  # noqa: BLE001 — delivery must never break the caller
+        log.error("%s send error (suppressed) to=%s: %s", context, to_email, exc)
+        return {"status": "error", "from": from_addr}
+
+
 def send_assignment_invite_email(
     *,
     to_email: str,
@@ -133,49 +171,56 @@ def send_assignment_invite_email(
             invite_token=invite_token,
             account_exists=account_exists,
         )
-        resend_key = os.getenv("RESEND_API_KEY", "")
-        from_addr = os.getenv("EMAIL_FROM", "noreply@relopass.com")
-
-        if not resend_key:
-            # Dev/no-config fallback — log so nothing is silently dropped.
-            log.info(
-                "ASSIGNMENT INVITE EMAIL (no RESEND_API_KEY): to=%s mode=%s subject=%r\n\n%s",
-                to_email,
-                mode,
-                subject,
-                plain,
-            )
-            return {"status": "logged", "mode": mode}
-
-        resp = http_requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {resend_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": from_addr,
-                "to": [to_email],
-                "subject": subject,
-                "text": plain,
-                "html": html,
-            },
-            timeout=10,
-        )
-        if resp.ok:
-            log.info(
-                "assignment invite email sent to=%s mode=%s request_id=%s",
-                to_email,
-                mode,
-                request_id,
-            )
-            return {"status": "sent", "mode": mode}
-        log.error(
-            "Resend delivery failed for assignment invite: %s %s",
-            resp.status_code,
-            resp.text[:200],
-        )
-        return {"status": "failed", "http_status": resp.status_code, "mode": mode}
     except Exception as exc:  # noqa: BLE001 — email must never break assignment
-        log.error("assignment invite email error (suppressed) to=%s: %s", to_email, exc)
+        log.error("assignment invite render error (suppressed) to=%s: %s", to_email, exc)
         return {"status": "error", "mode": mode}
+
+    res = _resend_send(
+        to_email=to_email,
+        subject=subject,
+        plain=plain,
+        html=html,
+        request_id=request_id,
+        context="assignment invite email",
+    )
+    # Preserve the public contract: the no-RESEND_API_KEY dev path reports "logged".
+    out: Dict[str, Any] = {
+        "status": "logged" if res["status"] == "no_key" else res["status"],
+        "mode": mode,
+    }
+    if "http_status" in res:
+        out["http_status"] = res["http_status"]
+    return out
+
+
+def send_smoke_test_email(to_email: str, request_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Send a minimal test email via the SAME Resend path as the HR invite
+    (``_resend_send`` — same RESEND_API_KEY/EMAIL_FROM/provider). Used by the
+    admin email-smoke-test endpoint to confirm live delivery. Never raises.
+
+    Returns the raw _resend_send status: no_key | sent | failed | error.
+    """
+    if not to_email or "@" not in to_email:
+        return {"status": "skipped", "reason": "no_email"}
+    subject = "ReloPass email smoke test"
+    plain = (
+        "This is a ReloPass email delivery smoke test.\n\n"
+        "If you received this, the Resend integration (RESEND_API_KEY + EMAIL_FROM) "
+        "is configured correctly and HR invite emails will be delivered.\n\n— ReloPass"
+    )
+    html = (
+        '<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a">'
+        "<p>This is a <strong>ReloPass email delivery smoke test</strong>.</p>"
+        "<p>If you received this, the Resend integration is configured correctly and "
+        "HR invite emails will be delivered.</p>"
+        '<p style="color:#94a3b8;font-size:12px">— ReloPass</p></div>'
+    )
+    return _resend_send(
+        to_email=to_email,
+        subject=subject,
+        plain=plain,
+        html=html,
+        request_id=request_id,
+        context="email smoke test",
+    )
