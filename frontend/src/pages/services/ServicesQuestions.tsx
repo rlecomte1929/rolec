@@ -4,6 +4,7 @@ import { AppShell } from '../../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { DynamicServicesQuestionnaire, validateDynamicAnswers, type DynamicQuestion } from '../../features/services/DynamicServicesQuestionnaire';
+import { PetRelocationCard } from '../../features/services/PetRelocationCard';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { logServicesWorkflow } from '../../features/services/servicesWorkflowInstrumentation';
 import { useServicesWorkflowState } from '../../features/services/useServicesWorkflowState';
@@ -65,7 +66,7 @@ export const ServicesQuestions: React.FC = () => {
   const [questions, setQuestions] = useState<DynamicQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
-  const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string } | null>(null);
+  const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string; originCountry?: string } | null>(null);
   const [caseDetailsLoaded, setCaseDetailsLoaded] = useState(false);
   const [isSavingAnswers, setIsSavingAnswers] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -128,7 +129,11 @@ export const ServicesQuestions: React.FC = () => {
         const ctx = res.case_context || {};
         const destCity = (ctx.destCity ?? ctx.destCountry ?? '') as string;
         const destCountry = (ctx.destCountry ?? '') as string;
-        setCaseContext({ destCity: destCity || undefined, destCountry: destCountry || undefined });
+        setCaseContext({
+          destCity: destCity || undefined,
+          destCountry: destCountry || undefined,
+          originCountry: (ctx.originCountry as string | undefined) || undefined,
+        });
 
         const fromCase = caseToInitialAnswers(null, {
           destCity,
@@ -385,6 +390,15 @@ export const ServicesQuestions: React.FC = () => {
         answers={answers}
         onChange={onAnswersChange}
         displayCurrency={displayCurrency}
+      />
+
+      {/* AIQ-1001 — pet relocation details, gated on intake has_pets + corridor availability */}
+      <PetRelocationCard
+        assignmentId={assignmentId || null}
+        originCountry={caseContext?.originCountry}
+        destCountry={caseContext?.destCountry}
+        answers={answers}
+        onChange={onAnswersChange}
       />
 
       {!isValid && (
