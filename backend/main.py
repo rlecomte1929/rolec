@@ -5471,6 +5471,135 @@ def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, A
     return result
 
 
+def _ensure_default_milestones_for_case(
+    assignment_id: Optional[str], case_id: str, request_id: Optional[str] = None
+) -> None:
+    """Materialize the deterministic default relocation milestones for a case
+    into ``case_milestones`` (idempotent upsert) and persist immigration-regime
+    exception flags.
+
+    No LLM is involved — this is the deterministic plan baseline, safe to call
+    inline. Best-effort: it never raises, so a materialization hiccup can't break
+    its caller. Wired into intake submit (AIQ-1004) so the relocation-plan view
+    populates without a manual ``timeline?ensure_defaults`` call, and reused by
+    GET /api/assignments/{id}/timeline.
+    """
+    request_id = request_id or str(uuid.uuid4())
+    try:
+        services = []
+        try:
+            svc_rows = db.list_case_services(assignment_id, request_id=request_id) if assignment_id else []
+            services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+        except Exception:
+            pass
+        draft, target_move_date = {}, None
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if case:
+                try:
+                    raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                    draft = raw_draft if isinstance(raw_draft, dict) else {}
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    draft = {}
+                target_move_date = getattr(case, "target_move_date", None)
+        # ── S5 wiring: extract plan-scope context from draft ─────────────
+        _s5_ac = draft.get("assignmentContext") or {}
+        _s5_as = draft.get("assignment") or {}
+        _s5_rb = draft.get("relocationBasics") or {}
+        _s5_contract_type = (
+            _s5_as.get("contractType")
+            or _s5_ac.get("contractType")
+            or _s5_rb.get("contractType")
+            or None
+        )
+        _s5_family = draft.get("family") or None
+        _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+        _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+        # ── P2 wiring: nationality for immigration regime detection ────────
+        _s5_ep = draft.get("employeeProfile") or {}
+        _s5_pa = draft.get("primaryApplicant") or {}
+        _s5_nationality = (
+            _s5_pa.get("nationality")
+            or _s5_ep.get("nationality")
+            or _s5_ep.get("nationalityCountry")
+            or _s5_rb.get("nationality")
+            or None
+        )
+        defaults = compute_default_milestones(
+            case_id=case_id,
+            case_draft=draft,
+            selected_services=services,
+            target_move_date=str(target_move_date) if target_move_date else None,
+            contract_type=_s5_contract_type,
+            family_profile=_s5_family,
+            destination_country=_s5_dest,
+            origin_country=_s5_origin,
+            nationality=_s5_nationality,
+        )
+        for m in defaults:
+            try:
+                db.upsert_case_milestone(
+                    case_id=case_id,
+                    milestone_type=m["milestone_type"],
+                    title=m["title"],
+                    description=m.get("description"),
+                    target_date=m.get("target_date"),
+                    status=m.get("status", "pending"),
+                    sort_order=m.get("sort_order", 0),
+                    owner=m.get("owner", "joint"),
+                    criticality=m.get("criticality", "normal"),
+                    notes=m.get("notes"),
+                    request_id=request_id,
+                )
+            except Exception as upsert_exc:
+                log.warning(
+                    "ensure_default_milestones upsert_case_milestone failed case_id=%s type=%s: %s",
+                    case_id, m.get("milestone_type"), upsert_exc, exc_info=True,
+                )
+        # ── P3 wiring: detect and persist immigration-regime exception flags ──
+        try:
+            from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+            from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+            from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+            _exc_profile = _extract_profile(draft)
+            _exc_profile.setdefault("destination_country", _s5_dest)
+            _exc_profile.setdefault("origin_country", _s5_origin)
+            _exc_profile.setdefault("nationality", _s5_nationality)
+            _exc_profile.setdefault("contract_type", _s5_contract_type)
+            _regime = _RegimeRouter().detect_regime(
+                nationality=_exc_profile.get("nationality"),
+                destination_country=_exc_profile.get("destination_country"),
+                origin_country=_exc_profile.get("origin_country"),
+                contract_type=_exc_profile.get("contract_type"),
+            )
+            for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                try:
+                    db.upsert_exception_request(
+                        case_id=case_id,
+                        exception_type=_flag.exception_type,
+                        reason=_flag.reason,
+                        severity=_flag.severity,
+                        assignment_id=assignment_id,
+                        recommended_action=_flag.recommended_action or None,
+                        request_id=request_id,
+                    )
+                except Exception as _fe:
+                    log.warning(
+                        "ensure_default_milestones upsert_exception_request failed case_id=%s type=%s: %s",
+                        case_id, _flag.exception_type, _fe,
+                    )
+        except Exception as _exc_err:
+            log.warning(
+                "ensure_default_milestones exception detection failed case_id=%s: %s",
+                case_id, _exc_err,
+            )
+    except Exception as exc:
+        log.warning(
+            "ensure_default_milestones_for_case failed assignment_id=%s case_id=%s: %s",
+            assignment_id, case_id, exc, exc_info=True,
+        )
+
+
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     _deny_if_impersonating(user)
@@ -5564,6 +5693,12 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             raise
     else:
         log.warning("submit_assignment: missing case_id for event assignment_id=%s", assignment_id)
+
+    # AIQ-1004: materialize the deterministic relocation plan on submit so the
+    # plan view (relocation-plans/{id}/view → case_milestones) populates without
+    # a manual timeline ?ensure_defaults call. Deterministic, idempotent, best-effort.
+    if case_id:
+        _ensure_default_milestones_for_case(assignment_id, case_id)
 
     track_event(
         "assignment.submitted",
@@ -7003,127 +7138,10 @@ def get_assignment_timeline(
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     milestones = db.list_case_milestones(case_id, request_id=request_id)
     if ensure_defaults and len(milestones) == 0:
-        try:
-            services = []
-            try:
-                svc_rows = db.list_case_services(assignment_id, request_id=request_id)
-                services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
-            except Exception:
-                pass
-            draft, target_move_date = {}, None
-            with SessionLocal() as session:
-                case = app_crud.get_case(session, case_id)
-                if case:
-                    try:
-                        raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
-                        draft = raw_draft if isinstance(raw_draft, dict) else {}
-                    except (json.JSONDecodeError, TypeError, ValueError):
-                        draft = {}
-                    target_move_date = getattr(case, "target_move_date", None)
-            # ── S5 wiring: extract plan-scope context from draft ─────────────
-            _s5_ac = draft.get("assignmentContext") or {}
-            _s5_as = draft.get("assignment") or {}
-            _s5_rb = draft.get("relocationBasics") or {}
-            _s5_contract_type = (
-                _s5_as.get("contractType")
-                or _s5_ac.get("contractType")
-                or _s5_rb.get("contractType")
-                or None
-            )
-            _s5_family = draft.get("family") or None
-            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
-            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
-            # ── P2 wiring: nationality for immigration regime detection ────────
-            _s5_ep = draft.get("employeeProfile") or {}
-            _s5_pa = draft.get("primaryApplicant") or {}
-            _s5_nationality = (
-                _s5_pa.get("nationality")
-                or _s5_ep.get("nationality")
-                or _s5_ep.get("nationalityCountry")
-                or _s5_rb.get("nationality")
-                or None
-            )
-            defaults = compute_default_milestones(
-                case_id=case_id,
-                case_draft=draft,
-                selected_services=services,
-                target_move_date=str(target_move_date) if target_move_date else None,
-                contract_type=_s5_contract_type,
-                family_profile=_s5_family,
-                destination_country=_s5_dest,
-                origin_country=_s5_origin,
-                nationality=_s5_nationality,
-            )
-            for m in defaults:
-                try:
-                    db.upsert_case_milestone(
-                        case_id=case_id,
-                        milestone_type=m["milestone_type"],
-                        title=m["title"],
-                        description=m.get("description"),
-                        target_date=m.get("target_date"),
-                        status=m.get("status", "pending"),
-                        sort_order=m.get("sort_order", 0),
-                        owner=m.get("owner", "joint"),
-                        criticality=m.get("criticality", "normal"),
-                        notes=m.get("notes"),
-                        request_id=request_id,
-                    )
-                except Exception as upsert_exc:
-                    log.warning(
-                        "ensure_defaults upsert_case_milestone failed case_id=%s type=%s: %s",
-                        case_id,
-                        m.get("milestone_type"),
-                        upsert_exc,
-                        exc_info=True,
-                    )
-            # ── P3 wiring: detect and persist exception flags ─────────────────
-            try:
-                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
-                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
-                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
-                _exc_profile = _extract_profile(draft)
-                _exc_profile.setdefault("destination_country", _s5_dest)
-                _exc_profile.setdefault("origin_country", _s5_origin)
-                _exc_profile.setdefault("nationality", _s5_nationality)
-                _exc_profile.setdefault("contract_type", _s5_contract_type)
-                _regime = _RegimeRouter().detect_regime(
-                    nationality=_exc_profile.get("nationality"),
-                    destination_country=_exc_profile.get("destination_country"),
-                    origin_country=_exc_profile.get("origin_country"),
-                    contract_type=_exc_profile.get("contract_type"),
-                )
-                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
-                    try:
-                        db.upsert_exception_request(
-                            case_id=case_id,
-                            exception_type=_flag.exception_type,
-                            reason=_flag.reason,
-                            severity=_flag.severity,
-                            assignment_id=assignment_id,
-                            recommended_action=_flag.recommended_action or None,
-                            request_id=request_id,
-                        )
-                    except Exception as _fe:
-                        log.warning(
-                            "upsert_exception_request failed case_id=%s type=%s: %s",
-                            case_id, _flag.exception_type, _fe,
-                        )
-            except Exception as _exc_err:
-                log.warning(
-                    "get_assignment_timeline exception detection failed case_id=%s: %s",
-                    case_id, _exc_err,
-                )
-            milestones = db.list_case_milestones(case_id, request_id=request_id)
-        except Exception as exc:
-            log.warning(
-                "get_assignment_timeline ensure_defaults failed assignment_id=%s case_id=%s: %s",
-                assignment_id,
-                case_id,
-                exc,
-                exc_info=True,
-            )
-            milestones = db.list_case_milestones(case_id, request_id=request_id)
+        # AIQ-1004: shared with the intake-submit trigger so both paths
+        # materialize the same deterministic plan. Best-effort (never raises).
+        _ensure_default_milestones_for_case(assignment_id, case_id, request_id=request_id)
+        milestones = db.list_case_milestones(case_id, request_id=request_id)
     if include_links:
         for m in milestones:
             m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
