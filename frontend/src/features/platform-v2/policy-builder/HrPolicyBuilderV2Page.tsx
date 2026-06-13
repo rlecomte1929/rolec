@@ -16,6 +16,7 @@ import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssis
 import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
 import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
+import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
 import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
 import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
 
@@ -257,6 +258,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const [savedAt, setSavedAt]         = useState<number | null>(null);
   const [version, setVersion]         = useState<string | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(true);
+  const [noCompany, setNoCompany] = useState(false);  // [T2.4] HR not linked to a company yet
   const [ctxOpen, setCtxOpen]         = useState(false);
   const [currency, setCurrency]       = useState('EUR');
   const [focusedBenefit]              = useState('host_housing_cap');
@@ -318,8 +320,11 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           setDraftVersionId(payload.policy_version);
         }
         setSavedAt(Date.now());
-      } catch {
-        // Non-fatal: fall back to the template flow (tiers stay []).
+      } catch (e) {
+        // [T2.4] 403 = HR not linked to a company → show onboarding, not a blank
+        // template the user can't actually save. Other errors are non-fatal here
+        // (fall back to the template flow, tiers stay []).
+        if (isNoCompanyError(e) && alive) setNoCompany(true);
       } finally {
         if (alive) setLoadingDraft(false);
       }
@@ -696,6 +701,12 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       )}
     </>
   );
+
+  // [T2.4] HR not linked to a company yet → onboarding, not a blank builder.
+  // Respect embedded vs standalone so the tab and the direct route both degrade.
+  if (noCompany) {
+    return embedded ? <HrNoCompanyOnboarding /> : <AppShell wide><HrNoCompanyOnboarding /></AppShell>;
+  }
 
   // The Policy Assistant docked shell wraps the builder so HR can ask about the
   // published policy without leaving the page (reuses the same shell + panel as

@@ -30,6 +30,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
+import { HrNoCompanyOnboarding, httpStatusOf, isNoCompanyError } from './hrNoCompanyOnboarding';
 import {
   policyConfigMatrixAPI,
   policyDocumentsAPI,
@@ -363,6 +364,8 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   const [documents, setDocuments] = useState<PolicyDocumentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // [T2.4] HR account not yet linked to a company → every policy endpoint 403s.
+  const [noCompany, setNoCompany] = useState(false);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -370,14 +373,32 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
+    setNoCompany(false);
+    // [T2.4] Classify per-endpoint failures rather than blanket-swallowing them:
+    //   403 → account not linked to a company → onboarding state
+    //   404 → benign "no data yet" → keep the empty fallback (starter onboarding)
+    //   other (5xx/network) → a real error must still surface, not be hidden
+    let companyDenied = false;
+    let hardError = false;
+    const onErr = <T,>(fallback: T) => (err: unknown): T => {
+      const status = httpStatusOf(err);
+      if (status === 403) companyDenied = true;
+      else if (status !== 404) hardError = true;
+      return fallback;
+    };
     try {
       const params = adminCompanyId ? { company_id: adminCompanyId } : undefined;
       const [docsRes, matrixRes] = await Promise.all([
-        policyDocumentsAPI.list(params).catch(() => ({ documents: [] as PolicyDocumentListItem[] })),
-        policyConfigMatrixAPI.hrGet(adminCompanyId ?? undefined).catch(() => null),
+        policyDocumentsAPI.list(params).catch(onErr({ documents: [] as PolicyDocumentListItem[] })),
+        policyConfigMatrixAPI.hrGet(adminCompanyId ?? undefined).catch(onErr(null)),
       ]);
+      if (companyDenied) {
+        setNoCompany(true);
+        return;
+      }
       setDocuments(Array.isArray(docsRes?.documents) ? (docsRes.documents as PolicyDocumentListItem[]) : []);
       setMatrixPayload((matrixRes as PolicyConfigWorkingPayload | null) ?? null);
+      if (hardError) setLoadError('Unable to load your policy. Try again or contact support.');
 
       // Canonical (document-normalized) policy status is loaded lazily by
       // the Detailed review drawer when the user opens it. The top-level
@@ -388,7 +409,9 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       // two-version race conditions and a 404 on companies that have only
       // published through the matrix.
     } catch (err) {
-      setLoadError('Unable to load your policy. Try again or contact support.');
+      // Defensive: anything the per-call handlers didn't catch.
+      if (isNoCompanyError(err)) setNoCompany(true);
+      else setLoadError('Unable to load your policy. Try again or contact support.');
     } finally {
       setLoading(false);
     }
@@ -491,6 +514,12 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         <div className="text-sm text-slate-600">Loading your policy…</div>
       </Card>
     );
+  }
+
+  // [T2.4] HR not linked to a company yet (403 from policy endpoints) → show the
+  // onboarding state instead of the (misleading) "set up a policy" workspace.
+  if (noCompany) {
+    return <HrNoCompanyOnboarding />;
   }
 
   return (
