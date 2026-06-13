@@ -49,6 +49,10 @@ from backend.app.services.policy_assistant_llm_client import (  # noqa: E402
     LlmRequest,
     MockClient,
 )
+from backend.app.services.roadmap_generator import (  # noqa: E402
+    _extract_json_object,
+    _parse_roadmap,
+)
 
 _PROMPT_PATH = os.path.join(_REPO_ROOT, "prompts", "roadmap_generator_v1.txt")
 
@@ -293,6 +297,61 @@ class RoadmapGeneratorBehaviourTests(unittest.TestCase):
         )
         self.assertEqual(len(client.calls), 1)
         self.assertIn("emit_case_roadmap", client.calls[0].system)
+
+
+class RoadmapParseRobustnessTests(unittest.TestCase):
+    """_parse_roadmap must tolerate the prose / code fences the model wraps the
+    JSON in when it follows the tool-use prompt through the plain-text seam,
+    stop at the first *complete* object (not greedily span trailing prose), and
+    refuse with a truncation-specific reason when the output was cut off at the
+    token ceiling — the live IN→DE "malformed roadmap JSON" failure."""
+
+    _OK = (
+        '{"result":"OK","corridor":"IN→DE","steps":'
+        '[{"order":1,"title":"Apply for EU Blue Card","source_url":"https://x"}]}'
+    )
+
+    def test_extracts_bare_object(self):
+        obj = _parse_roadmap(self._OK, "IN→DE", "skilled_worker_permit")
+        self.assertEqual(obj["result"], "OK")
+        self.assertEqual(len(obj["steps"]), 1)
+
+    def test_extracts_object_wrapped_in_prose(self):
+        # The greedy {.*} regex grabbed the trailing "{chunk:2}" too and failed
+        # json.loads; the balanced scan stops at the first complete object.
+        text = (
+            "Here is the roadmap you requested:\n"
+            + self._OK
+            + "\nEach step is grounded in {chunk:2}."
+        )
+        obj = _parse_roadmap(text, "IN→DE", "skilled_worker_permit")
+        self.assertEqual(obj["result"], "OK")
+        self.assertEqual(len(obj["steps"]), 1)
+
+    def test_extracts_object_in_markdown_fence(self):
+        text = "```json\n" + self._OK + "\n```"
+        obj = _parse_roadmap(text, "IN→DE", "skilled_worker_permit")
+        self.assertEqual(obj["result"], "OK")
+
+    def test_braces_inside_strings_do_not_break_extraction(self):
+        ok = '{"result":"OK","corridor":"IN→DE","summary":"file {A1} then {B2}","steps":[]}'
+        self.assertEqual(_extract_json_object("noise " + ok + " tail"), ok)
+
+    def test_truncated_output_refuses_with_truncation_reason(self):
+        truncated = '{"result":"OK","corridor":"IN→DE","steps":[{"order":1,"title":"App'
+        obj = _parse_roadmap(
+            truncated, "IN→DE", "skilled_worker_permit", stop_reason="max_tokens"
+        )
+        self.assertEqual(obj["result"], "RULE_NOT_FOUND")
+        self.assertEqual(obj["steps"], [])
+        self.assertIn("truncated", obj["refusal_reason"].lower())
+
+    def test_balanced_but_invalid_json_refuses_malformed(self):
+        obj = _parse_roadmap('{"result":"OK" "steps":[]}', "IN→DE", "x")
+        self.assertEqual(obj["result"], "RULE_NOT_FOUND")
+        self.assertEqual(
+            obj["refusal_reason"], "Generator returned malformed roadmap JSON."
+        )
 
 
 if __name__ == "__main__":

@@ -23,11 +23,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .immigration_retriever import PathClassification, UserProfile, corridor_key
+from .pii_masker import safe_log_text
 from .policy_assistant_llm_client import (
     DEFAULT_MODEL,
     LlmClient,
@@ -43,8 +43,12 @@ RESULT_RULE_NOT_FOUND = "RULE_NOT_FOUND"
 _PROMPT_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "prompts", "roadmap_generator_v1.txt"
 )
-_GEN_MAX_TOKENS = 1500
-_JSON_OBJ_RE = re.compile(r"\{.*\}", re.DOTALL)
+# A full citation-bound roadmap carries several steps, each with a source_url,
+# key_actions, confidence and review flags — 1500 tokens truncated longer
+# corridors mid-JSON, which surfaced as a "malformed roadmap JSON" refusal even
+# though retrieval succeeded. Sonnet supports far more; 4096 fits a complete
+# multi-step roadmap with headroom.
+_GEN_MAX_TOKENS = 4096
 
 _prompt_cache: Optional[str] = None
 
@@ -103,7 +107,12 @@ def generate(
         max_tokens=_GEN_MAX_TOKENS,
     )
     resp = client.complete(req)
-    roadmap = _parse_roadmap(resp.get("text") or "", corridor, classification.pathway_type)
+    roadmap = _parse_roadmap(
+        resp.get("text") or "",
+        corridor,
+        classification.pathway_type,
+        stop_reason=resp.get("stop_reason"),
+    )
     return GenerationResult(
         roadmap=roadmap,
         model=resp.get("model") or resolved_model,
@@ -147,17 +156,75 @@ def _build_context_message(
     return "\n".join(lines)
 
 
-def _parse_roadmap(text: str, corridor: str, pathway_type: Optional[str]) -> Dict[str, Any]:
+def _extract_json_object(text: str) -> Optional[str]:
+    """Return the first complete, balanced top-level JSON object in `text`.
+
+    Tolerates the prose preamble/postamble and ```json code fences the model
+    tends to wrap the object in when it follows the tool-use prompt through the
+    plain-text seam. String-aware so braces inside JSON string values don't
+    skew the depth count. Returns None when no *complete* object is present
+    (e.g. the output was truncated before the closing brace)."""
+    if not text:
+        return None
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None  # unbalanced — truncated mid-object
+
+
+def _parse_roadmap(
+    text: str,
+    corridor: str,
+    pathway_type: Optional[str],
+    stop_reason: Optional[str] = None,
+) -> Dict[str, Any]:
     """Tolerantly parse the emit_case_roadmap object. On any malformation,
-    refuse rather than surface a half-formed roadmap."""
-    m = _JSON_OBJ_RE.search(text or "")
-    if not m:
-        log.warning("roadmap_generator: no JSON object in generator output for %s", corridor)
-        return _refusal(corridor, pathway_type, "Generator returned no parseable roadmap.")
+    refuse rather than surface a half-formed roadmap — but log the raw output
+    (PII-safe) and the stop_reason so the failure is diagnosable rather than an
+    opaque refusal."""
+    candidate = _extract_json_object(text or "")
+    if not candidate:
+        # No complete object — the common cause is the model hitting the token
+        # ceiling and being cut off mid-JSON (stop_reason == "max_tokens").
+        truncated = stop_reason == "max_tokens"
+        log.warning(
+            "roadmap_generator: no complete JSON object for %s (stop_reason=%s) raw=%s",
+            corridor, stop_reason, safe_log_text(text or "", max_len=400),
+        )
+        reason = (
+            "Generator output was truncated at the token limit before completing the roadmap."
+            if truncated
+            else "Generator returned no parseable roadmap."
+        )
+        return _refusal(corridor, pathway_type, reason)
     try:
-        obj = json.loads(m.group(0))
+        obj = json.loads(candidate)
     except (json.JSONDecodeError, ValueError):
-        log.warning("roadmap_generator: unparseable generator JSON for %s", corridor)
+        log.warning(
+            "roadmap_generator: unparseable generator JSON for %s (stop_reason=%s) raw=%s",
+            corridor, stop_reason, safe_log_text(text or "", max_len=400),
+        )
         return _refusal(corridor, pathway_type, "Generator returned malformed roadmap JSON.")
     if not isinstance(obj, dict) or obj.get("result") not in (RESULT_OK, RESULT_RULE_NOT_FOUND):
         return _refusal(corridor, pathway_type, "Generator returned an invalid roadmap shape.")
