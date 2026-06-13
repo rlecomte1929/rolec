@@ -147,6 +147,11 @@ distinct requirement the chunks describe, in logical chronological order.
             "requires_expert_review": {
               "type": "boolean",
               "description": "True for conditional/ambiguous/consequential steps and for every confidence=low step."
+            },
+            "phase": {
+              "type": "string",
+              "enum": ["pre_departure", "immigration", "logistics", "arrival", "post_arrival"],
+              "description": "When in the relocation timeline this step occurs. pre_departure = before leaving the origin (gather/recognise documents, sign employment contract); immigration = visa/permit application and decision (consulate appointment, application submission, biometrics, approval); logistics = shipping and travel arrangements; arrival = first days in the destination (address registration / Anmeldung, entry formalities); post_arrival = settling in (residence permit collection at the Ausländerbehörde, eAT, health insurance, banking, long-term language). Choose the single best-fit phase for this step."
             }
           },
           "required": [
