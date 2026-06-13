@@ -8,7 +8,7 @@
  * placeholder. These tests pin the mapping (phase→track, task→step, status/owner).
  */
 import { describe, it, expect } from 'vitest';
-import { adaptPlanViewToTracks } from '../EmployeeCaseRoadmapPage';
+import { adaptPlanViewToTracks } from '../relocationPlanToRoadmap';
 import type { RelocationPlanViewResponseDTO } from '../../../types/relocationPlanView';
 
 function makePlan(): RelocationPlanViewResponseDTO {
