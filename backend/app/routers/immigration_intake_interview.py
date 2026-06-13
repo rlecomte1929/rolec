@@ -40,8 +40,9 @@ from ..services.immigration_service import (
     _load_or_create_session,
     _load_profile_for_case_employee,
     _load_session_for_update,
-    resolve_case_corridor,
+    _resolve_canonical_intake_fields,
     _save_session,
+    resolve_case_corridor,
 )
 
 
@@ -72,7 +73,14 @@ def interview_next(
         raise HTTPException(status_code=403, detail="Consent required before starting interview.")
 
     session = _load_or_create_session(case_id, employee_id, current_user.get("org_id", ""))
-    vault = _load_profile_for_case_employee(case_id, employee_id) or {}
+    # AIQ-973 (ASK-ONCE): overlay canonical intake values UNDER the real immigration
+    # vault so fields the user already gave (name/DOB/nationality/passport/spouse)
+    # surface as pre-filled 'confirm' instead of blank required questions. The vault
+    # wins on conflict (OCR'd / already-answered values take precedence).
+    vault = {
+        **_resolve_canonical_intake_fields(case_id),
+        **(_load_profile_for_case_employee(case_id, employee_id) or {}),
+    }
 
     confirmed = list(session.get("prefilled_fields") or [])
     answers = dict(session.get("answers") or {})
@@ -185,8 +193,12 @@ def interview_answer(
         except Exception:
             pass
 
-    # Recompute progress
-    vault = _load_profile_for_case_employee(case_id, employee_id) or {}
+    # Recompute progress — same canonical-intake overlay as interview_next (AIQ-973),
+    # so the next question after an answer also respects already-known fields.
+    vault = {
+        **_resolve_canonical_intake_fields(case_id),
+        **(_load_profile_for_case_employee(case_id, employee_id) or {}),
+    }
     completion = compute_completion_pct(answers, questions)
     progress = compute_section_progress(answers, questions)
     next_q = get_next_question(answers, vault, confirmed_prefills, questions)
