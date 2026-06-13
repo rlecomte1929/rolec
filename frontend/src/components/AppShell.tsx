@@ -82,6 +82,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
+  // AIQ-1017: on mobile (<md) the sidebar collapses into a slide-in drawer
+  // toggled from the topbar hamburger. Desktop is unchanged (inline sidebar).
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
 
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
@@ -102,6 +105,12 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
     window.addEventListener('nav-error', handler as EventListener);
     return () => window.removeEventListener('nav-error', handler as EventListener);
   }, []);
+
+  // AIQ-1017: close the mobile nav drawer on route change so a tap-through
+  // doesn't leave the overlay covering the new page.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!isEmployeeRole) return;
@@ -136,15 +145,34 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         Skip to main content
       </a>
 
-      <PlatformShellSidebar
-        role={sbRole}
-        companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
-        user={{
-          initials: userInitials,
-          name: identity ? `${identity}` : 'ReloPass user',
-          role: role ? role.toLowerCase() : '',
-        }}
-      />
+      {/* AIQ-1017: mobile backdrop — only rendered when the drawer is open, below md. */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          aria-hidden="true"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* AIQ-1017: one sidebar instance. Desktop (md+): static inline flex child,
+          unchanged. Mobile (<md): fixed slide-in drawer toggled by the topbar
+          hamburger. A tap inside closes it so nav links dismiss the drawer. */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        onClick={() => setMobileNavOpen(false)}
+      >
+        <PlatformShellSidebar
+          role={sbRole}
+          companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
+          user={{
+            initials: userInitials,
+            name: identity ? `${identity}` : 'ReloPass user',
+            role: role ? role.toLowerCase() : '',
+          }}
+        />
+      </div>
 
       {/* ── Right side: topbar + banners + main + footer ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -152,7 +180,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         {/* Slim topbar — breadcrumb moved inline above H1 (P4/AIQ-408).
             Topbar now carries only user-context controls; consistent across
             AppShell-backed pages and v2 custom-layout pages. */}
-        <header className="flex items-center justify-end px-6 py-3 bg-white border-b border-slate-200 shrink-0">
+        <header className="flex items-center justify-between gap-2 px-4 md:px-6 py-3 bg-white border-b border-slate-200 shrink-0">
+          {/* AIQ-1017: hamburger to open the nav drawer — mobile only. */}
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation menu"
+            aria-expanded={mobileNavOpen}
+            className="md:hidden grid h-9 w-9 shrink-0 place-items-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <div className="flex items-center gap-3 shrink-0">
             <ChangelogBell />
             <LogoutButton />
@@ -210,7 +250,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
         {/* Main scrollable area */}
         <main id="main-content" className="flex-1 overflow-y-auto">
-          <div className={wide ? 'px-6 py-6' : 'px-8 py-7 max-w-7xl mx-auto'}>
+          <div className={wide ? 'px-4 py-6 md:px-6' : 'px-4 py-6 md:px-8 md:py-7 max-w-7xl mx-auto'}>
             {title && (
               <div className="mb-6">
                 <Breadcrumb section={section} title={title} homeHref={homeHref} className="mb-3" />
