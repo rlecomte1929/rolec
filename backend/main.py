@@ -5471,6 +5471,96 @@ def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, A
     return result
 
 
+def _ensure_default_milestones_for_case(
+    case_id: str, assignment_id: str, request_id: Optional[str] = None
+) -> int:
+    """Seed default operational milestones for a case that has none, returning
+    the number created.
+
+    Idempotent — a no-op when the case already has milestones, so it never
+    clobbers an HR-curated timeline. This is the same deterministic
+    default-milestone derivation the timeline `?ensure_defaults=true` endpoints
+    run; it is factored out here so intake submit can populate the plan up
+    front (the relocation plan view reads case_milestones, which were otherwise
+    only ever seeded lazily on a timeline GET)."""
+    request_id = request_id or str(uuid.uuid4())
+    if db.list_case_milestones(case_id, request_id=request_id):
+        return 0
+
+    services: List[str] = []
+    try:
+        svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+        services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+    except Exception:
+        pass
+
+    draft: Dict[str, Any] = {}
+    target_move_date = None
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if case:
+            try:
+                raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                draft = raw_draft if isinstance(raw_draft, dict) else {}
+            except (json.JSONDecodeError, TypeError, ValueError):
+                draft = {}
+            target_move_date = getattr(case, "target_move_date", None)
+
+    _ac = draft.get("assignmentContext") or {}
+    _as = draft.get("assignment") or {}
+    _rb = draft.get("relocationBasics") or {}
+    contract_type = (
+        _as.get("contractType") or _ac.get("contractType") or _rb.get("contractType") or None
+    )
+    family_profile = draft.get("family") or None
+    dest = _rb.get("destCountry") or _rb.get("destination_country") or None
+    origin = _rb.get("originCountry") or _rb.get("origin_country") or None
+    _ep = draft.get("employeeProfile") or {}
+    _pa = draft.get("primaryApplicant") or {}
+    nationality = (
+        _pa.get("nationality")
+        or _ep.get("nationality")
+        or _ep.get("nationalityCountry")
+        or _rb.get("nationality")
+        or None
+    )
+
+    defaults = compute_default_milestones(
+        case_id=case_id,
+        case_draft=draft,
+        selected_services=services,
+        target_move_date=str(target_move_date) if target_move_date else None,
+        contract_type=contract_type,
+        family_profile=family_profile,
+        destination_country=dest,
+        origin_country=origin,
+        nationality=nationality,
+    )
+    created = 0
+    for m in defaults:
+        try:
+            db.upsert_case_milestone(
+                case_id=case_id,
+                milestone_type=m["milestone_type"],
+                title=m["title"],
+                description=m.get("description"),
+                target_date=m.get("target_date"),
+                status=m.get("status", "pending"),
+                sort_order=m.get("sort_order", 0),
+                owner=m.get("owner", "joint"),
+                criticality=m.get("criticality", "normal"),
+                notes=m.get("notes"),
+                request_id=request_id,
+            )
+            created += 1
+        except Exception as upsert_exc:
+            log.warning(
+                "ensure_default_milestones upsert failed case_id=%s type=%s: %s",
+                case_id, m.get("milestone_type"), upsert_exc, exc_info=True,
+            )
+    return created
+
+
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     _deny_if_impersonating(user)
@@ -5564,6 +5654,27 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             raise
     else:
         log.warning("submit_assignment: missing case_id for event assignment_id=%s", assignment_id)
+
+    # Seed the default relocation plan so the employee's plan view is populated
+    # the moment intake is submitted. GET /api/relocation-plans/{case_id}/view
+    # reads case_milestones, which were otherwise only ever populated lazily by
+    # the timeline `?ensure_defaults=true` endpoints — so a freshly-submitted
+    # case showed an empty plan (phases:0) until an HR user happened to open the
+    # timeline. Idempotent + best-effort: a seeding failure must never fail the
+    # submit the employee just completed.
+    if case_id:
+        try:
+            seeded = _ensure_default_milestones_for_case(case_id, assignment_id)
+            if seeded:
+                log.info(
+                    "submit_assignment: seeded %d default milestones case_id=%s",
+                    seeded, case_id,
+                )
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: default milestone seeding failed case_id=%s: %s",
+                case_id, str(exc), exc_info=True,
+            )
 
     track_event(
         "assignment.submitted",
