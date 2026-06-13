@@ -282,7 +282,12 @@ def _resolve_canonical_intake_fields(case_id: str) -> Dict[str, Any]:
             return {}
     if not isinstance(intake, dict):
         return {}
-    return _map_intake_to_vault_fields(intake)
+    # Defense-in-depth: this is a fail-soft read-time overlay — a malformed
+    # intake_data shape must degrade to "no prefill", never raise into the route.
+    try:
+        return _map_intake_to_vault_fields(intake)
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def _map_intake_to_vault_fields(intake: Dict[str, Any]) -> Dict[str, Any]:
@@ -301,13 +306,34 @@ def _map_intake_to_vault_fields(intake: Dict[str, Any]) -> Dict[str, Any]:
         or intake.get("primaryApplicant")
         or {}
     )
+    if not isinstance(profile, dict):
+        profile = {}
     basics = intake.get("relocationBasics") or {}
+    if not isinstance(basics, dict):
+        basics = {}
     full_name = (
         profile.get("legal_full_name") or profile.get("legalFullName")
         or profile.get("full_name") or profile.get("fullName")
     )
-    fam = intake.get("familyMembers") or intake.get("family") or {}
-    spouse = fam.get("spouse") or {}
+    # Family can arrive as a dict ({"spouse": {...}}) OR — the common wizard shape —
+    # a LIST of members ([{"relationship": "spouse", ...}, ...]). Handle both; a
+    # bare list would otherwise crash on `.get` (AIQ-973 follow-up).
+    fam = intake.get("familyMembers")
+    if fam is None:
+        fam = intake.get("family")
+    spouse: Any = {}
+    if isinstance(fam, dict):
+        spouse = fam.get("spouse") or {}
+    elif isinstance(fam, list):
+        for member in fam:
+            if not isinstance(member, dict):
+                continue
+            rel = str(member.get("relationship") or member.get("relation") or "").strip().lower()
+            if rel in ("spouse", "partner", "husband", "wife", "married"):
+                spouse = member
+                break
+    if not isinstance(spouse, dict):
+        spouse = {}
 
     out: Dict[str, Any] = {}
     # Name → first/last is a best-effort split, surfaced for CONFIRMATION (the user

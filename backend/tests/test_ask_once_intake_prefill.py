@@ -63,6 +63,44 @@ def test_mapper_empty_and_bad_input():
     assert _map_intake_to_vault_fields(None) == {}  # type: ignore[arg-type]
 
 
+def test_mapper_handles_familymembers_as_list():
+    # The common wizard shape: familyMembers is a LIST, not a {"spouse": ...} dict.
+    # Regression for the AIQ-973 `'list' object has no attribute 'get'` crash.
+    r = _map_intake_to_vault_fields({
+        "profile": {"full_name": "Ana Ruiz", "nationality": "ES"},
+        "familyMembers": [
+            {"relationship": "child", "full_name": "Leo Ruiz"},
+            {"relationship": "spouse", "full_name": "Marco Ruiz",
+             "date_of_birth": "1987-05-05", "nationality": "IT"},
+        ],
+    })
+    assert r["spouse_name"] == "Marco Ruiz"
+    assert r["spouse_dob"] == "1987-05-05"
+    assert r["spouse_nationality"] == "IT"
+
+
+def test_mapper_never_raises_on_malformed_shapes():
+    # A fail-soft read-time overlay must degrade to {} on any odd shape, never raise.
+    for bad in (
+        {"familyMembers": ["not-a-dict", 42]},
+        {"familyMembers": [{"relationship": "spouse"}]},   # spouse present but no fields
+        {"profile": "a-string-not-a-dict"},
+        {"family": "nope"},
+        {"relocationBasics": ["list", "not", "dict"]},
+        {"familyMembers": []},
+    ):
+        out = _map_intake_to_vault_fields(bad)
+        assert isinstance(out, dict)  # no exception, always a dict
+
+
+def test_mapper_real_prod_blob_returns_empty():
+    # The only prod case with intake_data (2026-06-13) carried just countries —
+    # no personal fields → correctly nothing to pre-fill.
+    assert _map_intake_to_vault_fields(
+        {"relocationBasics": {"destCountry": "Norway", "originCountry": "United States"}}
+    ) == {}
+
+
 # ── Layer 2: the interview never emits a known field as blank+required ──────
 
 def test_interview_does_not_reask_known_intake_fields():
