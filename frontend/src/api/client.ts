@@ -2423,10 +2423,14 @@ export const employeeAPI = {
     return response.data;
   },
   getPolicyCaps: async (): Promise<{
-    housing_monthly_usd: number;
-    movers_usd: number;
-    schools_usd: number;
-    immigration_usd: number;
+    // AIQ-999 — caps now come from the caller's resolved per-assignment policy,
+    // not a global default. When the company has not published a matching
+    // policy, has_policy is false and every cap is null (no fake defaults).
+    has_policy?: boolean;
+    housing_monthly_usd: number | null;
+    movers_usd: number | null;
+    schools_usd: number | null;
+    immigration_usd: number | null;
   }> => {
     const response = await api.get('/api/employee/policy/caps');
     return response.data;

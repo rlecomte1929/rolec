@@ -119,7 +119,7 @@ export const PackageSummary: React.FC<Props> = ({
     // Helper: convert the legacy PolicyCaps shape (USD numerics) into the
     // categoryCaps Map shape the new comparison loop expects. Used by the
     // company-default fallback path below.
-    const fromPolicyCaps = (c: { housing_monthly_usd: number; movers_usd: number; schools_usd: number } | null): Map<string, number> | null => {
+    const fromPolicyCaps = (c: { housing_monthly_usd: number | null; movers_usd: number | null; schools_usd: number | null } | null): Map<string, number> | null => {
       if (!c) return null;
       const m = new Map<string, number>();
       if (c.housing_monthly_usd) m.set('housing', c.housing_monthly_usd);
