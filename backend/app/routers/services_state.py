@@ -57,16 +57,27 @@ class ServicesStateRead(BaseModel):
     updated_by_user_id: Optional[str]
 
 
-def _caller_company_id(user: Dict[str, Any]) -> str:
-    uid = user.get("id")
-    # hr_users-first: legacy/text HR ids have NULL profiles.company_id but a valid hr_users row.
-    company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id") or user.get("company")
-    if not company_id:
+def _org_id_for_case(case_id: str, assignment: Dict[str, Any]) -> str:
+    """Derive the case's tenant from the case record itself — the canonical
+    source of truth — rather than from the caller's profile.
+
+    [AIQ-1012] Production-shaped employees often have no profiles.company_id
+    (their company association is through the assignment, not a profile field),
+    so deriving the tenant from the caller 403'd valid case owners. Call this
+    only AFTER require_case_access has authorized the caller for the case.
+    Falls back to the assignment's HR user's company when the relocation_cases
+    row carries no company_id.
+    """
+    case = db.get_case_by_id(case_id) or {}
+    org = case.get("company_id")
+    if not org and assignment:
+        org = db.get_hr_company_id(assignment.get("hr_user_id"))
+    if not org:
         raise HTTPException(
             status_code=403,
-            detail="No company linked to this profile — services state needs a tenant.",
+            detail="Case has no tenant — cannot resolve services state.",
         )
-    return company_id
+    return org
 
 
 def _audit(*, case_id: str, action: str, actor_id: str, byte_size: int) -> None:
@@ -98,9 +109,11 @@ def get_services_state(
     case_id: str,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> Dict[str, Any]:
-    organization_id = _caller_company_id(user)
-    # B21 fix: employees must own this case; HR is scoped to their company.
-    require_case_access(case_id, user)
+    # Authorize the case FIRST (employees must own it; HR scoped to their
+    # company), then derive the tenant from the case record — not the caller's
+    # profile (AIQ-1012). require_case_access returns the assignment row.
+    assignment = require_case_access(case_id, user)
+    organization_id = _org_id_for_case(case_id, assignment)
     with db.engine.begin() as conn:
         row = conn.execute(
             text(
@@ -138,9 +151,11 @@ def put_services_state(
     body: ServicesStatePut,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> Dict[str, Any]:
-    organization_id = _caller_company_id(user)
-    # B21 fix: employees must own this case; HR is scoped to their company.
-    require_case_access(case_id, user)
+    # Authorize the case FIRST (employees must own it; HR scoped to their
+    # company), then derive the tenant from the case record — not the caller's
+    # profile (AIQ-1012). require_case_access returns the assignment row.
+    assignment = require_case_access(case_id, user)
+    organization_id = _org_id_for_case(case_id, assignment)
     actor_id = user["id"]
     blob = json.dumps(body.state, default=str)
     if len(blob.encode("utf-8")) > MAX_STATE_BYTES:
