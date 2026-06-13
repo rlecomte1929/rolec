@@ -562,7 +562,11 @@ def _norm_viewer_role(viewer_role: str) -> RelocationPlanViewRole:
 
 def load_profile_draft_for_case(session, case_id: str) -> Dict[str, Any]:
     """SQLAlchemy session: load ``Case`` and parse ``draft_json``."""
-    from ..app import crud as app_crud
+    # NOTE: ``..`` from backend.app.services is backend.app, so the crud module is
+    # ``from .. import crud`` (backend.app.crud). The previous ``from ..app import
+    # crud`` resolved to the non-existent backend.app.app, raising ModuleNotFoundError
+    # on every plan-view request → HTTP 500 for every case (not just empty intake).
+    from .. import crud as app_crud
 
     case = app_crud.get_case(session, case_id)
     if not case:
