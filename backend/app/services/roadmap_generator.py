@@ -193,6 +193,19 @@ def _extract_json_object(text: str) -> Optional[str]:
     return None  # unbalanced — truncated mid-object
 
 
+def _unwrap_tool_envelope(obj: Dict[str, Any]) -> Dict[str, Any]:
+    """The generator prompt is authored for Anthropic tool-use and its exemplars
+    emit the full tool-call shape ``{"name": "emit_case_roadmap", "input": {...}}``.
+    Run through the no-tools text seam, the model echoes that envelope, so the
+    real roadmap lives under ``input``. Lift it (AIQ-1003 follow-up to #687:
+    otherwise top-level ``result`` is missing → "invalid roadmap shape" refusal
+    for every corridor). A bare object (``result`` already at top level) is
+    returned unchanged, so this is a no-op when the model emits the input directly."""
+    if isinstance(obj, dict) and "result" not in obj and isinstance(obj.get("input"), dict):
+        return obj["input"]
+    return obj
+
+
 def _parse_roadmap(
     text: str,
     corridor: str,
@@ -226,6 +239,7 @@ def _parse_roadmap(
             corridor, stop_reason, safe_log_text(text or "", max_len=400),
         )
         return _refusal(corridor, pathway_type, "Generator returned malformed roadmap JSON.")
+    obj = _unwrap_tool_envelope(obj)
     if not isinstance(obj, dict) or obj.get("result") not in (RESULT_OK, RESULT_RULE_NOT_FOUND):
         return _refusal(corridor, pathway_type, "Generator returned an invalid roadmap shape.")
 
