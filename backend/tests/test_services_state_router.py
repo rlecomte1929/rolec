@@ -3,6 +3,11 @@ Tests for backend/app/routers/services_state.py.
 
 Same direct-call pattern as test_exception_requests_router.py — bypasses the
 FastAPI app wiring so the broader main.py import issues don't bleed in.
+
+[AIQ-1012] The router authorizes the case via require_case_access, then derives
+the tenant from the CASE record (relocation_cases.company_id) rather than the
+caller's profile. These tests mock require_case_access (case ownership) and
+db.get_case_by_id (the case's tenant) accordingly.
 """
 from __future__ import annotations
 
@@ -50,7 +55,10 @@ CREATE TABLE audit_logs (
 """
 
 
-def _user(role: str, company: str):
+def _user(role: str = "EMPLOYEE", company=None):
+    # company is intentionally optional/None — the tenant comes from the case
+    # now, not the caller (AIQ-1012). Production-shaped employees have no
+    # profiles.company_id.
     return {
         "id": str(uuid.uuid4()),
         "role": role,
@@ -72,6 +80,55 @@ class ServicesStateRouterTests(unittest.TestCase):
         self.engine_patcher = mock.patch.object(router_module.db, "engine", self.engine)
         self.engine_patcher.start()
         self.addCleanup(self.engine_patcher.stop)
+
+        # _jb is the jsonb-cast suffix ("::jsonb" on postgres). sqlite has no
+        # jsonb cast, so pin it to empty string for these tests.
+        self.jb_patcher = mock.patch.object(router_module, "_jb", "")
+        self.jb_patcher.start()
+        self.addCleanup(self.jb_patcher.stop)
+
+        # Tenant comes from the case record. Map case_id -> company_id; an
+        # unknown case defaults to a single shared org so most tests are
+        # one-tenant.
+        self._default_org = str(uuid.uuid4())
+        self.case_org: dict = {}
+        # case_ids that require_case_access must DENY (cross-tenant / not owner).
+        self.denied_cases: set = set()
+
+        def _fake_require_case_access(case_id, user):
+            if case_id in self.denied_cases:
+                raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+            return {
+                "id": f"asg-{case_id}",
+                "hr_user_id": "hr-" + str(user["id"])[:8],
+                "employee_user_id": user["id"],
+            }
+
+        self.rca_patcher = mock.patch.object(
+            router_module, "require_case_access", side_effect=_fake_require_case_access
+        )
+        self.rca_patcher.start()
+        self.addCleanup(self.rca_patcher.stop)
+
+        def _fake_get_case_by_id(case_id):
+            org = self.case_org.get(case_id, self._default_org)
+            return {"id": case_id, "company_id": org}
+
+        self.case_patcher = mock.patch.object(
+            router_module.db, "get_case_by_id", side_effect=_fake_get_case_by_id
+        )
+        self.case_patcher.start()
+        self.addCleanup(self.case_patcher.stop)
+
+        # HR-company fallback only fires when the case row has no company_id.
+        self.hr_patcher = mock.patch.object(
+            router_module.db, "get_hr_company_id", side_effect=lambda hid: None
+        )
+        self.hr_patcher.start()
+        self.addCleanup(self.hr_patcher.stop)
+
+        # Production-shaped: caller profile has no company_id. The fix must not
+        # depend on this anymore.
         self.profile_patcher = mock.patch.object(
             router_module.db,
             "get_profile_record",
@@ -92,13 +149,12 @@ class ServicesStateRouterTests(unittest.TestCase):
             )
 
     def test_get_404_when_no_state_for_case(self) -> None:
-        emp = _user("EMPLOYEE", str(uuid.uuid4()))
         with self.assertRaises(HTTPException) as ctx:
-            get_services_state(case_id=str(uuid.uuid4()), user=emp)
+            get_services_state(case_id=str(uuid.uuid4()), user=_user())
         self.assertEqual(ctx.exception.status_code, 404)
 
     def test_put_then_get_round_trip(self) -> None:
-        emp = _user("EMPLOYEE", str(uuid.uuid4()))
+        emp = _user()
         case_id = str(uuid.uuid4())
         body = ServicesStatePut(state={
             "selectedServices": ["housing", "movers"],
@@ -108,25 +164,35 @@ class ServicesStateRouterTests(unittest.TestCase):
         })
         saved = put_services_state(case_id=case_id, body=body, user=emp)
         self.assertEqual(saved["case_id"], case_id)
+        self.assertEqual(saved["organization_id"], self._default_org)
         self.assertEqual(saved["state"]["displayCurrency"], "EUR")
 
         fetched = get_services_state(case_id=case_id, user=emp)
         self.assertEqual(fetched["state"]["selectedServices"], ["housing", "movers"])
         self.assertEqual(fetched["state"]["answers"]["budget_max"], 5000)
 
-    def test_put_inserts_then_updates_in_place(self) -> None:
-        emp = _user("EMPLOYEE", str(uuid.uuid4()))
+    def test_production_shaped_employee_no_profile_company_succeeds(self) -> None:
+        """Regression for AIQ-1012: an employee whose profile has no company_id
+        (company is via the assignment) can still GET/PUT — the tenant comes from
+        the case, not the caller. Previously this 403'd before case access was
+        even checked."""
+        emp = _user(company=None)  # no caller company anywhere
         case_id = str(uuid.uuid4())
-        put_services_state(
-            case_id=case_id,
-            body=ServicesStatePut(state={"v": 1}),
-            user=emp,
+        case_org = str(uuid.uuid4())
+        self.case_org[case_id] = case_org
+        saved = put_services_state(
+            case_id=case_id, body=ServicesStatePut(state={"ok": True}), user=emp
         )
-        put_services_state(
-            case_id=case_id,
-            body=ServicesStatePut(state={"v": 2}),
-            user=emp,
-        )
+        self.assertEqual(saved["organization_id"], case_org)
+        fetched = get_services_state(case_id=case_id, user=emp)
+        self.assertEqual(fetched["state"]["ok"], True)
+        self.assertEqual(fetched["organization_id"], case_org)
+
+    def test_put_inserts_then_updates_in_place(self) -> None:
+        emp = _user()
+        case_id = str(uuid.uuid4())
+        put_services_state(case_id=case_id, body=ServicesStatePut(state={"v": 1}), user=emp)
+        put_services_state(case_id=case_id, body=ServicesStatePut(state={"v": 2}), user=emp)
         with self.engine.connect() as conn:
             count = conn.execute(
                 text("SELECT COUNT(*) FROM services_state WHERE case_id = :id"),
@@ -136,47 +202,73 @@ class ServicesStateRouterTests(unittest.TestCase):
         latest = get_services_state(case_id=case_id, user=emp)
         self.assertEqual(latest["state"]["v"], 2)
 
-    def test_get_scoped_by_organization(self) -> None:
-        emp_a = _user("EMPLOYEE", str(uuid.uuid4()))
-        hr_b = _user("HR", str(uuid.uuid4()))
+    def test_case_access_denied_blocks_read(self) -> None:
+        """Cross-tenant / non-owner access is rejected by require_case_access
+        before any tenant derivation — the caller can't reach the data."""
+        emp_a = _user()
         case_id = str(uuid.uuid4())
-        put_services_state(
-            case_id=case_id,
-            body=ServicesStatePut(state={"v": "a"}),
-            user=emp_a,
-        )
-        # HR from a different org cannot read it.
+        put_services_state(case_id=case_id, body=ServicesStatePut(state={"v": "a"}), user=emp_a)
+        # A user the case-access check denies cannot read it.
+        self.denied_cases.add(case_id)
         with self.assertRaises(HTTPException) as ctx:
-            get_services_state(case_id=case_id, user=hr_b)
-        self.assertEqual(ctx.exception.status_code, 404)
+            get_services_state(case_id=case_id, user=_user("HR"))
+        self.assertEqual(ctx.exception.status_code, 403)
 
-    def test_put_other_tenant_case_id_returns_404(self) -> None:
-        emp_a = _user("EMPLOYEE", str(uuid.uuid4()))
-        emp_b = _user("EMPLOYEE", str(uuid.uuid4()))
+    def test_put_existing_row_org_mismatch_returns_404(self) -> None:
+        """Defense-in-depth: if a services_state row exists under a different
+        org than the case now resolves to, the overwrite is refused as 404."""
+        emp = _user()
         case_id = str(uuid.uuid4())
-        put_services_state(
-            case_id=case_id,
-            body=ServicesStatePut(state={"v": "a"}),
-            user=emp_a,
-        )
+        self.case_org[case_id] = str(uuid.uuid4())
+        put_services_state(case_id=case_id, body=ServicesStatePut(state={"v": "a"}), user=emp)
+        # The case now resolves to a different tenant than the stored row.
+        self.case_org[case_id] = str(uuid.uuid4())
         with self.assertRaises(HTTPException) as ctx:
             put_services_state(
-                case_id=case_id,
-                body=ServicesStatePut(state={"v": "b-overwrite"}),
-                user=emp_b,
+                case_id=case_id, body=ServicesStatePut(state={"v": "b"}), user=emp
             )
         self.assertEqual(ctx.exception.status_code, 404)
-        # Original tenant's data unchanged.
-        kept = get_services_state(case_id=case_id, user=emp_a)
-        self.assertEqual(kept["state"]["v"], "a")
+
+    def test_case_with_no_tenant_returns_403(self) -> None:
+        """If the case record has no company_id and the HR fallback yields
+        nothing, _org_id_for_case raises 403."""
+        emp = _user()
+        case_id = str(uuid.uuid4())
+        with mock.patch.object(
+            router_module.db,
+            "get_case_by_id",
+            side_effect=lambda cid: {"id": cid, "company_id": None},
+        ):
+            # hr_patcher already returns None for the fallback.
+            with self.assertRaises(HTTPException) as ctx:
+                put_services_state(
+                    case_id=case_id, body=ServicesStatePut(state={"v": 1}), user=emp
+                )
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_put_falls_back_to_hr_company_when_case_has_no_company(self) -> None:
+        """When relocation_cases.company_id is null, the tenant falls back to the
+        assignment's HR user's company."""
+        emp = _user()
+        case_id = str(uuid.uuid4())
+        hr_org = str(uuid.uuid4())
+        with mock.patch.object(
+            router_module.db,
+            "get_case_by_id",
+            side_effect=lambda cid: {"id": cid, "company_id": None},
+        ), mock.patch.object(
+            router_module.db, "get_hr_company_id", side_effect=lambda hid: hr_org
+        ):
+            saved = put_services_state(
+                case_id=case_id, body=ServicesStatePut(state={"v": 1}), user=emp
+            )
+        self.assertEqual(saved["organization_id"], hr_org)
 
     def test_put_audit_row_written(self) -> None:
-        emp = _user("EMPLOYEE", str(uuid.uuid4()))
+        emp = _user()
         case_id = str(uuid.uuid4())
         put_services_state(
-            case_id=case_id,
-            body=ServicesStatePut(state={"hello": "world"}),
-            user=emp,
+            case_id=case_id, body=ServicesStatePut(state={"hello": "world"}), user=emp
         )
         rows = self._audit_rows()
         self.assertEqual(len(rows), 1)
@@ -186,28 +278,14 @@ class ServicesStateRouterTests(unittest.TestCase):
         self.assertEqual(rows[0]["actor_id"], emp["id"])
 
     def test_put_rejects_oversize_payload(self) -> None:
-        emp = _user("EMPLOYEE", str(uuid.uuid4()))
+        emp = _user()
         case_id = str(uuid.uuid4())
-        # Build a state larger than MAX_STATE_BYTES once serialized.
         oversized = {"big": "x" * (MAX_STATE_BYTES + 100)}
         with self.assertRaises(HTTPException) as ctx:
             put_services_state(
-                case_id=case_id,
-                body=ServicesStatePut(state=oversized),
-                user=emp,
+                case_id=case_id, body=ServicesStatePut(state=oversized), user=emp
             )
         self.assertEqual(ctx.exception.status_code, 413)
-
-    def test_put_rejects_caller_with_no_company(self) -> None:
-        emp = _user("EMPLOYEE", "")
-        emp["company"] = None
-        with self.assertRaises(HTTPException) as ctx:
-            put_services_state(
-                case_id=str(uuid.uuid4()),
-                body=ServicesStatePut(state={}),
-                user=emp,
-            )
-        self.assertEqual(ctx.exception.status_code, 403)
 
 
 if __name__ == "__main__":
