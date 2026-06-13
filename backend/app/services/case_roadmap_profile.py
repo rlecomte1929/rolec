@@ -12,7 +12,8 @@ services so this stays a thin glue layer.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from . import rag_pipeline
 from .country_resources import _country_code_from_name
@@ -81,3 +82,67 @@ def generate_ai_roadmap_for_case(case: Dict[str, Any]) -> Optional[Dict[str, Any
         return None
     profile, classification = mapping
     return rag_pipeline.generate_roadmap(profile=profile, classification=classification)
+
+
+def map_generated_steps_to_milestones(
+    steps: Sequence[Dict[str, Any]], corridor: Optional[str]
+) -> List[Dict[str, Any]]:
+    """Map assembled generator steps (emit_case_roadmap shape: order/title/
+    description/source_url/confidence/requires_expert_review) to case_milestone
+    upsert kwargs. Steps without a title are dropped. Pure — no DB."""
+    stamp = datetime.now(timezone.utc).date().isoformat()
+    rows: List[Dict[str, Any]] = []
+    for idx, step in enumerate(steps):
+        title = str(step.get("title") or "").strip()
+        if not title:
+            continue
+        order = step.get("order")
+        order = order if isinstance(order, int) and order > 0 else idx + 1
+        note = f"AI-generated {stamp} | corridor: {corridor or '?'}"
+        src = step.get("source_url")
+        if src:
+            note += f" | source: {src}"
+        rows.append(
+            {
+                "milestone_type": f"ai_{order:02d}",
+                "title": title,
+                "description": step.get("description") or None,
+                "status": "pending",
+                "sort_order": order,
+                "owner": "employee",
+                "criticality": "normal",
+                "notes": note,
+            }
+        )
+    return rows
+
+
+def persist_generated_milestones(
+    db: Any,
+    case_id: str,
+    steps: Sequence[Dict[str, Any]],
+    corridor: Optional[str],
+    request_id: Optional[str] = None,
+) -> int:
+    """Replace the case's milestones with the generated AI steps so
+    /api/relocation-plans/{id}/view (and the employee roadmap page, AIQ-1005)
+    serves corridor-specific content instead of the deterministic seed.
+
+    Returns the number of milestones written. A no-op (returns 0) when there are
+    no usable steps — the deterministic seed is left intact in that case.
+    Callers must wrap this best-effort so a persist failure never fails the
+    generation response.
+    """
+    rows = map_generated_steps_to_milestones(steps, corridor)
+    if not rows:
+        return 0
+    db.delete_case_milestones(case_id, request_id=request_id)
+    written = 0
+    for row in rows:
+        db.upsert_case_milestone(case_id=case_id, request_id=request_id, **row)
+        written += 1
+    log.info(
+        "persist_generated_milestones: wrote %d AI milestones for case %s (corridor=%s)",
+        written, case_id, corridor,
+    )
+    return written
