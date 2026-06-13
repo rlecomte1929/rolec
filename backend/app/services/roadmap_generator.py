@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -51,6 +52,9 @@ _PROMPT_PATH = os.path.join(
 _GEN_MAX_TOKENS = 4096
 
 _prompt_cache: Optional[str] = None
+_tool_schema_cache: Optional[Dict[str, Any]] = None
+# The prompt embeds the emit_case_roadmap tool schema as a ```json fenced block.
+_TOOL_SCHEMA_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,24 @@ def load_prompt() -> str:
         with open(os.path.abspath(_PROMPT_PATH), "r", encoding="utf-8") as f:
             _prompt_cache = f.read()
     return _prompt_cache
+
+
+def load_tool_schema() -> Dict[str, Any]:
+    """Extract and cache the emit_case_roadmap tool definition the prompt
+    documents (`{name, description, input_schema}`). This is the schema we hand
+    to the Anthropic tool-use API so the model returns a structured tool_use
+    block instead of echoing the tool envelope as free text."""
+    global _tool_schema_cache
+    if _tool_schema_cache is None:
+        for block in _TOOL_SCHEMA_RE.findall(load_prompt()):
+            if '"emit_case_roadmap"' in block and '"input_schema"' in block:
+                _tool_schema_cache = json.loads(block)
+                break
+        if _tool_schema_cache is None:
+            raise RuntimeError(
+                "roadmap_generator: emit_case_roadmap tool schema not found in prompt"
+            )
+    return _tool_schema_cache
 
 
 def generate(
@@ -105,14 +127,25 @@ def generate(
         model=resolved_model,
         temperature=0.0,
         max_tokens=_GEN_MAX_TOKENS,
+        # Wire the emit_case_roadmap schema as a forced tool call so the model
+        # returns a structured object (read straight off the tool_use block)
+        # instead of echoing the tool envelope as free text (AIQ-1003).
+        tools=[load_tool_schema()],
+        tool_choice={"type": "tool", "name": "emit_case_roadmap"},
     )
     resp = client.complete(req)
-    roadmap = _parse_roadmap(
-        resp.get("text") or "",
-        corridor,
-        classification.pathway_type,
-        stop_reason=resp.get("stop_reason"),
-    )
+    tool_input = resp.get("tool_use")
+    if isinstance(tool_input, dict):
+        roadmap = _normalize_roadmap_obj(tool_input, corridor, classification.pathway_type)
+    else:
+        # Fallback for any client/path that didn't surface a tool_use block:
+        # parse the text the way the pre-tool seam did.
+        roadmap = _parse_roadmap(
+            resp.get("text") or "",
+            corridor,
+            classification.pathway_type,
+            stop_reason=resp.get("stop_reason"),
+        )
     return GenerationResult(
         roadmap=roadmap,
         model=resp.get("model") or resolved_model,
@@ -239,7 +272,14 @@ def _parse_roadmap(
             corridor, stop_reason, safe_log_text(text or "", max_len=400),
         )
         return _refusal(corridor, pathway_type, "Generator returned malformed roadmap JSON.")
-    obj = _unwrap_tool_envelope(obj)
+    return _normalize_roadmap_obj(_unwrap_tool_envelope(obj), corridor, pathway_type)
+
+
+def _normalize_roadmap_obj(
+    obj: Dict[str, Any], corridor: str, pathway_type: Optional[str]
+) -> Dict[str, Any]:
+    """Validate the roadmap object's shape and fill in defaults. Shared by the
+    tool_use path (structured `.input`) and the text-parse fallback."""
     if not isinstance(obj, dict) or obj.get("result") not in (RESULT_OK, RESULT_RULE_NOT_FOUND):
         return _refusal(corridor, pathway_type, "Generator returned an invalid roadmap shape.")
 

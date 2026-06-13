@@ -32,6 +32,7 @@ Cost estimate available via estimate_cost_usd(usage, model).
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -65,6 +66,12 @@ class LlmRequest:
     model: str = DEFAULT_MODEL
     temperature: float = 0.0
     max_tokens: int = 500
+    # Optional Anthropic tool-use. When `tools` is set the client passes the
+    # schema(s) to the API and returns the first tool_use block's `.input`
+    # under the response's `tool_use` key — letting structured callers (e.g.
+    # the roadmap generator) read a validated object instead of parsing text.
+    tools: Optional[List[Dict[str, Any]]] = None
+    tool_choice: Optional[Dict[str, Any]] = None
 
 
 class LlmClient(Protocol):
@@ -114,23 +121,34 @@ class AnthropicClient:
             else req.system
         )
 
-        resp = self._client.messages.create(
+        create_kwargs: Dict[str, Any] = dict(
             model=req.model,
             system=system_param,
             messages=[{"role": "user", "content": masked_user_message}],
             temperature=req.temperature,
             max_tokens=req.max_tokens,
         )
-        # The Anthropic SDK returns a Message object; the text content
-        # lives in resp.content[0].text. Defensive: tolerate empty
-        # content blocks.
+        if req.tools:
+            create_kwargs["tools"] = req.tools
+            if req.tool_choice:
+                create_kwargs["tool_choice"] = req.tool_choice
+        resp = self._client.messages.create(**create_kwargs)
+        # The Anthropic SDK returns a Message object. Text lives in `text`
+        # blocks; a (forced) tool call lives in a `tool_use` block whose
+        # `.input` is the already-structured object — no text parsing needed.
+        # Defensive: tolerate empty content blocks.
         text = ""
+        tool_use = None
         for block in (resp.content or []):
-            if getattr(block, "type", "") == "text":
+            btype = getattr(block, "type", "")
+            if btype == "text":
                 text += getattr(block, "text", "")
+            elif btype == "tool_use" and tool_use is None:
+                tool_use = getattr(block, "input", None)
         usage = getattr(resp, "usage", None)
         return {
             "text": text,
+            "tool_use": tool_use,
             "model": getattr(resp, "model", req.model),
             "stop_reason": getattr(resp, "stop_reason", "end_turn"),
             "usage": {
@@ -171,16 +189,26 @@ class MockClient:
             if pattern.lower() in req.user_message.lower():
                 text = response
                 break
-        # Approximate token counts (4 chars ≈ 1 token).
-        return {
+        out: Dict[str, Any] = {
             "text": text,
             "model": req.model,
             "stop_reason": "end_turn",
+            # Approximate token counts (4 chars ≈ 1 token).
             "usage": {
                 "input_tokens": (len(req.system) + len(req.user_message)) // 4,
                 "output_tokens": len(text) // 4,
             },
         }
+        # When the caller requested tools, mirror the real client: surface the
+        # canned response (which tool-using tests supply as the tool's JSON
+        # input) as a tool_use block so the tool path is exercised end to end.
+        if req.tools:
+            try:
+                out["tool_use"] = json.loads(text)
+                out["stop_reason"] = "tool_use"
+            except (json.JSONDecodeError, ValueError):
+                out["tool_use"] = None
+        return out
 
 
 # --- Factory + cost helper -------------------------------------------------

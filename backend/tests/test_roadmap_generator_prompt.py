@@ -52,6 +52,8 @@ from backend.app.services.policy_assistant_llm_client import (  # noqa: E402
 from backend.app.services.roadmap_generator import (  # noqa: E402
     _extract_json_object,
     _parse_roadmap,
+    generate,
+    load_tool_schema,
 )
 
 _PROMPT_PATH = os.path.join(_REPO_ROOT, "prompts", "roadmap_generator_v1.txt")
@@ -352,6 +354,91 @@ class RoadmapParseRobustnessTests(unittest.TestCase):
         self.assertEqual(
             obj["refusal_reason"], "Generator returned malformed roadmap JSON."
         )
+
+
+class RoadmapGeneratorToolWiringTests(unittest.TestCase):
+    """AIQ-1003: generate() must hand the emit_case_roadmap schema to the API as
+    a forced tool call and read the structured tool_use block directly — the
+    fix for "invalid roadmap shape" (the model echoing the tool envelope as text
+    through the no-tools seam)."""
+
+    def setUp(self):
+        self.marc = UserProfile(
+            nationality="FR", origin_country="FR", destination_country="NO", is_eea=True
+        )
+        self.path = PathClassification(pathway_type="eu_free_movement", corridor="FR→NO")
+
+    def test_load_tool_schema_returns_emit_case_roadmap(self):
+        schema = load_tool_schema()
+        self.assertEqual(schema["name"], "emit_case_roadmap")
+        self.assertIn("input_schema", schema)
+        self.assertEqual(
+            set(schema["input_schema"]["properties"]["result"]["enum"]),
+            {"OK", "RULE_NOT_FOUND"},
+        )
+
+    def test_generate_forces_tool_call_and_reads_tool_use(self):
+        client = MockClient(
+            responses_by_pattern={"FR→NO": _canned_ok_roadmap("FR→NO", _FR_NO_CHUNKS)}
+        )
+        res = generate(
+            profile=self.marc, classification=self.path, chunks=_FR_NO_CHUNKS, client=client
+        )
+        # The request carried the tool schema + a forced tool_choice.
+        self.assertEqual(len(client.calls), 1)
+        req = client.calls[0]
+        self.assertTrue(req.tools and req.tools[0]["name"] == "emit_case_roadmap")
+        self.assertEqual(req.tool_choice, {"type": "tool", "name": "emit_case_roadmap"})
+        # The roadmap came straight off the tool_use block — no "invalid shape".
+        self.assertEqual(res.roadmap["result"], "OK")
+        self.assertEqual(len(res.roadmap["steps"]), len(_FR_NO_CHUNKS))
+        self.assertTrue(res.called_llm)
+
+    def test_tool_use_block_wins_over_garbage_text(self):
+        class _ToolUseClient:
+            name = "stub"
+
+            def __init__(self):
+                self.calls = []
+
+            def complete(self, req):
+                self.calls.append(req)
+                return {
+                    "text": "here you go: not-json-at-all }{",
+                    "tool_use": {"result": "OK", "corridor": "FR→NO", "steps": []},
+                    "model": req.model,
+                    "stop_reason": "tool_use",
+                    "usage": {},
+                }
+
+        res = generate(
+            profile=self.marc, classification=self.path,
+            chunks=_FR_NO_CHUNKS, client=_ToolUseClient(),
+        )
+        self.assertEqual(res.roadmap["result"], "OK")
+
+    def test_falls_back_to_text_parse_when_no_tool_use(self):
+        class _TextOnlyClient:
+            name = "stub"
+
+            def __init__(self):
+                self.calls = []
+
+            def complete(self, req):
+                self.calls.append(req)
+                return {
+                    "text": _canned_ok_roadmap("FR→NO", _FR_NO_CHUNKS),
+                    "model": req.model,
+                    "stop_reason": "end_turn",
+                    "usage": {},
+                }
+
+        res = generate(
+            profile=self.marc, classification=self.path,
+            chunks=_FR_NO_CHUNKS, client=_TextOnlyClient(),
+        )
+        self.assertEqual(res.roadmap["result"], "OK")
+        self.assertEqual(len(res.roadmap["steps"]), len(_FR_NO_CHUNKS))
 
 
 if __name__ == "__main__":
