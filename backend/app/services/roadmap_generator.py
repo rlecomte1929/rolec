@@ -43,7 +43,12 @@ RESULT_RULE_NOT_FOUND = "RULE_NOT_FOUND"
 _PROMPT_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "prompts", "roadmap_generator_v1.txt"
 )
-_GEN_MAX_TOKENS = 1500
+# AIQ-1003: 1500 truncates a grounded roadmap for high-requirement corridors
+# (e.g. IN→DE Blue Card = 11 steps ≈ 3k output tokens) — the truncated JSON then
+# fails to parse → "malformed roadmap JSON" refusal. 4096 covers the known
+# corridors with headroom; generation is a single Sonnet call so the cost delta
+# is negligible against shipping an empty roadmap.
+_GEN_MAX_TOKENS = 4096
 _JSON_OBJ_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 _prompt_cache: Optional[str] = None
@@ -147,18 +152,50 @@ def _build_context_message(
     return "\n".join(lines)
 
 
+def _extract_json_obj(text: str) -> Optional[Dict[str, Any]]:
+    """Pull the first JSON object out of the generator output, tolerating a
+    leading ```json fence / trailing prose. Returns None when nothing parses."""
+    s = (text or "").strip()
+    # Strip a markdown code fence if the model wrapped the JSON in one.
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z0-9]*\s*", "", s)
+        s = re.sub(r"\s*```\s*$", "", s).strip()
+    # Try the whole string first (the clean case), then fall back to the
+    # greedy first-{ … last-} slice for output wrapped in prose.
+    for candidate in (s, (_JSON_OBJ_RE.search(s).group(0) if _JSON_OBJ_RE.search(s) else None)):
+        if not candidate:
+            continue
+        try:
+            obj = json.loads(candidate)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
+
+
+def _unwrap_tool_envelope(obj: Dict[str, Any]) -> Dict[str, Any]:
+    """The prompt is authored for Anthropic tool-use and its exemplars emit the
+    full tool-call shape ``{"name": "emit_case_roadmap", "input": {...}}``. In
+    the no-tools text seam the model echoes that envelope, so the real roadmap
+    lives under ``input``. Unwrap it (AIQ-1003: otherwise top-level ``result``
+    is missing → every corridor falls through to a RULE_NOT_FOUND refusal)."""
+    if not isinstance(obj, dict):
+        return obj
+    inner = obj.get("input")
+    if "result" not in obj and isinstance(inner, dict):
+        return inner
+    return obj
+
+
 def _parse_roadmap(text: str, corridor: str, pathway_type: Optional[str]) -> Dict[str, Any]:
     """Tolerantly parse the emit_case_roadmap object. On any malformation,
     refuse rather than surface a half-formed roadmap."""
-    m = _JSON_OBJ_RE.search(text or "")
-    if not m:
-        log.warning("roadmap_generator: no JSON object in generator output for %s", corridor)
-        return _refusal(corridor, pathway_type, "Generator returned no parseable roadmap.")
-    try:
-        obj = json.loads(m.group(0))
-    except (json.JSONDecodeError, ValueError):
-        log.warning("roadmap_generator: unparseable generator JSON for %s", corridor)
+    obj = _extract_json_obj(text)
+    if obj is None:
+        log.warning("roadmap_generator: no parseable JSON object in generator output for %s", corridor)
         return _refusal(corridor, pathway_type, "Generator returned malformed roadmap JSON.")
+    obj = _unwrap_tool_envelope(obj)
     if not isinstance(obj, dict) or obj.get("result") not in (RESULT_OK, RESULT_RULE_NOT_FOUND):
         return _refusal(corridor, pathway_type, "Generator returned an invalid roadmap shape.")
 
