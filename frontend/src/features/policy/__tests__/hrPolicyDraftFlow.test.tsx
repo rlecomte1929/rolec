@@ -139,4 +139,16 @@ describe('Partial API payloads', () => {
     expect(resolved.phase).toBe('draft_not_publishable');
     expect(resolved.benefitRuleCount).toBe(0);
   });
+
+  it('keeps a normalized published version live when the policy list is empty', () => {
+    const { normalized, policyReview } = mockPolicyState('published');
+    const resolved = resolveHrPolicyWorkspaceState({
+      policies: [],
+      normalized,
+      policyReview,
+    });
+
+    expect(resolved.phase).toBe('published');
+    expect(resolved.publishedVersionNumber).not.toBeNull();
+  });
 });

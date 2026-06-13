@@ -266,7 +266,7 @@ export const EmployeeDossierPage: React.FC = () => {
         ) : visible.length === 0 ? (
           <div className="py-12 text-center text-slate-500">
             {forms.length === 0
-              ? 'No forms yet — they appear automatically as you complete your roadmap.'
+              ? 'Your forms will appear here as your roadmap progresses. There is nothing to complete right now.'
               : 'No forms match this filter.'}
           </div>
         ) : (

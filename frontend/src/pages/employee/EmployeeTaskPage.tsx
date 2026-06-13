@@ -185,7 +185,9 @@ export const EmployeeTaskPage: React.FC = () => {
           <div className="text-center py-16 text-sm text-slate-400">Loading your tasks…</div>
         ) : tasks.length === 0 && !error ? (
           <div className="text-center py-16">
-            <p className="text-slate-500 text-sm">No tasks yet — your HR team hasn't assigned anything.</p>
+            <p className="text-slate-500 text-sm">
+              Your HR team hasn&apos;t assigned any tasks yet. We&apos;ll notify you when something needs your attention.
+            </p>
           </div>
         ) : (
           <>

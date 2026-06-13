@@ -7,15 +7,15 @@
 
 export const landingContent = {
   hero: {
-    eyebrow: 'EU AI Act–ready mobility',
-    headline: 'Mobility AI your auditor will trust.',
+    eyebrow: 'Global mobility infrastructure',
+    headline: 'Run every relocation case through one operating layer.',
     subheadline:
-      "Every step in your employee's relocation — every document, every decision — logged, cited, and EU AI Act–ready.",
+      'Coordinate cases, timelines, documents, providers, and policy controls in one system.',
     brandPromise:
-      'The audit trail your compliance team needs — and the experience your employees actually want.',
-    primaryCta: 'Book a demo',
-    secondaryCta: 'See the platform',
-    trustMicrocopy: '30-minute walkthrough. No commitment.',
+      'Every relocation case is visible, compliant, and on time.',
+    primaryCta: 'Structure how you run relocation. Start with one case.',
+    secondaryCta: 'Book a demo',
+    trustMicrocopy: 'Start with one case or book a 30-minute walkthrough.',
   },
 
   // FRIDAY-004c locked proof block — verbatim from audit/gtm/proof_block_v1.md §1.

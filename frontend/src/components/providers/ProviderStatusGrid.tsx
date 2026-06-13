@@ -162,7 +162,7 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
         >
           <p style={{ margin: 0, fontWeight: 500, fontSize: 15 }}>No providers assigned.</p>
           <p style={{ margin: '6px 0 0', fontSize: 13 }}>
-            Assign providers from the Mobility Control Center to track their status across cases.
+            Assign a provider from Mobility center to start tracking delivery across cases.
           </p>
         </div>
       )}

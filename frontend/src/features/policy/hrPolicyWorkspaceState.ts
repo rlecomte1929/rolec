@@ -185,10 +185,12 @@ export function resolveHrPolicyWorkspaceState(input: {
   }
 
   let phase: HrPolicyWorkspacePhase = 'no_policy';
-  if (!hasCompanyPolicy) {
-    phase = 'no_policy';
-  } else if (hasPublished) {
+  // UIAUDIT-2026-06-13: normalized published state stays authoritative when
+  // the separate policy-list request is empty or stale.
+  if (hasPublished) {
     phase = 'published';
+  } else if (!hasCompanyPolicy) {
+    phase = 'no_policy';
   } else if (publishStatus === 'ready' && latest && normStatus(latest.status) !== 'published') {
     phase = 'ready_to_publish';
   } else {
