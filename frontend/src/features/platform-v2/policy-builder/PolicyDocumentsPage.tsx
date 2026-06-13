@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
+import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
 import {
   policyBuilderPipelineAPI,
   type PolicyDocumentRow,
@@ -339,6 +340,7 @@ export function PolicyDocumentsPage() {
   const [documents, setDocuments] = useState<PolicyDocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [noCompany, setNoCompany] = useState(false);  // [T2.4] HR not linked to a company yet
   const [diffState, setDiffState] = useState<{
     entries: DiffEntry[];
     docAName: string;
@@ -355,7 +357,9 @@ export function PolicyDocumentsPage() {
       .listDocuments()
       .then((data) => setDocuments(data.documents))
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : 'Failed to load documents');
+        // [T2.4] 403 = HR not linked to a company → onboarding, not a red error banner.
+        if (isNoCompanyError(e)) setNoCompany(true);
+        else setError(e instanceof Error ? e.message : 'Failed to load documents');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -384,6 +388,19 @@ export function PolicyDocumentsPage() {
       setDiffLoading(false);
     }
   };
+
+  // [T2.4] HR not linked to a company yet → onboarding state, not an error banner.
+  if (noCompany && !loading) {
+    return (
+      <AppShell>
+        <div className="min-h-screen bg-[#f8fafc]">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <HrNoCompanyOnboarding />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
