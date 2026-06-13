@@ -11157,44 +11157,102 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
 
 @app.get("/api/employee/policy/caps")
 def get_employee_policy_caps(
+    request: Request,
     display_currency: Optional[str] = Query(None),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """
     Return policy caps for package comparison (housing/month, movers, schools, immigration).
 
+    [AIQ-999] Resolves the caller's assignment and reads the SAME per-assignment
+    published policy the comparison / policy-budget endpoints use, rather than a
+    global static file with hardcoded defaults. When the caller's company has not
+    published a matching policy, every cap is `None` (honest empty) and
+    `has_policy` is false — we no longer surface fake $5k/$10k/$20k/$4k defaults
+    as if they were a real policy. This aligns /policy/caps with
+    policy-service-comparison, which is the source of truth.
+
     When `display_currency` is set (e.g. EUR, GBP), the response also includes a
-    `display_currency` field naming the currency used and a `caps_display` map
-    with the same amounts converted from USD using indicative FX rates that
-    match the frontend's table — so HR and the employee see the same numbers
-    regardless of who's calling. Existing `*_usd` fields are preserved for
-    backward compatibility (T1.4 from Sprint 2 plan).
+    `display_currency` field and a `caps_display` map with the same amounts
+    converted from USD using indicative FX rates that match the frontend's table.
+    Existing `*_usd` fields are preserved for backward compatibility (their values
+    are now `number | null`).
     """
     from .app.services.fx_service import convert_usd_to_display, normalize_display_currency
+    from .app.services.policy_adapter import caps_from_resolved_benefits
 
-    policy = policy_engine.load_policy()
-    caps = policy.get("caps", {})
-    housing_usd = caps.get("housing", {}).get("amount", 5000)
-    movers_usd = caps.get("movers", {}).get("amount", 10000)
-    schools_usd = caps.get("schools", {}).get("amount", 20000)
-    immigration_usd = caps.get("immigration", {}).get("amount", 4000)
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
 
-    payload: Dict[str, Any] = {
-        "housing_monthly_usd": housing_usd,
-        "movers_usd": movers_usd,
-        "schools_usd": schools_usd,
-        "immigration_usd": immigration_usd,
-    }
-    if display_currency:
-        cur = normalize_display_currency(display_currency)
-        payload["display_currency"] = cur
-        payload["caps_display"] = {
-            "housing_monthly": convert_usd_to_display(housing_usd, cur),
-            "movers": convert_usd_to_display(movers_usd, cur),
-            "schools": convert_usd_to_display(schools_usd, cur),
-            "immigration": convert_usd_to_display(immigration_usd, cur),
+    def _build_payload(
+        *,
+        has_policy: bool,
+        housing_usd: Optional[float] = None,
+        movers_usd: Optional[float] = None,
+        schools_usd: Optional[float] = None,
+        immigration_usd: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "has_policy": has_policy,
+            "housing_monthly_usd": housing_usd,
+            "movers_usd": movers_usd,
+            "schools_usd": schools_usd,
+            "immigration_usd": immigration_usd,
         }
-    return payload
+        if display_currency:
+            cur = normalize_display_currency(display_currency)
+            payload["display_currency"] = cur
+
+            def _disp(v: Optional[float]) -> Optional[float]:
+                return convert_usd_to_display(v, cur) if isinstance(v, (int, float)) else None
+
+            payload["caps_display"] = {
+                "housing_monthly": _disp(housing_usd),
+                "movers": _disp(movers_usd),
+                "schools": _disp(schools_usd),
+                "immigration": _disp(immigration_usd),
+            }
+        return payload
+
+    # Resolve the caller's own assignment (supports impersonation via
+    # _effective_user). No assignment → honest empty, no fake caps.
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    eid = effective.get("id")
+    if not eid:
+        return _build_payload(has_policy=False)
+
+    try:
+        assignment = db.get_assignment_for_employee(eid, request_id=request_id)
+    except Exception:
+        assignment = None
+    if not assignment or not assignment.get("id"):
+        return _build_payload(has_policy=False)
+
+    try:
+        result = _resolve_published_policy_for_employee(
+            assignment["id"], user, request_id, read_only=True
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning(
+            "policy_caps resolve failed assignment_id=%s",
+            assignment.get("id"),
+            exc_info=True,
+        )
+        return _build_payload(has_policy=False)
+
+    if not result.get("has_policy"):
+        return _build_payload(has_policy=False)
+
+    budget = caps_from_resolved_benefits(result.get("benefits") or [])
+    caps = budget.get("caps") or {}
+    return _build_payload(
+        has_policy=True,
+        housing_usd=caps.get("housing"),
+        movers_usd=caps.get("movers"),
+        schools_usd=caps.get("schools"),
+        immigration_usd=caps.get("immigration"),
+    )
 
 
 # ---------------------------------------------------------------------------
