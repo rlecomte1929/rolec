@@ -187,11 +187,27 @@ def _require_case_access(case_id: str, org_id: str) -> Dict[str, Any]:
     """
     row = db.get_relocation_case(case_id)
     if not row:
+        # HR surfaces sometimes route with the assignment PK while the detail
+        # schema is keyed by relocation_cases.id. Resolve both assignment-id
+        # and case-id callers through the canonical assignment bridge.
+        assignment = db.get_assignment_by_id(case_id) or db.get_assignment_by_case_id(case_id)
+        if assignment:
+            resolved_case_id = str(
+                assignment.get("canonical_case_id") or assignment.get("case_id") or ""
+            ).strip()
+            if resolved_case_id:
+                row = db.get_relocation_case(resolved_case_id)
+    if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
     case_company_id = row.get("company_id")
     if case_company_id and case_company_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
     return row
+
+
+def _resolved_case_id(case: Dict[str, Any], requested_case_id: str) -> str:
+    """Return the canonical relocation-case id for downstream rce.* reads."""
+    return str(case.get("id") or requested_case_id)
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +229,7 @@ def get_case_overview(
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> OverviewResponse:
     case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
 
     employee_id = case.get("employee_id") or ""
     employee_name: str = ""
@@ -238,7 +255,7 @@ def get_case_overview(
                     ORDER BY created_at ASC
                     """
                 ),
-                {"case_id": case_id},
+                {"case_id": resolved_case_id},
             ).mappings().all()
         for r in rows:
             relationship_raw = (r.get("relationship_type") or "").upper()
@@ -286,7 +303,8 @@ def get_case_documents(
     _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> DocumentsResponse:
-    _require_case_access(case_id, org_id)
+    case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
     documents: List[CaseDocumentDTO] = []
     try:
         with db.engine.connect() as conn:
@@ -319,7 +337,7 @@ def get_case_documents(
                     ORDER BY d.created_at DESC
                     """
                 ),
-                {"case_id": case_id},
+                {"case_id": resolved_case_id},
             ).mappings().all()
 
         for r in rows:
@@ -359,7 +377,8 @@ def get_case_steps(
 ) -> StepsResponse:
     import json
 
-    _require_case_access(case_id, org_id)
+    case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
     steps: List[CaseStepDTO] = []
     try:
         with db.engine.connect() as conn:
@@ -396,7 +415,7 @@ def get_case_steps(
                     ORDER BY s.created_at ASC
                     """
                 ),
-                {"case_id": case_id},
+                {"case_id": resolved_case_id},
             ).mappings().all()
         for r in rows:
             raw_citations = r.get("citations")
@@ -442,7 +461,8 @@ def get_contradictions_summary(
     _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> ContradictionsSummaryResponse:
-    _require_case_access(case_id, org_id)
+    case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
     total = pending = resolved = 0
     try:
         with db.engine.connect() as conn:
@@ -459,7 +479,7 @@ def get_contradictions_summary(
                     WHERE case_id = :case_id
                     """
                 ),
-                {"case_id": case_id},
+                {"case_id": resolved_case_id},
             ).mappings().one_or_none()
         if row:
             total = int(row.get("total") or 0)
@@ -488,7 +508,8 @@ def list_case_contradictions(
     _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> ContradictionsListResponse:
-    _require_case_access(case_id, org_id)
+    case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
     contradictions: List[ContradictionDTO] = []
     try:
         with db.engine.connect() as conn:
@@ -512,7 +533,7 @@ def list_case_contradictions(
                     ORDER BY detected_at DESC
                     """
                 ),
-                {"case_id": case_id},
+                {"case_id": resolved_case_id},
             ).mappings().all()
 
         for r in rows:
@@ -579,7 +600,8 @@ def get_contradiction_history(
     so reviewers can see whether a pattern is forming on this person /
     field before they pick a winner.
     """
-    _require_case_access(case_id, org_id)
+    case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
     corrections: List[PriorCorrectionDTO] = []
     try:
         with db.engine.connect() as conn:
@@ -592,7 +614,7 @@ def get_contradiction_history(
                     WHERE contradiction_id = :cid AND case_id = :case_id
                     """
                 ),
-                {"cid": contradiction_id, "case_id": case_id},
+                {"cid": contradiction_id, "case_id": resolved_case_id},
             ).mappings().one_or_none()
             if not target:
                 return CorrectionHistoryResponse(corrections=[])
@@ -668,9 +690,10 @@ def detect_case_contradictions(
     call repeatedly — e.g. after a new document is extracted, or as a manual
     HR "re-check". Tenant-scoped via _require_case_access (404 on mismatch).
     """
-    _require_case_access(case_id, org_id)
+    case = _require_case_access(case_id, org_id)
+    resolved_case_id = _resolved_case_id(case, case_id)
     try:
-        case_uuid = UUID(case_id)
+        case_uuid = UUID(resolved_case_id)
     except ValueError:
         # Legacy relocation_cases ids can be non-UUID text; such a case has no
         # rce.cases row to detect against, so there is nothing to do.

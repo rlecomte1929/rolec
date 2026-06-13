@@ -97,8 +97,8 @@ class _BaseCase(unittest.TestCase):
                 side_effect=lambda uid: _EMP_USER if uid == _EMP_USER["id"] else None,
             ),
             patch(
-                "backend.app.auth_deps.db.get_profile_record",
-                side_effect=lambda uid: {"id": uid, "company_id": _HR_COMPANY.get(uid)},
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
             ),
             # Force the rce.* queries to raise — the router's try/except
             # then catches and returns empty arrays / zeroes. This isolates
@@ -152,14 +152,87 @@ class TestOverviewEndpoint(_BaseCase):
                 return_value=_CASE_A,
             ),
             patch(
-                "backend.app.auth_deps.db.get_profile_record",
-                side_effect=lambda uid: {"id": uid, "company_id": _HR_COMPANY.get(uid)},
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
             ),
         ):
             resp = client.get(
                 "/api/hr/cases/case-a/overview",
                 headers={"Authorization": "Bearer hr-b-token"},
             )
+        self.assertEqual(resp.status_code, 404)
+        self.assertNotIn("company-a", resp.text)
+
+    def test_overview_resolves_assignment_id_to_canonical_case(self) -> None:
+        client = self._client_for(_HR_A)
+        assignment_id = "assignment-a"
+        with (
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_relocation_case",
+                side_effect=lambda cid: _CASE_A if cid == _CASE_A["id"] else None,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_assignment_by_id",
+                return_value={
+                    "id": assignment_id,
+                    "case_id": "legacy-case-a",
+                    "canonical_case_id": _CASE_A["id"],
+                },
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_assignment_by_case_id",
+                return_value=None,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_user_by_id",
+                return_value=_EMP_USER,
+            ),
+            patch(
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.engine",
+                new=_make_failing_engine(),
+            ),
+        ):
+            resp = client.get(
+                f"/api/hr/cases/{assignment_id}/overview",
+                headers={"Authorization": "Bearer hr-a-token"},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["overview"]["case_id"], assignment_id)
+        self.assertEqual(resp.json()["overview"]["employee"]["display_name"], "Priya Sharma")
+
+    def test_assignment_id_resolution_preserves_cross_tenant_404(self) -> None:
+        client = self._client_for(_HR_B)
+        with (
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_relocation_case",
+                side_effect=lambda cid: _CASE_A if cid == _CASE_A["id"] else None,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_assignment_by_id",
+                return_value={
+                    "id": "assignment-a",
+                    "canonical_case_id": _CASE_A["id"],
+                },
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_assignment_by_case_id",
+                return_value=None,
+            ),
+            patch(
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
+            ),
+        ):
+            resp = client.get(
+                "/api/hr/cases/assignment-a/overview",
+                headers={"Authorization": "Bearer hr-b-token"},
+            )
+
         self.assertEqual(resp.status_code, 404)
         self.assertNotIn("company-a", resp.text)
 
@@ -171,8 +244,16 @@ class TestOverviewEndpoint(_BaseCase):
                 return_value=None,
             ),
             patch(
-                "backend.app.auth_deps.db.get_profile_record",
-                side_effect=lambda uid: {"id": uid, "company_id": _HR_COMPANY.get(uid)},
+                "backend.app.routers.hr_case_detail.db.get_assignment_by_id",
+                return_value=None,
+            ),
+            patch(
+                "backend.app.routers.hr_case_detail.db.get_assignment_by_case_id",
+                return_value=None,
+            ),
+            patch(
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
             ),
         ):
             resp = client.get(
