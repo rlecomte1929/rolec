@@ -154,10 +154,15 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Load variants for the current session immediately
-    supabase.auth.getUser().then(({ data }) => {
-      const userId = data.user?.id ?? getAuthItem('relopass_email') ?? null;
-            loadVariants(userId);
+    // Load variants for the current session immediately. Use getSession()
+    // (local read, no network) rather than getUser() (network → auth/v1/user):
+    // ReloPass-token users have no Supabase GoTrue session, so getUser() 403s on
+    // every page and floods the console. getSession() returns the session (with
+    // its user) when one exists and null otherwise — falling back to the
+    // ReloPass identity exactly as before, but without the network probe.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const userId = session?.user?.id ?? getAuthItem('relopass_email') ?? null;
+      loadVariants(userId);
     });
 
     // Re-resolve whenever the user signs in or out
