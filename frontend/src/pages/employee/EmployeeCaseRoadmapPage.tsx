@@ -9,6 +9,8 @@ import RoadmapScreen from '../../features/platform-v2/roadmap/RoadmapScreen';
 import { useTextSelection } from '../../hooks/useTextSelection';
 import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
+import { fetchRelocationPlanView } from '../../api/relocationPlanView';
+import { adaptPlanViewToTracks } from './relocationPlanToRoadmap';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
 import { PhaseContextBar } from '../../components/antigravity';
@@ -101,18 +103,30 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     setLoading(true);
     setError(null);
     getCaseRoadmapV2(caseId)
-      .then((data) => {
-        setTracks(adaptTracks(data.tracks));
-        setSuccessScore(computeSuccessScore(data.tracks));
-        const chips: Record<string, { count: number; worstStatus: string | null }> = {};
-        for (const track of data.tracks) {
-          for (const step of track.steps) {
-            if (step.doc_count > 0) {
-              chips[step.id] = { count: step.doc_count, worstStatus: step.worst_doc_status };
+      .then(async (data) => {
+        if (data.tracks.length > 0) {
+          setTracks(adaptTracks(data.tracks));
+          setSuccessScore(computeSuccessScore(data.tracks));
+          const chips: Record<string, { count: number; worstStatus: string | null }> = {};
+          for (const track of data.tracks) {
+            for (const step of track.steps) {
+              if (step.doc_count > 0) {
+                chips[step.id] = { count: step.doc_count, worstStatus: step.worst_doc_status };
+              }
             }
           }
+          setDocChips(chips);
+          return;
         }
-        setDocChips(chips);
+        // [AIQ-1005] The case_forms-projected V2 roadmap is empty. Fall back to
+        // the seeded relocation plan (case_milestones via relocation-plans/view)
+        // so the employee sees their milestones instead of the "being built"
+        // placeholder. An empty/errored plan leaves tracks [] → placeholder shows
+        // (graceful), which is the correct pre-intake state.
+        const plan = await fetchRelocationPlanView(caseId, { role: 'employee' });
+        setTracks(adaptPlanViewToTracks(plan));
+        setSuccessScore(null);
+        setDocChips({});
       })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : 'Failed to load roadmap');
