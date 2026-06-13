@@ -683,7 +683,7 @@ export const EmployeeJourney: React.FC = () => {
         >
           <div className="text-lg font-semibold text-[#0b2b43] mb-1">Cases waiting to be accepted</div>
           <p className="text-sm text-[#4b5563] mb-4">
-            HR set these up for you. Accept a case to add it to your account.
+            HR has started a relocation for you. Click below to accept it and begin your intake.
           </p>
           <ul className="space-y-4">
             {pendingSummaries.map((row) => {
@@ -725,9 +725,9 @@ export const EmployeeJourney: React.FC = () => {
                       <LoadingButton
                         onClick={() => void handleClaimPendingRow(row.assignment_id)}
                         loading={claimingPendingId === row.assignment_id}
-                        loadingLabel="Linking…"
+                        loadingLabel="Accepting…"
                       >
-                        Link assignment
+                        Accept relocation
                       </LoadingButton>
                     )}
                   </div>
@@ -740,9 +740,15 @@ export const EmployeeJourney: React.FC = () => {
 
       {!assignmentLoading && showPrimaryManualClaimPage ? (
         <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
-          <div className="text-lg font-semibold text-[#0b2b43]">Connect your case</div>
+          <div className="text-lg font-semibold text-[#0b2b43]">No relocation assigned yet</div>
           <p className="text-sm text-[#4b5563] mt-2">
-            Didn't find your case automatically? Enter the email HR used and the code HR sent you.
+            Ask your HR team to create your case. Once they do, it appears here automatically — no code needed.
+          </p>
+          <div className="mt-6 border-t border-[#e2e8f0] pt-5 text-base font-semibold text-[#0b2b43]">
+            Already have a case code from HR?
+          </div>
+          <p className="text-sm text-[#4b5563] mt-1">
+            Enter the email HR used and the code HR sent you.
           </p>
           <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -774,20 +780,35 @@ export const EmployeeJourney: React.FC = () => {
       {!assignmentLoading && showSecondaryManualClaimCard ? (
         <Card padding="lg" className="mb-6 border border-dashed border-[#cbd5e1] bg-[#fafbfc]">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold text-[#0b2b43]">Enter your case code manually</div>
-              <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
-                Use if your case didn't appear automatically or HR sent you a code directly.
-              </p>
-            </div>
-            {!manualClaimExpanded ? (
-              <Button variant="outline" className="shrink-0" onClick={() => setManualClaimExpanded(true)}>
-                Show form
-              </Button>
+            {showPendingSection ? (
+              // An email-matched case is already shown above with a primary
+              // "Accept relocation" button — the case-code path is a quiet
+              // fallback here, not a competing primary action.
+              <button
+                type="button"
+                onClick={() => setManualClaimExpanded((v) => !v)}
+                className="text-sm font-medium text-[#2563eb] underline underline-offset-2 hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm text-left"
+              >
+                {manualClaimExpanded ? 'Hide case-code form' : 'Have a case code instead? Enter it here.'}
+              </button>
             ) : (
-              <Button variant="outline" className="shrink-0" onClick={() => setManualClaimExpanded(false)}>
-                Hide form
-              </Button>
+              <>
+                <div>
+                  <div className="text-lg font-semibold text-[#0b2b43]">Enter your case code manually</div>
+                  <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
+                    Use if your case didn't appear automatically or HR sent you a code directly.
+                  </p>
+                </div>
+                {!manualClaimExpanded ? (
+                  <Button variant="outline" className="shrink-0" onClick={() => setManualClaimExpanded(true)}>
+                    Show form
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="shrink-0" onClick={() => setManualClaimExpanded(false)}>
+                    Hide form
+                  </Button>
+                )}
+              </>
             )}
           </div>
           {manualClaimExpanded ? (
