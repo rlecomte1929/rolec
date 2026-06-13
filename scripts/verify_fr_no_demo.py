@@ -29,6 +29,8 @@ import urllib.request
 import urllib.error
 
 API = os.environ.get("RELOPASS_API_BASE", "https://api.relopass.com")
+from _prod_write_guard import guard_prod_writes  # noqa: E402
+guard_prod_writes(API)  # AIQ-913: refuse to seed prod by accident
 EMP_EMAIL = os.environ.get("RELOPASS_DEMO_EMP_EMAIL", "employee@testingapril.com")
 EMP_PASS = os.environ.get("RELOPASS_DEMO_EMP_PASSWORD", "EmpPass!1")
 HR_EMAIL = os.environ.get("RELOPASS_DEMO_HR_EMAIL", "hr@testingapril.com")
