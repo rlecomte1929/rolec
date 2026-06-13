@@ -1,0 +1,18 @@
+{
+  "fixture_id": "ADV-CLS-04",
+  "fixture_name": "norwegian-bostedsbevis-hand-stamped-overlay",
+  "adversarial_category": "mixed_type_overlay_ambiguous_class",
+  "expected_label": "PROOF_OF_ADDRESS",
+  "expected_confidence_band": [0.55, 0.79],
+  "escalation_to_gpt4o_expected": true,
+  "document_text": "SKATTEETATEN — FOLKEREGISTERET\nNorges Skatteetat / Norwegian Tax Administration\n\nBEVIS PÅ REGISTRERT BOSTEDSADRESSE\n(Certificate of Registered Residential Address)\n\nDette dokumentet bekrefter at:\nThis document confirms that:\n\nNavn / Name: Lars Erik Thorvaldsen\nFødselsnummer / National ID: 150489 [REDACTED]\nStatsborgerskap / Citizenship: Norsk / Norwegian\n\nEr registrert bosatt ved følgende adresse:\nIs registered as resident at the following address:\n\nTrondheimsvegen 84, Leilighet 3B\n7030 Trondheim\nKommune: Trondheim\n\nRegistrert fra / Registered from: 01. september 2023\n\n[HAND-STAMP OVERLAY — partially obscures 3 lines below]\n[STAMP TEXT PARTIALLY LEGIBLE: \"...UTLENDINGSDIREKTORATET... OPPHOLDS... NR. 2024...\"\n  Appears to be a UDI residence permit application stamp added post-issuance]\n\nUtstedt av / Issued by: Skatteetaten, Trondheim Skattekontor\nDato / Date: 15. oktober 2024\nRef.nr.: TRH-2024-8821047\n\nDette er ikke et identitetsbevis.\nThis is not an identity document.",
+  "why_adversarial": "This Norwegian Folkeregister bostedsbevis (address certificate) has a post-issuance UDI (Utlendingsdirektoratet — Norwegian Immigration Directorate) hand-stamp overlaid on the middle section. The stamp reads partially '...UTLENDINGSDIREKTORATET... OPPHOLDS... NR. 2024...' — the word 'oppholds' (residence) is a key token in EU residence permit classification. A classifier may: (a) classify this as EU_RESIDENCE_PERMIT because of the UDI/OPPHOLDS stamp tokens; (b) classify it as UNKNOWN because the hand-stamp corrupts the address fields it overlays. The correct label is PROOF_OF_ADDRESS because the base document is a Skatteetaten address registration certificate — the UDI stamp is a co-temporal annotation, not the document type.",
+  "classifier_failure_mode": "Classifier emits EU_RESIDENCE_PERMIT because 'UTLENDINGSDIREKTORATET' and 'OPPHOLDS' are strong UDI/residence-permit signals that outweigh the address-certificate header. This is the primary failure mode — the overlay poisons the token distribution. Secondary failure: UNKNOWN due to obscured fields.",
+  "gold_signals_expected": [
+    "BEVIS PÅ REGISTRERT BOSTEDSADRESSE header — explicit address certificate declaration",
+    "Skatteetaten / Folkeregisteret issuer — Norwegian civil registry, not immigration authority",
+    "Trondheimsvegen 84 residential address as document subject",
+    "Explicit disclaimer: 'Dette er ikke et identitetsbevis' — not an identity document"
+  ],
+  "notes": "The UDI stamp must be recognised as an overlay annotation, not the document's own authority. Classifier should cite the base document header and issuer (Skatteetaten) as the determinative signals, explicitly noting that the OPPHOLDS token appears in a hand-stamp overlay rather than the printed document body. Confidence below 0.80 is correct given the overlay ambiguity — escalation to GPT-4o is the right path."
+}
