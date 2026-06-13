@@ -31,9 +31,12 @@ Design notes
 - `mask_pii` is idempotent: re-applying it to an already-masked string
   yields the same string. This lets callers compose with redact-on-log
   filters without double-bracket noise.
-- We do **not** mask names, dates, currency amounts, or addresses.
-  Those are too noisy and the data is already inside the platform's
-  trust boundary by the time the LLM is called.
+- Person names (FR/DE/NO/Hindi, context-boosted) ARE masked as a
+  fail-soft pass (`[REDACTED_PERSON]`) via the pure-Python
+  `multilingual_names.find_names` detector (AI-I.3f-FU) — no
+  presidio/spaCy dependency. We still do **not** mask dates, currency
+  amounts, or addresses: too noisy, and that data is already inside the
+  platform's trust boundary by the time the LLM is called.
 
 Performance
 ───────────
@@ -118,7 +121,7 @@ _GENERIC_ID: Pattern[str] = re.compile(
 
 # Already-masked tokens — used by `mask_pii` to short-circuit idempotency.
 _ALREADY_MASKED: Pattern[str] = re.compile(
-    r"\[REDACTED_(?:EMAIL|PHONE|IBAN|PASSPORT|SSN|FNR|ID)\]",
+    r"\[REDACTED_(?:EMAIL|PHONE|IBAN|PASSPORT|SSN|FNR|ID|PERSON)\]",
 )
 
 
@@ -165,6 +168,35 @@ def _mask_with_recognizers(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Person-name masking (AI-I.3f-FU) — pure-Python, no presidio/spaCy
+# ---------------------------------------------------------------------------
+# Names previously reached LLM prompts untouched (the checksum pass above only
+# covers passports + the German Steuer-ID). This closes that data-minimisation
+# gap using the recognizer's own pure-Python context-boosted detector
+# (FR/DE/NO/Hindi), so there is no ML runtime dependency and no cold-start cost.
+# A presidio + spaCy NER pass for *bare* (un-cued) names is a separate, env-gated
+# enhancement (tracked as a follow-up) since it carries the heavyweight ML dep.
+
+def _mask_person_names(text: str) -> str:
+    """Redact person names via the context-boosted ``multilingual_names``
+    detector (honorific / birth-cue / Devanagari). Never raises; returns the
+    input unchanged if the recognizer package can't be imported."""
+    try:
+        from .pii.presidio_recognizers.multilingual_names import find_names
+    except Exception:  # pragma: no cover - import safety
+        return text
+    try:
+        spans = find_names(text)
+    except Exception:  # pragma: no cover - detector must never break a request
+        return text
+    out = text
+    # Apply right-to-left so earlier replacements don't shift later offsets.
+    for m in sorted(spans, key=lambda x: x.start, reverse=True):
+        out = out[: m.start] + "[REDACTED_PERSON]" + out[m.end :]
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -172,16 +204,21 @@ def mask_pii(text: str) -> str:
     """Return `text` with each PII pattern replaced by a `[REDACTED_*]`
     placeholder. Safe to call on any string; never raises.
 
-    Order: email → IBAN → phone → French SSN → US SSN → Norwegian fnr
-    → passport → generic ID. Specific rules run first so they don't get
-    swallowed by `_GENERIC_ID`.
+    Order: person names → email → IBAN → phone → French SSN → US SSN →
+    Norwegian fnr → passport → generic ID. Names run first (on raw text, so
+    their offsets are clean); the specific digit shapes run before the loose
+    ones so a 9-digit string lands on SSN/passport, not phone or generic ID.
     """
     if not text:
         return text
     try:
+        # [AI-I.3f-FU] Mask person names first (fail-soft, pure-Python, no
+        # presidio/spaCy). Runs on raw text so find_names' offsets are exact;
+        # names are alphabetic so this never competes with the digit rules.
+        out = _mask_person_names(text)
         # Order matters: specific shapes run before the loose ones so a
         # 9-digit string lands on SSN/passport, not phone or generic ID.
-        out = _EMAIL.sub("[REDACTED_EMAIL]", text)
+        out = _EMAIL.sub("[REDACTED_EMAIL]", out)
         out = _IBAN_SPACED.sub("[REDACTED_IBAN]", out)
         out = _IBAN_COMPACT.sub("[REDACTED_IBAN]", out)
         out = _FR_INSEE.sub("[REDACTED_SSN]", out)
