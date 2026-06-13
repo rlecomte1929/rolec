@@ -9,6 +9,12 @@ import RoadmapScreen from '../../features/platform-v2/roadmap/RoadmapScreen';
 import { useTextSelection } from '../../hooks/useTextSelection';
 import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
+import { fetchRelocationPlanView } from '../../api/relocationPlanView';
+import type {
+  RelocationPlanViewResponseDTO,
+  RelocationPlanTaskStatusWire,
+  RelocationPlanTaskOwnerWire,
+} from '../../types/relocationPlanView';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
 import { PhaseContextBar } from '../../components/antigravity';
@@ -84,6 +90,62 @@ function adaptTracks(v2Tracks: RoadmapV2Track[]): (RoadmapTrack & { steps: Roadm
   }));
 }
 
+const PLAN_STATUS_TO_STEP: Record<RelocationPlanTaskStatusWire, RoadmapStep['status']> = {
+  not_started: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  blocked: 'blocked',
+  not_applicable: 'skipped',
+};
+
+const PLAN_OWNER_TO_STEP: Record<RelocationPlanTaskOwnerWire, RoadmapStep['owner']> = {
+  employee: 'employee',
+  hr: 'hr',
+  joint: 'employee',
+  provider: 'vendor',
+};
+
+/**
+ * [AIQ-1005] Adapt the seeded relocation plan (case_milestones via
+ * GET /api/relocation-plans/{id}/view) into the RoadmapScreen track/step shape.
+ * Used as a fallback when the case_forms-projected V2 roadmap is empty, so the
+ * employee sees their actual milestones instead of the "being built" placeholder.
+ * Each plan phase becomes a track; each task becomes a step.
+ */
+export function adaptPlanViewToTracks(
+  plan: RelocationPlanViewResponseDTO
+): (RoadmapTrack & { steps: RoadmapStep[] })[] {
+  return plan.phases.map((phase, phaseIdx) => ({
+    id: phase.phase_key,
+    case_id: plan.case_id,
+    name: phase.title,
+    icon: '',
+    sort_order: phaseIdx,
+    is_mandatory: true,
+    progress_pct: Math.round((phase.completion_ratio ?? 0) * 100),
+    created_at: '',
+    updated_at: '',
+    steps: phase.tasks.map((task, taskIdx) => ({
+      id: task.task_id,
+      track_id: phase.phase_key,
+      case_id: plan.case_id,
+      title: task.title,
+      description:
+        task.why_this_matters ?? (task.instructions.length ? task.instructions.join(' ') : null),
+      status: PLAN_STATUS_TO_STEP[task.status] ?? 'pending',
+      owner: PLAN_OWNER_TO_STEP[task.owner] ?? 'employee',
+      vendor_id: null,
+      due_date: task.due_date ?? null,
+      completed_at: null,
+      sort_order: taskIdx,
+      dependency_ids: task.depends_on ?? [],
+      ai_suggestion: null,
+      created_at: '',
+      updated_at: '',
+    })),
+  }));
+}
+
 export const EmployeeCaseRoadmapPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
@@ -101,18 +163,30 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     setLoading(true);
     setError(null);
     getCaseRoadmapV2(caseId)
-      .then((data) => {
-        setTracks(adaptTracks(data.tracks));
-        setSuccessScore(computeSuccessScore(data.tracks));
-        const chips: Record<string, { count: number; worstStatus: string | null }> = {};
-        for (const track of data.tracks) {
-          for (const step of track.steps) {
-            if (step.doc_count > 0) {
-              chips[step.id] = { count: step.doc_count, worstStatus: step.worst_doc_status };
+      .then(async (data) => {
+        if (data.tracks.length > 0) {
+          setTracks(adaptTracks(data.tracks));
+          setSuccessScore(computeSuccessScore(data.tracks));
+          const chips: Record<string, { count: number; worstStatus: string | null }> = {};
+          for (const track of data.tracks) {
+            for (const step of track.steps) {
+              if (step.doc_count > 0) {
+                chips[step.id] = { count: step.doc_count, worstStatus: step.worst_doc_status };
+              }
             }
           }
+          setDocChips(chips);
+          return;
         }
-        setDocChips(chips);
+        // [AIQ-1005] The case_forms-projected V2 roadmap is empty. Fall back to
+        // the seeded relocation plan (case_milestones via relocation-plans/view)
+        // so the employee sees their milestones instead of the "being built"
+        // placeholder. An empty/errored plan leaves tracks [] → placeholder shows
+        // (graceful), which is the correct pre-intake state.
+        const plan = await fetchRelocationPlanView(caseId, { role: 'employee' });
+        setTracks(adaptPlanViewToTracks(plan));
+        setSuccessScore(null);
+        setDocChips({});
       })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : 'Failed to load roadmap');
