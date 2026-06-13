@@ -75,5 +75,31 @@ class AsyncGenerateAndPersistTests(unittest.TestCase):
         persist.assert_not_called()
 
 
+class SeedThenGenerateChainTests(unittest.TestCase):
+    """The submit handler dispatches ONE chained background task that seeds the
+    deterministic plan then generates the AI roadmap — chained (not two pool
+    tasks) so seeding always lands before generation's delete+rewrite."""
+
+    def test_seeds_then_generates_in_order(self):
+        calls = []
+        with mock.patch.object(
+            M, "_ensure_default_milestones_for_case", side_effect=lambda *a, **k: calls.append("seed") or 3
+        ) as seed, mock.patch.object(
+            M, "_async_generate_and_persist_roadmap", side_effect=lambda *a, **k: calls.append("gen")
+        ) as gen:
+            M._async_seed_and_generate_roadmap("case-1", "asg-1", "rq")
+        seed.assert_called_once_with("case-1", "asg-1", "rq")
+        gen.assert_called_once_with("case-1", "rq")
+        self.assertEqual(calls, ["seed", "gen"])  # ordering guaranteed
+
+    def test_seeding_failure_does_not_block_generation(self):
+        with mock.patch.object(
+            M, "_ensure_default_milestones_for_case", side_effect=RuntimeError("boom")
+        ), mock.patch.object(M, "_async_generate_and_persist_roadmap") as gen:
+            # Must not raise; generation still runs after a seeding failure.
+            M._async_seed_and_generate_roadmap("case-1", "asg-1", "rq")
+        gen.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
