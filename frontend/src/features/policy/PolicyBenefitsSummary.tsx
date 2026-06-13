@@ -6,6 +6,7 @@ import {
   type PolicySummaryCategory,
   type PolicySummaryRow,
 } from '../../api/policySummary';
+import { HrNoCompanyOnboarding, isNoCompanyError } from './hrNoCompanyOnboarding';
 
 // AIQ-225 (P1-5) — company policy "truth board". Read-only view of the active
 // published policy, by category and tier. Always reflects the current published
@@ -56,11 +57,14 @@ export const PolicyBenefitsSummary: React.FC<{ companyId?: string | null }> = ({
   const [tier, setTier] = useState<string>(ALL_TIERS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // [T2.4-ext] HR account not yet linked to a company → policy summary 403s.
+  const [noCompany, setNoCompany] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setNoCompany(false);
     policySummaryAPI
       .get({ companyId: companyId ?? undefined, tier: tier || undefined })
       .then((res) => {
@@ -82,6 +86,11 @@ export const PolicyBenefitsSummary: React.FC<{ companyId?: string | null }> = ({
       })
       .catch((e: unknown) => {
         if (cancelled) return;
+        // [T2.4-ext] 403 = HR not linked to a company → onboarding, not an error.
+        if (isNoCompanyError(e)) {
+          setNoCompany(true);
+          return;
+        }
         const status = (e as { response?: { status?: number } })?.response?.status;
         setError(
           status === 400
@@ -104,6 +113,12 @@ export const PolicyBenefitsSummary: React.FC<{ companyId?: string | null }> = ({
 
   if (loading && !data) {
     return <div className="text-sm text-[#6b7280] py-8">Loading policy summary…</div>;
+  }
+
+  // [T2.4-ext] HR not linked to a company yet. Embedded in the /hr/policy tabs
+  // (parent supplies AppShell), so render the card unwrapped.
+  if (noCompany) {
+    return <HrNoCompanyOnboarding />;
   }
 
   if (error) {
