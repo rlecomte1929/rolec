@@ -2098,19 +2098,24 @@ def list_case_vendors(
         with main_db.engine.begin() as conn:
             rows = conn.execute(
                 _sql_text(
-                    # Only the columns the deployed schema actually has:
-                    # case_vendor_shortlist (id, case_id, service_key,
-                    # vendor_id, selected, created_at) joined to vendors
-                    # (name, contact_email). The previous query selected
-                    # cvs.status/cvs.contact_name/cvs.contact_email and
-                    # v.website — none of which exist — which 500'd the route.
+                    # AIQ-1011 follow-up — columns matched to the ACTUAL deployed
+                    # schema (verified read-only against prod). case_vendor_shortlist
+                    # DOES carry status/contact_name/contact_email + selected; the
+                    # only truly-missing column was vendors.website — the real column
+                    # is vendors.website_url (vendors has no `contact_email`; the
+                    # per-case contact lives on the shortlist row). #701 swapped one
+                    # absent column (v.website) for another (v.contact_email), so the
+                    # route still 500'd.
                     """
                     SELECT
                         cvs.id            AS shortlist_id,
                         cvs.service_key   AS category,
+                        cvs.status        AS status,
+                        cvs.contact_name  AS contact_name,
+                        cvs.contact_email AS contact_email,
                         cvs.selected      AS selected,
                         v.name            AS vendor_name,
-                        v.contact_email   AS contact_email
+                        v.website_url     AS vendor_website
                     FROM public.case_vendor_shortlist cvs
                     LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
                     WHERE cvs.case_id = :case_id
@@ -2129,19 +2134,13 @@ def list_case_vendors(
         result.append({
             "shortlist_id": str(d["shortlist_id"]) if d.get("shortlist_id") else None,
             "category": d.get("category"),
-            # Engagement state derived from the shortlist's `selected` flag —
-            # the only state column the table carries. vendors.status is a
-            # vendor-lifecycle field (active/pending), not a per-case
-            # engagement status, so it's not surfaced here.
-            "status": "Assigned" if d.get("selected") else "Removed",
-            # No contact_name column exists in the schema; keep the field on
-            # the contract but return null rather than inventing data.
-            "contact_name": None,
+            # Per-case engagement status; fall back to the `selected` flag when
+            # the row hasn't set an explicit status.
+            "status": d.get("status") or ("Assigned" if d.get("selected") else "Removed"),
+            "contact_name": d.get("contact_name"),
             "contact_email": d.get("contact_email"),
             "vendor_name": d.get("vendor_name"),
-            # vendors has no website column (logo_url only); keep the contract
-            # field but return null.
-            "vendor_website": None,
+            "vendor_website": d.get("vendor_website"),
         })
     return result
 
