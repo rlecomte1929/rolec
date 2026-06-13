@@ -1229,6 +1229,10 @@ class UsersMixin:
                 pass
             if has_status:
                 clauses.append("(COALESCE(TRIM(LOWER(p.status)), 'active') <> 'inactive')")
+        # AIQ-913: hide synthetic e2e/verify seed people (…@testco.com) from the
+        # Mobility-center index (prod is continuously re-seeded; purge can't hold).
+        from .test_data_filter import exclude_test_people
+        clauses.append(exclude_test_people("p.email"))
         where = " AND " + " AND ".join(clauses) if clauses else ""
         # B9b: p.created_at removed — column may not exist in production Supabase profiles
         # table (schema drift). Ordering falls back to full_name-only to avoid
@@ -1251,10 +1255,11 @@ class UsersMixin:
             row["name"] = row.get("full_name") or row.get("email") or row.get("id")
         # Orphans: profiles with role in ('HR','EMPLOYEE','EMPLOYEE_USER') and no company_id
         try:
-            orphan_sql = text("""
+            orphan_sql = text(f"""
                 SELECT COUNT(*) AS n FROM profiles
                 WHERE (role IN ('HR','EMPLOYEE','EMPLOYEE_USER') OR role IS NULL)
                 AND (company_id IS NULL OR TRIM(company_id) = '')
+                AND {exclude_test_people("email")}
             """)
             with self.engine.connect() as conn:
                 orphan_row = conn.execute(orphan_sql, {}).fetchone()

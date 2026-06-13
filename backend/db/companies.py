@@ -367,14 +367,20 @@ class CompaniesMixin:
         }
 
     def list_companies(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
+        # AIQ-913: hide synthetic e2e/verify seed companies from the admin list
+        # (prod is continuously re-seeded, so a one-time purge can't hold).
+        from .test_data_filter import exclude_test_companies
+        excl = exclude_test_companies("name")
         q = (query or "").strip().lower()
         with self.engine.connect() as conn:
             if q:
                 rows = conn.execute(text(
-                    "SELECT * FROM companies WHERE LOWER(name) LIKE :q ORDER BY created_at DESC"
+                    f"SELECT * FROM companies WHERE LOWER(name) LIKE :q AND {excl} ORDER BY created_at DESC"
                 ), {"q": f"%{q}%"}).fetchall()
             else:
-                rows = conn.execute(text("SELECT * FROM companies ORDER BY created_at DESC")).fetchall()
+                rows = conn.execute(text(
+                    f"SELECT * FROM companies WHERE {excl} ORDER BY created_at DESC"
+                )).fetchall()
         return self._rows_to_list(rows)
 
     def get_company(self, company_id: str) -> Optional[Dict[str, Any]]:
