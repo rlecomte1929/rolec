@@ -734,6 +734,21 @@ class CasesMixin:
             ).fetchone()
         return self._row_to_dict(row) or {}
 
+    def delete_case_milestones(self, case_id: str, *, request_id: Optional[str] = None) -> int:
+        """Delete all milestones for a case. Used before re-persisting a
+        regenerated roadmap so the plan view reflects the new set rather than a
+        mix. Matches the same predicate list_case_milestones reads by."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.begin() as conn:
+            result = self._exec(
+                conn,
+                "DELETE FROM case_milestones WHERE canonical_case_id = :cid OR case_id = :cid",
+                {"cid": cid},
+                op_name="delete_case_milestones",
+                request_id=request_id,
+            )
+        return getattr(result, "rowcount", 0) or 0
+
     def link_milestone_entity(
         self,
         milestone_id: str,
