@@ -82,6 +82,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
+  // [AIQ-1019] Mobile nav drawer. Desktop (md+) is unaffected — the sidebar
+  // renders inline as before; below md it's an off-canvas drawer toggled by a
+  // hamburger. Close it on navigation so it doesn't linger over the new page.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
 
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
@@ -136,15 +143,32 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         Skip to main content
       </a>
 
-      <PlatformShellSidebar
-        role={sbRole}
-        companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
-        user={{
-          initials: userInitials,
-          name: identity ? `${identity}` : 'ReloPass user',
-          role: role ? role.toLowerCase() : '',
-        }}
-      />
+      {/* [AIQ-1019] Mobile backdrop — only below md, only when the drawer is open. */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          aria-hidden="true"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      {/* [AIQ-1019] Sidebar wrapper: inline static column on md+ (desktop
+          unchanged), off-canvas drawer below md. `flex` lets the inner <aside>
+          stretch to full height in both modes. */}
+      <div
+        className={`${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        } fixed inset-y-0 left-0 z-50 flex shrink-0 transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none`}
+      >
+        <PlatformShellSidebar
+          role={sbRole}
+          companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
+          user={{
+            initials: userInitials,
+            name: identity ? `${identity}` : 'ReloPass user',
+            role: role ? role.toLowerCase() : '',
+          }}
+        />
+      </div>
 
       {/* ── Right side: topbar + banners + main + footer ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -153,6 +177,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
             Topbar now carries only user-context controls; consistent across
             AppShell-backed pages and v2 custom-layout pages. */}
         <header className="flex items-center justify-end px-6 py-3 bg-white border-b border-slate-200 shrink-0">
+          {/* [AIQ-1019] Hamburger — only below md; mr-auto pushes it left and
+              keeps the user controls right-aligned (desktop layout unchanged). */}
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation menu"
+            aria-expanded={mobileNavOpen}
+            className="md:hidden mr-auto inline-flex items-center justify-center rounded-lg p-2 text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
           <div className="flex items-center gap-3 shrink-0">
             <ChangelogBell />
             <LogoutButton />
