@@ -335,9 +335,10 @@ export const HrDashboard: React.FC = () => {
                 <Alert variant="info" title="Assignment created">
                   <div className="space-y-3 text-[#0b2b43]">
                     <p className="text-sm leading-relaxed">
-                      The employee does not need an account yet. They can <strong>register</strong> with the same email
-                      or username you entered, or <strong>sign in</strong> if they already have one. The case attaches
-                      when the login matches.
+                      An <strong>invite email</strong> has been sent to <strong>{employeeIdentifier.trim()}</strong> with
+                      a link to get started — they can <strong>register</strong> with that email (or <strong>sign in</strong>{' '}
+                      if they already have an account), and the case attaches automatically when the login matches. If the
+                      email doesn&rsquo;t arrive, share the case code below.
                     </p>
                     <p className="text-sm leading-relaxed">
                       For a <strong>manual claim</strong> (e.g. typo in the identifier), send the assignment ID below.
