@@ -2098,15 +2098,19 @@ def list_case_vendors(
         with main_db.engine.begin() as conn:
             rows = conn.execute(
                 _sql_text(
+                    # Only the columns the deployed schema actually has:
+                    # case_vendor_shortlist (id, case_id, service_key,
+                    # vendor_id, selected, created_at) joined to vendors
+                    # (name, contact_email). The previous query selected
+                    # cvs.status/cvs.contact_name/cvs.contact_email and
+                    # v.website — none of which exist — which 500'd the route.
                     """
                     SELECT
                         cvs.id            AS shortlist_id,
                         cvs.service_key   AS category,
-                        cvs.status,
-                        cvs.contact_name,
-                        cvs.contact_email,
+                        cvs.selected      AS selected,
                         v.name            AS vendor_name,
-                        v.website         AS vendor_website
+                        v.contact_email   AS contact_email
                     FROM public.case_vendor_shortlist cvs
                     LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
                     WHERE cvs.case_id = :case_id
@@ -2125,11 +2129,19 @@ def list_case_vendors(
         result.append({
             "shortlist_id": str(d["shortlist_id"]) if d.get("shortlist_id") else None,
             "category": d.get("category"),
-            "status": d.get("status", "Assigned"),
-            "contact_name": d.get("contact_name"),
+            # Engagement state derived from the shortlist's `selected` flag —
+            # the only state column the table carries. vendors.status is a
+            # vendor-lifecycle field (active/pending), not a per-case
+            # engagement status, so it's not surfaced here.
+            "status": "Assigned" if d.get("selected") else "Removed",
+            # No contact_name column exists in the schema; keep the field on
+            # the contract but return null rather than inventing data.
+            "contact_name": None,
             "contact_email": d.get("contact_email"),
             "vendor_name": d.get("vendor_name"),
-            "vendor_website": d.get("vendor_website"),
+            # vendors has no website column (logo_url only); keep the contract
+            # field but return null.
+            "vendor_website": None,
         })
     return result
 
