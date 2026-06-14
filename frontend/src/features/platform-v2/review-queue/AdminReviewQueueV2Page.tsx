@@ -392,9 +392,8 @@ export function AdminReviewQueueV2Page() {
         {backendUnavailable && (
           <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span>
-              Backend endpoint <code>/api/admin/review-queue</code> is unavailable in this environment
-              (likely the Supabase <code>review_queue_items</code> table isn't populated). Page renders
-              the layout but no rows. Backfill from signals from the legacy page once you wire seed data.
+              The review queue isn&rsquo;t available in this environment yet. It will populate once its
+              data source is connected.
             </span>
             <Button unstyled
               type="button"

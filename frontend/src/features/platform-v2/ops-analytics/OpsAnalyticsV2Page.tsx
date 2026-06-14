@@ -205,8 +205,8 @@ export function OpsAnalyticsV2Page() {
       {backendUnavailable && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <span>
-            All ops analytics endpoints failed in this environment (likely the Supabase
-            <code className="mx-1">review_queue_items</code> and related tables aren't populated).
+            Ops analytics isn&rsquo;t available in this environment yet. It will populate once its
+            data sources are connected.
           </span>
           <Button unstyled type="button" onClick={() => void load()} className="text-amber-700 hover:underline">
             Retry
