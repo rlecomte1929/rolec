@@ -8,6 +8,7 @@ import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
 import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceReport } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { blockerSummaryMessage } from '../features/cases/blockerSummaryCopy';
 import { AssignmentDebugPanel } from './AssignmentDebugPanel';
 import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 
@@ -238,7 +239,6 @@ export const HrAssignmentReview: React.FC = () => {
       ? 'Stage: Rejected'
       : 'Stage: Intake - In progress';
   const readiness = Math.max(0, Math.min(100, Math.round(assignment?.completeness ?? 0)));
-  const blockingItems = compliance?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
 
   const missingItem = useMemo(() => {
     if (!profile?.complianceDocs?.hasPassportScans) return 'Passport scans missing';
@@ -262,9 +262,14 @@ export const HrAssignmentReview: React.FC = () => {
   const docsComplete = docsList.filter((doc) => doc.complete).length;
   const docsTotal = docsList.length || 1;
 
-  const attentionItems: string[] = compliance?.actions?.length
-    ? compliance.actions.map((a) => (typeof a === 'string' ? a : a.title))
-    : ['Complete employee profile', 'Collect passport scans'];
+  // TASK-003 (AIQ-1042): single source of truth for blocking items. The
+  // "Attention Needed" checklist and the ReloPass Assistant summary both read
+  // this array, so the assistant can never contradict the visible list. No
+  // placeholder fallback — a case with no outstanding actions genuinely reads
+  // as on-track rather than inventing fake blockers.
+  const attentionItems: string[] = (compliance?.actions ?? []).map((a) =>
+    typeof a === 'string' ? a : a.title,
+  );
   const inProgressItems = compliance?.checks?.length
     ? compliance.checks.filter((check) => check.status === 'NEEDS_REVIEW').map((check) => check.name)
     : ['Confirm housing budget', 'Verify assignment details'];
@@ -419,7 +424,7 @@ export const HrAssignmentReview: React.FC = () => {
                     <div className="mt-3">
                       <ProgressBar value={readiness} />
                     </div>
-                    {blockingItems.length > 0 && (
+                    {attentionItems.length > 0 && (
                       <div className="text-xs text-[#b45309] mt-2">Action required</div>
                     )}
                   </Card>
@@ -455,11 +460,29 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'timeline' && (
                 <div className="space-y-6">
-                  <Card padding="lg" className="border border-[#fde2e2] bg-[#fff5f5]">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[#7a2a2a]">
-                      Attention Needed
-                      <span className="text-xs text-[#6b7280]">Action required / Blocking</span>
+                  <Card
+                    padding="lg"
+                    className={
+                      attentionItems.length > 0
+                        ? 'border border-[#fde2e2] bg-[#fff5f5]'
+                        : 'border border-[#d1f0e4] bg-[#f3fbf7]'
+                    }
+                  >
+                    <div
+                      className={`flex items-center gap-2 text-sm font-semibold ${
+                        attentionItems.length > 0 ? 'text-[#7a2a2a]' : 'text-[#1f8e8b]'
+                      }`}
+                    >
+                      {attentionItems.length > 0 ? 'Attention Needed' : 'On track'}
+                      <span className="text-xs text-[#6b7280]">
+                        {attentionItems.length > 0 ? 'Action required / Blocking' : 'Nothing blocking right now'}
+                      </span>
                     </div>
+                    {attentionItems.length === 0 && (
+                      <div className="mt-3 text-sm text-[#4b5563]">
+                        No items are blocking this plan right now.
+                      </div>
+                    )}
                     <div className="mt-4 space-y-3">
                       {attentionItems.map((item) => (
                         <div
@@ -673,7 +696,9 @@ export const HrAssignmentReview: React.FC = () => {
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-[#4b5563]">
                   <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
-                    Case review: readiness is {readiness}%. {blockingItems.length} blocking items remain.
+                    {/* TASK-003 (AIQ-1042): count the same `attentionItems` the checklist
+                        renders so the assistant can't contradict the visible list. */}
+                    {blockerSummaryMessage(attentionItems.length, attentionItems[0])}
                   </div>
                   <Button variant="outline" fullWidth>
                     Draft urgent reminder for Profile
