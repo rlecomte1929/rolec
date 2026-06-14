@@ -5,7 +5,7 @@ import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/
 import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { JourneyPhases } from '../features/employee-journey/JourneyPhases';
+import { JourneySpine } from '../features/employee-journey/JourneySpine';
 import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
@@ -577,7 +577,7 @@ export const EmployeeJourney: React.FC = () => {
                 : 'Sign in with the email HR used for your move, or enter the case code HR sent you.'}
           </p>
           {linkedSummaries.length > 0 ? (
-            <JourneyPhases
+            <JourneySpine
               intakeStep={linkedSummaries[0].intake_step ?? 0}
               intakeTotalSteps={linkedSummaries[0].intake_total_steps ?? 5}
               onContinueIntake={() => navigate(`/employee/case/${linkedSummaries[0].assignment_id}/intake`)}
