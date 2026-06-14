@@ -52,10 +52,11 @@ export function RoadmapActions({ caseId, hasRoadmap = true }: RoadmapActionsProp
   return (
     <div style={{ marginTop: '12px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <Button variant="secondary" size="sm" onClick={() => setConfirmEmail(true)} disabled={disabled} title={disabledTitle}>
+        {/* EMP-3: one primary action + one lower-friction secondary, not two equal CTAs. */}
+        <Button variant="primary" size="sm" onClick={() => setConfirmEmail(true)} disabled={disabled} title={disabledTitle}>
           {busy === 'email' ? 'Sending…' : '✉ Email this plan'}
         </Button>
-        <Button variant="secondary" size="sm" onClick={downloadCalendar} disabled={disabled} title={disabledTitle}>
+        <Button variant="outline" size="sm" onClick={downloadCalendar} disabled={disabled} title={disabledTitle}>
           {busy === 'calendar' ? 'Preparing…' : '📅 Add deadlines to calendar'}
         </Button>
       </div>

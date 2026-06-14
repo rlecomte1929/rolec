@@ -904,11 +904,8 @@ export function EmployeeIntakePage() {
   // the service-selection phase, shown only if has_pets + a pet service exists.
   // Canonical step list lives in ./intakeSteps so the dashboard derives the same total.
   const STEP_LABELS = INTAKE_STEP_LABELS;
-  // AIQ-978: step 6 ("My Needs") previously used a ✅ checkmark emoji as its
-  // icon, which read as "already complete" on a fresh wizard. The real
-  // completion state is the numbered circle (✓ only when stepValid && n < step);
-  // use a non-checkmark icon here so the decorative glyph can't imply progress.
-  const STEP_ICONS  = ['🛫', '👤', '👪', '🗺️', '🎯', '📋'];
+  // EMP-3: decorative emoji step-icons removed (consumer-app register). The numbered
+  // circle in the stepper below is the step indicator (✓ when stepValid && n < step).
   const STEP_ON_HOLD: Record<number, boolean> = {};  // AIQ-160-C: step 4 (Pets) is now active
   const TOTAL_STEPS = STEP_LABELS.length;
 
@@ -1103,7 +1100,7 @@ export function EmployeeIntakePage() {
                       onHold && !isActive ? 'bg-gray-100 text-gray-400' :
                       isActive ? 'bg-accent-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
                     }`}>{isDone ? '✓' : n}</span>
-                    <span className="hidden sm:inline">{STEP_ICONS[i]} {lbl}</span>
+                    <span className="hidden sm:inline">{lbl}</span>
                     {onHold && (
                       <span className="hidden sm:inline ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold">
                         On hold

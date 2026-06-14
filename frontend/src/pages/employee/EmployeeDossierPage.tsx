@@ -158,19 +158,27 @@ export const EmployeeDossierPage: React.FC = () => {
                 <div className="text-2xl font-semibold text-slate-900 leading-none">
                   {overall.pct}%
                 </div>
+                {/* EMP-3: the % is fields filled, distinct from forms ready to submit —
+                    label both so "83% / 0 ready" can't read as a contradiction. */}
                 <div className="text-xs text-slate-500 mt-1">
-                  {overall.ready} of {overall.total} form{overall.total === 1 ? '' : 's'} ready · overall completion
+                  fields filled · {overall.ready} of {overall.total} form{overall.total === 1 ? '' : 's'} ready to submit
                 </div>
               </div>
             )}
-            <Button unstyled
-              type="button"
-              disabled
-              title="Build dossier lands in P3-4 — coming soon"
-              className="px-4 py-2 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
-            >
-              Build dossier
-            </Button>
+            {/* EMP-3: surface the "coming soon" gating visibly, not just as a hover title. */}
+            <div className="text-center">
+              <Button unstyled
+                type="button"
+                disabled
+                title="Build dossier lands in P3-4 — coming soon"
+                className="px-4 py-2 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
+              >
+                Build dossier
+              </Button>
+              <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                Coming soon
+              </span>
+            </div>
           </div>
         </header>
 
