@@ -94,11 +94,6 @@ const SECTIONS: NavSection[] = [
     label: 'HR Operations',
     minRole: 'HR',
     items: [
-      // P10-followup #7 — Requirements item routes to /resources so clicking it
-      // lands on the page with H1 'Requirements' (Resources.tsx, renamed in P10).
-      // Mobility policy is still reachable via the sibling 'Policy' nav item
-      // ('policy-benefits' below) which points at ROUTE_DEFS.hrPolicy.path.
-      { id: 'requirements-discovery', label: 'Requirements', to: ROUTE_DEFS.resources.path, badge: { kind: 'static', variant: 'live' } },
       { id: 'company-profile', label: 'Company profile', to: ROUTE_DEFS.hrCompanyProfile.path, exact: true },
       {
         id: 'mobility-control',
@@ -113,6 +108,10 @@ const SECTIONS: NavSection[] = [
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
       { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrExceptions.path },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
+      // Requirements routes to /resources (H1 'Requirements', Resources.tsx).
+      // Placed last per product direction — a secondary discovery surface, not a
+      // primary HR operations action. (Mobility policy is reachable via 'Policy'.)
+      { id: 'requirements-discovery', label: 'Requirements', to: ROUTE_DEFS.resources.path, badge: { kind: 'static', variant: 'live' } },
     ],
   },
   {
