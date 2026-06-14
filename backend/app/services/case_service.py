@@ -284,6 +284,47 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     raise HTTPException(status_code=403, detail="Not authorised for this case")
 
 
+def resolve_case_forms_case_id(case_id: str) -> str:
+    """
+    [DOSSIER-ID] Resolve a route ``{case_id}`` to the id that ``case_forms`` rows
+    are actually keyed by — the canonical relocation case id.
+
+    Employee/HR case-scoped routes commonly pass an ``assignment_id`` (from
+    ``case_assignments``), but ``case_forms.case_id`` holds the canonical case id
+    (``case_assignments.canonical_case_id`` / ``case_id``). A verbatim
+    ``WHERE cf.case_id = :id`` with an assignment id therefore matches nothing,
+    so the Dossier renders empty even when forms exist.
+
+    Mirrors the assignment→case resolution in ``_assert_case_access``. If no
+    assignment row resolves (legacy ``public.cases`` ids), the input is returned
+    unchanged. Never raises — a lookup failure falls back to the input id.
+    """
+    if not case_id or not _UUID_RE.match(case_id):
+        return case_id
+    try:
+        with main_db.engine.connect() as conn:
+            row = conn.execute(
+                _sql_text(
+                    f"SELECT COALESCE("
+                    f"  NULLIF(TRIM(CAST(ca.canonical_case_id AS TEXT)), ''), "
+                    f"  CAST(ca.case_id AS TEXT)"
+                    f") AS resolved "
+                    f"FROM {_pg_table('case_assignments')} ca "
+                    f"WHERE CAST(ca.id AS TEXT) = :id "
+                    f"   OR CAST(ca.canonical_case_id AS TEXT) = :id "
+                    f"   OR CAST(ca.case_id AS TEXT) = :id "
+                    f"LIMIT 1"
+                ),
+                {"id": case_id},
+            ).mappings().first()
+    except Exception:
+        logger.exception("dossier: failed to resolve case_forms case_id id=%s", case_id)
+        return case_id
+    if row and row.get("resolved"):
+        return str(row["resolved"])
+    return case_id
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # DTO mapping
 # ─────────────────────────────────────────────────────────────────────────────
