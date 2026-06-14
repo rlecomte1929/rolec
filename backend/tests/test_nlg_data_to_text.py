@@ -94,3 +94,30 @@ def test_three_to_five_sentences():
     out = summarise_kpis(_six_kpi_fixture(), audience="exec")
     sentences = [s for s in out.split(". ") if s]
     assert 3 <= len(sentences) <= 5
+
+
+def test_no_prior_uses_plain_label_value():
+    # KPIs without a prior (e.g. a fresh period / empty tenant — the mobility
+    # control center case) must NOT use the old robotic "stands at" phrasing;
+    # they read plainly as "label: value".
+    ks = KPISet(
+        "current period",
+        [
+            KPI("active", "Active cases", 23, unit=""),
+            KPI("risk", "At-risk cases", 0, unit=""),
+        ],
+    )
+    out = summarise_kpis(ks, audience="exec")
+    assert "stands at" not in out
+    assert "Active cases: 23" in out
+    assert "At-risk cases: 0" in out
+
+
+def test_no_prior_with_target_composes():
+    # The label:value form must still compose with the target clause.
+    ks = KPISet(
+        "current period",
+        [KPI("sla", "SLA met", 96, target=95, unit="%")],
+    )
+    out = summarise_kpis(ks, audience="exec")
+    assert "SLA met: 96%; target is 95% (met)." in out

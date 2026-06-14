@@ -85,7 +85,10 @@ def _sentence_for(kpi: KPI, *, audience: Audience) -> str:
 
     d = kpi.delta
     if d is None:
-        base = f"{kpi.label} stands at {value}"
+        # No prior value to compare against — state it plainly. A label:value
+        # form reads calmly and avoids the robotic, repetitive "X stands at N.
+        # Y stands at N." when several KPIs lack a prior (e.g. a fresh period).
+        base = f"{kpi.label}: {value}"
     else:
         delta_txt = _fmt(kpi.abs_delta, kpi.unit)
         move = "up" if d > 0 else ("down" if d < 0 else "flat")
