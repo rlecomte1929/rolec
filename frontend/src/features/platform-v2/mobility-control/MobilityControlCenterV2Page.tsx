@@ -507,10 +507,10 @@ export function MobilityControlCenterV2Page() {
         {/* Header — breadcrumb above h1; the 'HR · Global mobility' eyebrow was
             removed per P4 audit ('Mobility Control Center no longer shows
             HR · GLOBAL MOBILITY as a standalone sub-header'). */}
-        <Breadcrumb section="HR Operations" title="Mobility control center" className="mb-3" />
+        <Breadcrumb section="HR Operations" title="Mobility command center" className="mb-3" />
         <div className="mb-5">
           <div className="flex flex-wrap items-baseline gap-3">
-            <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility control center</h1>
+            <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility command center</h1>
             <div className="ml-auto flex items-center gap-2">
               <Button unstyled
                 type="button"

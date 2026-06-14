@@ -102,7 +102,7 @@ const SECTIONS: NavSection[] = [
       { id: 'company-profile', label: 'Company profile', to: ROUTE_DEFS.hrCompanyProfile.path, exact: true },
       {
         id: 'mobility-control',
-        label: 'Mobility center',
+        label: 'Mobility command center',
         to: ROUTE_DEFS.hrCommandCenter.path,
         exact: true,
         // No badge: the hard-coded '12' never matched the real case count
