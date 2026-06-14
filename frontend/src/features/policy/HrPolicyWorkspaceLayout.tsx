@@ -11,6 +11,7 @@ import {
   deriveHrPolicyPrimaryAction,
 } from './hrPolicyWorkspaceState';
 import { publishImpactSentence } from './policyWorkflowCopy';
+import { comparisonBlockerMessage } from './comparisonBlockerCopy';
 import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
 import type { StarterTemplateKey } from './starterPolicyCopy';
 import type { EmployeePreviewCompareModel } from './hrPolicyEmployeePreviewCompare';
@@ -379,8 +380,10 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
                 <p className="text-[#374151]">{COMPARISON_SUMMARY_COPY[resolved.comparisonSummary]}</p>
                 {resolved.comparisonBlockers.length > 0 && (
                   <ul className="list-disc list-inside text-xs text-[#6b7280] mt-2">
+                    {/* TASK-004: render an HR-facing message, never the raw
+                        internal blocker code (e.g. MISSING_COMPARISON_CATEGORY:shipment). */}
                     {resolved.comparisonBlockers.slice(0, 6).map((b) => (
-                      <li key={b}>{b.replace(/_/g, ' ')}</li>
+                      <li key={b}>{comparisonBlockerMessage(b)}</li>
                     ))}
                   </ul>
                 )}
