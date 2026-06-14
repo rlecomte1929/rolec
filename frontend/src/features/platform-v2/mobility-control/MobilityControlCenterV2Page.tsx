@@ -5,6 +5,7 @@ import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import api, { hrAPI } from '../../../api/client';
 import type { CommandCenterCaseRow } from '../../../api/client';
+import { displayNameOrEmail } from '../../../utils/caseDisplay';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { fetchExecSummary } from '../../../api/nlg';
@@ -173,19 +174,18 @@ function Pill({ children, className = '', title }: { children: React.ReactNode; 
 }
 
 /**
- * Marker for cells whose data isn't yet wired to Supabase. Renders as a
- * small amber chip so it's instantly findable when grepping the rendered
- * UI — these are TODOs, not legitimate empty values.
- *
- * Search for "⚑ tbd" in the browser to find every unlinked surface.
+ * Marker for a case-row cell whose data isn't available yet. BRAND-5: this is
+ * a buyer-facing case table, so it must read as an intentional empty state
+ * ("Not set") in muted slate, never a "tbd" dev flag. The reason a column has
+ * no value is preserved for engineers in the `title` tooltip (the backing-data
+ * gap), not in the visible label.
  */
-function NotLinked({ label = 'tbd', title }: { label?: string; title?: string }) {
+function NotLinked({ label = 'Not set', title }: { label?: string; title?: string }) {
   return (
     <span
       title={title || 'Not yet linked to Supabase — placeholder.'}
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200 bg-amber-50"
+      className="text-[12.5px] text-slate-400"
     >
-      <span aria-hidden>⚑</span>
       {label}
     </span>
   );
@@ -193,9 +193,11 @@ function NotLinked({ label = 'tbd', title }: { label?: string; title?: string })
 
 function Flag({ iso2, raw }: { iso2: string | null; raw?: string | null }) {
   if (!iso2) {
+    // BRAND-5: muted intentional empty — show the raw value if we have one
+    // (even unresolved, it's information), otherwise "Not set", never "tbd".
     return (
       <span title={raw ? `Unknown country code: ${raw}` : 'No country recorded'} className="text-slate-400">
-        {raw ? `⚑ ${raw}` : '⚑ tbd'}
+        {raw ? raw : 'Not set'}
       </span>
     );
   }
@@ -385,7 +387,10 @@ export function MobilityControlCenterV2Page() {
       minWidth: 160,
       sortValue: (row) => (row.employeeIdentifier || '').toLowerCase(),
       cell: (row) => {
-        const name = row.employeeIdentifier || '—';
+        // BRAND-5: CommandCenterCaseRow has no name field today, so email is the
+        // legitimate fallback; displayNameOrEmail keeps it intentional (and is the
+        // single switch point if a name field is added to the payload later).
+        const name = displayNameOrEmail(null, row.employeeIdentifier);
         const tone = ownerTone(name);
         return (
           <div className="flex items-center gap-2.5">
@@ -411,6 +416,11 @@ export function MobilityControlCenterV2Page() {
       cell: (row) => {
         const o = resolveISO2(row.originCountry);
         const d = resolveISO2(row.destCountry);
+        // BRAND-5: when neither side is known, a single intentional label reads
+        // better than "Not set › Not set".
+        if (!(row.originCountry || '').trim() && !(row.destCountry || '').trim()) {
+          return <span className="text-[12.5px] text-slate-400">Route not set</span>;
+        }
         return (
           <div className="flex items-center gap-2 text-[12.5px] text-slate-700">
             <Flag iso2={o} raw={row.originCountry} />
