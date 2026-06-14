@@ -10,6 +10,7 @@ import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
 import { trackAuthPerf } from '../perf/authPerf';
 import { buildRoute } from '../navigation/routes';
+import { displayNameOrEmail, orEmptyLabel } from '../utils/caseDisplay';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
@@ -271,18 +272,22 @@ export const HrDashboard: React.FC = () => {
     return <Badge variant="neutral">Not started</Badge>;
   };
 
-  const displayName = (assignment: AssignmentSummary) => {
+  // BRAND-5: lead with the employee's real name; email is a genuine fallback only.
+  const employeeName = (assignment: AssignmentSummary) => {
     const safe = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '');
-    const fromHr = [safe(assignment.employeeFirstName), safe(assignment.employeeLastName)].filter(Boolean).join(' ');
-    return fromHr || assignment.employeeIdentifier;
+    return [safe(assignment.employeeFirstName), safe(assignment.employeeLastName)].filter(Boolean).join(' ');
   };
+  const displayName = (assignment: AssignmentSummary) =>
+    displayNameOrEmail(employeeName(assignment), assignment.employeeIdentifier);
 
-  const displayDestination = (assignment: AssignmentSummary) => {
-    const c = assignment.case;
-    const dest = (c?.host_country || '').trim();
-    if (dest) return dest;
-    const home = (c?.home_country || '').trim();
-    return home || '-';
+  // BRAND-5: intentional muted empty labels, never 'tbd'/'-'. Destination is the
+  // host country only (home country is the route's origin, shown separately).
+  const destinationCell = (assignment: AssignmentSummary) =>
+    orEmptyLabel(assignment.case?.host_country, 'Destination not set');
+  const routeCell = (assignment: AssignmentSummary) => {
+    const home = (assignment.case?.home_country || '').trim();
+    const host = (assignment.case?.host_country || '').trim();
+    return orEmptyLabel(home && host ? `${home} → ${host}` : '', 'Route not set');
   };
 
   return (
@@ -595,17 +600,23 @@ export const HrDashboard: React.FC = () => {
                     )}
                     <div>
                       <div className="text-sm font-semibold text-[#0b2b43]">{displayName(assignment)}</div>
-                      <div className="text-xs font-semibold text-[#0b2b43]">{assignment.employeeIdentifier}</div>
+                      {/* BRAND-5: only show the email subline when it isn't already the
+                          primary identity (i.e. a real name exists) \u2014 avoids the email twice. */}
+                      {employeeName(assignment) ? (
+                        <div className="text-xs text-[#6b7280]">{assignment.employeeIdentifier}</div>
+                      ) : null}
                     </div>
                     <div>
-                      <div className="text-sm text-[#0b2b43]">{displayDestination(assignment)}</div>
+                      {(() => {
+                        const d = destinationCell(assignment);
+                        return <div className={`text-sm ${d.isEmpty ? 'text-slate-400' : 'text-[#0b2b43]'}`}>{d.text}</div>;
+                      })()}
                     </div>
                     <div>
-                      <div className="text-sm text-[#0b2b43]">
-                        {assignment.case?.home_country && assignment.case?.host_country
-                          ? `${assignment.case.home_country} \u2192 ${assignment.case.host_country}`
-                          : '-'}
-                      </div>
+                      {(() => {
+                        const r = routeCell(assignment);
+                        return <div className={`text-sm ${r.isEmpty ? 'text-slate-400' : 'text-[#0b2b43]'}`}>{r.text}</div>;
+                      })()}
                     </div>
                     <div className="flex flex-wrap items-center gap-1">
                       {caseStatusBadge(assignment.status)}
