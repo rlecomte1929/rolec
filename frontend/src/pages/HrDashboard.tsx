@@ -36,6 +36,10 @@ export const HrDashboard: React.FC = () => {
   const [employeeLevel, setEmployeeLevel] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  // New-case form is opened locally; the case is NOT created until the HR user
+  // submits a valid employee identifier (prevents orphan empty cases on open).
+  const [formOpen, setFormOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   // Has this company published a benefits policy? null = unknown/loading.
   const [policyPublished, setPolicyPublished] = useState<boolean | null>(null);
   const [policyBannerDismissed, setPolicyBannerDismissed] = useState<boolean>(
@@ -174,33 +178,39 @@ export const HrDashboard: React.FC = () => {
     { label: 'Package', routeKey: 'hrPackage' },
   ]);
 
-  const handleCreateCase = async () => {
+  // Open the New-case form locally. Does NOT create a case — that happens on a
+  // validated Assign, so abandoning the form leaves no orphan case behind.
+  const openNewCaseForm = () => {
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
+    setCaseId(null);
     setEmployeeIdentifier('');
     setEmployeeFirstName('');
     setEmployeeLastName('');
-    try {
-      const response = await hrAPI.createCase();
-      setCaseId(response.caseId);
-      await loadAssignments(false);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to create case.');
-    }
+    setEmployeeLevel('');
+    setFormOpen(true);
   };
 
   const handleAssign = async () => {
-    if (!caseId || !employeeIdentifier.trim()) {
+    if (!employeeIdentifier.trim()) {
       setError('Provide an employee username or email.');
+      return;
+    }
+    if (submitting || assignmentId) {
+      // Guard against double-submit (the success state is already shown).
       return;
     }
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
+    setSubmitting(true);
     const interaction = startInteraction('HR_ASSIGN_CLICK');
     try {
-      const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim(), {
+      // Create the case only now that we have a valid identifier, then assign.
+      const created = await hrAPI.createCase();
+      setCaseId(created.caseId);
+      const response = await hrAPI.assignCase(created.caseId, employeeIdentifier.trim(), {
         firstName: employeeFirstName || undefined,
         lastName: employeeLastName || undefined,
         level: employeeLevel || undefined,
@@ -217,6 +227,7 @@ export const HrDashboard: React.FC = () => {
       // Log full error to console for debugging (see docs/DEBUG_ASSIGN_ERROR.md)
       logger.error('[Assign failed]', msg, data || err);
     } finally {
+      setSubmitting(false);
       // Measure click -> UI render (best-effort).
       void endInteraction(interaction);
     }
@@ -338,10 +349,10 @@ export const HrDashboard: React.FC = () => {
               <Button>All assignments</Button>
             </Link>
           )}
-          <Button onClick={handleCreateCase}>New case</Button>
+          <Button onClick={openNewCaseForm}>New case</Button>
         </div>
 
-        {caseId && (
+        {formOpen && (
           <Card padding="lg">
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -379,7 +390,9 @@ export const HrDashboard: React.FC = () => {
                   { value: 'c_suite', label: 'C-suite' },
                 ]}
               />
-              <Button onClick={handleAssign}>Assign</Button>
+              <Button onClick={handleAssign} disabled={submitting || !!assignmentId}>
+                {submitting ? 'Assigning…' : 'Assign'}
+              </Button>
               {assignmentId && (
                 <Alert variant="info" title="Assignment created">
                   <div className="space-y-3 text-[#0b2b43]">
@@ -389,6 +402,11 @@ export const HrDashboard: React.FC = () => {
                       if they already have an account), and the case attaches automatically when the login matches. If the
                       email doesn&rsquo;t arrive, share the case code below.
                     </p>
+                    {caseId && (
+                      <Button onClick={() => navigate(buildRoute('hrCaseSummary', { caseId }))}>
+                        Open case →
+                      </Button>
+                    )}
                     <p className="text-sm leading-relaxed">
                       For a <strong>manual claim</strong> (e.g. typo in the identifier), send the assignment ID below.
                       They should enter:
