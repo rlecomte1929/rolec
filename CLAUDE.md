@@ -290,3 +290,12 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## Design System
+
+Read `DESIGN.md` (repo root) before any visual or UI change. It documents the shipped
+system: navy `#0b2b43` (primary) + teal `#1f8e8b` (accent, used sparingly), Inter (UI/body)
++ JetBrains Mono (code/data), 8px spacing grid, the `frontend/src/components/antigravity/`
+component library, and light/`[data-theme='dark']` theming. There is no purple/violet in
+the brand. Prefer the `navy-*` / `accent-*` Tailwind classes or `--rp-*` CSS vars over
+hardcoded hex literals. In QA mode, flag code that deviates from DESIGN.md.
