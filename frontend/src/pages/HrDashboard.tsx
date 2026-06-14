@@ -30,6 +30,9 @@ export const HrDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  // CASE-3: field-level validation error for the employee identifier, shown inline
+  // next to the input (not the page-top banner).
+  const [identifierError, setIdentifierError] = useState('');
   const [caseId, setCaseId] = useState<string | null>(null);
   const [employeeIdentifier, setEmployeeIdentifier] = useState('');
   const [employeeFirstName, setEmployeeFirstName] = useState('');
@@ -63,6 +66,7 @@ export const HrDashboard: React.FC = () => {
   const acRef = useRef<AbortController | null>(null);
   const offsetRef = useRef(0);
   const routePerfStartedAt = useRef<number | null>(null);
+  const identifierRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     offsetRef.current = offset;
   }, [offset]);
@@ -195,13 +199,16 @@ export const HrDashboard: React.FC = () => {
 
   const handleAssign = async () => {
     if (!employeeIdentifier.trim()) {
-      setError('Provide an employee username or email.');
+      // CASE-3: show the error on the field itself and focus it, not as a far-away banner.
+      setIdentifierError('Enter the employee’s email or username to continue.');
+      identifierRef.current?.focus();
       return;
     }
     if (submitting || assignmentId) {
       // Guard against double-submit (the success state is already shown).
       return;
     }
+    setIdentifierError('');
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
@@ -366,23 +373,29 @@ export const HrDashboard: React.FC = () => {
                 <Input
                   value={employeeFirstName}
                   onChange={setEmployeeFirstName}
-                  label="First name"
+                  label="First name (optional)"
                   placeholder="Jane"
                   fullWidth
                 />
                 <Input
                   value={employeeLastName}
                   onChange={setEmployeeLastName}
-                  label="Last name"
+                  label="Last name (optional)"
                   placeholder="Doe"
                   fullWidth
                 />
               </div>
               <Input
+                ref={identifierRef}
                 value={employeeIdentifier}
-                onChange={setEmployeeIdentifier}
-                label="Employee username or email"
+                onChange={(v) => {
+                  setEmployeeIdentifier(v);
+                  if (identifierError) setIdentifierError('');
+                }}
+                label="Employee username or email *"
                 placeholder="jane_doe or jane@company.com"
+                error={identifierError}
+                required
                 fullWidth
               />
               <Select
