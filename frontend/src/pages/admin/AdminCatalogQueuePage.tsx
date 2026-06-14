@@ -9,10 +9,13 @@ import { AdminLayout } from './AdminLayout';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
   addAllowlistEntry,
+  fillDemandGap,
   listAdminDestinationRequests,
   listAllowlist,
+  listDemandGaps,
   resolveDestinationRequest,
   type AllowlistEntry,
+  type DemandGap,
 } from '../../api/adminCatalog';
 import type { DestinationRequest } from '../../api/hrCatalog';
 
@@ -40,6 +43,10 @@ export const AdminCatalogQueuePage: React.FC = () => {
   const [info, setInfo] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
+  // CATALOG-1: demand-driven coverage worklist
+  const [gaps, setGaps] = useState<DemandGap[]>([]);
+  const [fillingKey, setFillingKey] = useState<string | null>(null);
+
   // Manual allowlist add form
   const [newCity, setNewCity] = useState('');
   const [newCountry, setNewCountry] = useState('');
@@ -50,12 +57,14 @@ export const AdminCatalogQueuePage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [t, a] = await Promise.all([
+      const [t, a, g] = await Promise.all([
         listAdminDestinationRequests(tab),
         listAllowlist(),
+        listDemandGaps(),
       ]);
       setTickets(t);
       setAllowlistState(a);
+      setGaps(g);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load.';
       setError(msg);
@@ -111,6 +120,27 @@ export const AdminCatalogQueuePage: React.FC = () => {
     }
   };
 
+  const fillGap = async (g: DemandGap) => {
+    const key = `${g.category}|${g.city}|${g.country}`;
+    setFillingKey(key);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await fillDemandGap(g.category, g.city, g.country);
+      setInfo(
+        res.scraped_count > 0
+          ? `Added ${res.scraped_count} ${g.category} provider${res.scraped_count === 1 ? '' : 's'} for ${g.city}.`
+          : `${g.city} is now allowlisted. The scraper returned nothing yet (it may be disabled or have no API key) — re-run once it's configured.`,
+      );
+      await loadAll();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not fill this gap.';
+      setError(msg);
+    } finally {
+      setFillingKey(null);
+    }
+  };
+
   const allowlistByDest = useMemo(() => {
     const set = new Set<string>();
     for (const e of allowlist) set.add(`${e.city.toLowerCase()}|${e.country.toLowerCase()}`);
@@ -124,6 +154,48 @@ export const AdminCatalogQueuePage: React.FC = () => {
     >
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
+
+      {/* CATALOG-1: demand-driven worklist — what employees are asking for that
+          the catalog can't cover yet. One click allowlists + scrapes it. */}
+      <Card padding="lg" className="mb-6">
+        <div className="mb-1 text-lg font-semibold text-[#0b2b43]">Coverage gaps employees are hitting</div>
+        <p className="text-sm text-[#64748b] mb-4">
+          Highest-demand service + destination combos with no catalog coverage yet, across all companies.
+          Filling one allowlists the destination and runs the scraper — no manual search.
+        </p>
+        {gaps.length === 0 ? (
+          <p className="text-sm text-[#94a3b8] py-2">
+            {loading ? 'Loading…' : 'No uncovered demand right now. New gaps appear here as employees hit them.'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
+            {gaps.map((g) => {
+              const key = `${g.category}|${g.city}|${g.country}`;
+              return (
+                <li key={key} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-[#0b2b43]">
+                      <span className="capitalize">{g.category}</span> · {g.city}
+                      {g.country ? `, ${g.country}` : ''}
+                    </div>
+                    <div className="text-sm text-[#64748b]">
+                      {g.demand} request{g.demand === 1 ? '' : 's'} from {g.companies} compan{g.companies === 1 ? 'y' : 'ies'}
+                      {' · last '}{formatDate(g.last_seen_at)}
+                      {g.allowlisted ? ' · already allowlisted' : ''}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => void fillGap(g)}
+                    disabled={fillingKey === key}
+                  >
+                    {fillingKey === key ? 'Filling…' : 'Allowlist & scrape'}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
 
       <Card padding="lg" className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

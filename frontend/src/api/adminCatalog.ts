@@ -74,6 +74,29 @@ export const resolveDestinationRequest = (
     notes,
   });
 
+// CATALOG-1: demand-driven coverage worklist.
+export interface DemandGap {
+  category: string;
+  city: string;
+  country: string;
+  demand: number;
+  companies: number;
+  last_seen_at: string | null;
+  allowlisted: boolean;
+}
+
+/** Highest-demand (category, city) combos with no catalog coverage yet. */
+export const listDemandGaps = (limit = 50): Promise<DemandGap[]> =>
+  apiGet(`/api/admin/catalog/demand-gaps?limit=${limit}`);
+
+/** Allowlist the destination and fire the scraper for one (category, city). */
+export const fillDemandGap = (
+  category: string,
+  city: string,
+  country: string,
+): Promise<{ allowlisted: boolean; scraped_count: number; category: string; city: string; country: string }> =>
+  apiPost('/api/admin/catalog/demand-gaps/fill', { category, city, country });
+
 export interface AdminNotificationCounts {
   pending_tickets: number;
   allowlisted_destinations: number;

@@ -147,6 +147,131 @@ def resolve_destination_request(
     return ticket
 
 
+# ---------------------------------------------------------------------------
+# CATALOG-1: demand-driven coverage worklist
+# ---------------------------------------------------------------------------
+# Employees who hit an empty provider state upsert into catalog_employee_demand.
+# This turns that signal into an admin worklist: the highest-demand
+# (category, city) combos that have NO catalog coverage yet, each fillable in
+# one action (allowlist + fire the existing LLM scraper). Admin approves; the
+# scraper does the research — "let the user work for us".
+
+
+class FillGapBody(BaseModel):
+    category: str
+    city: str
+    country: str
+
+
+@router.get("/demand-gaps")
+def list_demand_gaps(
+    limit: int = Query(50, ge=1, le=200),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    """
+    Cross-company employee demand for (category, city) combos that have NO
+    catalog coverage yet, ranked by total demand. Already-allowlisted combos
+    are flagged (not hidden) so admin can tell 'queued' from 'uncovered'.
+    """
+    from sqlalchemy import text as _sql
+    from ...database import db
+    from ..services import catalog_coverage, scrape_safety
+
+    with db.engine.connect() as conn:
+        demand = conn.execute(
+            _sql(
+                "SELECT category, destination_city AS city, "
+                "MAX(destination_country) AS country, "
+                "SUM(demand_count) AS demand, "
+                "COUNT(DISTINCT company_id) AS companies, "
+                "MAX(last_seen_at) AS last_seen_at "
+                "FROM catalog_employee_demand "
+                "WHERE destination_city IS NOT NULL AND destination_city <> '' "
+                "GROUP BY category, destination_city "
+                "ORDER BY demand DESC"
+            )
+        ).mappings().all()
+
+    # Coverage is computed per-city via the canonical coverage report (handles
+    # city aliases); cache so each distinct city is queried once.
+    coverage_cache: Dict[str, Dict[str, Any]] = {}
+
+    def _have(city: str, category: str) -> int:
+        key = (city or "").strip().lower()
+        if key not in coverage_cache:
+            try:
+                coverage_cache[key] = catalog_coverage.report_coverage(city)
+            except Exception:
+                coverage_cache[key] = {}
+        cat = coverage_cache[key].get(category) or {}
+        try:
+            return int(cat.get("have", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    gaps: List[Dict[str, Any]] = []
+    for d in demand:
+        if _have(d["city"], d["category"]) > 0:
+            continue  # already has coverage — not a gap
+        last_seen = d["last_seen_at"]
+        gaps.append(
+            {
+                "category": d["category"],
+                "city": d["city"],
+                "country": d["country"],
+                "demand": int(d["demand"] or 0),
+                "companies": int(d["companies"] or 0),
+                "last_seen_at": last_seen.isoformat() if hasattr(last_seen, "isoformat") else last_seen,
+                "allowlisted": scrape_safety.is_destination_allowlisted(d["city"], d["country"]),
+            }
+        )
+    return gaps[:limit]
+
+
+@router.post("/demand-gaps/fill")
+def fill_demand_gap(
+    body: FillGapBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """
+    Allowlist the (city, country) and fire the LLM scraper for (category, city)
+    to fill the master catalog. Idempotent on the allowlist; the scraper returns
+    [] without raising when disabled / no API key, so scraped_count=0 is a
+    valid 'nothing yet' result, not an error.
+    """
+    from ..services import catalog_scraper, scrape_safety
+
+    city = body.city.strip()
+    country = body.country.strip()
+    category = body.category.strip()
+    if not city or not country or not category:
+        raise HTTPException(status_code=400, detail="category, city and country are required")
+
+    try:
+        scrape_safety.add_allowlist_entry(
+            city=city,
+            country=country,
+            approved_by_user_id=user["id"],
+            notes="Filled from demand worklist (CATALOG-1)",
+        )
+    except ValueError:
+        # Already allowlisted — fine, proceed to scrape.
+        pass
+
+    rows = catalog_scraper.populate_destination_catalog(
+        category=category,
+        destination_city=city,
+        country=country,
+    )
+    return {
+        "allowlisted": True,
+        "scraped_count": len(rows),
+        "category": category,
+        "city": city,
+        "country": country,
+    }
+
+
 @router.get("/notification-counts")
 def admin_notification_counts(
     user: Dict[str, Any] = Depends(require_admin),
