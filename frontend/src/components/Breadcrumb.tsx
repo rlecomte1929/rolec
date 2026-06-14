@@ -4,7 +4,7 @@
 // Used by:
 //   - AppShell.tsx (inline, above the H1)
 //   - v2 custom-layout pages that don't use AppShell (Company Profile,
-//     Mobility Control Center, Provider Status, Policy Builder, etc.) —
+//     Mobility command center, Provider Status, Policy Builder, etc.) —
 //     they import this directly and render it above their custom header
 //
 // Section labels mirror the sidebar SECTIONS config in

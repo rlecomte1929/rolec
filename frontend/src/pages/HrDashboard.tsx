@@ -337,10 +337,12 @@ export const HrDashboard: React.FC = () => {
             placeholder="Search employees..."
             className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
           />
+          {/* BRAND-1: 'New case' is the single filled primary on this Cases
+              surface; Filter + All assignments are secondary/ghost. */}
           <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
           {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' && (
             <Link to={buildRoute('adminAssignments')}>
-              <Button>All assignments</Button>
+              <Button variant="outline">All assignments</Button>
             </Link>
           )}
           <Button onClick={handleCreateCase}>New case</Button>

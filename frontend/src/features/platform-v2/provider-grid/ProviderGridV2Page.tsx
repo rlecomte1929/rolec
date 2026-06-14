@@ -114,7 +114,7 @@ export function ProviderGridV2Page() {
         {resizableOn ? (
           <ProviderGridV2Table
             rows={rows}
-            emptyState={loading ? 'Loading provider grid…' : 'No providers assigned. Assign providers from the Mobility Control Center to track their status across cases.'}
+            emptyState={loading ? 'Loading provider grid…' : 'No providers assigned. Assign providers from the Mobility command center to track their status across cases.'}
           />
         ) : (
           <ProviderStatusGrid
