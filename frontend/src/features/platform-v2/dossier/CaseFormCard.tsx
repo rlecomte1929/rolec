@@ -237,7 +237,10 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
               {form.fields_summary.missing_required > 0 &&
                 ` · ${form.fields_summary.missing_required} need${form.fields_summary.missing_required === 1 ? 's' : ''} input`}
             </span>
-            <span className="text-xs font-medium text-slate-700">{progressPct}%</span>
+            {/* EMP-7: label the bar as "filled" so it can't read as "done" — a form can be
+                100% filled (incl. AI-filled fields) yet still show "Action needed" (needs review).
+                The % measures field population; the status badge measures readiness. */}
+            <span className="text-xs font-medium text-slate-700">{progressPct}% filled</span>
           </div>
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div
