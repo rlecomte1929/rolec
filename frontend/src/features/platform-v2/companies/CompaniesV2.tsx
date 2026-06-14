@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
@@ -356,6 +357,12 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
   // existing hand-written <table> block unchanged. Set
   // localStorage.platform_v2_companies_resizable='on' to opt in per-session.
   const { on: resizableOn } = useV2Flag('companies_resizable');
+  const navigate = useNavigate();
+
+  // ADMIN-1: 'Click any row to inspect' now actually opens the company's full
+  // detail page (per-tenant user management + config) — the route already
+  // exists at /admin/companies/:companyId (App.tsx → AdminCompanyDetail).
+  const openCompanyDetail = (c: CompanyV2) => navigate(`/admin/companies/${c.id}`);
 
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -610,7 +617,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
           rows={filtered}
           activeId={activeId}
           busyId={busyId}
-          onRowClick={(c) => setActiveId(c.id)}
+          onRowClick={openCompanyDetail}
           onEdit={(c) => setEditTarget(c)}
           onArchive={(c) => void handleArchive(c)}
           onDelete={(c) => handleDelete(c)}
@@ -660,7 +667,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                 filtered.map((c) => (
                   <tr
                     key={c.id}
-                    onClick={() => setActiveId(c.id)}
+                    onClick={() => openCompanyDetail(c)}
                     className={`cursor-pointer hover:bg-slate-50 ${
                       activeId === c.id ? 'bg-accent-50' : ''
                     }`}
