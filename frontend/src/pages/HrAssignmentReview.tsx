@@ -469,9 +469,13 @@ export const HrAssignmentReview: React.FC = () => {
                           <div>
                             <div className="text-sm font-medium text-[#0b2b43]">{item}</div>
                             <div className="text-xs text-[#6b7280]">
+                              {/* TASK-002: dropped the redundant 'EMPLOYEE' tag and softened the
+                                  internal 'HIGH RISK' compliance classification to a neutral
+                                  'Priority' cue, so this employee-dashboard view doesn't read as
+                                  personal jeopardy. (HR's framed compliance status lives in the
+                                  'Compliance status' panel above, with its own context + link.) */}
                               <span className="inline-flex items-center gap-1 mr-2">
-                                <Badge variant="warning">EMPLOYEE</Badge>
-                                <Badge variant="warning">HIGH RISK</Badge>
+                                <Badge variant="neutral">Priority</Badge>
                               </span>
                               Overdue by 3 days
                             </div>
