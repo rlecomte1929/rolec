@@ -1433,6 +1433,7 @@ export function EmployeeIntakePage() {
             </div>
             {step < TOTAL_STEPS ? (
               <Button unstyled type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
+                aria-describedby={!stepValid(step) ? 'intake-step-hint' : undefined}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   stepValid(step) ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                 }`}>
@@ -1473,6 +1474,15 @@ export function EmployeeIntakePage() {
               </>
             )}
           </div>
+          {step < TOTAL_STEPS && !stepValid(step) && (
+            <p
+              id="intake-step-hint"
+              role="status"
+              className="px-5 pb-4 -mt-2 text-right text-xs text-gray-500"
+            >
+              Complete the required fields above to continue.
+            </p>
+          )}
         </div>
       </div>
     </AppShell>
