@@ -3,8 +3,10 @@
  * Uses servicesAPI.getTasks() (AIQ-34-B).
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
+import { buildRoute } from '../../navigation/routes';
 import { servicesAPI, apiGet } from '../../api/client';
 import type { EmployeeTask } from '../../api/client';
 import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
@@ -185,7 +187,13 @@ export const EmployeeTaskPage: React.FC = () => {
           <div className="text-center py-16 text-sm text-slate-400">Loading your tasks…</div>
         ) : tasks.length === 0 && !error ? (
           <div className="text-center py-16">
-            <p className="text-slate-500 text-sm">No tasks yet — your HR team hasn't assigned anything.</p>
+            <p className="text-slate-500 text-sm">No tasks yet — your HR team hasn&rsquo;t assigned anything.</p>
+            {/* EMP-2: don't dead-end — point the employee back to where they can make progress. */}
+            <p className="mt-2 text-sm">
+              <Link to={buildRoute('employeeDashboard')} className="font-medium text-[#1f8e8b] hover:underline">
+                While you wait, continue your relocation from your dashboard →
+              </Link>
+            </p>
           </div>
         ) : (
           <>
