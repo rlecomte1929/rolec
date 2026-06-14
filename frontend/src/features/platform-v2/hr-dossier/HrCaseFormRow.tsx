@@ -435,7 +435,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                 <span className="font-medium">
                   {form.template.authority_name ?? 'the issuing authority'}
                 </span>{' '}
-                before advising the employee. Not yet ops-verified.
+                before advising the employee.
               </span>
             </div>
           )}

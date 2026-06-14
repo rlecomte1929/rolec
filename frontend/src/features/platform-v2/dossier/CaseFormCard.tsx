@@ -284,12 +284,12 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
               </svg>
               <span>
-                Indicative guidance — confirm the exact requirements and current
-                forms with{' '}
+                Indicative guidance to help you prepare — confirm the current
+                requirements with{' '}
                 <span className="font-medium">
                   {form.template.authority_name ?? 'the issuing authority'}
                 </span>{' '}
-                before submitting. Not yet ops-verified.
+                before you submit.
               </span>
             </div>
           )}
