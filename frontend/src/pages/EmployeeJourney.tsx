@@ -6,6 +6,7 @@ import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { JourneySpine } from '../features/employee-journey/JourneySpine';
+import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
@@ -579,7 +580,7 @@ export const EmployeeJourney: React.FC = () => {
           {linkedSummaries.length > 0 ? (
             <JourneySpine
               intakeStep={linkedSummaries[0].intake_step ?? 0}
-              intakeTotalSteps={linkedSummaries[0].intake_total_steps ?? 5}
+              intakeTotalSteps={INTAKE_TOTAL_STEPS}
               onContinueIntake={() => navigate(`/employee/case/${linkedSummaries[0].assignment_id}/intake`)}
               onPreviewBenefits={() => navigate(buildRoute('employeeBenefitsComparison'))}
             />
@@ -607,7 +608,9 @@ export const EmployeeJourney: React.FC = () => {
                 // proxy because many statuses (`created`, `linked`, etc.)
                 // sit between "fresh" and "submitted" without indicating
                 // wizard progress either way.
-                const totalSteps = row.intake_total_steps ?? 7;
+                // Wizard is the single source of truth for the total (see intakeSteps.ts).
+                // Do not trust the stored intake_total_steps — historical rows hold a stale 7.
+                const totalSteps = INTAKE_TOTAL_STEPS;
                 const currentStep = row.intake_step ?? 0;
                 const intakeSubmitted = totalSteps > 0 && currentStep >= totalSteps;
                 const intakeStarted = currentStep > 0 && !intakeSubmitted;

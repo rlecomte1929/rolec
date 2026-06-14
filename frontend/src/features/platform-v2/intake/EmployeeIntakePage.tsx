@@ -9,6 +9,7 @@ import { ROUTE_DEFS } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
 import { MultiChip } from './MultiChip';
+import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { PrivacyNotice } from '../../privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
 
@@ -901,7 +902,8 @@ export function EmployeeIntakePage() {
   // Pet DETAILS are no longer collected in the intake wizard — only a yes/no
   // "has_pets" is captured in Step 1 (Journey). Pet relocation details belong to
   // the service-selection phase, shown only if has_pets + a pet service exists.
-  const STEP_LABELS = ['Journey', 'About You', 'My People', 'Work & Place', 'My Needs', 'Review'];
+  // Canonical step list lives in ./intakeSteps so the dashboard derives the same total.
+  const STEP_LABELS = INTAKE_STEP_LABELS;
   // AIQ-978: step 6 ("My Needs") previously used a ✅ checkmark emoji as its
   // icon, which read as "already complete" on a fresh wizard. The real
   // completion state is the numbered circle (✓ only when stepValid && n < step);
