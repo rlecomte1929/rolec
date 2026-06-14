@@ -64,6 +64,20 @@ export function formatDestinationLabel(dest?: EmployeeOverviewDestination | null
 }
 
 /**
+ * Corridor label "Origin → Destination" for an assignment row (EMP-1). Used to
+ * title a case picker by the MOVE rather than the (constant) company name, so
+ * multiple cases under one employer are distinguishable at a glance. Falls back
+ * to the destination label alone when no origin is known, and to "Not set yet"
+ * when neither is. Country-level for a clean, scannable corridor.
+ */
+export function formatCorridorLabel(dest?: EmployeeOverviewDestination | null): string {
+  const origin = dest?.home_country?.trim() || dest?.home_city?.trim() || '';
+  const destination = formatDestinationLabel(dest);
+  if (origin && destination !== 'Not set yet') return `${origin} → ${destination}`;
+  return destination;
+}
+
+/**
  * Short, stable per-case reference (last 8 chars of the case/assignment id,
  * upper-cased) used to distinguish otherwise-identical rows — e.g. multiple
  * cases that share a company and have no destination set yet. (AIQ-977)

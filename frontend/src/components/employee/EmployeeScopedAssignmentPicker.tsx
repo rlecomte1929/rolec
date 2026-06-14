@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../antigravity';
 import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
-import { formatDestinationLabel, formatCaseReference } from '../../types/employeeAssignmentOverview';
+import { formatCorridorLabel, formatCaseReference } from '../../types/employeeAssignmentOverview';
 import { setPreferredEmployeeAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 import { buildRoute } from '../../navigation/routes';
 
@@ -36,9 +36,12 @@ export function EmployeeScopedAssignmentPicker({
                 navigate(withAssignmentQuery(targetBasePath, row.assignment_id));
               }}
             >
-              <span className="block font-medium text-[#0b2b43]">{row.company?.name || 'Company'}</span>
+              {/* EMP-1: title the card by the MOVE (corridor), not the constant
+                  company name. Company + ref are muted metadata below it, so 8
+                  cases under one employer are distinguishable at a glance. */}
+              <span className="block font-medium text-[#0b2b43]">{formatCorridorLabel(row.destination)}</span>
               <span className="block text-sm text-[#64748b] font-normal">
-                {formatDestinationLabel(row.destination)}
+                {row.company?.name || 'Company'}
                 {formatCaseReference(row) ? (
                   <span className="text-[#94a3b8]"> · Ref {formatCaseReference(row)}</span>
                 ) : null}
