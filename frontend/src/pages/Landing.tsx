@@ -26,7 +26,7 @@ export const Landing: React.FC = () => {
   // FRIDAY-004d locked SEO meta stack — verbatim from audit/gtm/seo_meta_spec_v1.md.
   // Strings mirror the locked 004b hero. Ship verbatim; do not rephrase.
   usePageMeta({
-    title: 'ReloPass · Mobility AI your auditor will trust', // §2 — 50 chars
+    title: 'ReloPass — Global mobility infrastructure', // SITE-1: re-anchored to the infrastructure category (was 'Mobility AI…')
     description:
       "Mobility AI your auditor will trust. Every step in your employee's relocation — logged, cited, and EU AI Act–ready. See how ReloPass moves people across borders.", // §3 — 165-char long version (deliberate trade-off, §9)
     ogTitle: 'Mobility AI your auditor will trust', // §4 — brand prefix stripped for share cards
@@ -109,10 +109,12 @@ export const Landing: React.FC = () => {
           trustMicrocopy={c.hero.trustMicrocopy}
           actions={
             <>
-              <CTAButton onClick={() => openDemoBooking('landing-hero')} variant="primary" size="lg">
+              {/* SITE-1: primary CTA is now the approved get-started action;
+                  'Book a demo' becomes the lower-friction secondary. */}
+              <CTAButton to={buildRoute('access')} variant="primary" size="lg">
                 {c.hero.primaryCta}
               </CTAButton>
-              <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
+              <CTAButton onClick={() => openDemoBooking('landing-hero')} variant="outline" size="lg">
                 {c.hero.secondaryCta}
               </CTAButton>
             </>
