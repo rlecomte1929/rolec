@@ -406,64 +406,69 @@ export const HrDashboard: React.FC = () => {
                     <p className="text-sm leading-relaxed">
                       An <strong>invite email</strong> has been sent to <strong>{employeeIdentifier.trim()}</strong> with
                       a link to get started — they can <strong>register</strong> with that email (or <strong>sign in</strong>{' '}
-                      if they already have an account), and the case attaches automatically when the login matches. If the
-                      email doesn&rsquo;t arrive, share the case code below.
+                      if they already have an account), and the case attaches automatically when the login matches.
                     </p>
                     {caseId && (
                       <Button onClick={() => navigate(buildRoute('hrCaseSummary', { caseId }))}>
                         Open case →
                       </Button>
                     )}
-                    <p className="text-sm leading-relaxed">
-                      For a <strong>manual claim</strong> (e.g. typo in the identifier), send the assignment ID below.
-                      They should enter:
-                    </p>
-                    <ol className="text-sm leading-relaxed list-decimal pl-5 space-y-1.5 text-[#0b2b43]">
-                      <li>
-                        Field 1: <strong>ReloPass email or username</strong> (what they use to sign in, not the ID).
-                      </li>
-                      <li>
-                        Field 2: <strong>Assignment ID</strong> (UUID only). Do not swap the two fields.
-                      </li>
-                    </ol>
-                    <p className="text-sm leading-relaxed mt-2">Invite token below is optional for your records.</p>
-                    <div className="flex items-center gap-2 flex-wrap mt-2">
-                      <span className="text-sm">
-                        Assignment ID: <strong className="font-mono">{assignmentId}</strong>
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(assignmentId);
-                            setCopyFeedback(true);
-                            setTimeout(() => setCopyFeedback(false), 2000);
-                          } catch {
-                            const el = document.createElement('input');
-                            el.value = assignmentId;
-                            document.body.appendChild(el);
-                            el.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(el);
-                            setCopyFeedback(true);
-                            setTimeout(() => setCopyFeedback(false), 2000);
-                          }
-                        }}
-                      >
-                        {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
-                      </Button>
-                    </div>
+                    {/* CASE-2: keep the success state calm — the assignment ID, invite token, and
+                        manual-claim steps are support-tier details, tucked behind a disclosure for
+                        the rare "email didn't arrive / typo in the identifier" case. */}
+                    <details className="mt-1 text-sm text-[#4b5563]">
+                      <summary className="cursor-pointer font-medium text-[#0b2b43]">
+                        Didn&rsquo;t get the email?
+                      </summary>
+                      <div className="space-y-3 mt-3">
+                        <p className="leading-relaxed">
+                          For a <strong>manual claim</strong> (e.g. a typo in the identifier), the employee can attach the
+                          case with the assignment ID below. In ReloPass they enter:
+                        </p>
+                        <ol className="list-decimal pl-5 space-y-1.5">
+                          <li>
+                            Field 1: <strong>ReloPass email or username</strong> (what they sign in with, not the ID).
+                          </li>
+                          <li>
+                            Field 2: <strong>Assignment ID</strong> (the UUID below).
+                          </li>
+                        </ol>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>
+                            Assignment ID: <strong className="font-mono">{assignmentId}</strong>
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(assignmentId);
+                                setCopyFeedback(true);
+                                setTimeout(() => setCopyFeedback(false), 2000);
+                              } catch {
+                                const el = document.createElement('input');
+                                el.value = assignmentId;
+                                document.body.appendChild(el);
+                                el.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(el);
+                                setCopyFeedback(true);
+                                setTimeout(() => setCopyFeedback(false), 2000);
+                              }
+                            }}
+                          >
+                            {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
+                          </Button>
+                        </div>
+                        {inviteToken && (
+                          <div>
+                            <p className="mb-1">Invite token (optional, for your records):</p>
+                            <span className="font-mono break-all">{inviteToken}</span>
+                          </div>
+                        )}
+                      </div>
+                    </details>
                   </div>
-                </Alert>
-              )}
-              {inviteToken && (
-                <Alert variant="info" title="Invite token (optional)">
-                  <p className="text-sm mb-2">
-                    You can share this token with the employee; they can still access the case by signing up or signing
-                    in with the identifier you used, without the token.
-                  </p>
-                  <span className="font-mono text-sm break-all">{inviteToken}</span>
                 </Alert>
               )}
             </div>
