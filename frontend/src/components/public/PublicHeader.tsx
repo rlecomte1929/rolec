@@ -3,7 +3,6 @@ import { Button } from '../antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
 import { Container } from '../antigravity';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
-import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 
 const logoUrl = '/relopass-logo.png?v=3';
@@ -17,18 +16,8 @@ const PUBLIC_NAV = [
 
 export const PublicHeader: React.FC = () => {
   const location = useLocation();
-  const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const { open: openDemoBooking } = useDemoBooking();
-
-  const dashboardPath =
-    role === 'EMPLOYEE'
-      ? ROUTE_DEFS.employeeDashboard.path
-      : role === 'ADMIN'
-        ? ROUTE_DEFS.adminOverview.path
-        : role === 'HR'
-          ? ROUTE_DEFS.hrDashboard.path
-          : null;
 
   const isActive = (path: string) =>
     path === '/'
@@ -80,15 +69,6 @@ export const PublicHeader: React.FC = () => {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {dashboardPath ? (
-              <Link
-                to={dashboardPath}
-                onClick={() => setMobileOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-marketing-primary hover:text-marketing-accent transition-colors"
-              >
-                Dashboard
-              </Link>
-            ) : null}
             <Link
               to={`${buildRoute('auth')}?mode=login`}
               onClick={() => setMobileOpen(false)}
