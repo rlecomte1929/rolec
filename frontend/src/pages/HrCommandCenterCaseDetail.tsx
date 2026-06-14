@@ -32,6 +32,19 @@ type QuoteRequest = {
   updated_at: string;
 };
 
+/**
+ * Corridor label for the case-identity header (BRAND-4). The command-center
+ * case payload carries only a destination (no origin field), so we render
+ * "Relocating to <dest>" when a destination exists, and an intentional
+ * "Corridor not set" when it doesn't — never a bare "-" or "tbd"
+ * (coordinated with BRAND-5). If an origin is added to the payload later,
+ * this is the single place to switch to the "<origin> → <dest>" form.
+ */
+function corridorLabel(destCountry?: string): string {
+  const dest = destCountry?.trim();
+  return dest ? `Relocating to ${dest}` : 'Corridor not set';
+}
+
 export const HrCommandCenterCaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -123,14 +136,14 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
 
   if (isLoading) {
     return (
-      <AppShell title="Case Detail" subtitle="Loading...">
+      <AppShell section="Case detail" title="Loading…">
         <div className="text-sm text-[#6b7280] py-8">Loading...</div>
       </AppShell>
     );
   }
   if (!detail) {
     return (
-      <AppShell title="Case Detail" subtitle="Not found">
+      <AppShell section="Case detail" title="Case not found">
         <div className="text-sm text-[#6b7280] py-8">Case not found or not visible.</div>
         <Button variant="outline" onClick={() => navigate(buildRoute('hrCommandCenter'))}>
           Back to Command Center
@@ -142,15 +155,19 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   const bStatus = budgetStatus();
 
   return (
-    <AppShell title="Case Detail" subtitle={`${detail.employeeIdentifier} · ${detail.destCountry || '-'}`}>
+    <AppShell
+      section="Case detail"
+      title={detail.employeeIdentifier}
+      subtitle={corridorLabel(detail.destCountry)}
+    >
       <div className="space-y-6">
-        {/* Header */}
+        {/* BRAND-4: the case leads with identity — employee name/email (H1) +
+            corridor (subtitle) + 'Case detail' demoted to the breadcrumb eyebrow
+            above. This row carries the case state (status pill) and the primary
+            cross-link. (The payload has no display-name/origin field, so the H1
+            falls back to the email and the corridor shows destination only.) */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-[#0b2b43]">{detail.employeeIdentifier}</h1>
-            <RiskBadge status={detail.riskStatus as 'green' | 'yellow' | 'red'} showLabel />
-            <span className="text-sm text-[#6b7280]">{detail.destCountry || '-'}</span>
-          </div>
+          <RiskBadge status={detail.riskStatus as 'green' | 'yellow' | 'red'} showLabel />
           <Button variant="outline" onClick={() => navigate(buildRoute('hrAssignmentReview', { id: detail.id }))}>
             Open in Employee Dashboard
           </Button>
