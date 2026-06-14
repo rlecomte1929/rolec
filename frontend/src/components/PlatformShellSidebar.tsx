@@ -78,7 +78,7 @@ const SECTIONS: NavSection[] = [
       { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'documents', label: 'Tasks', hint: 'Documents and actions requested by your HR team', to: ROUTE_DEFS.employeeTaskPage.path },
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
-      { id: 'service-providers', label: 'Service providers', to: ROUTE_DEFS.services.path },
+      { id: 'service-providers', label: 'Services', hint: 'Choose services and see recommended providers for your move', to: ROUTE_DEFS.services.path },
       { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
       {
         id: 'inbox',

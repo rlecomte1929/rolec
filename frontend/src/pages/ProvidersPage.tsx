@@ -277,10 +277,10 @@ export const ProvidersPage: React.FC = () => {
 
   if (!assignmentLoading && needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell section="Employee" title="Services" subtitle="Pick the assignment for this session.">
+      <AppShell section="Employee" title="Services" subtitle="Choose which move to work on.">
         <EmployeeScopedAssignmentPicker
-          title="Which assignment are you working on?"
-          subtitle="Pick one assignment for this session. Change it anytime from the dashboard or by reopening Services with another choice."
+          title="Which move are you working on?"
+          subtitle="Choose the move you want to work on. You can switch anytime from your dashboard."
           linkedSummaries={linkedSummaries}
           targetBasePath={buildRoute('services')}
         />
@@ -316,7 +316,7 @@ export const ProvidersPage: React.FC = () => {
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Estimate currency</span>
             <p className="text-xs text-[#64748b] mt-0.5 mb-2">
-              Choose once for this flow—Preferences, Recommendations and Review &amp; budget use the same currency
+              Set it once — Preferences, Recommendations and Review &amp; budget all use it
               (converted from USD using indicative rates).
             </p>
             <div className="flex flex-wrap items-center gap-2">
