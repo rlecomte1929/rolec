@@ -7,14 +7,17 @@
 
 export const landingContent = {
   hero: {
-    eyebrow: 'EU AI Act–ready mobility',
-    headline: 'Mobility AI your auditor will trust.',
+    // SITE-1: re-anchored to the infrastructure category (was the 'Mobility AI /
+    // EU AI Act–ready' framing, which contradicted the Why/Platform/footer
+    // positioning). Primary CTA matches the approved access-page string.
+    eyebrow: 'Global mobility infrastructure',
+    headline: 'The operating layer for cross-border relocation.',
     subheadline:
-      "Every step in your employee's relocation — every document, every decision — logged, cited, and EU AI Act–ready.",
+      'Every case, document, provider, and deadline on one record — visible to HR, actioned by providers, on time for the employee.',
     brandPromise:
-      'The audit trail your compliance team needs — and the experience your employees actually want.',
-    primaryCta: 'Book a demo',
-    secondaryCta: 'See the platform',
+      'The coordination layer across HR, employees, and providers.',
+    primaryCta: 'Structure how you run relocation. Start with one case.',
+    secondaryCta: 'Book a demo',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
