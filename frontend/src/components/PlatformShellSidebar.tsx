@@ -105,6 +105,9 @@ const SECTIONS: NavSection[] = [
         // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
+      // The vendor-curation page (add + choose the providers employees see, incl.
+      // a custom-provider form) was built but unreachable from the nav — surface it.
+      { id: 'service-providers', label: 'Service providers', hint: 'Choose and add the providers your employees see', to: ROUTE_DEFS.hrVendorCuration.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
       { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrExceptions.path },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },

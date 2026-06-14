@@ -423,8 +423,9 @@ export const HrVendorCuration: React.FC = () => {
 
   return (
     <AppShell
-      title="Vendor curation"
-      subtitle="Choose which providers your employees see, per service and destination."
+      section="HR Operations"
+      title="Service providers"
+      subtitle="Choose which providers your employees see, and add your own, per service and destination."
     >
       <Card padding="lg" className="mb-6 border border-[#fde68a] bg-[#fffbeb]">
           <div className="flex flex-wrap items-start justify-between gap-3">
