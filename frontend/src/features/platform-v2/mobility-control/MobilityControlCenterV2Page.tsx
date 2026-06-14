@@ -582,7 +582,10 @@ export function MobilityControlCenterV2Page() {
           />
         </div>
 
-        {execSummary && (
+        {/* BRAND-3: hide the whole block (incl. the eyebrow) when every KPI is
+            zero — an all-zero summary is noise on a fresh/empty tenant. */}
+        {execSummary &&
+          !(kpis && kpis.activeCases === 0 && kpis.atRiskCount === 0 && kpis.completedCount === 0) && (
           <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive summary</p>
             <p className="mt-1 text-[13px] leading-relaxed text-slate-700">{execSummary}</p>
