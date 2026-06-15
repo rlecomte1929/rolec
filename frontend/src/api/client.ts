@@ -44,6 +44,7 @@ import type {
   CompanyProfilePayload,
   DossierQuestionsResponse,
   DossierSearchSuggestionsResponse,
+  DossierSource,
 } from '../types';
 import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryResponse } from '../types/policyAssistant';
 import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
@@ -3653,7 +3654,7 @@ export const dossierAPI = {
     const response = await api.post('/api/dossier/search-suggestions', { case_id: caseId });
     return response.data;
   },
-  addCaseQuestion: async (payload: { case_id: string; question_text: string; answer_type: string; options?: string[] | null; is_mandatory?: boolean; sources?: Array<{ title?: string; url: string }> }): Promise<any> => {
+  addCaseQuestion: async (payload: { case_id: string; question_text: string; answer_type: string; options?: string[] | null; is_mandatory?: boolean; sources?: DossierSource[] }): Promise<any> => {
     const response = await api.post('/api/dossier/case-questions', payload);
     return response.data;
   },
