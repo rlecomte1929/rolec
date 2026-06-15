@@ -187,7 +187,7 @@ export function AIDecisionsAuditPage() {
             disabled={visibleRecords.length === 0}
             className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            Export CSV
+            Export AI decisions log (CSV)
           </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500 leading-relaxed">
