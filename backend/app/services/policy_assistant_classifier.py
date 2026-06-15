@@ -192,7 +192,9 @@ _EMPLOYEE_VISIBILITY_HR = re.compile(
     r"\bwhat do employees see (?:now|today)\b|"
     r"\bwhat employees see (?:now|today)\b|"
     r"\bemployee(?:'s|s')? view (?:of |on )?(?:the )?policy\b|"
-    r"\bemployees (?:currently )?see\b",
+    r"\bemployees (?:currently )?see\b|"
+    r"\bvisible to employees\b|"
+    r"\bpublished\b.*\bvisible\b.*\bemployees?\b",
     re.I,
 )
 
@@ -214,8 +216,9 @@ _COMPARISON_READINESS_Q = re.compile(
 )
 
 _STATUS_Q = re.compile(
-    r"\bis (?:the |my )?policy published\b|\bunder review\b|\bvisible to me\b|"
-    r"\bwhen (?:will|can) (?:i|we) see\b.*\bpolicy\b",
+    r"\bis (?:the |my |this )?policy published\b|\bunder review\b|\bvisible to me\b|"
+    r"\bwhen (?:will|can) (?:i|we) see\b.*\bpolicy\b|"
+    r"\bpolicy\b.*\bpublished\b.*\bvisible\b|\bpublished\b.*\bvisible to employees\b",
     re.I,
 )
 
@@ -259,6 +262,8 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("host-country housing", 6),
             ("company-provided housing", 4),
             ("leased accommodation", 3),
+            # "housing support for the host country" — explicit host-country mention breaks tie
+            (re.compile(r"\bhousing\b.*\bhost country\b|\bhost country\b.*\bhousing\b", re.I), 5),
             (re.compile(r"\bhousing\b.*\bincluded\b|\bincluded\b.*\bhousing\b", re.I), 3),
         ),
         negatives=(),
@@ -292,7 +297,11 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("schooling", 3),
             ("dependent children", 3),
             ("international school", 4),
+            ("language training", 5),
+            ("language lessons", 4),
+            ("cultural training", 4),
             (re.compile(r"\bschool search\b.*\bfamily\b|\bfamily\b.*\bschool", re.I), 5),
+            (re.compile(r"\blanguage\b.*\b(training|lesson|class|course)s?\b", re.I), 4),
         ),
         negatives=(
             re.compile(r"\brecommend\b|\bbest school\b|\bwhich school\b", re.I),
@@ -306,6 +315,10 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("dual career", 5),
             ("trailing spouse", 5),
             ("spousal allowance", 4),
+            ("spousal career", 4),
+            ("spouse career", 4),
+            ("partner career", 4),
+            (re.compile(r"\bspousal?\b.*\b(support|assistance|allowance|career)\b", re.I), 4),
         ),
         negatives=(),
     ),
@@ -367,7 +380,12 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("relocation allowance", 6),
             ("lump sum", 4),
             ("mobility allowance", 5),
+            ("mobility premium", 5),
             ("settling in", 3),
+            ("cost of living", 5),
+            ("cola", 4),
+            ("location premium", 4),
+            ("remote premium", 4),
         ),
         negatives=(),
     ),
