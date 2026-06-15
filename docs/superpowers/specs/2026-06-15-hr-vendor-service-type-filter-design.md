@@ -66,6 +66,20 @@ frontend with no API-shape change. `CurationRow.attributes` already carries it.
 - `DossierSource`-style: extend the frontend curation row type to surface
   `attributes.service_types?: string[]`.
 
+## Rollout record (executed 2026-06-15/16)
+- **Dedupe data cleanup — DONE on prod.** 10 duplicate `movers` rows (the
+  UUID-`external_id` twin of each `m-N` seed) deactivated (`active=false`, reversible).
+  Verified: zero selections referenced them (no orphans); live curation now returns
+  12 master movers, no duplicates. The 2 non-duplicate singletons (Supplier Test,
+  testsupplier) were left untouched by an `EXISTS(... m-N twin ...)` guard.
+- **Deploy dependency — `CATALOG_SCRAPER_ENABLED` is NOT set in prod.** Both the new
+  populate tagging and `backfill_service_types` are gated on `catalog_scraper._enabled()`,
+  which is off. Until that env var is `true` (+ backend redeploy), the AI tagging
+  no-ops and the Service-type dropdown stays hidden (graceful: the list just renders
+  unfiltered, as today). Enabling it turns on HR-triggered AI vendor synthesis (OpenAI
+  cost) — a product decision for Romain, mirroring the `VITE_FEATURE_DYNAMIC_DOSSIER`
+  enablement.
+
 ## Out of scope / follow-ups
 - Editing/normalising free-form tags into a canonical set (free-form was chosen).
 - Tagging HR custom vendors via the "add your own" form (could be a later add).
