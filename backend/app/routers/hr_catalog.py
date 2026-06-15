@@ -169,6 +169,21 @@ def get_curation_view(
         master_items = [m for m in all_active if m.get("city") == destination_city]
     else:
         master_items = all_active
+    # Defensive de-dupe by name: two seed batches inserted the same vendors with
+    # different external_ids (e.g. 'm-2' vs a uuid), so the master list showed
+    # each vendor twice. Collapse by case-insensitive name, first occurrence wins
+    # (list_items is ordered updated_at DESC). A prefer-selected pass below would
+    # need the selection map, which isn't built yet — first-wins is sufficient
+    # because the data cleanup deactivates the unselected duplicate.
+    _seen_names: set = set()
+    _deduped: List[Dict[str, Any]] = []
+    for m in master_items:
+        key = (m.get("name") or "").strip().lower()
+        if key in _seen_names:
+            continue
+        _seen_names.add(key)
+        _deduped.append(m)
+    master_items = _deduped
     selections = vendor_curation.list_curation(
         company_id=company_id,
         category=category,
@@ -368,12 +383,20 @@ def populate_with_ai(
         destination_city=city,
         country=country,
     )
+    # Backfill service-type tags onto any existing vendors that lack them, so a
+    # re-click of "Populate" makes an already-populated category filterable. The
+    # call no-ops (no LLM cost) when every vendor is already tagged or when the
+    # populate above just inserted fresh (already-tagged) rows.
+    backfill = catalog_scraper.backfill_service_types(
+        category=body.category, destination_city=city, country=country,
+    )
     return {
         "status": "completed",
         "category": body.category,
         "destination_city": city,
         "country": country,
         "inserted": len(rows),
+        "service_types_tagged": backfill.get("tagged", 0),
         "quota": quota,
     }
 
@@ -603,6 +626,18 @@ def populate_destination_with_ai(
         # Every category short-circuited (everything already populated).
         last_quota = scrape_safety.get_quota_state(company_id)
 
+    # Backfill service-type tags onto existing vendors that lack them, across all
+    # categories. This is what makes already-populated destinations (the common
+    # case — "Oslo already has master vendors") filterable on a re-click. Each
+    # call no-ops without an LLM hit when its category is already fully tagged or
+    # was just freshly populated (fresh rows arrive pre-tagged).
+    total_tagged = 0
+    for cat in categories:
+        bf = catalog_scraper.backfill_service_types(
+            category=cat, destination_city=city, country=country,
+        )
+        total_tagged += bf.get("tagged", 0)
+
     return {
         "status": "completed",
         "destination_city": city,
@@ -612,6 +647,7 @@ def populate_destination_with_ai(
         "categories_skipped_existing": skipped_existing,
         "categories_quota_blocked": quota_blocked,
         "total_inserted": total_inserted,
+        "service_types_tagged": total_tagged,
         "per_category": results,
         "quota": last_quota,
     }

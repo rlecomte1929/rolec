@@ -74,6 +74,7 @@ def _build_prompt(category: str, destination_city: str, country: Optional[str]) 
         "      \"summary\": \"<one-sentence description, ≤140 chars>\",\n"
         "      \"website\": \"<https URL or null>\",\n"
         "      \"strengths\": [\"<short tag>\", ...],\n"
+        "      \"service_types\": [\"<short type of service this vendor offers>\", ...],\n"
         "      \"notes\": \"<optional extra info or null>\"\n"
         "    }\n"
         "  ]\n"
@@ -81,6 +82,11 @@ def _build_prompt(category: str, destination_city: str, country: Optional[str]) 
         "Constraints:\n"
         "- Only vendors that genuinely operate in or serve the destination city.\n"
         "- Skip parent brands when a more specific local subsidiary is well known.\n"
+        "- \"service_types\": 1-4 short labels describing the kinds of service this "
+        "vendor offers within the category, that HR could filter on (e.g. for movers: "
+        "\"International\", \"Local\", \"Storage\", \"Vehicle shipping\", \"Pet relocation\"). "
+        "Use concise Title Case labels; reuse the same label across vendors when they "
+        "offer the same service.\n"
         "- Do NOT include placeholders, lorem-ipsum, or fictional-sounding names.\n"
         "- If you cannot confidently produce N vendors, return fewer.\n"
         "- Return ONLY the JSON object. No prose, no markdown fences."
@@ -132,10 +138,27 @@ def _parse_vendors(raw: str) -> List[Dict[str, Any]]:
                 "summary": (v.get("summary") or "").strip(),
                 "website": (v.get("website") or None) or None,
                 "strengths": [str(s) for s in (v.get("strengths") or []) if str(s).strip()],
+                "service_types": _clean_service_types(v.get("service_types")),
                 "notes": (v.get("notes") or None),
             }
         )
     return out
+
+
+def _clean_service_types(raw: Any) -> List[str]:
+    """Normalise free-form service-type labels: trim, drop empties, and
+    de-duplicate case-insensitively while preserving the first-seen casing."""
+    if not isinstance(raw, list):
+        return []
+    seen: Dict[str, str] = {}
+    for s in raw:
+        label = str(s).strip()
+        if not label:
+            continue
+        key = label.lower()
+        if key not in seen:
+            seen[key] = label
+    return list(seen.values())
 
 
 def populate_destination_catalog(
@@ -211,6 +234,7 @@ def populate_destination_catalog(
             "summary": v["summary"],
             "website": v["website"],
             "strengths": v["strengths"],
+            "service_types": v["service_types"],
             "notes": v["notes"],
             "_provenance": "llm_synthesis",
         }
@@ -238,3 +262,111 @@ def populate_destination_catalog(
         len(inserted),
     )
     return inserted
+
+
+def _build_tagging_prompt(category: str, names: List[str]) -> str:
+    """Prompt to assign service-type labels to EXISTING vendors (backfill)."""
+    listing = "\n".join(f"- {n}" for n in names)
+    return (
+        "You assign service-type labels to existing relocation service-provider "
+        "vendors so an HR mobility lead can filter them by the kind of service "
+        "they offer.\n\n"
+        f"CATEGORY: {category}\n\n"
+        f"VENDORS:\n{listing}\n\n"
+        "For each vendor return 1-4 short Title Case labels describing the kinds of "
+        "service it offers within the category (e.g. for movers: \"International\", "
+        "\"Local\", \"Storage\", \"Vehicle shipping\", \"Pet relocation\"). Reuse the "
+        "same label across vendors that offer the same service.\n"
+        "Output strictly a JSON object of shape:\n"
+        "{\n"
+        "  \"tags\": [\n"
+        "    {\"name\": \"<vendor name exactly as given>\", "
+        "\"service_types\": [\"<label>\", ...]}\n"
+        "  ]\n"
+        "}\n"
+        "Return ONLY the JSON object. No prose, no markdown fences."
+    )
+
+
+def _parse_tags(raw: str) -> Dict[str, List[str]]:
+    """Parse the tagging LLM response into {lowercased vendor name: [types]}."""
+    out: Dict[str, List[str]] = {}
+    if not raw:
+        return out
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        log.warning("catalog_scraper_tagging_invalid_json snippet=%s", raw[:200])
+        return out
+    tags = payload.get("tags") if isinstance(payload, dict) else None
+    if not isinstance(tags, list):
+        return out
+    for t in tags:
+        if not isinstance(t, dict):
+            continue
+        name = (t.get("name") or "").strip()
+        if not name:
+            continue
+        out[name.lower()] = _clean_service_types(t.get("service_types"))
+    return out
+
+
+def backfill_service_types(
+    *,
+    category: str,
+    destination_city: Optional[str] = None,
+    country: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Tag existing master vendors that lack ``service_types``. Mirrors the HR
+    curation view's geo-agnostic-vs-bound row selection so it tags exactly the
+    rows HR sees. Makes NO LLM call (and no cost) when nothing needs tagging,
+    so it is safe to call on every "Populate with AI" click.
+
+    Returns {"tagged": int, "candidates": int, "reason": Optional[str]}.
+    """
+    if not _enabled() or not os.getenv("OPENAI_API_KEY"):
+        return {"tagged": 0, "candidates": 0, "reason": "scraper_disabled"}
+
+    all_active = service_catalog.list_items(
+        category=category, active_only=True, limit=200
+    )
+    has_geo_rows = any(m.get("city") for m in all_active)
+    if has_geo_rows and destination_city:
+        scope = [m for m in all_active if m.get("city") == destination_city]
+    else:
+        scope = all_active
+
+    untagged = [
+        m for m in scope
+        if not (m.get("attributes_json") or {}).get("service_types")
+    ]
+    if not untagged:
+        return {"tagged": 0, "candidates": 0, "reason": "all_tagged"}
+
+    names = [m["name"] for m in untagged]
+    try:
+        raw = _call_llm(_build_tagging_prompt(category, names))
+    except Exception as ex:  # pragma: no cover — network path
+        log.warning(
+            "catalog_scraper_backfill_llm_failed category=%s error=%s", category, ex
+        )
+        return {"tagged": 0, "candidates": len(untagged), "reason": "llm_failed"}
+
+    tags_by_name = _parse_tags(raw)
+    tagged = 0
+    for m in untagged:
+        types = tags_by_name.get((m.get("name") or "").strip().lower())
+        if not types:
+            continue
+        try:
+            service_catalog.merge_attributes(m["id"], {"service_types": types})
+            tagged += 1
+        except Exception:  # pragma: no cover — unexpected DB issue
+            log.exception("catalog_scraper_backfill_update_failed id=%s", m.get("id"))
+
+    log.info(
+        "catalog_scraper_backfill category=%s tagged=%d candidates=%d",
+        category, tagged, len(untagged),
+    )
+    return {"tagged": tagged, "candidates": len(untagged), "reason": None}

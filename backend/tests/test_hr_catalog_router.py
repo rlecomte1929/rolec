@@ -176,6 +176,25 @@ class HrCatalogRouterTests(unittest.TestCase):
         )
         self.assertEqual(len(view["rows"]), 3)
 
+    def test_curation_view_dedupes_duplicate_vendor_names(self) -> None:
+        # Two seed batches inserted the same vendors with different external_ids
+        # (prod showed each mover twice). The view must collapse by name.
+        for ext_id in ("m-1", "uuid-1-for-santa-fe"):
+            service_catalog.upsert_item(
+                category="movers", name="Santa Fe", attributes={}, source="seed",
+                external_id=ext_id,
+            )
+        service_catalog.upsert_item(
+            category="movers", name="Crown", attributes={}, source="seed",
+            external_id="m-2",
+        )
+        view = hr_catalog_router.get_curation_view(
+            category="movers", destination_city="Oslo",
+            user=_user("HR", str(uuid.uuid4())),
+        )
+        names = sorted(r["name"] for r in view["rows"] if r["kind"] == "master")
+        self.assertEqual(names, ["Crown", "Santa Fe"])  # Santa Fe once, not twice
+
 
 class CurationRowIdCoercionTests(unittest.TestCase):
     """Regression for the prod-only 500: Postgres returns uuid columns as
