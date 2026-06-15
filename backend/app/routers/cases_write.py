@@ -764,6 +764,31 @@ def create_form_comment(
 
 _FORM_DOC_BUCKET = "case-documents"
 _FORM_DOC_MAX_BYTES = 20 * 1024 * 1024  # 20 MiB — matches the bucket's file_size_limit
+# The case-documents bucket enforces an allowed_mime_types list. Mirror it here
+# so we reject unsupported files with a clear 415 (and never send a type the
+# bucket will 400 on — notably the old 'application/octet-stream' fallback,
+# which the bucket rejects and which surfaced as a misleading 502).
+_FORM_DOC_ALLOWED_MIME = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/tiff",
+}
+
+
+def _resolve_doc_mime(declared: Optional[str], filename: Optional[str]) -> Optional[str]:
+    """Best-effort content type for an uploaded doc, restricted to the bucket's
+    allowed set. Prefer the client's declared type; when it is missing or the
+    generic octet-stream, infer from the filename extension. Returns None when
+    no allowed type can be determined."""
+    import mimetypes
+
+    ct = (declared or "").strip().lower()
+    if ct in ("", "application/octet-stream"):
+        guessed, _ = mimetypes.guess_type(filename or "")
+        ct = (guessed or "").strip().lower()
+    return ct if ct in _FORM_DOC_ALLOWED_MIME else None
 
 
 def _safe_filename(name: str) -> str:
@@ -806,7 +831,17 @@ async def upload_form_document(
     file_name = _safe_filename(file.filename or "upload")
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
     storage_path = f"case-forms/{form_id}/uploads/{ts}_{file_name}"
-    content_type = file.content_type or "application/octet-stream"
+    # fix: [DOC-UPLOAD-502] the bucket only accepts PDF + common image types.
+    # The old `file.content_type or 'application/octet-stream'` sent octet-stream
+    # when the client omitted a type, which the bucket 400s — surfaced to users
+    # as a generic 502 "Storage unavailable". Resolve to an allowed type (infer
+    # from the filename when needed) and reject anything else with a clear 415.
+    content_type = _resolve_doc_mime(file.content_type, file.filename)
+    if content_type is None:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported file type. Upload a PDF or image (PNG, JPEG, WebP, TIFF).",
+        )
 
     # Confirm the form belongs to this case before touching storage.
     with main_db.engine.connect() as conn:
@@ -830,7 +865,15 @@ async def upload_form_document(
             {"content-type": content_type, "upsert": "true"},
         )
     except Exception as exc:
-        logger.warning("form_doc upload: storage error form_id=%s err=%s", form_id, exc)
+        # Full traceback so the real storage error is diagnosable in prod logs.
+        logger.exception("form_doc upload: storage error form_id=%s", form_id)
+        # Defense in depth: a mime rejection that slips past the check above is a
+        # client error (415), not a storage outage (502).
+        if "mime" in str(exc).lower():
+            raise HTTPException(
+                status_code=415,
+                detail="Unsupported file type. Upload a PDF or image (PNG, JPEG, WebP, TIFF).",
+            )
         raise HTTPException(status_code=502, detail="Storage unavailable — upload failed")
 
     try:
