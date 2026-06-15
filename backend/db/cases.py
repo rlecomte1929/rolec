@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -618,7 +618,9 @@ class CasesMixin:
                     updated_at TEXT NOT NULL,
                     owner TEXT NOT NULL DEFAULT 'joint',
                     criticality TEXT NOT NULL DEFAULT 'normal',
-                    notes TEXT
+                    notes TEXT,
+                    source TEXT,
+                    service_key TEXT
                 )
             """))
             conn.execute(text("""
@@ -653,7 +655,7 @@ class CasesMixin:
                 conn,
                 """SELECT id, case_id, canonical_case_id, milestone_type, title, description,
                    target_date, actual_date, status, sort_order, created_at, updated_at,
-                   owner, criticality, notes
+                   owner, criticality, notes, source, service_key
                    FROM case_milestones
                    WHERE (canonical_case_id = :cid OR case_id = :cid)
                    ORDER BY sort_order ASC, created_at ASC""",
@@ -677,6 +679,8 @@ class CasesMixin:
         owner: str = "joint",
         criticality: str = "normal",
         notes: Optional[str] = None,
+        source: Optional[str] = None,
+        service_key: Optional[str] = None,
         milestone_id: Optional[str] = None,
         request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -690,7 +694,7 @@ class CasesMixin:
                     """UPDATE case_milestones SET
                        title = :title, description = :desc, target_date = :td, actual_date = :ad,
                        status = :status, sort_order = :so, owner = :owner, criticality = :crit,
-                       notes = :notes, updated_at = :now
+                       notes = :notes, source = :source, service_key = :svc_key, updated_at = :now
                        WHERE id = :id AND (canonical_case_id = :cid OR case_id = :cid)""",
                     {
                         "id": milestone_id,
@@ -704,6 +708,8 @@ class CasesMixin:
                         "owner": owner,
                         "crit": criticality,
                         "notes": notes,
+                        "source": source,
+                        "svc_key": service_key,
                         "now": now,
                     },
                     op_name="update_case_milestone",
@@ -723,8 +729,8 @@ class CasesMixin:
             self._exec(
                 conn,
                 """INSERT INTO case_milestones
-                   (id, case_id, canonical_case_id, milestone_type, title, description, target_date, actual_date, status, sort_order, created_at, updated_at, owner, criticality, notes)
-                   VALUES (:id, :cid, :canonical, :mt, :title, :desc, :td, :ad, :status, :so, :now, :now, :owner, :crit, :notes)""",
+                   (id, case_id, canonical_case_id, milestone_type, title, description, target_date, actual_date, status, sort_order, created_at, updated_at, owner, criticality, notes, source, service_key)
+                   VALUES (:id, :cid, :canonical, :mt, :title, :desc, :td, :ad, :status, :so, :now, :now, :owner, :crit, :notes, :source, :svc_key)""",
                 {
                     "id": mid,
                     "cid": case_id,
@@ -740,6 +746,8 @@ class CasesMixin:
                     "owner": owner,
                     "crit": criticality,
                     "notes": notes,
+                    "source": source,
+                    "svc_key": service_key,
                 },
                 op_name="insert_case_milestone",
                 request_id=request_id,
@@ -754,17 +762,58 @@ class CasesMixin:
             ).fetchone()
         return self._row_to_dict(row) or {}
 
-    def delete_case_milestones(self, case_id: str, *, request_id: Optional[str] = None) -> int:
-        """Delete all milestones for a case. Used before re-persisting a
-        regenerated roadmap so the plan view reflects the new set rather than a
-        mix. Matches the same predicate list_case_milestones reads by."""
+    def delete_case_milestones(
+        self, case_id: str, *, exclude_source: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> int:
+        """Delete milestones for a case. Used before re-persisting a regenerated
+        roadmap so the plan view reflects the new set rather than a mix. Matches
+        the same predicate list_case_milestones reads by. `exclude_source`
+        (e.g. 'service') preserves rows with that source so externally-managed
+        milestones survive a regeneration."""
         cid = self.coalesce_case_lookup_id(case_id)
+        sql = "DELETE FROM case_milestones WHERE (canonical_case_id = :cid OR case_id = :cid)"
+        params: Dict[str, Any] = {"cid": cid}
+        if exclude_source is not None:
+            sql += " AND (source IS NULL OR source <> :excl)"
+            params["excl"] = exclude_source
         with self.engine.begin() as conn:
             result = self._exec(
-                conn,
-                "DELETE FROM case_milestones WHERE canonical_case_id = :cid OR case_id = :cid",
-                {"cid": cid},
+                conn, sql, params,
                 op_name="delete_case_milestones",
+                request_id=request_id,
+            )
+        return getattr(result, "rowcount", 0) or 0
+
+    def delete_service_milestones_not_in(
+        self, case_id: str, keep_service_keys: Sequence[str],
+        *, request_id: Optional[str] = None,
+    ) -> int:
+        """Delete source='service' milestones whose service_key is NOT in
+        keep_service_keys (i.e. the service was deselected). Never touches
+        AI/deterministic/manual rows."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        keys = list(keep_service_keys)
+        with self.engine.begin() as conn:
+            if keys:
+                placeholders = ", ".join(f":k{i}" for i in range(len(keys)))
+                params: Dict[str, Any] = {"cid": cid, **{f"k{i}": k for i, k in enumerate(keys)}}
+                sql = (
+                    "DELETE FROM case_milestones "
+                    "WHERE (canonical_case_id = :cid OR case_id = :cid) "
+                    "AND source = 'service' "
+                    f"AND service_key NOT IN ({placeholders})"
+                )
+            else:
+                params = {"cid": cid}
+                sql = (
+                    "DELETE FROM case_milestones "
+                    "WHERE (canonical_case_id = :cid OR case_id = :cid) "
+                    "AND source = 'service'"
+                )
+            result = self._exec(
+                conn, sql, params,
+                op_name="delete_service_milestones_not_in",
                 request_id=request_id,
             )
         return getattr(result, "rowcount", 0) or 0
@@ -3011,11 +3060,18 @@ class CasesMixin:
                   updated_at timestamptz NOT NULL DEFAULT now(),
                   owner text NOT NULL DEFAULT 'joint',
                   criticality text NOT NULL DEFAULT 'normal',
-                  notes text
+                  notes text,
+                  source text,
+                  service_key text
                 )
                 """
             )
         )
+        # Idempotent ALTERs so pre-existing test/dev DBs gain the provenance columns.
+        for _col in ("source", "service_key"):
+            conn.execute(
+                text(f"ALTER TABLE public.case_milestones ADD COLUMN IF NOT EXISTS {_col} text")
+            )
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS idx_case_milestones_case_id "
