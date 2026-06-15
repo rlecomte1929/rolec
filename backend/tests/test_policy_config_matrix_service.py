@@ -248,6 +248,39 @@ class PolicyConfigMatrixServiceTests(unittest.TestCase):
         self.assertEqual(a["new_value"]["amount_value"], 2000)
         self.assertEqual(a["changed_by"], "user-2")
 
+    def test_put_draft_uses_batched_replace_when_available(self) -> None:
+        # AIQ-1070: when the DB exposes replace_policy_config_benefits, put_draft
+        # must use it (one atomic batched write) instead of the per-row loop, and
+        # each audit row must reference its benefit's pre-generated id.
+        class _BatchDb(_StatefulPolicyDb):
+            def __init__(self) -> None:
+                super().__init__()
+                self.replace_calls: list = []
+
+            def replace_policy_config_benefits(self, vid, rows, audit_rows=None):
+                self.replace_calls.append(
+                    (str(vid), [dict(r) for r in rows], [dict(a) for a in (audit_rows or [])])
+                )
+                self._benefits[str(vid)] = []
+                for row in rows:
+                    self._bid_seq += 1
+                    stored = dict(row)
+                    stored["id"] = str(row.get("id") or f"ben-{self._bid_seq}")
+                    self._benefits.setdefault(str(vid), []).append(stored)
+                for a in (audit_rows or []):
+                    self.audit_rows.append(dict(a))
+
+        db = _BatchDb()
+        svc = PolicyConfigMatrixService(db)
+        vid = db.insert_policy_config_version(db.pc_id, 1, "draft", "2025-01-01")
+        svc.put_draft(db.company_id, self._manual_body(vid, 1500), changed_by="user-9")
+        self.assertEqual(len(db.replace_calls), 1)  # one atomic batched call, not a per-row loop
+        _v, rows, arows = db.replace_calls[0]
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0].get("id"))
+        self.assertEqual(arows[0]["benefit_id"], rows[0]["id"])
+        self.assertEqual(db.list_policy_config_benefits(vid)[0]["source"], "manual_hr")
+
     def test_validate_put_body_rejects_missing_policy_version(self) -> None:
         with self.assertRaises(ValueError) as ctx:
             self.svc.validate_put_body({"effective_date": "2025-01-01", "categories": [{"category_key": "tax_payroll", "benefits": []}]})

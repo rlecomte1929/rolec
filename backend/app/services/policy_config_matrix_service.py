@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import uuid
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -988,8 +989,18 @@ class PolicyConfigMatrixService:
             for b in (self._db.list_policy_config_benefits(vid) or [])
         }
         _write_audit = getattr(self._db, "insert_policy_config_benefit_audit_row", None)
+        _replace_ovs = getattr(
+            self._db, "replace_jurisdiction_overrides_for_benefit", lambda _bid, _ovs: None
+        )
 
-        self._db.delete_policy_config_benefits_for_version(vid)
+        # AIQ-1070: collect every row, then write them in ONE atomic batched call.
+        # The old code deleted then inserted benefit + audit + override rows one at
+        # a time — hundreds of sequential round-trips (~33s for a full matrix), and a
+        # mid-loop failure left the draft partial/empty (the destructive delete had
+        # already committed).
+        benefit_rows: List[Dict[str, Any]] = []
+        audit_rows: List[Dict[str, Any]] = []
+        override_writes: List[Tuple[str, List[Dict[str, Any]]]] = []
         for m in flat_writes:
             sig = compute_targeting_signature(
                 [t.value for t in m.assignment_types],
@@ -1023,11 +1034,15 @@ class PolicyConfigMatrixService:
                 "source": "manual_hr",
                 "auto_generated": False,
             }
-            inserted_id = self._db.insert_policy_config_benefit_row(row)
+            # AIQ-1070: pre-generate the id so the audit row can reference it
+            # without a per-row insert round-trip.
+            inserted_id = str(uuid.uuid4())
+            row["id"] = inserted_id
+            benefit_rows.append(row)
             # AIQ-839: append a field-level audit row (old→new) for this benefit.
             if callable(_write_audit):
                 prior = prior_by_key.get((str(m.benefit_key), str(sig)))
-                _write_audit(
+                audit_rows.append(
                     {
                         "benefit_id": inserted_id,
                         "policy_config_version_id": vid,
@@ -1055,14 +1070,24 @@ class PolicyConfigMatrixService:
                 ov["employee_level"] = ovl.value if hasattr(ovl, "value") else ovl
                 ova = ov.get("assignment_type")
                 ov["assignment_type"] = ova.value if hasattr(ova, "value") else ova
-            # Defensive against older test fakes; production DB always
-            # has this method.
-            _replace_ovs = getattr(
-                self._db,
-                "replace_jurisdiction_overrides_for_benefit",
-                lambda _bid, _ovs: None,
-            )
-            _replace_ovs(inserted_id, ov_payloads)
+            override_writes.append((inserted_id, ov_payloads))
+
+        # AIQ-1070: one atomic batched write (delete + benefit inserts + audit
+        # inserts, single transaction). Fall back to the legacy per-row path for
+        # older DB stubs that lack the batched method.
+        _replace = getattr(self._db, "replace_policy_config_benefits", None)
+        if callable(_replace):
+            _replace(vid, benefit_rows, audit_rows)
+        else:
+            self._db.delete_policy_config_benefits_for_version(vid)
+            for _r in benefit_rows:
+                self._db.insert_policy_config_benefit_row(_r)
+            if callable(_write_audit):
+                for _a in audit_rows:
+                    _write_audit(_a)
+        # Overrides are written after the benefit rows exist (they FK to them).
+        for _bid, _ovs in override_writes:
+            _replace_ovs(_bid, _ovs)
         ed = str(body.get("effective_date"))[:10]
         self._db.update_policy_config_version_effective_date(vid, ed, only_if_draft=True)
         vrow = self._db.get_policy_config_version_row(vid)
