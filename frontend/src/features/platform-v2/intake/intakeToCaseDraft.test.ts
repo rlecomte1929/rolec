@@ -10,7 +10,7 @@ function makeIntake(overrides: Partial<IntakeData> = {}): IntakeData {
     target_date: '', purpose: '', email: '', full_name: '', nationality: '',
     passport_country: '', passport_expiry: '', members: [],
     job_title: '', contract_type: '', contract_start: '', salary_band: '',
-    office_address: '', services: [],
+    office_address: '',
     ...overrides,
   } as unknown as IntakeData;
 }
@@ -23,7 +23,7 @@ describe('intakeToCaseDraft', () => {
       full_name: 'Lucas Martin', nationality: 'FR', passport_country: 'FR',
       passport_expiry: '2030-01-01', email: 'l@x.dev',
       job_title: 'Senior SWE', contract_type: 'permanent', contract_start: '2026-09-01',
-      salary_band: 'L5', office_address: 'Berlin office', services: ['housing', 'immigration'],
+      salary_band: 'L5', office_address: 'Berlin office',
     }));
     expect(d.relocationBasics).toMatchObject({
       originCountry: 'FR', originCity: 'Lyon', destCountry: 'DE', destCity: 'Berlin',
@@ -31,7 +31,6 @@ describe('intakeToCaseDraft', () => {
     });
     expect(d.employeeProfile).toMatchObject({ fullName: 'Lucas Martin', passportCountry: 'FR', email: 'l@x.dev' });
     expect(d.assignmentContext).toMatchObject({ jobTitle: 'Senior SWE', contractType: 'permanent', salaryBand: 'L5', workLocation: 'Berlin office' });
-    expect(d.services).toEqual(['housing', 'immigration']);
   });
 
   it('leaves empty fields undefined (so the backend deep-merge keeps existing values)', () => {

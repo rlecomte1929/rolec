@@ -6,7 +6,9 @@ import type { IntakeData } from './EmployeeIntakePage';
 // `undefined` so they drop out of the JSON and the backend deep-merge keeps any
 // existing value (never overwriting good data with blanks). The submit handler
 // previously patched only `{ services }`, so the rest of the intake never
-// reached the case — this is the durable, full-payload write.
+// reached the case — this is the durable, full-payload write. Service selection
+// is no longer collected in intake (it lives in the Service providers tab), so
+// it is not written here.
 //
 // Pure (type-only imports) so it unit-tests without pulling in the app graph.
 export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
@@ -49,6 +51,5 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       salaryBand: data.salary_band || undefined,
       workLocation: data.office_address || undefined,
     },
-    services: data.services,
   };
 }
