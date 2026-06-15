@@ -10,6 +10,7 @@ import { ROUTE_DEFS } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
 import { MultiChip } from './MultiChip';
+import { DossierSuggestionsPanel } from './DossierSuggestionsPanel';
 import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { PrivacyNotice } from '../../privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
@@ -1169,6 +1170,9 @@ export function EmployeeIntakePage() {
               <>
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
                 <ReviewSummary data={data} goTo={goTo} />
+                {/* P3-RAG-04: surface the RAG dossier suggestions (corpus-grounded,
+                    cited) in the active v2 flow — previously only in the legacy wizard. */}
+                <DossierSuggestionsPanel caseId={caseIdRef.current} />
                 <CaseMessagesPanel caseId={assignmentId ?? ''} />
                 {/* PRIV-005 / AIQ-473 — Art. 13 notice at the point of collection.
                     Acknowledging records a privacy_consents row and unblocks submit. */}
