@@ -217,9 +217,11 @@ interface KpiProps {
   sub: string;
   tone?: 'default' | 'success' | 'warning' | 'accent' | 'danger';
   progress?: number; // 0–100; renders a thin coloured bar at the bottom
+  /** Optional hover tooltip explaining the metric (TASK-014). */
+  title?: string;
 }
 
-function Kpi({ label, value, sub, tone = 'default', progress }: KpiProps) {
+function Kpi({ label, value, sub, tone = 'default', progress, title }: KpiProps) {
   const valueColor: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'text-slate-900',
     success: 'text-emerald-700',
@@ -236,7 +238,10 @@ function Kpi({ label, value, sub, tone = 'default', progress }: KpiProps) {
   };
   const pct = Math.max(0, Math.min(100, progress ?? 100));
   return (
-    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300">
+    <div
+      className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300"
+      title={title}
+    >
       <div className="truncate text-[10px] font-semibold uppercase tracking-widest text-slate-500">{label}</div>
       <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${valueColor[tone]}`}>
         {value}
@@ -563,8 +568,9 @@ export function MobilityControlCenterV2Page() {
           <Kpi
             label="At risk"
             value={kpis?.atRiskCount ?? (loading ? '…' : 0)}
-            sub="Over 5 days delayed"
+            sub="Delayed by 5+ days"
             tone="warning"
+            title="Flagged when a provider task is more than 5 days past its due date."
             progress={kpis?.activeCases ? Math.min(100, ((kpis.atRiskCount ?? 0) / kpis.activeCases) * 100) : 0}
           />
           <Kpi
@@ -673,7 +679,7 @@ export function MobilityControlCenterV2Page() {
                           <span className="font-medium text-slate-900">{row.employeeIdentifier}</span>
                         </div>
                         <div className="ml-3 truncate text-[11.5px] text-slate-500">
-                          {statusLabel(row.status)}{age != null ? ` · ${age}d` : ''}
+                          {statusLabel(row.status)}{age != null ? ` · Updated ${age} day${age !== 1 ? 's' : ''} ago` : ''}
                         </div>
                       </li>
                     );

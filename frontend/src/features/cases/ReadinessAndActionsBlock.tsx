@@ -162,12 +162,21 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
                     {b.linked_tracker_task_type && (
                       <PlanJumpLink milestoneType={b.linked_tracker_task_type} label="Open in plan" />
                     )}
-                    <Badge variant="neutral" size="sm">
-                      {b.source}
-                    </Badge>
+                    {/* TASK-014: humanize the gap-source tag + explain 'intake'. */}
+                    <span
+                      title={
+                        b.source === 'intake'
+                          ? "This gap is in the employee's intake form — ask them to complete it."
+                          : undefined
+                      }
+                    >
+                      <Badge variant="neutral" size="sm">
+                        {b.source === 'intake' ? 'Employee intake' : b.source}
+                      </Badge>
+                    </span>
                     {b.human_review_required && (
                       <Badge variant="warning" size="sm">
-                        Human review
+                        Needs your review
                       </Badge>
                     )}
                   </div>
