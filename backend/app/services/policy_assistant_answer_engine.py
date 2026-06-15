@@ -392,15 +392,26 @@ def generate_policy_assistant_answer(
                 role_scope=rs,
                 detected_intent=classification.intent,
             )
-        return build_policy_refusal_answer(
-            PolicyAssistantClassificationResult(
-                supported=False,
-                intent=PolicyAssistantIntent.OVERRIDE_EFFECT_QUESTION,
-                canonical_topic=None,
-                refusal_code=PolicyAssistantRefusalCode.INSUFFICIENT_POLICY_DATA,
-                normalized_question=classification.normalized_question,
-            ),
-            rs,
+        # No overrides present — return a substantive "none found" answer rather than a bare refusal
+        no_override_body = (
+            "No HR benefit rule overrides are currently applied to this policy version in ReloPass. "
+            "The policy rules shown to HR reflect the published normalization without any active overrides."
+        )
+        return PolicyAssistantAnswer(
+            answer_type=PolicyAssistantAnswerType.STATUS_SUMMARY,
+            canonical_topic=None,
+            answer_text=no_override_body,
+            policy_status=PolicyAssistantPolicyStatus.DRAFT
+            if resolved_policy_context.draft_exists
+            else PolicyAssistantPolicyStatus.PUBLISHED,
+            comparison_readiness=PolicyAssistantComparisonReadiness.NOT_APPLICABLE,
+            evidence=[],
+            conditions=[],
+            approval_required=False,
+            follow_up_options=_follow_ups(None),
+            refusal=None,
+            role_scope=rs,
+            detected_intent=classification.intent,
         )
 
     if classification.intent == PolicyAssistantIntent.DRAFT_VS_PUBLISHED_QUESTION and rs == PolicyAssistantRoleScope.HR:
