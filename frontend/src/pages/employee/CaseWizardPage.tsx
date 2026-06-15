@@ -626,7 +626,7 @@ export const CaseWizardPage: React.FC = () => {
         <CaseContextBar
           origin={caseData?.originCountry}
           destination={caseData?.destCountry}
-          familyCount={(draft.familyMembers.children?.length || 0) + (draft.familyMembers.spouse ? 1 : 0) + 1}
+          familyCount={(draft.familyMembers.children?.length || 0) + (draft.familyMembers.spouse ? 1 : 0)}
           targetDate={draft.relocationBasics.targetMoveDate}
           stage={`Step ${currentStep} of 5`}
         />
