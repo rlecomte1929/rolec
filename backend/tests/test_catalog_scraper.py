@@ -235,6 +235,59 @@ class CatalogScraperTests(unittest.TestCase):
         self.assertEqual(len(tokyo_schools), 2)
         self.assertTrue(all(r["source"] == "scraper" for r in tokyo_schools))
 
+    # ------------------------------------------------------------------
+    # Service types — generation + backfill (vendor-filter feature)
+    # ------------------------------------------------------------------
+    def test_populate_persists_service_types(self) -> None:
+        payload = {"vendors": [
+            {"name": "Tokyo Movers Inc", "summary": "x", "website": None,
+             "strengths": [], "service_types": ["International", "Storage"], "notes": None},
+        ]}
+        with _patch_complete(payload):
+            rows = catalog_scraper.populate_destination_catalog(
+                category="movers", destination_city="Tokyo",
+            )
+        self.assertEqual(rows[0]["attributes_json"]["service_types"], ["International", "Storage"])
+
+    def test_parse_dedupes_service_types_case_insensitively(self) -> None:
+        self.assertEqual(
+            catalog_scraper._clean_service_types(["International", "international", " Storage ", ""]),
+            ["International", "Storage"],
+        )
+
+    def test_backfill_tags_only_untagged_rows(self) -> None:
+        # Seed two movers (geo-agnostic, no city): one already tagged, one not.
+        service_catalog.upsert_item(
+            category="movers", name="Tagged Co", attributes={"service_types": ["Local"]},
+            source="seed", external_id="m-tagged",
+        )
+        service_catalog.upsert_item(
+            category="movers", name="Untagged Co", attributes={}, source="seed",
+            external_id="m-untagged",
+        )
+        tagging = {"tags": [
+            {"name": "Untagged Co", "service_types": ["International", "Vehicle shipping"]},
+            {"name": "Tagged Co", "service_types": ["SHOULD-NOT-OVERWRITE"]},
+        ]}
+        with _patch_complete(tagging):
+            result = catalog_scraper.backfill_service_types(category="movers")
+        self.assertEqual(result["tagged"], 1)
+        rows = {r["name"]: r for r in service_catalog.list_items(category="movers")}
+        self.assertEqual(rows["Untagged Co"]["attributes_json"]["service_types"],
+                         ["International", "Vehicle shipping"])
+        # The already-tagged row is left untouched (not in the candidate set).
+        self.assertEqual(rows["Tagged Co"]["attributes_json"]["service_types"], ["Local"])
+
+    def test_backfill_noop_without_llm_when_all_tagged(self) -> None:
+        service_catalog.upsert_item(
+            category="movers", name="A", attributes={"service_types": ["Local"]},
+            source="seed", external_id="m-a",
+        )
+        with mock.patch.object(catalog_scraper, "complete_text_sync") as m:
+            result = catalog_scraper.backfill_service_types(category="movers")
+        m.assert_not_called()
+        self.assertEqual(result["tagged"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

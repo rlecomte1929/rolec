@@ -172,6 +172,42 @@ def upsert_item(
     return _row_to_item(row)
 
 
+def merge_attributes(item_id: str, patch: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Shallow-merge ``patch`` into a row's ``attributes_json``, preserving any
+    keys not in the patch. Used by the service-type backfill to add
+    ``service_types`` to existing rows without rewriting the rest of the blob.
+    Returns the updated item, or None if the row doesn't exist."""
+    now = datetime.utcnow().isoformat()
+    with db.engine.begin() as conn:
+        existing = conn.execute(
+            text("SELECT attributes_json FROM service_catalog_items WHERE id = :id"),
+            {"id": item_id},
+        ).mappings().first()
+        if not existing:
+            return None
+        cur = existing["attributes_json"]
+        if isinstance(cur, str):
+            try:
+                cur = json.loads(cur)
+            except (json.JSONDecodeError, TypeError):
+                cur = {}
+        if not isinstance(cur, dict):
+            cur = {}
+        cur.update(patch or {})
+        conn.execute(
+            text(
+                "UPDATE service_catalog_items SET attributes_json = :attr, "
+                "updated_at = :now WHERE id = :id"
+            ),
+            {"attr": json.dumps(cur, default=str), "now": now, "id": item_id},
+        )
+        row = conn.execute(
+            text("SELECT * FROM service_catalog_items WHERE id = :id"),
+            {"id": item_id},
+        ).mappings().first()
+    return _row_to_item(row)
+
+
 def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict[str, Any]]:
     """
     Resolve a master row by its (category, external_id) tuple. Used by the
