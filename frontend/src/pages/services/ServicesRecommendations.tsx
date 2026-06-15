@@ -81,6 +81,7 @@ export const ServicesRecommendations: React.FC = () => {
         onStartOver={() => go(buildRoute('services'))}
         onViewSummary={() => go(buildRoute('servicesEstimate'))}
         displayCurrency={displayCurrency}
+        caseId={assignmentId || undefined}
       />
     </AppShell>
   );

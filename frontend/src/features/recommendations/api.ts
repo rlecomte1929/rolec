@@ -3,6 +3,29 @@ import type { RecommendationResponse, CategoryInfo } from './types';
 
 const BASE = '/api/recommendations';
 
+export interface ProviderRatingResult {
+  ok: boolean;
+  supplier_id: string;
+  average_rating: number | null;
+  review_count: number;
+}
+
+/**
+ * CATALOG-3 — submit an employee's 1-5 rating for a provider on a case.
+ * Idempotent server-side per (employee, supplier, case).
+ */
+export async function rateProvider(
+  supplierId: string,
+  payload: { caseId: string; score: number; comment?: string },
+): Promise<ProviderRatingResult> {
+  const res = await api.post(`/api/employee/providers/${encodeURIComponent(supplierId)}/rating`, {
+    case_id: payload.caseId,
+    score: payload.score,
+    comment: payload.comment,
+  });
+  return res.data;
+}
+
 export const recommendationsEngineAPI = {
   listCategories: async (): Promise<{ categories: CategoryInfo[] }> => {
     const res = await api.get(`${BASE}/categories`);

@@ -1,0 +1,64 @@
+"""
+CATALOG-3 / AIQ-1067 — Employee provider rating endpoint.
+
+POST /api/employee/providers/{supplier_id}/rating
+  Body: { case_id, score (1-5), comment? }
+
+An employee rates a provider for one of THEIR cases. The rating is idempotent
+per (employee, supplier, case) and feeds supplier_scoring_metadata, which the
+recommendation engine scores. See provider_ratings_service.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
+from sqlalchemy import text
+
+from ..auth_deps import get_current_user
+from ..db import SessionLocal
+from ..services import provider_ratings_service
+
+router = APIRouter(prefix="/api/employee/providers", tags=["provider-ratings"])
+
+
+class ProviderRatingBody(BaseModel):
+    case_id: str = Field(..., description="The case this rating is for")
+    score: int = Field(..., ge=1, le=5, description="1-5 star rating")
+    comment: Optional[str] = Field(None, max_length=2000)
+
+
+@router.post("/{supplier_id}/rating")
+def rate_provider(
+    body: ProviderRatingBody,
+    supplier_id: str = Path(..., description="Registry supplier id (recs item_id)"),
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    employee_id = user.get("id")
+    if not employee_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # The case is the authority for company scoping AND ownership: an employee
+    # may only rate within a case that is theirs.
+    with SessionLocal() as session:
+        case_row = session.execute(
+            text("SELECT employee_id, company_id FROM cases WHERE id = :cid"),
+            {"cid": body.case_id},
+        ).first()
+    if not case_row:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    is_admin = bool(user.get("is_admin")) or (user.get("role") or "").upper() == "ADMIN"
+    if str(case_row.employee_id) != str(employee_id) and not is_admin:
+        raise HTTPException(status_code=403, detail="Not your case")
+
+    aggregate = provider_ratings_service.record_rating(
+        employee_id=str(employee_id),
+        company_id=str(case_row.company_id),
+        supplier_id=supplier_id,
+        case_id=body.case_id,
+        score=body.score,
+        comment=body.comment,
+    )
+    return {"ok": True, "supplier_id": supplier_id, **aggregate}

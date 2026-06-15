@@ -3,6 +3,7 @@ import { Card, Badge, Button, Alert } from '../../components/antigravity';
 import type { RecommendationItem, RecommendationResponse } from './types';
 import { formatEstimationFromUsd } from '../services/servicesCurrency';
 import { createAIDecision } from '../../api/aiDecisions';
+import { rateProvider } from './api';
 
 const TIER_LABELS: Record<string, string> = {
   best_match: 'Best match',
@@ -98,6 +99,58 @@ function RatingStars({ rating }: { rating?: number }) {
   );
 }
 
+/**
+ * CATALOG-3 — interactive 1-5 star rater. Posts the employee's rating for this
+ * provider on the current case; the backend aggregates it into the signal the
+ * recommender scores. Only rendered when a caseId is in scope.
+ */
+function RateProviderControl({ supplierId, caseId }: { supplierId: string; caseId: string }) {
+  const [hover, setHover] = useState(0);
+  const [submitted, setSubmitted] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+
+  const send = async (score: number) => {
+    setSaving(true);
+    setError(false);
+    try {
+      await rateProvider(supplierId, { caseId, score });
+      setSubmitted(score);
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (submitted != null) {
+    return <span className="text-xs text-[#1f8e8b]">Thanks — you rated this {submitted}/5.</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-xs text-[#6b7280]">Was this provider helpful?</span>
+      <span className="inline-flex" role="radiogroup" aria-label="Rate this provider 1 to 5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Button
+            key={n}
+            unstyled
+            disabled={saving}
+            aria-label={`${n} star${n > 1 ? 's' : ''}`}
+            className={`px-0.5 text-base leading-none ${n <= hover ? 'text-amber-500' : 'text-[#cbd5e1]'} hover:text-amber-500`}
+            onMouseEnter={() => setHover(n)}
+            onMouseLeave={() => setHover(0)}
+            onClick={() => send(n)}
+          >
+            ★
+          </Button>
+        ))}
+      </span>
+      {error && <span className="text-xs text-red-600">Couldn’t save — try again.</span>}
+    </span>
+  );
+}
+
 const MapPinIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -137,6 +190,7 @@ function RecCard({
   topMatchName,
   onConfirmPick,
   onCancelPick,
+  caseId,
 }: {
   item: RecommendationItem;
   category: string;
@@ -153,6 +207,8 @@ function RecCard({
   topMatchName?: string;
   onConfirmPick: (reason: string) => void;
   onCancelPick: () => void;
+  /** CATALOG-3 — current case id; enables the provider rating control when set. */
+  caseId?: string;
 }) {
   const [overrideReason, setOverrideReason] = useState('');
   // Clear local reason text whenever this card stops being the active confirm target.
@@ -193,6 +249,7 @@ function RecCard({
             {item.metadata?.rating != null && (
               <RatingStars rating={item.metadata.rating} />
             )}
+            {caseId && <RateProviderControl supplierId={item.item_id} caseId={caseId} />}
             {isScarce && (
               <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
                 Limited availability
@@ -368,6 +425,8 @@ interface Props {
   onStartOver: () => void;
   onViewSummary: () => void;
   displayCurrency: string;
+  /** CATALOG-3 — current case id; enables provider rating on each card. */
+  caseId?: string;
 }
 
 export const RecommendationResults: React.FC<Props> = ({
@@ -378,6 +437,7 @@ export const RecommendationResults: React.FC<Props> = ({
   onStartOver,
   onViewSummary,
   displayCurrency,
+  caseId,
 }) => {
   const entries = Object.entries(results);
   const [activeTab, setActiveTab] = useState(entries[0]?.[0] ?? '');
@@ -557,6 +617,7 @@ export const RecommendationResults: React.FC<Props> = ({
                       topMatchName={res.recommendations[0]?.name}
                       onConfirmPick={confirmPendingPick}
                       onCancelPick={cancelPendingPick}
+                      caseId={caseId}
                     />
                   );
                 })}
