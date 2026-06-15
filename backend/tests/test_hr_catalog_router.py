@@ -177,5 +177,35 @@ class HrCatalogRouterTests(unittest.TestCase):
         self.assertEqual(len(view["rows"]), 3)
 
 
+class CurationRowIdCoercionTests(unittest.TestCase):
+    """Regression for the prod-only 500: Postgres returns uuid columns as
+    `uuid.UUID` objects, which a bare `str` field rejected. SQLite returns
+    them as strings, so this must be asserted at the model level (DB-agnostic)
+    rather than via the seeded sqlite fixtures above."""
+
+    def test_uuid_ids_coerced_to_str(self) -> None:
+        mid = uuid.uuid4()
+        sid = uuid.uuid4()
+        row = hr_catalog_router.CurationRow(
+            kind="master",
+            selection_id=sid,
+            master_item_id=mid,
+            name="ABC Movers",
+            selected=True,
+        )
+        self.assertEqual(row.master_item_id, str(mid))
+        self.assertEqual(row.selection_id, str(sid))
+        self.assertIsInstance(row.master_item_id, str)
+        self.assertIsInstance(row.selection_id, str)
+
+    def test_none_ids_stay_none(self) -> None:
+        row = hr_catalog_router.CurationRow(
+            kind="custom", selection_id=None, master_item_id=None,
+            name="x", selected=False,
+        )
+        self.assertIsNone(row.master_item_id)
+        self.assertIsNone(row.selection_id)
+
+
 if __name__ == "__main__":
     unittest.main()

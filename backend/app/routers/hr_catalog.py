@@ -18,7 +18,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..auth_deps import require_admin_or_hr
 from ...database import db
@@ -97,6 +97,16 @@ class CurationRow(BaseModel):
     source: Optional[str] = None  # master row source (scraper / manual / seed / hr_promoted)
     city: Optional[str] = None
     country: Optional[str] = None
+
+    # The id fields come straight from the DB. Under Postgres (prod) uuid
+    # columns are returned as `uuid.UUID` objects, but under SQLite (tests)
+    # they are plain strings — so a bare `str` annotation passes tests yet
+    # raises a Pydantic `string_type` error in prod, 500ing the curation view
+    # for any category that has master vendors. Coerce non-null ids to str.
+    @field_validator("selection_id", "master_item_id", mode="before")
+    @classmethod
+    def _coerce_id_to_str(cls, v: Any) -> Optional[str]:
+        return str(v) if v is not None else None
 
 
 class CurationView(BaseModel):
