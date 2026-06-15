@@ -73,6 +73,7 @@ TOPIC_BENEFIT_KEYS: Dict[PolicyAssistantCanonicalTopic, Tuple[str, ...]] = {
         "repatriation_allowance_dependent",
     ),
     PolicyAssistantCanonicalTopic.HOST_HOUSING: ("housing",),
+    PolicyAssistantCanonicalTopic.BANKING_SETUP: ("banking", "banking_setup"),
 }
 
 

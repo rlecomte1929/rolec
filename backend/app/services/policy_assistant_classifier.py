@@ -443,6 +443,18 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
         ),
         negatives=(),
     ),
+    _TopicRule(
+        PolicyAssistantCanonicalTopic.BANKING_SETUP,
+        (
+            ("banking support", 6),
+            ("banking setup", 6),
+            ("bank account", 5),
+            ("bank transfer", 4),
+            ("banking", 3),
+            (re.compile(r"\bbank\b.*\b(setup|support|assistance|fees?|account)\b", re.I), 5),
+        ),
+        negatives=(),
+    ),
 )
 
 

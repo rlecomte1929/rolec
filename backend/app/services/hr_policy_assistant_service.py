@@ -89,6 +89,8 @@ def _topic_from_grouped_item(item: Dict[str, Any]) -> Optional[PolicyAssistantCa
         "spouse_support": PolicyAssistantCanonicalTopic.SPOUSE_SUPPORT,
         "relocation_allowance": PolicyAssistantCanonicalTopic.RELOCATION_ALLOWANCE,
         "settling_in_allowance": PolicyAssistantCanonicalTopic.RELOCATION_ALLOWANCE,
+        "banking": PolicyAssistantCanonicalTopic.BANKING_SETUP,
+        "banking_setup": PolicyAssistantCanonicalTopic.BANKING_SETUP,
     }
     return alias.get(sk)
 
