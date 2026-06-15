@@ -205,6 +205,17 @@ def put_services_state(
             action = ACTION_INSERT
 
     _audit(case_id=case_id, action=action, actor_id=actor_id, byte_size=len(blob))
+
+    # Bridge the current service selection into the roadmap. Best-effort +
+    # idempotent — a reconcile failure must never fail the state save.
+    try:
+        from ..services.service_roadmap_bridge import reconcile_service_milestones
+        selected = body.state.get("selectedServices") if isinstance(body.state, dict) else None
+        if isinstance(selected, list):
+            reconcile_service_milestones(db, case_id, selected)
+    except Exception:  # noqa: BLE001 — non-fatal best-effort bridge
+        logger.warning("services-state: roadmap reconcile failed for case %s", case_id, exc_info=True)
+
     return {
         "case_id": case_id,
         "organization_id": organization_id,
