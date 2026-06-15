@@ -39,8 +39,7 @@ sys.path.insert(0, str(_root))
 
 # ── Imports ───────────────────────────────────────────────────────────────────
 try:
-    from langfuse import Langfuse
-    from langfuse.decorators import langfuse_context, observe
+    from langfuse import Langfuse, observe
     _HAS_LANGFUSE = True
 except ImportError:
     _HAS_LANGFUSE = False
@@ -83,20 +82,30 @@ def _section_for(idx: int) -> str:
 
 # ── Per-item runner (wrapped with @observe for Langfuse v4 tracing) ───────────
 
-def _make_runner(run_name: str, q_num: str, section: str, expected_output: dict):
+def _make_runner(
+    lf: Any,
+    run_name: str,
+    q_num: str,
+    section: str,
+    expected_output: dict,
+):
     """
-    Returns a zero-arg callable that runs one question and returns (answer, verdict).
-    Wraps it in @observe so Langfuse v4 records a trace per question.
+    Returns a callable that runs one question and returns (answer, verdict).
+    When Langfuse is available, wraps with @observe so v4 records a trace.
+    Uses lf instance methods (score_current_trace, set_current_trace_io)
+    which are the v4 API — no langfuse_context module needed.
     """
-    if _HAS_LANGFUSE:
+    if _HAS_LANGFUSE and lf is not None:
         @observe(name=f"golden-eval-{q_num}")
         def _run(q: str) -> tuple:
-            langfuse_context.update_current_trace(
-                name=f"golden-eval-{q_num}",
-                tags=[run_name, "golden-eval", section],
-                metadata={"q_num": q_num, "section": section, "run_name": run_name},
-                input={"question": q},
-            )
+            lf.set_current_trace_io(input={"question": q})
+            try:
+                lf.update_current_span(
+                    metadata={"q_num": q_num, "section": section, "run_name": run_name},
+                    tags=[run_name, "golden-eval", section],
+                )
+            except Exception:
+                pass  # update_current_span is best-effort
             result = hr_policy_assistant_query_response_dict(
                 message=q,
                 user=MOCK_HR,
@@ -104,12 +113,15 @@ def _make_runner(run_name: str, q_num: str, section: str, expected_output: dict)
             )
             answer = result.get("answer", {})
             verdict = _score_item(answer, expected_output)
-            langfuse_context.update_current_trace(output=answer)
-            langfuse_context.score_current_trace(
-                name="pass",
-                value=1.0 if verdict == "PASS" else 0.0,
-                comment=verdict,
-            )
+            lf.set_current_trace_io(input={"question": q}, output=answer)
+            try:
+                lf.score_current_trace(
+                    name="pass",
+                    value=1.0 if verdict == "PASS" else 0.0,
+                    comment=verdict,
+                )
+            except Exception:
+                pass
             return answer, verdict
     else:
         def _run(q: str) -> tuple:  # type: ignore[misc]
@@ -184,7 +196,7 @@ def run(run_name: Optional[str] = None) -> None:
         verdict = "ERROR"
         error_msg = ""
 
-        runner = _make_runner(run_name, q_num, section, expected_output)
+        runner = _make_runner(lf, run_name, q_num, section, expected_output)
         try:
             answer, verdict = runner(q)
         except Exception as exc:
