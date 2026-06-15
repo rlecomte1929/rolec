@@ -35,3 +35,12 @@ def test_category_label_maps_to_service_key():
     assert service_key_for_category("Schools / Childcare") == "schools"
     assert service_key_for_category("Banking") in {"banking", "banks"}
     assert service_key_for_category("totally unknown category") is None
+
+
+def test_services_tab_keys_resolve_for_quote_advance():
+    # The Services tab / RFQ flow sends these raw keys as service_categories;
+    # they must resolve so a quote request advances the matching roadmap step.
+    assert service_key_for_category("living_areas") == "housing"
+    assert service_key_for_category("schools") == "schools"
+    assert service_key_for_category("movers") == "movers"
+    assert service_key_for_category("banks") == "banking"
