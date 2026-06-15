@@ -97,10 +97,10 @@ export function ProviderGridV2Page() {
         <div className="mb-5 grid grid-cols-3 gap-3 md:grid-cols-6">
           <Kpi label="Active cases" value={kpis.total} sub="all in flight" />
           <Kpi label="Not started" value={kpis.notStarted} sub="Awaiting coordination" tone="default" />
-          <Kpi label="In progress" value={kpis.inProgress} sub="under way" tone="accent" />
-          <Kpi label="At risk" value={kpis.atRisk} sub="Over 5 days delayed" tone="warning" />
-          <Kpi label="Complete" value={kpis.complete} sub="ready" tone="success" />
-          <Kpi label="Blocked" value={kpis.blockedCells} sub="providers with a blocker" tone={kpis.blockedCells > 0 ? 'danger' : 'default'} />
+          <Kpi label="In progress" value={kpis.inProgress} sub="Work underway" tone="accent" />
+          <Kpi label="At risk" value={kpis.atRisk} sub="Delayed by 5+ days" tone="warning" title="Flagged when a provider task is more than 5 days past its due date." />
+          <Kpi label="Complete" value={kpis.complete} sub="Delivery complete" tone="success" />
+          <Kpi label="Blocked" value={kpis.blockedCells} sub="Waiting on a blocker" tone={kpis.blockedCells > 0 ? 'danger' : 'default'} />
         </div>
 
         {error && (
@@ -150,9 +150,11 @@ interface KpiProps {
   value: string | number;
   sub: string;
   tone?: 'default' | 'success' | 'warning' | 'danger' | 'accent';
+  /** Optional hover tooltip explaining the metric (TASK-014). */
+  title?: string;
 }
 
-function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
+function Kpi({ label, value, sub, tone = 'default', title }: KpiProps) {
   const valueColor: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'text-slate-900',
     success: 'text-emerald-700',
@@ -168,7 +170,10 @@ function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
     accent: 'bg-accent-500',
   };
   return (
-    <div className="relative rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300">
+    <div
+      className="relative rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300"
+      title={title}
+    >
       <span className={`absolute right-2.5 top-2.5 block h-1.5 w-1.5 rounded-full ${dot[tone]}`} aria-hidden />
       <div className="truncate text-[10px] font-semibold uppercase tracking-widest text-slate-500">{label}</div>
       <div className={`mt-1 text-[22px] font-semibold leading-none tracking-tight tabular-nums ${valueColor[tone]}`}>
