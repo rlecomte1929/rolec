@@ -15,6 +15,7 @@ import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
+import { getCaseStatusLabel } from '../utils/caseStatusLabel';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
 import { CalibrationAlertBanner } from '../components/CalibrationAlertBanner';
 import { AnswerProvenanceWidget } from '../components/AnswerProvenanceWidget';
@@ -278,16 +279,19 @@ export const HrDashboard: React.FC = () => {
     setIsConfirmingRemoval(false);
   };
 
+  // TASK-005: label text comes from the shared getCaseStatusLabel so this matches
+  // the Mobility center exactly; only the Badge variant is chosen here.
   const caseStatusBadge = (status: AssignmentSummary['status']) => {
-    if (status === 'approved') return <Badge variant="success">Complete</Badge>;
-    if (status === 'rejected') return <Badge variant="warning">Rejected</Badge>;
-    if (status === 'closed') return <Badge variant="neutral">Canceled</Badge>;
-    if (status === 'submitted') return <Badge variant="info">Awaiting HR review</Badge>;
-    if (status === 'awaiting_intake') return <Badge variant="warning">Intake in progress</Badge>;
-    if (status === 'assigned' || status === 'created') {
-      return <Badge variant="neutral">Not started</Badge>;
-    }
-    return <Badge variant="neutral">Not started</Badge>;
+    const label = getCaseStatusLabel(status);
+    const variant =
+      status === 'approved'
+        ? 'success'
+        : status === 'rejected' || status === 'awaiting_intake'
+        ? 'warning'
+        : status === 'submitted'
+        ? 'info'
+        : 'neutral';
+    return <Badge variant={variant}>{label}</Badge>;
   };
 
   // BRAND-5: lead with the employee's real name; email is a genuine fallback only.
@@ -698,14 +702,16 @@ export const HrDashboard: React.FC = () => {
                   onChange={(event) => setStatusFilter(event.target.value)}
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 >
+                  {/* TASK-005: option labels match the table cell labels (getCaseStatusLabel).
+                      created+assigned are the same "Not started" state — one option (value
+                      'assigned', the post-assign norm); 'created' cases show under All statuses. */}
                   <option value="all">All statuses</option>
-                  <option value="created">Created</option>
-                  <option value="assigned">Assigned</option>
-                  <option value="awaiting_intake">Awaiting intake</option>
-                  <option value="submitted">HR review</option>
-                  <option value="approved">Approved</option>
+                  <option value="assigned">Not started</option>
+                  <option value="awaiting_intake">Intake in progress</option>
+                  <option value="submitted">Awaiting HR review</option>
+                  <option value="approved">Complete</option>
                   <option value="rejected">Rejected</option>
-                  <option value="closed">Closed</option>
+                  <option value="closed">Canceled</option>
                 </select>
               </div>
               <div>
