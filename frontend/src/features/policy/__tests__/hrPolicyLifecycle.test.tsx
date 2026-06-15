@@ -37,7 +37,7 @@ describe('HR policy lifecycle (product states)', () => {
       const model = resolveLayoutModelFromState('draft_not_publishable');
       expect(model.resolved.phase).toBe('draft_not_publishable');
       render(renderHrPolicyLayout(model));
-      expect(screen.getByText(/Draft saved—finish review before it goes live/i)).toBeInTheDocument();
+      expect(screen.getByText(/Draft saved\. Check the benefit values below/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /review draft/i })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^publish policy$/i })).not.toBeInTheDocument();
       expect(screen.getByTestId('hr-policy-panel-if-publish')).toBeInTheDocument();
@@ -175,6 +175,6 @@ describe('Edge: partial resolver output still drives draft headline', () => {
         employeePreviewCompare={employeePreviewCompare}
       />
     );
-    expect(screen.getByText(/Draft saved—finish review before it goes live/i)).toBeInTheDocument();
+    expect(screen.getByText(/Draft saved\. Check the benefit values below/i)).toBeInTheDocument();
   });
 });

@@ -276,7 +276,7 @@ export function employeeComparisonVisibilityLabel(args: {
   if (!employeeSeesPublished) {
     return {
       headline: 'Not live for employees yet',
-      detail: 'Nothing from this working copy appears on assignments until you publish a version.',
+      detail: 'Once published, it applies automatically to every new relocation case you open.',
     };
   }
   if (st === 'ready' && comparisonReadyStrict === true) {

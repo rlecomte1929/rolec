@@ -130,7 +130,7 @@ export const HrPolicy: React.FC = () => {
       subtitle={
         adminCompanyId
           ? 'View and edit company policy as admin.'
-          : 'Published policy and policy builder.'
+          : 'Your relocation policy sets what each employee is entitled to — by job level, move type, and destination. Publish it to activate it on every new case.'
       }
     >
       {/* Tab bar — only shown for HR/Admin (not admin company-scoped view where
