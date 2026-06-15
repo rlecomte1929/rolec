@@ -422,9 +422,19 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
 
       {/* Content modules */}
       <div className="space-y-8">
+        {/* NAV-002: when no resource section has any content, show a single empty
+            state instead of section shells. Otherwise hide every empty section
+            (including 'overview') rather than rendering an empty header. */}
+        {SECTIONS.filter((s) => s.id !== 'events').every(
+          (s) => (resourcesBySection[s.id]?.length ?? 0) === 0,
+        ) && (
+          <Card padding="lg">
+            <p className="text-[#6b7280] text-sm">No resources available for this destination yet.</p>
+          </Card>
+        )}
         {SECTIONS.filter((s) => s.id !== 'events').map((section) => {
           const items = resourcesBySection[section.id] ?? [];
-          if (items.length === 0 && section.id !== 'overview') return null;
+          if (items.length === 0) return null;
           const searchQ = filters.search?.toLowerCase();
           const filtered =
             searchQ && items.length
@@ -529,12 +539,48 @@ function ResourceSection({
   );
 }
 
+// NAV-002: trust-tier → labelled, colored badge (verified=teal, community=amber,
+// unverified=gray). Unknown/absent tiers render nothing.
+const TRUST_TIER_BADGE: Record<string, { label: string; cls: string }> = {
+  verified: { label: 'Verified', cls: 'bg-[#e0f2f1] text-[#1f8e8b]' },
+  community: { label: 'Community', cls: 'bg-[#fef3c7] text-[#92400e]' },
+  unverified: { label: 'Unverified', cls: 'bg-[#f1f5f9] text-[#64748b]' },
+};
+
+// NAV-002: local relative-time formatter (no external library).
+function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
+  const years = Math.floor(days / 365);
+  return `${years} year${years === 1 ? '' : 's'} ago`;
+}
+
 function ResourceCard({ resource }: { resource: PublicResource }) {
   const url = resource.externalUrl || resource.bookingUrl || '#';
+  const hasUrl = Boolean(url && url !== '#');
+  const tier = resource.trustTier ? TRUST_TIER_BADGE[resource.trustTier] : null;
+  const updatedAt = resource.updated_at;
+
+  // Curation signals (trust tier + last-updated) shown on both link and non-link cards.
+  const meta =
+    tier || updatedAt ? (
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {tier && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tier.cls}`}>{tier.label}</span>
+        )}
+        {updatedAt && <span className="text-xs text-[#94a3b8]">Updated {formatRelativeTime(updatedAt)}</span>}
+      </div>
+    ) : null;
 
   return (
     <div className="p-4 border border-[#e2e8f0] rounded-lg hover:border-[#94a3b8] hover:shadow-sm transition-all">
-      {url && url !== '#' ? (
+      {hasUrl ? (
         <a href={url} target="_blank" rel="noreferrer" className="block">
           <div className="font-medium text-[#0b2b43]">{resource.title}</div>
           {resource.summary && (
@@ -543,11 +589,7 @@ function ResourceCard({ resource }: { resource: PublicResource }) {
           {resource.priceRangeText && (
             <div className="text-xs text-[#6b7280] mt-1">{resource.priceRangeText}</div>
           )}
-          {resource.trustTier && (
-            <span className="inline-block mt-2 text-[10px] px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">
-              {resource.trustTier}
-            </span>
-          )}
+          {meta}
           <span className="text-xs text-[#1d4ed8] mt-2 inline-block">Open</span>
         </a>
       ) : (
@@ -562,7 +604,19 @@ function ResourceCard({ resource }: { resource: PublicResource }) {
           {resource.isFamilyFriendly && (
             <span className="text-xs text-[#059669] mt-1 inline-block">Family-friendly</span>
           )}
+          {meta}
         </>
+      )}
+      {/* NAV-002: unobtrusive stale-link report, outside the anchor, only when a URL exists. */}
+      {hasUrl && (
+        <a
+          href={`mailto:support@relopass.com?subject=Stale+link+report&body=${encodeURIComponent(
+            `${resource.title} — ${url}`,
+          )}`}
+          className="text-xs text-[#94a3b8] hover:text-[#64748b] mt-1 inline-block"
+        >
+          Report stale link
+        </a>
       )}
     </div>
   );

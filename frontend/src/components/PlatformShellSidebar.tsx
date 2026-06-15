@@ -80,6 +80,10 @@ const SECTIONS: NavSection[] = [
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'service-providers', label: 'Services', hint: 'Choose services and see recommended providers for your move', to: ROUTE_DEFS.services.path },
       { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
+      // NAV-002: 'Resources' = the destination lifestyle guide (housing, events,
+      // local services) for the employee's assignment. No badge (the old 'LIVE'
+      // badge was misleading).
+      { id: 'resources-guide', label: 'Resources', to: ROUTE_DEFS.resources.path },
       {
         id: 'inbox',
         label: 'Inbox',
@@ -118,6 +122,9 @@ const SECTIONS: NavSection[] = [
       // page (/hr/requirements) — document checklist, risk flags, milestones, intake
       // progress — NOT the old /resources lifestyle destination guide.
       { id: 'requirements', label: 'Requirements', to: ROUTE_DEFS.hrRequirements.path },
+      // NAV-002: HR 'Resources' opens the destination-preview at /hr/resources
+      // (pick any destination, no case needed) — the lifestyle guide employees see.
+      { id: 'hr-resources-preview', label: 'Resources', to: ROUTE_DEFS.hrResources.path },
     ],
   },
   {
