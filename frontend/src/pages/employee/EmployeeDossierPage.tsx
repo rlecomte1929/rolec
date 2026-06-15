@@ -11,9 +11,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/antigravity/Button';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
+import { fetchRelocationPlanView } from '../../api/relocationPlanView';
 import { Alert, isSourceStale } from '../../components/antigravity';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
@@ -53,6 +54,19 @@ export const EmployeeDossierPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTabKey>('all');
+  // [Validate gate] soft gate: until the roadmap is validated, lead with a nudge
+  // and dim the forms. Optimistic-true so the gate never flashes before the
+  // fetch resolves; fail-open on error (soft gate never blocks).
+  const [roadmapValidated, setRoadmapValidated] = useState(true);
+
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    fetchRelocationPlanView(caseId, { role: 'employee' })
+      .then((p) => { if (!cancelled) setRoadmapValidated(!!p.roadmap_validated); })
+      .catch(() => { if (!cancelled) setRoadmapValidated(true); });
+    return () => { cancelled = true; };
+  }, [caseId]);
 
   const load = useCallback(async () => {
     if (!caseId) {
@@ -182,6 +196,29 @@ export const EmployeeDossierPage: React.FC = () => {
           </div>
         </header>
 
+        {/* [Validate gate] Soft gate: nudge the employee to validate their
+            roadmap first. Forms below stay reachable (dimmed), never blocked. */}
+        {!roadmapValidated && (
+          <div
+            data-testid="validate-roadmap-gate"
+            className="mb-4 flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4"
+          >
+            <span className="text-lg">🗺️</span>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-[#0b2b43]">Validate your roadmap to start</div>
+              <div className="text-xs text-[#64748b] mt-0.5">
+                Review your roadmap and click “Validate &amp; start tasks”. Your forms and uploads are below — they’ll be the focus once you’ve validated.
+              </div>
+              <Link
+                to={`/employee/case/${caseId}/roadmap`}
+                className="inline-block mt-2 text-xs font-semibold text-[#1f8e8b]"
+              >
+                Go to my roadmap →
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Content-honesty disclaimer — form templates are representative, not
             legally verified, so always remind the employee to confirm with the
             issuing authority before submitting (per the design brief's content
@@ -264,7 +301,8 @@ export const EmployeeDossierPage: React.FC = () => {
           })}
         </div>
 
-        {/* Body */}
+        {/* Body — dimmed (not blocked) until the roadmap is validated. */}
+        <div className={roadmapValidated ? '' : 'opacity-60'}>
         {loading ? (
           <div className="py-12 text-center text-slate-500">Loading your forms…</div>
         ) : error ? (
@@ -284,6 +322,7 @@ export const EmployeeDossierPage: React.FC = () => {
             ))}
           </div>
         )}
+        </div>
       </div>
     </AppShell>
   );

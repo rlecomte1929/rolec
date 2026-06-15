@@ -27,6 +27,9 @@ const mockList = vi.fn();
 vi.mock('../../../api/dossier', () => ({
   dossierAPI: { list: (...args: unknown[]) => mockList(...args) },
 }));
+vi.mock('../../../api/relocationPlanView', () => ({
+  fetchRelocationPlanView: () => Promise.resolve({ roadmap_validated: true }),
+}));
 vi.mock('../../../hooks/useCaseFormsRealtime', () => ({
   useCaseFormsRealtime: () => undefined,
 }));
