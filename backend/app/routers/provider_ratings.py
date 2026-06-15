@@ -35,7 +35,10 @@ def rate_provider(
     supplier_id: str = Path(..., description="Registry supplier id (recs item_id)"),
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    employee_id = user.get("id")
+    # Use the canonical Supabase auth uuid (AUTH-ID-1): case_assignments.employee_user_id
+    # and profiles.id are uuid-keyed, while user["id"] is the legacy users.id. Comparing
+    # the legacy id against employee_user_id 403'd every real employee.
+    employee_id = user.get("auth_uuid") or user.get("id")
     if not employee_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
