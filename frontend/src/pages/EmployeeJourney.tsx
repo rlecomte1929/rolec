@@ -6,6 +6,7 @@ import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { JourneySpine } from '../features/employee-journey/JourneySpine';
+import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
@@ -514,7 +515,7 @@ export const EmployeeJourney: React.FC = () => {
       ? 'My assignments'
       : hasPendingOnly
         ? 'Pending assignments'
-        : 'Welcome';
+        : 'Your relocation';
   const shellSubtitle = assignmentLoading
     ? 'Loading your assignment list.'
     : hasLinked
@@ -563,6 +564,8 @@ export const EmployeeJourney: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      {!assignmentLoading && showPrimaryManualClaimPage ? <EmployeeNoCaseOnboarding /> : null}
 
       {!assignmentLoading ? (
         <Card padding="lg" className="mb-6">

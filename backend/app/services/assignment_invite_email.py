@@ -63,9 +63,9 @@ def render_assignment_invite_email(
 
     subject = f"Your relocation with {company} has started"
     lead = (
-        f"{hr} at {company} has assigned you a new relocation case in ReloPass."
-        if account_exists
-        else f"{hr} at {company} has set up your relocation case in ReloPass."
+        f"{hr} at {company} has set up "
+        + ("a new move for you" if account_exists else "your move")
+        + " with ReloPass. Inside you'll find your relocation plan, documents, and next steps."
     )
 
     plain = (

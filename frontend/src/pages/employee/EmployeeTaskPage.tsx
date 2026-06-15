@@ -8,7 +8,7 @@ import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
 import { buildRoute } from '../../navigation/routes';
 import { servicesAPI, apiGet } from '../../api/client';
-import type { EmployeeTask } from '../../api/client';
+import type { EmployeeTask, TaskType } from '../../api/client';
 import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../features/privacy/privacyNoticeContent';
 
@@ -28,6 +28,23 @@ const STATUS_LABEL: Record<EmployeeTask['status'], string> = {
   approved:           'Approved',
 };
 
+// ── Task-completion confirmation copy (audit 3.4) ───────────────────────────────
+// Affirming, task-type-specific feedback shown briefly on the card the employee
+// just submitted. Upload copy deliberately says "we'll check this over" — NOT
+// "HR notified" — since no upload→HR notification trigger is confirmed.
+function getCompletionMessage(taskType: TaskType): string {
+  switch (taskType) {
+    case 'document_upload':
+      return '✓ Uploaded — we’ll check this over shortly.';
+    case 'address_confirmation':
+    case 'acknowledgment':
+    case 'selection':
+      return '✓ Saved — we’ll review this shortly.';
+    default:
+      return '✓ Done — your plan has been updated.';
+  }
+}
+
 // ── Task card ─────────────────────────────────────────────────────────────────
 
 interface TaskCardProps {
@@ -35,9 +52,11 @@ interface TaskCardProps {
   onSubmit: (task: EmployeeTask) => void;
   /** PRIV-005: block submission until the Art. 13 notice is acknowledged. */
   submitDisabled: boolean;
+  /** audit 3.4: show the transient completion confirmation on the just-submitted card. */
+  justCompleted?: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, justCompleted = false }) => {
   const [submitting, setSubmitting] = useState(false);
   const [note, setNote] = useState('');
 
@@ -86,6 +105,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled }) =
         </div>
       )}
 
+      {justCompleted && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-3 rounded bg-green-50 border border-green-100 px-3 py-2 text-xs font-medium text-green-800"
+        >
+          {getCompletionMessage(task.task_type)}
+        </div>
+      )}
+
       {canSubmit && (
         <>
           <textarea
@@ -122,6 +151,15 @@ export const EmployeeTaskPage: React.FC = () => {
   // PRIV-005: one-time persistent privacy-notice gate. Submission stays blocked
   // until the current notice version is acknowledged; a version bump re-prompts.
   const [acknowledged, setAcknowledged] = useState(false);
+  // audit 3.4: id of the task whose completion confirmation is currently showing.
+  const [completedTaskId, setCompletedTaskId] = useState<string | null>(null);
+
+  // Auto-dismiss the completion confirmation after ~4s.
+  useEffect(() => {
+    if (!completedTaskId) return;
+    const timer = setTimeout(() => setCompletedTaskId(null), 4000);
+    return () => clearTimeout(timer);
+  }, [completedTaskId]);
 
   useEffect(() => {
     void apiGet<{ acknowledged: boolean }>(
@@ -148,6 +186,7 @@ export const EmployeeTaskPage: React.FC = () => {
 
   const handleSubmit = (updated: EmployeeTask) => {
     setTasks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+    setCompletedTaskId(updated.id);
   };
 
   const pending   = tasks.filter((t) => t.status === 'pending' || t.status === 'revision_requested');
@@ -203,7 +242,7 @@ export const EmployeeTaskPage: React.FC = () => {
                   Action needed · {pending.length}
                 </h2>
                 <div className="space-y-3">
-                  {pending.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} />)}
+                  {pending.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
                 </div>
               </section>
             )}
@@ -213,7 +252,7 @@ export const EmployeeTaskPage: React.FC = () => {
                   Awaiting review · {submitted.length}
                 </h2>
                 <div className="space-y-3">
-                  {submitted.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} />)}
+                  {submitted.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
                 </div>
               </section>
             )}
@@ -223,7 +262,7 @@ export const EmployeeTaskPage: React.FC = () => {
                   Done · {approved.length}
                 </h2>
                 <div className="space-y-3">
-                  {approved.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} />)}
+                  {approved.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
                 </div>
               </section>
             )}

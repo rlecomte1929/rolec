@@ -97,6 +97,21 @@ export const fillDemandGap = (
 ): Promise<{ allowlisted: boolean; scraped_count: number; category: string; city: string; country: string }> =>
   apiPost('/api/admin/catalog/demand-gaps/fill', { category, city, country });
 
+// CATALOG-4: proactive intake-driven corridors (pre-warm before employees hit gaps).
+export interface IntakeCorridor {
+  city: string;
+  country: string;
+  top_origin: string | null;
+  intake_count: number;
+  last_intake_at: string | null;
+  uncovered_categories: string[];
+  allowlisted: boolean;
+}
+
+/** Emerging corridors from intake volume, with the categories still uncovered. */
+export const listIntakeCorridors = (limit = 50): Promise<IntakeCorridor[]> =>
+  apiGet(`/api/admin/catalog/intake-corridors?limit=${limit}`);
+
 export interface AdminNotificationCounts {
   pending_tickets: number;
   allowlisted_destinations: number;
