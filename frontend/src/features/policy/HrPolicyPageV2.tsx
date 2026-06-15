@@ -600,7 +600,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
                 matrixPayload?.source === 'published' ||
                 matrixPayload?.source === 'published_clone')
                 ? 'read-only summary by theme'
-                : 'publish to make this visible to employees'}
+                : ''}
             </span>
           </div>
         </summary>
@@ -653,7 +653,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
             <span className="text-base font-semibold text-[#0b2b43]">
               ▸ See draft vs live changes
             </span>
-            <span className="text-xs text-[#64748b]">matrix diff with revert per row</span>
+            <span className="text-xs text-[#64748b]">What changed, benefit by benefit</span>
           </div>
         </summary>
         <div className="px-5 pb-5">
@@ -668,9 +668,9 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
             <div className="flex items-center justify-between gap-3">
               <span className="text-base font-semibold text-[#0b2b43]">
-                ▸ See document-extraction diff
+                ▸ See policy rules from your documents
               </span>
-              <span className="text-xs text-[#64748b]">canonical rules from your uploaded files</span>
+              <span className="text-xs text-[#64748b]">Policy rules extracted from your source documents</span>
             </div>
           </summary>
           <div className="px-5 pb-5">
