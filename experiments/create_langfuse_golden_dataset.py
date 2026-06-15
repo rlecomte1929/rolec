@@ -5,8 +5,8 @@ Usage (from repo root, with venv_new active):
     python -m experiments.create_langfuse_golden_dataset
 
 What it does:
-  1. Creates (or updates) a Langfuse Dataset named ``policy-assistant-golden-v1``.
-  2. Upserts 20 dataset items — one per eval question.
+  1. Creates (or updates) a Langfuse Dataset named ``policy-assistant-golden-v2``.
+  2. Upserts 46 dataset items — one per eval question.
      Each item stores:
        input            → {"question": "..."}
        expected_output  → {"expected_verdict": ..., "description": ..., "checks": [...]}
@@ -312,7 +312,380 @@ GOLDEN_ITEMS: List[Dict[str, Any]] = [
             ],
         },
     },
-    # ─── Q19 — OUT OF SCOPE ───────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════════════
+    # B-db-cleanup (10 cases) — section-ref rows deleted; must not surface refs
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ─── Q21 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "What visa and work permit support is included for this assignment?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "immigration/§2.1 deleted — must not show section ref as a value. "
+                "Must return entitlement_summary with topic=work_permit_support or visa_support."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "2.1"},
+            ],
+        },
+    },
+    # ─── Q22 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Does the policy reimburse banking fees or bank transfer costs?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "banking_setup/§4.6 deleted — must not show section ref. "
+                "Must return entitlement_summary with topic=banking_setup."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "4.6"},
+            ],
+        },
+    },
+    # ─── Q23 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Is there a cost of living allowance (COLA)? What is the amount?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "cola/§6.4 deleted — must not show section ref. "
+                "Must return entitlement_summary with topic=relocation_allowance."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "6.4"},
+            ],
+        },
+    },
+    # ─── Q24 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "What household goods and removal expenses are covered?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "household_goods/§9.3 deleted — must not show section ref. "
+                "Must return entitlement_summary with topic=shipment."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "9.3"},
+            ],
+        },
+    },
+    # ─── Q25 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Is language or cultural training covered for the family?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "language_training/§2.5 deleted — must not show section ref. "
+                "Must return entitlement_summary with topic=school_search."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "2.5"},
+            ],
+        },
+    },
+    # ─── Q26 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Is a remote location premium included in the policy?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "remote_premium/§6.3 deleted — must not show section ref. "
+                "Must return entitlement_summary with topic=relocation_allowance."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "6.3"},
+            ],
+        },
+    },
+    # ─── Q27 — E5 ─────────────────────────────────────────────────────────────
+    {
+        "question": "What transport is covered when traveling to the host country?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "transport/§3.1 and §9.4 deleted — must not show section refs. "
+                "Must return entitlement_summary with topic=transport (E5 fix)."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "3.1"},
+                {"kind": "answer_text_not_contains", "value": "9.4"},
+            ],
+        },
+    },
+    # ─── Q28 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Are there any host-country housing benefits?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "housing/§6.5-6.7 deleted — must not show section refs. "
+                "Must return entitlement_summary with topic=host_housing."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "6.5"},
+                {"kind": "answer_text_not_contains", "value": "6.7"},
+            ],
+        },
+    },
+    # ─── Q29 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "What is the relocation allowance — exact amount and currency?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "location_allowance/§3.2 fixed to 5000/EUR — must not show '3.2' as the cap. "
+                "Must return entitlement_summary showing EUR 5,000."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "3.2"},
+            ],
+        },
+    },
+    # ─── Q30 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Are there mobility premium or incentive allowances?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "mobility_premium/§5.0 and §5.3 deleted — must not show section refs. "
+                "Must return entitlement_summary with topic=relocation_allowance."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "5.0"},
+                {"kind": "answer_text_not_contains", "value": "5.3"},
+            ],
+        },
+    },
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # C-aspects (4 new aspect cases; Q02/Q03 already covered above)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ─── Q31 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "How do I claim the relocation allowance — what is the process?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Aspect=process on relocation_allowance. "
+                "Must not be a bare refusal; should acknowledge the claim process question."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q32 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Who is eligible for the relocation allowance?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Aspect=eligibility on relocation_allowance. "
+                "Must not be a bare refusal; should acknowledge the eligibility question."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q33 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Is there a deadline or time limit to use home leave trips?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Aspect=deadline on home_leave. "
+                "Must not be a bare refusal; should acknowledge the deadline question."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q34 — E6 ─────────────────────────────────────────────────────────────
+    {
+        "question": "What documents do I need to submit to claim school fees?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Process aspect on school_search (E6 fix). "
+                "Must not be a bare refusal; should return entitlement_summary for school_search."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # D-refusal (4 new out-of-scope cases; Q19/Q20 already cover 2)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ─── Q35 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "What is the best area to live in Amsterdam for expats?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": "Lifestyle/location advice — must return answer_type=refusal.",
+            "checks": [
+                {"kind": "answer_type_eq", "value": "refusal"},
+            ],
+        },
+    },
+    # ─── Q36 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Can you calculate my net tax liability for the assignment?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": "Tax advice beyond policy — must return answer_type=refusal.",
+            "checks": [
+                {"kind": "answer_type_eq", "value": "refusal"},
+            ],
+        },
+    },
+    # ─── Q37 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "What does French employment law say about expat allowances?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": "Legal advice — must return answer_type=refusal.",
+            "checks": [
+                {"kind": "answer_type_eq", "value": "refusal"},
+            ],
+        },
+    },
+    # ─── Q38 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Hello, how are you today?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": "General chat — must return answer_type=refusal.",
+            "checks": [
+                {"kind": "answer_type_eq", "value": "refusal"},
+            ],
+        },
+    },
+    # ─── Q39 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "My colleague got a better relocation package — can you match it?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": "Cross-company / negotiation — must return answer_type=refusal.",
+            "checks": [
+                {"kind": "answer_type_eq", "value": "refusal"},
+            ],
+        },
+    },
+    # ─── Q40 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "What is the current EUR/USD exchange rate?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": "Market data / financial info — must return answer_type=refusal.",
+            "checks": [
+                {"kind": "answer_type_eq", "value": "refusal"},
+            ],
+        },
+    },
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # E-hr-meta (4 HR-scoped meta questions — require HR role context)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ─── Q41 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Is this policy currently published and visible to employees?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "HR policy status question. Must return status_summary or entitlement_summary. "
+                "Not a bare unknown refusal."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q42 — E7/E9 ──────────────────────────────────────────────────────────
+    {
+        "question": "Are there any HR overrides applied to this policy version?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Override question (E7+E9 fix). Must return status_summary with substantive text "
+                "— not a bare refusal with policy_status=unknown."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q43 — E8 ─────────────────────────────────────────────────────────────
+    {
+        "question": "What benefits does the employee currently see in the published policy?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Employee visibility question — HR-scoped (E8 fix). "
+                "Must return status_summary; not a bare refusal."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q44 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "Is there a difference between the draft and the published version?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "Draft vs published — HR-scoped question. "
+                "Must return draft_published_summary or status_summary; not a bare refusal."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Original out-of-scope cases (kept for continuity with v1 item IDs Q19/Q20)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ─── Q45 — OUT OF SCOPE ───────────────────────────────────────────────────
     {
         "question": "What is the best school district in Paris?",
         "expected_output": {
@@ -326,7 +699,7 @@ GOLDEN_ITEMS: List[Dict[str, Any]] = [
             ],
         },
     },
-    # ─── Q20 — OUT OF SCOPE ───────────────────────────────────────────────────
+    # ─── Q46 — OUT OF SCOPE ───────────────────────────────────────────────────
     {
         "question": "Can you help me negotiate a better relocation package?",
         "expected_output": {
@@ -395,11 +768,12 @@ def _score_item(answer: Dict[str, Any], expected_output: Dict[str, Any]) -> str:
 
 # ── Upload ────────────────────────────────────────────────────────────────────
 
-DATASET_NAME = "policy-assistant-golden-v1"
+DATASET_NAME = "policy-assistant-golden-v2"
 DATASET_DESCRIPTION = (
-    "20-question golden eval set for the ReloPass HR policy assistant. "
-    "Covers all 13 canonical topics + E2/E3 regression guards + 2 out-of-scope refusal checks. "
-    "Baseline: 20/20 PASS as of 2026-06-15 (post E1–E4 fixes)."
+    "46-question golden eval set for the ReloPass HR policy assistant. "
+    "Covers all 14 canonical topics (incl. TRANSPORT) + section-ref regression guards "
+    "(B-db-cleanup) + aspect questions (C) + out-of-scope refusals (D) + HR meta questions (E). "
+    "Baseline: 46/46 PASS as of 2026-06-15 (post E1–E9 fixes + unit display fix)."
 )
 
 

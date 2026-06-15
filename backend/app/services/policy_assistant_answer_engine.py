@@ -127,7 +127,19 @@ def _map_comparison_readiness(raw: Optional[str]) -> PolicyAssistantComparisonRe
     return mapping.get(key, PolicyAssistantComparisonReadiness.NOT_APPLICABLE)
 
 
-def _format_cap(row: PolicyAssistantResolvedTopic) -> Optional[str]:
+# Unit hints for topics whose cap amounts are counts/durations, not monetary values.
+# Applied only when cap_currency is absent — avoids overriding "EUR 5,000" style caps.
+_TOPIC_UNIT_HINTS: Dict[PolicyAssistantCanonicalTopic, str] = {
+    PolicyAssistantCanonicalTopic.HOME_LEAVE: "trips",
+    PolicyAssistantCanonicalTopic.SHIPMENT: "days",
+    PolicyAssistantCanonicalTopic.SCHOOL_SEARCH: "hours",
+}
+
+
+def _format_cap(
+    row: PolicyAssistantResolvedTopic,
+    topic: Optional[PolicyAssistantCanonicalTopic] = None,
+) -> Optional[str]:
     if not row.has_numeric_cap or row.cap_amount is None:
         return None
     cur = (row.cap_currency or "").strip().upper()
@@ -139,7 +151,12 @@ def _format_cap(row: PolicyAssistantResolvedTopic) -> Optional[str]:
             num_s = f"{num:,.2f}"
     except (TypeError, ValueError):
         num_s = str(num)
-    base = f"{cur} {num_s}".strip() if cur else num_s
+    if cur:
+        base = f"{cur} {num_s}"
+    elif topic and topic in _TOPIC_UNIT_HINTS:
+        base = f"{num_s} {_TOPIC_UNIT_HINTS[topic]}"
+    else:
+        base = num_s
     if row.cap_frequency:
         freq = row.cap_frequency.replace("_", " ")
         return f"{base} ({freq})"
@@ -599,7 +616,7 @@ def generate_policy_assistant_answer(
             classification.guardrail_note,
         )
 
-    cap_s = _format_cap(row)
+    cap_s = _format_cap(row, topic=topic)
     body = _build_aspect_body(title, row, classification.question_aspect, cap_s)
 
     if row.approval_required:
