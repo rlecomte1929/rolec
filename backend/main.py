@@ -52,7 +52,7 @@ from .schemas import (
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
     AddEvidenceRequest, AddEvidenceResponse,
 )
-from .app.services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
+from .app.services.dossier import evaluate_applies_if, validate_answer
 from .app.services.guidance_pack_service import generate_guidance_pack
 from .app.services.immigration_service import _log_access  # data_access_log PII-access writer
 from .app.services.policy_adapter import normalize_policy_caps
@@ -10655,24 +10655,27 @@ def dossier_search_suggestions(
     )
     if not dest:
         return DossierSearchSuggestionsResponse(destination_country=None, sources=[], suggestions=[])
+    # [P3-02] RAG path: retrieve corridor-specific immigration facts from
+    # policy_assistant_chunks → LLM (PII-masked) → structured dossier questions.
+    # Pure RAG — the SERPAPI web-search path is no longer called here. Corridors
+    # outside the corpus (5 supported) return an empty, graceful list.
+    from backend.app.services.dossier_suggestion_service import (
+        corridor_for_case,
+        suggest_questions,
+    )
+
     profile = _build_profile_snapshot(draft)
-    search = fetch_search_results(dest, profile)
-    results = search.get("results", [])
-    if results:
-        grouped: Dict[str, List[Dict[str, Any]]] = {}
-        for r in results:
-            grouped.setdefault(r.get("query") or "query", []).append({
-                "title": r.get("title"),
-                "url": r.get("url"),
-                "snippet": r.get("snippet", ""),
-            })
-        for q, items in grouped.items():
-            db.add_dossier_source_suggestion(request.case_id, dest, q, items)
-    suggestions = build_suggested_questions(dest, results)
-    sources = [
-        {"title": r.get("title"), "url": r.get("url"), "snippet": r.get("snippet", "")}
-        for r in results
-    ]
+    corridor = corridor_for_case(draft)
+    suggestions = suggest_questions(corridor, profile)
+    # Aggregate the per-question chunk citations into the top-level sources list.
+    seen: set = set()
+    sources: List[Dict[str, Any]] = []
+    for s in suggestions:
+        for src in s.get("sources") or []:
+            key = src.get("chunk_id")
+            if key and key not in seen:
+                seen.add(key)
+                sources.append(src)
     return DossierSearchSuggestionsResponse(
         destination_country=dest,
         sources=sources,
