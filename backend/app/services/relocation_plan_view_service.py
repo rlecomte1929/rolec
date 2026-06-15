@@ -414,6 +414,21 @@ def _build_next_action_schema(
     )
 
 
+def _resolve_roadmap_validation(db, case_id, summary):
+    """(validated, validated_at, validated_by). Explicit row wins; otherwise
+    grandfather a case that's already in execution (any task completed or in
+    progress) so the new gate never nags active users."""
+    try:
+        row = db.get_roadmap_validation(case_id)
+    except Exception:
+        row = None
+    if isinstance(row, dict):
+        return True, row.get("validated_at"), row.get("validated_by_user_id")
+    if (getattr(summary, "completed_tasks", 0) or 0) > 0 or (getattr(summary, "in_progress_tasks", 0) or 0) > 0:
+        return True, None, None
+    return False, None, None
+
+
 def build_relocation_plan_view_response(
     *,
     case_id: str,
@@ -539,6 +554,8 @@ def build_relocation_plan_view_response(
             if dbg:
                 debug_payload.setdefault("derivation_traces", {})[t.task_code] = dbg
 
+    rv_validated, rv_at, rv_by = _resolve_roadmap_validation(db, case_id, summary)
+
     return RelocationPlanViewResponse(
         case_id=case_id,
         assignment_id=assignment_id,
@@ -549,6 +566,9 @@ def build_relocation_plan_view_response(
         last_evaluated_at=datetime.now(timezone.utc),
         data_freshness=freshness,
         empty_state_reason=empty_reason_out,
+        roadmap_validated=rv_validated,
+        roadmap_validated_at=rv_at,
+        roadmap_validated_by=rv_by,
         debug=debug_payload,
     )
 

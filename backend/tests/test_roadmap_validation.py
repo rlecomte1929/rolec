@@ -38,3 +38,39 @@ def test_upsert_then_get_roundtrip_and_idempotent():
     db.upsert_roadmap_validation("case-1", "emp-9")
     again = db.get_roadmap_validation("case-1")
     assert again["canonical_case_id"] == "case-1"
+
+
+class _Summary:
+    def __init__(self, completed=0, in_progress=0):
+        self.completed_tasks = completed
+        self.in_progress_tasks = in_progress
+
+
+def test_resolver_explicit_validation_wins():
+    from backend.app.services.relocation_plan_view_service import _resolve_roadmap_validation
+
+    class DB:
+        def get_roadmap_validation(self, cid):
+            return {"validated_at": "2026-06-15T00:00:00", "validated_by_user_id": "emp"}
+    v, at, by = _resolve_roadmap_validation(DB(), "c", _Summary())
+    assert v is True and at == "2026-06-15T00:00:00" and by == "emp"
+
+
+def test_resolver_grandfathers_in_execution_case():
+    from backend.app.services.relocation_plan_view_service import _resolve_roadmap_validation
+
+    class DB:
+        def get_roadmap_validation(self, cid):
+            return None
+    v, at, by = _resolve_roadmap_validation(DB(), "c", _Summary(in_progress=2))
+    assert v is True and at is None
+
+
+def test_resolver_unvalidated_fresh_case():
+    from backend.app.services.relocation_plan_view_service import _resolve_roadmap_validation
+
+    class DB:
+        def get_roadmap_validation(self, cid):
+            return None
+    v, at, by = _resolve_roadmap_validation(DB(), "c", _Summary())
+    assert v is False and at is None

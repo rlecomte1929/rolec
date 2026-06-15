@@ -281,6 +281,15 @@ class RelocationPlanViewResponse(BaseModel):
         default=None,
         description="When next_action is null, stable UX copy (e.g. waiting on another party).",
     )
+    roadmap_validated: bool = Field(
+        default=False,
+        description="True once the employee validated the roadmap (or grandfathered: case already in execution).",
+    )
+    roadmap_validated_at: Optional[datetime] = Field(
+        default=None,
+        description="When the roadmap was explicitly validated; null when grandfathered or not validated.",
+    )
+    roadmap_validated_by: Optional[str] = Field(default=None)
     debug: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Internal diagnostics; only populated when the client passes debug=true (strip in proxies).",
