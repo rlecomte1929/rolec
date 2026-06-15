@@ -3853,6 +3853,110 @@ class PoliciesMixin:
             )
         return aid
 
+    # AIQ-1070: column/param spec shared by the single-row insert and the
+    # batched replace below — keep these in sync with insert_policy_config_benefit_row.
+    _PCB_INSERT_SQL = """
+                    INSERT INTO policy_config_benefits
+                    (id, policy_config_version_id, benefit_key, benefit_label, category, covered,
+                     value_type, amount_value, currency_code, percentage_value, unit_frequency,
+                     cap_rule_json, notes, conditions_json, assignment_types, family_statuses,
+                     employee_levels, targeting_signature, is_active, display_order, source,
+                     auto_generated, field_confidence, created_at, updated_at)
+                    VALUES
+                    (:id, :vid, :bk, :bl, :cat, :cov, :vt, :av, :cc, :pv, :uf, :crj, :notes, :cj,
+                     :atj, :fsj, :elj, :tsig, :ia, :do, :src, :ag, :fc, :ca, :ua)
+"""
+    _PCB_AUDIT_INSERT_SQL = """
+                    INSERT INTO policy_config_benefits_audit
+                    (id, benefit_id, policy_config_version_id, benefit_key, action,
+                     old_value, new_value, source, changed_by, changed_at)
+                    VALUES
+                    (:id, :bid, :vid, :bk, :act, :ov, :nv, :src, :cb, :ca)
+"""
+
+    def _policy_config_benefit_insert_params(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """Build the bound-param dict for one policy_config_benefits row.
+        Mirrors insert_policy_config_benefit_row exactly (JSON + sqlite-bool
+        coercion); used by the batched replace so the two paths agree."""
+        from ..database import _is_sqlite
+        bid = str(row.get("id") or uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        cap_j = row.get("cap_rule_json")
+        cap_j = json.dumps(cap_j) if isinstance(cap_j, dict) else ("{}" if cap_j is None else cap_j)
+        cond_j = row.get("conditions_json")
+        cond_j = json.dumps(cond_j) if isinstance(cond_j, dict) else ("{}" if cond_j is None else cond_j)
+        at_j = row.get("assignment_types")
+        at_j = json.dumps(at_j) if isinstance(at_j, list) else ("[]" if at_j is None else at_j)
+        fs_j = row.get("family_statuses")
+        fs_j = json.dumps(fs_j) if isinstance(fs_j, list) else ("[]" if fs_j is None else fs_j)
+        el_j = row.get("employee_levels")
+        el_j = json.dumps(el_j) if isinstance(el_j, list) else ("[]" if el_j is None else el_j)
+        cov = row.get("covered", False)
+        iact = row.get("is_active", True)
+        ag = row.get("auto_generated", True)
+        if _is_sqlite:
+            cov = 1 if cov else 0
+            iact = 1 if iact else 0
+            ag = 1 if ag else 0
+        return {
+            "id": bid, "vid": str(row["policy_config_version_id"]),
+            "bk": str(row["benefit_key"]), "bl": str(row["benefit_label"]),
+            "cat": str(row["category"]), "cov": cov,
+            "vt": str(row.get("value_type") or "none"), "av": row.get("amount_value"),
+            "cc": row.get("currency_code"), "pv": row.get("percentage_value"),
+            "uf": str(row.get("unit_frequency") or "one_time"), "crj": cap_j,
+            "notes": row.get("notes"), "cj": cond_j, "atj": at_j, "fsj": fs_j, "elj": el_j,
+            "tsig": str(row.get("targeting_signature") or "global"), "ia": iact,
+            "do": int(row.get("display_order") or 0),
+            "src": (str(row["source"]) if row.get("source") else None), "ag": ag,
+            "fc": row.get("field_confidence"), "ca": now, "ua": now,
+        }
+
+    def _policy_config_benefit_audit_params(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """Bound-param dict for one policy_config_benefits_audit row.
+        Mirrors insert_policy_config_benefit_audit_row."""
+        aid = str(row.get("id") or uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        ov = row.get("old_value")
+        ov = json.dumps(ov, default=str) if isinstance(ov, (dict, list)) else ov
+        nv = row.get("new_value")
+        nv = json.dumps(nv, default=str) if isinstance(nv, (dict, list)) else nv
+        return {
+            "id": aid,
+            "bid": str(row["benefit_id"]) if row.get("benefit_id") else None,
+            "vid": str(row["policy_config_version_id"]) if row.get("policy_config_version_id") else None,
+            "bk": row.get("benefit_key"), "act": str(row.get("action") or "update"),
+            "ov": ov, "nv": nv, "src": row.get("source"), "cb": row.get("changed_by"), "ca": now,
+        }
+
+    def replace_policy_config_benefits(
+        self,
+        policy_config_version_id: str,
+        rows: List[Dict[str, Any]],
+        audit_rows: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        """AIQ-1070: atomically replace all benefit rows for a draft version.
+
+        Deletes the version's existing benefit rows and re-inserts ``rows`` (plus
+        any ``audit_rows``) using batched multi-row inserts inside a SINGLE
+        transaction. Replaces the old delete-then-per-row-insert loop, which made
+        hundreds of sequential round-trips (~33s for a full matrix) and could leave
+        a partial/empty draft if it failed mid-loop. Each row in ``rows`` must carry
+        a pre-generated ``id`` so callers can reference it in ``audit_rows``.
+        """
+        vid = str(policy_config_version_id)
+        benefit_params = [self._policy_config_benefit_insert_params(r) for r in rows]
+        audit_params = [self._policy_config_benefit_audit_params(a) for a in (audit_rows or [])]
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM policy_config_benefits WHERE policy_config_version_id = :vid"),
+                {"vid": vid},
+            )
+            if benefit_params:
+                conn.execute(text(self._PCB_INSERT_SQL), benefit_params)
+            if audit_params:
+                conn.execute(text(self._PCB_AUDIT_INSERT_SQL), audit_params)
+
     def list_jurisdiction_overrides_for_benefit_rows(
         self, benefit_row_ids: List[str]
     ) -> Dict[str, List[Dict[str, Any]]]:
