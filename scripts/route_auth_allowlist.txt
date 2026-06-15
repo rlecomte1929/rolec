@@ -137,6 +137,10 @@ backend/app/routers/crons.py:test_monitoring_alert
 backend/app/routers/crons.py:case_health_scan
 # CRON (AIQ-378b): _verify_cron_secret(request) inline. Nightly proactive
 # case-health scan, invoked by the case-health-scan workflow, not an end user.
+backend/app/routers/crons.py:promote_hr_vendors_cron
+# CRON (CATALOG-2-FU/AIQ-1077): _verify_cron_secret(request) inline. Daily
+# automatic HR-vendor promotion, invoked by the catalog-promotion workflow,
+# not an end user.
 
 # CRON (PERMANENT): calls _verify_cron_secret(request) in the body — fail-closed
 # (503 if CRON_SECRET unset, 401 on mismatch). Inline, not a Depends().

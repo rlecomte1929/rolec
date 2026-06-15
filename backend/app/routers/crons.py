@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -171,4 +171,32 @@ def case_health_scan(request: Request) -> Dict[str, Any]:
     from ..services.case_health_scan import run_case_health_scan
 
     result = run_case_health_scan()
+    return {"ok": True, **result}
+
+
+@router.post("/promote-hr-vendors")
+def promote_hr_vendors_cron(
+    request: Request,
+    threshold: Optional[int] = None,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """
+    [CATALOG-2-FU/AIQ-1077] Scheduled automatic promotion of popular HR custom
+    vendors into the master catalog. Mirrors the admin-triggered
+    POST /api/admin/catalog/promote-hr-vendors, but runs unattended via
+    `.github/workflows/catalog-promotion.yml` (daily), gated behind the
+    `CATALOG_PROMOTION_CRON_ENABLED` repo var. The service is idempotent —
+    vendors already present in the master catalog are skipped, so re-runs never
+    duplicate. `threshold`/`dry_run` are query-configurable for manual
+    workflow_dispatch testing (default: configured threshold, real run).
+    """
+    _verify_cron_secret(request)
+    log.info(
+        "promote_hr_vendors cron triggered (threshold=%s, dry_run=%s)",
+        threshold,
+        dry_run,
+    )
+    from ..services.catalog_promotion_service import promote_hr_vendors
+
+    result = promote_hr_vendors(threshold=threshold, dry_run=dry_run, actor_id="cron")
     return {"ok": True, **result}
