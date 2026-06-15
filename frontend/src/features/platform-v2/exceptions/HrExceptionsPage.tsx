@@ -174,7 +174,8 @@ function ExcDetail({
             </svg>
           </div>
           <p className="text-sm font-medium text-slate-700">Select a request</p>
-          <p className="text-xs text-slate-400 mt-1 max-w-[260px]">Choose a request from the inbox to see the full context, justification, and decision history.</p>
+          {/* RTL: change 'on the left' to 'on the right' for Arabic/Hebrew locales */}
+          <p className="text-xs text-slate-400 mt-1 max-w-[260px]">Choose a request on the left to see the full context, justification, and decision history.</p>
         </div>
       </div>
     );
@@ -748,7 +749,7 @@ export function HrExceptionsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-sm text-slate-500">No {filter} requests.</p>
-                <p className="text-xs text-slate-400 mt-0.5">You're caught up.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Exception requests from employees will appear here.</p>
               </div>
             ) : (
               filtered.map((r) => (
