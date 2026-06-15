@@ -36,6 +36,14 @@ class PolicyAssistantClassificationResult(BaseModel):
         max_length=2000,
         description="When set, non-policy parts of the message were dropped; answer only the policy thread.",
     )
+    question_aspect: Optional[str] = Field(
+        None,
+        description=(
+            "Sub-question aspect when intent=POLICY_ENTITLEMENT_QUESTION and a topic was detected: "
+            "amount | deadline | eligibility | structure | process. "
+            "None means the question is general (entitlement summary with cap amount is appropriate)."
+        ),
+    )
 
 
 # --- Normalization ---
@@ -227,6 +235,52 @@ _APPROVAL_Q = re.compile(
     r"\bprior approval\b",
     re.I,
 )
+
+# Question-aspect detectors — used to branch answer generation beyond the default amount template
+_ASPECT_DEADLINE = re.compile(
+    r"\bdeadline\b|\btime limit\b|\bexpir[ye]\b|"
+    r"\bwhen (?:do|must|can) i (?:claim|use|submit|request)\b|"
+    r"\bhow long do i have\b",
+    re.I,
+)
+_ASPECT_STRUCTURE = re.compile(
+    r"\blump.?sum\b|\bmanaged (?:relocation|services?)\b|"
+    r"\bhow is it (?:structured|paid|disbursed)\b|"
+    r"\b(?:option|choice)s?\b.*\b(?:lump|managed|cash)\b|"
+    r"\binstead of managed\b",
+    re.I,
+)
+_ASPECT_ELIGIBILITY = re.compile(
+    r"\bam i eligible\b|\bwho (?:is eligible|qualifies|can get|can claim)\b|"
+    r"\bdoes it apply to\b|\beligib\w+\b.*\b(?:for|to|this)\b",
+    re.I,
+)
+_ASPECT_PROCESS = re.compile(
+    r"\bhow (?:do|can) i (?:claim|apply|request|get|submit)\b|"
+    r"\bwhat (?:do i|steps|documents)\b.*\b(?:claim|apply|request)\b|"
+    r"\b(?:claim|application) process\b",
+    re.I,
+)
+_ASPECT_AMOUNT = re.compile(
+    r"\bhow much\b|\bwhat (?:is|are) (?:the )?(?:amount|cap|limit|budget|value)\b|"
+    r"\bwhat (?:percentage|%)\b|\bwhat (?:is )?the (?:rate|level)\b",
+    re.I,
+)
+
+
+def _detect_question_aspect(norm: str) -> Optional[str]:
+    """Return the sub-question aspect for entitlement questions, or None for general."""
+    if _ASPECT_DEADLINE.search(norm):
+        return "deadline"
+    if _ASPECT_STRUCTURE.search(norm):
+        return "structure"
+    if _ASPECT_ELIGIBILITY.search(norm):
+        return "eligibility"
+    if _ASPECT_PROCESS.search(norm):
+        return "process"
+    if _ASPECT_AMOUNT.search(norm):
+        return "amount"
+    return None
 
 
 # Topic: (positive patterns or literals), negative patterns (if match, skip topic or penalize)
@@ -633,4 +687,5 @@ def classify_policy_chat_message(
         ambiguity_reason=None,
         refusal_code=None,
         normalized_question=normalized_question,
+        question_aspect=_detect_question_aspect(norm),
     )

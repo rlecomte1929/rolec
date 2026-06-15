@@ -180,6 +180,73 @@ def _evidence_for_topic(topic: PolicyAssistantCanonicalTopic, row: PolicyAssista
     )
 
 
+_ASPECT_GAP_SUFFIX = (
+    " For this detail, please refer to your policy document or ask HR directly."
+)
+
+
+def _build_aspect_body(
+    title: str,
+    row: PolicyAssistantResolvedTopic,
+    question_aspect: Optional[str],
+    cap_s: Optional[str],
+) -> str:
+    """
+    Generate entitlement answer text appropriate to the question aspect.
+
+    For aspects other than 'amount' (deadline, structure, eligibility, process), the template
+    acknowledges the topic is included, then notes whether the specific attribute is captured
+    in the stored policy data — avoiding the misleading pattern of always returning the cap amount.
+    """
+    aspect = (question_aspect or "").lower()
+    included_prefix = f"**{title}** is **included**" + (f" up to **{cap_s}**" if cap_s else "") + " in the policy data ReloPass has for this case"
+
+    if aspect == "deadline":
+        if row.excerpt and re.search(r"\bdeadline\b|\bwithin\b|\bmonths?\b|\bweeks?\b|\bdays?\b|\bexpir[ye]\b", row.excerpt, re.I):
+            return f"{included_prefix}. Policy text: {row.excerpt.strip()}"
+        return (
+            f"{included_prefix}, but **no deadline for claiming** is specified in the stored policy data."
+            + _ASPECT_GAP_SUFFIX
+        )
+
+    if aspect == "structure":
+        if row.excerpt and re.search(r"\blump.?sum\b|\bmanaged\b|\bservice\b|\boption\b|\bcash\b", row.excerpt, re.I):
+            return f"{included_prefix}. Policy text: {row.excerpt.strip()}"
+        return (
+            f"{included_prefix}, but **no lump sum vs. managed structure** is specified in the stored policy data."
+            + _ASPECT_GAP_SUFFIX
+        )
+
+    if aspect == "eligibility":
+        if row.excerpt and re.search(r"\beligib\w+\b|\bqualif\w+\b|\bapply to\b|\bwho\b", row.excerpt, re.I):
+            return f"{included_prefix}. Policy text: {row.excerpt.strip()}"
+        return (
+            f"{included_prefix}. **Specific eligibility conditions** are not detailed in the stored policy data."
+            + _ASPECT_GAP_SUFFIX
+        )
+
+    if aspect == "process":
+        if row.excerpt:
+            return f"{included_prefix}. Policy text: {row.excerpt.strip()}"
+        return (
+            f"{included_prefix}. **Claim process details** are not stored in the policy data ReloPass has for this case."
+            + _ASPECT_GAP_SUFFIX
+        )
+
+    # Default / amount / None: original cap-first template
+    if row.has_numeric_cap and cap_s:
+        return f"For your case, **{title}** is **included** up to **{cap_s}** in the policy data ReloPass is using."
+    if row.has_numeric_cap:
+        return (
+            f"**{title}** is **included**, but **no complete numeric cap** "
+            f"(amount and currency) is defined in the published policy data for this case."
+        )
+    return (
+        f"**{title}** is **included** in the policy data, but **no numeric cap is defined** "
+        f"in the published policy ReloPass has for this case."
+    )
+
+
 def _follow_ups(current: Optional[PolicyAssistantCanonicalTopic]) -> List[PolicyAssistantFollowUpOption]:
     out: List[PolicyAssistantFollowUpOption] = []
     for t in POLICY_ASSISTANT_TOPIC_ORDER:
@@ -522,18 +589,7 @@ def generate_policy_assistant_answer(
         )
 
     cap_s = _format_cap(row)
-    if row.has_numeric_cap and cap_s:
-        body = f"For your case, **{title}** is **included** up to **{cap_s}** in the policy data ReloPass is using."
-    elif row.has_numeric_cap and not cap_s:
-        body = (
-            f"**{title}** is **included**, but **no complete numeric cap** "
-            f"(amount and currency) is defined in the published policy data for this case."
-        )
-    else:
-        body = (
-            f"**{title}** is **included** in the policy data, but **no numeric cap is defined** "
-            f"in the published policy ReloPass has for this case."
-        )
+    body = _build_aspect_body(title, row, classification.question_aspect, cap_s)
 
     if row.approval_required:
         body += " This item **may be subject to approval** according to the policy text."

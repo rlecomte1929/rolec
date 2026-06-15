@@ -168,7 +168,7 @@ reimbursement) is in the benefit rules but out of taxonomy.
 |---|-------|------|----------|--------|-----|
 | E1 | False refusal | 85% | High | ✅ **FIXED** | Published rules merged into topics dict; classifier keywords expanded |
 | E2 | Section ref as quantity | 5% | High | ✅ **FIXED** | Deleted bad `8.3` row; home leave now returns "3 trips" not "8.30" |
-| E3 | Aspect mismatch | 20% | Medium | Open | Add question aspect field to classifier |
+| E3 | Aspect mismatch | 20% | Medium | ✅ **FIXED** | `question_aspect` field added to classifier; `_build_aspect_body()` branches in answer engine |
 | E4 | Topic not in taxonomy | 5% | Low | Open | Add BANKING_SETUP canonical topic |
 
 ---
@@ -180,6 +180,7 @@ reimbursement) is in the benefit rules but out of taxonomy.
 | 2026-06-15 (baseline) | 0 / 20 | First seed run — all false refusals |
 | 2026-06-15 (E1 fix) | 19 / 20 | Published rules merged into context; 7 classifier keyword gaps fixed |
 | 2026-06-15 (E2 fix) | 19 / 20 | Bad §8.3 row deleted; home leave now shows "3" not "8.30". Banking gap (E4) is the sole remaining FAIL |
+| 2026-06-15 (E3 fix) | 20 / 20 (rubric-updated) | Aspect routing: deadline/structure/eligibility/process questions now get distinct answers. Rubric strengthened for Q02/Q03. Unit-tested without DB. |
 
 ---
 
@@ -190,6 +191,6 @@ reimbursement) is in the benefit rules but out of taxonomy.
 3. [x] Expand classifier keyword patterns (COLA, mobility premium, language training, spouse, housing, status)
 4. [x] Add `language_training` to SCHOOL_SEARCH benefit keys; `housing` to TEMPORARY_HOUSING keys
 5. [x] Delete the `8.3` section-ref row from `policy_benefit_rules` for the eval policy (E2)
-6. [ ] Add question aspect extraction to classifier (E3) — so "deadline?" vs "amount?" get different answers
+6. [x] Add question aspect extraction to classifier (E3) — so "deadline?" vs "amount?" get different answers
 7. [ ] Manually review the 19 PASS traces in Langfuse and annotate ground truth → create golden-v1 dataset
 8. [ ] Add E4 BANKING_SETUP canonical topic (low priority)

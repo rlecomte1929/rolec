@@ -91,6 +91,7 @@ def _verdict(i: int, answer: dict) -> str:
     atype = answer.get("answer_type", "")
     pstatus = answer.get("policy_status", "")
     text = answer.get("answer_text", "")
+    tl = text.lower()
 
     # Questions 18-19 (0-indexed) should be refused
     if i in (18, 19):
@@ -103,6 +104,23 @@ def _verdict(i: int, answer: dict) -> str:
     # Must have some content
     if not text and atype != "refusal":
         return "FAIL"
+
+    # E3 checks: aspect-specific content must differ from the generic amount template.
+    # Q02 (0-indexed: 1) — "Is there a deadline to claim the relocation allowance?"
+    if i == 1:
+        has_amount_only = "5,000" in text and not any(
+            kw in tl for kw in ("deadline", "doesn't specify", "not specified", "no deadline", "policy text")
+        )
+        if has_amount_only:
+            return "FAIL"
+
+    # Q03 (0-indexed: 2) — "Is there a lump sum option instead of managed relocation services?"
+    if i == 2:
+        has_amount_only = "5,000" in text and not any(
+            kw in tl for kw in ("lump", "managed", "structure", "doesn't specify", "not specified", "policy text")
+        )
+        if has_amount_only:
+            return "FAIL"
 
     return "PASS"
 
