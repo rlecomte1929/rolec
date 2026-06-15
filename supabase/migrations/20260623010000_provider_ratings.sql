@@ -47,10 +47,13 @@ CREATE POLICY "provider_ratings_admin_read" ON public.provider_ratings
   USING (public.is_admin());
 
 -- HR: read-only for ratings scoped to companies they manage.
+-- hr_company_ids() RETURNS SETOF text, so it must be used as `IN (SELECT ...)`
+-- (a set-returning function is not allowed in `= ANY(...)` inside a policy), and
+-- company_id (uuid) is cast to text to match the function's text company ids.
 DROP POLICY IF EXISTS "provider_ratings_hr_read" ON public.provider_ratings;
 CREATE POLICY "provider_ratings_hr_read" ON public.provider_ratings
   FOR SELECT
-  USING (company_id = ANY (public.hr_company_ids()));
+  USING (company_id::text IN (SELECT public.hr_company_ids()));
 
 -- Defense-in-depth: the anon key (shipped in the frontend bundle) must never
 -- reach this table directly via PostgREST.
