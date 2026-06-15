@@ -514,14 +514,14 @@ export const EmployeeJourney: React.FC = () => {
       ? 'My assignments'
       : hasPendingOnly
         ? 'Pending assignments'
-        : 'Welcome';
+        : 'Your relocation';
   const shellSubtitle = assignmentLoading
     ? 'Loading your assignment list.'
     : hasLinked
       ? 'Open a case or pick up where you left off.'
       : hasPendingOnly
         ? 'Accept your pending case below, then open it to get started.'
-        : 'Enter the case code from HR to link your case, or wait for HR to match your email.';
+        : 'Your HR team is setting up your case. Once it’s ready, your plan, documents, and next steps appear here.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle} wide>
@@ -743,9 +743,15 @@ export const EmployeeJourney: React.FC = () => {
 
       {!assignmentLoading && showPrimaryManualClaimPage ? (
         <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
-          <div className="text-lg font-semibold text-[#0b2b43]">No relocation assigned yet</div>
+          {/* E2.1–E2.2: set expectations + reassure instead of presenting a blank
+              dashboard. No dead-end CTA — the case-code form below is the only
+              (optional) self-serve path; otherwise the employee just waits. */}
+          <div className="text-lg font-semibold text-[#0b2b43]">Your HR team is setting up your case</div>
           <p className="text-sm text-[#4b5563] mt-2">
-            Ask your HR team to create your case. Once they do, it appears here automatically — no code needed.
+            Once it’s ready, you’ll see your plan, documents, and next steps here — it appears automatically, no code needed.
+          </p>
+          <p className="text-sm text-[#4b5563] mt-2">
+            We’ll email you when everything is in place.
           </p>
           <div className="mt-6 border-t border-[#e2e8f0] pt-5 text-base font-semibold text-[#0b2b43]">
             Already have a case code from HR?
