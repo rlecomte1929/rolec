@@ -180,7 +180,7 @@ reimbursement) is in the benefit rules but out of taxonomy.
 | 2026-06-15 (baseline) | 0 / 20 | First seed run — all false refusals |
 | 2026-06-15 (E1 fix) | 19 / 20 | Published rules merged into context; 7 classifier keyword gaps fixed |
 | 2026-06-15 (E2 fix) | 19 / 20 | Bad §8.3 row deleted; home leave now shows "3" not "8.30". Banking gap (E4) is the sole remaining FAIL |
-| 2026-06-15 (E3 fix) | 20 / 20 (rubric-updated) | Aspect routing: deadline/structure/eligibility/process questions now get distinct answers. Rubric strengthened for Q02/Q03. Unit-tested without DB. |
+| 2026-06-15 (E3 fix) | 19 / 20 (rubric-updated) | Aspect routing: deadline/structure/eligibility/process questions now get distinct answers. Rubric strengthened for Q02/Q03 — both now PASS with correct content. E4 banking remains sole FAIL. |
 
 ---
 
