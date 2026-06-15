@@ -44,3 +44,28 @@ def test_services_tab_keys_resolve_for_quote_advance():
     assert service_key_for_category("schools") == "schools"
     assert service_key_for_category("movers") == "movers"
     assert service_key_for_category("banks") == "banking"
+
+
+def test_destination_merge_augments_generic_steps():
+    from backend.app.services.service_roadmap_steps import (
+        steps_for_service_in_destination, steps_for_service, normalize_destination_iso,
+    )
+    de = steps_for_service_in_destination("banking", "DE")
+    keys = [s.key for s in de]
+    # generic banking steps still present
+    assert {"appt", "open_account"} <= set(keys)
+    # DE adds an Anmeldung step, sorted before opening the account
+    assert "anmeldung" in keys
+    assert keys.index("anmeldung") < keys.index("open_account")
+    # unknown destination -> generic only
+    assert [s.key for s in steps_for_service_in_destination("banking", "ZZ")] == \
+           [s.key for s in steps_for_service("banking")]
+    # name or code both normalise
+    assert normalize_destination_iso("Germany") == "DE"
+    assert normalize_destination_iso("de") == "DE"
+    assert normalize_destination_iso(None) is None
+
+
+def test_immigration_has_no_destination_overrides():
+    from backend.app.services.service_roadmap_steps import SERVICE_STEPS_BY_DESTINATION
+    assert "immigration" not in SERVICE_STEPS_BY_DESTINATION

@@ -6,14 +6,43 @@ deterministic-seed, or manual milestones.
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Optional, Sequence
 
+from sqlalchemy import text as _sql_text
+
 from backend.app.services.service_roadmap_steps import (
-    steps_for_service, service_key_for_category, _canonical_service_key,
+    steps_for_service, steps_for_service_in_destination, service_key_for_category,
+    normalize_destination_iso, _canonical_service_key,
 )
 
 log = logging.getLogger(__name__)
+
+
+def _destination_iso_for_case(db: Any, case_id: str, *, request_id: Optional[str] = None) -> Optional[str]:
+    """Resolve the case's destination country to ISO2, best-effort. None if unknown."""
+    cid = db.coalesce_case_lookup_id(case_id)
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                _sql_text("SELECT draft_json FROM cases WHERE id = :cid"), {"cid": cid}
+            ).fetchone()
+            if row and row[0]:
+                draft = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                dest = ((draft or {}).get("relocationBasics") or {}).get("destCountry")
+                iso = normalize_destination_iso(dest)
+                if iso:
+                    return iso
+            row = conn.execute(
+                _sql_text("SELECT host_country FROM relocation_cases WHERE id::text = :cid"),
+                {"cid": cid},
+            ).fetchone()
+            if row and row[0]:
+                return normalize_destination_iso(str(row[0]))
+    except Exception:
+        log.debug("destination resolve failed for case %s", case_id, exc_info=True)
+    return None
 
 # Base sort_order offset per service so service clusters sit after the
 # deterministic/AI milestones (which use small sort_orders).
@@ -46,16 +75,21 @@ def reconcile_service_milestones(
     # Remove service rows for deselected services first.
     db.delete_service_milestones_not_in(case_id, keys, request_id=request_id)
 
+    # Destination drives which extra steps apply (e.g. an Anmeldung step for DE).
+    dest_iso = _destination_iso_for_case(db, case_id, request_id=request_id)
+
     existing = {
         m["milestone_type"]: m
         for m in db.list_case_milestones(case_id, request_id=request_id)
         if m.get("source") == "service"
     }
 
+    desired_types: list = []
     added = kept = 0
     for service_key in keys:
-        for step in steps_for_service(service_key):
+        for step in steps_for_service_in_destination(service_key, dest_iso):
             mt = _milestone_type(service_key, step.key)
+            desired_types.append(mt)
             row = existing.get(mt)
             if row:
                 # Keep employee progress: only refresh copy, never reset status.
@@ -75,6 +109,10 @@ def reconcile_service_milestones(
                     request_id=request_id,
                 )
                 added += 1
+
+    # Prune service rows for selected services that are no longer desired (e.g. a
+    # destination change dropped a destination-specific step).
+    db.delete_service_milestones_not_in_types(case_id, desired_types, request_id=request_id)
 
     removed_total = len(existing) - kept
     return {"added": added, "removed": max(removed_total, 0), "kept": kept}

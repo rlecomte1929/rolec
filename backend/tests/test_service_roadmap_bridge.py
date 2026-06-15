@@ -73,6 +73,17 @@ class FakeDB:
                        "AND source='service'")
             c.execute(text(sql), params)
 
+    def delete_service_milestones_not_in_types(self, case_id, keep_types, request_id=None):
+        keep = set(keep_types)
+        with self.engine.begin() as c:
+            rows = c.execute(text(
+                "SELECT id, milestone_type FROM case_milestones "
+                "WHERE (case_id=:cid OR canonical_case_id=:cid) AND source='service'"
+            ), {"cid": case_id}).mappings().all()
+            for r in rows:
+                if r["milestone_type"] not in keep:
+                    c.execute(text("DELETE FROM case_milestones WHERE id=:id"), {"id": r["id"]})
+
 
 def _svc_rows(db, case_id):
     return [m for m in db.list_case_milestones(case_id) if m["source"] == "service"]
@@ -161,3 +172,23 @@ def test_ai_regen_preserves_service_rows(monkeypatch):
     assert any(r["source"] == "service" for r in rows), "service rows must survive regen"
     assert any(r["milestone_type"] == "pre_departure_ai_01" for r in rows), "AI rows written"
     assert not any(r["milestone_type"] == "old_seed" for r in rows), "old seed replaced"
+
+
+def test_destination_steps_materialise_and_prune(monkeypatch):
+    from backend.app.services import service_roadmap_bridge as bridge
+
+    db = FakeDB()
+    # Pretend this case's destination is Germany.
+    monkeypatch.setattr(bridge, "_destination_iso_for_case", lambda d, c, request_id=None: "DE")
+
+    bridge.reconcile_service_milestones(db, "case1", ["banking"])
+    types = {r["milestone_type"] for r in _svc_rows(db, "case1")}
+    assert "service_banking_anmeldung" in types      # DE extra present
+    assert "service_banking_open_account" in types   # generic present
+
+    # Destination changes to Norway -> the DE-only Anmeldung step is pruned.
+    monkeypatch.setattr(bridge, "_destination_iso_for_case", lambda d, c, request_id=None: "NO")
+    bridge.reconcile_service_milestones(db, "case1", ["banking"])
+    types2 = {r["milestone_type"] for r in _svc_rows(db, "case1")}
+    assert "service_banking_anmeldung" not in types2
+    assert "service_banking_open_account" in types2

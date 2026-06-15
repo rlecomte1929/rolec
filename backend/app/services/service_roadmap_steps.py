@@ -124,6 +124,101 @@ def steps_for_service(service_key: str) -> List[ServiceStep]:
     return SERVICE_STEPS.get(_canonical_service_key(service_key), [])
 
 
+# Destination-specific EXTRA steps that augment the generic per-service steps.
+# Keyed service_key -> destination ISO2 -> [ServiceStep]. Immigration is excluded
+# on purpose — the AI roadmap generator already produces corridor-specific
+# immigration steps. sort_offset slots each extra into the generic sequence.
+SERVICE_STEPS_BY_DESTINATION: Dict[str, Dict[str, List[ServiceStep]]] = {
+    "banking": {
+        "DE": [
+            ServiceStep("anmeldung", "Register your address (Anmeldung) first",
+                        "German banks require an Anmeldung (address registration) confirmation to open an account.",
+                        "arrival", 5),
+        ],
+    },
+    "housing": {
+        "DE": [
+            ServiceStep("anmeldung", "Register your address (Anmeldung) at the Bürgeramt",
+                        "Within ~2 weeks of moving in, register your address — it's needed for banking, tax ID and more.",
+                        "arrival", 35),
+        ],
+    },
+    "schools": {
+        "DE": [
+            ServiceStep("school_year_de", "Check the German school year & Schulpflicht",
+                        "Schooling is compulsory (Schulpflicht); the school year starts in late summer — plan enrolment around it.",
+                        "pre_departure", 5),
+        ],
+        "NO": [
+            ServiceStep("school_year_no", "Check the Norwegian school year",
+                        "The school year starts in mid-August; contact the local kommune about enrolment.",
+                        "pre_departure", 5),
+        ],
+    },
+    "pets": {
+        "DE": [
+            ServiceStep("import_de", "Prepare EU pet entry documents",
+                        "For Germany (EU): microchip, valid rabies vaccination, and an EU pet passport or health certificate.",
+                        "pre_departure", 5),
+        ],
+        "NO": [
+            ServiceStep("import_no", "Meet Norway's pet import rules",
+                        "Norway requires microchip, rabies vaccination, and (for dogs) tapeworm treatment 24–120h before arrival.",
+                        "pre_departure", 5),
+        ],
+    },
+    "movers": {
+        "DE": [
+            ServiceStep("customs_de", "Prepare EU customs/removal-goods paperwork",
+                        "Moving within the EU is simpler; keep an inventory and proof of prior residence for removal-goods relief.",
+                        "pre_departure", 5),
+        ],
+        "NO": [
+            ServiceStep("customs_no", "Prepare Norwegian customs declaration",
+                        "Norway is outside the EU customs union — you'll declare household goods; a moving-goods exemption may apply.",
+                        "pre_departure", 5),
+        ],
+    },
+}
+
+# Minimal, self-contained country -> ISO2 normaliser (kept light so this pure
+# module doesn't pull in the heavier country/RAG stacks). Covers the destinations
+# we support plus ISO2 pass-through.
+_DEST_NAME_TO_ISO = {
+    "germany": "DE", "de": "DE", "deu": "DE",
+    "norway": "NO", "no": "NO", "nor": "NO",
+    "france": "FR", "fr": "FR",
+    "india": "IN", "in": "IN",
+}
+
+
+def normalize_destination_iso(value: Optional[str]) -> Optional[str]:
+    """Country name or code -> ISO2 (e.g. 'Germany'/'de' -> 'DE'). None if unknown."""
+    if not value:
+        return None
+    raw = str(value).strip()
+    hit = _DEST_NAME_TO_ISO.get(raw.lower())
+    if hit:
+        return hit
+    return raw.upper() if len(raw) == 2 and raw.isalpha() else None
+
+
+def destination_steps(service_key: str, dest_iso: Optional[str]) -> List[ServiceStep]:
+    """Destination-specific extra steps for a service (alias-aware). [] if none."""
+    if not dest_iso:
+        return []
+    by_dest = SERVICE_STEPS_BY_DESTINATION.get(_canonical_service_key(service_key))
+    if not by_dest:
+        return []
+    return by_dest.get(dest_iso.upper(), [])
+
+
+def steps_for_service_in_destination(service_key: str, dest_iso: Optional[str]) -> List[ServiceStep]:
+    """Generic steps merged with the destination's extras, sorted by sort_offset."""
+    merged = list(steps_for_service(service_key)) + destination_steps(service_key, dest_iso)
+    return sorted(merged, key=lambda s: s.sort_offset)
+
+
 # Maps a quote_requests.service_categories[] label to a service_key. Labels come
 # from the frontend serviceConfig; match on a lowercased keyword so minor label
 # drift still resolves.
