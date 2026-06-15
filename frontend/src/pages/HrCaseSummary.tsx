@@ -51,6 +51,7 @@ export const HrCaseSummary: React.FC = () => {
   const [decisionNotes, setDecisionNotes] = useState('');
   const [requestedSections, setRequestedSections] = useState<string[]>([]);
   const [isDeciding, setIsDeciding] = useState(false);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [isReopenOpen, setIsReopenOpen] = useState(false);
   const [reopenNote, setReopenNote] = useState('');
   const [isReopening, setIsReopening] = useState(false);
@@ -300,11 +301,17 @@ export const HrCaseSummary: React.FC = () => {
                     {isReopenOpen ? 'Close reopen' : 'Reopen for employee'}
                   </Button>
                 )}
+                {/* TASK-006: split the combined CTA into two distinct actions.
+                    Approve goes through a confirmation dialog; Request changes
+                    opens the decision panel (comment + sections). */}
+                <Button onClick={() => setApproveConfirmOpen(true)} disabled={isDeciding}>
+                  Approve case
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setIsDecisionOpen((prev) => !prev)}
                 >
-                  {isDecisionOpen ? 'Close decision' : 'Approve / Request changes'}
+                  {isDecisionOpen ? 'Close request changes' : 'Request changes'}
                 </Button>
                 {caseId && (
                   <Link to={buildRoute('hrResources')}>
@@ -460,9 +467,9 @@ export const HrCaseSummary: React.FC = () => {
 
           {isDecisionOpen && (
             <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Decision</div>
+              <div className="text-sm font-semibold text-[#0b2b43]">Request changes</div>
               <div className="text-xs text-[#6b7280] mt-1">
-                If you request changes, the employee will be routed back into the wizard with the sections you flagged.
+                The employee will be routed back into the wizard with the sections you flag below.
               </div>
 
               <div className="mt-4">
@@ -499,14 +506,52 @@ export const HrCaseSummary: React.FC = () => {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button onClick={handleApprove} disabled={isDeciding}>
-                  {isDeciding ? 'Saving...' : 'Approve'}
-                </Button>
-                <Button variant="outline" onClick={handleRequestChanges} disabled={isDeciding}>
+                <Button onClick={handleRequestChanges} disabled={isDeciding}>
                   {isDeciding ? 'Saving...' : 'Request changes'}
                 </Button>
               </div>
             </Card>
+          )}
+
+          {/* TASK-006: Approve confirmation dialog — the most consequential CTA
+              gets an explicit confirmation step before committing. */}
+          {approveConfirmOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <Button
+                unstyled
+                type="button"
+                className="absolute inset-0 bg-black/40"
+                aria-label="Cancel approve"
+                onClick={() => setApproveConfirmOpen(false)}
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="approve-case-title"
+                className="relative w-full max-w-md rounded-xl border border-[#e2e8f0] bg-white shadow-xl p-6 space-y-4"
+              >
+                <h2 id="approve-case-title" className="text-lg font-semibold text-[#0b2b43]">
+                  Approve this case?
+                </h2>
+                <p className="text-sm text-[#475569] leading-relaxed">
+                  The employee will be notified and their relocation plan will be unlocked.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setApproveConfirmOpen(false)} disabled={isDeciding}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setApproveConfirmOpen(false);
+                      handleApprove();
+                    }}
+                    disabled={isDeciding}
+                  >
+                    {isDeciding ? 'Saving...' : 'Approve case'}
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
 
           {assignment.complianceReport?.explanation?.steps &&
