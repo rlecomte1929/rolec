@@ -1463,10 +1463,14 @@ export function EmployeeIntakePage() {
                       // services) so HR, the case record, and the plan/roadmap see
                       // everything the employee entered.
                       await patchCase(caseIdRef.current, intakeToCaseDraft(data));
-                      // Mark intake as fully completed against the linked
-                      // assignment so the hub row flips to "Submitted".
-                      // Fire-and-forget — patchCase already succeeded.
                       if (assignmentId) {
+                        // Flip the assignment to "submitted" so the case advances
+                        // past intake (status surfaces + roadmap generation). The
+                        // backend syncs the profile from the full draft written
+                        // above, so this no longer 400s "complete all wizard steps".
+                        // Awaited: a real precondition failure surfaces to the user.
+                        await employeeAPI.submitAssignment(assignmentId);
+                        // Also mark the wizard complete (status reads intake_step too).
                         void employeeAPI.updateIntakeProgress(
                           assignmentId,
                           TOTAL_STEPS,
