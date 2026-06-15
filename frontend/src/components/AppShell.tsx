@@ -264,7 +264,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
         {/* Footer */}
         <footer className="border-t border-slate-200 bg-white px-6 py-3 text-xs text-slate-500 shrink-0">
-          Informational guidance only. ReloPass does not provide legal advice.
+          {/* Legal disclaimer: requires legal review before translation for EU/APAC locales. Do not translate without sign-off. */}
+          ReloPass is not a legal adviser. Verify immigration requirements with qualified counsel.
         </footer>
       </div>
 
