@@ -51,15 +51,6 @@ interface Member {
   care_level?: string;
 }
 
-interface HousingPrefs {
-  intent?: string;
-  bedrooms?: number | '';
-  budget?: number | '';
-  school_type?: string;
-  special_needs?: string;
-  school_start?: string;
-}
-
 export interface IntakeData {
   origin_country: string;
   origin_city: string;
@@ -84,9 +75,6 @@ export interface IntakeData {
   work_pattern: string;
   commute_mins: number;
   commute_mode: string[];
-  services: string[];
-  service_notes: Record<string, string>;
-  housing_prefs: HousingPrefs;
   consent: boolean;
 }
 
@@ -132,21 +120,6 @@ const CITIES_BY_COUNTRY: Record<string, string[]> = {
   AU: ['Sydney', 'Melbourne', 'Brisbane'],
 };
 
-const SERVICES = [
-  { id: 'housing',     ico: '🏠', t: 'Housing search',       s: 'Apartment or house search at destination' },
-  { id: 'immigration', ico: '🛂', t: 'Immigration',          s: 'Visas, permits, residence registration' },
-  { id: 'schools',     ico: '🏫', t: 'Schools',              s: 'School search and enrollment for kids' },
-  { id: 'movers',      ico: '📦', t: 'International movers', s: 'Household goods shipping' },
-  { id: 'banking',     ico: '🏦', t: 'Banking',              s: 'Local bank account, FX transfer' },
-  { id: 'tax',         ico: '🧾', t: 'Tax advisor',          s: 'Cross-border tax, equalization' },
-  { id: 'language',    ico: '🗣️', t: 'Language tuition',     s: 'Lessons for you or your family' },
-  { id: 'pets',        ico: '🐾', t: 'Pet relocation',       s: 'Quarantine, health certs, transport' },
-  { id: 'temp',        ico: '🏨', t: 'Temporary housing',    s: 'Where you stay on arrival' },
-  { id: 'spouse',      ico: '💼', t: 'Spouse career',        s: 'Job search, coaching, credentials' },
-  { id: 'healthcare',  ico: '🏥', t: 'Healthcare',           s: 'Insurance, doctor finding', soon: true },
-  { id: 'culture',     ico: '🎭', t: 'Culture & community',  s: 'Expat groups, orientation', soon: true },
-];
-
 // Empty defaults. The wizard previously shipped a hardcoded demo persona
 // (Marc Bouchard, France → Norway, fake family + address). That diverged
 // from the case row on the hub (which reads `relocation_cases.host_country`
@@ -182,9 +155,6 @@ const INITIAL_DATA: IntakeData = {
   work_pattern: '',
   commute_mins: 30,
   commute_mode: [],
-  services: [],
-  service_notes: {},
-  housing_prefs: {},
   consent: false,
 };
 
@@ -529,67 +499,6 @@ function StepHd({ title, sub, required }: { title: string; sub: string; required
   );
 }
 
-// ─── Quote request panel (WZ4) ────────────────────────────────────────────────
-
-function QuoteRequestPanel({ caseId, services }: { caseId: string; services: string[] }) {
-  const [notes, setNotes] = useState('');
-  const [budgetRange, setBudgetRange] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSend = async () => {
-    if (sending || sent) return;
-    setSending(true);
-    setError(null);
-    try {
-      await apiPost(`/api/cases/${caseId}/quote-request`, {
-        services,
-        notes: notes || undefined,
-        budget_range: budgetRange || undefined,
-      });
-      setSent(true);
-    } catch (e) {
-      setError((e as Error).message ?? 'Failed to send request');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  if (sent) {
-    return (
-      <div className="mt-3 flex items-start gap-2 p-3 bg-green-50 border border-green-100 rounded-xl text-xs text-green-700">
-        ✅ <span>Quote request sent — your HR team will be in touch.</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 border border-gray-100 rounded-xl p-4 bg-white">
-      <div className="text-xs font-bold text-gray-700 mb-3">📋 Request vendor quotes</div>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-600">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-          <textarea rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300 resize-none"
-            placeholder="Any specific requirements or context for the vendor…"
-            value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-600">Budget range <span className="text-gray-400 font-normal">(optional)</span></label>
-          <Input unstyled type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
-            placeholder="e.g. 5 000–10 000 €"
-            value={budgetRange} onChange={(v) => setBudgetRange(v)} />
-        </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <Button unstyled type="button" onClick={handleSend} disabled={sending}
-          className="self-start px-4 py-2 text-xs font-semibold rounded-lg bg-navy-800 text-white hover:bg-navy-900 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
-          {sending ? 'Sending…' : 'Send quote request'}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Case messages thread (WZ5) ───────────────────────────────────────────────
 
 interface CaseMessage {
@@ -694,61 +603,6 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
         </Button>
       </div>
       {error && <p className="px-4 pb-3 text-xs text-red-500">{error}</p>}
-    </div>
-  );
-}
-
-// ─── Budget summary panel (WZ3) ───────────────────────────────────────────────
-
-interface BudgetCategory {
-  name: string;
-  cap_amount: number | null;
-  cap_currency: string;
-  status: string;
-}
-
-function BudgetSummaryPanel({ caseId, services }: { caseId: string; services: string[] }) {
-  const [categories, setCategories] = useState<BudgetCategory[] | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!caseId) return;
-    setLoading(true);
-    apiGet<{ case_id: string; categories: BudgetCategory[] }>(`/api/cases/${caseId}/budget-summary`)
-      .then((res) => setCategories(res.categories))
-      .catch(() => setCategories(null))
-      .finally(() => setLoading(false));
-  }, [caseId]);
-
-  const displayCats: BudgetCategory[] = categories && categories.length > 0
-    ? categories
-    : services.map((s) => ({ name: s, cap_amount: null, cap_currency: 'EUR', status: 'no_cap' }));
-
-  return (
-    <div className="mt-4 border border-accent-100 rounded-xl p-4 bg-accent-50">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-bold text-accent-700 uppercase tracking-wide">Budget caps</span>
-        <span className="text-xs text-accent-400">(from your HR policy)</span>
-      </div>
-      {loading ? (
-        <p className="text-xs text-accent-400">Loading budget information…</p>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          {displayCats.map((cat) => (
-            <div key={cat.name} className="flex items-center justify-between text-xs">
-              <span className="text-gray-600 capitalize">{cat.name.replace(/_/g, ' ')}</span>
-              <span className={`font-semibold ${cat.cap_amount != null ? 'text-gray-800' : 'text-gray-400'}`}>
-                {cat.cap_amount != null
-                  ? `${cat.cap_amount.toLocaleString()} ${cat.cap_currency}`
-                  : 'No cap set'}
-              </span>
-            </div>
-          ))}
-          {displayCats.length === 0 && (
-            <p className="text-xs text-accent-400">No services selected.</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -882,28 +736,11 @@ export function EmployeeIntakePage() {
   const removeMember = (id: string) => setField('members', data.members.filter((m) => m.id !== id));
   const toggleMember = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
-  // Auto-select services on household change.
-  // AIQ-289: pets entry is on hold (separate tab) — the Pet relocation
-  // service stays available in step "My Needs" so the employee can still
-  // request it manually, but we no longer auto-add based on members.
-  useEffect(() => {
-    const auto = new Set(data.services);
-    auto.add('housing'); auto.add('immigration');
-    if (children.length) auto.add('schools');
-    if (partner) auto.add('spouse');
-    const next = [...auto];
-    if (next.length !== data.services.length || next.some((s) => !data.services.includes(s))) {
-      setField('services', next);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.members.length]);
-
   const stepValid = (s: number) => {
     if (s === 1) return !!(data.origin_country && data.origin_city && data.dest_country && data.dest_city && data.target_date && data.purpose) && data.has_pets != null;
     if (s === 2) return !!(data.full_name && data.nationality && data.passport_country && data.passport_expiry);
     if (s === 3) return data.members.length >= 1;
     if (s === 4) return !!(data.job_title && data.contract_start && data.contract_type && data.office_address && data.work_pattern && data.salary_band);
-    if (s === 5) return data.services.length >= 1;
     return true;
   };
 
@@ -1327,94 +1164,11 @@ export function EmployeeIntakePage() {
               </>
             )}
 
-            {/* ── Step 5 — My Needs ── */}
+            {/* ── Step 5 — Review ── */}
             {step === 5 && (
-              <>
-                <StepHd title="What do you need help with?" sub="We've pre-selected services most relevant to your household. Adjust freely." />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
-                  {SERVICES.map((svc) => (
-                    <Button unstyled key={svc.id} type="button" disabled={svc.soon}
-                      onClick={() => !svc.soon && setField('services', data.services.includes(svc.id)
-                        ? data.services.filter((s) => s !== svc.id)
-                        : [...data.services, svc.id])}
-                      className={`flex flex-col gap-1 p-3 rounded-xl border text-left transition-all ${
-                        svc.soon ? 'opacity-40 cursor-not-allowed border-gray-100 bg-gray-50' :
-                        data.services.includes(svc.id) ? 'border-accent-300 bg-accent-50 ring-1 ring-accent-300' :
-                        'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
-                      }`}>
-                      <span className="text-lg">{svc.ico}</span>
-                      <span className="text-xs font-semibold text-gray-900">{svc.t}{svc.soon && <span className="ml-1 text-[9px] text-gray-400">soon</span>}</span>
-                      <span className="text-[10px] text-gray-400 leading-tight">{svc.s}</span>
-                      {data.services.includes(svc.id) && <span className="text-[9px] font-bold text-accent-600 mt-0.5">✓ Selected</span>}
-                    </Button>
-                  ))}
-                </div>
-                {data.services.length === 0 && (
-                  <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-                    ⚠ <span>Select at least one service to continue. You can always add more later.</span>
-                  </div>
-                )}
-                {data.services.includes('housing') && (
-                  <div className="border border-gray-100 rounded-xl p-4 mb-3 bg-white">
-                    <div className="text-xs font-bold text-gray-700 mb-3">🏠 Housing preferences</div>
-                    <Grid>
-                      <FieldWrap label="Rent or buy?">
-                        <select className={selectCls()} value={data.housing_prefs.intent ?? ''}
-                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, intent: e.target.value })}>
-                          <option value="">Select…</option><option>Rent</option><option>Buy</option><option>Not sure yet</option>
-                        </select>
-                      </FieldWrap>
-                      <FieldWrap label="Bedrooms needed">
-                        <Input unstyled type="number" min={1} max={6} className={inputCls()} placeholder="e.g. 2"
-                          value={data.housing_prefs.bedrooms ?? ''}
-                          onChange={(v) => setField('housing_prefs', { ...data.housing_prefs, bedrooms: v === '' ? '' : Number(v) })} />
-                      </FieldWrap>
-                      <FieldWrap label="Monthly budget (€)" className="sm:col-span-2">
-                        <Input unstyled type="number" className={inputCls()} placeholder="e.g. 2500"
-                          value={data.housing_prefs.budget ?? ''}
-                          onChange={(v) => setField('housing_prefs', { ...data.housing_prefs, budget: v === '' ? '' : Number(v) })} />
-                      </FieldWrap>
-                    </Grid>
-                  </div>
-                )}
-                {data.services.includes('schools') && children.length > 0 && (
-                  <div className="border border-gray-100 rounded-xl p-4 mb-3 bg-white">
-                    <div className="text-xs font-bold text-gray-700 mb-3">🏫 Schools · {children.length} child{children.length > 1 ? 'ren' : ''}</div>
-                    <Grid>
-                      <FieldWrap label="School type">
-                        <select className={selectCls()} value={data.housing_prefs.school_type ?? ''}
-                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, school_type: e.target.value })}>
-                          <option value="">Select…</option>
-                          <option>International</option><option>Public</option><option>Private</option><option>Bilingual</option>
-                        </select>
-                      </FieldWrap>
-                      <FieldWrap label="Any special needs support?">
-                        <select className={selectCls()} value={data.housing_prefs.special_needs ?? ''}
-                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, special_needs: e.target.value })}>
-                          <option value="">Select…</option><option>Yes</option><option>No</option>
-                        </select>
-                      </FieldWrap>
-                      <FieldWrap label="Expected school start date" className="sm:col-span-2" hint="Defaults to your move date; adjust if kids start later.">
-                        <Input unstyled type="date" className={inputCls()} value={data.housing_prefs.school_start ?? data.target_date}
-                          onChange={(v) => setField('housing_prefs', { ...data.housing_prefs, school_start: v })} />
-                      </FieldWrap>
-                    </Grid>
-                  </div>
-                )}
-                {data.services.length > 0 && (
-                  <QuoteRequestPanel caseId={assignmentId ?? ''} services={data.services} />
-                )}
-              </>
-            )}
-
-            {/* ── Step 6 — Review ── */}
-            {step === 6 && (
               <>
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
                 <ReviewSummary data={data} goTo={goTo} />
-                {data.services.length > 0 && (
-                  <BudgetSummaryPanel caseId={assignmentId ?? ''} services={data.services} />
-                )}
                 <CaseMessagesPanel caseId={assignmentId ?? ''} />
                 {/* PRIV-005 / AIQ-473 — Art. 13 notice at the point of collection.
                     Acknowledging records a privacy_consents row and unblocks submit. */}
