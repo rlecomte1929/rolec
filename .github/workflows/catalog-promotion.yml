@@ -1,0 +1,60 @@
+name: Catalog HR-vendor promotion
+
+# [CATALOG-2-FU/AIQ-1077] Calls POST /api/crons/promote-hr-vendors once a day to
+# promote popular HR custom vendors into the master catalog (>= threshold distinct
+# companies added the same vendor). Idempotent — the service skips vendors already
+# in the master catalog. Gated behind `vars.CATALOG_PROMOTION_CRON_ENABLED` so this
+# is a no-op until the secret/vars are configured.
+
+on:
+  schedule:
+    # 03:30 UTC daily — staggered after the 03:00 source-monitoring scheduler.
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run in dry-run mode (detect only, no writes)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: catalog-promotion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: Promote popular HR vendors
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.CATALOG_PROMOTION_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.CATALOG_PROMOTION_API_BASE }}    # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+    steps:
+      - name: POST /api/crons/promote-hr-vendors
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/promote-hr-vendors?dry_run=${DRY_RUN}")
+          echo "$response"
+          # Surface the promotion summary in the workflow run summary so reviewers
+          # can see promoted / skipped_existing / below_threshold without an artifact.
+          {
+            echo "## Catalog HR-vendor promotion run"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
