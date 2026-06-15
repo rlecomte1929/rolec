@@ -6,6 +6,7 @@ import { Breadcrumb } from '../../../components/Breadcrumb';
 import api, { hrAPI } from '../../../api/client';
 import type { CommandCenterCaseRow } from '../../../api/client';
 import { displayNameOrEmail } from '../../../utils/caseDisplay';
+import { getCaseStatusLabel } from '../../../utils/caseStatusLabel';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { fetchExecSummary } from '../../../api/nlg';
@@ -118,8 +119,8 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 function statusLabel(raw: string): string {
-  if (!raw) return '—';
-  return raw.replace(/_/g, ' ');
+  // TASK-005: shared with the Cases list so a case reads the same on both pages.
+  return getCaseStatusLabel(raw);
 }
 function statusTone(raw: string, risk: string): string {
   const key = (raw || '').toLowerCase();
