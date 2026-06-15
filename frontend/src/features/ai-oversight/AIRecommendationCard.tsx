@@ -43,6 +43,13 @@ export interface AIRecommendationCardProps {
   /** Optional confidence score (0-1) to render as a badge. */
   confidence?: number;
 
+  /** TASK-008: when both are provided, the card leads with the checkpoint
+   * count ('N of X checkpoints satisfied') as the primary metric and demotes
+   * confidence to a labelled secondary line. Used by the case-readiness card so
+   * HR doesn't read a low confidence % as the platform being unreliable. */
+  checkpointsSatisfied?: number;
+  checkpointsTotal?: number;
+
   /** Called after a decision is successfully recorded. */
   onDecisionRecorded?: (record: AIDecisionRecord) => void;
 }
@@ -71,6 +78,8 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
   rationale,
   aiOutput,
   confidence,
+  checkpointsSatisfied,
+  checkpointsTotal,
   onDecisionRecorded,
 }) => {
   const [pendingAction, setPendingAction] = useState<AIDecisionAction | null>(null);
@@ -175,13 +184,37 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-xs font-semibold text-accent-700 uppercase tracking-wider">{title}</span>
-            {typeof confidence === 'number' && (
-              <span className="text-[10px] text-accent-500">{Math.round(confidence * 100)}% confidence</span>
-            )}
-          </div>
-          <div className="text-sm text-accent-800 leading-relaxed">{rationale}</div>
+          {typeof checkpointsTotal === 'number' && typeof checkpointsSatisfied === 'number' ? (
+            // TASK-008: lead with the actionable checkpoint count; confidence is
+            // a labelled secondary so a low % reads as incomplete data, not an
+            // unreliable platform. (Sentence-case header for this variant.)
+            <>
+              <div className="text-xs font-semibold text-accent-700 mb-1">{title}</div>
+              <div className="text-2xl font-semibold text-accent-800 leading-tight">
+                {checkpointsSatisfied} of {checkpointsTotal} checkpoints satisfied
+              </div>
+              {typeof confidence === 'number' && (
+                <div className="flex items-center gap-1 text-xs text-accent-500 mt-1">
+                  <span>Confidence score: {Math.round(confidence * 100)}%</span>
+                  <span
+                    className="cursor-help select-none border border-accent-300 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center text-[9px] leading-none"
+                    title="Confidence increases as intake fields and documents are completed. At 100%, all required information is available for AI-assisted decisions."
+                    aria-label="Confidence increases as intake fields and documents are completed. At 100%, all required information is available for AI-assisted decisions."
+                  >
+                    i
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-xs font-semibold text-accent-700 uppercase tracking-wider">{title}</span>
+              {typeof confidence === 'number' && (
+                <span className="text-[10px] text-accent-500">{Math.round(confidence * 100)}% confidence</span>
+              )}
+            </div>
+          )}
+          <div className="text-sm text-accent-800 leading-relaxed mt-1">{rationale}</div>
           <p className="text-[11px] text-accent-500 mt-1">AI-generated · your decision is required and will be logged</p>
 
           {priorDecision && (
