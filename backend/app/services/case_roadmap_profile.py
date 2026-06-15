@@ -141,10 +141,12 @@ def persist_generated_milestones(
     rows = map_generated_steps_to_milestones(steps, corridor)
     if not rows:
         return 0
-    db.delete_case_milestones(case_id, request_id=request_id)
+    # Preserve service-derived milestones (source='service') so a regeneration
+    # of the AI roadmap doesn't wipe steps the employee added via the Services tab.
+    db.delete_case_milestones(case_id, request_id=request_id, exclude_source="service")
     written = 0
     for row in rows:
-        db.upsert_case_milestone(case_id=case_id, request_id=request_id, **row)
+        db.upsert_case_milestone(case_id=case_id, request_id=request_id, source="ai", **row)
         written += 1
     log.info(
         "persist_generated_milestones: wrote %d AI milestones for case %s (corridor=%s)",

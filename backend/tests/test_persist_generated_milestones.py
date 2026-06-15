@@ -88,12 +88,17 @@ class PersistGeneratedMilestonesTests(unittest.TestCase):
         db = mock.MagicMock()
         written = persist_generated_milestones(db, "case-1", _STEPS, "IN→DE", request_id="rq")
         self.assertEqual(written, 2)
-        db.delete_case_milestones.assert_called_once_with("case-1", request_id="rq")
+        # Regen preserves service-derived milestones (exclude_source='service')
+        # and tags its own writes source='ai' so they're managed separately.
+        db.delete_case_milestones.assert_called_once_with(
+            "case-1", request_id="rq", exclude_source="service"
+        )
         self.assertEqual(db.upsert_case_milestone.call_count, 2)
         first = db.upsert_case_milestone.call_args_list[0].kwargs
         self.assertEqual(first["case_id"], "case-1")
         self.assertEqual(first["milestone_type"], "immigration_ai_01")
         self.assertEqual(first["request_id"], "rq")
+        self.assertEqual(first["source"], "ai")
 
     def test_no_op_when_no_usable_steps_does_not_delete(self):
         db = mock.MagicMock()

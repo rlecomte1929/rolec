@@ -195,6 +195,14 @@ def create_quote_request(
             {"id": new_id},
         ).mappings().first()
 
+    # Advance the matching service '*_quote' roadmap step to in_progress.
+    # Best-effort — never fail the quote request over a roadmap side-effect.
+    try:
+        from ..services.service_roadmap_bridge import advance_quote_step
+        advance_quote_step(db, body.case_id, body.service_categories, quote_request_id=new_id)
+    except Exception:  # noqa: BLE001 — non-fatal best-effort bridge
+        logger.warning("quote-request: roadmap advance failed for case %s", body.case_id, exc_info=True)
+
     return _row_to_dict(row)
 
 
