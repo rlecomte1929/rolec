@@ -95,6 +95,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailFetched, setDetailFetched] = useState(false);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (!assignmentId) return;
@@ -108,7 +109,10 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
         if (!cancelled) setSummary(data as Summary);
       })
       .catch(() => {
-        if (!cancelled) setSummaryError('Could not load readiness summary.');
+        if (!cancelled)
+          setSummaryError(
+            'Route readiness couldn’t load — the destination or policy template may not be configured yet.',
+          );
       })
       .finally(() => {
         if (!cancelled) setSummaryLoading(false);
@@ -117,7 +121,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
       cancelled = true;
       ac.abort();
     };
-  }, [assignmentId]);
+  }, [assignmentId, retryTick]);
 
   useEffect(() => {
     setDetailFetched(false);
@@ -188,7 +192,15 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
   if (summaryError || !summary) {
     return (
       <Card padding="lg">
-        <div className="text-sm text-red-600">{summaryError || 'Readiness unavailable.'}</div>
+        <div className="text-sm text-[#0b2b43]">
+          {summaryError ||
+            'Route readiness couldn’t load — the destination or policy template may not be configured yet.'}
+        </div>
+        <div className="mt-3">
+          <Button variant="ghost" onClick={() => setRetryTick((t) => t + 1)}>
+            Try again
+          </Button>
+        </div>
       </Card>
     );
   }
