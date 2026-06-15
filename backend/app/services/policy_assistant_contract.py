@@ -68,6 +68,7 @@ class PolicyAssistantCanonicalTopic(str, Enum):
     RELOCATION_ALLOWANCE = "relocation_allowance"
     HOST_HOUSING = "host_housing"
     BANKING_SETUP = "banking_setup"
+    TRANSPORT = "transport"
 
 
 POLICY_ASSISTANT_TOPIC_ORDER: Tuple[PolicyAssistantCanonicalTopic, ...] = (
@@ -84,6 +85,7 @@ POLICY_ASSISTANT_TOPIC_ORDER: Tuple[PolicyAssistantCanonicalTopic, ...] = (
     PolicyAssistantCanonicalTopic.RELOCATION_ALLOWANCE,
     PolicyAssistantCanonicalTopic.HOST_HOUSING,
     PolicyAssistantCanonicalTopic.BANKING_SETUP,
+    PolicyAssistantCanonicalTopic.TRANSPORT,
 )
 
 

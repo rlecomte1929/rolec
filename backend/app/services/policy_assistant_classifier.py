@@ -197,12 +197,14 @@ _HR_STRATEGY_UNSUPPORTED = re.compile(
 )
 
 _EMPLOYEE_VISIBILITY_HR = re.compile(
-    r"\bwhat do employees see (?:now|today)\b|"
-    r"\bwhat employees see (?:now|today)\b|"
+    r"\bwhat do employees? see (?:now|today)\b|"
+    r"\bwhat employees? see (?:now|today)\b|"
     r"\bemployee(?:'s|s')? view (?:of |on )?(?:the )?policy\b|"
-    r"\bemployees (?:currently )?see\b|"
-    r"\bvisible to employees\b|"
-    r"\bpublished\b.*\bvisible\b.*\bemployees?\b",
+    r"\bemployees? (?:currently )?see\b|"
+    r"\bwhat (?:benefits?\b.*\b)?(?:do(?:es)? )?(?:the )?employees? (?:currently )?see\b|"
+    r"\bvisible to employees?\b|"
+    r"\bpublished\b.*\bvisible\b.*\bemployees?\b|"
+    r"\bemployees? (?:see|view)s?\b.*\bpublished\b",
     re.I,
 )
 
@@ -210,7 +212,11 @@ _OVERRIDE_EFFECT_HR = re.compile(
     r"\bwhat (?:does|will) (?:the |my )?hr override\b|"
     r"\boverride effect\b|"
     r"\bhow do(?:es)? (?:the )?overrides? affect\b|"
-    r"\beffect of (?:the )?(?:hr )?override",
+    r"\beffect of (?:the )?(?:hr )?override|"
+    r"\bhr overrides?\b|"
+    r"\bany overrides?\b|"
+    r"\boverrides? applied\b|"
+    r"\boverrides? (?:applied |set |in place\b|on this\b)",
     re.I,
 )
 
@@ -349,6 +355,8 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
         (
             ("school search", 6),
             ("schooling", 3),
+            ("school fees", 5),
+            ("tuition", 4),
             ("dependent children", 3),
             ("international school", 4),
             ("language training", 5),
@@ -356,6 +364,9 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("cultural training", 4),
             (re.compile(r"\bschool search\b.*\bfamily\b|\bfamily\b.*\bschool", re.I), 5),
             (re.compile(r"\blanguage\b.*\b(training|lesson|class|course)s?\b", re.I), 4),
+            (re.compile(r"\bschool\b.*\bfees?\b|\bfees?\b.*\bschool\b", re.I), 5),
+            (re.compile(r"\bschool\b.*\b(costs?|expenses?|reimburse|claim|submit)\b", re.I), 4),
+            (re.compile(r"\bschool\b.*\b(covered|included)\b|\b(covered|included)\b.*\bschool\b", re.I), 3),
         ),
         negatives=(
             re.compile(r"\brecommend\b|\bbest school\b|\bwhich school\b", re.I),
@@ -454,6 +465,29 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             (re.compile(r"\bbank\b.*\b(setup|support|assistance|fees?|account)\b", re.I), 5),
         ),
         negatives=(),
+    ),
+    _TopicRule(
+        PolicyAssistantCanonicalTopic.TRANSPORT,
+        (
+            ("transport", 5),
+            ("flight", 4),
+            ("flights", 4),
+            ("air travel", 5),
+            ("travel to the host", 6),
+            ("travel to host country", 6),
+            ("economy class", 5),
+            ("business class", 5),
+            (re.compile(r"\btravel\b.*\bhost country\b|\bhost country\b.*\btravel\b", re.I), 6),
+            (re.compile(r"\bflights?\b.*\b(covered|included|provided)\b", re.I), 5),
+            (re.compile(r"\bwhat transport\b|\btransport covered\b|\btransport included\b", re.I), 6),
+            (re.compile(r"\btravel\b.*\b(covered|included|provided|reimburse)\b", re.I), 4),
+        ),
+        negatives=(
+            # Don't capture HR strategy questions about structuring travel policy
+            re.compile(r"\btravel policy design\b|\bstructure.*travel\b", re.I),
+            # Flights mentioned in a home-leave context belong to HOME_LEAVE, not TRANSPORT
+            re.compile(r"\bhome leave\b", re.I),
+        ),
     ),
 )
 
