@@ -89,6 +89,9 @@ def _topic_from_grouped_item(item: Dict[str, Any]) -> Optional[PolicyAssistantCa
         "spouse_support": PolicyAssistantCanonicalTopic.SPOUSE_SUPPORT,
         "relocation_allowance": PolicyAssistantCanonicalTopic.RELOCATION_ALLOWANCE,
         "settling_in_allowance": PolicyAssistantCanonicalTopic.RELOCATION_ALLOWANCE,
+        "banking": PolicyAssistantCanonicalTopic.BANKING_SETUP,
+        "banking_setup": PolicyAssistantCanonicalTopic.BANKING_SETUP,
+        "transport": PolicyAssistantCanonicalTopic.TRANSPORT,
     }
     return alias.get(sk)
 
@@ -190,6 +193,13 @@ def build_hr_resolved_policy_context_from_review_payload(
                 policy_source_type="published_benefit_rule",
                 source_label="Published version (employees)",
             )
+
+    # Fill gaps: when the working-draft topic dict is sparse (e.g. layer2_publishable is
+    # empty or hasn't been normalised yet), fall back to the published benefit rules so
+    # the answer engine can respond instead of issuing a false refusal.
+    for k, v in hr_pub.items():
+        if k not in topics:
+            topics[k] = v
 
     ovs = payload.get("hr_overrides") or []
     hr_override_summary = _format_hr_override_summary(list(ovs) if isinstance(ovs, list) else [])

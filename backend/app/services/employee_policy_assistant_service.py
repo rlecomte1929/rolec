@@ -34,13 +34,15 @@ from .policy_taxonomy import BENEFIT_TAXONOMY
 # Both must appear here or the assistant returns a false-negative
 # "not included" answer for a topic that IS in the published matrix.
 TOPIC_BENEFIT_KEYS: Dict[PolicyAssistantCanonicalTopic, Tuple[str, ...]] = {
-    PolicyAssistantCanonicalTopic.TEMPORARY_HOUSING: ("temporary_housing",),
+    # "temporary_housing" = legacy key; "housing" = PDF-extractor key (benefit_category=temporary_housing)
+    PolicyAssistantCanonicalTopic.TEMPORARY_HOUSING: ("temporary_housing", "housing"),
     PolicyAssistantCanonicalTopic.HOME_SEARCH: ("scouting_trip", "relocation_services"),
     PolicyAssistantCanonicalTopic.SHIPMENT: ("shipment", "movers", "household_goods", "storage"),
     PolicyAssistantCanonicalTopic.SCHOOL_SEARCH: (
         "schooling",
         "tuition",
         "schools",
+        "language_training",
         # matrix
         "child_education_support",
     ),
@@ -71,6 +73,8 @@ TOPIC_BENEFIT_KEYS: Dict[PolicyAssistantCanonicalTopic, Tuple[str, ...]] = {
         "repatriation_allowance_dependent",
     ),
     PolicyAssistantCanonicalTopic.HOST_HOUSING: ("housing",),
+    PolicyAssistantCanonicalTopic.BANKING_SETUP: ("banking", "banking_setup"),
+    PolicyAssistantCanonicalTopic.TRANSPORT: ("transport",),
 }
 
 

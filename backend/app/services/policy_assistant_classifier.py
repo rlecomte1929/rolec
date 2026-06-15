@@ -36,6 +36,14 @@ class PolicyAssistantClassificationResult(BaseModel):
         max_length=2000,
         description="When set, non-policy parts of the message were dropped; answer only the policy thread.",
     )
+    question_aspect: Optional[str] = Field(
+        None,
+        description=(
+            "Sub-question aspect when intent=POLICY_ENTITLEMENT_QUESTION and a topic was detected: "
+            "amount | deadline | eligibility | structure | process. "
+            "None means the question is general (entitlement summary with cap amount is appropriate)."
+        ),
+    )
 
 
 # --- Normalization ---
@@ -189,10 +197,14 @@ _HR_STRATEGY_UNSUPPORTED = re.compile(
 )
 
 _EMPLOYEE_VISIBILITY_HR = re.compile(
-    r"\bwhat do employees see (?:now|today)\b|"
-    r"\bwhat employees see (?:now|today)\b|"
+    r"\bwhat do employees? see (?:now|today)\b|"
+    r"\bwhat employees? see (?:now|today)\b|"
     r"\bemployee(?:'s|s')? view (?:of |on )?(?:the )?policy\b|"
-    r"\bemployees (?:currently )?see\b",
+    r"\bemployees? (?:currently )?see\b|"
+    r"\bwhat (?:benefits?\b.*\b)?(?:do(?:es)? )?(?:the )?employees? (?:currently )?see\b|"
+    r"\bvisible to employees?\b|"
+    r"\bpublished\b.*\bvisible\b.*\bemployees?\b|"
+    r"\bemployees? (?:see|view)s?\b.*\bpublished\b",
     re.I,
 )
 
@@ -200,7 +212,11 @@ _OVERRIDE_EFFECT_HR = re.compile(
     r"\bwhat (?:does|will) (?:the |my )?hr override\b|"
     r"\boverride effect\b|"
     r"\bhow do(?:es)? (?:the )?overrides? affect\b|"
-    r"\beffect of (?:the )?(?:hr )?override",
+    r"\beffect of (?:the )?(?:hr )?override|"
+    r"\bhr overrides?\b|"
+    r"\bany overrides?\b|"
+    r"\boverrides? applied\b|"
+    r"\boverrides? (?:applied |set |in place\b|on this\b)",
     re.I,
 )
 
@@ -214,8 +230,9 @@ _COMPARISON_READINESS_Q = re.compile(
 )
 
 _STATUS_Q = re.compile(
-    r"\bis (?:the |my )?policy published\b|\bunder review\b|\bvisible to me\b|"
-    r"\bwhen (?:will|can) (?:i|we) see\b.*\bpolicy\b",
+    r"\bis (?:the |my |this )?policy published\b|\bunder review\b|\bvisible to me\b|"
+    r"\bwhen (?:will|can) (?:i|we) see\b.*\bpolicy\b|"
+    r"\bpolicy\b.*\bpublished\b.*\bvisible\b|\bpublished\b.*\bvisible to employees\b",
     re.I,
 )
 
@@ -224,6 +241,52 @@ _APPROVAL_Q = re.compile(
     r"\bprior approval\b",
     re.I,
 )
+
+# Question-aspect detectors — used to branch answer generation beyond the default amount template
+_ASPECT_DEADLINE = re.compile(
+    r"\bdeadline\b|\btime limit\b|\bexpir[ye]\b|"
+    r"\bwhen (?:do|must|can) i (?:claim|use|submit|request)\b|"
+    r"\bhow long do i have\b",
+    re.I,
+)
+_ASPECT_STRUCTURE = re.compile(
+    r"\blump.?sum\b|\bmanaged (?:relocation|services?)\b|"
+    r"\bhow is it (?:structured|paid|disbursed)\b|"
+    r"\b(?:option|choice)s?\b.*\b(?:lump|managed|cash)\b|"
+    r"\binstead of managed\b",
+    re.I,
+)
+_ASPECT_ELIGIBILITY = re.compile(
+    r"\bam i eligible\b|\bwho (?:is eligible|qualifies|can get|can claim)\b|"
+    r"\bdoes it apply to\b|\beligib\w+\b.*\b(?:for|to|this)\b",
+    re.I,
+)
+_ASPECT_PROCESS = re.compile(
+    r"\bhow (?:do|can) i (?:claim|apply|request|get|submit)\b|"
+    r"\bwhat (?:do i|steps|documents)\b.*\b(?:claim|apply|request)\b|"
+    r"\b(?:claim|application) process\b",
+    re.I,
+)
+_ASPECT_AMOUNT = re.compile(
+    r"\bhow much\b|\bwhat (?:is|are) (?:the )?(?:amount|cap|limit|budget|value)\b|"
+    r"\bwhat (?:percentage|%)\b|\bwhat (?:is )?the (?:rate|level)\b",
+    re.I,
+)
+
+
+def _detect_question_aspect(norm: str) -> Optional[str]:
+    """Return the sub-question aspect for entitlement questions, or None for general."""
+    if _ASPECT_DEADLINE.search(norm):
+        return "deadline"
+    if _ASPECT_STRUCTURE.search(norm):
+        return "structure"
+    if _ASPECT_ELIGIBILITY.search(norm):
+        return "eligibility"
+    if _ASPECT_PROCESS.search(norm):
+        return "process"
+    if _ASPECT_AMOUNT.search(norm):
+        return "amount"
+    return None
 
 
 # Topic: (positive patterns or literals), negative patterns (if match, skip topic or penalize)
@@ -259,6 +322,8 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("host-country housing", 6),
             ("company-provided housing", 4),
             ("leased accommodation", 3),
+            # "housing support for the host country" — explicit host-country mention breaks tie
+            (re.compile(r"\bhousing\b.*\bhost country\b|\bhost country\b.*\bhousing\b", re.I), 5),
             (re.compile(r"\bhousing\b.*\bincluded\b|\bincluded\b.*\bhousing\b", re.I), 3),
         ),
         negatives=(),
@@ -290,9 +355,18 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
         (
             ("school search", 6),
             ("schooling", 3),
+            ("school fees", 5),
+            ("tuition", 4),
             ("dependent children", 3),
             ("international school", 4),
+            ("language training", 5),
+            ("language lessons", 4),
+            ("cultural training", 4),
             (re.compile(r"\bschool search\b.*\bfamily\b|\bfamily\b.*\bschool", re.I), 5),
+            (re.compile(r"\blanguage\b.*\b(training|lesson|class|course)s?\b", re.I), 4),
+            (re.compile(r"\bschool\b.*\bfees?\b|\bfees?\b.*\bschool\b", re.I), 5),
+            (re.compile(r"\bschool\b.*\b(costs?|expenses?|reimburse|claim|submit)\b", re.I), 4),
+            (re.compile(r"\bschool\b.*\b(covered|included)\b|\b(covered|included)\b.*\bschool\b", re.I), 3),
         ),
         negatives=(
             re.compile(r"\brecommend\b|\bbest school\b|\bwhich school\b", re.I),
@@ -306,6 +380,10 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("dual career", 5),
             ("trailing spouse", 5),
             ("spousal allowance", 4),
+            ("spousal career", 4),
+            ("spouse career", 4),
+            ("partner career", 4),
+            (re.compile(r"\bspousal?\b.*\b(support|assistance|allowance|career)\b", re.I), 4),
         ),
         negatives=(),
     ),
@@ -367,9 +445,49 @@ _TOPIC_RULES: Tuple[_TopicRule, ...] = (
             ("relocation allowance", 6),
             ("lump sum", 4),
             ("mobility allowance", 5),
+            ("mobility premium", 5),
             ("settling in", 3),
+            ("cost of living", 5),
+            ("cola", 4),
+            ("location premium", 4),
+            ("remote premium", 4),
         ),
         negatives=(),
+    ),
+    _TopicRule(
+        PolicyAssistantCanonicalTopic.BANKING_SETUP,
+        (
+            ("banking support", 6),
+            ("banking setup", 6),
+            ("bank account", 5),
+            ("bank transfer", 4),
+            ("banking", 3),
+            (re.compile(r"\bbank\b.*\b(setup|support|assistance|fees?|account)\b", re.I), 5),
+        ),
+        negatives=(),
+    ),
+    _TopicRule(
+        PolicyAssistantCanonicalTopic.TRANSPORT,
+        (
+            ("transport", 5),
+            ("flight", 4),
+            ("flights", 4),
+            ("air travel", 5),
+            ("travel to the host", 6),
+            ("travel to host country", 6),
+            ("economy class", 5),
+            ("business class", 5),
+            (re.compile(r"\btravel\b.*\bhost country\b|\bhost country\b.*\btravel\b", re.I), 6),
+            (re.compile(r"\bflights?\b.*\b(covered|included|provided)\b", re.I), 5),
+            (re.compile(r"\bwhat transport\b|\btransport covered\b|\btransport included\b", re.I), 6),
+            (re.compile(r"\btravel\b.*\b(covered|included|provided|reimburse)\b", re.I), 4),
+        ),
+        negatives=(
+            # Don't capture HR strategy questions about structuring travel policy
+            re.compile(r"\btravel policy design\b|\bstructure.*travel\b", re.I),
+            # Flights mentioned in a home-leave context belong to HOME_LEAVE, not TRANSPORT
+            re.compile(r"\bhome leave\b", re.I),
+        ),
     ),
 )
 
@@ -615,4 +733,5 @@ def classify_policy_chat_message(
         ambiguity_reason=None,
         refusal_code=None,
         normalized_question=normalized_question,
+        question_aspect=_detect_question_aspect(norm),
     )
