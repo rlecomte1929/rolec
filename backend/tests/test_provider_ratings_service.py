@@ -29,7 +29,10 @@ CREATE TABLE provider_ratings (
 CREATE TABLE supplier_scoring_metadata (
   supplier_id TEXT PRIMARY KEY,
   average_rating REAL,
-  review_count INTEGER NOT NULL DEFAULT 0
+  review_count INTEGER NOT NULL DEFAULT 0,
+  -- mirror prod: NOT NULL with no DB default, so the service INSERT must set them
+  preferred_partner BOOLEAN NOT NULL,
+  premium_partner BOOLEAN NOT NULL
 );
 """
 
