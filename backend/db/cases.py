@@ -54,6 +54,26 @@ _is_sqlite = _raw_url.startswith("sqlite")
 # by extracted CasesMixin methods that build jsonb SQL.
 _jb = "" if _is_sqlite else "::jsonb"
 
+# public.cases.purpose CHECK allows only these four values. The wizard emits
+# free-er strings; map them onto the allowed set so the canonical-case bridge
+# never trips cases_purpose_check. Unknown/blank → 'work' (the column default).
+_CASE_PURPOSE_MAP = {
+    "work": "work",
+    "employment": "work",
+    "employment_transfer": "work",
+    "job": "work",
+    "relocation": "work",
+    "intra_company_transfer": "intra_company_transfer",
+    "intra_company": "intra_company_transfer",
+    "ict": "intra_company_transfer",
+    "transfer": "intra_company_transfer",
+    "family_join": "family_join",
+    "family": "family_join",
+    "family_reunification": "family_join",
+    "remote_work": "remote_work",
+    "remote": "remote_work",
+}
+
 
 class CasesMixin:
     """Cases-domain methods mixed into :class:`backend.database.Database`."""
@@ -2614,7 +2634,14 @@ class CasesMixin:
         if not company_id:
             return
         origin = (derived.get("origin_country") or "").strip()
-        purpose = (derived.get("purpose") or "").strip() or "relocation"
+        # public.cases.purpose has a CHECK constraint
+        # (work | intra_company_transfer | family_join | remote_work). The wizard
+        # emits free-er values (and the old default 'relocation' is invalid), which
+        # tripped cases_purpose_check and made this whole bridge silently fail for
+        # ~every case — leaving public.cases nearly empty. Map onto the allowed set;
+        # default to 'work' (the column default).
+        _raw_purpose = (derived.get("purpose") or "").strip().lower()
+        purpose = _CASE_PURPOSE_MAP.get(_raw_purpose, "work")
         dest_city = (derived.get("dest_city") or "").strip() or None
         move = (derived.get("target_move_date") or "") or ""
         params = {
@@ -3167,8 +3194,11 @@ class CasesMixin:
                     params["cid"] = case_id
                 else:
                     where = "WHERE employee_id = :eid"
+                # fix: the column is `task_type`, not `type` — the old SELECT
+                # raised `column "type" does not exist`, which the except below
+                # swallowed into an empty list (employee task list always blank).
                 sql = f"""
-                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                    SELECT id, case_id, employee_id, org_id, task_type, title, description,
                            due_date, status, required_file_upload, submission_data,
                            file_url, submitted_at, reviewed_by, reviewed_at, review_note,
                            created_at, updated_at
