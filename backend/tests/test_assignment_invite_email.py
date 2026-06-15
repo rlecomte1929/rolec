@@ -30,6 +30,16 @@ class TestRender(unittest.TestCase):
         subject, _, _ = self._render()
         self.assertEqual(subject, "Your relocation with TechCorp International has started")
 
+    def test_body_avoids_system_noun_and_sets_expectations(self):
+        # [TASK-026] employee-facing copy: drop the "case" system noun and say
+        # what to expect, in both the new-account and existing-account variants.
+        for account_exists in (False, True):
+            _, plain, html = self._render(account_exists=account_exists)
+            self.assertNotIn("relocation case", plain)
+            self.assertIn("set up", plain)
+            self.assertIn("plan, documents, and next steps", plain)
+            self.assertIn("plan, documents, and next steps", html)
+
     def test_register_link_for_new_account(self):
         _, plain, html = self._render(account_exists=False)
         self.assertIn("mode=register", plain)
