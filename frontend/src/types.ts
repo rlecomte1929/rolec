@@ -1119,6 +1119,8 @@ export interface PublicResource {
   contactInfo?: unknown;
   openingHours?: unknown;
   trustTier?: string | null;
+  /** NAV-002: content-currency signal — when the resource was last updated. */
+  updated_at?: string | null;
   tags?: ResourceTag[];
 }
 
