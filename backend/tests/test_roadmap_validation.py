@@ -74,3 +74,33 @@ def test_resolver_unvalidated_fresh_case():
             return None
     v, at, by = _resolve_roadmap_validation(DB(), "c", _Summary())
     assert v is False and at is None
+
+
+def test_validate_endpoint_is_idempotent_and_sets_state(monkeypatch):
+    import os
+    os.environ["RELOPASS_QUERY_COUNTER_OFF"] = "1"
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    import backend.app.auth_deps as auth_deps
+    import backend.app.routers.cases_write as cw
+
+    fake_user = {"id": "emp-1"}
+    app.dependency_overrides[auth_deps.get_current_user] = lambda: fake_user
+    monkeypatch.setattr(cw, "_assert_case_access", lambda user, case_id: None)
+
+    captured = {}
+    monkeypatch.setattr(
+        cw.main_db, "upsert_roadmap_validation",
+        lambda cid, uid, **k: captured.update(cid=cid, uid=uid)
+        or {"validated_at": "2026-06-15T00:00:00", "validated_by_user_id": uid},
+    )
+    try:
+        c = TestClient(app)
+        r = c.post("/api/cases/abc/roadmap/validate")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["roadmap_validated"] is True
+        assert body["roadmap_validated_at"] == "2026-06-15T00:00:00"
+        assert captured["cid"] == "abc" and captured["uid"] == "emp-1"
+    finally:
+        app.dependency_overrides.clear()
