@@ -53,6 +53,7 @@ from ..services.case_service import (
     _pg_conn,
     _pg_table,
     _sql_now,
+    resolve_case_forms_case_id,
 )
 from ...database import db as main_db
 
@@ -1081,6 +1082,10 @@ def _load_case_form_summaries(
     and the roadmap projection (`get_case_roadmap_tracks`). No auth check —
     callers must `_assert_case_access` first.
     """
+    # fix: [DOSSIER-ID] case-scoped routes pass an assignment_id, but case_forms
+    # is keyed by the canonical case id. Resolve first so the Dossier (and the
+    # roadmap projection that shares this loader) find the case's forms.
+    case_id = resolve_case_forms_case_id(case_id)
     # Build the join in one statement. The aggregate over case_form_field_values
     # is done as a correlated sub-select per row — simpler than a GROUP BY and
     # cheap given typical row counts (<50 forms per case).
