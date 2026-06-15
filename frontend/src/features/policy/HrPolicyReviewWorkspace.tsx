@@ -71,6 +71,13 @@ type HrPolicyReviewWorkspaceProps = {
   onBindComplete?: () => void;
   /** Admin context: scope to this company */
   adminCompanyId?: string | null;
+  /**
+   * POLICY-UI/AIQ-1078: true when a compensation-matrix policy is published.
+   * This workspace only fetches the canonical/document policy, so it can't tell
+   * a matrix-only company apart from a brand-new one — the parent passes the
+   * matrix-live signal so the no_policy onboarding empty-state is suppressed.
+   */
+  hasPublishedMatrix?: boolean;
 };
 
 export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = ({
@@ -78,6 +85,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   postNormalizePolicyId = null,
   onBindComplete,
   adminCompanyId = null,
+  hasPublishedMatrix = false,
 }) => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [policies, setPolicies] = useState<any[]>([]);
@@ -659,6 +667,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       <HrPolicyWorkspaceLayout
         resolved={workspaceResolved}
         lifecycle={policyLifecycle}
+        hasPublishedMatrix={hasPublishedMatrix}
         documentsCount={documents.length}
         loading={Boolean(selectedPolicyId && loading)}
         reviewUnavailable={reviewUnavailable}

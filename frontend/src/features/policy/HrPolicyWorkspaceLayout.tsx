@@ -22,6 +22,14 @@ export type HrPolicyWorkspaceLayoutProps = {
   lifecycle: HrPolicyLifecycleContext;
   documentsCount: number;
   loading: boolean;
+  /**
+   * POLICY-UI/AIQ-1078: true when a compensation-matrix policy is published
+   * (GET /api/hr/policy-config/published). The workspace `phase` is derived
+   * only from the canonical/document policy (company_policies), so a
+   * matrix-only company resolves to `no_policy` and would otherwise render the
+   * onboarding "get started" empty-state even though a live policy exists.
+   */
+  hasPublishedMatrix?: boolean;
   /** True after policy-review fetch failed (normalized may still load). */
   reviewUnavailable?: boolean;
   starterTemplateBusy: StarterTemplateKey | null;
@@ -166,8 +174,20 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
   publishDataReady = true,
   employeePreviewCompare,
   onScrollToDraftReviewPanel,
+  hasPublishedMatrix = false,
 }) => {
-  const copy = HR_POLICY_WORKSPACE_COPY[resolved.phase];
+  // POLICY-UI/AIQ-1078: a matrix-published company with no canonical/document
+  // policy resolves to phase `no_policy`. A live policy DOES exist (the matrix,
+  // shown above), so suppress the onboarding "get started" framing here — the
+  // "Create a new policy version" section above is the correct add-a-version path.
+  const matrixOnlyLive = resolved.phase === 'no_policy' && hasPublishedMatrix;
+  const copy = matrixOnlyLive
+    ? {
+        headline: 'Your compensation matrix is live',
+        subline:
+          'Employees already see your published matrix policy (shown above). There’s no separate document-based policy version here yet — use “Create a new policy version” above only if you want to add one.',
+      }
+    : HR_POLICY_WORKSPACE_COPY[resolved.phase];
   const primaryAction = deriveHrPolicyPrimaryAction(resolved);
   const [showAllIssues, setShowAllIssues] = useState(false);
   const issueLimit = showAllIssues ? 50 : 3;
@@ -279,8 +299,12 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          {renderPrimaryCta()}
-          {primaryAction === 'start_baseline_or_upload' && (
+          {/* AIQ-1078: when the matrix is already live, the no_policy onboarding
+              CTAs ("Start from a baseline" / "Upload company policy") duplicate
+              the "Create a new policy version" section above and re-introduce the
+              misleading first-run framing — suppress them here. */}
+          {!matrixOnlyLive && renderPrimaryCta()}
+          {!matrixOnlyLive && primaryAction === 'start_baseline_or_upload' && (
             <Button variant="outline" onClick={onUploadDocument} disabled={starterTemplateBusy !== null}>
               Upload company policy
             </Button>
@@ -345,8 +369,10 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
         </details>
       </Card>
 
-      {/* Starter onboarding (no policy) — primary path */}
-      {resolved.phase === 'no_policy' && (
+      {/* Starter onboarding (no policy) — primary path. AIQ-1078: hidden when a
+          matrix policy is already live (the "Create a new policy version"
+          section above is the correct add-a-version entry point in that case). */}
+      {resolved.phase === 'no_policy' && !matrixOnlyLive && (
         <div id="hr-policy-starter-onboarding" className="scroll-mt-4">
           <StarterPolicyOnboardingCard
             error={starterError}

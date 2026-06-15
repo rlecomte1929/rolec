@@ -692,6 +692,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           postNormalizePolicyId={postNormalizePolicyId}
           onBindComplete={() => setPostNormalizePolicyId(null)}
           adminCompanyId={adminCompanyId ?? null}
+          hasPublishedMatrix={hasLivePolicy}
         />
       </div>
 
