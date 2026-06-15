@@ -215,7 +215,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
             </div>
           )}
           <div className="text-sm text-accent-800 leading-relaxed mt-1">{rationale}</div>
-          <p className="text-[11px] text-accent-500 mt-1">AI-generated · your decision is required and will be logged</p>
+          <p className="text-[11px] text-accent-500 mt-1">AI-generated · Your decision is required and logged for your EU AI Act audit trail.</p>
 
           {priorDecision && (
             <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
