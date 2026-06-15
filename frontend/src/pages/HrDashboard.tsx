@@ -23,6 +23,27 @@ import { AnswerProvenanceWidget } from '../components/AnswerProvenanceWidget';
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
+/**
+ * Zero-cases onboarding empty state for the HR Cases page (E1.1–E1.2). Explains
+ * what a case is and offers the first-case CTA, which reuses the same
+ * openNewCaseForm handler as the toolbar "New case" button.
+ */
+function CasesEmptyState({ onCreateCase }: { onCreateCase: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
+      <h3 className="text-lg font-semibold text-[#0b2b43] mb-2">No relocation cases yet.</h3>
+      <p className="text-sm text-[#4b5563] mb-6">
+        A case is the record for one employee&rsquo;s move. It holds their timeline,
+        documents, vendor assignments, and compliance status.
+      </p>
+      <Button onClick={onCreateCase}>Open your first case →</Button>
+      <p className="text-sm text-[#6b7280] mt-2">
+        Takes about 2 minutes. You&rsquo;ll add the employee, destination, and move date.
+      </p>
+    </div>
+  );
+}
+
 export const HrDashboard: React.FC = () => {
   const { setSelectedCaseId } = useSelectedCase();
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
@@ -312,8 +333,14 @@ export const HrDashboard: React.FC = () => {
     return orEmptyLabel(home && host ? `${home} → ${host}` : '', 'Route not set');
   };
 
+  // E1.1–E1.3: a genuine zero-cases HR (no cases at all, no active search) gets
+  // the onboarding empty state. A search that happens to match nothing is NOT
+  // "no cases" — it keeps the toolbar + a "no matches" message, so onboarding
+  // copy never wrongly appears for an HR who already has cases.
+  const hasNoCases = total === 0 && !searchDebounced.trim();
+
   return (
-    <AppShell section="HR Operations" title="Cases" subtitle="Track every relocation case. Assign stakeholders, manage status, run the full lifecycle.">
+    <AppShell section="HR Operations" title="Cases" subtitle="Every cross-border relocation starts here. Create a case to build a plan, assign documents, and track progress — for each employee, from offer to arrival.">
       <div className="space-y-6">
         {/* P5-7: Policy calibration alerts — shown to HR/Admin when benefit caps need review */}
         <CalibrationAlertBanner />
@@ -493,6 +520,9 @@ export const HrDashboard: React.FC = () => {
         )}
 
         <Card padding="lg">
+          {/* E1.3: the "Active relocation cases" header is a label for existing
+              content — hide the whole toolbar when there are no cases yet. */}
+          {!hasNoCases && (
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</span>
@@ -531,6 +561,7 @@ export const HrDashboard: React.FC = () => {
               )}
             </div>
           </div>
+          )}
           {assignments.length < total && !isManageMode && (
             <div className="mb-3 text-xs text-[#6b7280] flex items-center gap-2">
               Showing {assignments.length} of {total} cases.
@@ -582,10 +613,16 @@ export const HrDashboard: React.FC = () => {
               ))}
             </div>
           )}
-          {!isLoading && assignments.length === 0 && (
+          {/* E1.1–E1.2: first-time HR (no cases at all) → onboarding empty state
+              that explains what a case is and how to open the first one. */}
+          {!isLoading && hasNoCases && (
+            <CasesEmptyState onCreateCase={openNewCaseForm} />
+          )}
+          {/* Search/filter matched nothing, but the HR does have cases. */}
+          {!isLoading && !hasNoCases && assignments.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <p className="text-sm text-[#4b5563]">No active cases.</p>
-              <p className="text-xs text-[#6b7280]">Open the first case — every stakeholder works from the same record.</p>
+              <p className="text-sm text-[#4b5563]">No cases match your search.</p>
+              <p className="text-xs text-[#6b7280]">Clear the search or adjust your filters to see all cases.</p>
             </div>
           )}
 
