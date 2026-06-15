@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
@@ -7,6 +8,7 @@ import { hrAPI } from '../../../api/client';
 import type { ProviderGridRow } from '../../../api/client';
 import { useV2Flag } from '../useV2Flag';
 import { ProviderGridV2Table } from './ProviderGridV2Table';
+import { ROUTE_DEFS } from '../../../navigation/routes';
 
 /**
  * Provider Grid V2 — prototype-styled wrapper around the existing
@@ -114,7 +116,19 @@ export function ProviderGridV2Page() {
         {resizableOn ? (
           <ProviderGridV2Table
             rows={rows}
-            emptyState={loading ? 'Loading provider grid…' : 'No providers assigned. Assign providers from the Mobility command center to track their status across cases.'}
+            emptyState={
+              loading ? (
+                'Loading provider grid…'
+              ) : (
+                <span>
+                  No providers assigned. Assign providers in the{' '}
+                  <Link to={ROUTE_DEFS.hrCommandCenter.path} className="text-[#1f8e8b] underline">
+                    Mobility command center
+                  </Link>{' '}
+                  to track their status here.
+                </span>
+              )
+            }
           />
         ) : (
           <ProviderStatusGrid
