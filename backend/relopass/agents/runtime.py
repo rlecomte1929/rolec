@@ -6,7 +6,7 @@ row). It:
 
 1. Builds a prompt from the agent version + document text + few-shot examples.
 2. Selects a model via :func:`backend.relopass.llm.route_llm` for the
-   ``field_extraction`` task class (escalates to claude-3-7-sonnet on
+   ``field_extraction`` task class (escalates to claude-sonnet-4-6 on
    validator failure or low confidence — Architecture Report §11).
 3. Awaits the LLM call via the handle's ``complete()`` method. Token / cost
    logging flows through the router's pluggable agent_runs logger.
@@ -191,7 +191,7 @@ class ExtractionRunner:
         prompt = _build_prompt(agent_version, document)
 
         # Route based on field_extraction. The router's escalation logic
-        # decides between gpt-4o-mini and claude-3-7-sonnet at the
+        # decides between gpt-4o-mini and claude-sonnet-4-6 at the
         # validator-failure / low-confidence step.
         handle = route_llm("field_extraction")
         raw_output = await handle.complete(

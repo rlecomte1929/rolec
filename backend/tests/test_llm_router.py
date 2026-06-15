@@ -3,8 +3,8 @@
 Covers each Validation Criterion from the Notion task:
 
 1. route_llm('document_classification') returns gpt-4o-mini handle.
-2. route_llm('eligibility_reasoning') always returns claude-3-7-sonnet.
-3. route_llm('extraction', confidence=0.7) escalates to claude-3-7-sonnet.
+2. route_llm('eligibility_reasoning') always returns claude-sonnet-4-6.
+3. route_llm('extraction', confidence=0.7) escalates to claude-sonnet-4-6.
 4. All §11 table rows implemented.
 5. Cost logging visible in agent_runs after each call.
 6. Test fixture asserts the deterministic routing decisions.
@@ -88,31 +88,31 @@ def test_document_classification_stays_default_above_threshold():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Criterion 2 — eligibility_reasoning → always claude-3-7-sonnet
+# Criterion 2 — eligibility_reasoning → always claude-sonnet-4-6
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def test_eligibility_reasoning_always_returns_claude():
     handle = route_llm("eligibility_reasoning")
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalated is False
 
 
 def test_eligibility_reasoning_ignores_confidence_inputs():
     handle = route_llm("eligibility_reasoning", current_confidence=0.10, validator_failed=True)
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalated is False  # no escalation path defined
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Criterion 3 — extraction alias, confidence=0.7 → claude-3-7-sonnet
+# Criterion 3 — extraction alias, confidence=0.7 → claude-sonnet-4-6
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def test_extraction_alias_escalates_below_0_85_threshold():
     handle = route_llm("extraction", current_confidence=0.7)
     assert handle.task_class == "field_extraction"  # alias resolved
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalated is True
     assert handle.escalation_reason is not None
     assert "0.70" in handle.escalation_reason
@@ -120,7 +120,7 @@ def test_extraction_alias_escalates_below_0_85_threshold():
 
 def test_field_extraction_validator_failure_escalates_even_when_confident():
     handle = route_llm("field_extraction", current_confidence=0.99, validator_failed=True)
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalation_reason == "validator failure"
 
 
@@ -156,7 +156,7 @@ def test_mrz_extraction_routes_to_no_model_sentinel():
 
 def test_entity_resolution_fallback_escalates_on_tight_cluster():
     handle = route_llm("entity_resolution_fallback", cosine_gap=0.03)
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalated is True
 
 
@@ -174,14 +174,14 @@ def test_policy_clause_extraction_always_claude():
 
 def test_pathway_conversational_escalates_on_explain_intent():
     handle = route_llm("pathway_conversational", intent="explain")
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalated is True
     assert handle.escalation_reason == "'explain' intent"
 
 
 def test_pathway_conversational_escalates_on_sensitive_topic():
     handle = route_llm("pathway_conversational", sensitive_topic=True)
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
     assert handle.escalation_reason == "sensitive topic"
 
 
@@ -243,17 +243,17 @@ ROUTING_MATRIX = [
     ("document_classification", {"current_confidence": 0.95}, "gpt-4o-mini", False),
     ("document_classification", {"current_confidence": 0.5}, "gpt-4o", True),
     ("field_extraction", {}, "gpt-4o-mini", False),
-    ("field_extraction", {"current_confidence": 0.7}, "claude-3-7-sonnet", True),
-    ("field_extraction", {"validator_failed": True}, "claude-3-7-sonnet", True),
-    ("extraction", {"current_confidence": 0.7}, "claude-3-7-sonnet", True),
+    ("field_extraction", {"current_confidence": 0.7}, "claude-sonnet-4-6", True),
+    ("field_extraction", {"validator_failed": True}, "claude-sonnet-4-6", True),
+    ("extraction", {"current_confidence": 0.7}, "claude-sonnet-4-6", True),
     ("entity_resolution_fallback", {}, "gpt-4o-mini", False),
-    ("entity_resolution_fallback", {"cosine_gap": 0.02}, "claude-3-7-sonnet", True),
+    ("entity_resolution_fallback", {"cosine_gap": 0.02}, "claude-sonnet-4-6", True),
     ("entity_resolution_fallback", {"cosine_gap": 0.30}, "gpt-4o-mini", False),
-    ("eligibility_reasoning", {}, "claude-3-7-sonnet", False),
+    ("eligibility_reasoning", {}, "claude-sonnet-4-6", False),
     ("policy_clause_extraction", {}, "claude-sonnet-4-6", False),
     ("pathway_conversational", {}, "gpt-4o-mini", False),
-    ("pathway_conversational", {"intent": "explain"}, "claude-3-7-sonnet", True),
-    ("pathway_conversational", {"sensitive_topic": True}, "claude-3-7-sonnet", True),
+    ("pathway_conversational", {"intent": "explain"}, "claude-sonnet-4-6", True),
+    ("pathway_conversational", {"sensitive_topic": True}, "claude-sonnet-4-6", True),
 ]
 
 

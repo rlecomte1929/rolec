@@ -92,7 +92,7 @@ def _install_completer_returning(output: Mapping[str, Any], *, tokens_in: int = 
         )
 
     register_completer("gpt-4o-mini", _completer)
-    register_completer("claude-3-7-sonnet", _completer)
+    register_completer("claude-sonnet-4-6", _completer)
 
 
 def _document(text: str = "Some document text.") -> ParsedDocument:
@@ -448,7 +448,7 @@ def test_extraction_run_raises_on_missing_required_keys():
 
 def test_extraction_run_retries_with_escalated_model_on_first_validator_miss():
     """When the first attempt misses a required key, the runner re-routes
-    with validator_failed=True (escalates to claude-3-7-sonnet per §11) and
+    with validator_failed=True (escalates to claude-sonnet-4-6 per §11) and
     succeeds on the second try.
     """
     storage = InMemoryAgentStorage()
@@ -458,7 +458,7 @@ def test_extraction_run_retries_with_escalated_model_on_first_validator_miss():
     ).version
 
     # First call (gpt-4o-mini) emits an empty fields object → missing key.
-    # Second call (escalated to claude-3-7-sonnet) emits the right field.
+    # Second call (escalated to claude-sonnet-4-6) emits the right field.
     call_count = {"n": 0}
 
     async def _completer_mini(prompt: str, **_kwargs: Any) -> CompletionResult:
@@ -488,16 +488,16 @@ def test_extraction_run_retries_with_escalated_model_on_first_validator_miss():
         )
 
     register_completer("gpt-4o-mini", _completer_mini)
-    register_completer("claude-3-7-sonnet", _completer_claude)
+    register_completer("claude-sonnet-4-6", _completer_claude)
 
     sink = InMemoryExtractionSink()
     runner = ExtractionRunner(sink=sink)
     result = asyncio.run(runner.run(agent_version, _document()))
 
-    assert result.model_name == "claude-3-7-sonnet"
+    assert result.model_name == "claude-sonnet-4-6"
     assert call_count["n"] == 2  # one mini, one claude
     assert len(sink.agent_runs) == 1  # only the successful run logged
-    assert sink.agent_runs[0].model_name == "claude-3-7-sonnet"
+    assert sink.agent_runs[0].model_name == "claude-sonnet-4-6"
 
 
 def test_extraction_run_raises_on_malformed_json():

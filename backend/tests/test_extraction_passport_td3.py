@@ -208,7 +208,7 @@ def _document(text: str) -> ParsedDocument:
 
 def _install_llm_returning(output: Mapping[str, Any]) -> None:
     """Register a completer that returns ``output`` (wrapped in tool-use
-    ``{"input": ...}``) for both gpt-4o-mini and claude-3-7-sonnet so the
+    ``{"input": ...}``) for both gpt-4o-mini and claude-sonnet-4-6 so the
     runtime's single-retry escalation path works whichever model gets
     routed to.
     """
@@ -221,7 +221,7 @@ def _install_llm_returning(output: Mapping[str, Any]) -> None:
         )
 
     register_completer("gpt-4o-mini", _completer)
-    register_completer("claude-3-7-sonnet", _completer)
+    register_completer("claude-sonnet-4-6", _completer)
 
 
 @pytest.fixture
