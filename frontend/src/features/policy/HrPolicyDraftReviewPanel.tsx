@@ -166,7 +166,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
       {/* What to fix before going live — promoted to top so the action list
           ranks above descriptive blocks. */}
       <Card padding="lg">
-        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">What to fix before going live</h3>
+        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Pre-publish checklist</h3>
         <p className="text-xs text-[#6b7280] mb-3">
           Plain-language items from readiness checks. Use them together with the workspace banner above.
         </p>
@@ -188,7 +188,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </ul>
         ) : (
           !missingStructure.length && (
-            <p className="text-sm text-[#6b7280]">No open checklist items for this version right now.</p>
+            <p className="text-sm text-[#6b7280]">All checks passed — your policy is ready to publish.</p>
           )
         )}
       </Card>

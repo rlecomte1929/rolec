@@ -234,7 +234,7 @@ export const HR_POLICY_WORKSPACE_COPY: Record<
       'Nothing is live for employees yet. Pick a standard baseline to start fast, or upload your company’s PDF or Word policy—then review and publish when ReloPass says you’re clear.',
   },
   draft_not_publishable: {
-    headline: 'Draft saved—finish review before it goes live',
+    headline: 'Draft saved. Check the benefit values below, then publish when you’re ready.',
     subline:
       'ReloPass turned your file (or baseline) into an editable draft. Work through the checklist below and the benefit table; when checks pass, you can publish.',
   },
