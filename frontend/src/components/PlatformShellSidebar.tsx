@@ -109,7 +109,7 @@ const SECTIONS: NavSection[] = [
       // a custom-provider form) was built but unreachable from the nav — surface it.
       { id: 'service-providers', label: 'Service providers', hint: 'Choose and add the providers your employees see', to: ROUTE_DEFS.hrVendorCuration.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
-      { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrExceptions.path },
+      { id: 'exceptions', label: 'Policy exceptions', to: ROUTE_DEFS.hrExceptions.path },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
       // Requirements routes to /resources (H1 'Requirements', Resources.tsx).
       // Placed last per product direction — a secondary discovery surface, not a

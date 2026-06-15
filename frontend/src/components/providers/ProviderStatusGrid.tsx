@@ -13,8 +13,10 @@
  */
 import React, { useState, useCallback } from 'react';
 import { Button } from '../antigravity/Button';
+import { Link } from 'react-router-dom';
 import { ProviderStatusCell } from './ProviderStatusCell';
 import type { ProviderGridRow, CoordinationStatus } from '../../api/client';
+import { ROUTE_DEFS } from '../../navigation/routes';
 
 const PROVIDER_COLUMNS: Array<{ key: keyof ProviderGridRow['cells']; label: string }> = [
   { key: 'housing',      label: 'Housing' },
@@ -162,7 +164,11 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
         >
           <p style={{ margin: 0, fontWeight: 500, fontSize: 15 }}>No providers assigned.</p>
           <p style={{ margin: '6px 0 0', fontSize: 13 }}>
-            Assign providers from the Mobility command center to track their status across cases.
+            Assign providers in the{' '}
+            <Link to={ROUTE_DEFS.hrCommandCenter.path} style={{ color: '#1f8e8b', textDecoration: 'underline' }}>
+              Mobility command center
+            </Link>{' '}
+            to track their status here.
           </p>
         </div>
       )}
