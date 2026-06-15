@@ -39,23 +39,30 @@ def rate_provider(
     if not employee_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    # The case is the authority for company scoping AND ownership: an employee
-    # may only rate within a case that is theirs.
+    # Ownership is validated against case_assignments — the employee-facing case
+    # id space (public.cases is a separate space under the case-identity schism).
+    # company_id is resolved best-effort from the employee profile for HR scoping.
     with SessionLocal() as session:
-        case_row = session.execute(
-            text("SELECT employee_id, company_id FROM cases WHERE id = :cid"),
+        asg = session.execute(
+            text("SELECT employee_user_id FROM case_assignments WHERE id = :cid"),
             {"cid": body.case_id},
         ).first()
-    if not case_row:
-        raise HTTPException(status_code=404, detail="Case not found")
+        if not asg:
+            raise HTTPException(status_code=404, detail="Assignment not found")
 
-    is_admin = bool(user.get("is_admin")) or (user.get("role") or "").upper() == "ADMIN"
-    if str(case_row.employee_id) != str(employee_id) and not is_admin:
-        raise HTTPException(status_code=403, detail="Not your case")
+        is_admin = bool(user.get("is_admin")) or (user.get("role") or "").upper() == "ADMIN"
+        if str(asg.employee_user_id) != str(employee_id) and not is_admin:
+            raise HTTPException(status_code=403, detail="Not your case")
+
+        prof = session.execute(
+            text("SELECT company_id FROM profiles WHERE id = :eid"),
+            {"eid": employee_id},
+        ).first()
+    company_id = str(prof.company_id) if prof and prof.company_id else None
 
     aggregate = provider_ratings_service.record_rating(
         employee_id=str(employee_id),
-        company_id=str(case_row.company_id),
+        company_id=company_id,
         supplier_id=supplier_id,
         case_id=body.case_id,
         score=body.score,
