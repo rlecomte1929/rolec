@@ -98,14 +98,6 @@ def _make_runner(
     if _HAS_LANGFUSE and lf is not None:
         @observe(name=f"golden-eval-{q_num}")
         def _run(q: str) -> tuple:
-            lf.set_current_trace_io(input={"question": q})
-            try:
-                lf.update_current_span(
-                    metadata={"q_num": q_num, "section": section, "run_name": run_name},
-                    tags=[run_name, "golden-eval", section],
-                )
-            except Exception:
-                pass  # update_current_span is best-effort
             result = hr_policy_assistant_query_response_dict(
                 message=q,
                 user=MOCK_HR,
@@ -113,15 +105,18 @@ def _make_runner(
             )
             answer = result.get("answer", {})
             verdict = _score_item(answer, expected_output)
-            lf.set_current_trace_io(input={"question": q}, output=answer)
-            try:
-                lf.score_current_trace(
-                    name="pass",
-                    value=1.0 if verdict == "PASS" else 0.0,
-                    comment=verdict,
-                )
-            except Exception:
-                pass
+            lf.update_current_trace(
+                name=f"golden-eval-{q_num}",
+                input={"question": q},
+                output=answer,
+                metadata={"q_num": q_num, "section": section, "run_name": run_name},
+                tags=[run_name, "golden-eval", section],
+            )
+            lf.score_current_trace(
+                name="pass",
+                value=1.0 if verdict == "PASS" else 0.0,
+                comment=verdict,
+            )
             return answer, verdict
     else:
         def _run(q: str) -> tuple:  # type: ignore[misc]
