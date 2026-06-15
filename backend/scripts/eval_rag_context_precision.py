@@ -174,20 +174,31 @@ def _build_typed_inputs(profile: dict, corridor_norm: str) -> tuple[UserProfile,
 
 
 class ImmigrationRetrieverAdapter:
-    """Adapts `immigration_retriever.retrieve_for_profile` to RetrieverProtocol.
+    """Adapts the immigration corpus retrieval to RetrieverProtocol.
 
-    The retriever needs a typed (UserProfile, PathClassification) — the eval
-    pipeline carries a single free-text query plus a `profile` block on each
-    GoldenQuery. This adapter stitches them together.
+    Queries `policy_assistant_chunks` (source_type='immigration_rule') via
+    pgvector cosine similarity, using the same OpenAI embedder that was used
+    to index the corpus.  This table stores corpus-level source_refs (e.g.
+    `immigration_rule.us_fr_lsv_passport`) whose stripped form matches the
+    `expected_chunk_ids` in the golden set — making precision@k meaningful.
+
+    Why not `immigration_retriever.retrieve_for_profile`?
+    That function reads from `immigration_corpus_chunks` (web-crawled content,
+    random DB UUIDs) which is a separate pipeline from the synthetic corpus
+    data in `policy_assistant_chunks`.  The golden set was built against the
+    synthetic corpus IDs, so the two tables are incompatible for this eval.
+    Long-term fix: align `immigration_retriever` to return corpus IDs.
     """
+
+    _SOURCE_TYPE = "immigration_rule"
+    _SOURCE_REF_PREFIX = "immigration_rule."
 
     def __init__(self, *, default_top_k: int = 5):
         self._default_top_k = default_top_k
         self._current_query: GoldenQuery | None = None
+        # Lazy-initialised so imports work without a live DB.
+        self._embedder = None
 
-    # The harness calls retrieve(query_text, k) without the per-query
-    # GoldenQuery in scope. Set it via set_current_query() before retrieve()
-    # so we can build the typed inputs from the profile block.
     def set_current_query(self, q: GoldenQuery) -> None:
         self._current_query = q
 
@@ -197,22 +208,50 @@ class ImmigrationRetrieverAdapter:
                 "ImmigrationRetrieverAdapter.retrieve called before "
                 "set_current_query — see evaluate() for the wiring."
             )
-        profile = self._current_query.extra.get("profile") or {}
-        corridor_norm = _normalize_corridor(self._current_query.corridor)
-        user, classification = _build_typed_inputs(profile, corridor_norm)
+        from backend.app.services.policy_assistant_embedder import get_default_embedder
+        from backend.database import db
+        from sqlalchemy import text as sa_text
 
-        hits = immigration_retriever.retrieve_for_profile(
-            profile=user,
-            classification=classification,
-            top_k=k,
+        corridor_norm = _normalize_corridor(self._current_query.corridor)
+
+        if self._embedder is None:
+            self._embedder = get_default_embedder()
+
+        q_emb = self._embedder.embed(query)
+        q_vec = "[" + ",".join(f"{x:.6f}" for x in q_emb) + "]"
+
+        sql = sa_text(
+            "SELECT source_ref, chunk_text, chunk_metadata, "
+            "  (embedding <=> CAST(:q AS vector)) AS distance "
+            "FROM policy_assistant_chunks "
+            "WHERE source_type = :src_type "
+            "  AND chunk_metadata->>'corridor' = :corridor "
+            "ORDER BY embedding <=> CAST(:q AS vector) ASC "
+            "LIMIT :k"
         )
+        with db.engine.begin() as conn:
+            rows = conn.execute(
+                sql,
+                {"q": q_vec, "src_type": self._SOURCE_TYPE, "corridor": corridor_norm, "k": k},
+            ).mappings().all()
+
         out: list[RetrievedChunk] = []
-        for h in hits:
-            meta = h.get("chunk_metadata") or {}
+        for r in rows:
+            source_ref = r["source_ref"] or ""
+            chunk_id = source_ref.removeprefix(self._SOURCE_REF_PREFIX)
+            distance = float(r["distance"] or 1.0)
+            score = max(0.0, 1.0 - distance / 2.0)
+            meta = r["chunk_metadata"] or {}
+            if isinstance(meta, str):
+                import json as _json
+                try:
+                    meta = _json.loads(meta)
+                except Exception:
+                    meta = {}
             out.append(RetrievedChunk(
-                chunk_id=str(h["id"]),
-                score=float(h.get("score", 0.0)),
-                text=h.get("chunk_text"),
+                chunk_id=chunk_id,
+                score=score,
+                text=r["chunk_text"],
                 source_url=meta.get("source_url"),
             ))
         return out
