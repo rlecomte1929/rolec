@@ -85,20 +85,30 @@ ROUTING_TABLE: Mapping[TaskClass, RoutingDecision] = {
     "field_extraction": RoutingDecision(
         task_class="field_extraction",
         default_model="gpt-4o-mini",
-        escalate_model="claude-3-7-sonnet",
+        # LLM-MODEL-DRIFT/AIQ-1085: escalate off the retired claude-3-7-sonnet
+        # onto the current Sonnet (same $3/$15 tier — cost-neutral). Extraction
+        # is a structured-output task, not deep reasoning, so Sonnet (not Opus).
+        escalate_model="claude-sonnet-4-6",
         escalation_reason="validator failure or confidence < 0.85",
     ),
     "entity_resolution_fallback": RoutingDecision(
         task_class="entity_resolution_fallback",
         default_model="gpt-4o-mini",
-        escalate_model="claude-3-7-sonnet",
+        # LLM-MODEL-DRIFT/AIQ-1085: retired 3.7 → current Sonnet (cost-neutral).
+        # Disambiguating a tight candidate cluster is well within Sonnet's range.
+        escalate_model="claude-sonnet-4-6",
         escalation_reason="candidate cluster within 0.05 cosine",
     ),
     "eligibility_reasoning": RoutingDecision(
         task_class="eligibility_reasoning",
-        default_model="claude-3-7-sonnet",
+        # LLM-MODEL-DRIFT/AIQ-1085: retired 3.7 → current Sonnet (same $3/$15
+        # tier — cost-neutral for this per-call default). This is the most
+        # reasoning-heavy route; if eligibility accuracy ever needs the stronger
+        # tier, claude-opus-4-8 is the lever, but that warrants a benchmark +
+        # adding Opus pricing to costs.yaml first (kept cost-neutral here).
+        default_model="claude-sonnet-4-6",
         escalate_model=None,
-        escalation_reason="always uses claude-3-7-sonnet",
+        escalation_reason="always uses claude-sonnet-4-6",
     ),
     "policy_clause_extraction": RoutingDecision(
         task_class="policy_clause_extraction",
@@ -112,7 +122,9 @@ ROUTING_TABLE: Mapping[TaskClass, RoutingDecision] = {
     "pathway_conversational": RoutingDecision(
         task_class="pathway_conversational",
         default_model="gpt-4o-mini",
-        escalate_model="claude-3-7-sonnet",
+        # LLM-MODEL-DRIFT/AIQ-1085: retired 3.7 → current Sonnet (cost-neutral).
+        # Conversational 'explain'/sensitive-topic handling fits Sonnet well.
+        escalate_model="claude-sonnet-4-6",
         escalation_reason="'explain' intent or sensitive topic",
     ),
 }

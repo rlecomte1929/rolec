@@ -72,7 +72,7 @@ def _install_completer(payload: Mapping[str, Any]) -> None:
         )
 
     register_completer("gpt-4o-mini", _completer)
-    register_completer("claude-3-7-sonnet", _completer)
+    register_completer("claude-sonnet-4-6", _completer)
 
 
 @pytest.fixture(autouse=True)

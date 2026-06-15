@@ -7,12 +7,15 @@
 # If a model appears in router.RoutingTable but is not present here, the
 # router emits a LLMRoutingError so the missing price is surfaced fast.
 
+# RETIRED — no task_class routes here anymore (LLM-MODEL-DRIFT/AIQ-1085 moved the
+# last routes to claude-sonnet-4-6). Price kept only for historical cost calcs on
+# old agent_runs rows; safe to drop once those are no longer queried.
 claude-3-7-sonnet:
   in_per_million: 3.00
   out_per_million: 15.00
 
 # Claude Sonnet 4.6 — current "sonnet" tier and the FD-2/AIQ-994 benchmark
-# baseline (the routing table still names the retired claude-3-7-sonnet). $3/$15.
+# baseline. Every Claude route in the table now names this model. $3/$15.
 claude-sonnet-4-6:
   in_per_million: 3.00
   out_per_million: 15.00
