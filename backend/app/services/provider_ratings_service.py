@@ -38,8 +38,12 @@ def recompute_supplier_aggregate(session, supplier_id: str) -> Dict[str, Any]:
 
     session.execute(
         text(
-            "INSERT INTO supplier_scoring_metadata (supplier_id, average_rating, review_count) "
-            "VALUES (:sid, :avg, :cnt) "
+            # preferred_partner/premium_partner are NOT NULL with no DB default, so a
+            # first-time INSERT for a supplier must set them (false). On conflict we
+            # only touch the rating aggregate and leave those admin flags untouched.
+            "INSERT INTO supplier_scoring_metadata "
+            "(supplier_id, average_rating, review_count, preferred_partner, premium_partner) "
+            "VALUES (:sid, :avg, :cnt, false, false) "
             "ON CONFLICT (supplier_id) DO UPDATE SET "
             "average_rating = excluded.average_rating, "
             "review_count = excluded.review_count"
