@@ -262,6 +262,11 @@ export const HrAssignmentReview: React.FC = () => {
   const docsComplete = docsList.filter((doc) => doc.complete).length;
   const docsTotal = docsList.length || 1;
 
+  // TASK-017: visa progress as a step count (forward-looking) rather than a 0% alarm.
+  const visaChecks = compliance?.checks ?? [];
+  const visaStepsSatisfied = visaChecks.filter((c) => c.status === 'COMPLIANT').length;
+  const visaStepsTotal = visaChecks.length;
+
   // TASK-003 (AIQ-1042): single source of truth for blocking items. The
   // "Attention Needed" checklist and the ReloPass Assistant summary both read
   // this array, so the assistant can never contradict the visible list. No
@@ -394,9 +399,9 @@ export const HrAssignmentReview: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="border border-[#d7e3ed] bg-[#f4f7fb] rounded-lg px-3 py-2 text-xs text-[#0b2b43] max-w-xs">
                       <div className="font-semibold uppercase text-[10px] text-[#5b6b7a] mb-1">AI Insight</div>
-                      <div>Profile completion {readiness}%. {missingItem}. Est. delay 4 days.</div>
+                      <div>Profile {readiness}% complete · Next: {missingItem}.</div>
                       <div className="text-[10px] text-[#6b7280] mt-2">
-                        AI-generated summary. Not a final decision.
+                        AI-assisted · Based on what we know so far.
                       </div>
                     </div>
                     <div className="border border-[#f3d6d6] bg-[#fff5f5] rounded-lg px-3 py-2 text-xs text-[#7a2a2a]">
@@ -419,21 +424,24 @@ export const HrAssignmentReview: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   <Card padding="md">
-                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Visa readiness</div>
-                    <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{readiness}%</div>
+                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Visa checklist</div>
+                    <div className="text-lg font-semibold text-[#0b2b43] mt-2">
+                      {visaStepsTotal > 0
+                        ? `${visaStepsSatisfied} of ${visaStepsTotal} steps complete`
+                        : 'Not started yet'}
+                    </div>
                     <div className="mt-3">
-                      <ProgressBar value={readiness} />
+                      <ProgressBar value={visaStepsTotal > 0 ? Math.round((visaStepsSatisfied / visaStepsTotal) * 100) : 0} />
                     </div>
                     {attentionItems.length > 0 && (
                       <div className="text-xs text-[#b45309] mt-2">Action required</div>
                     )}
                   </Card>
                   <Card padding="md">
-                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Docs collected</div>
-                    <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
-                      {docsComplete}/{docsTotal}
+                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Documents</div>
+                    <div className="text-lg font-semibold text-[#0b2b43] mt-2">
+                      {docsComplete} of {docsTotal} uploaded
                     </div>
-                    <div className="text-xs text-[#6b7280] mt-1">Critical documents</div>
                   </Card>
                   <Card padding="md">
                     <div className="text-xs uppercase tracking-wide text-[#6b7280]">Path</div>
