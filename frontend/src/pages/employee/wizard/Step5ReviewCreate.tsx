@@ -9,6 +9,7 @@ import type {
   RequirementItemDTO,
   DossierQuestion,
   DossierSuggestion,
+  DossierSource,
 } from '../../../types';
 import { buildRequirementsFromMissingFields, getRelocationCase } from '../../../api/relocation';
 import { RequirementList } from '../../../components/requirements/RequirementList';
@@ -116,12 +117,12 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const [dossierQuestions, setDossierQuestions] = useState<DossierQuestion[]>([]);
   const [dossierAnswers, setDossierAnswers] = useState<Record<string, any>>({});
   const [dossierComplete, setDossierComplete] = useState(true);
-  const [dossierSources, setDossierSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
+  const [dossierSources, setDossierSources] = useState<DossierSource[]>([]);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierSaving, setDossierSaving] = useState(false);
   const [dossierError, setDossierError] = useState('');
   const [dossierSuggestions, setDossierSuggestions] = useState<DossierSuggestion[]>([]);
-  const [suggestionSources, setSuggestionSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
+  const [suggestionSources, setSuggestionSources] = useState<DossierSource[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [approvedMissingFields, setApprovedMissingFields] = useState<string[]>([]);
   const [sufficiencyLoading, setSufficiencyLoading] = useState(false);
@@ -541,8 +542,35 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
               <div className="text-sm font-semibold text-[#0b2b43] mb-2">Suggested extra questions</div>
               <div className="space-y-3">
                 {dossierSuggestions.map((s, idx) => (
-                  <div key={`${s.question_text}-${idx}`} className="flex items-center justify-between gap-4">
-                    <div className="text-sm text-[#4b5563]">{s.question_text}</div>
+                  <div key={`${s.question_text}-${idx}`} className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-sm text-[#4b5563]">{s.question_text}</div>
+                      {s.sources && s.sources.length > 0 && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          {s.sources.map((src, sIdx) => {
+                            const label = src.chunk_id || src.title || src.url;
+                            if (!label) return null;
+                            const chip = (
+                              <span className="inline-block rounded bg-[#eef2f6] px-1.5 py-0.5 text-[10px] font-medium text-[#4b5563]">
+                                {label}
+                              </span>
+                            );
+                            return (
+                              <span key={`${label}-${sIdx}`} className="inline-flex items-center">
+                                <span className="mr-1 text-[10px] uppercase tracking-wide text-[#9ca3af]">Source</span>
+                                {src.url ? (
+                                  <a href={src.url} target="_blank" rel="noreferrer" className="underline decoration-dotted">
+                                    {chip}
+                                  </a>
+                                ) : (
+                                  chip
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                     <Button variant="outline" onClick={() => handleAddSuggestion(s)}>
                       Add this question
                     </Button>
@@ -558,14 +586,21 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
                 Sources used
               </summary>
               <ul className="mt-3 space-y-2 text-sm text-[#4b5563]">
-                {(suggestionSources.length > 0 ? suggestionSources : dossierSources).map((src, idx) => (
-                  <li key={`${src.url}-${idx}`}>
-                    <a href={src.url} target="_blank" rel="noreferrer" className="text-[#1d4ed8] underline">
-                      {src.title || src.url}
-                    </a>
-                    {src.snippet && <div className="text-xs text-[#6b7280] mt-1">{src.snippet}</div>}
-                  </li>
-                ))}
+                {(suggestionSources.length > 0 ? suggestionSources : dossierSources).map((src, idx) => {
+                  const label = src.title || src.chunk_id || src.url;
+                  return (
+                    <li key={`${src.url || src.chunk_id}-${idx}`}>
+                      {src.url ? (
+                        <a href={src.url} target="_blank" rel="noreferrer" className="text-[#1d4ed8] underline">
+                          {label}
+                        </a>
+                      ) : (
+                        <span>{label}</span>
+                      )}
+                      {src.snippet && <div className="text-xs text-[#6b7280] mt-1">{src.snippet}</div>}
+                    </li>
+                  );
+                })}
               </ul>
             </details>
           )}

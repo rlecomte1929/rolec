@@ -122,15 +122,26 @@ export interface DossierQuestionsResponse {
   sources_used: Array<{ title?: string; url: string; snippet?: string }>;
 }
 
+// A single citation backing a dossier suggestion. The RAG path (P3-02) returns
+// corpus chunks as `{ chunk_id, url }` (url may be absent when the chunk has no
+// source_url); the legacy web-search path returned `{ title, url, snippet }`.
+// `url` is therefore optional and `chunk_id` carries the corpus attribution.
+export interface DossierSource {
+  chunk_id?: string;
+  title?: string;
+  url?: string;
+  snippet?: string;
+}
+
 export interface DossierSuggestion {
   question_text: string;
   answer_type: 'text' | 'boolean' | 'select' | 'date' | 'multiselect';
-  sources: Array<{ title?: string; url: string }>;
+  sources: DossierSource[];
 }
 
 export interface DossierSearchSuggestionsResponse {
   destination_country?: string | null;
-  sources: Array<{ title?: string; url: string; snippet?: string }>;
+  sources: DossierSource[];
   suggestions: DossierSuggestion[];
 }
 
