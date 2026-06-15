@@ -114,10 +114,10 @@ const SECTIONS: NavSection[] = [
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
       { id: 'exceptions', label: 'Policy exceptions', to: ROUTE_DEFS.hrExceptions.path },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
-      // Requirements routes to /resources (H1 'Requirements', Resources.tsx).
-      // Placed last per product direction — a secondary discovery surface, not a
-      // primary HR operations action. (Mobility policy is reachable via 'Policy'.)
-      { id: 'requirements-discovery', label: 'Requirements', to: ROUTE_DEFS.resources.path, badge: { kind: 'static', variant: 'live' } },
+      // NAV-001: 'Requirements' now points to the corridor immigration-compliance
+      // page (/hr/requirements) — document checklist, risk flags, milestones, intake
+      // progress — NOT the old /resources lifestyle destination guide.
+      { id: 'requirements', label: 'Requirements', to: ROUTE_DEFS.hrRequirements.path },
     ],
   },
   {

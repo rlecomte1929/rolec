@@ -55,6 +55,9 @@ export const ROUTE_DEFS = {
   hrReview: { path: '/hr/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrReviewCase: { path: '/hr/review/case/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAssignmentReview: { path: '/hr/assignments/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** NAV-001: HR corridor immigration compliance (document checklist, risk flags,
+   *  milestones, intake progress). Replaces the old 'Requirements'→/resources tab. */
+  hrRequirements: { path: '/hr/requirements', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrComplianceIndex: { path: '/hr/compliance', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrErasureRequests: { path: '/hr/compliance/erasure-requests', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompliance: { path: '/hr/compliance/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
