@@ -348,7 +348,9 @@ export const HrCaseSummary: React.FC = () => {
                 <AIRecommendationCard
                   recommendationId={`case_readiness_v1:${assignment.id}`}
                   feature="case_readiness"
-                  title="AI case readiness assessment"
+                  title="AI case readiness"
+                  checkpointsSatisfied={assignment.caseReadinessUi.intake_satisfied}
+                  checkpointsTotal={assignment.caseReadinessUi.intake_total}
                   confidence={
                     assignment.caseReadinessUi.intake_total > 0
                       ? assignment.caseReadinessUi.intake_satisfied / assignment.caseReadinessUi.intake_total
