@@ -13,6 +13,14 @@ export async function startResearch(caseId: string): Promise<{ jobId: string }> 
   return apiPost(`/api/cases/${caseId}/research/start`);
 }
 
+export async function validateRoadmap(caseId: string): Promise<{
+  roadmap_validated: boolean;
+  roadmap_validated_at?: string | null;
+  roadmap_validated_by?: string | null;
+}> {
+  return apiPost(`/api/cases/${caseId}/roadmap/validate`);
+}
+
 export async function getRequirements(caseId: string): Promise<CaseRequirementsDTO> {
   return apiGet(`/api/cases/${caseId}/requirements`);
 }
