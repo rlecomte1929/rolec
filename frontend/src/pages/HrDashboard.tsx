@@ -356,7 +356,7 @@ export const HrDashboard: React.FC = () => {
             id="hr-search"
             value={search}
             onChange={(event) => setSearch(event)}
-            placeholder="Search employees..."
+            placeholder="Search cases..."
             className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
           />
           {/* BRAND-1: 'New case' is the single filled primary on this Cases
@@ -506,7 +506,7 @@ export const HrDashboard: React.FC = () => {
               {!isManageMode ? (
                 <>
                   <RefreshButton onClick={() => loadAssignments(false)} label="Refresh" />
-                  <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage cases</Button>
+                  <Button variant="outline" onClick={() => setIsManageMode(true)}>Remove cases</Button>
                 </>
               ) : (
                 <>

@@ -315,7 +315,7 @@ export const HrCaseSummary: React.FC = () => {
                 </Button>
                 {caseId && (
                   <Link to={buildRoute('hrResources')}>
-                    <Button variant="outline">View resources</Button>
+                    <Button variant="outline">View country guides</Button>
                   </Link>
                 )}
               </div>
