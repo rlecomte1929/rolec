@@ -29,6 +29,7 @@ import {
   type PopulateDestinationResult,
   type ScrapeQuotaState,
 } from '../api/hrCatalog';
+import { serviceTypeOptions, filterByServiceType } from './hrVendorServiceTypes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living areas / Housing',
@@ -298,6 +299,23 @@ export const HrVendorCuration: React.FC = () => {
 
   const masters = useMemo(() => rows.filter((r) => r.kind === 'master'), [rows]);
   const customs = useMemo(() => rows.filter((r) => r.kind === 'custom'), [rows]);
+
+  // Service-type filter. Tags are free-form (assigned by AI populate) and live
+  // in row.attributes.service_types. Options + filtering are pure helpers (tested
+  // in hrVendorServiceTypes.test.ts).
+  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('');
+
+  const serviceTypeOptionList = useMemo(() => serviceTypeOptions(masters), [masters]);
+
+  // Reset the filter when the scope changes, so a stale tag never hides the list.
+  useEffect(() => {
+    setServiceTypeFilter('');
+  }, [category, selectedDestinationKey]);
+
+  const visibleMasters = useMemo(
+    () => filterByServiceType(masters, serviceTypeFilter),
+    [masters, serviceTypeFilter],
+  );
 
   const togglePending = (masterId: string, current: boolean) => {
     setPendingToggles((prev) => {
@@ -690,8 +708,40 @@ export const HrVendorCuration: React.FC = () => {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
-            {masters.map((row) => {
+          <>
+            {serviceTypeOptionList.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <label htmlFor="vendor-service-type" className="text-sm font-medium text-[#0b2b43]">
+                  Service type
+                </label>
+                <select
+                  id="vendor-service-type"
+                  value={serviceTypeFilter}
+                  onChange={(e) => setServiceTypeFilter(e.target.value)}
+                  className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+                >
+                  <option value="">All service types</option>
+                  {serviceTypeOptionList.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                {serviceTypeFilter && (
+                  <span className="text-xs text-[#6b7280]">
+                    Showing {visibleMasters.length} of {masters.length}
+                  </span>
+                )}
+              </div>
+            )}
+            {visibleMasters.length === 0 ? (
+              <p className="py-2 text-sm text-[#4b5563]">
+                No master vendors match “{serviceTypeFilter}”.{' '}
+                <Button unstyled type="button" onClick={() => setServiceTypeFilter('')} className="underline text-[#0b2b43]">
+                  Clear filter
+                </Button>
+              </p>
+            ) : (
+            <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
+            {visibleMasters.map((row) => {
               const selected = effectiveSelected(row);
               const pending = row.master_item_id ? pendingToggles.has(row.master_item_id) : false;
               return (
@@ -717,7 +767,9 @@ export const HrVendorCuration: React.FC = () => {
                 </li>
               );
             })}
-          </ul>
+            </ul>
+            )}
+          </>
         )}
       </Card>
 
