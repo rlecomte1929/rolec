@@ -181,6 +181,27 @@ def start_research(case_id: str, user: Dict[str, Any] = Depends(get_current_user
     return {"jobId": str(uuid.uuid4())}
 
 
+@router.post("/{case_id}/roadmap/validate")
+def validate_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    """Employee validates their roadmap (the 'start tasks' checkpoint). Idempotent."""
+    _assert_case_access(user, case_id)
+    result = main_db.upsert_roadmap_validation(case_id, str(user.get("id") or ""))
+    # Invalidate the cached plan view so the validated state shows immediately.
+    try:
+        invalidate_relocation_plan_cache(case_id)
+    except Exception:
+        pass
+    _audit_case(
+        entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE,
+        new_value={"event": "roadmap_validated"},
+    )
+    return {
+        "roadmap_validated": True,
+        "roadmap_validated_at": result["validated_at"],
+        "roadmap_validated_by": result["validated_by_user_id"],
+    }
+
+
 @router.post("/{case_id}/create")
 def create_case(
     case_id: str,

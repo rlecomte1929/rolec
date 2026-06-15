@@ -818,6 +818,73 @@ class CasesMixin:
             )
         return getattr(result, "rowcount", 0) or 0
 
+    # ------------------------------------------------------------------
+    # Roadmap validation gate (employee "validate & start tasks" checkpoint)
+    # ------------------------------------------------------------------
+    def _ensure_case_roadmap_validations_table(self, conn: Any) -> None:
+        """Idempotently ensure the table exists (prod gets it via migration;
+        this keeps SQLite test DBs and fresh dev DBs working)."""
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS case_roadmap_validations ("
+            "  canonical_case_id TEXT PRIMARY KEY,"
+            "  validated_at TEXT NOT NULL,"
+            "  validated_by_user_id TEXT,"
+            "  created_at TEXT NOT NULL"
+            ")"
+        ))
+
+    def upsert_roadmap_validation(
+        self, case_id: str, validated_by_user_id: Optional[str],
+        *, request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Record (or refresh) the roadmap-validation checkpoint for a case.
+        Keyed by canonical case id (same as case_milestones). Idempotent."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            self._ensure_case_roadmap_validations_table(conn)
+            existing = self._exec(
+                conn,
+                "SELECT canonical_case_id FROM case_roadmap_validations WHERE canonical_case_id = :cid",
+                {"cid": cid}, op_name="get_roadmap_validation_for_upsert", request_id=request_id,
+            ).fetchone()
+            if existing:
+                self._exec(
+                    conn,
+                    "UPDATE case_roadmap_validations SET validated_at = :now, "
+                    "validated_by_user_id = :uid WHERE canonical_case_id = :cid",
+                    {"now": now, "uid": validated_by_user_id, "cid": cid},
+                    op_name="update_roadmap_validation", request_id=request_id,
+                )
+            else:
+                self._exec(
+                    conn,
+                    "INSERT INTO case_roadmap_validations "
+                    "(canonical_case_id, validated_at, validated_by_user_id, created_at) "
+                    "VALUES (:cid, :now, :uid, :now)",
+                    {"cid": cid, "now": now, "uid": validated_by_user_id},
+                    op_name="insert_roadmap_validation", request_id=request_id,
+                )
+        return {"canonical_case_id": cid, "validated_at": now,
+                "validated_by_user_id": validated_by_user_id}
+
+    def get_roadmap_validation(
+        self, case_id: str, *, request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Return the validation row for a case, or None."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.begin() as conn:
+            self._ensure_case_roadmap_validations_table(conn)
+            row = self._exec(
+                conn,
+                "SELECT canonical_case_id, validated_at, validated_by_user_id, created_at "
+                "FROM case_roadmap_validations WHERE canonical_case_id = :cid",
+                {"cid": cid}, op_name="get_roadmap_validation", request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        return self._row_to_dict(row) if hasattr(self, "_row_to_dict") else dict(row._mapping)
+
     def link_milestone_entity(
         self,
         milestone_id: str,

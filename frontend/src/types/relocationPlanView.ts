@@ -129,5 +129,9 @@ export interface RelocationPlanViewResponseDTO {
   last_evaluated_at?: string | null;
   data_freshness?: RelocationPlanDataFreshnessDTO | null;
   empty_state_reason?: string | null;
+  /** True once the employee validated the roadmap (or grandfathered: case already in execution). */
+  roadmap_validated?: boolean;
+  roadmap_validated_at?: string | null;
+  roadmap_validated_by?: string | null;
   debug?: Record<string, unknown> | null;
 }

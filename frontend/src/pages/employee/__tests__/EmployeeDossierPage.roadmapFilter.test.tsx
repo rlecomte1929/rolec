@@ -30,6 +30,9 @@ vi.mock('../../../api/dossier', () => ({
     list: (...args: unknown[]) => mockList(...args),
   },
 }));
+vi.mock('../../../api/relocationPlanView', () => ({
+  fetchRelocationPlanView: () => Promise.resolve({ roadmap_validated: true }),
+}));
 
 // Realtime hook pulls in the Supabase client — stub it to a no-op.
 vi.mock('../../../hooks/useCaseFormsRealtime', () => ({

@@ -10,10 +10,11 @@ import { useTextSelection } from '../../hooks/useTextSelection';
 import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
 import { fetchRelocationPlanView } from '../../api/relocationPlanView';
+import { validateRoadmap } from '../../api/cases';
 import { adaptPlanViewToTracks } from './relocationPlanToRoadmap';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
-import { PhaseContextBar } from '../../components/antigravity';
+import { PhaseContextBar, Button } from '../../components/antigravity';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
 import {
   successProbability,
@@ -97,6 +98,37 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const [docChips, setDocChips] = useState<Record<string, { count: number; worstStatus: string | null }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // [Validate gate] roadmap validation state (employee "validate & start tasks").
+  const [serverValidated, setServerValidated] = useState(false);
+  const [serverValidatedAt, setServerValidatedAt] = useState<string | null>(null);
+  const [validatedLocalAt, setValidatedLocalAt] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const isValidated = serverValidated || validatedLocalAt !== null;
+  const validatedAtDisplay = validatedLocalAt ?? serverValidatedAt;
+
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    fetchRelocationPlanView(caseId, { role: 'employee' })
+      .then((p) => {
+        if (cancelled) return;
+        setServerValidated(!!p.roadmap_validated);
+        setServerValidatedAt(p.roadmap_validated_at ?? null);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [caseId]);
+
+  const handleValidate = async () => {
+    if (!caseId || validating) return;
+    setValidating(true);
+    try {
+      const res = await validateRoadmap(caseId);
+      setValidatedLocalAt(res.roadmap_validated_at ?? new Date().toISOString());
+    } finally {
+      setValidating(false);
+    }
+  };
 
   useEffect(() => {
     if (!caseId) return;
@@ -187,6 +219,25 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
           successScore={successScore}
           caseId={caseId}
         />
+      </div>
+      <div className="mx-auto max-w-5xl px-6 pb-8">
+        {!isValidated ? (
+          <div className="mt-2 rounded-xl border border-[#e2e8f0] bg-white p-5 text-center">
+            <div className="text-sm font-semibold text-[#0b2b43]">Happy with your plan?</div>
+            <div className="text-xs text-[#64748b] mt-1 mb-3">
+              Validate your roadmap to start working through your tasks — forms and documents.
+            </div>
+            <Button onClick={handleValidate} disabled={validating}>
+              {validating ? 'Validating…' : '✓ Validate & start tasks'}
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-2 flex items-center gap-2 text-xs text-[#1f8e8b]">
+            ✓ <span>
+              Roadmap validated{validatedAtDisplay ? ` on ${new Date(validatedAtDisplay).toLocaleDateString()}` : ''}. Your tasks are unlocked.
+            </span>
+          </div>
+        )}
       </div>
       {selection && (
         <ExplainTermPopover selection={selection} assignmentId={caseId ?? ''} onClose={clear} />
