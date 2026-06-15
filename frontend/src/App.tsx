@@ -96,6 +96,7 @@ const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mo
 // /hr/policy?tab=builder via <Navigate> below. HrPolicyBuilderV2Page is
 // imported directly by HrPolicy.tsx for the embedded tab.
 const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
+const HrRequirementsPage = lazy(() => import('./features/requirements/HrRequirementsPage').then((module) => ({ default: module.HrRequirementsPage })));
 const AIDecisionsAuditPage = lazy(() => import('./features/ai-oversight/AIDecisionsAuditPage').then((module) => ({ default: module.AIDecisionsAuditPage })));
 const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
 const HrPolicyDashboardPage = lazy(() => import('./features/platform-v2/policy-dashboard/HrPolicyDashboardPage').then((module) => ({ default: module.HrPolicyDashboardPage })));
@@ -302,6 +303,7 @@ function App() {
             a tab on the Policy page rather than a standalone route. */}
         <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<RequireHrRoute><Navigate to={`${ROUTE_DEFS.hrPolicy.path}?tab=builder`} replace /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrExceptions.path} element={<RequireHrRoute><HrExceptionsPage /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrRequirements.path} element={<RequireHrRoute><HrRequirementsPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAiDecisions.path} element={<RequireHrRoute><AIDecisionsAuditPage /></RequireHrRoute>} />
                 <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<RequireHrRoute><HrPolicyRealityPage /></RequireHrRoute>} />
                 <Route path={ROUTE_DEFS.hrPolicyDashboard.path} element={<RequireHrRoute><HrPolicyDashboardPage /></RequireHrRoute>} />
