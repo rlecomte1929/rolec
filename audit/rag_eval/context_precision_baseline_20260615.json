@@ -1,0 +1,102 @@
+{
+  "aggregate": 0.144,
+  "by_corridor": {
+    "BR->PT": 0.0,
+    "FR->NO": 0.0,
+    "IN->DE": 0.34,
+    "UK->DE": 0.0,
+    "US->FR": 0.38
+  },
+  "by_difficulty": {
+    "easy": 0.1667,
+    "hard": 0.1286,
+    "medium": 0.1333
+  },
+  "by_intent": {
+    "document_requirements": 0.18,
+    "edge_case": 0.14,
+    "eligibility": 0.0727,
+    "fact_lookup": 0.1,
+    "process_steps": 0.2444
+  },
+  "extra": {
+    "k": 5,
+    "retriever": "ImmigrationRetrieverAdapter"
+  },
+  "lowest_queries": [
+    {
+      "corridor": "FR->NO",
+      "intent": "document_requirements",
+      "query_id": "Q-FRNO-001",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "process_steps",
+      "query_id": "Q-FRNO-002",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "eligibility",
+      "query_id": "Q-FRNO-003",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "edge_case",
+      "query_id": "Q-FRNO-004",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "fact_lookup",
+      "query_id": "Q-FRNO-005",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "process_steps",
+      "query_id": "Q-FRNO-006",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "document_requirements",
+      "query_id": "Q-FRNO-007",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "eligibility",
+      "query_id": "Q-FRNO-008",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "fact_lookup",
+      "query_id": "Q-FRNO-009",
+      "retrieved_ids": [],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "edge_case",
+      "query_id": "Q-FRNO-010",
+      "retrieved_ids": [],
+      "value": 0.0
+    }
+  ],
+  "metric": "precision_at_k",
+  "passes_threshold": false,
+  "queries_evaluated": 50,
+  "threshold": 0.85
+}
