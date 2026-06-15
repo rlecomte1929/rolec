@@ -129,3 +129,35 @@ def test_advance_quote_step_sets_in_progress():
     advance_quote_step(db, "case1", ["Housing search"], quote_request_id="q-123")
     quote_rows = [r for r in _svc_rows(db, "case1") if r["milestone_type"].endswith("_quote")]
     assert quote_rows and quote_rows[0]["status"] == "in_progress"
+
+
+def test_ai_regen_preserves_service_rows(monkeypatch):
+    """persist_generated_milestones must not delete source='service' rows."""
+    from backend.app.services import case_roadmap_profile as crp
+
+    db = FakeDB()
+
+    # Provide the exclude_source-aware delete the production function calls.
+    def delete_case_milestones(case_id, *, exclude_source=None, request_id=None):
+        with db.engine.begin() as c:
+            sql = "DELETE FROM case_milestones WHERE (case_id=:cid OR canonical_case_id=:cid)"
+            params = {"cid": case_id}
+            if exclude_source is not None:
+                sql += " AND (source IS NULL OR source <> :excl)"
+                params["excl"] = exclude_source
+            c.execute(text(sql), params)
+
+    db.delete_case_milestones = delete_case_milestones
+
+    reconcile_service_milestones(db, "case1", ["housing"])               # service rows
+    db.upsert_case_milestone("case1", "old_seed", "Seed", source=None)   # will be replaced
+
+    monkeypatch.setattr(crp, "map_generated_steps_to_milestones",
+                        lambda steps, corridor: [
+                            {"milestone_type": "pre_departure_ai_01", "title": "AI 1"}])
+    crp.persist_generated_milestones(db, "case1", [{"x": 1}], corridor="FR_DE")
+
+    rows = db.list_case_milestones("case1")
+    assert any(r["source"] == "service" for r in rows), "service rows must survive regen"
+    assert any(r["milestone_type"] == "pre_departure_ai_01" for r in rows), "AI rows written"
+    assert not any(r["milestone_type"] == "old_seed" for r in rows), "old seed replaced"
