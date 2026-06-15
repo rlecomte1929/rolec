@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
+import re
 import uuid
 from typing import Any, Dict, Optional, Tuple
 
@@ -36,6 +37,24 @@ _ADHOC_DEFAULT_STATUS = "in_progress"
 # Supabase Storage bucket shared with the rest of the dossier PDFs.
 _BUCKET = "case-forms"
 _ALLOWED_PDF_TYPES = {"application/pdf", "application/octet-stream"}
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def _actor_uuid(user: Dict[str, Any]) -> Optional[str]:
+    """``case_form_events.actor_id`` is uuid-typed. Legacy/seed sessions carry a
+    non-UUID text id (e.g. ``seed-emp-testingapril``); inserting that fails the
+    uuid cast and — inside the form-creation transaction — poisons it, silently
+    rolling back the ad-hoc form (surfaced as a misleading 404). Return the
+    caller's canonical Supabase uuid (``auth_uuid``), else their id only when it
+    is uuid-shaped, else ``None`` (the column is nullable)."""
+    for v in (user.get("auth_uuid"), user.get("id")):
+        s = str(v) if v else ""
+        if _UUID_RE.match(s):
+            return s
+    return None
 
 
 async def _read_pdf(upload: UploadFile) -> Tuple[Optional[bytes], Optional[str]]:
@@ -127,17 +146,25 @@ async def create_adhoc_form(
                     "original_file_url": original_file_url,
                 },
             )
+            # fix: [ADHOC-FORM] isolate the audit-event insert in a SAVEPOINT.
+            # case_form_events may be absent in legacy schemas, and a failed
+            # insert (e.g. a non-uuid actor_id) would otherwise poison the outer
+            # transaction and silently roll back the form → misleading 404.
             try:
-                conn.execute(
-                    _sql_text(
-                        f"INSERT INTO {_pg_table('case_form_events')} "
-                        "(case_form_id, event_type, actor_id, note) "
-                        "VALUES (:form_id, 'adhoc_created', :actor_id, :note)"
-                    ),
-                    {"form_id": form_id, "actor_id": str(user.get("id") or ""), "note": clean_name},
-                )
+                with conn.begin_nested():
+                    conn.execute(
+                        _sql_text(
+                            f"INSERT INTO {_pg_table('case_form_events')} "
+                            "(case_form_id, event_type, actor_id, note) "
+                            "VALUES (:form_id, 'adhoc_created', :actor_id, :note)"
+                        ),
+                        {"form_id": form_id, "actor_id": _actor_uuid(user), "note": clean_name},
+                    )
             except Exception:
-                pass  # case_form_events may not exist in legacy test schemas
+                logger.warning(
+                    "adhoc: case_form_events insert skipped (savepoint rollback) form_id=%s",
+                    form_id,
+                )
     except HTTPException:
         raise
     except Exception:
@@ -186,17 +213,23 @@ async def replace_adhoc_pdf(
                 ),
                 {"url": original_file_url, "form_id": form_id, "case_id": case_id},
             )
+            # fix: [ADHOC-FORM] SAVEPOINT-isolate the audit-event insert so a
+            # non-uuid actor_id (legacy sessions) can't poison the outer tx.
             try:
-                conn.execute(
-                    _sql_text(
-                        f"INSERT INTO {_pg_table('case_form_events')} "
-                        "(case_form_id, event_type, actor_id) "
-                        "VALUES (:form_id, 'adhoc_pdf_replaced', :actor_id)"
-                    ),
-                    {"form_id": form_id, "actor_id": str(user.get("id") or "")},
-                )
+                with conn.begin_nested():
+                    conn.execute(
+                        _sql_text(
+                            f"INSERT INTO {_pg_table('case_form_events')} "
+                            "(case_form_id, event_type, actor_id) "
+                            "VALUES (:form_id, 'adhoc_pdf_replaced', :actor_id)"
+                        ),
+                        {"form_id": form_id, "actor_id": _actor_uuid(user)},
+                    )
             except Exception:
-                pass
+                logger.warning(
+                    "adhoc: replace-pdf event insert skipped (savepoint rollback) form_id=%s",
+                    form_id,
+                )
     except Exception:
         logger.exception("adhoc: replace-pdf failed form_id=%s", form_id)
         raise HTTPException(status_code=500, detail="Failed to replace PDF")
