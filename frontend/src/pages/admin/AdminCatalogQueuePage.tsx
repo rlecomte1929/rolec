@@ -13,9 +13,11 @@ import {
   listAdminDestinationRequests,
   listAllowlist,
   listDemandGaps,
+  listIntakeCorridors,
   resolveDestinationRequest,
   type AllowlistEntry,
   type DemandGap,
+  type IntakeCorridor,
 } from '../../api/adminCatalog';
 import type { DestinationRequest } from '../../api/hrCatalog';
 
@@ -46,6 +48,8 @@ export const AdminCatalogQueuePage: React.FC = () => {
   // CATALOG-1: demand-driven coverage worklist
   const [gaps, setGaps] = useState<DemandGap[]>([]);
   const [fillingKey, setFillingKey] = useState<string | null>(null);
+  // CATALOG-4: proactive intake-driven corridors
+  const [corridors, setCorridors] = useState<IntakeCorridor[]>([]);
 
   // Manual allowlist add form
   const [newCity, setNewCity] = useState('');
@@ -57,14 +61,16 @@ export const AdminCatalogQueuePage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [t, a, g] = await Promise.all([
+      const [t, a, g, c] = await Promise.all([
         listAdminDestinationRequests(tab),
         listAllowlist(),
         listDemandGaps(),
+        listIntakeCorridors(),
       ]);
       setTickets(t);
       setAllowlistState(a);
       setGaps(g);
+      setCorridors(c);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load.';
       setError(msg);
@@ -141,6 +147,29 @@ export const AdminCatalogQueuePage: React.FC = () => {
     }
   };
 
+  // CATALOG-4: pre-warm one uncovered category for an emerging corridor — reuses
+  // the same allowlist+scrape action as the reactive demand worklist.
+  const fillCorridorCategory = async (corridor: IntakeCorridor, category: string) => {
+    const key = `${category}|${corridor.city}|${corridor.country}`;
+    setFillingKey(key);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await fillDemandGap(category, corridor.city, corridor.country);
+      setInfo(
+        res.scraped_count > 0
+          ? `Added ${res.scraped_count} ${category} provider${res.scraped_count === 1 ? '' : 's'} for ${corridor.city}.`
+          : `${corridor.city} is now allowlisted. The scraper returned nothing yet (it may be disabled or have no API key) — re-run once it's configured.`,
+      );
+      await loadAll();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not pre-warm this corridor.';
+      setError(msg);
+    } finally {
+      setFillingKey(null);
+    }
+  };
+
   const allowlistByDest = useMemo(() => {
     const set = new Set<string>();
     for (const e of allowlist) set.add(`${e.city.toLowerCase()}|${e.country.toLowerCase()}`);
@@ -193,6 +222,55 @@ export const AdminCatalogQueuePage: React.FC = () => {
                 </li>
               );
             })}
+          </ul>
+        )}
+      </Card>
+
+      {/* CATALOG-4: proactive intake-driven worklist — corridors employees are
+          moving to (from intake) that the catalog can't fully cover yet. Pre-warm
+          before anyone hits an empty state. Same allowlist+scrape action. */}
+      <Card padding="lg" className="mb-6">
+        <div className="mb-1 text-lg font-semibold text-[#0b2b43]">Emerging corridors (from intake)</div>
+        <p className="text-sm text-[#64748b] mb-4">
+          Destinations employees are moving to, ranked by intake volume, with the service categories
+          still missing catalog coverage. Pre-warm them here before employees hit an empty state.
+        </p>
+        {corridors.length === 0 ? (
+          <p className="text-sm text-[#94a3b8] py-2">
+            {loading ? 'Loading…' : 'Every intake destination is covered. New corridors appear here as intake grows.'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
+            {corridors.map((c) => (
+              <li key={`${c.city}|${c.country}`} className="p-4 flex flex-col gap-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="font-medium text-[#0b2b43]">
+                    {c.top_origin ? `${c.top_origin} → ` : ''}{c.city}{c.country ? `, ${c.country}` : ''}
+                  </div>
+                  <div className="text-sm text-[#64748b]">
+                    {c.intake_count} intake{c.intake_count === 1 ? '' : 's'}
+                    {' · last '}{formatDate(c.last_intake_at)}
+                    {c.allowlisted ? ' · already allowlisted' : ''}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[#94a3b8]">Uncovered:</span>
+                  {c.uncovered_categories.map((cat) => {
+                    const key = `${cat}|${c.city}|${c.country}`;
+                    return (
+                      <Button
+                        key={cat}
+                        variant="outline"
+                        onClick={() => void fillCorridorCategory(c, cat)}
+                        disabled={fillingKey === key}
+                      >
+                        {fillingKey === key ? 'Filling…' : <span className="capitalize">{cat}</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </Card>

@@ -272,6 +272,90 @@ def fill_demand_gap(
     }
 
 
+@router.get("/intake-corridors")
+def list_intake_corridors(
+    limit: int = Query(50, ge=1, le=200),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    """
+    [CATALOG-4] Proactive companion to /demand-gaps. Aggregates intake
+    destinations (wizard_cases) into emerging corridors ranked by intake volume,
+    and flags which service categories have NO catalog coverage yet — so admin
+    can pre-warm the catalog (allowlist + scrape) BEFORE employees hit an empty
+    state, instead of reacting after they do.
+
+    Each returned corridor carries its uncovered categories; admin fills them via
+    the same POST /demand-gaps/fill action (category, city, country). No PII:
+    only origin/destination geography is read — never employee names.
+    """
+    from sqlalchemy import text as _sql
+    from ...database import db
+    from ..services import catalog_coverage, scrape_safety
+
+    with db.engine.connect() as conn:
+        corridors = conn.execute(
+            _sql(
+                "SELECT dest_city AS city, "
+                "MAX(dest_country) AS country, "
+                "MAX(origin_country) AS top_origin, "
+                "COUNT(*) AS intake_count, "
+                "MAX(created_at) AS last_intake_at "
+                "FROM wizard_cases "
+                "WHERE dest_city IS NOT NULL AND dest_city <> '' "
+                "GROUP BY dest_city "
+                "ORDER BY intake_count DESC"
+            )
+        ).mappings().all()
+
+    # Coverage is computed per-city via the canonical coverage report (handles
+    # city aliases + every registered service category); cache so each distinct
+    # city is queried once. Mirrors the /demand-gaps caching pattern.
+    coverage_cache: Dict[str, Dict[str, Any]] = {}
+
+    def _uncovered_categories(city: str) -> List[str]:
+        key = (city or "").strip().lower()
+        if key not in coverage_cache:
+            try:
+                coverage_cache[key] = catalog_coverage.report_coverage(city)
+            except Exception:
+                coverage_cache[key] = {}
+        out: List[str] = []
+        for category, data in (coverage_cache[key] or {}).items():
+            # report_coverage emits {"title","items","geo_bound"}; "items" is the
+            # coverage count for this city (geo-bound cats) or globally. items==0
+            # → genuinely no catalog rows for this corridor → a pre-warm target.
+            items = data.get("items") if isinstance(data, dict) else None
+            try:
+                items_n = int(items or 0)
+            except (TypeError, ValueError):
+                items_n = 0
+            if items_n <= 0:
+                out.append(category)
+        return sorted(out)
+
+    results: List[Dict[str, Any]] = []
+    # Bound the per-city coverage work to the highest-volume corridors.
+    for c in corridors[: int(limit)]:
+        city = c["city"]
+        country = c["country"]
+        uncovered = _uncovered_categories(city)
+        if not uncovered:
+            continue  # corridor is already fully covered — not a pre-warm target
+        last_seen = c["last_intake_at"]
+        results.append(
+            {
+                "city": city,
+                "country": country,
+                "top_origin": c["top_origin"],
+                "intake_count": int(c["intake_count"] or 0),
+                "last_intake_at": last_seen.isoformat() if hasattr(last_seen, "isoformat") else last_seen,
+                "uncovered_categories": uncovered,
+                "allowlisted": scrape_safety.is_destination_allowlisted(city, country),
+            }
+        )
+    return results
+
+
 @router.get("/notification-counts")
 def admin_notification_counts(
     user: Dict[str, Any] = Depends(require_admin),
