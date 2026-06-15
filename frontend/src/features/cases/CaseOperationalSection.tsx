@@ -22,7 +22,9 @@ export const CaseOperationalSection: React.FC<Props> = ({ step, title, subtitle,
           {step}
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0b2b43]">{title}</h2>
+          {/* TASK-011: sentence case (not ALL CAPS). Hierarchy held by weight +
+              the numbered step badge, not letter case. */}
+          <h2 className="text-sm font-semibold text-[#0b2b43]">{title}</h2>
           <p className="text-xs text-[#64748b] mt-0.5 max-w-3xl leading-relaxed">{subtitle}</p>
         </div>
       </div>
