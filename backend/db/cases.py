@@ -818,6 +818,38 @@ class CasesMixin:
             )
         return getattr(result, "rowcount", 0) or 0
 
+    def delete_service_milestones_not_in_types(
+        self, case_id: str, keep_types: Sequence[str],
+        *, request_id: Optional[str] = None,
+    ) -> int:
+        """Delete source='service' milestones whose milestone_type is NOT in
+        keep_types. Used so a changed step set (e.g. destination change) cleans up
+        stale rows. Never touches AI/deterministic/manual rows."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        types = list(keep_types)
+        with self.engine.begin() as conn:
+            if types:
+                ph = ", ".join(f":t{i}" for i in range(len(types)))
+                params: Dict[str, Any] = {"cid": cid, **{f"t{i}": t for i, t in enumerate(types)}}
+                sql = (
+                    "DELETE FROM case_milestones "
+                    "WHERE (canonical_case_id = :cid OR case_id = :cid) "
+                    "AND source = 'service' "
+                    f"AND milestone_type NOT IN ({ph})"
+                )
+            else:
+                params = {"cid": cid}
+                sql = (
+                    "DELETE FROM case_milestones "
+                    "WHERE (canonical_case_id = :cid OR case_id = :cid) AND source = 'service'"
+                )
+            result = self._exec(
+                conn, sql, params,
+                op_name="delete_service_milestones_not_in_types",
+                request_id=request_id,
+            )
+        return getattr(result, "rowcount", 0) or 0
+
     # ------------------------------------------------------------------
     # Roadmap validation gate (employee "validate & start tasks" checkpoint)
     # ------------------------------------------------------------------
