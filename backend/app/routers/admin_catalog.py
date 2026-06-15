@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin
 from ..services import service_catalog
@@ -301,3 +301,33 @@ def admin_notification_counts(
         "pending_tickets": int(pending),
         "allowlisted_destinations": int(allowlist),
     }
+
+
+class PromoteHrVendorsBody(BaseModel):
+    threshold: Optional[int] = Field(
+        None, ge=1, description="Distinct-company count to promote at; defaults to CATALOG_HR_PROMOTE_THRESHOLD (2)."
+    )
+    dry_run: bool = Field(False, description="Preview promotions without writing.")
+
+
+@router.post("/promote-hr-vendors")
+def promote_hr_vendors(
+    body: PromoteHrVendorsBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """
+    [CATALOG-2] Promote HR custom vendors added by >= threshold distinct
+    companies for the same (category, city) into the shared master catalog
+    with source='hr_promoted'. Idempotent; one-offs and already-catalogued
+    vendors are skipped. Pass dry_run=true to preview without writing.
+    """
+    from ..services import catalog_promotion_service
+
+    try:
+        return catalog_promotion_service.promote_hr_vendors(
+            threshold=body.threshold,
+            dry_run=body.dry_run,
+            actor_id=user.get("id"),
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
