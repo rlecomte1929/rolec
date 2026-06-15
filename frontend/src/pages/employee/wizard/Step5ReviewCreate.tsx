@@ -124,6 +124,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const [dossierSuggestions, setDossierSuggestions] = useState<DossierSuggestion[]>([]);
   const [suggestionSources, setSuggestionSources] = useState<DossierSource[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionDegraded, setSuggestionDegraded] = useState(false);
   const [approvedMissingFields, setApprovedMissingFields] = useState<string[]>([]);
   const [sufficiencyLoading, setSufficiencyLoading] = useState(false);
   const [sufficiencyMessage, setSufficiencyMessage] = useState<string | null>(null);
@@ -300,10 +301,12 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const handleSuggestionSearch = async () => {
     if (!caseId) return;
     setSuggestionLoading(true);
+    setSuggestionDegraded(false);
     try {
       const res = await dossierAPI.searchSuggestions(caseId);
       setDossierSuggestions(res.suggestions || []);
       setSuggestionSources(res.sources || []);
+      setSuggestionDegraded(Boolean(res.degraded));
     } catch {
       setDossierError('Unable to fetch suggested questions at this time.');
     } finally {
@@ -448,6 +451,12 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
           {dossierError && (
             <div className="rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
               {dossierError}
+            </div>
+          )}
+
+          {suggestionDegraded && (
+            <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92660a]">
+              Suggested questions are temporarily unavailable — please try again shortly.
             </div>
           )}
 

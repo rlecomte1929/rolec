@@ -23,6 +23,14 @@ from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
+
+class DossierSuggestionUnavailable(RuntimeError):
+    """[OBS-01] Raised when the dossier-suggestion LLM call fails (transport /
+    provider outage, e.g. Anthropic credit exhaustion) — as opposed to a corridor
+    with no corpus coverage, which is a legitimate empty result. The handler turns
+    this into a `degraded` signal so a platform-wide LLM outage is observable
+    instead of looking identical to 'this corridor has no coverage'."""
+
 # policy_assistant_chunks stores corpus source_refs like
 # `immigration_rule.us_fr_lsv_passport`; the corridor metadata uses a Unicode
 # arrow + ISO2 (e.g. "US→FR").
@@ -160,7 +168,11 @@ def suggest_questions(
 ) -> List[Dict[str, Any]]:
     """RAG dossier suggestions for a corridor. Returns a list of dicts shaped for
     DossierSuggestionDTO ({question_text, answer_type, sources}). [] when the
-    corridor has no corpus coverage (graceful empty fallback)."""
+    corridor has no corpus coverage (graceful empty fallback).
+
+    Raises DossierSuggestionUnavailable when the LLM call itself fails (provider /
+    transport outage) — distinct from the empty-corpus case — so callers can
+    surface a degraded state instead of a silent empty result ([OBS-01])."""
     if not corridor:
         return []
     chunks = retrieve_chunks(corridor, _retrieval_query(profile))
@@ -189,9 +201,15 @@ def suggest_questions(
     )
     try:
         result = cli.complete(req)
-    except Exception:
-        log.warning("dossier suggest LLM failed for corridor %s", corridor, exc_info=True)
-        return []
+    except Exception as exc:
+        # [OBS-01] A failure here is an LLM/transport outage, NOT a covered-but-empty
+        # corridor (the corpus was retrieved fine above). Log at ERROR so it alerts,
+        # and raise so the handler can surface a `degraded` signal instead of an
+        # indistinguishable empty 200.
+        log.error(
+            "dossier suggest LLM failed for corridor %s (degraded)", corridor, exc_info=True
+        )
+        raise DossierSuggestionUnavailable(corridor) from exc
 
     tool = result.get("tool_use") if isinstance(result, dict) else None
     questions = tool.get("questions") if isinstance(tool, dict) else None
