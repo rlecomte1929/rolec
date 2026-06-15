@@ -102,9 +102,12 @@ ROUTING_TABLE: Mapping[TaskClass, RoutingDecision] = {
     ),
     "policy_clause_extraction": RoutingDecision(
         task_class="policy_clause_extraction",
-        default_model="claude-3-7-sonnet",
+        # FD-2/AIQ-994: baseline off the retired claude-3-7-sonnet onto the
+        # current Sonnet (same $3/$15 tier, the Fable-5 benchmark baseline). The
+        # POLICY_PARSING_FABLE5 env override still routes to claude-fable-5 when set.
+        default_model="claude-sonnet-4-6",
         escalate_model=None,
-        escalation_reason="always uses claude-3-7-sonnet",
+        escalation_reason="always uses claude-sonnet-4-6",
     ),
     "pathway_conversational": RoutingDecision(
         task_class="pathway_conversational",

@@ -167,8 +167,9 @@ def test_entity_resolution_fallback_default_on_wide_cluster():
 
 
 def test_policy_clause_extraction_always_claude():
+    # FD-2/AIQ-994: baseline moved off the retired claude-3-7-sonnet to current Sonnet.
     handle = route_llm("policy_clause_extraction")
-    assert handle.model_name == "claude-3-7-sonnet"
+    assert handle.model_name == "claude-sonnet-4-6"
 
 
 def test_pathway_conversational_escalates_on_explain_intent():
@@ -249,7 +250,7 @@ ROUTING_MATRIX = [
     ("entity_resolution_fallback", {"cosine_gap": 0.02}, "claude-3-7-sonnet", True),
     ("entity_resolution_fallback", {"cosine_gap": 0.30}, "gpt-4o-mini", False),
     ("eligibility_reasoning", {}, "claude-3-7-sonnet", False),
-    ("policy_clause_extraction", {}, "claude-3-7-sonnet", False),
+    ("policy_clause_extraction", {}, "claude-sonnet-4-6", False),
     ("pathway_conversational", {}, "gpt-4o-mini", False),
     ("pathway_conversational", {"intent": "explain"}, "claude-3-7-sonnet", True),
     ("pathway_conversational", {"sensitive_topic": True}, "claude-3-7-sonnet", True),
