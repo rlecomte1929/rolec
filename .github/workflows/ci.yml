@@ -205,12 +205,14 @@ jobs:
       - name: Pytest (P1 deterministic suite)
         run: |
           # NOTE: the RAG context-precision eval (test_eval_rag_context_precision.py +
-          # test_rag_eval_fixture_precision.py, W3-4/AIQ-777) is intentionally NOT in
-          # this blocking suite. #778 merged it already failing — the fixture eval
-          # scores 0.0 (vs the 0.24 it was written against) and CI SQLite rejects the
-          # retriever SQL ("near '>'") — so it false-reds every backend PR. The tests
-          # are kept in the repo; re-add here once the eval is fixed + properly gated
-          # under AIQ-1089. Until then it must not block unrelated backend work.
+          # test_rag_eval_fixture_precision.py, W3-4/AIQ-777) is back in the blocking
+          # suite as of AIQ-1089. The two failures #786 de-gated it for are fixed: the
+          # adapter (eval_rag_context_precision.ImmigrationRetrieverAdapter) now
+          # dispatches on engine dialect — SQLite routes through the shared retriever's
+          # in-Python cosine leg (no pgvector `<=>` / CAST AS vector → no "near '>'"),
+          # and reads the db handle off immigration_retriever.db so the fixture's
+          # mock.patch is honoured. Fixture vector p@5 is back to 0.2400 (floor 0.20).
+          # The live-corpus gate (≥0.62 vs the v13 baseline) runs separately with secrets.
           python -m pytest -q \
             backend/tests/test_admin_form_templates_router.py \
             backend/tests/test_immigration_documents.py \
@@ -226,6 +228,7 @@ jobs:
             backend/tests/test_factual_verifier.py \
             backend/tests/test_rag_roadmap_pipeline.py \
             backend/tests/test_rag_integration.py \
+            backend/tests/test_eval_rag_context_precision.py \
             backend/tests/test_deliverable_integrity.py \
             backend/tests/test_queue_status_hygiene.py \
             backend/tests/test_correction_analytics.py \
@@ -282,7 +285,8 @@ jobs:
             backend/tests/test_corridor_intake_questions.py \
             backend/tests/test_corridor_sla.py \
             backend/tests/test_corridor_pathways.py \
-            backend/tests/test_budget_summary_policy_config.py
+            backend/tests/test_budget_summary_policy_config.py \
+            backend/tests/test_rag_eval_fixture_precision.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route

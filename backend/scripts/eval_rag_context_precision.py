@@ -208,11 +208,25 @@ class ImmigrationRetrieverAdapter:
                 "ImmigrationRetrieverAdapter.retrieve called before "
                 "set_current_query — see evaluate() for the wiring."
             )
+
+        corridor_norm = _normalize_corridor(self._current_query.corridor)
+
+        # AIQ-1089: dispatch on engine dialect. The live gate runs against
+        # Postgres/pgvector (`policy_assistant_chunks`, below) and produced the
+        # v13 baseline (0.620). The deterministic CI gate seeds the synthetic
+        # corpus into an in-memory SQLite `immigration_corpus_chunks` table —
+        # the pgvector SQL (`<=>` / CAST AS vector) is a Postgres-only operator
+        # that SQLite rejects with `near ">"`, so route SQLite through the shared
+        # retriever's in-Python cosine leg (immigration_retriever, which already
+        # has a tested SQLite path). Read the handle off immigration_retriever.db
+        # so the fixture's mock.patch.object(immigration_retriever, "db", ...)
+        # is honoured — `from backend.database import db` would bind past it.
+        if immigration_retriever.db.engine.dialect.name == "sqlite":
+            return self._retrieve_fixture(corridor_norm, k)
+
         from backend.app.services.policy_assistant_embedder import get_default_embedder
         from backend.database import db
         from sqlalchemy import text as sa_text
-
-        corridor_norm = _normalize_corridor(self._current_query.corridor)
 
         if self._embedder is None:
             self._embedder = get_default_embedder()
@@ -253,6 +267,34 @@ class ImmigrationRetrieverAdapter:
                 score=score,
                 text=r["chunk_text"],
                 source_url=meta.get("source_url"),
+            ))
+        return out
+
+    def _retrieve_fixture(self, corridor_norm: str, k: int) -> Sequence[RetrievedChunk]:
+        """Deterministic SQLite path for the CI gate (no DB, no secrets).
+
+        Delegates to the shared `immigration_retriever`, whose corpus leg has an
+        in-Python cosine path for SQLite. The fixture (rag_eval_fixture.py /
+        test_eval_rag_context_precision.py) seeds the synthetic golden corpus into
+        an in-memory `immigration_corpus_chunks` table keyed by the deterministic
+        chunk id (== expected_chunk_ids), so retrieve_for_profile's returned `id`
+        aligns with the golden set and precision@k is meaningful.
+        """
+        profile = (self._current_query.extra or {}).get("profile", {}) if self._current_query else {}
+        user, classification = _build_typed_inputs(profile, corridor_norm)
+        rows = immigration_retriever.retrieve_for_profile(
+            profile=user,
+            classification=classification,
+            top_k=k,
+            engine=immigration_retriever.db.engine,
+        )
+        out: list[RetrievedChunk] = []
+        for r in rows:
+            out.append(RetrievedChunk(
+                chunk_id=r.get("id") or "",
+                score=float(r.get("score") or 0.0),
+                text=r.get("chunk_text") or "",
+                source_url=r.get("source_url"),
             ))
         return out
 
