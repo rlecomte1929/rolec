@@ -106,7 +106,7 @@ export const HrAssignmentServicesCapPanel: React.FC<{ assignmentId: string }> = 
   }, [rows, results, cmpLoading]);
 
   if (loadingSvc) {
-    return <div className="text-sm text-[#6b7280]">Loading services and estimates…</div>;
+    return <div className="text-sm text-[#6b7280]">Loading your relocation services…</div>;
   }
   if (svcError) {
     return <div className="text-sm text-red-600">{svcError}</div>;
