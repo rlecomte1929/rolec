@@ -481,10 +481,41 @@ GOLDEN_ITEMS: List[Dict[str, Any]] = [
     },
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # C-aspects (4 new aspect cases; Q02/Q03 already covered above)
+    # C-aspects (6 cases — 2 from the eval have distinct phrasing from A-baseline)
     # ═══════════════════════════════════════════════════════════════════════════
 
     # ─── Q31 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "How many home leave trips am I entitled to?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "C-aspects: Home leave count — different phrasing from Q04. "
+                "Must show actual trip count (1 or 3), not a section ref or bare refusal."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+                {"kind": "answer_text_not_contains", "value": "8.3"},
+            ],
+        },
+    },
+    # ─── Q32 ──────────────────────────────────────────────────────────────────
+    {
+        "question": "How does the shipment allowance work — is it a managed service or cash?",
+        "expected_output": {
+            "expected_verdict": "PASS",
+            "description": (
+                "C-aspects: Structure aspect on shipment — distinct from Q03 (lump sum on relocation). "
+                "Must not be a bare refusal; should return entitlement_summary for shipment."
+            ),
+            "checks": [
+                {"kind": "refusal_not_unknown"},
+                {"kind": "answer_text_not_empty"},
+            ],
+        },
+    },
+    # ─── Q33 ──────────────────────────────────────────────────────────────────
     {
         "question": "How do I claim the relocation allowance — what is the process?",
         "expected_output": {
