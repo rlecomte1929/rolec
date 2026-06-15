@@ -107,7 +107,10 @@ const SECTIONS: NavSection[] = [
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
       // The vendor-curation page (add + choose the providers employees see, incl.
       // a custom-provider form) was built but unreachable from the nav — surface it.
-      { id: 'service-providers', label: 'Service providers', hint: 'Choose and add the providers your employees see', to: ROUTE_DEFS.hrVendorCuration.path },
+      // RECS-CATALOG-2/AIQ-1080: badge the count of employees stuck on the "HR is
+      // finalizing" empty state (catalog_employee_demand, un-curated only) so HR is
+      // nudged to curate from anywhere — not just once they're already on the page.
+      { id: 'service-providers', label: 'Service providers', hint: 'Choose and add the providers your employees see', to: ROUTE_DEFS.hrVendorCuration.path, badge: { kind: 'dynamic', getCount: (c) => c.hr?.employees_waiting ?? 0 } },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
       { id: 'exceptions', label: 'Policy exceptions', to: ROUTE_DEFS.hrExceptions.path },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
