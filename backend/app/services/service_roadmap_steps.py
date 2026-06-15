@@ -129,6 +129,7 @@ def steps_for_service(service_key: str) -> List[ServiceStep]:
 # drift still resolves.
 _CATEGORY_KEYWORDS = [
     ("housing", "housing"),
+    ("living", "housing"),  # Services tab calls housing "living_areas"
     ("school", "schools"),
     ("childcare", "schools"),
     ("immigration", "immigration"),
