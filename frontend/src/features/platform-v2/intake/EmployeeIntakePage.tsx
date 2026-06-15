@@ -4,6 +4,7 @@ import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { patchCase } from '../../../api/cases';
+import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
@@ -59,7 +60,7 @@ interface HousingPrefs {
   school_start?: string;
 }
 
-interface IntakeData {
+export interface IntakeData {
   origin_country: string;
   origin_city: string;
   dest_country: string;
@@ -831,24 +832,36 @@ export function EmployeeIntakePage() {
   // We can't depend on `assignmentId` directly because setField is
   // stable and its closure would otherwise capture the initial null.
   const assignmentIdRef = useRef<string | null>(null);
+  // True once the saved draft has been fetched (success or failure). The
+  // autosave in setField is gated on this so a mount-time setField — e.g. the
+  // auto-select-services effect, which runs before hydration — can't schedule a
+  // save that captures the empty initial state. The draft store REPLACES (not
+  // merges) on the backend, so such a save wiped the employee's saved answers
+  // on every reload.
+  const draftHydratedRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const setField = useCallback(<K extends keyof IntakeData>(k: K, v: IntakeData[K]) => {
     setData((d) => {
       const next = { ...d, [k]: v };
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        setSavedAt(Date.now());
-        const aid = assignmentIdRef.current;
-        if (aid) {
-          void employeeAPI
-            .updateIntakeDraft(aid, next as unknown as Record<string, unknown>)
-            .catch(() => {
-              /* swallow — next edit will retry, wizard stays usable */
-            });
-        }
-      }, 700);
+      // Gate on hydration: never schedule a save before the saved draft has
+      // loaded, or a pre-hydration edit would persist the empty initial state
+      // and clobber the server draft (which replaces, not merges).
+      if (draftHydratedRef.current) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => {
+          setSavedAt(Date.now());
+          const aid = assignmentIdRef.current;
+          if (aid) {
+            void employeeAPI
+              .updateIntakeDraft(aid, next as unknown as Record<string, unknown>)
+              .catch(() => {
+                /* swallow — next edit will retry, wizard stays usable */
+              });
+          }
+        }, 700);
+      }
       return next;
     });
   }, []);
@@ -991,8 +1004,8 @@ export function EmployeeIntakePage() {
   // GET /api/employee/assignments/{id}/intake. Merges into local
   // state only over empty fields so a user typing during the
   // load doesn't get their work overwritten. Failure is soft —
-  // the wizard still runs against the in-memory defaults.
-  const draftHydratedRef = useRef(false);
+  // the wizard still runs against the in-memory defaults. draftHydratedRef is
+  // declared above (it also gates the autosave); set true here in finally().
   useEffect(() => {
     if (draftHydratedRef.current || !assignmentId) return;
     let cancelled = false;
@@ -1446,7 +1459,10 @@ export function EmployeeIntakePage() {
                     setSubmitting(true);
                     setSubmitError(null);
                     try {
-                      await patchCase(caseIdRef.current, { services: data.services });
+                      // Persist the FULL intake onto the canonical case (not just
+                      // services) so HR, the case record, and the plan/roadmap see
+                      // everything the employee entered.
+                      await patchCase(caseIdRef.current, intakeToCaseDraft(data));
                       // Mark intake as fully completed against the linked
                       // assignment so the hub row flips to "Submitted".
                       // Fire-and-forget — patchCase already succeeded.
