@@ -1050,7 +1050,7 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
           <h3 className="text-base font-semibold text-[#0b2b43] mb-4">{title}</h3>
         )}
         <div role="status" aria-live="polite" aria-busy="true">
-          <span className="sr-only">Loading relocation plan…</span>
+          <span className="sr-only">Loading plan tasks…</span>
           <SkeletonTimeline />
         </div>
       </Card>

@@ -1051,7 +1051,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           <div className="text-sm font-semibold text-[#0b2b43] mb-2">Publish controls</div>
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('draft')} disabled={statusBusy}>
-              {statusBusy ? 'Saving…' : 'Save draft'}
+              {statusBusy ? 'Saving draft…' : 'Save draft'}
             </Button>
             {/* PARKED: 'Mark for review' / 'Mark reviewed' lifecycle buttons hidden in PR 0.5
                 (HR Policy UX simplification, design doc 2026-04-27). The DB column

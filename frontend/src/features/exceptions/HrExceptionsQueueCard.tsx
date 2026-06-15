@@ -100,7 +100,7 @@ export const HrExceptionsQueueCard: React.FC = () => {
           disabled={loading}
           className="text-sm text-[#0b2b43] hover:underline disabled:opacity-50"
         >
-          {loading ? 'Refreshing…' : 'Refresh'}
+          {loading ? 'Refreshing exception requests…' : 'Refresh'}
         </Button>
       </div>
 

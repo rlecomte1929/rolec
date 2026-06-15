@@ -263,7 +263,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
   if (loading && milestones.length === 0) {
     return (
       <Card padding="lg">
-        <div className="text-sm text-[#6b7280]">Loading relocation plan…</div>
+        <div className="text-sm text-[#6b7280]">Loading plan tasks…</div>
       </Card>
     );
   }
