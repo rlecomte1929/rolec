@@ -197,38 +197,46 @@ export const PolicyBenefitsSummary: React.FC<{ companyId?: string | null }> = ({
               {cat.rows.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-[#9ca3af]">No values set for this category.</div>
               ) : (
-                <div className="divide-y divide-[#eef2f7]">
-                  {cat.rows.map((row, idx) => {
-                    const cap = formatCap(row);
-                    return (
-                      <div
-                        key={`${cat.code}-${row.tier_id ?? 'all'}-${idx}`}
-                        className="px-4 py-3 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3"
-                      >
-                        <div className="text-sm text-[#0b2b43]">
-                          {row.tier_name ? (
-                            <Badge variant="info" size="sm">
-                              {row.tier_name}
-                            </Badge>
-                          ) : (
-                            <Badge variant="neutral" size="sm">
-                              All tiers
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-sm">
-                          <div className="font-medium text-[#0b2b43]">{cap ?? 'Not set'}</div>
-                          {row.value_notes && (
-                            <div className="text-xs text-[#6b7280] mt-0.5">{row.value_notes}</div>
-                          )}
-                        </div>
-                        {/* "Last validated by" line is mandatory on every row. */}
-                        <div className="text-xs text-[#6b7280] md:text-right self-center">
-                          {validationLine(row)}
-                        </div>
-                      </div>
-                    );
-                  })}
+                // AIQ-1105: scannable table with explicit column headers (was a
+                // header-less 3-col grid). overflow-x-auto keeps it usable on
+                // narrow screens without dropping the header row.
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-[#e2e8f0] text-left text-[11px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                        <th scope="col" className="px-4 py-2 font-semibold">Tier</th>
+                        <th scope="col" className="px-4 py-2 font-semibold">Coverage</th>
+                        <th scope="col" className="px-4 py-2 font-semibold">Notes</th>
+                        <th scope="col" className="px-4 py-2 font-semibold text-right">Validated</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#eef2f7]">
+                      {cat.rows.map((row, idx) => {
+                        const cap = formatCap(row);
+                        return (
+                          <tr key={`${cat.code}-${row.tier_id ?? 'all'}-${idx}`} className="align-top">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {row.tier_name ? (
+                                <Badge variant="info" size="sm">
+                                  {row.tier_name}
+                                </Badge>
+                              ) : (
+                                <Badge variant="neutral" size="sm">
+                                  All tiers
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-[#0b2b43]">{cap ?? 'Not set'}</td>
+                            <td className="px-4 py-3 text-xs text-[#6b7280]">{row.value_notes || '—'}</td>
+                            {/* "Last validated by" line is mandatory on every row. */}
+                            <td className="px-4 py-3 text-right text-xs text-[#6b7280] whitespace-nowrap">
+                              {validationLine(row)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </Card>
