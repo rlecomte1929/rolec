@@ -88,7 +88,13 @@ function destinationKey(d: { city: string; country: string }): string {
   return `${d.city}|${d.country}`;
 }
 
-export const HrVendorCuration: React.FC = () => {
+/**
+ * `embedded`: when rendered as the "Vendor Management" tab inside another
+ * AppShell (HrServiceProvidersPage, NAV-SP-1), skip the outer AppShell so we
+ * don't double-nest the platform shell. Default off → the standalone
+ * /hr/vendor-curation route is unchanged.
+ */
+export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [category, setCategory] = useState<string>('schools');
   // Destinations come from the admin allowlist — HR can't type free-form.
   const [destinations, setDestinations] = useState<AllowlistedDestination[]>([]);
@@ -439,12 +445,8 @@ export const HrVendorCuration: React.FC = () => {
     window.setTimeout(() => setFlashMaster(false), 1800);
   };
 
-  return (
-    <AppShell
-      section="HR Operations"
-      title="Service providers"
-      subtitle="Choose which providers your employees see, and add your own, per service and destination."
-    >
+  const inner = (
+    <>
       <Card padding="lg" className="mb-6 border border-[#fde68a] bg-[#fffbeb]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -823,6 +825,18 @@ export const HrVendorCuration: React.FC = () => {
           </Button>
         </div>
       </Card>
+    </>
+  );
+
+  return embedded ? (
+    inner
+  ) : (
+    <AppShell
+      section="HR Operations"
+      title="Service providers"
+      subtitle="Choose which providers your employees see, and add your own, per service and destination."
+    >
+      {inner}
     </AppShell>
   );
 };
