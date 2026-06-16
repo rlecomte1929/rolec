@@ -647,7 +647,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           accordions inside (slice 3a) keep the open state scannable.
           Slice 2 still gates the canonical diff to deployments with
           uploaded documents. */}
-      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+      <details id="hr-policy-draft-vs-live-diff" className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
         <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
           <div className="flex items-center justify-between gap-3">
             <span className="text-base font-semibold text-[#0b2b43]">

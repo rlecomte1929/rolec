@@ -619,6 +619,15 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     document.getElementById('hr-policy-benefit-matrix')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // NAV-POL-2: from the publish preflight, surface the existing benefit-by-benefit
+  // draft-vs-live diff so HR reviews exactly what changes before confirming.
+  const reviewChangesFromPublish = () => {
+    setPublishModalOpen(false);
+    const el = document.getElementById('hr-policy-draft-vs-live-diff');
+    if (el instanceof HTMLDetailsElement) el.open = true;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const scrollToDraftPanel = () => {
     document.getElementById('hr-policy-draft-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -699,6 +708,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         draftVersionLabel={preflightDraftVersionLabel}
         comparisonAfterPublish={workingComparison}
         willReplaceActive={preflightWillReplaceActive}
+        onReviewChanges={reviewChangesFromPublish}
       />
 
       {showStarterDraftGuidance && (
