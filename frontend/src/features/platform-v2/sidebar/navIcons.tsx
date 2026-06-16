@@ -20,6 +20,7 @@ import {
   BookOpen,
   Users,
   Layers,
+  BrainCircuit,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -53,6 +54,9 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   'policy-reality': Activity,
   'provider-status': Activity,
   exceptions: TriangleAlert,
+  // AIQ-1116: AI decisions audit — a brain-circuit icon conveys "AI/automation",
+  // distinct from intake's Sparkles, so the nav item is no longer icon-less.
+  'ai-decisions': BrainCircuit,
 
   // Admin · ReloPass
   'admin-overview': Home,
