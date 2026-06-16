@@ -220,6 +220,7 @@ jobs:
             backend/tests/crawler/test_llm_resource_extractor.py \
             backend/tests/test_trigger_engine.py \
             backend/tests/test_case_dossier_forms.py \
+            backend/tests/test_dossier_suggestions.py \
             backend/tests/test_validators_tax_id.py \
             backend/tests/test_validators_residency.py \
             backend/tests/test_tax_cert_findings.py \

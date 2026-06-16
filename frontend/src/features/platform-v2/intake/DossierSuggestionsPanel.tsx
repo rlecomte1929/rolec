@@ -29,6 +29,7 @@ export function DossierSuggestionsPanel({ caseId }: { caseId: string }) {
   const [sources, setSources] = useState<DossierSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [degraded, setDegraded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [addedCount, setAddedCount] = useState(0);
@@ -39,10 +40,12 @@ export function DossierSuggestionsPanel({ caseId }: { caseId: string }) {
     if (!caseId) return;
     setLoading(true);
     setError(null);
+    setDegraded(false);
     try {
       const res = await dossierAPI.searchSuggestions(caseId);
       setSuggestions(res.suggestions || []);
       setSources(res.sources || []);
+      setDegraded(Boolean(res.degraded));
       setSearched(true);
     } catch {
       setError('Unable to fetch suggested questions right now.');
@@ -100,7 +103,13 @@ export function DossierSuggestionsPanel({ caseId }: { caseId: string }) {
         </div>
       )}
 
-      {searched && !loading && suggestions.length === 0 && (
+      {searched && !loading && degraded && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Suggested questions are temporarily unavailable — please try again shortly.
+        </div>
+      )}
+
+      {searched && !loading && !degraded && suggestions.length === 0 && (
         <div className="mt-3 text-sm text-gray-500">No additional suggestions for this route right now.</div>
       )}
 

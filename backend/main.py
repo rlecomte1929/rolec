@@ -1530,6 +1530,11 @@ class DossierSearchSuggestionsResponse(BaseModel):
     destination_country: Optional[str]
     sources: List[Dict[str, Any]]
     suggestions: List[DossierSuggestionDTO]
+    # [OBS-01] True when the suggestion LLM call failed (provider/transport
+    # outage) — distinct from a genuinely empty result for an uncovered corridor.
+    # Lets the wizard show a 'temporarily unavailable' notice instead of treating
+    # a platform-wide LLM outage as 'no questions for this destination'.
+    degraded: bool = False
 
 
 class DossierCaseQuestionRequest(BaseModel):
@@ -10660,13 +10665,23 @@ def dossier_search_suggestions(
     # Pure RAG — the SERPAPI web-search path is no longer called here. Corridors
     # outside the corpus (5 supported) return an empty, graceful list.
     from backend.app.services.dossier_suggestion_service import (
+        DossierSuggestionUnavailable,
         corridor_for_case,
         suggest_questions,
     )
 
     profile = _build_profile_snapshot(draft)
     corridor = corridor_for_case(draft)
-    suggestions = suggest_questions(corridor, profile)
+    try:
+        suggestions = suggest_questions(corridor, profile)
+    except DossierSuggestionUnavailable:
+        # [OBS-01] LLM/transport outage — surface a degraded signal the wizard can
+        # render, rather than a silent empty 200 (which reads as 'no coverage').
+        # The service already logged at ERROR; don't 500 the wizard.
+        log.error("dossier search-suggestions degraded for corridor %s", corridor)
+        return DossierSearchSuggestionsResponse(
+            destination_country=dest, sources=[], suggestions=[], degraded=True
+        )
     # Aggregate the per-question chunk citations into the top-level sources list.
     seen: set = set()
     sources: List[Dict[str, Any]] = []

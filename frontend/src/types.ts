@@ -143,6 +143,9 @@ export interface DossierSearchSuggestionsResponse {
   destination_country?: string | null;
   sources: DossierSource[];
   suggestions: DossierSuggestion[];
+  // [OBS-01] true when the suggestion LLM call failed (provider/transport outage),
+  // distinct from a genuinely empty result for an uncovered corridor.
+  degraded?: boolean;
 }
 
 export interface User {
