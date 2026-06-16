@@ -68,3 +68,6 @@ class CrawlConfig:
     # second pass through the LLM resource extractor (capped per run). Default OFF —
     # see _llm_fallback_enabled() / CRAWLER_LLM_FALLBACK env override in pipeline.py.
     llm_fallback_enabled: bool = False
+    # CRAWL-03: max LLM fallback extractions per run (cost ceiling). Tunable per run
+    # without a code change; the pipeline guard reads this instead of a constant.
+    llm_fallback_max_per_run: int = 25

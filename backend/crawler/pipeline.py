@@ -27,10 +27,6 @@ from .staging.writer import (
 
 log = logging.getLogger(__name__)
 
-# CRAWL-02: cap on LLM fallback extractions per run so a large crawl can't run up
-# an unbounded LLM bill even with the fallback flag on.
-LLM_FALLBACK_MAX_PER_RUN = 25
-
 
 def _llm_fallback_enabled(config: CrawlConfig) -> bool:
     """LLM resource-extraction fallback is OFF by default. Enable via the
@@ -51,7 +47,7 @@ class PipelineReport:
     duplicates_detected: int = 0
     # CRAWL-02: observability for the LLM fallback. resources_staged_llm is the
     # subset of resources_staged that came from the LLM extractor; llm_fallback_calls
-    # is how many pages triggered the fallback this run (bounded by LLM_FALLBACK_MAX_PER_RUN).
+    # is how many pages triggered the fallback this run (bounded by config.llm_fallback_max_per_run).
     llm_fallback_calls: int = 0
     resources_staged_llm: int = 0
     errors: List[str] = field(default_factory=list)
@@ -235,7 +231,7 @@ def _crawl_source(source: CrawlSource, config: CrawlConfig, run_id: str, report:
     if (
         not resource_candidates
         and _llm_fallback_enabled(config)
-        and report.llm_fallback_calls < LLM_FALLBACK_MAX_PER_RUN
+        and report.llm_fallback_calls < config.llm_fallback_max_per_run
     ):
         report.llm_fallback_calls += 1
         llm_candidates = asyncio.run(

@@ -129,12 +129,16 @@ async def extract_resource_candidates_llm(
         f"TEXT:\n{combined_text}"
     )
 
+    # CRAWL-03: pin the model explicitly so the value recorded in provenance is
+    # exactly what was sent (no drift between the call and the audit record).
+    model = llm_client._OPENAI_DEFAULT_MODEL
     try:
         response = await llm_client.complete_text(
             system=_SYSTEM,
             user=user_prompt,
             temperature=0.1,
             json_object=True,
+            model=model,
         )
     except Exception as exc:  # provider/transport/key failure → degrade to no recall
         log.warning("LLM resource extraction failed for %s: %s", source_url, exc)
@@ -184,7 +188,7 @@ async def extract_resource_candidates_llm(
                 provenance={
                     "source_url": source_url,
                     "page_title": page_title,
-                    "llm_model": "auto",
+                    "llm_model": model,
                 },
             )
         )

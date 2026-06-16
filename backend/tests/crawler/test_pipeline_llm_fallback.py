@@ -83,8 +83,10 @@ def _wire(monkeypatch, *, rule_based, llm_candidates, dup=False):
     return calls
 
 
-def _run(flag=False, preset_calls=0):
-    config = CrawlConfig(sources=[], llm_fallback_enabled=flag)
+def _run(flag=False, preset_calls=0, max_per_run=25):
+    config = CrawlConfig(
+        sources=[], llm_fallback_enabled=flag, llm_fallback_max_per_run=max_per_run
+    )
     report = pipeline.PipelineReport(run_id="run-1")
     report.llm_fallback_calls = preset_calls
     pipeline._crawl_source(_source(), config, "run-1", report)
@@ -124,11 +126,21 @@ def test_env_override_enables_fallback(monkeypatch):
     assert report.resources_staged_llm == 1
 
 
-def test_per_run_cap_respected(monkeypatch):
+def test_configurable_cap_respected(monkeypatch):
+    # CRAWL-03: the cap is now a CrawlConfig field. At the (low) configured cap → no call.
     calls = _wire(monkeypatch, rule_based=[], llm_candidates=[_llm_candidate()])
-    report = _run(flag=True, preset_calls=pipeline.LLM_FALLBACK_MAX_PER_RUN)
+    report = _run(flag=True, preset_calls=2, max_per_run=2)
     assert calls == []                          # cap reached → no further LLM calls
     assert report.resources_staged_llm == 0
+
+
+def test_default_cap_is_25(monkeypatch):
+    # Default unchanged: field defaults to 25; under it the fallback still fires.
+    assert CrawlConfig(sources=[]).llm_fallback_max_per_run == 25
+    calls = _wire(monkeypatch, rule_based=[], llm_candidates=[_llm_candidate()])
+    report = _run(flag=True, preset_calls=24)   # under the default 25 → fires
+    assert len(calls) == 1
+    assert report.resources_staged_llm == 1
 
 
 def test_llm_candidate_goes_through_dedup(monkeypatch):
