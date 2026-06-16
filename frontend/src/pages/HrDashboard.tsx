@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -78,6 +78,13 @@ export const HrDashboard: React.FC = () => {
   const [destinationFilter, setDestinationFilter] = useState('');
   const [appliedStatus, setAppliedStatus] = useState<string>('all');
   const [appliedDestination, setAppliedDestination] = useState('');
+  // NAV-HR-1: client-side "submitted between" date-range filter (the list API has
+  // no date param, so this narrows the loaded rows). Draft state lives in the modal;
+  // `applied*` is what the table actually filters on.
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [appliedDateFrom, setAppliedDateFrom] = useState('');
+  const [appliedDateTo, setAppliedDateTo] = useState('');
   const [isManageMode, setIsManageMode] = useState(false);
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
@@ -196,6 +203,8 @@ export const HrDashboard: React.FC = () => {
     if (isFilterOpen) {
       setStatusFilter(appliedStatus);
       setDestinationFilter(appliedDestination);
+      setDateFrom(appliedDateFrom);
+      setDateTo(appliedDateTo);
     }
   }, [isFilterOpen]);
 
@@ -338,6 +347,62 @@ export const HrDashboard: React.FC = () => {
   // "no cases" — it keeps the toolbar + a "no matches" message, so onboarding
   // copy never wrongly appears for an HR who already has cases.
   const hasNoCases = total === 0 && !searchDebounced.trim();
+
+  // NAV-HR-1: status-priority order — surface what needs HR action first.
+  // Pending Action (Awaiting HR review > Rejected) > In Progress
+  // (Intake > Not started > Created) > Completed > Canceled/archived.
+  const STATUS_PRIORITY: Record<AssignmentSummary['status'], number> = {
+    submitted: 0,
+    rejected: 1,
+    awaiting_intake: 2,
+    assigned: 3,
+    created: 4,
+    approved: 5,
+    closed: 6,
+  };
+
+  const formatSubmitted = (iso?: string | null): string | null => {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return null;
+    return new Date(t).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  // Default-sort by status priority, then oldest-submitted first (waiting longest).
+  // The "submitted between" range filters client-side on the loaded rows (the list
+  // API exposes no date param — see appliedDateFrom/To above).
+  const displayedAssignments = useMemo(() => {
+    const inRange = (iso?: string | null) => {
+      if (!appliedDateFrom && !appliedDateTo) return true;
+      if (!iso) return false;
+      const day = iso.slice(0, 10); // YYYY-MM-DD
+      if (appliedDateFrom && day < appliedDateFrom) return false;
+      if (appliedDateTo && day > appliedDateTo) return false;
+      return true;
+    };
+    const rank = (s: AssignmentSummary['status']) => STATUS_PRIORITY[s] ?? 99;
+    return assignments
+      .filter((a) => inRange(a.submittedAt))
+      .slice()
+      .sort((a, b) => {
+        const pr = rank(a.status) - rank(b.status);
+        if (pr !== 0) return pr;
+        const sa = a.submittedAt ?? '';
+        const sb = b.submittedAt ?? '';
+        if (sa && sb) return sa < sb ? -1 : sa > sb ? 1 : 0;
+        if (sa) return -1;
+        if (sb) return 1;
+        return 0;
+      });
+    // STATUS_PRIORITY is a stable literal; assignments + applied dates drive recompute.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments, appliedDateFrom, appliedDateTo]);
+
+  // NAV-HR-1: shared column template so the header and rows stay in sync.
+  // Cols: [Employee] [Destination] [Route] [Status] [Submitted] [Next deadline] [Compliance] [View].
+  const gridCols = isManageMode
+    ? 'grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,1fr,1fr,0.3fr]'
+    : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,1fr,1fr,0.3fr]';
 
   return (
     <AppShell section="HR Operations" title="Cases" subtitle="Every cross-border relocation starts here. Create a case to build a plan, assign documents, and track progress — for each employee, from offer to arrival.">
@@ -602,12 +667,14 @@ export const HrDashboard: React.FC = () => {
           {isLoading && (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="grid grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] first:border-t-0">
+                <div key={i} className="grid grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] first:border-t-0">
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-32" />
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-24" />
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-16" />
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-16" />
                   <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-4 ml-auto" />
                 </div>
               ))}
@@ -619,25 +686,27 @@ export const HrDashboard: React.FC = () => {
             <CasesEmptyState onCreateCase={openNewCaseForm} />
           )}
           {/* Search/filter matched nothing, but the HR does have cases. */}
-          {!isLoading && !hasNoCases && assignments.length === 0 && (
+          {!isLoading && !hasNoCases && displayedAssignments.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <p className="text-sm text-[#4b5563]">No cases match your search.</p>
               <p className="text-xs text-[#6b7280]">Clear the search or adjust your filters to see all cases.</p>
             </div>
           )}
 
-          {!isLoading && assignments.length > 0 && (
+          {!isLoading && displayedAssignments.length > 0 && (
             <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">
-              <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${isManageMode ? 'grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]' : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]'}`}>
+              <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${gridCols}`}>
                 {isManageMode && <div></div>}
                 <div>Employee name</div>
                 <div>Destination</div>
                 <div>Route (origin → dest)</div>
                 <div>Status</div>
+                <div>Submitted</div>
                 <div>Next deadline</div>
+                <div>Compliance</div>
                 <div className="text-right">View</div>
               </div>
-              {assignments.map((assignment) => {
+              {displayedAssignments.map((assignment) => {
                 const isSelected = selectedForRemoval.has(assignment.id);
                 return (
                   <div
@@ -661,10 +730,10 @@ export const HrDashboard: React.FC = () => {
                         }
                       },
                     })}
-                    className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${
+                    className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${gridCols} ${
                       isManageMode
-                        ? `grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] ${isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]'}`
-                        : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none'
+                        ? (isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]')
+                        : 'hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none'
                     }`}
                   >
                     {isManageMode && (
@@ -701,12 +770,25 @@ export const HrDashboard: React.FC = () => {
                       {caseStatusBadge(assignment.status)}
                     </div>
                     <div>
+                      {(() => {
+                        const submitted = formatSubmitted(assignment.submittedAt);
+                        return submitted
+                          ? <div className="text-sm text-[#0b2b43]">{submitted}</div>
+                          : <div className="text-sm text-slate-400">—</div>;
+                      })()}
+                    </div>
+                    <div>
                       <div className="text-sm text-[#0b2b43]">
                         {assignment.nextDeadline?.trim() || '—'}
                       </div>
                       <div className="text-xs text-[#6b7280]">
                         {assignment.nextDeadline?.trim() ? 'Next milestone' : 'No upcoming date'}
                       </div>
+                    </div>
+                    <div>
+                      {assignment.complianceStatus?.trim()
+                        ? <span className="text-sm text-[#0b2b43] capitalize">{assignment.complianceStatus.replace(/_/g, ' ')}</span>
+                        : <span className="text-sm text-slate-400">—</span>}
                     </div>
                     <div className="text-right text-[#94a3b8] text-lg">
                       {isManageMode ? '' : '→'}
@@ -760,14 +842,43 @@ export const HrDashboard: React.FC = () => {
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 />
               </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-[#6b7280] mb-2">Submitted between</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(event) => setDateFrom(event.target.value)}
+                    aria-label="Submitted from"
+                    className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
+                  />
+                  <span className="text-sm text-[#6b7280]">to</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(event) => setDateTo(event.target.value)}
+                    aria-label="Submitted to"
+                    className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              {/* NAV-HR-1: Relocation type and Assigned agent are intentionally not
+                  offered — the /api/hr/assignments payload (AssignmentSummary) carries
+                  neither, so filtering on them would require a backend change. */}
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setStatusFilter('all');
                     setDestinationFilter('');
+                    setDateFrom('');
+                    setDateTo('');
                     setAppliedStatus('all');
                     setAppliedDestination('');
+                    setAppliedDateFrom('');
+                    setAppliedDateTo('');
                     setIsFilterOpen(false);
                   }}
                 >
@@ -777,6 +888,8 @@ export const HrDashboard: React.FC = () => {
                   onClick={() => {
                     setAppliedStatus(statusFilter);
                     setAppliedDestination(destinationFilter);
+                    setAppliedDateFrom(dateFrom);
+                    setAppliedDateTo(dateTo);
                     setIsFilterOpen(false);
                   }}
                 >
