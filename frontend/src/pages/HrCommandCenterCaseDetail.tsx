@@ -18,6 +18,7 @@ import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPane
 import { AdvisorsPanel } from '../components/case/AdvisorsPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
 import { PetRequirementsSection } from '../components/case/PetRequirementsSection';
+import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 
 type QuoteRequest = {
   id: string;
@@ -84,6 +85,10 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   const [vendorImmigrationContext, setVendorImmigrationContext] = useState<ImmigrationContext | null>(null);
   const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
   const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
+  // NAV-HR-2: case-level escalate — the one case action missing from this view
+  // (approve/reject already live in the exception panels below).
+  const [escalateOpen, setEscalateOpen] = useState(false);
+  const [escalateSuccessMsg, setEscalateSuccessMsg] = useState('');
   const [rfqListKey, setRfqListKey] = useState(0);
 
   const loadQuoteRequests = useCallback(() => {
@@ -168,9 +173,14 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             falls back to the email and the corridor shows destination only.) */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <RiskBadge status={detail.riskStatus as 'green' | 'yellow' | 'red'} showLabel />
-          <Button variant="outline" onClick={() => navigate(buildRoute('hrAssignmentReview', { id: detail.id }))}>
-            Open in Employee Dashboard
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => setEscalateOpen(true)}>
+              Escalate case
+            </Button>
+            <Button variant="outline" onClick={() => navigate(buildRoute('hrAssignmentReview', { id: detail.id }))}>
+              Open in Employee Dashboard
+            </Button>
+          </div>
         </div>
 
         {/* ── Exception flags (P3/B6): blockers + warnings from immigration check ── */}
@@ -449,6 +459,24 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           setVendorImmigrationContext(null);
           setRfqSuccessMsg(`Quote request sent to ${vendorName}`);
           setRfqListKey((k) => k + 1);
+        }}
+      />
+
+      {/* ── NAV-HR-2: case-level escalate ── */}
+      {escalateSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
+          ✓ {escalateSuccessMsg}
+          <Button unstyled type="button" aria-label="Dismiss notification" onClick={() => setEscalateSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</Button>
+        </div>
+      )}
+      <EscalateCaseModal
+        open={escalateOpen}
+        onClose={() => setEscalateOpen(false)}
+        caseId={detail.id}
+        caseLabel={detail.employeeIdentifier}
+        onSuccess={() => {
+          setEscalateOpen(false);
+          setEscalateSuccessMsg('Case escalated — the specialist has been notified.');
         }}
       />
     </AppShell>

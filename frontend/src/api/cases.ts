@@ -64,3 +64,28 @@ export async function updateCaseException(
     payload,
   );
 }
+
+export type EscalationKind = 'specialist' | 'legal' | 'other';
+
+export interface EscalateCasePayload {
+  reason: string;
+  kind: EscalationKind;
+  assignee?: string;
+  sla_due_at?: string;
+}
+
+/**
+ * Escalate a case to a specialist / legal (NAV-HR-2). Composes the existing
+ * HR endpoint POST /api/hr/cases/{case_id}/escalate (backend
+ * hr_case_escalation.py) — tenant-scoped server-side by the HR user's company.
+ * HR/Admin only; throws on auth failure or missing company association.
+ */
+export async function escalateCase(
+  caseId: string,
+  payload: EscalateCasePayload,
+): Promise<{ id?: string; status?: string }> {
+  return apiPost<{ id?: string; status?: string }>(
+    `/api/hr/cases/${encodeURIComponent(caseId)}/escalate`,
+    payload,
+  );
+}
