@@ -1,7 +1,9 @@
 """
 Main crawler pipeline: fetch -> parse -> chunk -> extract -> dedupe -> stage.
 """
+import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -9,6 +11,7 @@ from .chunkers.chunker import Chunk, chunk_document
 from .config.models import CrawlConfig, CrawlSource
 from .dedupe.dedupe import check_event_duplicate, check_resource_duplicate
 from .extractors.event_extractor import extract_event_candidates
+from .extractors.llm_resource_extractor import extract_resource_candidates_llm
 from .extractors.models import StagedEventCandidate, StagedResourceCandidate
 from .extractors.resource_extractor import extract_resource_candidates
 from .fetchers.http_fetcher import fetch_page, FetchResult
@@ -24,6 +27,16 @@ from .staging.writer import (
 
 log = logging.getLogger(__name__)
 
+# CRAWL-02: cap on LLM fallback extractions per run so a large crawl can't run up
+# an unbounded LLM bill even with the fallback flag on.
+LLM_FALLBACK_MAX_PER_RUN = 25
+
+
+def _llm_fallback_enabled(config: CrawlConfig) -> bool:
+    """LLM resource-extraction fallback is OFF by default. Enable via the
+    CrawlConfig flag or the CRAWLER_LLM_FALLBACK=1 env override (ops kill-switch)."""
+    return bool(config.llm_fallback_enabled) or os.environ.get("CRAWLER_LLM_FALLBACK") == "1"
+
 
 @dataclass
 class PipelineReport:
@@ -36,6 +49,11 @@ class PipelineReport:
     resources_staged: int = 0
     events_staged: int = 0
     duplicates_detected: int = 0
+    # CRAWL-02: observability for the LLM fallback. resources_staged_llm is the
+    # subset of resources_staged that came from the LLM extractor; llm_fallback_calls
+    # is how many pages triggered the fallback this run (bounded by LLM_FALLBACK_MAX_PER_RUN).
+    llm_fallback_calls: int = 0
+    resources_staged_llm: int = 0
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
@@ -48,6 +66,8 @@ class PipelineReport:
             "resources_staged": self.resources_staged,
             "events_staged": self.events_staged,
             "duplicates_detected": self.duplicates_detected,
+            "llm_fallback_calls": self.llm_fallback_calls,
+            "resources_staged_llm": self.resources_staged_llm,
             "errors": self.errors,
             "warnings": self.warnings,
         }
@@ -114,7 +134,8 @@ def run_pipeline(
 
     summary = (
         f"Fetched: {report.documents_fetched}, failed: {report.documents_failed}, "
-        f"chunks: {report.chunks_created}, resources: {report.resources_staged}, "
+        f"chunks: {report.chunks_created}, resources: {report.resources_staged} "
+        f"(llm: {report.resources_staged_llm}/{report.llm_fallback_calls} calls), "
         f"events: {report.events_staged}, duplicates: {report.duplicates_detected}"
     )
     update_crawl_run(
@@ -204,6 +225,42 @@ def _crawl_source(source: CrawlSource, config: CrawlConfig, run_id: str, report:
         chunk_id = chunk_ids.get(chunk_idx) if chunk_ids else None
         write_resource_candidate(run_id, doc_id, chunk_id, rc)
         report.resources_staged += 1
+
+    # CRAWL-02: LLM fallback. Only when the rule-based extractor recovered NOTHING
+    # for this page (dense prose / no heading path — often the highest-value local
+    # gov / community sources), and only behind the flag + under the per-run cap, so
+    # the LLM never runs on every page. Candidates carry
+    # extraction_method='llm_structured_extraction' and go through the SAME dedup +
+    # staging path (admin still reviews everything). PII is masked inside the extractor.
+    if (
+        not resource_candidates
+        and _llm_fallback_enabled(config)
+        and report.llm_fallback_calls < LLM_FALLBACK_MAX_PER_RUN
+    ):
+        report.llm_fallback_calls += 1
+        llm_candidates = asyncio.run(
+            extract_resource_candidates_llm(
+                chunks,
+                source,
+                fetch_result.final_url,
+                doc.page_title or url,
+            )
+        )
+        for rc in llm_candidates:
+            is_dup, _ = check_resource_duplicate(
+                rc.country_code,
+                rc.city_name,
+                rc.title,
+                rc.source_url,
+            )
+            if is_dup:
+                report.duplicates_detected += 1
+                continue
+            chunk_idx = rc.provenance.get("document_chunk_index", 0)
+            chunk_id = chunk_ids.get(chunk_idx) if chunk_ids else None
+            write_resource_candidate(run_id, doc_id, chunk_id, rc)
+            report.resources_staged += 1
+            report.resources_staged_llm += 1
 
     event_candidates = extract_event_candidates(
         chunks,

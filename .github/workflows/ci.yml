@@ -218,6 +218,7 @@ jobs:
             backend/tests/test_immigration_documents.py \
             backend/tests/test_document_extraction_queue.py \
             backend/tests/crawler/test_llm_resource_extractor.py \
+            backend/tests/crawler/test_pipeline_llm_fallback.py \
             backend/tests/test_trigger_engine.py \
             backend/tests/test_case_dossier_forms.py \
             backend/tests/test_dossier_suggestions.py \

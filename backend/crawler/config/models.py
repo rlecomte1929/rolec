@@ -64,3 +64,7 @@ class CrawlConfig:
     timeout_seconds: int = 15
     retry_count: int = 3
     retry_backoff_base_seconds: float = 1.0
+    # CRAWL-02: when True, pages the rule-based extractor recovers nothing for get a
+    # second pass through the LLM resource extractor (capped per run). Default OFF —
+    # see _llm_fallback_enabled() / CRAWLER_LLM_FALLBACK env override in pipeline.py.
+    llm_fallback_enabled: bool = False
