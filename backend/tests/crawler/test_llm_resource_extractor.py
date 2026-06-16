@@ -115,6 +115,11 @@ def test_happy_path_returns_llm_candidate_and_masks_pii(monkeypatch):
     assert "+351 912 345 678" not in captured["user"]
     # JSON-mode requested
     assert captured["kwargs"].get("json_object") is True
+    # CRAWL-03: provenance records the real model that was sent (not 'auto'), and it
+    # matches the model actually passed to complete_text.
+    assert cand.provenance["llm_model"] == llm_client._OPENAI_DEFAULT_MODEL
+    assert cand.provenance["llm_model"] != "auto"
+    assert captured["kwargs"].get("model") == llm_client._OPENAI_DEFAULT_MODEL
 
 
 def test_malformed_json_returns_empty_without_raising(monkeypatch):
