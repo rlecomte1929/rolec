@@ -44,7 +44,7 @@ export function CompanyProfileV2Page() {
           onSave={handleSave}
           onUploadLogo={handleUploadLogo}
           onRemoveLogo={handleRemoveLogo}
-          breadcrumbSection="HR Operations"
+          showBreadcrumb
           title="Company profile"
           subtitle="How your company appears to employees, providers, and relocation partners on ReloPass. Changes are saved to your company account."
         />

@@ -155,6 +155,9 @@ export interface CompanyProfileFormProps {
   eyebrow?: string;
   /** Breadcrumb section, e.g. 'HR Operations'. Omit to skip the breadcrumb. */
   breadcrumbSection?: string;
+  /** Render the breadcrumb (ReloPass / title) even when no section is set.
+   *  Lets a page show "ReloPass / <title>" without an intermediate crumb. */
+  showBreadcrumb?: boolean;
   /** Main heading. */
   title: string;
   /** One-line description shown below the h1. */
@@ -180,6 +183,7 @@ export function CompanyProfileForm({
   onRemoveLogo,
   eyebrow,
   breadcrumbSection,
+  showBreadcrumb = false,
   title,
   subtitle,
   badge,
@@ -353,7 +357,7 @@ export function CompanyProfileForm({
     <div className="mx-auto max-w-[1400px] px-6 py-6 pb-28">
       {topSlot}
 
-      {breadcrumbSection && (
+      {(breadcrumbSection || showBreadcrumb) && (
         <Breadcrumb section={breadcrumbSection} title={title} className="mb-3" />
       )}
       <div className="mb-5">
