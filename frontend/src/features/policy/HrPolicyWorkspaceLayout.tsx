@@ -3,6 +3,7 @@
  */
 import React, { useState } from 'react';
 import { Alert, Button, Card } from '../../components/antigravity';
+import { AIQ1107_HIDE_SECTIONS } from './aiq1107Flags';
 import type { HrPolicyLifecycleContext } from './hrPolicyLifecycle';
 import {
   COMPARISON_SUMMARY_COPY,
@@ -492,7 +493,8 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
       )}
 
       {/* D — Secondary actions only (primary is in at-a-glance) */}
-      {resolved.phase !== 'no_policy' && (
+      {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}
+      {!AIQ1107_HIDE_SECTIONS && resolved.phase !== 'no_policy' && (
         <Card padding="lg" className="border-dashed border-[#cbd5e1] bg-[#f8fafc]">
           <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">More actions</h3>
           <div className="flex flex-wrap gap-2">

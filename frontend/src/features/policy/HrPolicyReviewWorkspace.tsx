@@ -5,6 +5,7 @@ import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../a
 import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
 import { buildEmployeePreviewCompare } from './hrPolicyEmployeePreviewCompare';
 import { HrPolicyWorkspaceLayout } from './HrPolicyWorkspaceLayout';
+import { AIQ1107_HIDE_SECTIONS } from './aiq1107Flags';
 import { PublishPreflightModal } from './PublishPreflightModal';
 import {
   derivePublishedComparisonSummary,
@@ -814,7 +815,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       </Card>
 
       {/* Parker-J: extractive TL;DR of the uploaded source document */}
-      {policyTldr && (
+      {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}
+      {!AIQ1107_HIDE_SECTIONS && policyTldr && (
         <Card padding="lg" id="hr-policy-tldr">
           <div className="text-sm font-semibold text-[#0b2b43] mb-1">TL;DR</div>
           <div className="text-[11px] uppercase tracking-wide text-[#9ca3af] mb-2">
@@ -1031,7 +1033,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       )}
 
       {/* Exclusions & evidence summary */}
-      {normalized?.version && (normalized.exclusions?.length > 0 || normalized.evidence_requirements?.length > 0) && (
+      {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}
+      {!AIQ1107_HIDE_SECTIONS && normalized?.version && (normalized.exclusions?.length > 0 || normalized.evidence_requirements?.length > 0) && (
         <Card padding="lg">
           <div className="text-sm font-semibold text-[#0b2b43] mb-2">Exclusions & evidence</div>
           <div className="space-y-3 text-sm">

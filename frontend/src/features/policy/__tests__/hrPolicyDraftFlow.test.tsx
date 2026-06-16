@@ -17,7 +17,7 @@ import {
 afterEach(() => cleanup());
 
 describe('Draft flow — review panel', () => {
-  it('shows document summary, draft review heading, and checklist issues for a blocked draft', () => {
+  it('hides the AIQ-1107 decluttered sections for a blocked draft', () => {
     const model = resolveLayoutModelFromState('draft_not_publishable');
     const review = mockPolicyReviewPayload({
       issues: [
@@ -39,10 +39,11 @@ describe('Draft flow — review panel', () => {
       />
     );
 
-    expect(screen.getByText(/Document summary/i)).toBeInTheDocument();
-    expect(screen.getByText(/relocation-policy-2025\.pdf/)).toBeInTheDocument();
-    expect(screen.getByText(/Pre-publish checklist/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add a clear cap for household goods shipment/i)).toBeInTheDocument();
+    // AIQ-1107: the document-extraction (incl. Document summary), pre-publish
+    // checklist, and employee-visibility sections are now hidden from this panel.
+    expect(screen.queryByText(/Document summary/i)).toBeNull();
+    expect(screen.queryByText(/Pre-publish checklist/i)).toBeNull();
+    expect(screen.queryByText(/Employee visibility preview/i)).toBeNull();
   });
 
   it('shows loading skeleton while review payload is loading', () => {
