@@ -51,5 +51,31 @@ class ProdWriteGuardTests(unittest.TestCase):
             del os.environ["RELOPASS_ALLOW_PROD_WRITES"]
 
 
+class SeederGuardCoverageTests(unittest.TestCase):
+    """PRODSEED-1: every in-repo script that WRITES against a relopass.com host
+    by default must wire the prod-write guard, so a no-env run can't seed/mutate
+    production. Add new write-seeders to this list as they land."""
+
+    GUARDED_SEEDERS = (
+        "verify_fresh_onboarding.py",
+        "verify_tenant_isolation.py",
+        "verify_fr_no_demo.py",
+        "aiq173_upload_and_test_pdf.py",
+    )
+
+    def test_known_write_seeders_call_the_guard(self):
+        for name in self.GUARDED_SEEDERS:
+            path = os.path.join(_SCRIPTS, name)
+            self.assertTrue(os.path.exists(path), f"{name} missing from scripts/")
+            with open(path, encoding="utf-8") as fh:
+                src = fh.read()
+            self.assertIn(
+                "guard_prod_writes",
+                src,
+                f"{name} writes against prod by default but does not call "
+                "guard_prod_writes() — wire scripts/_prod_write_guard.py.",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -25,7 +25,6 @@ CASE_FORM_ID  = "bb000001-0000-0000-0000-000000000001"
 CASE_ID       = "aa000001-0000-0000-0000-000000000001"
 STORAGE_PATH  = "utl-2011/test_template_v1.pdf"
 BUCKET        = "form-templates"
-API_BASE      = "https://api.relopass.com"
 
 # Load from .env at repo root
 env_path = Path(__file__).resolve().parent.parent / ".env"
@@ -38,6 +37,16 @@ if env_path.exists():
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SERVICE_KEY  = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 DB_URL       = os.environ.get("DATABASE_URL", "")
+
+# ─── Prod-write guard (AIQ-913 / PRODSEED-1) ───────────────────────────────
+# This script WRITES (Supabase storage upload + form_template.original_pdf_url
+# update) and defaults to the live API. Refuse to run against production without
+# an explicit opt-in so it can't mutate prod by accident.
+#   • local/test API:  RELOPASS_API_BASE=http://localhost:8000
+#   • prod ON PURPOSE: RELOPASS_ALLOW_PROD_WRITES=1
+API_BASE = os.environ.get("RELOPASS_API_BASE", "https://api.relopass.com")
+from _prod_write_guard import guard_prod_writes  # noqa: E402
+guard_prod_writes(API_BASE)
 
 # ─── Step 1: Generate synthetic template PDF ───────────────────────────────
 def make_template_pdf() -> bytes:
