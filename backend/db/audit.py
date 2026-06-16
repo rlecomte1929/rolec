@@ -22,6 +22,19 @@ log = logging.getLogger(__name__)
 
 _is_sqlite = _raw_url.startswith("sqlite")
 
+# [AUDIT-2/AIQ-1126] log_audit consolidation — decision: Option C.
+# Drain the legacy ``audit_log`` table by routing each event to its canonical home:
+#   * READ / pure-access events  -> ``data_access_log`` (the GDPR PII-access log),
+#   * true mutations             -> canonical ``audit_logs`` via insert_audit_log,
+#     mapped onto the insert/update/delete CHECK with the semantic verb preserved
+#     in ``new_value.event`` (the convention AIQ-932/942 already established).
+_ACCESS_ACTIONS = frozenset({"READ", "VIEW", "LIST", "EXPORT", "DOWNLOAD", "ACCESS"})
+_CREATE_ACTIONS = frozenset({"CREATE", "INSERT"})
+_DELETE_ACTIONS = frozenset({"DELETE", "DESTROY", "PURGE"})
+# target_type values that map onto data_access_log's case_id / profile_id columns.
+_CASE_TARGETS = frozenset({"case", "assignment", "case_assignment"})
+_PROFILE_TARGETS = frozenset({"person", "profile", "employee", "user"})
+
 
 class AuditMixin:
     """Audit-domain methods mixed into :class:`backend.database.Database`."""
@@ -227,25 +240,107 @@ class AuditMixin:
         reason: Optional[str],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Append-only audit log. Never raises: failures are logged and ignored so callers are not broken."""
-        now = datetime.utcnow().isoformat()
+        """Append-only audit. Never raises: failures are logged and ignored so callers are not broken.
+
+        [AUDIT-2/AIQ-1126] Consolidated off the legacy ``audit_log`` table (decision:
+        Option C). READ/access events are routed to ``data_access_log``; every other
+        (mutation) event lands in the canonical ``audit_logs`` via ``insert_audit_log``,
+        with the original verb preserved in ``new_value.event``. Callers are unchanged.
+        """
+        verb = (action_type or "").strip().upper()
         try:
             with self.engine.begin() as conn:
-                conn.execute(text(
-                    "INSERT INTO audit_log (id, actor_user_id, action_type, target_type, target_id, reason, metadata_json, created_at) "
-                    "VALUES (:id, :actor, :action, :target_type, :target_id, :reason, :meta, :created_at)"
-                ), {
-                    "id": str(uuid.uuid4()),
-                    "actor": actor_user_id,
-                    "action": action_type,
-                    "target_type": target_type,
-                    "target_id": target_id,
-                    "reason": reason,
-                    "meta": json.dumps(metadata or {}),
-                    "created_at": now,
-                })
+                if verb in _ACCESS_ACTIONS:
+                    self._log_data_access(conn, actor_user_id, verb, target_type, target_id, reason)
+                else:
+                    self._log_mutation(conn, actor_user_id, verb, target_type, target_id, reason, metadata)
         except Exception as e:
             log.warning("log_audit failed (non-fatal): %s", e)
+
+    def _log_mutation(
+        self,
+        conn: Any,
+        actor_user_id: str,
+        verb: str,
+        target_type: str,
+        target_id: Optional[str],
+        reason: Optional[str],
+        metadata: Optional[Dict[str, Any]],
+    ) -> None:
+        """Write a mutation event to the canonical audit_logs (semantic verb in new_value.event)."""
+        # Lazy import (matches this module's convention) — no cycle: audit_log_service
+        # imports only stdlib + sqlalchemy.
+        from ..app.services.audit_log_service import (
+            insert_audit_log,
+            ACTION_INSERT,
+            ACTION_UPDATE,
+            ACTION_DELETE,
+            ACTOR_HUMAN,
+        )
+
+        if verb in _CREATE_ACTIONS:
+            mapped = ACTION_INSERT
+        elif verb in _DELETE_ACTIONS:
+            mapped = ACTION_DELETE
+        else:
+            mapped = ACTION_UPDATE
+
+        new_value: Dict[str, Any] = {"event": verb}
+        if reason:
+            new_value["reason"] = reason
+        if metadata:
+            new_value.update(metadata)
+
+        insert_audit_log(
+            conn,
+            entity_type=target_type or "unknown",
+            entity_id=str(target_id) if target_id is not None else "",
+            action_type=mapped,
+            new_value=new_value,
+            actor_type=ACTOR_HUMAN,
+            actor_id=actor_user_id,
+        )
+
+    def _log_data_access(
+        self,
+        conn: Any,
+        actor_user_id: str,
+        verb: str,
+        target_type: str,
+        target_id: Optional[str],
+        reason: Optional[str],
+    ) -> None:
+        """Write a READ/access event to data_access_log (the GDPR PII-access trail)."""
+        tt = (target_type or "").strip().lower()
+        case_id = target_id if tt in _CASE_TARGETS else None
+        profile_id = target_id if tt in _PROFILE_TARGETS else None
+        # fields_accessed is text[] on Postgres (psycopg2 adapts a Python list);
+        # SQLite (tests) has no array type, so store the JSON form there.
+        fields_list = [target_type] if target_type else None
+        is_pg = getattr(conn, "dialect", None) is not None and conn.dialect.name == "postgresql"
+        fields_param = fields_list if (is_pg or fields_list is None) else json.dumps(fields_list)
+        conn.execute(
+            text(
+                """
+                INSERT INTO data_access_log
+                    (case_id, profile_id, accessed_by_user_id, accessed_by_role,
+                     action, fields_accessed, purpose, accessed_at)
+                VALUES
+                    (:case_id, :profile_id, :user_id, :role,
+                     :action, :fields, :purpose, :accessed_at)
+                """
+            ),
+            {
+                "case_id": case_id,
+                "profile_id": profile_id,
+                "user_id": actor_user_id,
+                "role": "admin",
+                "action": verb,
+                "fields": fields_param,
+                "purpose": reason or "admin_audit",
+                "accessed_at": datetime.utcnow().isoformat(),
+            },
+        )
 
     @staticmethod
     def log_expected_tables_status() -> None:
