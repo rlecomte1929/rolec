@@ -21,6 +21,10 @@ export type PublishPreflightModalProps = {
   comparisonAfterPublish: HrPolicyComparisonSummary;
   /** True when a published policy exists and this publish replaces it */
   willReplaceActive: boolean;
+  /** NAV-POL-2: surface the benefit-by-benefit draft-vs-live diff from the
+   *  publish step. When provided, a "Review changes" CTA opens the existing
+   *  diff (PolicyDiffView) so HR can see exactly what will change first. */
+  onReviewChanges?: () => void;
 };
 
 export const PublishPreflightModal: React.FC<PublishPreflightModalProps> = ({
@@ -36,6 +40,7 @@ export const PublishPreflightModal: React.FC<PublishPreflightModalProps> = ({
   draftVersionLabel,
   comparisonAfterPublish,
   willReplaceActive,
+  onReviewChanges,
 }) => {
   if (!open) return null;
 
@@ -110,7 +115,18 @@ export const PublishPreflightModal: React.FC<PublishPreflightModalProps> = ({
             </Alert>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-3 justify-end">
+          <div className="mt-6 flex flex-wrap items-center gap-3 justify-end">
+            {onReviewChanges && (
+              <Button
+                unstyled
+                type="button"
+                onClick={onReviewChanges}
+                disabled={publishBusy}
+                className="mr-auto text-sm font-medium text-[#1f8e8b] hover:text-[#0b2b43] underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                Review changes before publishing →
+              </Button>
+            )}
             <Button variant="outline" onClick={onClose} disabled={publishBusy}>
               Cancel
             </Button>
