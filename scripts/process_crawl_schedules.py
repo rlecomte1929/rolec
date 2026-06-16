@@ -23,7 +23,15 @@ log = logging.getLogger("process_crawl_schedules")
 
 
 def main() -> int:
-    from backend.services.crawl_scheduler_service import process_due_schedules
+    from backend.app.services.crawl_scheduler_service import (
+        process_due_schedules,
+        sync_tier_schedules,
+    )
+
+    # Self-heal the per-tier cron schedules (daily / weekly / monthly) before
+    # processing due runs, so the tier config (AIQ-689 / P2-02a) is always live.
+    tier_sync = sync_tier_schedules(user_id=None)
+    log.info("Synced %d tier schedules: %s", len(tier_sync), tier_sync)
 
     results = process_due_schedules(user_id=None)
     log.info("Processed %d schedules: %s", len(results), results)
