@@ -23,6 +23,10 @@ from backend.app.services.policy_rule_comparison_readiness import (  # noqa: E40
 from backend.app.services.policy_starter_templates import (  # noqa: E402
     build_starter_template_benefit_rows,
 )
+from backend.app.services.policy_template_service import PolicyTemplateService  # noqa: E402
+from backend.app.services.policy_entitlement_model import (  # noqa: E402
+    CANONICAL_SERVICE_TO_LEGACY_BENEFIT_KEY,
+)
 
 
 class _FakeTemplateInitDB:
@@ -175,6 +179,58 @@ class StarterTemplateTests(unittest.TestCase):
         br = [{k: v for k, v in r.items() if k != "policy_version_id"} for r in rows]
         pol = evaluate_policy_comparison_readiness(normalized={"benefit_rules": br, "exclusions": []})
         self.assertNotEqual(pol.get("policy_level"), "full")
+
+
+# [TPL-1/AIQ-1131] Golden values — the EXACT per-service caps the retired
+# _TIER_CAPS dict held. PolicyTemplateService.get_starter_template_caps() must
+# return these verbatim, and the produced benefit rows must carry them unchanged.
+_GOLDEN_STARTER_CAPS = {
+    "conservative": {
+        "visa_support": 2500, "temporary_housing": 3500, "home_search": 1500,
+        "school_search": 8000, "household_goods_shipment": 5000,
+    },
+    "standard": {
+        "visa_support": 4000, "temporary_housing": 5500, "home_search": 2500,
+        "school_search": 15000, "household_goods_shipment": 10000,
+    },
+    "premium": {
+        "visa_support": 6500, "temporary_housing": 8500, "home_search": 4000,
+        "school_search": 25000, "household_goods_shipment": 18000,
+    },
+}
+
+
+class StarterTemplateCapsGoldenTests(unittest.TestCase):
+    """TPL-1: the verbatim _TIER_CAPS → PolicyTemplateService port is byte-identical."""
+
+    def test_service_caps_returned_verbatim(self):
+        self.assertEqual(PolicyTemplateService.get_starter_template_caps(), _GOLDEN_STARTER_CAPS)
+
+    def test_home_search_cap_present(self):
+        # The trap: the service's _LTA_TIER_DEFAULTS is keyed by benefit-taxonomy and
+        # has NO home_search. The starter caps MUST keep it (1500/2500/4000).
+        caps = PolicyTemplateService.get_starter_template_caps()
+        self.assertEqual(caps["conservative"]["home_search"], 1500)
+        self.assertEqual(caps["standard"]["home_search"], 2500)
+        self.assertEqual(caps["premium"]["home_search"], 4000)
+
+    def test_built_rows_carry_exact_caps(self):
+        for tier, expected in _GOLDEN_STARTER_CAPS.items():
+            rows = build_starter_template_benefit_rows(
+                tier, policy_version_id="v-golden", comparison_ready_structure=True
+            )
+            by_bk = {r["benefit_key"]: r["amount_value"] for r in rows}
+            for service, cap in expected.items():
+                bk = CANONICAL_SERVICE_TO_LEGACY_BENEFIT_KEY[service]
+                self.assertEqual(
+                    by_bk.get(bk), float(cap),
+                    f"{tier}/{service} ({bk}) cap drifted: {by_bk.get(bk)} != {float(cap)}",
+                )
+
+    def test_returns_fresh_copy(self):
+        a = PolicyTemplateService.get_starter_template_caps()
+        a["standard"]["home_search"] = 999
+        self.assertEqual(PolicyTemplateService.get_starter_template_caps()["standard"]["home_search"], 2500)
 
 
 if __name__ == "__main__":

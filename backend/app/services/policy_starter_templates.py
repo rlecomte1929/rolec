@@ -1,8 +1,9 @@
 """
 DEPRECATED (N12/AIQ-852): one of four legacy template systems now unified by
-``policy_template_service.PolicyTemplateService`` (``_TIER_CAPS`` below was ported
-into the versioned registry). Left in place until a follow-up cleanup task retires
-it after validation — do not extend; add new template data to the unified service.
+``policy_template_service.PolicyTemplateService``. [TPL-1/AIQ-1131] The per-service
+starter caps (formerly the ``_TIER_CAPS`` dict here) now live in
+``PolicyTemplateService.get_starter_template_caps()``; this module only builds the
+benefit rows from them. Do not extend — add new template data to the unified service.
 
 Platform starter policy templates (conservative / standard / premium).
 
@@ -25,6 +26,7 @@ from .policy_entitlement_model import (
     RuleStrength,
 )
 from .policy_taxonomy import get_benefit_meta, resolve_theme
+from .policy_template_service import PolicyTemplateService
 
 StarterTemplateKey = Literal["conservative", "standard", "premium"]
 
@@ -44,30 +46,9 @@ _SERVICE_ORDER: Tuple[str, ...] = (
     "household_goods_shipment",
 )
 
-# template_key -> per-service numeric cap (USD or months where noted)
-_TIER_CAPS: Dict[str, Dict[str, float]] = {
-    "conservative": {
-        "visa_support": 2500,
-        "temporary_housing": 3500,
-        "home_search": 1500,
-        "school_search": 8000,
-        "household_goods_shipment": 5000,
-    },
-    "standard": {
-        "visa_support": 4000,
-        "temporary_housing": 5500,
-        "home_search": 2500,
-        "school_search": 15000,
-        "household_goods_shipment": 10000,
-    },
-    "premium": {
-        "visa_support": 6500,
-        "temporary_housing": 8500,
-        "home_search": 4000,
-        "school_search": 25000,
-        "household_goods_shipment": 18000,
-    },
-}
+# [TPL-1/AIQ-1131] The per-service caps moved to
+# PolicyTemplateService.get_starter_template_caps() (verbatim port). This module
+# now reads them from the unified service rather than a local dict.
 
 
 def list_starter_template_keys() -> List[str]:
@@ -158,7 +139,8 @@ def build_starter_template_benefit_rows(
     """
     Rows suitable for insert_policy_benefit_rule (includes policy_version_id, metadata_json).
     """
-    caps = _TIER_CAPS.get(template_key) or _TIER_CAPS["standard"]
+    caps_by_tier = PolicyTemplateService.get_starter_template_caps()
+    caps = caps_by_tier.get(template_key) or caps_by_tier["standard"]
     rows: List[Dict[str, Any]] = []
 
     for sk in _SERVICE_ORDER:
