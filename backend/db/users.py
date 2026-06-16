@@ -593,18 +593,32 @@ class UsersMixin:
             else:
                 # INSERT — may fail on Supabase if user_id is not in auth.users
                 # (FK constraint).  Catch and log rather than surfacing a 500.
+                # PRODSEED-3/AIQ-1130: durably stamp synthetic (…@testco.com) people
+                # at registration. is_test is only added when the column exists, so
+                # this stays valid before the migration applies and on test SQLite.
+                from ..database import _table_columns  # lazy: avoid import cycle
+                from .test_data_filter import looks_like_test_email
+                _has_is_test = "is_test" in _table_columns(conn, "profiles")
+                ins_params: Dict[str, Any] = {
+                    "id": id_param,
+                    "role": role_norm,
+                    "email": email_norm,
+                    "full_name": full_name_norm,
+                    "company_id": company_id,
+                    "created_at": now,
+                }
+                if _has_is_test:
+                    ins_cols = "id, role, email, full_name, company_id, created_at, is_test"
+                    ins_vals = ":id, :role, :email, :full_name, :company_id, :created_at, :is_test"
+                    ins_params["is_test"] = looks_like_test_email(email_norm)
+                else:
+                    ins_cols = "id, role, email, full_name, company_id, created_at"
+                    ins_vals = ":id, :role, :email, :full_name, :company_id, :created_at"
                 try:
-                    conn.execute(text(
-                        "INSERT INTO profiles (id, role, email, full_name, company_id, created_at) "
-                        "VALUES (:id, :role, :email, :full_name, :company_id, :created_at)"
-                    ), {
-                        "id": id_param,
-                        "role": role_norm,
-                        "email": email_norm,
-                        "full_name": full_name_norm,
-                        "company_id": company_id,
-                        "created_at": now,
-                    })
+                    conn.execute(
+                        text(f"INSERT INTO profiles ({ins_cols}) VALUES ({ins_vals})"),
+                        ins_params,
+                    )
                 except Exception as _ei:
                     log.warning(
                         "ensure_profile_record insert failed user_id=%s email=%s error=%s",
@@ -777,7 +791,10 @@ class UsersMixin:
                     )
                 ).fetchall()
                 existing = {r._mapping["column_name"] for r in cols}
-                base_cols = ["id", "email", "full_name", "role", "company_id", "created_at", "updated_at"]
+                # PRODSEED-3/AIQ-1130: durably stamp synthetic (…@testco.com) people
+                # at creation. Only added when the column exists (deploy-safe).
+                from .test_data_filter import looks_like_test_email
+                base_cols = ["id", "email", "full_name", "role", "company_id", "created_at", "updated_at", "is_test"]
                 insert_cols = [c for c in base_cols if c in existing]
                 params: Dict[str, Any] = {
                     "id": person_id,
@@ -787,11 +804,13 @@ class UsersMixin:
                     "company_id": company_id,
                     "created_at": now,
                     "updated_at": now,
+                    "is_test": looks_like_test_email(email_clean),
                 }
                 values_clause = ", ".join(f":{c}" for c in insert_cols)
                 update_sets = []
                 for c in insert_cols:
-                    if c in ("id", "created_at"):
+                    # Never overwrite id/created_at; never un-flag is_test on re-upsert.
+                    if c in ("id", "created_at", "is_test"):
                         continue
                     update_sets.append(f"{c} = EXCLUDED.{c}")
                 sql = (
@@ -849,6 +868,12 @@ class UsersMixin:
         if not row:
             return {"ok": False, "error": f"Company '{company_name}' not found", "profiles_updated": 0}
         test_company_id = row._mapping["id"]
+        # PRODSEED-3/AIQ-1130: profiles corralled into the (synthetic) test company are
+        # themselves test data — stamp is_test=true. Guarded on column presence so the
+        # script stays valid before the migration applies.
+        from ..database import _table_columns  # lazy: avoid import cycle
+        with self.engine.connect() as _c:
+            _set_is_test = ", is_test = true" if "is_test" in _table_columns(_c, "profiles") else ""
         with self.engine.connect() as conn:
             profiles = conn.execute(
                 text(
@@ -881,7 +906,7 @@ class UsersMixin:
             with self.engine.begin() as conn:
                 conn.execute(
                     text(
-                        "UPDATE profiles SET company_id = :cid, role = :role WHERE id = :id"
+                        f"UPDATE profiles SET company_id = :cid, role = :role{_set_is_test} WHERE id = :id"
                     ),
                     {"cid": new_company, "role": new_role, "id": pid},
                 )
@@ -1183,13 +1208,22 @@ class UsersMixin:
         company_id: Optional[str] = None,
         query: Optional[str] = None,
         role: Optional[str] = None,
+        include_test: bool = False,
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         List people (profiles) for admin with optional company, role, and text filters.
         Returns (list with company_name, status), summary with count and orphans_without_company.
+
+        PRODSEED-3/AIQ-1130: synthetic e2e/verify people (is_test=true) are hidden by
+        default; pass include_test=True to show them. Replaces the read-time @testco.com
+        name filter (AIQ-913) with the durable flag, guarded on the column's presence so
+        it degrades safely if the migration hasn't applied yet.
         """
+        from ..database import _table_columns  # lazy: avoid import cycle
         params: Dict[str, Any] = {}
         clauses = []
+        with self.engine.connect() as _c:
+            _profiles_has_is_test = "is_test" in _table_columns(_c, "profiles")
         if company_id:
             clauses.append("p.company_id = :cid")
             params["cid"] = company_id
@@ -1229,10 +1263,11 @@ class UsersMixin:
                 pass
             if has_status:
                 clauses.append("(COALESCE(TRIM(LOWER(p.status)), 'active') <> 'inactive')")
-        # AIQ-913: hide synthetic e2e/verify seed people (…@testco.com) from the
-        # Mobility-center index (prod is continuously re-seeded; purge can't hold).
-        from .test_data_filter import exclude_test_people
-        clauses.append(exclude_test_people("p.email"))
+        # PRODSEED-3/AIQ-1130: hide synthetic e2e/verify seed people via the durable
+        # is_test flag (replaces the AIQ-913 …@testco.com read-time pattern). Guarded
+        # on column presence so it no-ops safely before the migration applies.
+        if not include_test and _profiles_has_is_test:
+            clauses.append("COALESCE(p.is_test, false) = false")
         where = " AND " + " AND ".join(clauses) if clauses else ""
         # B9b: p.created_at removed — column may not exist in production Supabase profiles
         # table (schema drift). Ordering falls back to full_name-only to avoid
@@ -1255,11 +1290,18 @@ class UsersMixin:
             row["name"] = row.get("full_name") or row.get("email") or row.get("id")
         # Orphans: profiles with role in ('HR','EMPLOYEE','EMPLOYEE_USER') and no company_id
         try:
+            # PRODSEED-3: exclude synthetic people from the orphan count via the flag
+            # (guarded so it stays valid before the migration applies).
+            orphan_test_clause = (
+                "AND COALESCE(is_test, false) = false"
+                if (not include_test and _profiles_has_is_test)
+                else ""
+            )
             orphan_sql = text(f"""
                 SELECT COUNT(*) AS n FROM profiles
                 WHERE (role IN ('HR','EMPLOYEE','EMPLOYEE_USER') OR role IS NULL)
                 AND (company_id IS NULL OR TRIM(company_id) = '')
-                AND {exclude_test_people("email")}
+                {orphan_test_clause}
             """)
             with self.engine.connect() as conn:
                 orphan_row = conn.execute(orphan_sql, {}).fetchone()

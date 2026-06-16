@@ -47,3 +47,40 @@ def exclude_test_companies(name_col: str = "name") -> str:
 def exclude_test_people(email_col: str = "email") -> str:
     """SQL fragment that is TRUE for real (non-seed) person rows."""
     return f"COALESCE({email_col}, '') NOT LIKE '{_TEST_EMAIL_LIKE}'"
+
+
+# ── Write-time classifiers (PRODSEED-3 / AIQ-1130) ──────────────────────────────
+# The durable fix flips the same patterns from a read-time SQL filter to a one-time
+# `is_test` stamp set when a synthetic row is *created*. These predicates power that
+# auto-stamp (companies/profiles creation) and mirror the SQL fragments above so a
+# tenant is classified identically whether it's flagged at write time or backfilled
+# by the migration. Demo tenants are intentionally NOT matched (see module docstring).
+
+# Company-name prefixes the verify/e2e seeders use ('Probe ISO-…' from the tenant-
+# isolation probe, 'Probe RLS-…' from verify_tenant_isolation.py).
+_TEST_COMPANY_PREFIXES = ("Probe ISO-", "Probe RLS-")
+
+# Synthetic email domains: '@testco.com' (e2e runner + verify_fresh_onboarding) and
+# '@probe.test' (verify_tenant_isolation.py). Kept as exact suffixes so real domains
+# like '@testcompany.com' / '@testingapril.com' (the demo tenants) never match.
+_TEST_EMAIL_DOMAINS = ("@testco.com", "@probe.test")
+
+
+def looks_like_test_company(name: "str | None") -> bool:
+    """True if a company name matches a known synthetic-seeder pattern."""
+    n = (name or "").strip()
+    if not n:
+        return False
+    if n in _TEST_COMPANY_NAMES:
+        return True
+    if any(n.startswith(p) for p in _TEST_COMPANY_PREFIXES):
+        return True
+    if "(Seed)" in n:
+        return True
+    return False
+
+
+def looks_like_test_email(email: "str | None") -> bool:
+    """True if an email is on a synthetic seeder domain (@testco.com / @probe.test)."""
+    e = (email or "").strip().lower()
+    return any(e.endswith(d) for d in _TEST_EMAIL_DOMAINS)

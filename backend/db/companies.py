@@ -679,8 +679,15 @@ class CompaniesMixin:
         plan_tier: Optional[str] = None,
         hr_seat_limit: Optional[int] = None,
         employee_seat_limit: Optional[int] = None,
+        is_test: Optional[bool] = None,
     ) -> None:
         from ..database import _table_columns  # lazy: avoid import cycle
+        # PRODSEED-3/AIQ-1130: stamp synthetic tenants with a durable is_test flag.
+        # Explicit value wins (e.g. verify scripts pass True); otherwise auto-detect
+        # from the seeder name pattern so e2e-created companies are flagged at write
+        # time. Real/demo tenants resolve to False.
+        from .test_data_filter import looks_like_test_company
+        is_test_val = bool(is_test) if is_test is not None else looks_like_test_company(name)
         now = datetime.utcnow().isoformat()
         status_val = (status or "active").lower() if status else "active"
         plan_val = (plan_tier or "starter").lower() if plan_tier else "starter"
@@ -715,6 +722,7 @@ class CompaniesMixin:
             "plan_tier": plan_val,
             "hr_seat_limit": hr_seat_limit,
             "employee_seat_limit": employee_seat_limit,
+            "is_test": is_test_val,
         }
 
         with self.engine.begin() as conn:
@@ -748,6 +756,10 @@ class CompaniesMixin:
                 "plan_tier",
                 "hr_seat_limit",
                 "employee_seat_limit",
+                # PRODSEED-3: only inserted when the column exists (deploy-safe before
+                # the migration applies). Deliberately omitted from the ON CONFLICT
+                # update set so a re-upsert never un-flags an existing row.
+                "is_test",
             ]
 
             insert_cols = [c for c in base_cols if c in company_cols] + [
@@ -1324,15 +1336,24 @@ class CompaniesMixin:
                 )
         return {"ok": True, "policy_id": policy_id, "version_id": version_id}
 
-    def get_admin_company_index(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_admin_company_index(
+        self, query: Optional[str] = None, include_test: bool = False
+    ) -> List[Dict[str, Any]]:
         """
         List all companies for admin from the canonical companies table only.
         Orphan company_ids (referenced elsewhere but not in companies) are logged, not shown.
+
+        PRODSEED-3/AIQ-1130: synthetic e2e/verify tenants (is_test=true) are hidden by
+        default; pass include_test=True to show them. The filter is guarded on the
+        column's presence so it degrades safely if the migration hasn't applied yet.
         """
+        from ..database import _table_columns  # lazy: avoid import cycle
         q = (query or "").strip().lower()
         with self.engine.connect() as conn:
             base_sql = "SELECT * FROM companies WHERE 1=1"
             params: Dict[str, Any] = {}
+            if not include_test and "is_test" in _table_columns(conn, "companies"):
+                base_sql += " AND COALESCE(is_test, false) = false"
             if q:
                 base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
                 params["q"] = f"%{q}%"
