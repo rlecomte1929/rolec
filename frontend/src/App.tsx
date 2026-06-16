@@ -47,6 +47,7 @@ const HrComplianceCheck = lazy(() => import('./pages/HrComplianceCheck').then((m
 const HrAssignmentPackageReview = lazy(() => import('./pages/HrAssignmentPackageReview').then((module) => ({ default: module.HrAssignmentPackageReview })));
 const HrPreferredSuppliers = lazy(() => import('./pages/HrPreferredSuppliers').then((module) => ({ default: module.HrPreferredSuppliers })));
 const HrVendorCuration = lazy(() => import('./pages/HrVendorCuration').then((module) => ({ default: module.HrVendorCuration })));
+const HrServiceProvidersPage = lazy(() => import('./pages/HrServiceProvidersPage').then((module) => ({ default: module.HrServiceProvidersPage })));
 const HrPolicy = lazy(() => import('./pages/HrPolicy').then((module) => ({ default: module.HrPolicy })));
 const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPage').then((module) => ({ default: module.EmployeePolicyPage })));
 const EmployeeBenefitComparisonPage = lazy(() => import('./pages/employee/EmployeeBenefitComparisonPage').then((module) => ({ default: module.EmployeeBenefitComparisonPage })));
@@ -340,6 +341,7 @@ function App() {
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
         <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<RequireHrRoute><HrPreferredSuppliers /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrVendorCuration.path} element={<RequireHrRoute><HrVendorCuration /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrServiceProviders.path} element={<RequireHrRoute><HrServiceProvidersPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<RequireHrRoute allowEmployee><HrPolicy /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.employeePolicy.path} element={<RequireEmployeeRoute><EmployeePolicyPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeBenefitsComparison.path} element={<RequireEmployeeRoute><EmployeeBenefitComparisonPage /></RequireEmployeeRoute>} />

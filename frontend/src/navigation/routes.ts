@@ -86,6 +86,9 @@ export const ROUTE_DEFS = {
   hrPreferredSuppliers: { path: '/hr/preferred-suppliers', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrVendorCuration: { path: '/hr/vendor-curation', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrProviderGrid: { path: '/hr/provider-grid', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** [NAV-SP-1] Service Providers — grouped surface with Dashboard / Vendor
+   *  Management / Provider Status sub-tabs (?tab=). */
+  hrServiceProviders: { path: '/hr/service-providers', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Employee relocation task checklist portal (AIQ-34-B). */
   employeeTaskPage: { path: '/employee/tasks', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrPolicy: { path: '/hr/policy', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },

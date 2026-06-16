@@ -20,8 +20,13 @@ import { ROUTE_DEFS } from '../../../navigation/routes';
  *
  * Endpoint: GET /api/hr/provider-status-grid (existing).
  * Mounted at sibling /hr/provider-grid-v2 + via V2Gate on /hr/provider-grid.
+ *
+ * `embedded`: when rendered as the "Provider Status" tab inside another
+ * AppShell (HrServiceProvidersPage, NAV-SP-1), skip the outer AppShell +
+ * Breadcrumb to avoid double-shell nesting. Default off → standalone route
+ * behaviour is unchanged.
  */
-export function ProviderGridV2Page() {
+export function ProviderGridV2Page({ embedded = false }: { embedded?: boolean } = {}) {
   // Flag-gated resizable + drag-reorder table. Defaults off → renders the
   // existing ProviderStatusGrid unchanged. Set
   // localStorage.platform_v2_provider_grid_resizable='on' to opt in.
@@ -69,13 +74,13 @@ export function ProviderGridV2Page() {
     };
   }, [rows]);
 
-  return (
-    <AppShell>
+  const inner = (
+    <>
       {/* No max-width cap — list pages fill the viewport so wide tables fit
           without horizontal scroll on larger monitors. */}
       <div className="px-6 py-6">
-        {/* Header */}
-        <Breadcrumb section="HR Operations" title="Provider status" className="mb-3" />
+        {/* Header — Breadcrumb suppressed when embedded as a sub-tab. */}
+        {!embedded && <Breadcrumb section="HR Operations" title="Provider status" className="mb-3" />}
         <div className="mb-5">
           <div className="flex items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Provider status</h1>
@@ -139,8 +144,10 @@ export function ProviderGridV2Page() {
           />
         )}
       </div>
-    </AppShell>
+    </>
   );
+
+  return embedded ? inner : <AppShell>{inner}</AppShell>;
 }
 
 // ── Local visual primitives (same idiom as CompaniesV2) ─────────────────────

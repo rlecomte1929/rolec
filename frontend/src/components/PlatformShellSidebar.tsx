@@ -109,13 +109,13 @@ const SECTIONS: NavSection[] = [
         // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
-      // The vendor-curation page (add + choose the providers employees see, incl.
-      // a custom-provider form) was built but unreachable from the nav — surface it.
+      // NAV-SP-1: the former two flat entries (vendor-curation + provider-grid)
+      // are re-homed under one grouped 'Service providers' surface with Dashboard /
+      // Vendor Management / Provider Status sub-tabs (/hr/service-providers).
       // RECS-CATALOG-2/AIQ-1080: badge the count of employees stuck on the "HR is
       // finalizing" empty state (catalog_employee_demand, un-curated only) so HR is
       // nudged to curate from anywhere — not just once they're already on the page.
-      { id: 'service-providers', label: 'Service providers', hint: 'Choose and add the providers your employees see', to: ROUTE_DEFS.hrVendorCuration.path, badge: { kind: 'dynamic', getCount: (c) => c.hr?.employees_waiting ?? 0 } },
-      { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
+      { id: 'service-providers', label: 'Service providers', hint: 'Manage vendors and track provider status', to: ROUTE_DEFS.hrServiceProviders.path, badge: { kind: 'dynamic', getCount: (c) => c.hr?.employees_waiting ?? 0 } },
       { id: 'exceptions', label: 'Policy exceptions', to: ROUTE_DEFS.hrExceptions.path },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
       // NAV-001: 'Requirements' now points to the corridor immigration-compliance
