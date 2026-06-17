@@ -32,9 +32,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -341,11 +342,15 @@ def get_case_audit(
 
 
 # ---------------------------------------------------------------------------
-# [NAV-HR-3 / AIQ-1122] HR-action audit trail from the canonical audit_logs.
-# Distinct from GET /audit above (which unions the rce.* immigration pipeline):
-# this returns the HR mutation trail consolidated by AUDIT-1/2/3 — who did what
-# to this case (escalate, reassign, status change, ...) — read-only for now
-# (append-only amend/reverse is a tracked follow-up).
+# [NAV-HR-3 / AIQ-1122 + NAV-HR-3-FU / AIQ-1137] HR-action audit trail from the
+# canonical audit_logs. Distinct from GET /audit above (which unions the rce.*
+# immigration pipeline): this returns the HR mutation trail consolidated by
+# AUDIT-1/2/3 — who did what to this case (escalate, reassign, note, ...).
+#
+# AIQ-1137 completes the MVP: (1) aggregates across ALL of the case's bridged
+# ids (most legacy rows are keyed by the relocation uuid, recent NAV-HR-2 rows by
+# the assignment id), (2) action-type + date filters, (3) append-only
+# amend/reverse annotations (never mutate an existing row).
 # ---------------------------------------------------------------------------
 
 
@@ -363,59 +368,125 @@ class CaseActionAuditEvent(BaseModel):
     created_at: Optional[str] = None
 
 
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
+def _require_case_access_bridged(case_id: str, org_id: str) -> str:
+    """Tenant gate for the audit trail. Resolves the owning company whether
+    ``case_id`` is the assignment id (what the UI passes) or a relocation uuid.
+    404 (not 403) on missing/cross-tenant so case ids can't be probed.
+    Returns the resolved company id.
+    """
+    company_id = db.get_case_company_for_audit(case_id)
+    if not company_id or (org_id and company_id != org_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    return company_id
+
+
+def _actor_uuid(user: Dict[str, Any]) -> Optional[str]:
+    """The actor's auth uuid if it is a real uuid, else None (audit_logs.actor_id
+    is a nullable uuid; a non-uuid legacy id is dropped rather than rejected)."""
+    raw = user.get("auth_uuid") or user.get("id")
+    return str(raw) if raw and _UUID_RE.match(str(raw)) else None
+
+
 @router.get("/{case_id}/audit-trail", response_model=List[CaseActionAuditEvent])
 def get_case_action_audit_trail(
     case_id: str,
+    action_type: Optional[str] = Query(None, pattern=r"^(insert|update|delete)$"),
+    event: Optional[str] = Query(None, max_length=100, description="Filter by semantic verb (new_value.event)."),
+    date_from: Optional[str] = Query(None, description="ISO timestamp; events at/after this time."),
+    date_to: Optional[str] = Query(None, description="ISO timestamp; events at/before this time."),
     _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> List[Dict[str, Any]]:
-    """Chronological HR-action audit trail for one case, read from the canonical
-    ``public.audit_logs`` (entity_id = case_id), newest first. Tenant-gated by
-    case ownership (404 on mismatch); actor names resolved via LEFT JOIN profiles.
-
-    Scope note: returns entries keyed directly by this case id. Aggregating the
-    case's bridged ids (mobility_cases / relocation_cases / assignment) and the
-    append-only amend/reverse action are a tracked follow-up.
+    """Chronological HR-action audit trail for one case, newest first, from the
+    canonical ``public.audit_logs``. Aggregates across all of the case's bridged
+    ids so no event is missed. Optional action-type / event / date filters.
+    Tenant-gated by case ownership (404 on mismatch); actor names via profiles.
     """
-    _require_case_access(case_id, org_id)
+    _require_case_access_bridged(case_id, org_id)
+    entity_ids = db.resolve_case_audit_entity_ids(case_id)
+    return db.query_case_audit_trail(
+        entity_ids,
+        action_type=action_type,
+        event=event,
+        from_ts=date_from,
+        to_ts=date_to,
+        limit=200,
+    )
 
-    with db.engine.begin() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT
-                    al.id::text          AS id,
-                    al.entity_type       AS entity_type,
-                    al.entity_id::text   AS entity_id,
-                    al.action_type       AS action_type,
-                    al.actor_type        AS actor_type,
-                    al.actor_id::text    AS actor_id,
-                    al.old_value_json    AS old_value,
-                    al.new_value_json    AS new_value,
-                    al.created_at        AS created_at,
-                    ap.full_name         AS actor_name
-                FROM audit_logs al
-                LEFT JOIN profiles ap ON ap.id = al.actor_id
-                WHERE al.entity_id::text = :cid
-                ORDER BY al.created_at DESC, al.id DESC
-                LIMIT 200
-                """
-            ),
-            {"cid": case_id},
-        ).mappings().all()
 
-    out: List[Dict[str, Any]] = []
-    for r in rows:
-        d = dict(r)
-        for k in ("old_value", "new_value"):
-            v = d.get(k)
-            if isinstance(v, str):
-                try:
-                    d[k] = json.loads(v) if v else None
-                except Exception:
-                    d[k] = None
-        nv = d.get("new_value")
-        d["event"] = nv.get("event") if isinstance(nv, dict) else None
-        d["created_at"] = str(d["created_at"]) if d.get("created_at") is not None else None
-        out.append(d)
-    return out
+class AuditAnnotationBody(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
+
+
+def _annotate_audit_event(
+    case_id: str,
+    audit_id: str,
+    *,
+    kind: Literal["amend", "reverse"],
+    reason: str,
+    user: Dict[str, Any],
+    org_id: str,
+) -> Dict[str, Any]:
+    """Shared amend/reverse path: tenant-gate, validate the target belongs to
+    this case, enforce the reversible-state rule, then append a linked row."""
+    _require_case_access_bridged(case_id, org_id)
+
+    target = db.get_audit_log_entry(audit_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit entry not found")
+
+    entity_ids = set(db.resolve_case_audit_entity_ids(case_id))
+    if str(target.get("entity_id")) not in entity_ids:
+        # The target row isn't part of this case — 404 so it can't be probed.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit entry not found")
+
+    target_event = (target.get("event") or "").upper()
+    if kind == "reverse":
+        # Reversible state: only an original insert/update event may be reversed,
+        # never a delete, never an amend/reverse annotation, and not twice.
+        if target.get("action_type") == "delete" or target_event in ("AUDIT_AMENDED", "AUDIT_REVERSED"):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This entry cannot be reversed.")
+        existing = db.find_audit_amendments(audit_id)
+        if any((e.get("event") or "").upper() == "AUDIT_REVERSED" for e in existing):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This entry has already been reversed.")
+
+    link_field = "amends" if kind == "amend" else "reverses"
+    new_id = db.insert_case_audit_annotation(
+        entity_type=target.get("entity_type"),
+        entity_id=str(target.get("entity_id")),
+        event="AUDIT_AMENDED" if kind == "amend" else "AUDIT_REVERSED",
+        reason=reason,
+        link_field=link_field,
+        original_id=audit_id,
+        actor_id=_actor_uuid(user),
+    )
+    return {"ok": True, "id": new_id, link_field: audit_id}
+
+
+@router.post("/{case_id}/audit-trail/{audit_id}/amend")
+def amend_case_audit_event(
+    case_id: str,
+    audit_id: str,
+    body: AuditAnnotationBody = Body(...),
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """Append an amendment (correction note) linked to an existing audit entry.
+    The original row is never mutated; a new row records ``amends = audit_id``."""
+    return _annotate_audit_event(case_id, audit_id, kind="amend", reason=body.reason, user=user, org_id=org_id)
+
+
+@router.post("/{case_id}/audit-trail/{audit_id}/reverse")
+def reverse_case_audit_event(
+    case_id: str,
+    audit_id: str,
+    body: AuditAnnotationBody = Body(...),
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """Append a reversal linked to an existing audit entry, only in a reversible
+    state. The original row is never mutated; a new row records ``reverses = audit_id``."""
+    return _annotate_audit_event(case_id, audit_id, kind="reverse", reason=body.reason, user=user, org_id=org_id)

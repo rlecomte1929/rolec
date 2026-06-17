@@ -342,6 +342,229 @@ class AuditMixin:
             },
         )
 
+    # ------------------------------------------------------------------
+    # [NAV-HR-3-FU / AIQ-1137] Case audit-trail aggregation + amend/reverse.
+    #
+    # A case is represented by several bridged ids (the assignment id the UI
+    # passes, the relocation_cases uuid most legacy audit rows are keyed by, and
+    # the mobility_cases uuid). The read-only #820 endpoint only matched the
+    # single id it was given, so it missed every event keyed by a sibling id.
+    # These helpers resolve the full id set, query audit_logs across all of them
+    # with optional filters, and support append-only amend/reverse annotations.
+    # Postgres-only SQL (casts + jsonb operators); the router mocks these in tests.
+    # ------------------------------------------------------------------
+
+    def resolve_case_audit_entity_ids(self, case_id: str) -> List[str]:
+        """All audit entity-ids that represent this case.
+
+        Accepts either the assignment id (what the case-detail UI passes) or a
+        relocation_cases uuid, and returns the deduped set of related ids:
+        the input, the assignment's case_id / canonical_case_id (relocation
+        uuids), any assignment ids that point back to a relocation uuid, and the
+        bridged mobility_cases id. Returns at least ``[case_id]``.
+        """
+        cid = (case_id or "").strip()
+        if not cid:
+            return []
+        sql = """
+            SELECT DISTINCT eid FROM (
+                SELECT CAST(:cid AS TEXT) AS eid
+                UNION SELECT ca.case_id FROM case_assignments ca
+                    WHERE ca.id = :cid AND ca.case_id IS NOT NULL
+                UNION SELECT ca.canonical_case_id FROM case_assignments ca
+                    WHERE ca.id = :cid AND ca.canonical_case_id IS NOT NULL
+                UNION SELECT ca.id FROM case_assignments ca
+                    WHERE ca.case_id = :cid OR ca.canonical_case_id = :cid
+                UNION SELECT aml.mobility_case_id::text FROM assignment_mobility_links aml
+                    WHERE aml.assignment_id = :cid
+                UNION SELECT aml.mobility_case_id::text FROM assignment_mobility_links aml
+                    JOIN case_assignments ca ON ca.id = aml.assignment_id
+                    WHERE ca.case_id = :cid OR ca.canonical_case_id = :cid
+            ) s WHERE eid IS NOT NULL
+        """
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(text(sql), {"cid": cid}).fetchall()
+            ids = {str(r[0]).strip() for r in rows if r[0] is not None}
+            ids.add(cid)
+            return sorted(ids)
+        except Exception as e:
+            log.debug("resolve_case_audit_entity_ids failed: %s", e)
+            return [cid]
+
+    def get_case_company_for_audit(self, case_id: str) -> Optional[str]:
+        """Company id owning this case, resolved from an assignment id OR a
+        relocation uuid. Used to tenant-gate the audit trail (404 on mismatch).
+        Returns None when ownership can't be proven (caller treats as 404).
+        """
+        cid = (case_id or "").strip()
+        if not cid:
+            return None
+        sql = """
+            SELECT rc.company_id AS company_id
+            FROM relocation_cases rc
+            WHERE rc.id::text = :cid
+               OR rc.id::text IN (
+                    SELECT ca.case_id FROM case_assignments ca WHERE ca.id = :cid
+                    UNION
+                    SELECT ca.canonical_case_id FROM case_assignments ca WHERE ca.id = :cid
+               )
+            LIMIT 1
+        """
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(sql), {"cid": cid}).mappings().first()
+            return row["company_id"] if row and row.get("company_id") else None
+        except Exception as e:
+            log.debug("get_case_company_for_audit failed: %s", e)
+            return None
+
+    def query_case_audit_trail(
+        self,
+        entity_ids: List[str],
+        *,
+        action_type: Optional[str] = None,
+        event: Optional[str] = None,
+        from_ts: Optional[str] = None,
+        to_ts: Optional[str] = None,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """Filtered, newest-first audit_logs rows across all of a case's ids.
+
+        Parses old/new value json and derives the semantic ``event``. Filters are
+        each null-guarded so an omitted filter is a no-op.
+        """
+        ids = [str(e).strip() for e in (entity_ids or []) if e]
+        if not ids:
+            return []
+        sql = """
+            SELECT
+                al.id::text          AS id,
+                al.entity_type       AS entity_type,
+                al.entity_id::text   AS entity_id,
+                al.action_type       AS action_type,
+                al.actor_type        AS actor_type,
+                al.actor_id::text    AS actor_id,
+                al.old_value_json    AS old_value,
+                al.new_value_json    AS new_value,
+                al.created_at        AS created_at,
+                ap.full_name         AS actor_name
+            FROM audit_logs al
+            LEFT JOIN profiles ap ON ap.id = al.actor_id
+            WHERE al.entity_id::text = ANY(:ids)
+              AND (:action_type IS NULL OR al.action_type = :action_type)
+              AND (:event IS NULL OR al.new_value_json->>'event' = :event)
+              AND (:from_ts IS NULL OR al.created_at >= CAST(:from_ts AS timestamptz))
+              AND (:to_ts IS NULL OR al.created_at <= CAST(:to_ts AS timestamptz))
+            ORDER BY al.created_at DESC, al.id DESC
+            LIMIT :limit
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(sql),
+                {
+                    "ids": ids,
+                    "action_type": action_type,
+                    "event": event,
+                    "from_ts": from_ts,
+                    "to_ts": to_ts,
+                    "limit": limit,
+                },
+            ).mappings().all()
+        return [self._shape_audit_row(dict(r)) for r in rows]
+
+    def get_audit_log_entry(self, audit_id: str) -> Optional[Dict[str, Any]]:
+        """One audit_logs row by id (for amend/reverse target validation)."""
+        aid = (audit_id or "").strip()
+        if not aid:
+            return None
+        sql = """
+            SELECT
+                al.id::text          AS id,
+                al.entity_type       AS entity_type,
+                al.entity_id::text   AS entity_id,
+                al.action_type       AS action_type,
+                al.old_value_json    AS old_value,
+                al.new_value_json    AS new_value,
+                al.created_at        AS created_at
+            FROM audit_logs al
+            WHERE al.id::text = :aid
+            LIMIT 1
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(text(sql), {"aid": aid}).mappings().first()
+        return self._shape_audit_row(dict(row)) if row else None
+
+    def find_audit_amendments(self, original_id: str) -> List[Dict[str, Any]]:
+        """Audit rows that amend or reverse ``original_id`` (to block double-reverse)."""
+        oid = (original_id or "").strip()
+        if not oid:
+            return []
+        sql = """
+            SELECT al.id::text AS id,
+                   al.new_value_json->>'event'    AS event,
+                   al.new_value_json->>'amends'    AS amends,
+                   al.new_value_json->>'reverses'  AS reverses
+            FROM audit_logs al
+            WHERE al.new_value_json->>'amends' = :oid
+               OR al.new_value_json->>'reverses' = :oid
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), {"oid": oid}).mappings().all()
+        return [dict(r) for r in rows]
+
+    def insert_case_audit_annotation(
+        self,
+        *,
+        entity_type: Optional[str],
+        entity_id: str,
+        event: str,
+        reason: Optional[str],
+        link_field: str,
+        original_id: str,
+        actor_id: Optional[str] = None,
+    ) -> str:
+        """Write an append-only amend/reverse annotation to audit_logs and return
+        its new id. ``link_field`` is 'amends' or 'reverses'; the original row is
+        never mutated. Raises on failure — the write IS the operation here, so it
+        must not be swallowed like ``log_audit``.
+        """
+        from ..app.services.audit_log_service import (
+            insert_audit_log,
+            ACTION_UPDATE,
+            ACTOR_HUMAN,
+        )
+
+        new_value: Dict[str, Any] = {"event": event, link_field: original_id}
+        if reason:
+            new_value["reason"] = reason
+        with self.engine.begin() as conn:
+            return insert_audit_log(
+                conn,
+                entity_type=entity_type or "assignment",
+                entity_id=entity_id,
+                action_type=ACTION_UPDATE,
+                new_value=new_value,
+                actor_type=ACTOR_HUMAN,
+                actor_id=actor_id,
+            )
+
+    @staticmethod
+    def _shape_audit_row(d: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse old/new json, derive ``event``, stringify created_at."""
+        for k in ("old_value", "new_value"):
+            v = d.get(k)
+            if isinstance(v, str):
+                try:
+                    d[k] = json.loads(v) if v else None
+                except Exception:
+                    d[k] = None
+        nv = d.get("new_value")
+        d["event"] = nv.get("event") if isinstance(nv, dict) else None
+        if d.get("created_at") is not None:
+            d["created_at"] = str(d["created_at"])
+        return d
+
     @staticmethod
     def log_expected_tables_status() -> None:
         """
