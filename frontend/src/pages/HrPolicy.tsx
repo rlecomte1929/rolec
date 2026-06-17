@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { FileInput } from '../components/antigravity/FileInput';
-import { Link, useSearchParams, useLocation } from 'react-router-dom';
+import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pagePerf';
@@ -61,6 +61,7 @@ function EmployeePolicyContent() {
 export const HrPolicy: React.FC = () => {
   const role = getAuthItem('relopass_role');
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
@@ -153,6 +154,16 @@ export const HrPolicy: React.FC = () => {
         </div>
       )}
 
+      {/* Guided next-step CTA — points HR to the natural next action per tab.
+          Does not alter the tab content below. (NAV-POL-1) */}
+      {!adminCompanyId && (
+        <PolicyNextStepCta
+          activeTab={activeTab}
+          setTab={setTab}
+          onReviewPublish={() => navigate(buildRoute('hrPolicyBuilderReview'))}
+        />
+      )}
+
       <div data-hr-policy-page="v3" id="hr-policy-top">
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
@@ -195,6 +206,62 @@ function PolicyTabButton({
     >
       {children}
     </Button>
+  );
+}
+
+/**
+ * Guided next-step CTA shown above each Policy tab (NAV-POL-1). Nudges HR toward
+ * the natural next action without touching the tab content:
+ *   • Published policy → Edit in Builder
+ *   • Policy builder    → Review & publish / See benefits summary
+ *   • Benefits summary  → Edit in Builder
+ */
+function PolicyNextStepCta({
+  activeTab,
+  setTab,
+  onReviewPublish,
+}: {
+  activeTab: 'policy' | 'builder' | 'summary';
+  setTab: (tab: 'policy' | 'builder' | 'summary') => void;
+  onReviewPublish: () => void;
+}) {
+  const config: { hint: string; actions: React.ReactNode } = (() => {
+    if (activeTab === 'builder') {
+      return {
+        hint: 'Finished editing? Review the extracted values before publishing, or preview what employees will see.',
+        actions: (
+          <>
+            <Button size="sm" onClick={onReviewPublish}>Review &amp; publish</Button>
+            <Button size="sm" variant="outline" onClick={() => setTab('summary')}>
+              See benefits summary
+            </Button>
+          </>
+        ),
+      };
+    }
+    if (activeTab === 'summary') {
+      return {
+        hint: 'This is what employees see. Need to change a cap or rule?',
+        actions: (
+          <Button size="sm" onClick={() => setTab('builder')}>Edit in Builder</Button>
+        ),
+      };
+    }
+    return {
+      hint: 'This is your live, published policy. Make changes in the Policy builder.',
+      actions: (
+        <Button size="sm" onClick={() => setTab('builder')}>Edit in Builder</Button>
+      ),
+    };
+  })();
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent-100 bg-accent-50/60 px-4 py-2.5">
+      <p className="text-sm text-[#0b2b43] min-w-0">
+        <span className="font-medium">Next step:</span> {config.hint}
+      </p>
+      <div className="flex items-center gap-2 shrink-0">{config.actions}</div>
+    </div>
   );
 }
 

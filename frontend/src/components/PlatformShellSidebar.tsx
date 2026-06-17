@@ -37,6 +37,9 @@ interface SectionItem {
   badge?: BadgeSpec;
   /** Hide this item conditionally (e.g. wizard tab is meaningless without a case). */
   hidden?: (ctx: SidebarVisibilityCtx) => boolean;
+  /** Optional sub-items shown indented below the parent while the parent route
+   *  is active (e.g. the Policy tabs deep-linking to /hr/policy?tab=…). NAV-POL-1. */
+  children?: { id: string; label: string; to: string }[];
 }
 
 interface NavSection {
@@ -108,7 +111,18 @@ const SECTIONS: NavSection[] = [
         // (116 in prod). No active-case count is exposed by the notification
         // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
-      { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
+      // NAV-POL-1: surface the existing HrPolicy ?tab= tabs as sidebar sub-items
+      // (shown indented while on /hr/policy). Each deep-links to a bookmarkable tab.
+      {
+        id: 'policy-benefits',
+        label: 'Policy',
+        to: ROUTE_DEFS.hrPolicy.path,
+        children: [
+          { id: 'policy-published', label: 'Published policy', to: `${ROUTE_DEFS.hrPolicy.path}?tab=policy` },
+          { id: 'policy-builder', label: 'Policy builder', to: `${ROUTE_DEFS.hrPolicy.path}?tab=builder` },
+          { id: 'policy-summary', label: 'Benefits summary', to: `${ROUTE_DEFS.hrPolicy.path}?tab=summary` },
+        ],
+      },
       // NAV-SP-1: the former two flat entries (vendor-curation + provider-grid)
       // are re-homed under one grouped 'Service providers' surface with Dashboard /
       // Vendor Management / Provider Status sub-tabs (/hr/service-providers).
@@ -307,6 +321,17 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
+  // A child sub-item (e.g. a Policy tab) is active when its pathname matches and
+  // its ?tab= equals the current tab — defaulting to the first tab when absent,
+  // so /hr/policy with no query highlights "Published policy". (NAV-POL-1)
+  const isChildActive = (childTo: string) => {
+    const [childPath, childQuery = ''] = childTo.split('?');
+    if (location.pathname !== childPath) return false;
+    const childTab = new URLSearchParams(childQuery).get('tab') ?? 'policy';
+    const currentTab = new URLSearchParams(location.search).get('tab') ?? 'policy';
+    return childTab === currentTab;
+  };
+
   const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount };
   const visibleSections = SECTIONS
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
@@ -417,8 +442,8 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
               }
 
               return (
+                <React.Fragment key={item.id}>
                 <Link
-                  key={item.id}
                   to={to}
                   title={item.label}
                   className={`group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
@@ -463,6 +488,32 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                     </span>
                   )}
                 </Link>
+
+                {/* NAV-POL-1: indented sub-items deep-linking to the parent's
+                    ?tab= variants. Always visible when expanded so every step is
+                    reachable directly from the sidebar (hidden when collapsed). */}
+                {!collapsed && item.children && (
+                  <div className="ml-7 mb-1 mt-0.5 flex flex-col gap-0.5 border-l border-slate-200 pl-2">
+                    {item.children.map((child) => {
+                      const childActive = isChildActive(child.to);
+                      return (
+                        <Link
+                          key={child.id}
+                          to={child.to}
+                          title={child.label}
+                          className={`block truncate rounded-md px-2 py-1 text-[13px] transition-colors ${
+                            childActive
+                              ? 'text-[#0b2b43] font-medium bg-[#0b2b43]/8'
+                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+                </React.Fragment>
               );
             })}
           </React.Fragment>
