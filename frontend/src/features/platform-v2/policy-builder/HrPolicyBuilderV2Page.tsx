@@ -1,5 +1,5 @@
 // HrPolicyBuilderV2Page.tsx — Policy Builder canvas + benefit matrix
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import {
@@ -11,7 +11,7 @@ import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Alert } from '../../../components/antigravity';
 import { Breadcrumb } from '../../../components/Breadcrumb';
-import { policyConfigMatrixAPI } from '../../../api/client';
+import { policyConfigMatrixAPI, policyDocumentsAPI } from '../../../api/client';
 import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssistantDockedShell';
 import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
@@ -418,70 +418,77 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const inner = (
     <>
       {!embedded && <Breadcrumb section="HR Operations" title="Policy builder" className="px-6 pt-4 pb-2" />}
-      {/* ── Header ── */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 flex items-center gap-4 px-6 py-3">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-semibold text-gray-900 leading-none">Policy Builder</h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusColour}`}>{statusLbl}</span>
-            {version && <span className="text-[11px] text-gray-400 font-mono">{version}</span>}
+      {/* ── Header — two-row layout so content never overflows ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
+        {/* Row 1: title + primary publish actions */}
+        <div className="flex items-center gap-3 px-6 pt-2.5 pb-1.5">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <h1 className="text-[14px] font-semibold text-gray-900 leading-none whitespace-nowrap">Policy Builder</h1>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusColour}`}>{statusLbl}</span>
+            {version && <span className="text-[11px] text-gray-400 font-mono truncate">{version}</span>}
             {savedAt && (
-              <span className="text-[11px] text-gray-400 flex items-center gap-1">
+              <span className="text-[11px] text-gray-400 flex items-center gap-1 shrink-0">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"/>
                 Saved {timeAgo(savedAt)}
               </span>
             )}
           </div>
-        </div>
-
-        {/* mode tabs */}
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[12px] font-medium">
-          {(['template','document'] as const).map(m => (
-            <Button unstyled key={m} onClick={() => setMode(m)}
-              className={`px-3 py-1.5 transition-colors ${mode === m ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
-              {m === 'template' ? 'Build from template' : 'Import from document'}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button unstyled onClick={handleSaveDraft} disabled={saving || tiers.length === 0}
+              className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+              {saving ? 'Saving…' : 'Save draft'}
             </Button>
-          ))}
+            <Button unstyled onClick={() => setPreviewOpen(true)} disabled={tiers.length === 0}
+              className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1.5">
+              <Eye size={12}/> Preview
+            </Button>
+            <Button unstyled onClick={handlePublish} disabled={publishing || tiers.length === 0}
+              className="text-[12px] px-3 py-1.5 rounded-lg bg-navy-800 text-white font-semibold hover:bg-navy-900 disabled:opacity-40 flex items-center gap-1.5">
+              <Check size={12}/> {publishing ? 'Publishing…' : 'Publish'}
+            </Button>
+          </div>
         </div>
-
-        {/* currency */}
-        <div className="flex items-center gap-1.5 text-[12px] text-gray-500">
-          <span className="font-semibold text-gray-700">{CUR_SYM[currency]}</span>
-          <select value={currency} onChange={e => setCurrency(e.target.value)}
-            className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white focus:outline-none">
-            <option value="EUR">EUR (€)</option>
-            <option value="USD">USD ($)</option>
-            <option value="GBP">GBP (£)</option>
-            <option value="CHF">CHF</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button unstyled onClick={() => setAssistantOpen(o => !o)}
-            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border transition-colors font-medium ${assistantOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
-            <MessageSquare size={12}/> Ask about this policy
-          </Button>
-          <Button unstyled onClick={() => setCtxOpen(o => !o)}
-            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border transition-colors font-medium ${ctxOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
-            <Activity size={12}/> {ctxOpen ? 'Context on' : 'Context'}
-          </Button>
-          {/* Effective date — required by the publish pipeline */}
-          <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
-            <Clock size={12} className="text-gray-400"/>
-            <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)}
-              title="Effective date"
-              className="border border-gray-200 rounded px-2 py-1 text-[11px] bg-white focus:outline-none"/>
-          </label>
-          <Button unstyled onClick={handleSaveDraft} disabled={saving || tiers.length === 0}
-            className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">
-            {saving ? 'Saving…' : 'Save draft'}
-          </Button>
-          <Button unstyled onClick={() => setPreviewOpen(true)} disabled={tiers.length === 0}
-            className="text-[12px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 flex items-center gap-1.5"><Eye size={12}/> Preview</Button>
-          <Button unstyled onClick={handlePublish} disabled={publishing || tiers.length === 0}
-            className="text-[12px] px-3 py-1.5 rounded-lg bg-navy-800 text-white font-semibold hover:bg-navy-900 disabled:opacity-40 flex items-center gap-1.5">
-            <Check size={12}/> {publishing ? 'Publishing…' : 'Publish'}
-          </Button>
+        {/* Row 2: source toggle + currency + secondary tools */}
+        <div className="flex items-center gap-3 px-6 pb-2">
+          {/* mode tabs */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[12px] font-medium shrink-0">
+            <Button unstyled onClick={() => setMode('template')}
+              className={`px-3 py-1 transition-colors ${mode === 'template' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+              Build from template
+            </Button>
+            <Button unstyled onClick={() => setImportOpen(true)}
+              className={`px-3 py-1 transition-colors border-l border-gray-200 ${mode === 'document' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+              Import from document
+            </Button>
+          </div>
+          {/* currency */}
+          <div className="flex shrink-0 items-center gap-1.5 text-[12px] text-gray-500">
+            <span className="font-semibold text-gray-700">{CUR_SYM[currency]}</span>
+            <select value={currency} onChange={e => setCurrency(e.target.value)}
+              className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white focus:outline-none">
+              <option value="EUR">EUR (€)</option>
+              <option value="USD">USD ($)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="CHF">CHF</option>
+            </select>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 ml-auto">
+            <Button unstyled onClick={() => setAssistantOpen(o => !o)}
+              className={`flex items-center gap-1.5 text-[12px] px-3 py-1 rounded-lg border transition-colors font-medium ${assistantOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
+              <MessageSquare size={12}/> Ask about this policy
+            </Button>
+            <Button unstyled onClick={() => setCtxOpen(o => !o)}
+              className={`flex items-center gap-1.5 text-[12px] px-3 py-1 rounded-lg border transition-colors font-medium ${ctxOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
+              <Activity size={12}/> {ctxOpen ? 'Context on' : 'Context'}
+            </Button>
+            {/* Effective date — required by the publish pipeline */}
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-500 shrink-0">
+              <Clock size={12} className="text-gray-400"/>
+              <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)}
+                title="Effective date"
+                className="border border-gray-200 rounded px-2 py-1 text-[11px] bg-white focus:outline-none"/>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -1156,12 +1163,39 @@ interface ImportFlowProps {
 
 function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
   const [step, setStep]         = useState(1);
-  const [file, setFile]         = useState<{ nm: string; sz: string } | null>(null);
+  const [file, setFile]         = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [stageIdx, setStageIdx] = useState(0);
   const [showLog, setShowLog]   = useState(false);
   const [rules, setRules]       = useState<MockRule[]>(MOCK_RULES);
   const [activeMark, setActiveMark] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fmtSize = (bytes: number) => bytes < 1_000_000
+    ? `${(bytes / 1024).toFixed(0)} KB`
+    : `${(bytes / 1_048_576).toFixed(1)} MB`;
+
+  const handleFiles = (picked: FileList | null) => {
+    const f = picked?.[0];
+    if (!f) return;
+    setFile(f);
+    setUploadError(null);
+  };
+
+  const handleStartExtraction = async () => {
+    if (!file) return;
+    setStep(2);
+    setStageIdx(0);
+    try {
+      await policyDocumentsAPI.upload(file);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setUploadError(msg);
+      setStep(1);
+      return;
+    }
+  };
 
   useEffect(() => {
     if (step !== 2) return;
@@ -1227,13 +1261,21 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
           {/* Step 1: Upload */}
           {step === 1 && (
             <div className="p-6">
+              {/* Hidden real file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={e => handleFiles(e.target.files)}
+              />
               {!file ? (
                 <div
                   className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-colors ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-300'}`}
-                  onClick={() => setFile({ nm: 'Aurora_Mobility_Policy_v2026.pdf', sz: '2.4 MB' })}
+                  onClick={() => fileInputRef.current?.click()}
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
-                  onDrop={e => { e.preventDefault(); setDragOver(false); setFile({ nm: 'Aurora_Mobility_Policy_v2026.pdf', sz: '2.4 MB' }); }}>
+                  onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}>
                   <Upload size={28} className="text-gray-300"/>
                   <div className="text-sm font-semibold text-gray-700">Drop your policy document here</div>
                   <div className="text-[12px] text-gray-400">PDF or Word (.docx) · max 50 MB</div>
@@ -1241,12 +1283,19 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                 </div>
               ) : (
                 <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl">
-                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-[11px] font-bold text-red-600">PDF</div>
-                  <div className="flex-1">
-                    <div className="text-[13px] font-semibold text-gray-900">{file.nm}</div>
-                    <div className="text-[11.5px] text-gray-400">{file.sz} · ready to extract</div>
+                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-[11px] font-bold text-red-600">
+                    {file.name.toLowerCase().endsWith('.docx') ? 'DOC' : 'PDF'}
                   </div>
-                  <Button unstyled onClick={() => setFile(null)} className="text-gray-400 hover:text-gray-600"><X size={16}/></Button>
+                  <div className="flex-1">
+                    <div className="text-[13px] font-semibold text-gray-900">{file.name}</div>
+                    <div className="text-[11.5px] text-gray-400">{fmtSize(file.size)} · ready to extract</div>
+                  </div>
+                  <Button unstyled onClick={() => { setFile(null); setUploadError(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600"><X size={16}/></Button>
+                </div>
+              )}
+              {uploadError && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-[12.5px] text-red-700">
+                  Upload failed: {uploadError}. Please try again.
                 </div>
               )}
               <div className="mt-4 p-4 bg-blue-50 rounded-xl text-[12.5px] text-blue-700">
@@ -1401,7 +1450,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
           {step === 1 && <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Cancel</Button>}
           <div className="flex-1"/>
           {step === 1 && (
-            <Button unstyled disabled={!file} onClick={() => setStep(2)}
+            <Button unstyled disabled={!file} onClick={handleStartExtraction}
               className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
               Start extraction →
             </Button>

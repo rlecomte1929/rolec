@@ -701,7 +701,7 @@ export function MobilityControlCenterV2Page() {
             up to 360px on wider monitors but the table always gets the
             remaining viewport (no max-width cap). On <lg the rail stacks
             below the table. */}
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
           <div>
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-baseline gap-2">

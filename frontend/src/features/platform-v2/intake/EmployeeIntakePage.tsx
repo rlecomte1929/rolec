@@ -881,12 +881,20 @@ export function EmployeeIntakePage() {
             const merged = { ...d };
             for (const [k, v] of Object.entries(res.intakeDraft as Record<string, unknown>)) {
               const key = k as keyof IntakeData;
-              // Only fill if current value is empty/falsy — user-
-              // entered changes during the load take priority.
               const cur = merged[key] as unknown;
+              // Apply the saved draft value unless the user actively typed something
+              // during the brief hydration load window. We detect "user edited" by
+              // comparing against the initial default: if the field still matches
+              // the default it hasn't been touched, so we overwrite with the saved
+              // value. Fields that are genuinely empty also always get the draft value.
+              // This fixes restoration of fields with non-empty defaults (members,
+              // purpose, contract_type, commute_mins) which the old isEmpty-only
+              // check never restored.
+              const initialDefault = (INITIAL_DATA as unknown as Record<string, unknown>)[key as string];
+              const isStillDefault = JSON.stringify(cur) === JSON.stringify(initialDefault);
               const isEmpty = cur === '' || cur === null || cur === undefined
                 || (Array.isArray(cur) && cur.length === 0);
-              if (isEmpty) (merged as Record<string, unknown>)[key as string] = v;
+              if (isEmpty || isStillDefault) (merged as Record<string, unknown>)[key as string] = v;
             }
             return merged;
           });
