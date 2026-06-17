@@ -74,7 +74,7 @@ describe('EmployeeDossierPage content-honesty banner', () => {
     mockList.mockResolvedValue([]);
     renderPage();
     await waitFor(() =>
-      expect(screen.getByText(/No forms yet/i)).toBeInTheDocument(),
+      expect(screen.getByText(/Your forms will appear here/i)).toBeInTheDocument(),
     );
     expect(screen.queryByTestId('dossier-honesty-banner')).not.toBeInTheDocument();
   });
