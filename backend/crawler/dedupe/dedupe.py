@@ -9,12 +9,11 @@ log = logging.getLogger(__name__)
 
 
 def _get_supabase():
-    try:
-        from backend.services.supabase_client import get_supabase_admin_client
-        return get_supabase_admin_client()
-    except ImportError:
-        from ...services.supabase_client import get_supabase_admin_client
-        return get_supabase_admin_client()
+    # Canonical client path is backend.app.services.supabase_client; the old
+    # backend.services / ...services paths resolve to backend.services (nonexistent)
+    # → ModuleNotFoundError, which broke duplicate checks during crawls. (CRAWL-RUN-1)
+    from backend.app.services.supabase_client import get_supabase_admin_client
+    return get_supabase_admin_client()
 
 
 def _normalize_title(title: str) -> str:
