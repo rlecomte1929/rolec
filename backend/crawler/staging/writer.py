@@ -216,8 +216,15 @@ def write_resource_candidate(
     document_id: Optional[str],
     chunk_id: Optional[str],
     candidate: StagedResourceCandidate,
+    duplicate_of_live_resource_id: Optional[str] = None,
 ) -> str:
-    """Write staged resource candidate."""
+    """Write staged resource candidate.
+
+    [CRAWL-QUALITY-2] When duplicate_of_live_resource_id is given (a semantic
+    overlap with a live resource), the candidate is still staged but FLAGGED — so
+    the admin reviews it as a likely duplicate rather than as net-new. Flag-only;
+    no auto-reject.
+    """
     supabase = _get_supabase()
     row = {
         "crawl_run_id": crawl_run_id,
@@ -239,9 +246,11 @@ def write_resource_candidate(
         "trust_tier": candidate.trust_tier,
         "confidence_score": candidate.confidence_score,
         "extraction_method": candidate.extraction_method,
-        "status": "new",
+        "status": "needs_review" if duplicate_of_live_resource_id else "new",
         "provenance_json": candidate.provenance,
     }
+    if duplicate_of_live_resource_id:
+        row["duplicate_of_live_resource_id"] = duplicate_of_live_resource_id
     r = supabase.table("staged_resource_candidates").insert(row).execute()
     data = (r.data or [{}])[0]
     return data.get("id", str(uuid.uuid4()))
