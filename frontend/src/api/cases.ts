@@ -1,4 +1,34 @@
 import { apiGet, apiPatch, apiPost } from './client';
+
+export interface HrTeamMember {
+  profile_id: string;
+  name: string | null;
+  email: string | null;
+}
+
+/**
+ * List HR users in the caller's company — the reassignment target list
+ * (AIQ-1136). GET /api/hr/team, tenant-scoped server-side.
+ */
+export async function listCompanyHrTeam(): Promise<HrTeamMember[]> {
+  const res = await apiGet<{ members: HrTeamMember[] }>(`/api/hr/team`);
+  return res.members ?? [];
+}
+
+/**
+ * Reassign a case's HR owner to another HR in the same company (AIQ-1136).
+ * PATCH /api/hr/cases/{case_id}/reassign-hr-owner — HR-scoped; the backend
+ * verifies both the case and the target HR belong to the caller's company.
+ */
+export async function reassignCaseHrOwner(
+  caseId: string,
+  payload: { hr_user_id: string; reason: string },
+): Promise<{ ok: boolean }> {
+  return apiPatch<{ ok: boolean }>(
+    `/api/hr/cases/${encodeURIComponent(caseId)}/reassign-hr-owner`,
+    payload,
+  );
+}
 import type { CaseDTO, CaseDraftDTO, CaseRequirementsDTO, CaseExceptionsResponse, ExceptionFlag } from '../types';
 
 export async function getCase(caseId: string): Promise<CaseDTO> {

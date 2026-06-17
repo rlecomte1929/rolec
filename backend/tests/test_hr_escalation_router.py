@@ -64,3 +64,77 @@ def test_resolve_not_found(client, monkeypatch):
     monkeypatch.setattr(case_escalation_service, "resolve_escalation", lambda eid, co, **kw: None)
     r = client.post("/api/hr/escalations/ghost/resolve", json={"resolution_note": "x"})
     assert r.status_code == 404
+
+
+# ── AIQ-1136: HR case reassignment ─────────────────────────────────────────
+from backend.app.routers import hr_case_escalation  # noqa: E402
+
+
+@pytest.fixture()
+def reassign_client(monkeypatch):
+    """HR (co-1) with a 2-person team: prof-a, prof-b."""
+    monkeypatch.setattr(
+        hr_case_escalation.db, "list_hr_users_with_profiles",
+        lambda cid: [
+            {"profile_id": "prof-a", "name": "Alice", "email": "a@co-1.com"},
+            {"profile_id": "prof-b", "name": "Bob", "email": "b@co-1.com"},
+        ] if cid == "co-1" else [],
+    )
+    calls = []
+    monkeypatch.setattr(
+        hr_case_escalation.db, "admin_reassign_hr_owner",
+        lambda aid, hr: calls.append((aid, hr)),
+    )
+    app.dependency_overrides[auth_deps.get_current_user] = lambda: _HR
+    app.dependency_overrides[auth_deps.get_org_id_for_hr_user] = lambda: "co-1"
+    client = TestClient(app)
+    client._reassign_calls = calls  # type: ignore[attr-defined]
+    yield client
+    app.dependency_overrides.pop(auth_deps.get_current_user, None)
+    app.dependency_overrides.pop(auth_deps.get_org_id_for_hr_user, None)
+
+
+def test_reassign_routes_registered():
+    paths = {r.path for r in app.routes}
+    assert "/api/hr/team" in paths
+    assert "/api/hr/cases/{case_id}/reassign-hr-owner" in paths
+
+
+def test_team_list(reassign_client):
+    r = reassign_client.get("/api/hr/team")
+    assert r.status_code == 200
+    members = r.json()["members"]
+    assert {m["profile_id"] for m in members} == {"prof-a", "prof-b"}
+
+
+def test_reassign_success(reassign_client, monkeypatch):
+    monkeypatch.setattr(hr_case_escalation, "_assignment_company_id", lambda aid: "co-1")
+    r = reassign_client.patch(
+        "/api/hr/cases/case-9/reassign-hr-owner",
+        json={"hr_user_id": "prof-b", "reason": "Going on leave"},
+    )
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert reassign_client._reassign_calls == [("case-9", "prof-b")]
+
+
+def test_reassign_rejects_case_in_other_company(reassign_client, monkeypatch):
+    # The case belongs to a different company → 404, and no reassign happens.
+    monkeypatch.setattr(hr_case_escalation, "_assignment_company_id", lambda aid: "co-2")
+    r = reassign_client.patch(
+        "/api/hr/cases/case-9/reassign-hr-owner",
+        json={"hr_user_id": "prof-b", "reason": "x"},
+    )
+    assert r.status_code == 404
+    assert reassign_client._reassign_calls == []
+
+
+def test_reassign_rejects_target_outside_company(reassign_client, monkeypatch):
+    # Target HR is not in the caller's team → 400, and no reassign happens.
+    monkeypatch.setattr(hr_case_escalation, "_assignment_company_id", lambda aid: "co-1")
+    r = reassign_client.patch(
+        "/api/hr/cases/case-9/reassign-hr-owner",
+        json={"hr_user_id": "prof-zzz", "reason": "x"},
+    )
+    assert r.status_code == 400
+    assert reassign_client._reassign_calls == []
