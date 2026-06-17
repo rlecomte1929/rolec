@@ -74,9 +74,15 @@ interface AppShellProps {
    * standard 1280px cap leaves dead space on wide monitors.
    */
   wide?: boolean;
+  /**
+   * Optional intermediate parent page for breadcrumb back-navigation.
+   * Renders a clickable crumb between section and the current page title.
+   * Example: { label: 'Mobility command center', href: '/hr/command-center' }
+   */
+  parent?: { label: string; href: string };
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false, parent }) => {
   const name = getAuthItem('relopass_name');
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
@@ -193,7 +199,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 md:ml-auto">
             <ChangelogBell />
             <LogoutButton />
             {identity && (
@@ -253,7 +259,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
           <div className={wide ? 'px-4 py-6 md:px-6' : 'px-4 py-6 md:px-8 md:py-7 max-w-7xl mx-auto'}>
             {title && (
               <div className="mb-6">
-                <Breadcrumb section={section} title={title} homeHref={homeHref} className="mb-3" />
+                <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
                 {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
               </div>

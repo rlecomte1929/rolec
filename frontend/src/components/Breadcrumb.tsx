@@ -24,6 +24,11 @@ export interface BreadcrumbProps {
   homeHref?: string;
   /** Extra utility classes (e.g. for margin / inline placement). */
   className?: string;
+  /**
+   * Optional intermediate parent page for back-navigation.
+   * Renders a clickable crumb between section and the current page title.
+   */
+  parent?: { label: string; href: string };
 }
 
 export const Breadcrumb: React.FC<BreadcrumbProps> = ({
@@ -31,6 +36,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
   title,
   homeHref = '/',
   className = '',
+  parent,
 }) => {
   return (
     <nav
@@ -47,6 +53,14 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
         <>
           <span className="text-slate-300" aria-hidden="true">/</span>
           <span className="text-slate-500 truncate">{section}</span>
+        </>
+      )}
+      {parent && (
+        <>
+          <span className="text-slate-300" aria-hidden="true">/</span>
+          <Link to={parent.href} className="text-slate-500 hover:text-slate-700 transition-colors truncate">
+            {parent.label}
+          </Link>
         </>
       )}
       <span className="text-slate-300" aria-hidden="true">/</span>

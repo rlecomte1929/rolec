@@ -694,6 +694,11 @@ export function EmployeeIntakePage() {
   // merges) on the backend, so such a save wiped the employee's saved answers
   // on every reload.
   const draftHydratedRef = useRef(false);
+  // Tracks the latest unsaved data so the unmount-flush effect can access it
+  // without a stale closure. Set in setField on every edit; cleared after
+  // each successful debounced save so we don't re-send data that's already
+  // persisted.
+  const pendingSaveDataRef = useRef<IntakeData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -704,8 +709,12 @@ export function EmployeeIntakePage() {
       // loaded, or a pre-hydration edit would persist the empty initial state
       // and clobber the server draft (which replaces, not merges).
       if (draftHydratedRef.current) {
+        // Always track the latest unsaved payload so the unmount-flush can
+        // pick it up even if the debounce timer hasn't fired yet.
+        pendingSaveDataRef.current = next;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
+          pendingSaveDataRef.current = null; // mark as persisted
           setSavedAt(Date.now());
           const aid = assignmentIdRef.current;
           if (aid) {
@@ -719,6 +728,22 @@ export function EmployeeIntakePage() {
       }
       return next;
     });
+  }, []);
+
+  // Unmount flush: if the user navigates away before the 700ms debounce fires,
+  // immediately persist any pending data so it's not lost.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      const pending = pendingSaveDataRef.current;
+      const aid = assignmentIdRef.current;
+      if (pending && aid && draftHydratedRef.current) {
+        // fire-and-forget — component is unmounting, can't update state
+        void employeeAPI
+          .updateIntakeDraft(aid, pending as unknown as Record<string, unknown>)
+          .catch(() => { /* best-effort */ });
+      }
+    };
   }, []);
 
   const unlock = (key: keyof typeof locks) => setLocks((l) => ({ ...l, [key]: false }));
