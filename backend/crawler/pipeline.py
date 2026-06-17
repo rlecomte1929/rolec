@@ -9,7 +9,11 @@ from typing import Dict, List, Optional
 
 from .chunkers.chunker import Chunk, chunk_document
 from .config.models import CrawlConfig, CrawlSource
-from .dedupe.dedupe import check_event_duplicate, check_resource_duplicate
+from .dedupe.dedupe import (
+    check_event_duplicate,
+    check_resource_duplicate,
+    find_live_semantic_duplicate,
+)
 from .extractors.event_extractor import extract_event_candidates
 from .extractors.llm_resource_extractor import extract_resource_candidates_llm
 from .extractors.models import StagedEventCandidate, StagedResourceCandidate
@@ -217,9 +221,13 @@ def _crawl_source(source: CrawlSource, config: CrawlConfig, run_id: str, report:
         if is_dup:
             report.duplicates_detected += 1
             continue
+        # [CRAWL-QUALITY-2] Not an exact-title dup, but flag a semantic overlap
+        # with a live resource (set duplicate_of_live_resource_id) so the admin
+        # reviews it as a likely duplicate rather than as net-new.
+        dup_live_id = find_live_semantic_duplicate(rc.country_code, rc.city_name, rc.title, rc.body)
         chunk_idx = rc.provenance.get("document_chunk_index", 0)
         chunk_id = chunk_ids.get(chunk_idx) if chunk_ids else None
-        write_resource_candidate(run_id, doc_id, chunk_id, rc)
+        write_resource_candidate(run_id, doc_id, chunk_id, rc, duplicate_of_live_resource_id=dup_live_id)
         report.resources_staged += 1
 
     # CRAWL-02: LLM fallback. Only when the rule-based extractor recovered NOTHING
@@ -252,9 +260,10 @@ def _crawl_source(source: CrawlSource, config: CrawlConfig, run_id: str, report:
             if is_dup:
                 report.duplicates_detected += 1
                 continue
+            dup_live_id = find_live_semantic_duplicate(rc.country_code, rc.city_name, rc.title, rc.body)
             chunk_idx = rc.provenance.get("document_chunk_index", 0)
             chunk_id = chunk_ids.get(chunk_idx) if chunk_ids else None
-            write_resource_candidate(run_id, doc_id, chunk_id, rc)
+            write_resource_candidate(run_id, doc_id, chunk_id, rc, duplicate_of_live_resource_id=dup_live_id)
             report.resources_staged += 1
             report.resources_staged_llm += 1
 
