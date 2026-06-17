@@ -338,3 +338,84 @@ def get_case_audit(
         response.headers["ETag"] = head_etag
 
     return AuditResponse(case_id=case_id, events=events, next_cursor=next_cursor)
+
+
+# ---------------------------------------------------------------------------
+# [NAV-HR-3 / AIQ-1122] HR-action audit trail from the canonical audit_logs.
+# Distinct from GET /audit above (which unions the rce.* immigration pipeline):
+# this returns the HR mutation trail consolidated by AUDIT-1/2/3 — who did what
+# to this case (escalate, reassign, status change, ...) — read-only for now
+# (append-only amend/reverse is a tracked follow-up).
+# ---------------------------------------------------------------------------
+
+
+class CaseActionAuditEvent(BaseModel):
+    id: str
+    entity_type: str
+    entity_id: str
+    action_type: str  # insert | update | delete
+    actor_type: Optional[str] = None
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    event: Optional[str] = None  # the semantic verb, from new_value.event
+    old_value: Optional[Dict[str, Any]] = None
+    new_value: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+
+
+@router.get("/{case_id}/audit-trail", response_model=List[CaseActionAuditEvent])
+def get_case_action_audit_trail(
+    case_id: str,
+    _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> List[Dict[str, Any]]:
+    """Chronological HR-action audit trail for one case, read from the canonical
+    ``public.audit_logs`` (entity_id = case_id), newest first. Tenant-gated by
+    case ownership (404 on mismatch); actor names resolved via LEFT JOIN profiles.
+
+    Scope note: returns entries keyed directly by this case id. Aggregating the
+    case's bridged ids (mobility_cases / relocation_cases / assignment) and the
+    append-only amend/reverse action are a tracked follow-up.
+    """
+    _require_case_access(case_id, org_id)
+
+    with db.engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT
+                    al.id::text          AS id,
+                    al.entity_type       AS entity_type,
+                    al.entity_id::text   AS entity_id,
+                    al.action_type       AS action_type,
+                    al.actor_type        AS actor_type,
+                    al.actor_id::text    AS actor_id,
+                    al.old_value_json    AS old_value,
+                    al.new_value_json    AS new_value,
+                    al.created_at        AS created_at,
+                    ap.full_name         AS actor_name
+                FROM audit_logs al
+                LEFT JOIN profiles ap ON ap.id = al.actor_id
+                WHERE al.entity_id::text = :cid
+                ORDER BY al.created_at DESC, al.id DESC
+                LIMIT 200
+                """
+            ),
+            {"cid": case_id},
+        ).mappings().all()
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        d = dict(r)
+        for k in ("old_value", "new_value"):
+            v = d.get(k)
+            if isinstance(v, str):
+                try:
+                    d[k] = json.loads(v) if v else None
+                except Exception:
+                    d[k] = None
+        nv = d.get("new_value")
+        d["event"] = nv.get("event") if isinstance(nv, dict) else None
+        d["created_at"] = str(d["created_at"]) if d.get("created_at") is not None else None
+        out.append(d)
+    return out
