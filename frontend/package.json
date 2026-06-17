@@ -20,6 +20,7 @@
     "@tanstack/react-table": "8.20.5",
     "axios": "^1.6.2",
     "flag-icons": "^7.5.0",
+    "html2canvas": "^1.4.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
     "posthog-js": "^1.372.9",
