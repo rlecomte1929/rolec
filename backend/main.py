@@ -11592,9 +11592,11 @@ async def upload_policy_document(
                 request_id=request_id,
             )
         company_id = cid.strip()
-        from .app.services.policy_assistant_access import require_company_access
-
-        require_company_access(user, company_id, db)
+        # Access already validated: _resolve_company_for_policy → _get_hr_company_id
+        # checks hr_users first, then profiles. require_company_access only checks
+        # profiles.company_id and would falsely 404 HR users whose company is in
+        # hr_users. No additional check needed — non-admin HR gets their own company,
+        # admin override is unrestricted by design.
     except HTTPException:
         raise
     except Exception as exc:

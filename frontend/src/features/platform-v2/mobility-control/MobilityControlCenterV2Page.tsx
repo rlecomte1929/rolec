@@ -635,7 +635,7 @@ export function MobilityControlCenterV2Page() {
                 onClick={() => navigate('/employees/new')}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
               >
-                New case
+                Manage cases
               </Button>
             </div>
           </div>
