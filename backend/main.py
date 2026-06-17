@@ -8806,7 +8806,13 @@ def _resolve_published_policy_for_employee(
     except Exception:
         employee_profile = None
 
-    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
+    # [AIQ-1014/PERF-3] Pass the HR company + employee profile we already fetched
+    # above (8748/8753) so candidate collection doesn't re-query them — 2 fewer
+    # DB round-trips per call on this 5-endpoint-shared resolver. Candidate list
+    # is identical (same values, same order).
+    candidates = collect_company_id_candidates_for_assignment(
+        db, assignment, case, hr_company_id=hr_company_id, employee_profile=emp_profile
+    )
     pub = find_first_published_company_policy(db, candidates) if candidates else None
     if not pub:
         from .app.services.employee_policy_matrix_bridge import find_published_matrix_version, build_matrix_assignment_package
@@ -8828,7 +8834,12 @@ def _resolve_published_policy_for_employee(
         _push_matrix_company(profile_company_id)
         if emp_user_id:
             try:
-                er = db.get_profile_record(emp_user_id)
+                # [AIQ-1014/PERF-3] In read_only mode no profile back-fill ran
+                # above, so the profile we already fetched (8753) is current —
+                # reuse it instead of a redundant re-query. Non-read-only keeps
+                # the fresh fetch (the profile's company_id may have just been
+                # back-filled at 8785).
+                er = emp_profile if read_only else db.get_profile_record(emp_user_id)
                 _push_matrix_company((er or {}).get("company_id"))
             except Exception:
                 pass
