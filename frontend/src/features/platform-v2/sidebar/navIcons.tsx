@@ -21,6 +21,7 @@ import {
   Users,
   Layers,
   BrainCircuit,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -57,6 +58,9 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   // AIQ-1116: AI decisions audit — a brain-circuit icon conveys "AI/automation",
   // distinct from intake's Sparkles, so the nav item is no longer icon-less.
   'ai-decisions': BrainCircuit,
+  requirements: ClipboardList,
+  'hr-resources-preview': BookOpen,
+  'resources-guide': BookOpen,
 
   // Admin · ReloPass
   'admin-overview': Home,
