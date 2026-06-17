@@ -14,6 +14,7 @@ import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
 import { PolicyBenefitsSummary } from '../features/policy/PolicyBenefitsSummary';
 import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/HrPolicyBuilderV2Page';
+import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -64,8 +65,8 @@ export const HrPolicy: React.FC = () => {
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
   // the /hr/settings/policy redirect lands on the correct tab.
-  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary';
-  const setTab = (tab: 'policy' | 'builder' | 'summary') => {
+  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions';
+  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions') => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab);
     setSearchParams(next, { replace: true });
@@ -146,6 +147,9 @@ export const HrPolicy: React.FC = () => {
           <PolicyTabButton active={activeTab === 'summary'} onClick={() => setTab('summary')}>
             Benefits summary
           </PolicyTabButton>
+          <PolicyTabButton active={activeTab === 'exceptions'} onClick={() => setTab('exceptions')}>
+            Exceptions
+          </PolicyTabButton>
         </div>
       )}
 
@@ -160,6 +164,8 @@ export const HrPolicy: React.FC = () => {
           ? <HrPolicyBuilderV2Page embedded />
           : (!adminCompanyId && activeTab === 'summary')
           ? <PolicyBenefitsSummary />
+          : (!adminCompanyId && activeTab === 'exceptions')
+          ? <HrExceptionsPage embedded />
           : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
         }
       </div>
