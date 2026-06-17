@@ -21,6 +21,7 @@ import { PetRequirementsSection } from '../components/case/PetRequirementsSectio
 import { CaseAuditTimeline } from '../components/case/CaseAuditTimeline';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
+import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
 
 type QuoteRequest = {
   id: string;
@@ -190,6 +191,35 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* ── AIQ-1136 slice 3: EU AI Act Art. 14 oversight on the AI risk verdict.
+            The risk status is an AI-derived recommendation shown above as a passive
+            badge; this card gives "override" a concrete target by forcing HR to
+            accept / override / reject it. Only surfaces while the verdict is
+            load-bearing (yellow/red) — a green case needs no oversight prompt. ── */}
+        {(detail.riskStatus === 'yellow' || detail.riskStatus === 'red') && (
+          <AIRecommendationCard
+            recommendationId={`case_risk_v1:${detail.id}`}
+            feature="case_risk"
+            title="AI risk assessment"
+            rationale={
+              <>
+                The platform flagged this case as{' '}
+                <strong>{detail.riskStatus === 'red' ? 'high risk' : 'needs attention'}</strong>
+                {' '}based on intake completeness, blocking exceptions, and overdue tasks.
+                Accept to confirm, or override with your own judgement.
+              </>
+            }
+            aiOutput={{
+              assignment_id: detail.id,
+              risk_status: detail.riskStatus,
+              tasks_total: detail.tasksTotal,
+              tasks_done: detail.tasksDone,
+              tasks_overdue: detail.tasksOverdue,
+              source_version: 'case_risk_v1',
+            }}
+          />
+        )}
 
         {/* ── Exception flags (P3/B6): blockers + warnings from immigration check ── */}
         <ExceptionFlagsPanel caseId={detail.id} />
