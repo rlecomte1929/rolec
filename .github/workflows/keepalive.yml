@@ -11,11 +11,19 @@ name: Render keepalive
 
 on:
   schedule:
-    # Keep the worker warm only during likely-active hours (06:00-19:00 UTC,
-    # Mon-Fri). Nights/weekends accept the cold start, which the frontend's 45s
-    # axios cap on /api/auth/login already tolerates. Caps the billed-minute
-    # ceiling vs the previous 24/7 */10 schedule.
-    - cron: "*/12 6-19 * * 1-5"
+    # Keep the worker warm during likely-active hours (06:00-19:00 UTC), ALL 7
+    # DAYS. The Mon-Fri-only window used to leave weekends fully cold — the
+    # 2026-06-13 perf audit's 7.7s was a *Saturday* cold-start (AIQ-1014/PERF-2).
+    # GitHub throttles high-frequency scheduled runs hard, so even */12 only
+    # actually fires a handful of times a day with multi-hour gaps; adding
+    # weekends barely moves the billed-minute ceiling but closes the gap on the
+    # days GitHub does fire. Nights still accept the cold start (45s axios cap on
+    # /api/auth/login tolerates it).
+    #
+    # IMPORTANT: this Actions cron is a best-effort SUPPLEMENT, not a reliable
+    # keep-warm — GitHub drops most runs. For dependable warmth use an external
+    # monitor (see docs/performance/keep_warm.md) or upgrade the Render plan.
+    - cron: "*/12 6-19 * * *"
   workflow_dispatch:
 
 concurrency:
