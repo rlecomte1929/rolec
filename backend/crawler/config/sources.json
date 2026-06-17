@@ -1,0 +1,77 @@
+{
+  "_comment": "[CRAWL-RUN-1] Default resource crawl sources for the built corridors' destinations (DE/FR/NO). load_sources() reads this first; the Oslo pilot fixture is only the fallback. All are official government / publicly-funded newcomer portals (trust_tier T0/T1), single-page, max_depth 1, scope-restricted. content_domain must be a key of CONTENT_DOMAIN_TO_CATEGORY (config/models.py). The rule-based extractor runs first; the LLM fallback (CRAWLER_LLM_FALLBACK) only fires on pages it recovers nothing from, capped per run. Candidates land in staged_resource_candidates for admin review — never auto-published.",
+  "sources": [
+    {
+      "source_name": "make_it_in_germany_living",
+      "base_url": "https://www.make-it-in-germany.com/en/living-in-germany",
+      "country_code": "DE", "country_name": "Germany",
+      "source_type": "official", "trust_tier": "T0",
+      "content_domain": "admin_essentials", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "Federal Government relocation portal — living-in-Germany essentials."
+    },
+    {
+      "source_name": "handbook_germany_housing",
+      "base_url": "https://handbookgermany.de/en/renting-an-apartment",
+      "country_code": "DE", "country_name": "Germany",
+      "source_type": "institutional", "trust_tier": "T1",
+      "content_domain": "housing", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "Publicly-funded newcomer info — renting in Germany."
+    },
+    {
+      "source_name": "make_it_in_germany_health",
+      "base_url": "https://www.make-it-in-germany.com/en/living-in-germany/health-insurance",
+      "country_code": "DE", "country_name": "Germany",
+      "source_type": "official", "trust_tier": "T0",
+      "content_domain": "healthcare", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "Health insurance in Germany."
+    },
+    {
+      "source_name": "welcome_to_france_residence",
+      "base_url": "https://www.welcometofrance.com/en/residence-permit",
+      "country_code": "FR", "country_name": "France",
+      "source_type": "official", "trust_tier": "T0",
+      "content_domain": "admin_essentials", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "French Government newcomer portal — residence permit."
+    },
+    {
+      "source_name": "service_public_fr_housing",
+      "base_url": "https://www.service-public.fr/particuliers/vosdroits/N20360",
+      "country_code": "FR", "country_name": "France",
+      "source_type": "official", "trust_tier": "T0",
+      "content_domain": "housing", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "fr", "is_active": true,
+      "notes": "French Government service portal — housing rights."
+    },
+    {
+      "source_name": "oslo_kommune_newcomer",
+      "base_url": "https://www.oslo.kommune.no/english/",
+      "country_code": "NO", "country_name": "Norway", "city_name": "Oslo",
+      "source_type": "official", "trust_tier": "T0",
+      "content_domain": "admin_essentials", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "Oslo municipality newcomer info."
+    },
+    {
+      "source_name": "ruter_transport",
+      "base_url": "https://ruter.no/en/",
+      "country_code": "NO", "country_name": "Norway", "city_name": "Oslo",
+      "source_type": "official", "trust_tier": "T1",
+      "content_domain": "transport", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "Oslo public transport (Ruter)."
+    },
+    {
+      "source_name": "new_in_norway_home",
+      "base_url": "https://www.nyinorge.no/en/",
+      "country_code": "NO", "country_name": "Norway",
+      "source_type": "official", "trust_tier": "T0",
+      "content_domain": "admin_essentials", "crawl_strategy": "single_page", "max_depth": 1,
+      "language_code": "en", "is_active": true,
+      "notes": "Norwegian Government newcomer portal (English landing)."
+    }
+  ]
+}

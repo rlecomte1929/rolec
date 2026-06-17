@@ -17,12 +17,12 @@ log = logging.getLogger(__name__)
 
 
 def _get_supabase():
-    try:
-        from backend.services.supabase_client import get_supabase_admin_client
-        return get_supabase_admin_client()
-    except ImportError:
-        from ...services.supabase_client import get_supabase_admin_client
-        return get_supabase_admin_client()
+    # The admin client lives at backend.app.services.supabase_client. The previous
+    # 'backend.services' / '...services' paths both resolve to backend.services
+    # (nonexistent), so every staging write raised ModuleNotFoundError — the crawler
+    # could never persist a crawl run or a candidate. (CRAWL-RUN-1)
+    from backend.app.services.supabase_client import get_supabase_admin_client
+    return get_supabase_admin_client()
 
 
 def write_crawl_run(
