@@ -1827,6 +1827,7 @@ class CasesMixin:
                     "wc.origin_country as wizard_origin_country, "
                     "wc.dest_country as wizard_dest_country, "
                     "wc.target_move_date as wizard_target_move_date, "
+                    "wc.purpose as wizard_purpose, "
                     "wc.move_type as wizard_move_type, "
                     "wc.contract_type as wizard_contract_type, "
                     "wc.has_spouse as wizard_has_spouse, "
@@ -2007,13 +2008,16 @@ class CasesMixin:
                 if isinstance(employee_role, str) and not employee_role.strip():
                     employee_role = None
 
-                # Visa label — best-effort surrogate. move_type / contract_type
-                # come from the wizard; assignment_type is the employees-table
-                # band. None of these is a real visa-program enum (the prototype
-                # mock showed "Skilled Worker", "EU Blue Card", "L-1A", etc.),
-                # but they're the closest first-class fields we have today.
+                # Visa label — sourced from the employee's intake wizard (AIQ-1135).
+                # `purpose` is the wizard's relocation-purpose field and the most
+                # visa-relevant signal, so it's preferred; move_type / contract_type
+                # (also wizard) and the employees-table assignment_type are fallbacks.
+                # None of these is a real visa-program enum (the prototype mock showed
+                # "Skilled Worker", "EU Blue Card", "L-1A", etc.) — they're the closest
+                # first-class fields the wizard captures today.
                 visa_label = (
-                    m.get("wizard_move_type")
+                    m.get("wizard_purpose")
+                    or m.get("wizard_move_type")
                     or m.get("wizard_contract_type")
                     or m.get("employee_assignment_type")
                     or None
