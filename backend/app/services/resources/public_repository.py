@@ -12,7 +12,13 @@ log = logging.getLogger(__name__)
 
 
 def _get_supabase():
-    from ...supabase_client import get_supabase_admin_client
+    # supabase_client lives in backend/app/services/ (two levels up from this
+    # resources/ package), not backend/app/. The previous "..." (three dots)
+    # resolved to backend.app.supabase_client → ModuleNotFoundError, which the
+    # bare excepts swallowed, so every public_repository read (resources,
+    # categories, tags, events) silently returned [] and the resources page
+    # rendered only via the rkg fallback with no category grouping.
+    from ..supabase_client import get_supabase_admin_client
     return get_supabase_admin_client()
 
 
