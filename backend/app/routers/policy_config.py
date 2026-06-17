@@ -496,14 +496,23 @@ def hr_get_policy_config_published(
     # empty scaffold (company_setup_required) instead of a 400 — mirrors
     # GET /policy-config. A missing precondition must degrade gracefully
     # (SKILL.md Phase 0.5); /published was the lone policy endpoint still 400ing.
-    if not user.get("is_admin") and not _get_hr_company_id(user):
-        return policy_config_matrix_svc.empty_onboarding_payload(
-            assignment_type=at,
-            family_status=fs,
-            employee_level=el,
-            effective_rows_only=effectiveRowsOnly,
-        )
-    cid = _policy_matrix_company_hr(user, companyId)
+    #
+    # [AIQ-1014/PERF-3] Resolve the HR company ONCE. The previous code called
+    # _get_hr_company_id for this onboarding check and then _policy_matrix_company_hr
+    # re-resolved the same value (re-querying get_hr_company_id + get_profile_record)
+    # — ~2 redundant DB round-trips per call. For non-admin HR the resolved id IS
+    # _get_hr_company_id, so reuse it directly; admins keep the override-aware path.
+    if user.get("is_admin"):
+        cid = _policy_matrix_company_hr(user, companyId)
+    else:
+        cid = _get_hr_company_id(user)
+        if not cid:
+            return policy_config_matrix_svc.empty_onboarding_payload(
+                assignment_type=at,
+                family_status=fs,
+                employee_level=el,
+                effective_rows_only=effectiveRowsOnly,
+            )
     return policy_config_matrix_svc.get_published_payload(
         cid,
         assignment_type=at,
