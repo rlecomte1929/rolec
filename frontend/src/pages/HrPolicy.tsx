@@ -156,7 +156,7 @@ export const HrPolicy: React.FC = () => {
 
       {/* Guided next-step CTA — points HR to the natural next action per tab.
           Does not alter the tab content below. (NAV-POL-1) */}
-      {!adminCompanyId && (
+      {!adminCompanyId && activeTab !== 'exceptions' && (
         <PolicyNextStepCta
           activeTab={activeTab}
           setTab={setTab}
@@ -221,8 +221,8 @@ function PolicyNextStepCta({
   setTab,
   onReviewPublish,
 }: {
-  activeTab: 'policy' | 'builder' | 'summary';
-  setTab: (tab: 'policy' | 'builder' | 'summary') => void;
+  activeTab: 'policy' | 'builder' | 'summary' | 'exceptions';
+  setTab: (tab: 'policy' | 'builder' | 'summary' | 'exceptions') => void;
   onReviewPublish: () => void;
 }) {
   const config: { hint: string; actions: React.ReactNode } = (() => {
