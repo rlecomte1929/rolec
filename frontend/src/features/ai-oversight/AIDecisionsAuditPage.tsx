@@ -191,7 +191,12 @@ export function AIDecisionsAuditPage() {
           </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500 leading-relaxed">
-          Every accept, override, or reject your team recorded on an AI-generated recommendation. Append-only — required by EU AI Act Art. 14(4)(c).
+          ReloPass AI reviews each relocation case and recommends — it never decides alone. It suggests the{' '}
+          <strong className="font-medium text-slate-700">policy tier</strong> that applies to the employee, the{' '}
+          <strong className="font-medium text-slate-700">service providers</strong> best suited to the destination and case,
+          and the <strong className="font-medium text-slate-700">immigration pathway</strong> for the move. Every recommendation
+          lands here for your team to accept, override, or reject with a reason. This append-only log is your human-oversight
+          record, required by EU AI Act Art. 14(4)(c).
         </p>
       </div>
 
