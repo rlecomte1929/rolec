@@ -1420,9 +1420,9 @@ class PolicyConfigMatrixService:
           KeyError("draft_has_rows")          — draft exists with rows
                                                 and replace_existing_draft=False
         """
-        from .policy_config_templates import expand_template_rows, get_template
+        from .policy_template_service import PolicyTemplateService
 
-        tpl = get_template(template_key)
+        tpl = PolicyTemplateService.get_comp_allowance_template(template_key)
         if tpl is None:
             raise KeyError(f"unknown_template:{template_key}")
 
@@ -1455,7 +1455,7 @@ class PolicyConfigMatrixService:
         # on a brand-new draft returns [].
         self._db.delete_policy_config_benefits_for_version(vid)
 
-        rows = expand_template_rows(template_key)
+        rows = PolicyTemplateService.expand_comp_allowance_rows(template_key)
         for row in rows:
             sig = compute_targeting_signature(
                 row.get("assignment_types") or [],

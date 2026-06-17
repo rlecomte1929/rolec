@@ -294,10 +294,10 @@ def hr_get_policy_config_templates(
     "Start from a template" card. Returns lightweight metadata only;
     the full row expansion happens server-side when HR applies one.
     """
-    from ..services.policy_config_templates import list_templates
+    from ..services.policy_template_service import PolicyTemplateService
 
     _ = user  # auth already enforced by require_role
-    return {"templates": list_templates()}
+    return {"templates": PolicyTemplateService.list_comp_allowance_templates()}
 
 
 @hr_policy_config_router.post("/policy-config/draft/apply-template")
@@ -670,10 +670,10 @@ def admin_get_policy_config_history(
 def admin_get_policy_config_templates(
     user: Dict[str, Any] = Depends(require_admin),
 ):
-    from ..services.policy_config_templates import list_templates
+    from ..services.policy_template_service import PolicyTemplateService
 
     _ = user
-    return {"templates": list_templates()}
+    return {"templates": PolicyTemplateService.list_comp_allowance_templates()}
 
 
 @admin_policy_config_router.post("/policy-config/draft/apply-template")

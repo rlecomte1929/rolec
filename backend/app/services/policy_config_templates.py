@@ -1,9 +1,16 @@
 """
-DEPRECATED (N12/AIQ-852): one of four legacy template systems now unified by
-``policy_template_service.PolicyTemplateService`` (``POLICY_TEMPLATES`` below was
-ported into the versioned registry). Left in place until a follow-up cleanup task
-retires it after validation — do not extend; add new template data to the unified
-service instead.
+Comp & Allowance starter-template DATA (TPL-2/AIQ-1132).
+
+This module is now **data only**: it holds the curated Conservative / Standard /
+Premium baseline rows (``COMP_ALLOWANCE_TEMPLATES``). The public API — listing,
+fetching, and expanding these into draft rows — lives on
+``policy_template_service.PolicyTemplateService`` (the
+``list_comp_allowance_templates`` / ``get_comp_allowance_template`` /
+``expand_comp_allowance_rows`` static methods). The old module-level
+``POLICY_TEMPLATES`` dict and ``list_templates`` / ``get_template`` /
+``expand_template_rows`` functions were retired here and folded into that one
+service so there is a single template entry point. Do not re-add a module-level
+API; add template data below and expose it via the service.
 
 Starter-baseline templates for the Compensation & Allowance matrix.
 
@@ -37,9 +44,7 @@ without filesystem IO.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-
-from .policy_config_targeting import EMPLOYEE_LEVELS
+from typing import Any, Dict
 
 # --- Types used below -------------------------------------------------------
 
@@ -116,7 +121,7 @@ LEAVE_REPATRIATION = "leave_repatriation"
 TAX_PAYROLL = "tax_payroll"
 
 
-POLICY_TEMPLATES: Dict[str, Dict[str, Any]] = {
+COMP_ALLOWANCE_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "conservative": {
         "key": "conservative",
         "label": "Conservative",
@@ -367,76 +372,7 @@ POLICY_TEMPLATES: Dict[str, Dict[str, Any]] = {
 }
 
 
-def list_templates() -> List[Dict[str, Any]]:
-    """Metadata for the picker UI — no row data, fast to serialize."""
-    return [
-        {
-            "key": v["key"],
-            "label": v["label"],
-            "description": v["description"],
-        }
-        for v in POLICY_TEMPLATES.values()
-    ]
-
-
-def get_template(key: str) -> Optional[Dict[str, Any]]:
-    return POLICY_TEMPLATES.get(str(key).strip().lower())
-
-
-def expand_template_rows(template_key: str) -> List[Dict[str, Any]]:
-    """
-    Expand a template into a list of concrete benefit rows ready to
-    insert into a draft. Tiered rows become N rows (one per
-    employee level). Display order follows the declaration order; the
-    matrix service will re-sort by category + display_order on read.
-
-    Raises KeyError if the template key is unknown.
-    """
-    tpl = get_template(template_key)
-    if tpl is None:
-        raise KeyError(f"unknown_template:{template_key}")
-    rows: List[Dict[str, Any]] = []
-    order = 0
-    for src in tpl["rows"]:
-        order += 10
-        base = {
-            "benefit_key": src["benefit_key"],
-            "category": src["category"],
-            "covered": bool(src.get("covered", False)),
-            "value_type": src.get("value_type", "none"),
-            "currency_code": src.get("currency_code"),
-            "percentage_value": src.get("percentage"),
-            "unit_frequency": src.get("unit_frequency", "one_time"),
-            "notes": src.get("notes"),
-            "cap_rule_json": {},
-            "conditions_json": {},
-            "assignment_types": [],
-            "family_statuses": [],
-            "is_active": True,
-            "display_order": order,
-        }
-        amounts_by_level = src.get("amounts_by_level")
-        if isinstance(amounts_by_level, dict) and amounts_by_level:
-            # Emit one row per level so HR can tier caps from day one.
-            # Any level missing from the map falls back to 0 and is
-            # skipped rather than silently written as a zero cap — the
-            # row should really declare all levels (see _tiered_amounts).
-            for level in sorted(EMPLOYEE_LEVELS):
-                amount = amounts_by_level.get(level)
-                if amount is None:
-                    continue
-                out = dict(base)
-                out["amount_value"] = float(amount)
-                out["employee_levels"] = [level]
-                rows.append(out)
-        else:
-            out = dict(base)
-            if "amount" in src:
-                out["amount_value"] = float(src["amount"])
-            elif "percentage" in src:
-                out["percentage_value"] = float(src["percentage"])
-            else:
-                out["amount_value"] = None
-            out["employee_levels"] = []
-            rows.append(out)
-    return rows
+# NOTE (TPL-2/AIQ-1132): the list/get/expand functions that used to live here
+# were moved verbatim onto PolicyTemplateService (list_comp_allowance_templates /
+# get_comp_allowance_template / expand_comp_allowance_rows). This module is now
+# pure data — import COMP_ALLOWANCE_TEMPLATES from the service, not from callers.
