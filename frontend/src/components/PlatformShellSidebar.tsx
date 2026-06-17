@@ -130,7 +130,7 @@ const SECTIONS: NavSection[] = [
       // finalizing" empty state (catalog_employee_demand, un-curated only) so HR is
       // nudged to curate from anywhere — not just once they're already on the page.
       { id: 'service-providers', label: 'Service providers', hint: 'Manage vendors and track provider status', to: ROUTE_DEFS.hrServiceProviders.path, badge: { kind: 'dynamic', getCount: (c) => c.hr?.employees_waiting ?? 0 } },
-      { id: 'exceptions', label: 'Policy exceptions', to: ROUTE_DEFS.hrExceptions.path },
+      { id: 'exceptions', label: 'Policy exceptions', to: `${ROUTE_DEFS.hrPolicy.path}?tab=exceptions` },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
       // NAV-001: 'Requirements' now points to the corridor immigration-compliance
       // page (/hr/requirements) — document checklist, risk flags, milestones, intake

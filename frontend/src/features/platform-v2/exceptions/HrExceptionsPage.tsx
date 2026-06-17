@@ -560,7 +560,7 @@ function mapAuditEventToUi(ev: ExceptionAuditEvent): AuditEvent {
 
 type FilterTab = 'pending' | 'approved' | 'rejected' | 'all';
 
-export function HrExceptionsPage() {
+export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [requests, setRequests] = useState<ExcRequest[]>([]);
   const [filter, setFilter] = useState<FilterTab>('pending');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -668,8 +668,10 @@ export function HrExceptionsPage() {
     { key: 'all',      label: 'All' },
   ];
 
-  return (
-    <AppShell wide>
+  // AIQ-1112: when embedded under the Policy tab, skip the AppShell wrapper
+  // (HrPolicy provides the shell + tab chrome). Standalone route still wraps it.
+  const body = (
+    <>
       {/* Page header */}
       <div className="px-6 py-5 border-b border-slate-100">
         <Breadcrumb section="HR Operations" title="Policy exceptions" className="mb-2" />
@@ -767,6 +769,8 @@ export function HrExceptionsPage() {
         {/* Right detail pane */}
         <ExcDetail r={selected} onDecide={handleDecide} />
       </div>
-    </AppShell>
+    </>
   );
+
+  return embedded ? body : <AppShell wide>{body}</AppShell>;
 }
