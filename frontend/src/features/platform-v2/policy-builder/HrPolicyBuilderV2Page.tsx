@@ -546,6 +546,9 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <div className="flex overflow-x-auto flex-1">
             {/* Sidebar */}
             <div className="w-[272px] flex-shrink-0 sticky left-0 z-10 bg-white border-r border-gray-200">
+              {/* AIQ-1108: spacer matches the TierColumn header height (h-[168px])
+                  so each benefit label below aligns with its tier-cell row. */}
+              <div className="h-[168px] border-b border-gray-200 bg-white" aria-hidden="true" />
               {CATEGORIES.map(cat => {
                 const isCol = collapsed[cat.id];
                 return (
@@ -850,7 +853,10 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
   return (
     <div className="w-[220px] flex-shrink-0 border-r border-gray-200 flex flex-col" style={{ '--tier-color': tier.color } as React.CSSProperties}>
       {/* Tier header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 pb-3 pt-3 px-3"
+      {/* AIQ-1108: fixed header height keeps every tier column's benefit grid
+          starting at the same Y (independent of lump vs caps mode), and matches
+          the sidebar's top spacer so labels line up with their cells. */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 pb-3 pt-3 px-3 h-[168px]"
            style={{ borderTop: `3px solid ${tier.color}` }}>
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tier.color }}/>
