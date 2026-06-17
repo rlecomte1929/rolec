@@ -24,11 +24,16 @@ if _REPO_ROOT not in sys.path:
 from backend.app.services.policy_config_matrix_service import PolicyConfigMatrixService
 from backend.app.services.policy_config_targeting import EMPLOYEE_LEVELS
 from backend.app.services.policy_config_templates import (
-    POLICY_TEMPLATES,
-    expand_template_rows,
-    get_template,
-    list_templates,
+    COMP_ALLOWANCE_TEMPLATES as POLICY_TEMPLATES,
 )
+from backend.app.services.policy_template_service import PolicyTemplateService
+
+# [TPL-2/AIQ-1132] The module-level list/get/expand functions were retired and
+# folded into PolicyTemplateService. Alias the new static methods to the old names
+# so the existing behavioural tests below now exercise the service methods directly.
+list_templates = PolicyTemplateService.list_comp_allowance_templates
+get_template = PolicyTemplateService.get_comp_allowance_template
+expand_template_rows = PolicyTemplateService.expand_comp_allowance_rows
 
 
 class TemplateRegistryTests(unittest.TestCase):
@@ -239,6 +244,55 @@ class ApplyTemplateToDraftTests(unittest.TestCase):
         self.assertEqual(len(signatures), len(EMPLOYEE_LEVELS))
         # None is the "global" signature
         self.assertNotIn("global", signatures)
+
+
+class GoldenEquivalenceTests(unittest.TestCase):
+    """[TPL-2/AIQ-1132] Prove the service methods reproduce the retired module
+    functions' output byte-identically. The fixture was captured from the ORIGINAL
+    policy_config_templates.{list_templates,get_template,expand_template_rows}
+    before they were removed — so this asserts equivalence against the true
+    pre-refactor baseline, not against the moved copy."""
+
+    _KEYS = ("conservative", "standard", "premium")
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        path = os.path.join(
+            os.path.dirname(__file__), "fixtures",
+            "policy_comp_allowance_templates_golden.json",
+        )
+        with open(path) as f:
+            cls.golden = json.load(f)
+
+    @staticmethod
+    def _canon(obj):
+        # Normalise the same way the fixture was written (sort_keys + default=str)
+        # so the comparison is structural, not dependent on dict key order.
+        import json
+        return json.loads(json.dumps(obj, sort_keys=True, default=str))
+
+    def test_list_templates_matches_golden(self):
+        self.assertEqual(
+            self._canon(PolicyTemplateService.list_comp_allowance_templates()),
+            self.golden["list_templates"],
+        )
+
+    def test_get_template_matches_golden(self):
+        for k in self._KEYS:
+            self.assertEqual(
+                self._canon(PolicyTemplateService.get_comp_allowance_template(k)),
+                self.golden["get_template"][k],
+                f"get_comp_allowance_template({k!r}) drifted from golden",
+            )
+
+    def test_expand_rows_matches_golden(self):
+        for k in self._KEYS:
+            self.assertEqual(
+                self._canon(PolicyTemplateService.expand_comp_allowance_rows(k)),
+                self.golden["expand_template_rows"][k],
+                f"expand_comp_allowance_rows({k!r}) drifted from golden",
+            )
 
 
 if __name__ == "__main__":

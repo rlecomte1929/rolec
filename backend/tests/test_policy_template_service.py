@@ -187,10 +187,12 @@ def test_w4_gap_fill_produces_template_default_items():
 
 
 def test_legacy_template_systems_still_present():
-    # 1. POLICY_TEMPLATES dict
-    from backend.app.services.policy_config_templates import POLICY_TEMPLATES
-
-    assert {"conservative", "standard", "premium"} <= set(POLICY_TEMPLATES)
+    # 1. Comp & Allowance starter templates — [TPL-2/AIQ-1132] the legacy
+    #    POLICY_TEMPLATES dict + module-level list/get/expand functions were retired
+    #    and folded into PolicyTemplateService (list/get/expand_comp_allowance_*);
+    #    the data lives as COMP_ALLOWANCE_TEMPLATES.
+    keys = {t["key"] for t in PolicyTemplateService.list_comp_allowance_templates()}
+    assert {"conservative", "standard", "premium"} <= keys
     # 2. Starter per-service caps — [TPL-1/AIQ-1131] the legacy _TIER_CAPS dict was
     #    retired and ported verbatim into PolicyTemplateService.get_starter_template_caps().
     caps = PolicyTemplateService.get_starter_template_caps()
