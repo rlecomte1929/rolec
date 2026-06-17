@@ -19,6 +19,7 @@ import { AdvisorsPanel } from '../components/case/AdvisorsPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
 import { PetRequirementsSection } from '../components/case/PetRequirementsSection';
 import { CaseAuditTimeline } from '../components/case/CaseAuditTimeline';
+import { CaseNotesPanel } from '../components/case/CaseNotesPanel';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 
 type QuoteRequest = {
@@ -317,6 +318,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
 
         {/* ── GAP 7: Assignment-level policy exception requests ── */}
         <AssignmentExceptionsPanel assignmentId={detail.id} />
+
+        {/* ── NAV-HR-2-FU: internal HR notes on the case ── */}
+        <CaseNotesPanel caseId={detail.id} />
 
         {/* ── NAV-HR-3: chronological HR-action audit trail (from audit_logs) ── */}
         <CaseAuditTimeline caseId={detail.id} />
