@@ -29,6 +29,7 @@ from .routers import (
     hr_analytics,
     hr_export,
     hr_case_audit,
+    hr_case_notes,
     hr_case_detail,
     compliance,
     gdpr,
@@ -122,6 +123,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_detail.router)
     # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
     app.include_router(hr_case_audit.router)
+    # AIQ-1136 / NAV-HR-2-FU: GET/POST /api/hr/cases/{id}/notes — internal case notes.
+    app.include_router(hr_case_notes.router)
     # P1-08c/d/e: roadmap as_of reconstruction + legal export + rule-change notifier.
     app.include_router(roadmap_audit.router)
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
