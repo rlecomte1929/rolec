@@ -4,6 +4,7 @@
  */
 import React, { useMemo } from 'react';
 import { Card } from '../../components/antigravity';
+import { AIQ1107_HIDE_SECTIONS } from './aiq1107Flags';
 import type { HrPolicyWorkspaceResolved } from './hrPolicyWorkspaceState';
 import {
   confidencePercent,
@@ -165,6 +166,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
 
       {/* What to fix before going live — promoted to top so the action list
           ranks above descriptive blocks. */}
+      {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}
+      {!AIQ1107_HIDE_SECTIONS && (
       <Card padding="lg">
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Pre-publish checklist</h3>
         <p className="text-xs text-[#6b7280] mb-3">
@@ -192,6 +195,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           )
         )}
       </Card>
+      )}
 
       {/* Slice 3d wraps the doc-only blocks (Document summary + Extracted
           policy signals) in one shared <details>. Both are reference
@@ -199,7 +203,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           "fix + publish" path. The disclosure only renders when at
           least one of them has data (matrix-only deployments collapse
           this section away entirely). */}
-      {(hasSourceDocument || hasExtractedSignals) && (
+      {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}
+      {!AIQ1107_HIDE_SECTIONS && (hasSourceDocument || hasExtractedSignals) && (
       <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
         <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
           <div className="flex items-center justify-between gap-3">
@@ -415,6 +420,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           but not part of the fast "check + fix + publish" path. The
           headline banner stays visible so HR sees the visibility state
           at a glance and only expands the grid if they need the detail. */}
+      {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}
+      {!AIQ1107_HIDE_SECTIONS && (
       <details
         className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl"
         id="hr-policy-employee-visibility-preview"
@@ -492,6 +499,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         )}
         </div>
       </details>
+      )}
     </div>
   );
 };
