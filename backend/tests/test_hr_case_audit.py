@@ -198,5 +198,213 @@ class TestAuditEndpoint(_BaseCase):
         self.assertEqual(resp.status_code, 422)  # FastAPI validation error
 
 
+# ---------------------------------------------------------------------------
+# [NAV-HR-3-FU / AIQ-1137] bridged aggregation + filters + amend/reverse
+# ---------------------------------------------------------------------------
+
+
+class TestAuditTrailFU(unittest.TestCase):
+    """Tests for GET /audit-trail aggregation/filters + POST amend/reverse.
+
+    The db layer is mocked throughout (its SQL is postgres-only), so these
+    exercise the router's tenant gate, filter plumbing, and reversible-state rule.
+    """
+
+    R = "backend.app.routers.hr_case_audit.db"
+
+    def _client(self, fake_user: Dict[str, Any]) -> TestClient:
+        # Override the auth_deps dependencies directly — the router uses
+        # backend.app.auth_deps.get_current_user, NOT backend.main's (a different
+        # function), so overriding main's would silently never fire (CLAUDE.md).
+        from backend.app import auth_deps
+        app.dependency_overrides[auth_deps.get_current_user] = lambda: fake_user
+        app.dependency_overrides[auth_deps.get_org_id_for_hr_user] = lambda: _HR_COMPANY.get(fake_user["id"], "")
+        return TestClient(app, raise_server_exceptions=False)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def _profile_patch(self):
+        import contextlib
+        return contextlib.nullcontext()
+
+    def test_aggregates_across_bridged_ids_and_returns_rows(self) -> None:
+        client = self._client(_HR_A)
+        canned = [{
+            "id": "ev-1", "entity_type": "assignment", "entity_id": "reloc-uuid",
+            "action_type": "update", "actor_type": "human", "actor_id": None,
+            "actor_name": "Alice", "event": "REASSIGN_HR_OWNER",
+            "old_value": None, "new_value": {"event": "REASSIGN_HR_OWNER"}, "created_at": "2026-06-17T00:00:00+00:00",
+        }]
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a", "reloc-uuid"]) as m_ids,
+            patch(f"{self.R}.query_case_audit_trail", return_value=canned) as m_q,
+            self._profile_patch(),
+        ):
+            resp = client.get("/api/hr/cases/assignment-a/audit-trail", headers={"Authorization": "Bearer t"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()[0]["id"], "ev-1")
+        m_ids.assert_called_once_with("assignment-a")
+        # entity_ids from the bridge are passed through to the query.
+        self.assertEqual(m_q.call_args.args[0], ["assignment-a", "reloc-uuid"])
+
+    def test_filters_are_passed_through(self) -> None:
+        client = self._client(_HR_A)
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a"]),
+            patch(f"{self.R}.query_case_audit_trail", return_value=[]) as m_q,
+            self._profile_patch(),
+        ):
+            resp = client.get(
+                "/api/hr/cases/assignment-a/audit-trail?action_type=update&event=REASSIGN_HR_OWNER&date_from=2026-06-01T00:00:00Z",
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        kw = m_q.call_args.kwargs
+        self.assertEqual(kw["action_type"], "update")
+        self.assertEqual(kw["event"], "REASSIGN_HR_OWNER")
+        self.assertEqual(kw["from_ts"], "2026-06-01T00:00:00Z")
+
+    def test_bad_action_type_filter_422(self) -> None:
+        client = self._client(_HR_A)
+        with self._profile_patch():
+            resp = client.get(
+                "/api/hr/cases/assignment-a/audit-trail?action_type=bogus",
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 422)
+
+    def test_cross_tenant_404(self) -> None:
+        client = self._client(_HR_B)  # company-b
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            self._profile_patch(),
+        ):
+            resp = client.get("/api/hr/cases/assignment-a/audit-trail", headers={"Authorization": "Bearer t"})
+        self.assertEqual(resp.status_code, 404)
+        self.assertNotIn("company-a", resp.text)
+
+    def test_unresolvable_case_404(self) -> None:
+        client = self._client(_HR_A)
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value=None),
+            self._profile_patch(),
+        ):
+            resp = client.get("/api/hr/cases/ghost/audit-trail", headers={"Authorization": "Bearer t"})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_amend_appends_linked_row(self) -> None:
+        client = self._client(_HR_A)
+        target = {"id": "ev-1", "entity_type": "assignment", "entity_id": "reloc-uuid",
+                  "action_type": "update", "event": "REASSIGN_HR_OWNER", "old_value": None, "new_value": {}}
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a", "reloc-uuid"]),
+            patch(f"{self.R}.get_audit_log_entry", return_value=target),
+            patch(f"{self.R}.insert_case_audit_annotation", return_value="new-id") as m_ins,
+            self._profile_patch(),
+        ):
+            resp = client.post(
+                "/api/hr/cases/assignment-a/audit-trail/ev-1/amend",
+                json={"reason": "Wrong owner picked"},
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["amends"], "ev-1")
+        self.assertEqual(m_ins.call_args.kwargs["link_field"], "amends")
+        self.assertEqual(m_ins.call_args.kwargs["event"], "AUDIT_AMENDED")
+
+    def test_reverse_on_reversible_event_ok(self) -> None:
+        client = self._client(_HR_A)
+        target = {"id": "ev-1", "entity_type": "assignment", "entity_id": "reloc-uuid",
+                  "action_type": "update", "event": "REASSIGN_HR_OWNER", "old_value": None, "new_value": {}}
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a", "reloc-uuid"]),
+            patch(f"{self.R}.get_audit_log_entry", return_value=target),
+            patch(f"{self.R}.find_audit_amendments", return_value=[]),
+            patch(f"{self.R}.insert_case_audit_annotation", return_value="rev-id") as m_ins,
+            self._profile_patch(),
+        ):
+            resp = client.post(
+                "/api/hr/cases/assignment-a/audit-trail/ev-1/reverse",
+                json={"reason": "Reassign was a mistake"},
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["reverses"], "ev-1")
+        self.assertEqual(m_ins.call_args.kwargs["event"], "AUDIT_REVERSED")
+
+    def test_reverse_already_reversed_409(self) -> None:
+        client = self._client(_HR_A)
+        target = {"id": "ev-1", "entity_type": "assignment", "entity_id": "reloc-uuid",
+                  "action_type": "update", "event": "REASSIGN_HR_OWNER", "old_value": None, "new_value": {}}
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a", "reloc-uuid"]),
+            patch(f"{self.R}.get_audit_log_entry", return_value=target),
+            patch(f"{self.R}.find_audit_amendments", return_value=[{"id": "x", "event": "AUDIT_REVERSED", "reverses": "ev-1"}]),
+            patch(f"{self.R}.insert_case_audit_annotation") as m_ins,
+            self._profile_patch(),
+        ):
+            resp = client.post(
+                "/api/hr/cases/assignment-a/audit-trail/ev-1/reverse",
+                json={"reason": "again"},
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 409)
+        m_ins.assert_not_called()
+
+    def test_reverse_annotation_row_rejected_409(self) -> None:
+        client = self._client(_HR_A)
+        target = {"id": "ann-1", "entity_type": "assignment", "entity_id": "reloc-uuid",
+                  "action_type": "update", "event": "AUDIT_AMENDED", "old_value": None, "new_value": {"amends": "ev-1"}}
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a", "reloc-uuid"]),
+            patch(f"{self.R}.get_audit_log_entry", return_value=target),
+            patch(f"{self.R}.insert_case_audit_annotation") as m_ins,
+            self._profile_patch(),
+        ):
+            resp = client.post(
+                "/api/hr/cases/assignment-a/audit-trail/ann-1/reverse",
+                json={"reason": "no"},
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 409)
+        m_ins.assert_not_called()
+
+    def test_target_not_in_case_404(self) -> None:
+        client = self._client(_HR_A)
+        target = {"id": "ev-9", "entity_type": "assignment", "entity_id": "OTHER-CASE-UUID",
+                  "action_type": "update", "event": "X", "old_value": None, "new_value": {}}
+        with (
+            patch(f"{self.R}.get_case_company_for_audit", return_value="company-a"),
+            patch(f"{self.R}.resolve_case_audit_entity_ids", return_value=["assignment-a", "reloc-uuid"]),
+            patch(f"{self.R}.get_audit_log_entry", return_value=target),
+            patch(f"{self.R}.insert_case_audit_annotation") as m_ins,
+            self._profile_patch(),
+        ):
+            resp = client.post(
+                "/api/hr/cases/assignment-a/audit-trail/ev-9/amend",
+                json={"reason": "x"},
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 404)
+        m_ins.assert_not_called()
+
+    def test_amend_requires_reason_422(self) -> None:
+        client = self._client(_HR_A)
+        with self._profile_patch():
+            resp = client.post(
+                "/api/hr/cases/assignment-a/audit-trail/ev-1/amend",
+                json={"reason": ""},
+                headers={"Authorization": "Bearer t"},
+            )
+        self.assertEqual(resp.status_code, 422)
+
+
 if __name__ == "__main__":
     unittest.main()
