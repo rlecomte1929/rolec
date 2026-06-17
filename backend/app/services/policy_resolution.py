@@ -250,14 +250,27 @@ def extract_resolution_context(
     return ctx
 
 
+_UNSET = object()  # sentinel: distinguishes "not supplied" from a real None
+
+
 def collect_company_id_candidates_for_assignment(
     db: Any,
     assignment: Dict[str, Any],
     case: Optional[Dict[str, Any]],
+    *,
+    hr_company_id: Any = _UNSET,
+    employee_profile: Any = _UNSET,
 ) -> List[str]:
     """
     Ordered unique company_ids to try when resolving a published policy.
     Matches product order: case.company_id → HR owner's company → employee profile company_id.
+
+    [AIQ-1014/PERF-3] N+1 dedup: callers that have already fetched the HR owner's
+    company and/or the employee profile (e.g. ``_resolve_published_policy_for_employee``)
+    may pass them via ``hr_company_id`` / ``employee_profile`` to skip the two
+    redundant DB lookups. The sentinel default preserves the original
+    query-on-demand behaviour for callers that don't, so the candidate list is
+    byte-identical either way.
     """
     candidates: List[str] = []
     seen: Set[str] = set()
@@ -275,18 +288,25 @@ def collect_company_id_candidates_for_assignment(
         add(case.get("company_id"))
     hr_uid = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
     if hr_uid:
-        try:
-            add(db.get_hr_company_id(hr_uid))
-        except Exception:
-            pass
+        if hr_company_id is not _UNSET:
+            add(hr_company_id)
+        else:
+            try:
+                add(db.get_hr_company_id(hr_uid))
+            except Exception:
+                pass
     emp_uid = assignment.get("employee_user_id")
     if emp_uid:
-        try:
-            prof = db.get_profile_record(emp_uid)
-            if prof:
-                add(prof.get("company_id"))
-        except Exception:
-            pass
+        if employee_profile is not _UNSET:
+            if employee_profile:
+                add(employee_profile.get("company_id"))
+        else:
+            try:
+                prof = db.get_profile_record(emp_uid)
+                if prof:
+                    add(prof.get("company_id"))
+            except Exception:
+                pass
     return candidates
 
 
