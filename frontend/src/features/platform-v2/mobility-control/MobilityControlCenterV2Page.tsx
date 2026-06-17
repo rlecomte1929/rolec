@@ -374,6 +374,12 @@ export function MobilityControlCenterV2Page() {
       .slice(0, 5);
   }, [cases]);
 
+  // AIQ-1109: "Mobility spend" is the sum of each active case's ESTIMATED
+  // relocation budget (`budgetEstimated`), shown against the total policy budget
+  // (`budgetLimit`). It is an estimate — NOT invoiced/actual spend. Both fields
+  // arrive per-case from hrAPI.listCommandCenterCases → GET /api/hr/command-center/cases
+  // → db.list_command_center_cases (case_assignments.budget_estimated / budget_limit),
+  // and are summed client-side here. The figure is company-scoped server-side.
   const totalBudget = useMemo(() => {
     const limit = cases.reduce((acc, c) => acc + (c.budgetLimit ?? 0), 0);
     const est = cases.reduce((acc, c) => acc + (c.budgetEstimated ?? 0), 0);
@@ -583,8 +589,9 @@ export function MobilityControlCenterV2Page() {
           <Kpi
             label="Mobility spend"
             value={formatMoney(totalBudget.est)}
-            sub={totalBudget.limit ? `of ${formatMoney(totalBudget.limit)} budget` : '—'}
+            sub={totalBudget.limit ? `est. of ${formatMoney(totalBudget.limit)} budget` : '—'}
             tone={kpis?.budgetOverrunsCount ? 'danger' : 'default'}
+            title="Estimated relocation spend — the sum of each active case's estimated budget, shown against the total policy budget. Source: GET /api/hr/command-center/cases (case_assignments.budget_estimated / budget_limit). Estimate, not invoiced spend."
             progress={totalBudget.limit ? Math.min(100, (totalBudget.est / totalBudget.limit) * 100) : 0}
           />
         </div>
