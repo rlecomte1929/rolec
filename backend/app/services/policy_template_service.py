@@ -95,6 +95,39 @@ _LTA_TIER_DEFAULTS: Dict[str, Dict[str, float]] = {
     },
 }
 
+# --- Starter-template caps (USD), keyed by SERVICE then tier -----------------
+# [TPL-1/AIQ-1131] Ported VERBATIM from the retired
+# ``policy_starter_templates._TIER_CAPS`` so the starter-template initializer
+# (POST /api/company/policy-templates/initialize) routes through this unified
+# service. NOTE: this is keyed by SERVICE (visa_support / temporary_housing /
+# home_search / school_search / household_goods_shipment) — DISTINCT from
+# ``_LTA_TIER_DEFAULTS`` above, which is keyed by benefit-taxonomy and has NO
+# ``home_search``. Do not conflate the two: reusing _LTA_TIER_DEFAULTS here would
+# silently drop the home_search cap.
+_STARTER_TEMPLATE_CAPS: Dict[str, Dict[str, float]] = {
+    "conservative": {
+        "visa_support": 2500,
+        "temporary_housing": 3500,
+        "home_search": 1500,
+        "school_search": 8000,
+        "household_goods_shipment": 5000,
+    },
+    "standard": {
+        "visa_support": 4000,
+        "temporary_housing": 5500,
+        "home_search": 2500,
+        "school_search": 15000,
+        "household_goods_shipment": 10000,
+    },
+    "premium": {
+        "visa_support": 6500,
+        "temporary_housing": 8500,
+        "home_search": 4000,
+        "school_search": 25000,
+        "household_goods_shipment": 18000,
+    },
+}
+
 # STA = short-term assignment (typically < 12 months): no family relocation,
 # no household-goods shipment, no school search; temporary housing dominates.
 # NEW placeholder content — lower field_confidence so HR knows to tune it.
@@ -224,6 +257,15 @@ class PolicyTemplateService:
 
     def __init__(self, registry: Optional[Dict[str, PolicyTemplateSchema]] = None):
         self._registry = registry if registry is not None else _REGISTRY
+
+    @staticmethod
+    def get_starter_template_caps() -> Dict[str, Dict[str, float]]:
+        """Per-service numeric caps for the starter templates, keyed by tier then
+        service (visa_support / temporary_housing / home_search / school_search /
+        household_goods_shipment). Ported verbatim from the retired ``_TIER_CAPS``
+        dict; consumed by ``build_starter_template_benefit_rows()``. Returns a fresh
+        copy so callers cannot mutate the module constant. [TPL-1/AIQ-1131]"""
+        return {tier: dict(caps) for tier, caps in _STARTER_TEMPLATE_CAPS.items()}
 
     def get_template(
         self,

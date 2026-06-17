@@ -191,10 +191,11 @@ def test_legacy_template_systems_still_present():
     from backend.app.services.policy_config_templates import POLICY_TEMPLATES
 
     assert {"conservative", "standard", "premium"} <= set(POLICY_TEMPLATES)
-    # 2. _TIER_CAPS dict
-    from backend.app.services.policy_starter_templates import _TIER_CAPS
-
-    assert {"conservative", "standard", "premium"} <= set(_TIER_CAPS)
+    # 2. Starter per-service caps — [TPL-1/AIQ-1131] the legacy _TIER_CAPS dict was
+    #    retired and ported verbatim into PolicyTemplateService.get_starter_template_caps().
+    caps = PolicyTemplateService.get_starter_template_caps()
+    assert {"conservative", "standard", "premium"} <= set(caps)
+    assert caps["standard"]["home_search"] == 2500  # the cap _LTA_TIER_DEFAULTS lacks
     # 3. benefits_templates table router still mounted
     from backend.app.routers import policy_templates as benefits_templates_router
 

@@ -164,6 +164,31 @@ function daysAgo(iso?: string | null): number | null {
   return Math.max(0, Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24)));
 }
 
+// ── MOBCC-FU1: header filters (corridor + time period) ───────────────────────
+// Canonical corridor key — identical to the corridorMix histogram key so the
+// filter, the table, and the sidebar mix all agree on what "US → FR" means.
+function corridorKey(originCountry?: string | null, destCountry?: string | null): string {
+  const o = resolveISO2(originCountry);
+  const d = resolveISO2(destCountry);
+  return `${o ?? `?${originCountry ?? ''}`}|${d ?? `?${destCountry ?? ''}`}`;
+}
+function corridorLabel(originCountry?: string | null, destCountry?: string | null): string {
+  const o = resolveISO2(originCountry) ?? (originCountry?.trim() || '—');
+  const d = resolveISO2(destCountry) ?? (destCountry?.trim() || '—');
+  return `${o} → ${d}`;
+}
+
+type PeriodFilter = 'all' | '7d' | '30d' | '90d';
+const PERIOD_OPTIONS: { value: PeriodFilter; label: string; days: number | null }[] = [
+  { value: 'all', label: 'All time', days: null },
+  { value: '7d', label: 'Last 7 days', days: 7 },
+  { value: '30d', label: 'Last 30 days', days: 30 },
+  { value: '90d', label: 'Last 90 days', days: 90 },
+];
+// Terminal/green statuses — used to split filtered cases into active vs completed
+// when recomputing the KPI tiles client-side (mirrors STATUS_PILL's green set).
+const COMPLETED_STATUSES = new Set(['completed', 'done', 'approved', 'closed']);
+
 // ── Small visual primitives ─────────────────────────────────────────────────
 
 function Pill({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
@@ -285,6 +310,10 @@ function ProgressBar({ value, risk }: { value: number; risk: string }) {
 export function MobilityControlCenterV2Page() {
   const navigate = useNavigate();
   const [cases, setCases] = useState<CommandCenterCaseRow[]>([]);
+  // MOBCC-FU1: header filters applied client-side over the already-scoped case
+  // list — they never widen tenant visibility (no scope/endpoint change).
+  const [corridorFilter, setCorridorFilter] = useState<string | null>(null);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [kpis, setKpis] = useState<{
     activeCases: number;
     atRiskCount: number;
@@ -343,13 +372,56 @@ export function MobilityControlCenterV2Page() {
     return () => ctrl.abort();
   }, [companyId]);
 
+  // ── MOBCC-FU1: client-side header filters ─────────────────────────────────
+  const filterActive = corridorFilter !== null || periodFilter !== 'all';
+
+  // Corridor dropdown options come from the FULL scoped list (so you can switch
+  // corridors), unlike corridorMix below which reflects the active filter.
+  const corridorOptions = useMemo(() => {
+    const m = new Map<string, { key: string; label: string; count: number }>();
+    for (const c of cases) {
+      if (!c.originCountry && !c.destCountry) continue;
+      const key = corridorKey(c.originCountry, c.destCountry);
+      const cur = m.get(key);
+      if (cur) cur.count += 1;
+      else m.set(key, { key, label: corridorLabel(c.originCountry, c.destCountry), count: 1 });
+    }
+    return [...m.values()].sort((a, b) => b.count - a.count);
+  }, [cases]);
+
+  const filteredCases = useMemo(() => {
+    const maxDays = PERIOD_OPTIONS.find((p) => p.value === periodFilter)?.days ?? null;
+    return cases.filter((c) => {
+      if (corridorFilter && corridorKey(c.originCountry, c.destCountry) !== corridorFilter) return false;
+      if (maxDays != null) {
+        const d = daysAgo(c.updatedAt);
+        if (d == null || d > maxDays) return false;
+      }
+      return true;
+    });
+  }, [cases, corridorFilter, periodFilter]);
+
+  // KPI tiles come from a backend endpoint (authoritative totals). When a filter
+  // is active, recompute them from the filtered rows so the whole dashboard stays
+  // coherent; with no filter, fall back to the backend KPIs.
+  const displayKpis = useMemo(() => {
+    if (!filterActive) return kpis;
+    const completed = filteredCases.filter((c) => COMPLETED_STATUSES.has((c.status ?? '').toLowerCase())).length;
+    return {
+      activeCases: filteredCases.length - completed,
+      atRiskCount: filteredCases.filter((c) => c.riskStatus === 'red' || c.riskStatus === 'yellow').length,
+      completedCount: completed,
+      budgetOverrunsCount: filteredCases.filter((c) => (c.budgetEstimated ?? 0) > (c.budgetLimit ?? 0) && (c.budgetLimit ?? 0) > 0).length,
+    };
+  }, [filterActive, kpis, filteredCases]);
+
   // ── Derived sidebar data ──────────────────────────────────────────────────
-  // Aggregate the case list into a corridor histogram keyed by canonical
-  // ISO-2 codes so the sidebar matches the table flag rendering exactly
+  // Aggregate the (filtered) case list into a corridor histogram keyed by
+  // canonical ISO-2 codes so the sidebar matches the table flag rendering exactly
   // (e.g. "France" + "FR" + "FRA" all collapse onto the same FR row).
   const corridorMix = useMemo(() => {
     const counts = new Map<string, { origin: string | null; dest: string | null; rawOrigin: string | null; rawDest: string | null; count: number }>();
-    for (const c of cases) {
+    for (const c of filteredCases) {
       const o = resolveISO2(c.originCountry);
       const d = resolveISO2(c.destCountry);
       if (!o && !d && !c.originCountry && !c.destCountry) continue;
@@ -359,10 +431,10 @@ export function MobilityControlCenterV2Page() {
       else counts.set(key, { origin: o, dest: d, rawOrigin: c.originCountry ?? null, rawDest: c.destCountry ?? null, count: 1 });
     }
     return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 6);
-  }, [cases]);
+  }, [filteredCases]);
 
   const riskFeed = useMemo(() => {
-    return cases
+    return filteredCases
       .filter((c) => c.riskStatus && c.riskStatus !== 'green')
       .sort((a, b) => {
         // red first, then yellow
@@ -372,7 +444,7 @@ export function MobilityControlCenterV2Page() {
         return 0;
       })
       .slice(0, 5);
-  }, [cases]);
+  }, [filteredCases]);
 
   // AIQ-1109: "Mobility spend" is the sum of each active case's ESTIMATED
   // relocation budget (`budgetEstimated`), shown against the total policy budget
@@ -381,10 +453,10 @@ export function MobilityControlCenterV2Page() {
   // → db.list_command_center_cases (case_assignments.budget_estimated / budget_limit),
   // and are summed client-side here. The figure is company-scoped server-side.
   const totalBudget = useMemo(() => {
-    const limit = cases.reduce((acc, c) => acc + (c.budgetLimit ?? 0), 0);
-    const est = cases.reduce((acc, c) => acc + (c.budgetEstimated ?? 0), 0);
+    const limit = filteredCases.reduce((acc, c) => acc + (c.budgetLimit ?? 0), 0);
+    const est = filteredCases.reduce((acc, c) => acc + (c.budgetEstimated ?? 0), 0);
     return { limit, est };
-  }, [cases]);
+  }, [filteredCases]);
 
   // ── DataTable columns ─────────────────────────────────────────────────────
   const goToCase = useCallback((row: CommandCenterCaseRow) => {
@@ -534,20 +606,30 @@ export function MobilityControlCenterV2Page() {
           <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility command center</h1>
             <div className="ml-auto flex items-center gap-2">
-              <Button unstyled
-                type="button"
-                onClick={() => alert('Corridor filter — wire in follow-up')}
+              {/* MOBCC-FU1: corridor filter — narrows the table, corridor mix, and
+                  KPIs to one origin→dest. Options come from the scoped case list. */}
+              <select
+                value={corridorFilter ?? ''}
+                onChange={(e) => setCorridorFilter(e.target.value || null)}
+                aria-label="Filter by corridor"
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                ⏷ All corridors
-              </Button>
-              <Button unstyled
-                type="button"
-                onClick={() => alert('Time period filter — wire in follow-up')}
+                <option value="">All corridors</option>
+                {corridorOptions.map((o) => (
+                  <option key={o.key} value={o.key}>{o.label} ({o.count})</option>
+                ))}
+              </select>
+              {/* MOBCC-FU1: time-period filter — keeps cases updated within the window. */}
+              <select
+                value={periodFilter}
+                onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
+                aria-label="Filter by time period"
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                📅 Current quarter
-              </Button>
+                {PERIOD_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
               <Button unstyled
                 type="button"
                 onClick={() => navigate('/employees/new')}
@@ -558,7 +640,7 @@ export function MobilityControlCenterV2Page() {
             </div>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
-            {kpis ? kpis.activeCases : '—'} active relocation{kpis && kpis.activeCases === 1 ? '' : 's'} across {corridorMix.length} corridor{corridorMix.length === 1 ? '' : 's'}
+            {displayKpis ? displayKpis.activeCases : '—'} active relocation{displayKpis && displayKpis.activeCases === 1 ? '' : 's'} across {corridorMix.length} corridor{corridorMix.length === 1 ? '' : 's'}
           </p>
         </div>
 
@@ -566,31 +648,31 @@ export function MobilityControlCenterV2Page() {
         <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Kpi
             label="Active cases"
-            value={kpis?.activeCases ?? (loading ? '…' : 0)}
+            value={displayKpis?.activeCases ?? (loading ? '…' : 0)}
             sub={`across ${corridorMix.length} corridor${corridorMix.length === 1 ? '' : 's'}`}
             tone="accent"
-            progress={Math.min(100, (kpis?.activeCases ?? 0) * 5)}
+            progress={Math.min(100, (displayKpis?.activeCases ?? 0) * 5)}
           />
           <Kpi
             label="At risk"
-            value={kpis?.atRiskCount ?? (loading ? '…' : 0)}
+            value={displayKpis?.atRiskCount ?? (loading ? '…' : 0)}
             sub="Delayed by 5+ days"
             tone="warning"
             title="Flagged when a provider task is more than 5 days past its due date."
-            progress={kpis?.activeCases ? Math.min(100, ((kpis.atRiskCount ?? 0) / kpis.activeCases) * 100) : 0}
+            progress={displayKpis?.activeCases ? Math.min(100, ((displayKpis.atRiskCount ?? 0) / displayKpis.activeCases) * 100) : 0}
           />
           <Kpi
             label="Completed YTD"
-            value={kpis?.completedCount ?? (loading ? '…' : 0)}
+            value={displayKpis?.completedCount ?? (loading ? '…' : 0)}
             sub="completed relocations this year"
             tone="success"
-            progress={kpis?.completedCount ? Math.min(100, kpis.completedCount * 5) : 0}
+            progress={displayKpis?.completedCount ? Math.min(100, displayKpis.completedCount * 5) : 0}
           />
           <Kpi
             label="Mobility spend"
             value={formatMoney(totalBudget.est)}
             sub={totalBudget.limit ? `est. of ${formatMoney(totalBudget.limit)} budget` : '—'}
-            tone={kpis?.budgetOverrunsCount ? 'danger' : 'default'}
+            tone={displayKpis?.budgetOverrunsCount ? 'danger' : 'default'}
             title="Estimated relocation spend — the sum of each active case's estimated budget, shown against the total policy budget. Source: GET /api/hr/command-center/cases (case_assignments.budget_estimated / budget_limit). Estimate, not invoiced spend."
             progress={totalBudget.limit ? Math.min(100, (totalBudget.est / totalBudget.limit) * 100) : 0}
           />
@@ -599,7 +681,7 @@ export function MobilityControlCenterV2Page() {
         {/* BRAND-3: hide the whole block (incl. the eyebrow) when every KPI is
             zero — an all-zero summary is noise on a fresh/empty tenant. */}
         {execSummary &&
-          !(kpis && kpis.activeCases === 0 && kpis.atRiskCount === 0 && kpis.completedCount === 0) && (
+          !(displayKpis && displayKpis.activeCases === 0 && displayKpis.atRiskCount === 0 && displayKpis.completedCount === 0) && (
           <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive summary</p>
             <p className="mt-1 text-[13px] leading-relaxed text-slate-700">{execSummary}</p>
@@ -625,7 +707,7 @@ export function MobilityControlCenterV2Page() {
               <div className="flex items-baseline gap-2">
                 <h2 className="text-[15px] font-semibold text-slate-900">All relocation cases</h2>
                 <span className="text-[12px] text-slate-500">
-                  {cases.length} employee{cases.length === 1 ? '' : 's'}
+                  {filteredCases.length} employee{filteredCases.length === 1 ? '' : 's'}
                 </span>
               </div>
             </div>
@@ -633,14 +715,14 @@ export function MobilityControlCenterV2Page() {
             <DataTable
               tableId="hr.mobility-control"
               columns={columns}
-              rows={cases}
+              rows={filteredCases}
               rowKey={(r) => r.id}
               onRowClick={goToCase}
               ariaLabel="Mobility control cases"
               emptyState={loading ? 'Loading cases…' : 'No active relocations yet. Cases created on the Assignments page appear here.'}
               footerSlot={
                 <div className="flex items-center justify-between px-4 py-2 text-[11.5px] text-slate-500">
-                  <span>{cases.length} case{cases.length === 1 ? '' : 's'}</span>
+                  <span>{filteredCases.length} case{filteredCases.length === 1 ? '' : 's'}</span>
                   <ResetColumnsLink tableId="hr.mobility-control" />
                 </div>
               }

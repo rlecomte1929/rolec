@@ -1888,9 +1888,13 @@ def stop_impersonation(
 
 
 @app.get("/api/admin/companies")
-def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
-    items = db.get_admin_company_index(q)
-    log.info("admin_companies list query=%s count=%s", q, len(items))
+def list_companies(
+    q: Optional[str] = Query(None),
+    include_test: bool = Query(False, description="PRODSEED-3: include synthetic is_test tenants"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    items = db.get_admin_company_index(q, include_test=include_test)
+    log.info("admin_companies list query=%s include_test=%s count=%s", q, include_test, len(items))
     db.log_audit(user["id"], "READ", "company", None, None, {"query": q})
     return {"companies": items}
 
@@ -2009,6 +2013,10 @@ class AdminCreateCompanyRequest(BaseModel):
     phone: Optional[str] = None
     hr_contact: Optional[str] = None
     support_email: Optional[str] = None
+    # PRODSEED-3/AIQ-1130: verify/e2e provisioning passes True so the tenant is
+    # flagged synthetic and hidden from admin surfaces. Omitted/None → auto-detect
+    # from the name pattern (real tenants resolve to False).
+    is_test: Optional[bool] = None
 
 
 class AdminUpdateCompanyRequest(BaseModel):
@@ -2041,6 +2049,7 @@ def create_company(body: AdminCreateCompanyRequest, user: Dict[str, Any] = Depen
         plan_tier=body.plan_tier,
         hr_seat_limit=body.hr_seat_limit,
         employee_seat_limit=body.employee_seat_limit,
+        is_test=body.is_test,
     )
     company = db.get_company(company_id)
     log.info("admin company created id=%s name=%s by=%s", company_id, body.name, user.get("id"))
@@ -2117,9 +2126,10 @@ def list_users(
     q: Optional[str] = Query(None),
     company_id: Optional[str] = Query(None),
     role: Optional[str] = Query(None),
+    include_test: bool = Query(False, description="PRODSEED-3: include synthetic is_test people"),
     user: Dict[str, Any] = Depends(require_admin),
 ):
-    people, summary = db.get_admin_people_index(company_id=company_id, query=q, role=role)
+    people, summary = db.get_admin_people_index(company_id=company_id, query=q, role=role, include_test=include_test)
     log.info("admin_users list company_id=%s role=%s query=%s count=%s", company_id, role, q, summary.get("count"))
     db.log_audit(user["id"], "READ", "profile", None, None, {"query": q, "company_id": company_id, "role": role})
     return {"profiles": people, "summary": summary}
@@ -2130,6 +2140,7 @@ def list_people(
     company_id: Optional[str] = Query(None),
     role: Optional[str] = Query(None),
     query: Optional[str] = Query(None, alias="q"),
+    include_test: bool = Query(False, description="PRODSEED-3: include synthetic is_test people"),
     user: Dict[str, Any] = Depends(require_admin),
 ):
     """Admin people list with company, role, and text filters. Returns admin-safe fields including company_name, status."""
@@ -2137,7 +2148,7 @@ def list_people(
     # an unhandled ProgrammingError → 500. Return an empty-but-valid payload so the
     # admin UI degrades gracefully and the error is surfaced in logs only.
     try:
-        people, summary = db.get_admin_people_index(company_id=company_id, query=query, role=role)
+        people, summary = db.get_admin_people_index(company_id=company_id, query=query, role=role, include_test=include_test)
     except Exception as exc:
         log.exception("list_people: DB query failed (schema drift?): %s", exc)
         return {"people": [], "summary": {"count": 0, "orphans_without_company": 0}}
