@@ -4,8 +4,11 @@ Never reads from base tables. Used for HR/Employee/Admin read-only consumption.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+
+log = logging.getLogger(__name__)
 
 
 def _get_supabase():
@@ -174,18 +177,24 @@ def _is_weekend(dt_str: Optional[str]) -> bool:
 def find_active_categories() -> List[Dict[str, Any]]:
     """Active categories for public display."""
     try:
-        r = _get_supabase().table("resource_categories").select("id", "key", "label", "description", "icon_name", "sort_order").eq("is_active", True).order("sort_order").execute()
+        # Use select("*") (matches the working find_published_resources / rkg reads);
+        # a multi-column positional select returned empty under the deployed
+        # postgrest, which silently dropped categories from the resources page so
+        # every resource fell into the 'Overview' fallback section.
+        r = _get_supabase().table("resource_categories").select("*").eq("is_active", True).order("sort_order").execute()
         return r.data or []
     except Exception:
+        log.exception("find_active_categories failed")
         return []
 
 
 def find_tags(tag_group: Optional[str] = None) -> List[Dict[str, Any]]:
     try:
-        q = _get_supabase().table("resource_tags").select("id", "key", "label", "tag_group")
+        q = _get_supabase().table("resource_tags").select("*")
         if tag_group:
             q = q.eq("tag_group", tag_group)
         r = q.order("key").execute()
         return r.data or []
     except Exception:
+        log.exception("find_tags failed")
         return []
