@@ -119,6 +119,39 @@ def test_same_heading_chunks_collapse_to_one():
     assert out[0].title == "How the rental market works"
 
 
+def test_page_index_faq_body_rejected_even_with_real_heading():
+    # The live-crawl survivor: a real heading over a page-intro / FAQ-heading list.
+    # Must be rejected so the page goes to the LLM fallback instead of staging junk.
+    body = (
+        "Renting a flat Housing & Moving Updated: What do I need to consider when I "
+        "move into my new home? Finding a new flat is challenging in many German "
+        "cities. There is a checklist at the end of the page to help you plan. What "
+        "do I need to know? What happens after I have been approved as a tenant? "
+        "Have you been accepted as a new tenant?"
+    )
+    out = extract_resource_candidates(
+        [_chunk(body, heading="How are the rental costs broken down?")],
+        _src(),
+        "https://handbookgermany.de/en/renting-an-apartment",
+        "Renting a flat | Handbook Germany : Together",
+    )
+    assert out == []
+
+
+def test_one_or_two_rhetorical_questions_still_pass():
+    # Don't over-reject: a normal guide with a rhetorical question is fine.
+    body = (
+        "You must register your address within two weeks of moving in. Where do you "
+        "do this? At your local Buergeramt, with your passport and a landlord "
+        "confirmation. The certificate is then required for your bank account."
+    )
+    out = extract_resource_candidates(
+        [_chunk(body, heading="Register your address")], _src(domain="admin_essentials"),
+        "https://handbookgermany.de/en/city-registration", "City registration | Handbook Germany",
+    )
+    assert len(out) == 1
+
+
 def test_per_page_candidate_cap():
     # Many distinct headings on one page are capped (guards against flooding).
     chunks = [

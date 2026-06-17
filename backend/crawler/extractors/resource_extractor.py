@@ -54,6 +54,23 @@ _BOT_WALL_TEXT_MARKERS = (
 # Site-name separators commonly appended to a page <title> ("Page | Site : tag").
 _TITLE_SEPARATORS = (" | ", " : ", " — ", " - ", " · ", " // ")
 
+# Page-scaffolding / meta-navigation phrases: signal a page INTRO or index ("read
+# the checklist at the end of the page", "here you can find out…"), not guidance.
+_SCAFFOLD_MARKERS = (
+    "at the end of the page",
+    "at the end of this page",
+    "checklist at the end",
+    "here you can find out",
+    "here, you can find",
+    "find out below",
+    "see below",
+    "scroll down",
+    "on this page you",
+    "in this article",
+    "read more below",
+    "table of contents",
+)
+
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
@@ -88,6 +105,12 @@ def extract_resource_candidates(
         # Reject nav menus / link-lists / homepage dumps — they pass the length
         # check but are not guidance.
         if _looks_like_nav_or_boilerplate(text):
+            continue
+        # Reject page intros / FAQ-heading lists / scaffolding (a real heading over
+        # a non-answer body). These previously slipped through *and* suppressed the
+        # LLM fallback (which only fires when rule-based returns nothing) — so
+        # rejecting them sends the page to the LLM extractor instead.
+        if _looks_like_page_index(text):
             continue
 
         title = _infer_title(chunk)
@@ -161,6 +184,19 @@ def _looks_like_nav_or_boilerplate(text: str) -> bool:
         return True
     # Long-ish blob that contains essentially no sentences = boilerplate.
     if len(text) > 200 and sentences == 0:
+        return True
+    return False
+
+
+def _looks_like_page_index(text: str) -> bool:
+    """True for a page intro / FAQ-heading list / scaffolding blob: a real heading
+    over a body that is a string of sub-questions or 'see the rest of this page'
+    meta-text rather than a single answer."""
+    low = text.lower()
+    # Many questions strung together = an FAQ/heading index, not one answer.
+    if text.count("?") >= 3:
+        return True
+    if any(m in low for m in _SCAFFOLD_MARKERS):
         return True
     return False
 
