@@ -113,6 +113,9 @@ def main():
         s, p = call("POST", "/api/admin/companies", admin, {
             "name": ADMIN_COMPANY_NAME, "country": "FR",
             "address": "10 Rue de Test, 75001 Paris", "phone": "+33100000000",
+            # PRODSEED-3/AIQ-1130: flag this throwaway tenant so it's hidden from
+            # admin surfaces and never mistaken for a real customer.
+            "is_test": True,
         })
         comp = (p or {}).get("company") if isinstance(p, dict) else None
         cid = comp.get("id") if isinstance(comp, dict) else None
