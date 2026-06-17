@@ -23,15 +23,17 @@ export const Landing: React.FC = () => {
     { label: 'See the platform', routeKey: 'platform' },
   ]);
 
-  // FRIDAY-004d locked SEO meta stack — verbatim from audit/gtm/seo_meta_spec_v1.md.
-  // Strings mirror the locked 004b hero. Ship verbatim; do not rephrase.
+  // UIAUDIT-2026-06-13: keep the search + share metadata aligned with the
+  // operating-layer category SITE-1 re-anchored the title/hero to. (The old
+  // FRIDAY-004d "Mobility AI" strings still lingered in description/ogTitle/
+  // ogDescription/ogImageAlt/schema below while the title already changed.)
   usePageMeta({
     title: 'ReloPass — Global mobility infrastructure', // SITE-1: re-anchored to the infrastructure category (was 'Mobility AI…')
     description:
-      "Mobility AI your auditor will trust. Every step in your employee's relocation — logged, cited, and EU AI Act–ready. See how ReloPass moves people across borders.", // §3 — 165-char long version (deliberate trade-off, §9)
-    ogTitle: 'Mobility AI your auditor will trust', // §4 — brand prefix stripped for share cards
+      'Run relocation cases, timelines, documents, providers, and policy controls through one operating layer.',
+    ogTitle: 'ReloPass — Global mobility infrastructure',
     ogDescription:
-      "Every step in your employee's relocation — every document, every decision — logged, cited, and EU AI Act–ready.", // §4 — full sub-hero verbatim
+      'Every relocation case is visible, compliant, and on time.',
     ogUrl: 'https://relopass.com/',
     // TODO [FRIDAY-004e hand-off]: og:image asset is a designer commission and does
     // NOT exist yet (1200×630 spec in FRIDAY-004d §5). This path 404s until the asset
@@ -39,7 +41,7 @@ export const Landing: React.FC = () => {
     ogImage: 'https://relopass.com/og/og-default-1200x630.png',
     ogImageWidth: '1200',
     ogImageHeight: '630',
-    ogImageAlt: 'ReloPass — Mobility AI your auditor will trust',
+    ogImageAlt: 'ReloPass — Global mobility infrastructure',
     ogLocale: 'en_GB',
     // TODO [FRIDAY-004e hand-off]: confirm the @relopass X handle exists; if not,
     // drop twitterSite/twitterCreator (FRIDAY-004d §6).
@@ -55,11 +57,11 @@ export const Landing: React.FC = () => {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       name: 'ReloPass',
-      alternateName: 'ReloPass — Mobility AI',
+      alternateName: 'ReloPass — Global mobility infrastructure',
       url: 'https://relopass.com/',
       logo: 'https://relopass.com/brand/logo-512.png',
       description:
-        "Mobility AI your auditor will trust. Every step in your employee's relocation — logged, cited, and EU AI Act–ready.",
+        'The operating layer for relocation cases, timelines, documents, providers, and policy controls.',
       foundingDate: '2025', // TODO [Romain]: confirm 2024 vs 2025
       sameAs: [
         'https://www.linkedin.com/company/relopass/', // TODO [Romain]: confirm slug
