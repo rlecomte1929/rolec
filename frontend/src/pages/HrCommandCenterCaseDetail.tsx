@@ -21,6 +21,8 @@ import { PetRequirementsSection } from '../components/case/PetRequirementsSectio
 import { CaseAuditTimeline } from '../components/case/CaseAuditTimeline';
 import { CaseNotesPanel } from '../components/case/CaseNotesPanel';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
+import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
+import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
 
 type QuoteRequest = {
   id: string;
@@ -91,6 +93,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   // (approve/reject already live in the exception panels below).
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalateSuccessMsg, setEscalateSuccessMsg] = useState('');
+  // AIQ-1136: case-level reassign — HR hands a case to another HR in the company.
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassignSuccessMsg, setReassignSuccessMsg] = useState('');
   const [rfqListKey, setRfqListKey] = useState(0);
 
   const loadQuoteRequests = useCallback(() => {
@@ -179,11 +184,43 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             <Button variant="outline" onClick={() => setEscalateOpen(true)}>
               Escalate case
             </Button>
+            <Button variant="outline" onClick={() => setReassignOpen(true)}>
+              Reassign case
+            </Button>
             <Button variant="outline" onClick={() => navigate(buildRoute('hrAssignmentReview', { id: detail.id }))}>
               Open in Employee Dashboard
             </Button>
           </div>
         </div>
+
+        {/* ── AIQ-1136 slice 3: EU AI Act Art. 14 oversight on the AI risk verdict.
+            The risk status is an AI-derived recommendation shown above as a passive
+            badge; this card gives "override" a concrete target by forcing HR to
+            accept / override / reject it. Only surfaces while the verdict is
+            load-bearing (yellow/red) — a green case needs no oversight prompt. ── */}
+        {(detail.riskStatus === 'yellow' || detail.riskStatus === 'red') && (
+          <AIRecommendationCard
+            recommendationId={`case_risk_v1:${detail.id}`}
+            feature="case_risk"
+            title="AI risk assessment"
+            rationale={
+              <>
+                The platform flagged this case as{' '}
+                <strong>{detail.riskStatus === 'red' ? 'high risk' : 'needs attention'}</strong>
+                {' '}based on intake completeness, blocking exceptions, and overdue tasks.
+                Accept to confirm, or override with your own judgement.
+              </>
+            }
+            aiOutput={{
+              assignment_id: detail.id,
+              risk_status: detail.riskStatus,
+              tasks_total: detail.tasksTotal,
+              tasks_done: detail.tasksDone,
+              tasks_overdue: detail.tasksOverdue,
+              source_version: 'case_risk_v1',
+            }}
+          />
+        )}
 
         {/* ── Exception flags (P3/B6): blockers + warnings from immigration check ── */}
         <ExceptionFlagsPanel caseId={detail.id} />
@@ -485,6 +522,25 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         onSuccess={() => {
           setEscalateOpen(false);
           setEscalateSuccessMsg('Case escalated — the specialist has been notified.');
+        }}
+      />
+
+      {/* ── AIQ-1136: case-level reassign ── */}
+      {reassignSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
+          ✓ {reassignSuccessMsg}
+          <Button unstyled type="button" aria-label="Dismiss notification" onClick={() => setReassignSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</Button>
+        </div>
+      )}
+      <ReassignCaseModal
+        open={reassignOpen}
+        onClose={() => setReassignOpen(false)}
+        caseId={detail.id}
+        caseLabel={detail.employeeIdentifier}
+        onSuccess={() => {
+          setReassignOpen(false);
+          setReassignSuccessMsg('Case reassigned — the new owner now sees it in their command center.');
+          if (id) hrAPI.getCommandCenterCaseDetail(id).then(setDetail).catch(() => {});
         }}
       />
     </AppShell>
