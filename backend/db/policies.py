@@ -1185,8 +1185,8 @@ class PoliciesMixin:
                         (id, company_id, uploaded_by_user_id, filename, mime_type, storage_path,
                          checksum, uploaded_at, processing_status, created_at, updated_at,
                          file_size_bytes, assistant_import_status)
-                        VALUES (CAST(:id AS uuid), :cid, :uid, :fn, :mt, :sp, :cs, :now::timestamptz, 'uploaded',
-                         :now::timestamptz, :now::timestamptz, :fsz, :ais)
+                        VALUES (CAST(:id AS uuid), :cid, :uid, :fn, :mt, :sp, :cs, CAST(:now AS timestamptz), 'uploaded',
+                         CAST(:now AS timestamptz), CAST(:now AS timestamptz), :fsz, :ais)
                     """),
                     {
                         "id": doc_id,
