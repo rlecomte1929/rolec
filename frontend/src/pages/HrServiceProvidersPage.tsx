@@ -16,7 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, Badge } from '../components/antigravity';
 import { HrVendorCuration } from './HrVendorCuration';
-import { ProviderGridV2Page } from '../features/platform-v2/provider-grid/ProviderGridV2Page';
+import { VendorPerformancePage } from '../features/platform-v2/vendor-performance/VendorPerformancePage';
 import {
   getHrNotificationCounts,
   listEmployeeDemand,
@@ -29,7 +29,7 @@ type ServiceTab = 'dashboard' | 'vendor' | 'providers';
 const TABS: { key: ServiceTab; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'vendor', label: 'Vendor Management' },
-  { key: 'providers', label: 'Provider Status' },
+  { key: 'providers', label: 'Vendor Performance' },
 ];
 
 export const HrServiceProvidersPage: React.FC = () => {
@@ -63,7 +63,7 @@ export const HrServiceProvidersPage: React.FC = () => {
       {activeTab === 'vendor' ? (
         <HrVendorCuration embedded />
       ) : activeTab === 'providers' ? (
-        <ProviderGridV2Page embedded />
+        <VendorPerformancePage embedded />
       ) : (
         <ServiceProvidersDashboard
           onAddVendor={() => setTab('vendor')}

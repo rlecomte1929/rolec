@@ -45,6 +45,7 @@ from ..services.milestone_reminders import run_milestone_reminder_cron
 from ..services.monitoring_alerts import send_test_alert
 from ..services.rule_change_notifier import notify_superseded_rules
 from ..services.source_reliability_service import recompute_reliability_scores
+from ..services.vendor_metric_snapshot_service import snapshot_vendor_metrics
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +127,20 @@ def process_crawl_schedules(request: Request) -> Dict[str, Any]:
         "results": results,
         "rule_change_notifications": rule_change_notifications,
     }
+
+
+@router.post("/snapshot-vendor-metrics")
+def snapshot_vendor_metrics_cron(request: Request) -> Dict[str, Any]:
+    """
+    [NAV-SP-2 Tier 3] Daily snapshot of per-supplier-per-category aggregates
+    (rating, cost, review_count) into vendor_metric_snapshots, powering the Vendor
+    Performance trend charts and watchlist deltas. Idempotent per (supplier,
+    category, day) — safe to re-run. Designed to run daily (e.g. 05:30 UTC).
+    """
+    _verify_cron_secret(request)
+    log.info("snapshot_vendor_metrics cron triggered")
+    result = snapshot_vendor_metrics()
+    return {"ok": True, **result}
 
 
 @router.post("/recompute-source-reliability")
