@@ -1,0 +1,56 @@
+name: Daily vendor-metric snapshot
+
+# [NAV-SP-2 Tier 3] Calls POST /api/crons/snapshot-vendor-metrics once a day so
+# vendor_metric_snapshots accumulates one row per (supplier × category × day).
+# The Vendor Performance dashboard reads these to draw cost / review-score trend
+# lines and ▲/▼ watchlist deltas. Idempotent — a same-day re-run upserts.
+#
+# Gated behind `vars.VENDOR_SNAPSHOT_CRON_ENABLED` so it is a no-op until the repo
+# var + secrets are configured. Endpoint auth is the shared CRON_SECRET (Bearer),
+# the same the other /api/crons/* endpoints use.
+
+on:
+  schedule:
+    # 05:30 UTC every day — after the crawler (03:00), compliance (04:00),
+    # case-health (04:30) and source-reliability (05:00) jobs.
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: vendor-metric-snapshot-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    name: Snapshot vendor metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.VENDOR_SNAPSHOT_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.VENDOR_SNAPSHOT_API_BASE }}     # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/snapshot-vendor-metrics
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/snapshot-vendor-metrics")
+          echo "$response"
+          {
+            echo "## Vendor-metric snapshot"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

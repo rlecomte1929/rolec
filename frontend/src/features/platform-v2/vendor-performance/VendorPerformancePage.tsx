@@ -134,6 +134,51 @@ function BarChart({ data }: { data: { label: string; value: number }[] }) {
   );
 }
 
+// ── SVG line chart (trend over time) ───────────────────────────────────────────
+
+function LineChart({
+  data,
+  color = '#1f8e8b',
+  fmt = (v) => String(v),
+}: {
+  data: { label: string; value: number }[];
+  color?: string;
+  fmt?: (v: number) => string;
+}) {
+  const W = 400;
+  const H = 120;
+  const PAD = 10;
+  const vals = data.map((d) => d.value);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min || 1;
+  const x = (i: number) =>
+    data.length === 1 ? W / 2 : PAD + (i / (data.length - 1)) * (W - 2 * PAD);
+  const y = (v: number) => PAD + (1 - (v - min) / span) * (H - 2 * PAD - 12);
+  const pts = data.map((d, i) => `${x(i)},${y(d.value)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Trend line chart">
+      <polyline fill="none" stroke={color} strokeWidth={2} points={pts} />
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={x(i)} cy={y(d.value)} r={2.5} fill={color}>
+            <title>{`${d.label}: ${fmt(d.value)}`}</title>
+          </circle>
+        </g>
+      ))}
+      {/* first + last x labels */}
+      {data.length > 0 && (
+        <>
+          <text x={PAD} y={H - 2} className="fill-slate-400" style={{ fontSize: 9 }}>{data[0].label}</text>
+          <text x={W - PAD} y={H - 2} textAnchor="end" className="fill-slate-400" style={{ fontSize: 9 }}>
+            {data[data.length - 1].label}
+          </text>
+        </>
+      )}
+    </svg>
+  );
+}
+
 // ── SVG cost-vs-rating scatter ──────────────────────────────────────────────────
 // One dot per vendor. Bottom-right (high cost, low rating) is the danger zone.
 
@@ -560,6 +605,16 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
     [data, catFilter],
   );
 
+  // ── Snapshot-backed trend lines (Tier 3; empty until the cron has run) ────
+  const costTrendData = useMemo(
+    () => (data?.cost_trend ?? []).map((p) => ({ label: p.date.slice(5), value: p.avg_cost_eur })),
+    [data],
+  );
+  const ratingTrendData = useMemo(
+    () => (data?.rating_trend ?? []).map((p) => ({ label: p.date.slice(5), value: p.avg_rating })),
+    [data],
+  );
+
   const inner = (
     <div className="px-6 py-6 space-y-5">
       {/* Page header */}
@@ -701,6 +756,41 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             </div>
           ) : (
             <BarChart data={costChartData} />
+          )}
+        </div>
+      </div>
+
+      {/* Trend lines over time (snapshot-backed) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="mb-2">
+            <p className="text-[13px] font-medium text-[#0b2b43]">Cost trend</p>
+            <p className="text-[11px] text-slate-400">Avg vendor cost over time · {range}</p>
+          </div>
+          {loading ? (
+            <div className="h-[120px] animate-pulse rounded bg-slate-100" />
+          ) : costTrendData.length < 2 ? (
+            <div className="flex h-[120px] items-center justify-center px-4 text-center text-[12px] text-slate-400">
+              Collecting data — the trend line appears once the nightly snapshot has run for 2+ days.
+            </div>
+          ) : (
+            <LineChart data={costTrendData} fmt={(v) => fmtCost(v)} />
+          )}
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="mb-2">
+            <p className="text-[13px] font-medium text-[#0b2b43]">Avg review score</p>
+            <p className="text-[11px] text-slate-400">Mean vendor rating over time · {range}</p>
+          </div>
+          {loading ? (
+            <div className="h-[120px] animate-pulse rounded bg-slate-100" />
+          ) : ratingTrendData.length < 2 ? (
+            <div className="flex h-[120px] items-center justify-center px-4 text-center text-[12px] text-slate-400">
+              Collecting data — the trend line appears once the nightly snapshot has run for 2+ days.
+            </div>
+          ) : (
+            <LineChart data={ratingTrendData} fmt={(v) => `${v.toFixed(1)}★`} />
           )}
         </div>
       </div>

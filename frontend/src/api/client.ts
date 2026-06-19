@@ -888,6 +888,8 @@ export const hrAPI = {
       vendor_count: number;
       status: 'healthy' | 'thin' | 'gap';
     }>;
+    cost_trend: Array<{ date: string; avg_cost_eur: number }>;
+    rating_trend: Array<{ date: string; avg_rating: number }>;
   }> => {
     const response = await api.get('/api/hr/vendor-performance', { params: { range } });
     return response.data;

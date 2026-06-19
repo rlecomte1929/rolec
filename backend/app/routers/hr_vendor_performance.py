@@ -19,6 +19,7 @@ Data sources:
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,6 +31,7 @@ from ...database import db as _db
 from ...schemas import UserRole
 
 router = APIRouter(tags=["hr_vendor_performance"])
+log = logging.getLogger(__name__)
 
 
 # ── Auth helper ───────────────────────────────────────────────────────────────
@@ -298,6 +300,32 @@ def get_vendor_performance(
         for r in coverage_rows
     ]
 
+    # ── Trend lines from the nightly snapshot table (Tier 3) ──────────────────
+    # Runs in its own session so a missing table (migration not yet applied) or
+    # any error degrades to empty arrays — the dashboard shows an honest
+    # "collecting data" state instead of 500-ing the whole page.
+    cost_trend: List[Dict[str, Any]] = []
+    rating_trend: List[Dict[str, Any]] = []
+    try:
+        with SessionLocal() as snap_session:
+            trend_rows = snap_session.execute(text("""
+                SELECT
+                    captured_date::text                          AS date,
+                    ROUND(AVG(avg_rating)::numeric, 1)::float    AS avg_rating,
+                    ROUND(AVG(avg_cost_eur)::numeric, 0)::int    AS avg_cost_eur
+                FROM public.vendor_metric_snapshots
+                WHERE captured_date >= CURRENT_DATE - CAST(:window AS interval)
+                GROUP BY captured_date
+                ORDER BY captured_date ASC
+            """), {"window": window}).mappings().all()
+        for r in trend_rows:
+            if r["avg_cost_eur"] is not None:
+                cost_trend.append({"date": str(r["date"]), "avg_cost_eur": int(r["avg_cost_eur"])})
+            if r["avg_rating"] is not None:
+                rating_trend.append({"date": str(r["date"]), "avg_rating": float(r["avg_rating"])})
+    except Exception:
+        log.warning("vendor_metric_snapshots unavailable; trend lines empty", exc_info=True)
+
     return {
         "summary": {
             "avg_rating": float(kpi.avg_rating) if kpi and kpi.avg_rating is not None else None,
@@ -308,4 +336,6 @@ def get_vendor_performance(
         "monthly_trend": monthly_trend,
         "categories": categories,
         "coverage": coverage,
+        "cost_trend": cost_trend,
+        "rating_trend": rating_trend,
     }
