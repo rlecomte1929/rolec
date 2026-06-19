@@ -194,6 +194,7 @@ from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP —
 from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import provider_ratings as provider_ratings_router
+from .app.routers import hr_vendor_performance as hr_vendor_performance_router
 from .app.routers import employee_steps as employee_steps_router
 from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
@@ -758,6 +759,7 @@ app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/
 app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provider ratings
+app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
 app.include_router(employee_steps_router.router)  # [B11/AIQ-421] /api/employee/steps/4
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)

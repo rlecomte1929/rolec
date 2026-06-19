@@ -847,6 +847,46 @@ export const hrAPI = {
     return response.data;
   },
 
+  // ── NAV-SP-2: Vendor performance dashboard ───────────────────────────────
+
+  /** GET /api/hr/vendor-performance — NAV-SP-2 Vendor Performance tab. */
+  getVendorPerformance: async (): Promise<{
+    summary: {
+      avg_rating: number | null;
+      avg_cost_eur: number | null;
+      active_vendors: number;
+      avg_response_sla_hours: number | null;
+    };
+    monthly_trend: Array<{
+      month: string;
+      supplier_id: string;
+      category: string;
+      case_count: number;
+    }>;
+    categories: Array<{
+      category: string;
+      vendor_count: number;
+      avg_rating: number | null;
+      avg_cost_eur: number | null;
+      status: 'healthy' | 'low_coverage' | 'review' | 'critical';
+      vendors: Array<{
+        id: string;
+        name: string;
+        location: string;
+        rating: number | null;
+        review_count: number;
+        response_sla_hours: number | null;
+        cost_eur: number | null;
+        cost_min_eur: number | null;
+        cost_max_eur: number | null;
+        recent_reviews: Array<{ score: number; comment: string; date: string }>;
+      }>;
+    }>;
+  }> => {
+    const response = await api.get('/api/hr/vendor-performance');
+    return response.data;
+  },
+
   // ── AIQ-40-A/B: Vendor directory ─────────────────────────────────────────
 
   /** GET /api/hr/vendors?corridor=X&category=Y */

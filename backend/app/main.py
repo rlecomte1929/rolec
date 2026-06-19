@@ -25,6 +25,7 @@ from .routers import (
     employee_quotes,
     employee_steps,
     provider_ratings,
+    hr_vendor_performance,
     exception_requests,
     hr_analytics,
     hr_export,
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
     app.include_router(employee_quotes.router)
     app.include_router(provider_ratings.router)  # CATALOG-3 employee provider ratings
+    app.include_router(hr_vendor_performance.router)  # NAV-SP-2 HR vendor performance dashboard
     app.include_router(employee_steps.router)  # [B11/AIQ-421] /api/employee/steps/4 → quote-request alias
     app.include_router(pets.router)
     app.include_router(support.router)
