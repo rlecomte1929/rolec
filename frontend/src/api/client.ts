@@ -849,8 +849,8 @@ export const hrAPI = {
 
   // ── NAV-SP-2: Vendor performance dashboard ───────────────────────────────
 
-  /** GET /api/hr/vendor-performance — NAV-SP-2 Vendor Performance tab. */
-  getVendorPerformance: async (): Promise<{
+  /** GET /api/hr/vendor-performance?range=30d|90d|12mo — NAV-SP-2 Vendor Performance tab. */
+  getVendorPerformance: async (range: '30d' | '90d' | '12mo' = '90d'): Promise<{
     summary: {
       avg_rating: number | null;
       avg_cost_eur: number | null;
@@ -889,7 +889,7 @@ export const hrAPI = {
       status: 'healthy' | 'thin' | 'gap';
     }>;
   }> => {
-    const response = await api.get('/api/hr/vendor-performance');
+    const response = await api.get('/api/hr/vendor-performance', { params: { range } });
     return response.data;
   },
 

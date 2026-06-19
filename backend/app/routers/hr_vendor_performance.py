@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
@@ -55,6 +55,14 @@ def _health_status(vendor_count: int, avg_rating: Optional[float]) -> str:
     return "healthy"
 
 
+# Time-range toggle → (SQL interval for the monthly window, number of month buckets).
+_RANGE_WINDOWS: Dict[str, str] = {
+    "30d": "30 days",
+    "90d": "90 days",
+    "12mo": "12 months",
+}
+
+
 def _coverage_status(vendor_count: int) -> str:
     """Heatmap cell status: healthy (3+), thin (1-2), gap (0).
 
@@ -72,15 +80,18 @@ def _coverage_status(vendor_count: int) -> str:
 
 @router.get("/api/hr/vendor-performance")
 def get_vendor_performance(
+    range_: str = Query("90d", alias="range"),
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Full vendor performance snapshot for the HR dashboard tab.
 
+    `range` (30d | 90d | 12mo, default 90d) windows the monthly case trend.
     All review data is scoped to the caller's company_id so HR never sees
     another company's employee feedback.
     """
     company_id = _require_hr(user)
+    window = _RANGE_WINDOWS.get(range_, _RANGE_WINDOWS["90d"])
 
     with SessionLocal() as session:
 
@@ -121,10 +132,10 @@ def get_vendor_performance(
             JOIN supplier_service_capabilities ssc
                                  ON ssc.supplier_id = s.id
             WHERE pr.company_id = CAST(:cid AS uuid)
-              AND pr.created_at >= now() - INTERVAL '6 months'
+              AND pr.created_at >= now() - CAST(:window AS interval)
             GROUP BY month, pr.supplier_id, ssc.service_category
             ORDER BY month ASC
-        """), {"cid": company_id}).mappings().all()
+        """), {"cid": company_id, "window": window}).mappings().all()
 
         # ── 3. Per-category aggregate ─────────────────────────────────────────
         cat_rows = session.execute(text("""

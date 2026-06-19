@@ -11,9 +11,17 @@
  * Data: GET /api/hr/vendor-performance (hr_vendor_performance router)
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { hrAPI } from '../../../api/client';
+
+type RangeKey = '30d' | '90d' | '12mo';
+const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
+  { key: '30d', label: '30d' },
+  { key: '90d', label: '90d' },
+  { key: '12mo', label: '12mo' },
+];
 
 // ── Types (derived from the API function's return shape) ──────────────────────
 
@@ -27,8 +35,8 @@ type FlatVendor = VendorEntry & { category: string };
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
-async function fetchVendorPerformance(): Promise<VendorPerformanceData> {
-  return hrAPI.getVendorPerformance();
+async function fetchVendorPerformance(range: RangeKey): Promise<VendorPerformanceData> {
+  return hrAPI.getVendorPerformance(range);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -74,11 +82,13 @@ function fmtCat(cat: string): string {
   return CATEGORY_LABELS[cat] ?? cat.replace(/_/g, ' ');
 }
 
-// Last 6 calendar months as "YYYY-MM" strings (oldest → newest)
-function last6Months(): string[] {
+// Calendar months covered by the selected range, as "YYYY-MM" (oldest → newest).
+// 30d → current month, 90d → last 3, 12mo → last 12.
+function monthsForRange(range: RangeKey): string[] {
+  const n = range === '30d' ? 1 : range === '12mo' ? 12 : 3;
   const months: string[] = [];
   const now = new Date();
-  for (let i = 5; i >= 0; i--) {
+  for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
@@ -425,6 +435,19 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Time range — persisted in the URL like the parent ?tab= (HrServiceProvidersPage).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawRange = searchParams.get('range');
+  const range: RangeKey = rawRange === '30d' || rawRange === '12mo' ? rawRange : '90d';
+  const setRange = useCallback(
+    (r: RangeKey) => {
+      const next = new URLSearchParams(searchParams);
+      next.set('range', r);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   // Filters
   const [catFilter, setCatFilter] = useState<string>('all');
   const [vendorFilter, setVendorFilter] = useState('');
@@ -445,14 +468,14 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
     setLoading(true);
     setError(null);
     try {
-      const d = await fetchVendorPerformance();
+      const d = await fetchVendorPerformance(range);
       setData(d);
     } catch {
       setError('Could not load vendor performance data. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -465,7 +488,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
   }, [data, catFilter]);
 
   // ── Derived: monthly trend chart data ────────────────────────────────────
-  const MONTHS = useMemo(() => last6Months(), []);
+  const MONTHS = useMemo(() => monthsForRange(range), [range]);
 
   const trendChartData = useMemo((): { label: string; value: number }[] => {
     if (!data) return MONTHS.map((m) => ({ label: monthLabel(m), value: 0 }));
@@ -583,6 +606,24 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-[12px] font-medium text-slate-500">Range</label>
+          <div className="inline-flex overflow-hidden rounded-md border border-slate-200">
+            {RANGE_OPTIONS.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setRange(o.key)}
+                aria-pressed={range === o.key}
+                className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                  range === o.key ? 'bg-[#1f8e8b] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <label htmlFor="vp-cat-filter" className="text-[12px] font-medium text-slate-500">Category</label>
           <select
