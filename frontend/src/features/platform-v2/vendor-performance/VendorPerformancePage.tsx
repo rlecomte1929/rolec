@@ -20,6 +20,10 @@ import { hrAPI } from '../../../api/client';
 type VendorPerformanceData = Awaited<ReturnType<typeof hrAPI.getVendorPerformance>>;
 type CategoryEntry = VendorPerformanceData['categories'][number];
 type VendorEntry = CategoryEntry['vendors'][number];
+type CoverageEntry = VendorPerformanceData['coverage'][number];
+
+// A flattened vendor + its category, used by the scatter and watchlist.
+type FlatVendor = VendorEntry & { category: string };
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
@@ -117,6 +121,133 @@ function BarChart({ data }: { data: { label: string; value: number }[] }) {
         );
       })}
     </svg>
+  );
+}
+
+// ── SVG cost-vs-rating scatter ──────────────────────────────────────────────────
+// One dot per vendor. Bottom-right (high cost, low rating) is the danger zone.
+
+function ScatterChart({ points }: { points: { name: string; cost: number; rating: number }[] }) {
+  const W = 400;
+  const H = 200;
+  const PAD = 30;
+  const maxCost = Math.max(...points.map((p) => p.cost), 1);
+  const px = (c: number) => PAD + (c / maxCost) * (W - PAD - 10);
+  const py = (r: number) => 10 + (1 - r / 5) * (H - PAD - 10); // rating 5 at top
+  const COST_HI = maxCost * 0.6; // "high cost" = top 40% of the cost range
+  const RATING_LO = 3.8;          // matches the backend _health_status threshold
+  const qx = px(COST_HI);
+  const qy = py(RATING_LO);
+  const isDanger = (p: { cost: number; rating: number }) => p.cost >= COST_HI && p.rating < RATING_LO;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Cost versus rating scatter plot">
+      {/* danger quadrant */}
+      <rect x={qx} y={qy} width={W - 10 - qx} height={H - PAD - qy} className="fill-red-50" />
+      <text x={W - 12} y={qy + 12} textAnchor="end" className="fill-red-400" style={{ fontSize: 9 }}>
+        high cost · low rating
+      </text>
+      {/* axes */}
+      <line x1={PAD} y1={H - PAD} x2={W - 10} y2={H - PAD} stroke="#e2e8f0" />
+      <line x1={PAD} y1={10} x2={PAD} y2={H - PAD} stroke="#e2e8f0" />
+      <text x={W - 10} y={H - PAD + 14} textAnchor="end" className="fill-slate-400" style={{ fontSize: 9 }}>cost →</text>
+      <text x={PAD - 4} y={16} textAnchor="end" className="fill-slate-400" style={{ fontSize: 9 }}>5★</text>
+      <text x={PAD - 4} y={H - PAD} textAnchor="end" className="fill-slate-400" style={{ fontSize: 9 }}>0</text>
+      {points.map((p, i) => (
+        <circle
+          key={i}
+          cx={px(p.cost)}
+          cy={py(p.rating)}
+          r={4}
+          className={isDanger(p) ? 'fill-red-500' : 'fill-[#1f8e8b]'}
+          opacity={0.8}
+        >
+          <title>{`${p.name} · €${p.cost.toLocaleString('en-EU')} · ${p.rating.toFixed(1)}★`}</title>
+        </circle>
+      ))}
+    </svg>
+  );
+}
+
+// ── Coverage heatmap (category × destination country) ───────────────────────────
+// Green ≥3 vendors, amber 1-2, red gap (0). Corridor is a Tier-2 follow-up.
+
+function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
+  const categories = [...new Set(coverage.map((c) => c.category))];
+  const countries = [...new Set(coverage.map((c) => c.country))].sort();
+  if (categories.length === 0 || countries.length === 0) {
+    return <div className="py-6 text-center text-[12px] text-slate-400">No coverage data available.</div>;
+  }
+  const byKey = new Map(coverage.map((c) => [`${c.category}|${c.country}`, c]));
+  const cellCls = (status: string | undefined) =>
+    status === 'healthy' ? 'bg-emerald-500' : status === 'thin' ? 'bg-amber-400' : 'bg-red-400';
+  return (
+    <div className="overflow-x-auto">
+      <table className="border-separate" style={{ borderSpacing: 4 }}>
+        <thead>
+          <tr>
+            <th />
+            {countries.map((co) => (
+              <th key={co} className="px-1 text-[10px] font-medium text-slate-400">{co}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {categories.map((cat) => (
+            <tr key={cat}>
+              <td className="pr-2 text-[12px] font-medium text-[#0b2b43] whitespace-nowrap">{fmtCat(cat)}</td>
+              {countries.map((co) => {
+                const entry = byKey.get(`${cat}|${co}`);
+                const count = entry?.vendor_count ?? 0;
+                const status = entry?.status ?? 'gap';
+                return (
+                  <td key={co}>
+                    <div
+                      className={`flex h-9 w-10 flex-col items-center justify-center rounded text-[13px] font-semibold text-white ${cellCls(status)}`}
+                      title={`${fmtCat(cat)} · ${co}: ${count} vendor${count === 1 ? '' : 's'}${status === 'gap' ? ' — qualify more' : ''}`}
+                    >
+                      {count}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-500" /> Healthy (3+)</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-400" /> Thin (1-2)</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-400" /> Gap (0) — qualify more</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Watchlist (vendor-level, static thresholds) ─────────────────────────────────
+// Flags low rating, top-quartile cost, or slow SLA. Tier 3 adds ▲/▼ deltas.
+
+function Watchlist({ vendors }: { vendors: { vendor: FlatVendor; reasons: string[] }[] }) {
+  if (vendors.length === 0) {
+    return <div className="py-6 text-center text-[12px] text-slate-400">No vendors need attention.</div>;
+  }
+  return (
+    <ul className="divide-y divide-slate-100">
+      {vendors.map(({ vendor, reasons }) => (
+        <li key={`${vendor.id}-${vendor.category}`} className="flex items-center gap-3 px-1 py-2.5">
+          <span className="min-w-0 flex-1">
+            <span className="text-[13px] font-medium text-[#0b2b43]">{vendor.name}</span>
+            <span className="ml-2 text-[11px] text-slate-400">
+              {fmtCat(vendor.category)} · {fmtRating(vendor.rating)}★ · {fmtCost(vendor.cost_eur)} · {fmtSla(vendor.response_sla_hours)}
+            </span>
+          </span>
+          <span className="flex shrink-0 flex-wrap justify-end gap-1">
+            {reasons.map((r) => (
+              <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">{r}</span>
+            ))}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -367,6 +498,45 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
     };
   }, [data]);
 
+  // ── Flattened vendors for scatter + watchlist (respects category filter) ──
+  const flatVendors = useMemo<FlatVendor[]>(
+    () => filteredCats.flatMap((c) => c.vendors.map((v) => ({ ...v, category: c.category }))),
+    [filteredCats],
+  );
+
+  // ── Cost-vs-rating scatter points ────────────────────────────────────────
+  const scatterPoints = useMemo(
+    () =>
+      flatVendors
+        .filter((v) => v.cost_eur != null && v.rating != null)
+        .map((v) => ({ name: v.name, cost: v.cost_eur as number, rating: v.rating as number })),
+    [flatVendors],
+  );
+
+  // ── Watchlist: low rating, top-quartile cost, or slow SLA ────────────────
+  const watchlist = useMemo(() => {
+    const costs = flatVendors.map((v) => v.cost_eur).filter((c): c is number => c != null).sort((a, b) => a - b);
+    // 75th-percentile cost across the visible vendors (undefined when <4 priced vendors)
+    const q3 = costs.length >= 4 ? costs[Math.floor(costs.length * 0.75)] : undefined;
+    return flatVendors
+      .map((vendor) => {
+        const reasons: string[] = [];
+        if (vendor.rating != null && vendor.rating < 3.8) reasons.push('Low rating');
+        if (q3 != null && vendor.cost_eur != null && vendor.cost_eur >= q3) reasons.push('High cost');
+        if (vendor.response_sla_hours != null && vendor.response_sla_hours > 48) reasons.push('Slow SLA');
+        return { vendor, reasons };
+      })
+      .filter((r) => r.reasons.length > 0)
+      .sort((a, b) => b.reasons.length - a.reasons.length);
+  }, [flatVendors]);
+
+  // ── Coverage matrix, narrowed to the selected category ───────────────────
+  const coverage = useMemo(
+    () =>
+      (data?.coverage ?? []).filter((c) => catFilter === 'all' || c.category === catFilter),
+    [data, catFilter],
+  );
+
   const inner = (
     <div className="px-6 py-6 space-y-5">
       {/* Page header */}
@@ -492,6 +662,56 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             <BarChart data={costChartData} />
           )}
         </div>
+      </div>
+
+      {/* Cost-vs-rating scatter + watchlist */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="mb-2">
+            <p className="text-[13px] font-medium text-[#0b2b43]">Cost vs rating</p>
+            <p className="text-[11px] text-slate-400">
+              Each dot is a vendor · bottom-right = expensive and weak
+            </p>
+          </div>
+          {loading ? (
+            <div className="h-[200px] animate-pulse rounded bg-slate-100" />
+          ) : scatterPoints.length === 0 ? (
+            <div className="flex h-[200px] items-center justify-center text-[12px] text-slate-400">
+              No vendors with both cost and rating data
+            </div>
+          ) : (
+            <ScatterChart points={scatterPoints} />
+          )}
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="mb-2">
+            <p className="text-[13px] font-medium text-[#0b2b43]">Watchlist</p>
+            <p className="text-[11px] text-slate-400">
+              Vendors flagged for low rating, high cost, or slow response
+            </p>
+          </div>
+          {loading ? (
+            <div className="h-[200px] animate-pulse rounded bg-slate-100" />
+          ) : (
+            <Watchlist vendors={watchlist} />
+          )}
+        </div>
+      </div>
+
+      {/* Coverage heatmap */}
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+        <div className="mb-3">
+          <p className="text-[13px] font-medium text-[#0b2b43]">Coverage by destination</p>
+          <p className="text-[11px] text-slate-400">
+            Active vendors per category × country — red cells are where to qualify more
+          </p>
+        </div>
+        {loading ? (
+          <div className="h-[160px] animate-pulse rounded bg-slate-100" />
+        ) : (
+          <CoverageHeatmap coverage={coverage} />
+        )}
       </div>
 
       {/* Category rows with vendor cards */}

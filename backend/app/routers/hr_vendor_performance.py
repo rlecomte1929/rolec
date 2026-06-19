@@ -55,6 +55,19 @@ def _health_status(vendor_count: int, avg_rating: Optional[float]) -> str:
     return "healthy"
 
 
+def _coverage_status(vendor_count: int) -> str:
+    """Heatmap cell status: healthy (3+), thin (1-2), gap (0).
+
+    Only category × country pairs with ≥1 active vendor are returned by the
+    query, so 'gap' is surfaced client-side for cells the matrix never produced.
+    """
+    if vendor_count <= 0:
+        return "gap"
+    if vendor_count <= 2:
+        return "thin"
+    return "healthy"
+
+
 # ── Route ─────────────────────────────────────────────────────────────────────
 
 @router.get("/api/hr/vendor-performance")
@@ -136,6 +149,24 @@ def get_vendor_performance(
             WHERE s.status = 'active'
             GROUP BY ssc.service_category
             ORDER BY vendor_count DESC, ssc.service_category
+        """)).mappings().all()
+
+        # ── 3b. Coverage matrix — active vendors per (category × country) ─────
+        # Powers the direction-B coverage heatmap: where are we thin / where do
+        # we need to qualify more vendors. country_code is the destination the
+        # capability serves (corridor is a Tier-2 follow-up; suppliers carry no
+        # origin→dest corridor yet).
+        coverage_rows = session.execute(text("""
+            SELECT
+                ssc.service_category              AS category,
+                ssc.country_code                  AS country,
+                COUNT(DISTINCT s.id)::int         AS vendor_count
+            FROM suppliers s
+            JOIN supplier_service_capabilities ssc ON ssc.supplier_id = s.id
+            WHERE s.status = 'active'
+              AND ssc.country_code IS NOT NULL
+            GROUP BY ssc.service_category, ssc.country_code
+            ORDER BY ssc.service_category, ssc.country_code
         """)).mappings().all()
 
         # ── 4. All active vendors with their first capability + scoring ───────
@@ -246,6 +277,16 @@ def get_vendor_performance(
         for r in cat_rows
     ]
 
+    coverage = [
+        {
+            "category": str(r["category"] or "other"),
+            "country": str(r["country"]),
+            "vendor_count": int(r["vendor_count"] or 0),
+            "status": _coverage_status(int(r["vendor_count"] or 0)),
+        }
+        for r in coverage_rows
+    ]
+
     return {
         "summary": {
             "avg_rating": float(kpi.avg_rating) if kpi and kpi.avg_rating is not None else None,
@@ -255,4 +296,5 @@ def get_vendor_performance(
         },
         "monthly_trend": monthly_trend,
         "categories": categories,
+        "coverage": coverage,
     }

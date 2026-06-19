@@ -882,6 +882,12 @@ export const hrAPI = {
         recent_reviews: Array<{ score: number; comment: string; date: string }>;
       }>;
     }>;
+    coverage: Array<{
+      category: string;
+      country: string;
+      vendor_count: number;
+      status: 'healthy' | 'thin' | 'gap';
+    }>;
   }> => {
     const response = await api.get('/api/hr/vendor-performance');
     return response.data;
