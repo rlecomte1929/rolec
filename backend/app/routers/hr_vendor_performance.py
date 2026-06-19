@@ -119,25 +119,29 @@ def get_vendor_performance(
             WHERE s.status = 'active'
         """)).first()
 
-        # ── 2. Monthly case trend — last 6 months ────────────────────────────
+        # ── 2. Monthly case trend, windowed by `range` ───────────────────────
         # Source: provider_ratings (one row per employee+supplier+case).
         # Grouped by month × supplier × service_category so the frontend can
-        # filter down to a single vendor or category.
-        monthly_rows = session.execute(text("""
-            SELECT
-                to_char(pr.created_at, 'YYYY-MM')             AS month,
-                pr.supplier_id,
-                ssc.service_category                           AS category,
-                COUNT(DISTINCT pr.case_id)::int                AS case_count
-            FROM provider_ratings pr
-            JOIN suppliers s     ON s.id = pr.supplier_id AND s.status = 'active'
-            JOIN supplier_service_capabilities ssc
-                                 ON ssc.supplier_id = s.id
-            WHERE pr.company_id = CAST(:cid AS uuid)
-              AND pr.created_at >= now() - CAST(:window AS interval)
-            GROUP BY month, pr.supplier_id, ssc.service_category
-            ORDER BY month ASC
-        """), {"cid": company_id, "window": window}).mappings().all()
+        # filter down to a single vendor or category. Company-scoped — skipped
+        # when the caller has no resolvable company_id (a CAST("" AS uuid) would
+        # otherwise 500 the whole dashboard); global vendor data still renders.
+        monthly_rows = []
+        if company_id:
+            monthly_rows = session.execute(text("""
+                SELECT
+                    to_char(pr.created_at, 'YYYY-MM')             AS month,
+                    pr.supplier_id,
+                    ssc.service_category                           AS category,
+                    COUNT(DISTINCT pr.case_id)::int                AS case_count
+                FROM provider_ratings pr
+                JOIN suppliers s     ON s.id = pr.supplier_id AND s.status = 'active'
+                JOIN supplier_service_capabilities ssc
+                                     ON ssc.supplier_id = s.id
+                WHERE pr.company_id = CAST(:cid AS uuid)
+                  AND pr.created_at >= now() - CAST(:window AS interval)
+                GROUP BY month, pr.supplier_id, ssc.service_category
+                ORDER BY month ASC
+            """), {"cid": company_id, "window": window}).mappings().all()
 
         # ── 3. Per-category aggregate ─────────────────────────────────────────
         cat_rows = session.execute(text("""
@@ -203,16 +207,19 @@ def get_vendor_performance(
         """)).mappings().all()
 
         # ── 5. Recent reviews scoped to this company (max 5 per supplier) ────
-        review_rows = session.execute(text("""
-            SELECT
-                pr.supplier_id,
-                pr.score,
-                pr.comment,
-                pr.created_at::date AS review_date
-            FROM provider_ratings pr
-            WHERE pr.company_id = CAST(:cid AS uuid)
-            ORDER BY pr.created_at DESC
-        """), {"cid": company_id}).mappings().all()
+        # Same no-company guard as the monthly trend above.
+        review_rows = []
+        if company_id:
+            review_rows = session.execute(text("""
+                SELECT
+                    pr.supplier_id,
+                    pr.score,
+                    pr.comment,
+                    pr.created_at::date AS review_date
+                FROM provider_ratings pr
+                WHERE pr.company_id = CAST(:cid AS uuid)
+                ORDER BY pr.created_at DESC
+            """), {"cid": company_id}).mappings().all()
 
     # ── Assemble response ─────────────────────────────────────────────────────
 
