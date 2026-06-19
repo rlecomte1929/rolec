@@ -451,6 +451,90 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
           <p className="text-sm text-slate-600 leading-relaxed">{task.why_this_matters}</p>
         )}
 
+        {/* Step-by-step instructions — sent by backend, previously ignored */}
+        {Array.isArray(task.instructions) && task.instructions.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+              How to complete this step
+            </p>
+            <ol className="space-y-1.5">
+              {(task.instructions as string[]).map((step, i) => (
+                <li key={i} className="flex gap-2.5 text-sm text-slate-600">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#1f8e8b]/10 text-[10px] font-semibold text-[#1f8e8b]">
+                    {i + 1}
+                  </span>
+                  <span className="leading-snug">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Required inputs checklist — shows what's already provided vs. still needed */}
+        {Array.isArray(task.required_inputs) && task.required_inputs.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+              What's needed
+            </p>
+            <ul className="space-y-1">
+              {(task.required_inputs as { label: string; present: boolean }[]).map((inp, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  {inp.present ? (
+                    <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <circle cx="7" cy="7" r="6.5" className="fill-emerald-50 stroke-emerald-300" strokeWidth="1" />
+                      <path d="M4 7l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5 shrink-0 text-amber-400" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <circle cx="7" cy="7" r="6.5" className="fill-amber-50 stroke-amber-300" strokeWidth="1" />
+                      <path d="M7 4v3M7 9.5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  )}
+                  <span className={inp.present ? 'text-slate-500 line-through' : 'text-slate-700'}>
+                    {inp.label}
+                  </span>
+                  {!inp.present && (
+                    <span className="ml-auto text-[10px] font-medium text-amber-600 bg-amber-50 rounded px-1.5 py-0.5">
+                      Missing
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* CTA button — backend sends type + label; target is not yet wired so we
+            show the button only when the label is present and link to the dossier
+            as a sensible fallback until backend populates cta.target per-task. */}
+        {task.cta?.label && !isHrOwned && (
+          <a
+            href={task.cta.target ?? '#'}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2b43] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b2b43]/90 transition-colors"
+          >
+            {task.cta.label}
+            <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2.5 6h7M6.5 3.5l3 2.5-3 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        )}
+
+        {/* Blocked-by details — previously only showed generic "Blocked" badge */}
+        {task.status === 'blocked' && Array.isArray(task.blocked_by) && task.blocked_by.length > 0 && (
+          <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-600 mb-1">
+              Waiting on
+            </p>
+            <ul className="space-y-0.5">
+              {(task.blocked_by as string[]).map((dep, i) => (
+                <li key={i} className="text-xs text-amber-700">
+                  {dep.replace(/_/g, ' ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {isHrOwned && role === 'employee' && (
           <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
             HR is handling this step. No action required from you.

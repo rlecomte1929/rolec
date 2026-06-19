@@ -715,9 +715,10 @@ export function EmployeeIntakePage() {
         if (saveTimer.current) clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
           pendingSaveDataRef.current = null; // mark as persisted
-          setSavedAt(Date.now());
           const aid = assignmentIdRef.current;
           if (aid) {
+            // Only update the "Auto-saved" timestamp after a real write fires.
+            setSavedAt(Date.now());
             void employeeAPI
               .updateIntakeDraft(aid, next as unknown as Record<string, unknown>)
               .catch(() => {
@@ -806,8 +807,16 @@ export function EmployeeIntakePage() {
   // and logged console 404s). Stay null until resolved so the guarded effects
   // below never fire a request with the wrong id.
   const { assignmentId: contextAssignmentId, linkedSummaries } = useEmployeeAssignment();
+  // AIQ-INK-1: the URL param (:caseId) is actually an assignment_id — all
+  // three call-sites in EmployeeJourney.tsx build the link as
+  // `/employee/case/${row.assignment_id}/intake`. Matching on `case_id` never
+  // finds the row, leaving assignmentId null and silently skipping every save.
+  // Try assignment_id first; fall back to case_id for deep-links that carry the
+  // case UUID (e.g. links sent by HR from the command center).
   const assignmentId = routeCaseId
-    ? (linkedSummaries.find((r) => r.case_id === routeCaseId)?.assignment_id ?? null)
+    ? (linkedSummaries.find((r) => r.assignment_id === routeCaseId)?.assignment_id
+        ?? linkedSummaries.find((r) => r.case_id === routeCaseId)?.assignment_id
+        ?? null)
     : contextAssignmentId;
   const hydratedStepRef = useRef(false);
   const lastPersistedStepRef = useRef<number | null>(null);

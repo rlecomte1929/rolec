@@ -672,18 +672,38 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
   // (HrPolicy provides the shell + tab chrome). Standalone route still wraps it.
   const body = (
     <>
-      {/* Page header */}
-      <div className="px-6 py-5 border-b border-slate-100">
-        <Breadcrumb section="HR Operations" title="Policy exceptions" className="mb-2" />
-        <div className="flex items-end gap-3">
-          <h1 className="text-xl font-semibold text-slate-900">Policy exceptions</h1>
-          <div className="flex-1" />
-          {counts.pending > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              {counts.pending} pending
-            </span>
-          )}
+      {/* Page header — hidden when embedded (HrPolicy's AppShell already provides title + breadcrumb) */}
+      {!embedded && (
+        <div className="px-6 py-5 border-b border-slate-100">
+          <Breadcrumb section="HR Operations" title="Policy exceptions" className="mb-2" />
+          <div className="flex items-end gap-3">
+            <h1 className="text-xl font-semibold text-slate-900">Policy exceptions</h1>
+            <div className="flex-1" />
+            {counts.pending > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                {counts.pending} pending
+              </span>
+            )}
+            <Button unstyled className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export
+            </Button>
+          </div>
+          <p className="mt-1 text-sm text-slate-500 leading-relaxed">
+            Employees requested deviations from their assigned policy. Review each request, approve or reject with a note, and the decision flows back to their relocation plan.
+          </p>
+        </div>
+      )}
+      {/* When embedded, show only the Export button inline with the exception list */}
+      {embedded && counts.pending > 0 && (
+        <div className="flex items-center justify-between px-1 pb-3">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            {counts.pending} pending
+          </span>
           <Button unstyled className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -691,10 +711,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
             Export
           </Button>
         </div>
-        <p className="mt-1 text-sm text-slate-500 leading-relaxed">
-          Employees requested deviations from their assigned policy. Review each request, approve or reject with a note, and the decision flows back to their relocation plan.
-        </p>
-      </div>
+      )}
 
       {/* Two-pane inbox */}
       <div className="flex h-[calc(100vh-160px)] overflow-hidden">

@@ -130,7 +130,19 @@ const SECTIONS: NavSection[] = [
       // RECS-CATALOG-2/AIQ-1080: badge the count of employees stuck on the "HR is
       // finalizing" empty state (catalog_employee_demand, un-curated only) so HR is
       // nudged to curate from anywhere — not just once they're already on the page.
-      { id: 'service-providers', label: 'Service providers', hint: 'Manage vendors and track provider status', to: ROUTE_DEFS.hrServiceProviders.path, badge: { kind: 'dynamic', getCount: (c) => c.hr?.employees_waiting ?? 0 } },
+      // NAV-SP-2: surface sub-tabs as sidebar children (mirrors NAV-POL-1 for Policy).
+      {
+        id: 'service-providers',
+        label: 'Service providers',
+        hint: 'Manage vendors and track provider status',
+        to: ROUTE_DEFS.hrServiceProviders.path,
+        badge: { kind: 'dynamic', getCount: (c) => c.hr?.employees_waiting ?? 0 },
+        children: [
+          { id: 'sp-dashboard', label: 'Dashboard', to: `${ROUTE_DEFS.hrServiceProviders.path}?tab=dashboard` },
+          { id: 'sp-vendor', label: 'Vendor management', to: `${ROUTE_DEFS.hrServiceProviders.path}?tab=vendor` },
+          { id: 'sp-performance', label: 'Vendor performance', to: `${ROUTE_DEFS.hrServiceProviders.path}?tab=providers` },
+        ],
+      },
       { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
       // NAV-001: 'Requirements' now points to the corridor immigration-compliance
       // page (/hr/requirements) — document checklist, risk flags, milestones, intake
@@ -321,14 +333,22 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  // A child sub-item (e.g. a Policy tab) is active when its pathname matches and
-  // its ?tab= equals the current tab — defaulting to the first tab when absent,
-  // so /hr/policy with no query highlights "Published policy". (NAV-POL-1)
+  // Default tab per parent path — avoids hardcoding 'policy' everywhere.
+  // Each grouped surface declares its own first tab here. (NAV-POL-1, NAV-SP-2)
+  const PATH_DEFAULT_TABS: Record<string, string> = {
+    [ROUTE_DEFS.hrPolicy.path]: 'policy',
+    [ROUTE_DEFS.hrServiceProviders.path]: 'dashboard',
+  };
+
+  // A child sub-item is active when its pathname matches and its ?tab= equals the
+  // current tab — defaulting to the path's first tab when absent, so e.g.
+  // /hr/policy with no query highlights "Published policy". (NAV-POL-1, NAV-SP-2)
   const isChildActive = (childTo: string) => {
     const [childPath, childQuery = ''] = childTo.split('?');
     if (location.pathname !== childPath) return false;
-    const childTab = new URLSearchParams(childQuery).get('tab') ?? 'policy';
-    const currentTab = new URLSearchParams(location.search).get('tab') ?? 'policy';
+    const defaultTab = PATH_DEFAULT_TABS[childPath] ?? '';
+    const childTab = new URLSearchParams(childQuery).get('tab') ?? defaultTab;
+    const currentTab = new URLSearchParams(location.search).get('tab') ?? defaultTab;
     return childTab === currentTab;
   };
 

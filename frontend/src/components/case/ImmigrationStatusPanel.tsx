@@ -134,15 +134,23 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    Promise.all([
+    // allSettled so a missing/failed interview-status endpoint never
+    // kills the immigration requirements display (the primary surface).
+    Promise.allSettled([
       hrAPI.getImmigrationRequirements(caseId),
       hrAPI.getImmigrationInterviewStatus(caseId),
     ])
-      .then(([imm, iv]) => {
-        setImmData(imm);
-        setInterview(iv);
+      .then(([immRes, ivRes]) => {
+        if (immRes.status === 'fulfilled') {
+          setImmData(immRes.value);
+        } else {
+          setError('Failed to load immigration data.');
+        }
+        if (ivRes.status === 'fulfilled') {
+          setInterview(ivRes.value);
+        }
+        // Interview status failure is silent — the checklist still shows.
       })
-      .catch(() => setError('Failed to load immigration data.'))
       .finally(() => setLoading(false));
   }, [caseId]);
 
