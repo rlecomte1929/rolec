@@ -63,37 +63,39 @@ const SECTIONS: NavSection[] = [
     label: 'Employee',
     minRole: 'EMPLOYEE',
     items: [
-      { id: 'intake', label: 'My cases', to: ROUTE_DEFS.employeeDashboard.path, exact: true },
+      // NAV-EMP-1: "My cases" is the hub — Intake, Roadmap, Tasks, Dossier are
+      // grouped as children (always visible when expanded) so the sidebar mirrors
+      // the HR/Policy grouping pattern and keeps the flat list short.
       {
-        id: 'detailed-intake',
-        label: 'Intake form',
-        hint: 'Answer questions that shape your relocation case',
-        to: ROUTE_DEFS.employeeIntake.path,
-        // Wizard is meaningless without a linked case — hide until the user has one.
-        // Admins keep it visible so they can preview the form.
-        hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
+        id: 'intake',
+        label: 'My cases',
+        to: ROUTE_DEFS.employeeDashboard.path,
+        exact: true,
+        children: [
+          { id: 'detailed-intake', label: 'Intake form', to: ROUTE_DEFS.employeeIntake.path },
+          { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path },
+          { id: 'documents', label: 'Tasks', to: ROUTE_DEFS.employeeTaskPage.path },
+          { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
+        ],
       },
-      // No badge: the roadmap item count isn't wired into the sidebar's
-      // NotifContext, and the hard-coded '3' showed even when the roadmap was
-      // empty (buttons disabled, no items) — the same distrust-training problem
-      // AIQ-914 fixed for the other items. Re-add a `dynamic` badge once a real
-      // roadmap-item count is exposed to the sidebar. (AIQ-979)
-      { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path },
-      { id: 'documents', label: 'Tasks', hint: 'Documents and actions requested by your HR team', to: ROUTE_DEFS.employeeTaskPage.path },
-      { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
-      { id: 'service-providers', label: 'Services', hint: 'Choose services and see recommended providers for your move', to: ROUTE_DEFS.services.path },
-      { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
+      // NAV-EMP-2: Services groups Benefit comparison underneath.
+      {
+        id: 'service-providers-emp',
+        label: 'Services',
+        hint: 'Choose services and see recommended providers for your move',
+        to: ROUTE_DEFS.services.path,
+        children: [
+          { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
+        ],
+      },
       // NAV-002: 'Resources' = the destination lifestyle guide (housing, events,
-      // local services) for the employee's assignment. No badge (the old 'LIVE'
-      // badge was misleading).
+      // local services) for the employee's assignment.
       { id: 'resources-guide', label: 'Resources', to: ROUTE_DEFS.resources.path },
       {
         id: 'inbox',
         label: 'Inbox',
         to: ROUTE_DEFS.messages.path,
         toByRole: { HR: ROUTE_DEFS.hrMessages.path, ADMIN: ROUTE_DEFS.hrMessages.path },
-        // No badge: there is no thread-count source wired yet, and a hard-coded
-        // '3' (vs 0 real threads) trained users to distrust the badge (AIQ-914).
       },
     ],
   },
@@ -311,20 +313,25 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   const { linkedCount, primaryCaseId } = useEmployeeAssignment();
   const effectiveCaseId = urlCaseId ?? selectedCaseId ?? primaryCaseId;
 
-  // Resolve the effective `to` for an item, allowing case-scoped overrides
+  // Resolve the effective `to` for a top-level item, allowing case-scoped overrides
   const resolveItemTo = (item: SectionItem): string => {
-    if (item.id === 'roadmap' && effectiveCaseId) {
-      return buildRoute('employeeCaseRoadmap', { caseId: effectiveCaseId });
-    }
-    if (item.id === 'dossier' && effectiveCaseId) {
-      return buildRoute('employeeCaseDossier', { caseId: effectiveCaseId });
-    }
-    // AIQ-976: case-scope the intake link so the sidebar opens the active case
-    // in the v2 wizard, consistent with roadmap/dossier above.
-    if (item.id === 'detailed-intake' && effectiveCaseId) {
+    return item.toByRole?.[role] ?? item.to;
+  };
+
+  // Resolve child item `to` — handles case-scoped employee routes.
+  // (NAV-EMP-1) Children like Intake/Roadmap/Dossier are now nested under
+  // "My cases" and need the same case-scoping that top-level items had.
+  const resolveChildTo = (childId: string, childTo: string): string => {
+    if (childId === 'detailed-intake' && effectiveCaseId) {
       return buildRoute('employeeCaseIntake', { caseId: effectiveCaseId });
     }
-    return item.toByRole?.[role] ?? item.to;
+    if (childId === 'roadmap' && effectiveCaseId) {
+      return buildRoute('employeeCaseRoadmap', { caseId: effectiveCaseId });
+    }
+    if (childId === 'dossier' && effectiveCaseId) {
+      return buildRoute('employeeCaseDossier', { caseId: effectiveCaseId });
+    }
+    return childTo;
   };
 
   const isActive = (item: SectionItem) => {
@@ -340,12 +347,14 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     [ROUTE_DEFS.hrServiceProviders.path]: 'dashboard',
   };
 
-  // A child sub-item is active when its pathname matches and its ?tab= equals the
-  // current tab — defaulting to the path's first tab when absent, so e.g.
-  // /hr/policy with no query highlights "Published policy". (NAV-POL-1, NAV-SP-2)
-  const isChildActive = (childTo: string) => {
-    const [childPath, childQuery = ''] = childTo.split('?');
-    if (location.pathname !== childPath) return false;
+  // A child sub-item is active when its (resolved) pathname matches and its
+  // ?tab= equals the current tab — defaulting to the path's first tab when
+  // absent. (NAV-POL-1, NAV-SP-2, NAV-EMP-1)
+  const isChildActive = (child: { id: string; to: string }) => {
+    const resolvedTo = resolveChildTo(child.id, child.to);
+    const [childPath, childQuery = ''] = resolvedTo.split('?');
+    // Allow prefix match for case-scoped routes (e.g. /employee/case/:id/intake)
+    if (location.pathname !== childPath && !location.pathname.startsWith(`${childPath}/`)) return false;
     const defaultTab = PATH_DEFAULT_TABS[childPath] ?? '';
     const childTab = new URLSearchParams(childQuery).get('tab') ?? defaultTab;
     const currentTab = new URLSearchParams(location.search).get('tab') ?? defaultTab;
@@ -515,11 +524,12 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 {!collapsed && item.children && (
                   <div className="ml-7 mb-1 mt-0.5 flex flex-col gap-0.5 border-l border-slate-200 pl-2">
                     {item.children.map((child) => {
-                      const childActive = isChildActive(child.to);
+                      const childActive = isChildActive(child);
+                      const childTo = resolveChildTo(child.id, child.to);
                       return (
                         <Link
                           key={child.id}
-                          to={child.to}
+                          to={childTo}
                           title={child.label}
                           className={`block truncate rounded-md px-2 py-1 text-[13px] transition-colors ${
                             childActive

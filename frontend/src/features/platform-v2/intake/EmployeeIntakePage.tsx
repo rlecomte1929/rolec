@@ -980,14 +980,13 @@ export function EmployeeIntakePage() {
                 const isActive = n === step;
                 return (
                   <Button unstyled key={lbl} type="button"
-                    onClick={() => n < step && goTo(n)}
-                    disabled={n > step}
+                    onClick={() => goTo(n)}
                     title={onHold ? 'On hold — coming soon' : undefined}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
-                      onHold && !isActive ? 'text-gray-400 opacity-60' :
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors cursor-pointer ${
+                      onHold && !isActive ? 'text-gray-400 opacity-60 hover:bg-gray-50' :
                       isActive ? 'bg-accent-100 text-accent-700' :
-                      isDone ? 'text-green-600 cursor-pointer hover:bg-green-50' :
-                      'text-gray-300'
+                      isDone ? 'text-green-600 hover:bg-green-50' :
+                      'text-gray-400 hover:bg-gray-50'
                     }`}>
                     <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center flex-shrink-0 ${
                       onHold && !isActive ? 'bg-gray-100 text-gray-400' :
