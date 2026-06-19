@@ -141,6 +141,10 @@ backend/app/routers/crons.py:promote_hr_vendors_cron
 # CRON (CATALOG-2-FU/AIQ-1077): _verify_cron_secret(request) inline. Daily
 # automatic HR-vendor promotion, invoked by the catalog-promotion workflow,
 # not an end user.
+backend/app/routers/crons.py:snapshot_vendor_metrics_cron
+# CRON (NAV-SP-2 Tier 3): _verify_cron_secret(request) inline. Daily
+# vendor-metric snapshot, invoked by the vendor-metric-snapshot-daily workflow,
+# not an end user.
 
 # CRON (PERMANENT): calls _verify_cron_secret(request) in the body — fail-closed
 # (503 if CRON_SECRET unset, 401 on mismatch). Inline, not a Depends().
