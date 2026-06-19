@@ -29,11 +29,11 @@ import {
   AlertTriangle,
   Ban,
   CheckCircle2,
+  ChevronRight,
   Circle,
   CircleDot,
   Diamond,
   TriangleAlert,
-  X,
 } from 'lucide-react';
 import { Button, Card, LoadingButton } from '../../components/antigravity';
 import { fetchRelocationPlanView } from '../../api/relocationPlanView';
@@ -650,219 +650,123 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
   );
 }
 
-// ─── Desktop detail panel wrapper ─────────────────────────────────────────────
+// DetailPanel and BottomSheet removed — replaced by inline expand in TaskRow.
 
-interface DetailPanelProps {
-  task: RelocationPlanPhaseTaskDTO | null;
-  caseId: string | null;
-  role: RelocationTimelineRole;
-  onSaved: () => void;
-}
-
-function DetailPanel({ task, caseId, role, onSaved }: DetailPanelProps) {
-  if (!task) {
-    return (
-      <div className="hidden lg:flex h-full min-h-[200px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6">
-        <p className="text-sm text-slate-400 text-center">Select a task to view and edit details</p>
-      </div>
-    );
-  }
-  return (
-    <div className="hidden lg:block sticky top-4 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <DetailPanelContent
-        task={task}
-        caseId={caseId}
-        role={role}
-        idPrefix="dp"
-        onSaved={onSaved}
-      />
-    </div>
-  );
-}
-
-// ─── Mobile bottom sheet ──────────────────────────────────────────────────────
-
-interface BottomSheetProps {
-  open: boolean;
-  task: RelocationPlanPhaseTaskDTO | null;
-  caseId: string | null;
-  role: RelocationTimelineRole;
-  onClose: () => void;
-  onSaved: () => void;
-}
-
-const FOCUSABLE_SELECTORS =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function BottomSheet({ open, task, caseId, role, onClose, onSaved }: BottomSheetProps) {
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape key.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
-  // Move focus into sheet when it opens.
-  useEffect(() => {
-    if (open && sheetRef.current) {
-      const first = sheetRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTORS);
-      first?.focus();
-    }
-  }, [open, task]);
-
-  // Focus trap — keep Tab / Shift+Tab inside the dialog while it is open.
-  // WCAG 2.4.3 Focus Order + APG modal dialog pattern.
-  useEffect(() => {
-    if (!open) return;
-    const trapFocus = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !sheetRef.current) return;
-      const focusable = Array.from(
-        sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS)
-      ).filter((el) => !el.closest('[aria-hidden="true"]'));
-      if (focusable.length === 0) { e.preventDefault(); return; }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener('keydown', trapFocus);
-    return () => document.removeEventListener('keydown', trapFocus);
-  }, [open]);
-
-  // Prevent body scroll while sheet is open.
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
-
-  return (
-    // Outer: lg:hidden so it never appears on desktop
-    <div className={`lg:hidden`} aria-hidden={!open}>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-200 ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        aria-hidden
-      />
-
-      {/* Sheet */}
-      <div
-        ref={sheetRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={task ? `Task details: ${task.title}` : 'Task details'}
-        className={`fixed inset-x-0 bottom-0 z-50 max-h-[85vh] flex flex-col rounded-t-2xl border-t border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out ${
-          open ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        {/* Drag handle + close */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
-          <div className="mx-auto w-10 h-1 rounded-full bg-slate-300" aria-hidden />
-          <Button unstyled
-            type="button"
-            onClick={onClose}
-            className="absolute right-4 top-3 p-2 rounded-lg text-slate-500 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]"
-            aria-label="Close task details"
-          >
-            <X className="size-5" aria-hidden />
-          </Button>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1 pb-safe">
-          {task ? (
-            <DetailPanelContent
-              task={task}
-              caseId={caseId}
-              role={role}
-              idPrefix="bs"
-              onSaved={() => { onSaved(); onClose(); }}
-            />
-          ) : (
-            <p className="text-sm text-slate-400 text-center py-8">
-              Select a task to view details
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Task row ─────────────────────────────────────────────────────────────────
+// ─── Task row — inline expand (Option C) ─────────────────────────────────────
+//
+// Single-column layout that works at every screen size. Clicking a task expands
+// its detail inline, pushing siblings down. No right panel, no bottom sheet.
+// Matches platform brand: navy #0b2b43 structure, teal #1f8e8b for active state.
 
 function TaskRow({
   task,
-  selected,
+  expanded,
+  phaseIndex,
+  phaseTotal,
+  caseId,
+  role,
   isLast,
   onSelect,
+  onSaved,
 }: {
   task: RelocationPlanPhaseTaskDTO;
-  selected: boolean;
+  expanded: boolean;
+  /** 0-based index of this task within its phase (for "Step N of M"). */
+  phaseIndex: number;
+  phaseTotal: number;
+  caseId: string | null;
+  role: RelocationTimelineRole;
   isLast: boolean;
   onSelect: () => void;
+  onSaved: () => void;
 }) {
   const visual = deriveVisualStatus(task);
   const v = VISUAL[visual];
   const done = isTaskComplete(task);
 
   return (
-    <li className="relative flex gap-3">
-      {/* Vertical connector line */}
+    <li className="relative">
+      {/* Vertical connector line — runs behind the row */}
       {!isLast && (
         <span
-          className="absolute left-3 top-6 bottom-0 w-[2px] bg-slate-200 -z-0"
+          className="absolute left-[11px] top-6 bottom-0 w-[2px] bg-slate-200 z-0"
           aria-hidden
         />
       )}
 
-      <span className="relative z-10 pt-0.5 shrink-0">
-        <TimelineDot status={visual} />
-      </span>
-
-      <Button unstyled
-        type="button"
-        onClick={onSelect}
-        aria-pressed={selected}
-        aria-label={`${task.title}. ${v.label}${task.due_date ? `. Due ${task.due_date}` : ''}. ${selected ? 'Selected' : 'Click to view details'}`}
-        className={`flex-1 min-w-0 text-left rounded-lg px-3 py-2 min-h-[44px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-2 ${
-          selected
-            ? 'bg-[#0b2b43]/5 border border-[#0b2b43]/15'
-            : 'hover:bg-slate-50 border border-transparent'
-        } ${v.accentClass}`}
+      <div
+        className={`relative rounded-xl border transition-all duration-200 overflow-hidden ${
+          expanded
+            ? 'border-[#1f8e8b] shadow-sm bg-white'
+            : 'border-transparent bg-transparent'
+        }`}
       >
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-          <span className={`text-sm font-medium leading-snug truncate ${done ? 'line-through text-slate-400' : v.textClass}`}>
-            {task.title}
+        {/* ── Clickable header row ── */}
+        <Button unstyled
+          type="button"
+          onClick={onSelect}
+          aria-expanded={expanded}
+          aria-label={`${task.title}. ${v.label}${task.due_date ? `. Due ${task.due_date}` : ''}. ${expanded ? 'Collapse' : 'Expand'} details`}
+          className={`relative z-10 w-full text-left flex items-start gap-3 px-3 py-2.5 min-h-[44px] rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-2 ${
+            expanded ? 'bg-[#0b2b43]/[0.04]' : 'hover:bg-slate-50'
+          }`}
+        >
+          <span className="relative z-10 pt-0.5 shrink-0">
+            <TimelineDot status={visual} />
           </span>
-          <OwnerChip owner={task.owner} />
-          {task.priority === 'critical' && !done && (
-            <span aria-label="Critical path" className="text-red-700" title="Critical path">
-              <Diamond className="size-3" aria-hidden />
-            </span>
-          )}
-        </div>
-        {(task.due_date || visual === 'overdue') && (
-          <p className={`text-xs mt-0.5 ${visual === 'overdue' ? 'text-red-700 font-medium' : 'text-slate-500'}`}>
-            {visual === 'overdue'
-              ? `Overdue · ${task.due_date}`
-              : `Due ${task.due_date}`}
-          </p>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className={`text-sm font-medium leading-snug ${done ? 'line-through text-slate-400' : v.textClass}`}>
+                {task.title}
+              </span>
+              <OwnerChip owner={task.owner} />
+              {task.priority === 'critical' && !done && (
+                <span aria-label="Critical path" className="text-red-700" title="Critical path">
+                  <Diamond className="size-3" aria-hidden />
+                </span>
+              )}
+            </div>
+            {(task.due_date || visual === 'overdue') && (
+              <p className={`text-xs mt-0.5 ${visual === 'overdue' ? 'text-red-700 font-medium' : 'text-slate-500'}`}>
+                {visual === 'overdue' ? `Overdue · ${task.due_date}` : `Due ${task.due_date}`}
+              </p>
+            )}
+            {visual === 'blocked' && (
+              <p className="text-xs text-amber-800 mt-0.5">Blocked</p>
+            )}
+          </div>
+
+          <ChevronRight
+            className={`size-4 shrink-0 mt-0.5 transition-transform duration-200 ${
+              expanded ? 'rotate-90 text-[#1f8e8b]' : 'text-slate-400'
+            }`}
+            aria-hidden
+          />
+        </Button>
+
+        {/* ── Inline expanded detail ── */}
+        {expanded && (
+          <div className="border-t border-slate-100 animate-[fadeIn_0.15s_ease-out]">
+            {/* Phase context strip — replaces the redundant repeated phase heading */}
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50/80 border-b border-slate-100">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1f8e8b] shrink-0" aria-hidden />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[#1f8e8b]">
+                Step {phaseIndex + 1} of {phaseTotal}
+              </span>
+            </div>
+
+            {/* Shared detail content (status, instructions, required inputs, CTA) */}
+            <DetailPanelContent
+              task={task}
+              caseId={caseId}
+              role={role}
+              idPrefix={`inline-${task.task_id}`}
+              onSaved={onSaved}
+            />
+          </div>
         )}
-        {visual === 'blocked' && (
-          <p className="text-xs text-amber-800 mt-0.5">Blocked</p>
-        )}
-      </Button>
+      </div>
     </li>
   );
 }
@@ -1007,7 +911,6 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<RelocationTimelineFilter>('all');
-  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
 
   const effectiveViewRole = planViewRole ?? role;
 
@@ -1096,15 +999,10 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
     return null;
   }, [data]);
 
-  const selectedTask = useMemo(
-    () => allTasks.find((t) => t.task_id === selectedId) ?? null,
-    [allTasks, selectedId]
-  );
-
+  // Toggle: clicking the expanded task collapses it; clicking a new one expands it.
   const handleSelect = useCallback(
     (taskId: string) => {
-      setSelectedId(taskId);
-      setBottomSheetOpen(true);
+      setSelectedId((prev) => (prev === taskId ? null : taskId));
       onMilestoneSelect?.(taskId);
     },
     [onMilestoneSelect]
@@ -1203,52 +1101,38 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
             <EmptyFilterNoResults />
           </div>
         ) : (
-          /* Two-column layout */
-          <div className="mt-4 lg:grid lg:grid-cols-[40%_60%] lg:gap-6 items-start">
-            {/* LEFT: timeline list */}
-            <div className="overflow-y-auto max-h-[70vh] pr-1">
-              <ul
-                role="list"
-                aria-label="Relocation milestones"
-                className="relative space-y-1 pl-3"
-              >
-                {filteredPhases.map(({ phase, tasks }) => (
-                  <React.Fragment key={phase.phase_key}>
-                    <PhaseHeader phase={phase} />
-                    {tasks.map((task, idx) => (
-                      <TaskRow
-                        key={task.task_id}
-                        task={task}
-                        selected={selectedId === task.task_id}
-                        isLast={idx === tasks.length - 1}
-                        onSelect={() => handleSelect(task.task_id)}
-                      />
-                    ))}
-                  </React.Fragment>
-                ))}
-              </ul>
-            </div>
-
-            {/* RIGHT: detail panel (desktop only) */}
-            <DetailPanel
-              task={selectedTask}
-              caseId={data?.case_id ?? null}
-              role={role}
-              onSaved={() => void load()}
-            />
+          /* Single-column inline-expand — works at every screen size */
+          <div className="mt-4">
+            <ul
+              role="list"
+              aria-label="Relocation milestones"
+              className="relative space-y-1 pl-3"
+            >
+              {filteredPhases.map(({ phase, tasks }) => (
+                <React.Fragment key={phase.phase_key}>
+                  <PhaseHeader phase={phase} />
+                  {tasks.map((task, idx) => (
+                    <TaskRow
+                      key={task.task_id}
+                      task={task}
+                      expanded={selectedId === task.task_id}
+                      phaseIndex={idx}
+                      phaseTotal={tasks.length}
+                      caseId={data?.case_id ?? null}
+                      role={role}
+                      isLast={idx === tasks.length - 1}
+                      onSelect={() => handleSelect(task.task_id)}
+                      onSaved={() => void load()}
+                    />
+                  ))}
+                </React.Fragment>
+              ))}
+            </ul>
           </div>
         )}
       </Card>
 
-      {/* Mobile bottom sheet — rendered outside Card so fixed positioning works correctly */}
-      <BottomSheet
-        open={bottomSheetOpen}
-        task={selectedTask}
-        caseId={data?.case_id ?? null}
-        role={role}
-        onClose={() => setBottomSheetOpen(false)}
-        onSaved={() => void load()}
-      />
+      {/* Bottom sheet removed — inline expand handles all screen sizes */}
     </>
   );
 };
