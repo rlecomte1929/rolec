@@ -98,6 +98,8 @@ export interface RelocationPlanPhaseTaskDTO {
   blocked_by: string[];
   depends_on: string[];
   why_this_matters?: string | null;
+  /** Representative effort label, e.g. "~10 min" (library-level approximation). */
+  estimated_effort?: string | null;
   instructions: string[];
   required_inputs: RelocationPlanRequiredInputDTO[];
   cta?: RelocationPlanCtaDTO | null;
