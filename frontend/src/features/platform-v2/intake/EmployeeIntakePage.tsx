@@ -610,11 +610,30 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
 
 // ─── Review summary ───────────────────────────────────────────────────────────
 
-function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => void }) {
+function ReviewSummary({ data, goTo, loading = false }: { data: IntakeData; goTo: (s: number) => void; loading?: boolean }) {
   const partner = data.members.find((m) => m.kind === 'partner');
   const children = data.members.filter((m) => m.kind === 'child');
   const oC = COUNTRIES.find((c) => c.code === data.origin_country);
   const dC = COUNTRIES.find((c) => c.code === data.dest_country);
+
+  // While the saved draft is still loading, show skeleton rows instead of the
+  // "—"/"missing" fallbacks — populated fields would otherwise flash as lost.
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4" aria-busy="true" aria-label="Loading your saved answers">
+        {['Move', 'About you', 'Household', 'Work & commute'].map((label) => (
+          <div key={label} className="border border-gray-100 rounded-xl p-4 bg-white">
+            <div className="mb-3"><span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{label}</span></div>
+            <div className="flex flex-col gap-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-3 rounded bg-gray-100 animate-pulse" style={{ width: `${70 - i * 12}%` }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   const Card = ({ label, step, rows }: { label: string; step: number; rows: [string, React.ReactNode][] }) => (
     <div className="border border-gray-100 rounded-xl p-4 bg-white">
@@ -694,6 +713,11 @@ export function EmployeeIntakePage() {
   // merges) on the backend, so such a save wiped the employee's saved answers
   // on every reload.
   const draftHydratedRef = useRef(false);
+  // Render-visible mirror of draftHydratedRef (a ref can't drive a re-render).
+  // Used to skeleton the Review summary and gate submit until the saved draft
+  // has loaded, so a reload that restores straight to the Review step doesn't
+  // paint populated fields as "missing"/"—" before the fetch resolves.
+  const [draftHydrated, setDraftHydrated] = useState(false);
   // Tracks the latest unsaved data so the unmount-flush effect can access it
   // without a stale closure. Set in setField on every edit; cleared after
   // each successful debounced save so we don't re-send data that's already
@@ -904,7 +928,10 @@ export function EmployeeIntakePage() {
         /* fall through to in-memory defaults */
       })
       .finally(() => {
-        if (!cancelled) draftHydratedRef.current = true;
+        if (!cancelled) {
+          draftHydratedRef.current = true;
+          setDraftHydrated(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -925,6 +952,11 @@ export function EmployeeIntakePage() {
 
   const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
   const savedLabel = elapsedSecs < 60 ? 'just now' : 'a moment ago';
+
+  // Only "loading" when there's an assignment whose saved draft hasn't resolved
+  // yet. With no assignment (bare /employee/intake) there's nothing to fetch, so
+  // the fresh empty defaults are correct and we don't skeleton.
+  const intakeLoading = !!assignmentId && !draftHydrated;
 
   return (
     <AppShell>
@@ -1202,7 +1234,7 @@ export function EmployeeIntakePage() {
             {step === 5 && (
               <>
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
-                <ReviewSummary data={data} goTo={goTo} />
+                <ReviewSummary data={data} goTo={goTo} loading={intakeLoading} />
                 {/* P3-RAG-04: surface the RAG dossier suggestions (corpus-grounded,
                     cited) in the active v2 flow — previously only in the legacy wizard. */}
                 <DossierSuggestionsPanel caseId={caseIdRef.current} />
@@ -1245,7 +1277,7 @@ export function EmployeeIntakePage() {
                 {submitError && (
                   <p className="text-xs text-red-500 mr-2">{submitError}</p>
                 )}
-                <Button unstyled type="button" disabled={!data.consent || submitting}
+                <Button unstyled type="button" disabled={!data.consent || submitting || intakeLoading}
                   onClick={async () => {
                     setSubmitting(true);
                     setSubmitError(null);
