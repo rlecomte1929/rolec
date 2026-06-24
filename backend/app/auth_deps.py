@@ -1,6 +1,7 @@
 """Shared auth dependencies for routers (avoids circular imports with main)."""
 from __future__ import annotations
 
+import os
 import uuid
 from typing import Any, Dict, Optional
 
@@ -8,7 +9,6 @@ from fastapi import Depends, Header, HTTPException, Request
 
 from ..database import db
 from ..schemas import UserRole
-
 
 def _resolve_auth_uuid(user: Dict[str, Any]) -> Optional[str]:
     """Resolve the caller to a canonical Supabase auth UUID (AUTH-ID-1).
@@ -21,9 +21,9 @@ def _resolve_auth_uuid(user: Dict[str, Any]) -> Optional[str]:
     ``None`` (→ no match, which degrades safely) instead of crashing.
 
     - UUID-native id (Supabase-native account) → that id, unchanged.
-    - Legacy text id with a matching profile    → ``profiles.id`` (the auth
+    - Legacy text id with a matching profile → ``profiles.id`` (the auth
       UUID), bridged by email (``profiles`` is keyed by the auth uuid).
-    - Otherwise                                 → ``None``.
+    - Otherwise → ``None``.
     """
     raw = user.get("id")
     try:
@@ -41,7 +41,6 @@ def _resolve_auth_uuid(user: Dict[str, Any]) -> Optional[str]:
                 return None
     return None
 
-
 def _is_admin_user(user: Dict[str, Any]) -> bool:
     role = (user.get("role") or "").upper()
     if role == UserRole.ADMIN.value:
@@ -54,7 +53,6 @@ def _is_admin_user(user: Dict[str, Any]) -> bool:
         return True
     return False
 
-
 async def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
@@ -63,6 +61,23 @@ async def get_current_user(
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
     token = authorization.replace("Bearer ", "")
+
+    # ── Cron / internal service bypass ──────────────────────────────────────
+    # Scheduled jobs (e.g. compliance-daily.yml) use a static CRON_SECRET env
+    # var rather than a session token so the cron never breaks when a session
+    # expires. Set CRON_SECRET in the backend environment and store the same
+    # value in the COMPLIANCE_ADMIN_TOKEN GitHub secret.
+    _cron_secret = os.environ.get("CRON_SECRET", "").strip()
+    if _cron_secret and token == _cron_secret:
+        return {
+            "id": "cron",
+            "role": UserRole.ADMIN.value,
+            "is_admin": True,
+            "email": "cron@relopass.com",
+            "auth_uuid": None,
+        }
+    # ────────────────────────────────────────────────────────────────────────
+
     user = db.get_user_by_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -95,7 +110,6 @@ async def get_current_user(
         }
     return user
 
-
 def require_role(role: UserRole):
     """Return a FastAPI dependency that requires *role*. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
@@ -107,7 +121,6 @@ def require_role(role: UserRole):
         return user
     return dependency
 
-
 def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Allow HR or Employee. Admin passes as HR."""
     r = user.get("role")
@@ -117,13 +130,11 @@ def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> 
         return user
     raise HTTPException(status_code=403, detail="HR or Employee only")
 
-
 def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Admin only."""
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin only")
     return user
-
 
 def require_admin_or_hr(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Admin or HR. Used for read-only access to suppliers (HR picks from approved list)."""
@@ -133,7 +144,6 @@ def require_admin_or_hr(user: Dict[str, Any] = Depends(get_current_user)) -> Dic
     if r == UserRole.HR.value:
         return user
     raise HTTPException(status_code=403, detail="Admin or HR only")
-
 
 def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = None) -> Dict[str, Any]:
     imp = user.get("impersonation")
@@ -145,7 +155,6 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     if expected_role and target.get("role") != expected_role.value:
         return user
     return target
-
 
 def get_org_id_for_hr_user(user: Dict[str, Any] = Depends(require_admin_or_hr)) -> str:
     """Return the company_id for the current HR / Admin user.
@@ -161,7 +170,6 @@ def get_org_id_for_hr_user(user: Dict[str, Any] = Depends(require_admin_or_hr)) 
     company_id = (db.get_hr_company_id(uid) if uid else None) or user.get("company") or ""
     return company_id
 
-
 def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Require user to be a vendor. Returns user dict with vendor_id added. 403 if not a vendor."""
     vendor_id = db.get_vendor_for_user(user.get("id"))
@@ -170,7 +178,6 @@ def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str
     user = dict(user)
     user["vendor_id"] = vendor_id
     return user
-
 
 def require_assignment_visibility(assignment_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
     """Validate user can access assignment; return assignment.
@@ -189,14 +196,13 @@ def require_assignment_visibility(assignment_id: str, user: Dict[str, Any]) -> D
         visible = emp_id == effective["id"]
     else:
         visible = effective.get("is_admin") or hr_id == effective["id"]
-        if not visible and effective.get("role") == UserRole.HR.value:
-            hr_company = db.get_hr_company_id(effective["id"])
-            if hr_company and db.assignment_belongs_to_company(assignment_id, hr_company):
-                visible = True
+    if not visible and effective.get("role") == UserRole.HR.value:
+        hr_company = db.get_hr_company_id(effective["id"])
+        if hr_company and db.assignment_belongs_to_company(assignment_id, hr_company):
+            visible = True
     if not visible:
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     return assignment
-
 
 def require_case_access(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
     """Validate user can access a case by its case_id; return the assignment row.
