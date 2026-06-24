@@ -81,9 +81,13 @@ class ServicesStateRouterTests(unittest.TestCase):
         self.engine_patcher.start()
         self.addCleanup(self.engine_patcher.stop)
 
-        # _jb is the jsonb-cast suffix ("::jsonb" on postgres). sqlite has no
-        # jsonb cast, so pin it to empty string for these tests.
-        self.jb_patcher = mock.patch.object(router_module, "_jb", "")
+        # _jbind() wraps JSON params in CAST(:p AS jsonb) on postgres. sqlite has
+        # no jsonb cast, so pin it to emit a bare ":p" for these tests (the real
+        # helper does this on sqlite anyway; pinning keeps the test hermetic
+        # regardless of the ambient DATABASE_URL).
+        self.jb_patcher = mock.patch.object(
+            router_module, "_jbind", lambda name: f":{name}"
+        )
         self.jb_patcher.start()
         self.addCleanup(self.jb_patcher.stop)
 

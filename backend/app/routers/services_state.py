@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..auth_deps import require_hr_or_employee, require_case_access
-from ...database import db, _jb
+from ...database import db, _jbind
 from ..services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -181,7 +181,7 @@ def put_services_state(
             conn.execute(
                 text(
                     f"UPDATE services_state "
-                    f"SET state_json = :blob{_jb}, updated_at = :now, updated_by_user_id = :actor "
+                    f"SET state_json = {_jbind('blob')}, updated_at = :now, updated_by_user_id = :actor "
                     f"WHERE case_id = :id"
                 ),
                 {"blob": blob, "now": now, "actor": actor_id, "id": case_id},
@@ -192,7 +192,7 @@ def put_services_state(
                 text(
                     f"INSERT INTO services_state "
                     f"(case_id, organization_id, state_json, updated_at, updated_by_user_id) "
-                    f"VALUES (:id, :org, :blob{_jb}, :now, :actor)"
+                    f"VALUES (:id, :org, {_jbind('blob')}, :now, :actor)"
                 ),
                 {
                     "id": case_id,
