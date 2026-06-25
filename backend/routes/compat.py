@@ -12,7 +12,6 @@ from ..database import db
 from ..app.db import SessionLocal
 from ..app import crud as app_crud
 from ..app.routers import cases as wizard_cases_router
-from ..app.services.case_status import normalize_status
 from ..app.services.requirements_builder import compute_case_requirements
 
 router = APIRouter(prefix="/api", tags=["compat"])
@@ -50,29 +49,18 @@ def _get_case_row_for_user(case_id: str, user_id: str) -> Optional[Dict[str, Any
     return db._row_to_dict(row)
 
 
-def _resolve_assignment_status(session, case_id: str) -> Optional[str]:
-    """WI3 single source of truth: the case status reported to clients is the
-    linked assignment's (canonical) lifecycle status, so this detail endpoint can
-    never disagree with GET /api/employee/cases. None when there's no assignment
-    (the caller then falls back to wizard_cases.status)."""
-    row = session.execute(
-        text(
-            "SELECT status FROM case_assignments "
-            "WHERE (canonical_case_id = :cid OR case_id = :cid) "
-            "ORDER BY created_at DESC LIMIT 1"
-        ),
-        {"cid": case_id},
-    ).fetchone()
-    return normalize_status(row[0]) if row else None
-
-
-def _get_wizard_case_dto(case_id: str) -> Optional[Dict[str, Any]]:
+def _get_wizard_case_dto(
+    case_id: str, employee_user_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     with SessionLocal() as session:
         case = app_crud.get_case(session, case_id)
         if not case:
             return None
         draft = json.loads(case.draft_json)
-        assignment_status = _resolve_assignment_status(session, case_id)
+        # Single source of truth: derive status via the shared resolver, scoped to
+        # the requesting employee, so the detail agrees with GET /api/employee/cases
+        # (both pick the SAME assignment row). None falls back to wizard_cases.status.
+        assignment_status = db.resolve_case_status(case_id, employee_user_id)
         return wizard_cases_router._case_dto(
             case, draft, assignment_status=assignment_status
         ).model_dump()
@@ -126,7 +114,10 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
         row = result.data[0] or {}
     else:
         user = _get_user_from_session_token(token)
-        wizard_case = _get_wizard_case_dto(case_id)
+        # Scope status resolution to the requesting employee so the detail picks the
+        # same assignment row the employee's case list does (HR/admin → most-recent).
+        employee_user_id = user["id"] if user.get("role") == "employee" else None
+        wizard_case = _get_wizard_case_dto(case_id, employee_user_id)
         if wizard_case:
             return wizard_case
         row = _get_case_row_for_user(case_id, user["id"])

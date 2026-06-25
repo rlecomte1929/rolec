@@ -1005,6 +1005,41 @@ class CasesMixin:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def resolve_case_status(
+        self,
+        case_key: str,
+        employee_user_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Canonical case status — the SINGLE source shared by the case LIST
+        (GET /api/employee/cases) and the case DETAIL (GET /api/cases/{id}) so
+        they can never disagree. Picks the requesting employee's most-recently
+        created assignment for the case (matching the list's ORDER BY created_at
+        DESC), or the most-recent assignment overall when employee_user_id is None
+        (HR/admin callers), and normalizes it. Returns None when the case has no
+        assignment (callers then fall back to wizard_cases.status).
+        """
+        from ..app.services.case_status import normalize_status  # lazy: avoid import cycle
+        ck = (case_key or "").strip()
+        if not ck:
+            return None
+        emp = (employee_user_id or "").strip() or None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT status FROM case_assignments "
+                "WHERE (canonical_case_id = :ck OR case_id = :ck OR id = :ck) "
+                "  AND (:emp IS NULL OR employee_user_id = :emp) "
+                "ORDER BY created_at DESC LIMIT 1",
+                {"ck": ck, "emp": emp},
+                op_name="resolve_case_status",
+                request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping if hasattr(row, "_mapping") else row
+        return normalize_status(m["status"])
+
     def get_mobility_case_id_for_assignment(
         self, assignment_id: str, request_id: Optional[str] = None
     ) -> Optional[str]:

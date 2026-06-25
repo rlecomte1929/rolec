@@ -4647,7 +4647,11 @@ def get_employee_cases(
             "id": case_id,
             "caseId": case_id,
             "assignmentId": d.get("id"),
-            "status": normalize_status(d.get("status")),
+            # Single source of truth: derive via the shared resolver (employee-scoped)
+            # so this list agrees with GET /api/cases/{id}. Falls back to the row's own
+            # status only if the resolver finds nothing (shouldn't happen — the row exists).
+            "status": db.resolve_case_status(case_id, effective["id"], request_id=rid)
+            or normalize_status(d.get("status")),
             "employeeIdentifier": d.get("employee_identifier"),
         })
     return {"cases": cases}
