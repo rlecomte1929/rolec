@@ -1,6 +1,12 @@
 import axios from 'axios';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { signOutSupabase } from './supabaseAuth';
+import { parseResponse } from './schemas/parseResponse';
+import {
+  intakeEnvelopeSchema,
+  assignmentsOverviewSchema,
+  currentAssignmentSchema,
+} from './schemas/employee';
 import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
 import type {
   LoginRequest,
@@ -2354,14 +2360,14 @@ export const employeeAPI = {
   }> => {
     return cachedRequest('employee:current-assignment', 30_000, async () => {
       const response = await api.get('/api/employee/assignments/current');
-      return response.data;
+      return parseResponse(currentAssignmentSchema, response.data, 'getCurrentAssignment');
     });
   },
   /** Compact linked + pending summaries (no case draft hydration). */
   getAssignmentsOverview: async (): Promise<{ linked: any[]; pending: any[] }> => {
     return cachedRequest('employee:assignments-overview', 60_000, async () => {
       const response = await api.get('/api/employee/assignments/overview');
-      return response.data;
+      return parseResponse(assignmentsOverviewSchema, response.data, 'getAssignmentsOverview');
     });
   },
   listMessages: async (): Promise<{
@@ -2417,7 +2423,7 @@ export const employeeAPI = {
     intakeDraft: Record<string, unknown> | null;
   }> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/intake`);
-    return response.data;
+    return parseResponse(intakeEnvelopeSchema, response.data, 'getIntake');
   },
   /**
    * Persist the wizard form draft. Fire-and-forget from the wizard's
