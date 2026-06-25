@@ -69,3 +69,20 @@ def test_get_case_resolves_assignment_status():
     assert "FROM case_assignments" in body
     assert "normalize_status(" in body
     assert "assignment_status=assignment_status" in body
+
+
+def test_compat_handler_resolves_assignment_status():
+    """The LIVE GET /api/cases/{id} handler is backend.routes.compat.compat_get_case
+    (registered before cases_read, so it WINS). Its _get_wizard_case_dto must also
+    pass the assignment status into _case_dto — otherwise the detail endpoint falls
+    back to wizard_cases.status and diverges from the list (the prod bug found
+    2026-06-25 after #851 shipped to the shadowed handler)."""
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "routes", "compat.py")
+    with open(path, "r", encoding="utf-8") as fh:
+        src = fh.read()
+    start = src.index("def _get_wizard_case_dto(")
+    body = src[start: src.index("\ndef ", start + 1)]
+    assert "assignment_status=assignment_status" in body
+    assert "_resolve_assignment_status" in body
+    assert "FROM case_assignments" in src
+    assert "normalize_status(" in src

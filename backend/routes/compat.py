@@ -12,6 +12,7 @@ from ..database import db
 from ..app.db import SessionLocal
 from ..app import crud as app_crud
 from ..app.routers import cases as wizard_cases_router
+from ..app.services.case_status import normalize_status
 from ..app.services.requirements_builder import compute_case_requirements
 
 router = APIRouter(prefix="/api", tags=["compat"])
@@ -49,13 +50,32 @@ def _get_case_row_for_user(case_id: str, user_id: str) -> Optional[Dict[str, Any
     return db._row_to_dict(row)
 
 
+def _resolve_assignment_status(session, case_id: str) -> Optional[str]:
+    """WI3 single source of truth: the case status reported to clients is the
+    linked assignment's (canonical) lifecycle status, so this detail endpoint can
+    never disagree with GET /api/employee/cases. None when there's no assignment
+    (the caller then falls back to wizard_cases.status)."""
+    row = session.execute(
+        text(
+            "SELECT status FROM case_assignments "
+            "WHERE (canonical_case_id = :cid OR case_id = :cid) "
+            "ORDER BY created_at DESC LIMIT 1"
+        ),
+        {"cid": case_id},
+    ).fetchone()
+    return normalize_status(row[0]) if row else None
+
+
 def _get_wizard_case_dto(case_id: str) -> Optional[Dict[str, Any]]:
     with SessionLocal() as session:
         case = app_crud.get_case(session, case_id)
         if not case:
             return None
         draft = json.loads(case.draft_json)
-        return wizard_cases_router._case_dto(case, draft).model_dump()
+        assignment_status = _resolve_assignment_status(session, case_id)
+        return wizard_cases_router._case_dto(
+            case, draft, assignment_status=assignment_status
+        ).model_dump()
 
 
 def _default_wizard_draft() -> Dict[str, Any]:
