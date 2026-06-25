@@ -14,6 +14,11 @@ frontend/dist/
 # gitlinks, which broke Cloudflare Pages clones.)
 .claude/worktrees/
 
+# Per-machine Claude Code settings — may record local permission allow-rules
+# (e.g. one-off `! TOKEN=… cmd` invocations), so it must never be tracked.
+# Keep .claude/settings.json (shared, safe) tracked; only the .local file is ignored.
+.claude/settings.local.json
+
 # Agent/tooling scratch — branch snapshots and Playwright MCP run artifacts.
 # Machine-generated, regenerated on demand; never useful to track.
 .branch-backups/
