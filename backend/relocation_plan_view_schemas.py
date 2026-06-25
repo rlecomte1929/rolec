@@ -217,6 +217,10 @@ class RelocationPlanPhaseTask(BaseModel):
         description="Logical prerequisites (task_code) for ordering hints.",
     )
     why_this_matters: Optional[str] = Field(default=None, description="Employee-friendly rationale.")
+    estimated_effort: Optional[str] = Field(
+        default=None,
+        description='Representative effort label, e.g. "~10 min" (library-level approximation, not per-case).',
+    )
     instructions: List[str] = Field(default_factory=list, description="Bullet steps for the task detail panel.")
     required_inputs: List[RelocationPlanRequiredInput] = Field(default_factory=list)
     cta: Optional[RelocationPlanCta] = None

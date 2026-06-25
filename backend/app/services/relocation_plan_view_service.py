@@ -38,6 +38,7 @@ from ...relocation_plan_service import (
     map_milestone_status_to_plan_status,
 )
 from ...relocation_plan_draft_normalize import profile_for_plan_derivation
+from ...relocation_plan_task_library import estimated_effort_for
 from ...relocation_plan_status_derivation import (
     DerivationThresholds,
     RelocationPlanDerivationContext,
@@ -342,6 +343,7 @@ def _enriched_to_schema_task(
         blocked_by=_blocked_by_codes(t, status_by_code),
         depends_on=list(t.depends_on),
         why_this_matters=t.why_this_matters or None,
+        estimated_effort=estimated_effort_for(t.task_code),
         instructions=list(t.instructions),
         required_inputs=req_in,
         cta=RelocationPlanCta(type=cta_t, label=cta_label, target=None),

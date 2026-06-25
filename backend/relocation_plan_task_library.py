@@ -1042,6 +1042,65 @@ _TASK_LIBRARY_SEQ: Tuple[TaskLibraryEntry, ...] = (
 TASK_BY_CODE: Dict[str, TaskLibraryEntry] = {t.task_code: t for t in _TASK_LIBRARY_SEQ}
 TASK_BY_MILESTONE_TYPE: Dict[str, TaskLibraryEntry] = {t.milestone_type: t for t in _TASK_LIBRARY_SEQ}
 
+# Representative per-task-type effort estimate (the "~10 min" shown on the roadmap).
+# Library-level approximations (always rendered with a "~"), not per-case data.
+_ESTIMATED_EFFORT: Final[Mapping[str, str]] = {
+    # Pre-departure
+    "confirm_employee_core_profile": "~5 min",
+    "confirm_family_details": "~10 min",
+    "upload_passport_copy": "~5 min",
+    "upload_assignment_letter": "~5 min",
+    "verify_destination_route": "~10 min",
+    # Immigration (generic)
+    "hr_review_case_data": "~1 day",
+    "schedule_immigration_review": "~15 min",
+    "prepare_visa_pack": "~2 days",
+    "submit_visa_application": "~1 day",
+    "book_biometrics": "~20 min",
+    # Logistics
+    "arrange_temporary_housing": "~30 min",
+    "arrange_movers": "~45 min",
+    "coordinate_relocation_providers": "~30 min",
+    "plan_travel": "~30 min",
+    # Arrival / post-arrival
+    "complete_arrival_registration": "~20 min",
+    "tax_local_registration": "~1 hour",
+    "settle_in": "",
+    # Family / schooling
+    "school_enrollment_research": "~1 hour",
+    "school_enrollment_application": "~45 min",
+    "spouse_work_authorization": "~30 min",
+    "partner_family_visa_application": "~1 hour",
+    "partner_mvv_application": "~1 hour",
+    "dependent_visa_application": "~1 hour",
+    # US L-1B corridor
+    "l1b_support_letter": "~1 day",
+    "l1b_petition_preparation": "~3 days",
+    "l1b_petition_filing": "~1 day",
+    "l1b_visa_interview": "~1 hour",
+    "l1b_port_of_entry": "~30 min",
+    "l1b_ssn_application": "~20 min",
+    # Japan corridor
+    "japan_coe_preparation": "~2 days",
+    "japan_coe_visa_application": "~1 day",
+    "japan_residence_card": "~30 min",
+    "japan_municipal_registration": "~1 hour",
+    # EU / UK corridor
+    "eu_registration": "~30 min",
+    "uk_cos_request": "~1 day",
+    "uk_visa_application": "~1 hour",
+    "uk_biometric_appointment": "~20 min",
+    "uk_brp_collection": "~20 min",
+    "uk_right_to_work_check": "~15 min",
+}
+
+
+def estimated_effort_for(task_code: str) -> Optional[str]:
+    """Representative effort label for a task code, e.g. "~10 min". None when the
+    task has no meaningful estimate (open-ended) or the code is unknown."""
+    val = _ESTIMATED_EFFORT.get((task_code or "").strip())
+    return val or None
+
 
 def get_task_library_entry_by_code(task_code: str) -> Optional[TaskLibraryEntry]:
     return TASK_BY_CODE.get(task_code)
