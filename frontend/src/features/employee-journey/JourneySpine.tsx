@@ -1,6 +1,11 @@
 import React from 'react';
 import { Button, StatusPill } from '../../components/antigravity';
 import type { JourneyStatus } from '../../components/antigravity';
+import { isIntakeComplete } from './caseStage';
+
+// Re-export so existing importers (`import { isIntakeComplete } from './JourneySpine'`)
+// keep working now that the canonical definition lives in caseStage.ts.
+export { isIntakeComplete } from './caseStage';
 
 /**
  * JourneySpine — the employee journey-home as a vertical timeline.
@@ -24,6 +29,9 @@ interface JourneySpineProps {
   intakeTotalSteps: number;
   /** Authoritative assignment lifecycle status (e.g. 'awaiting_intake', 'submitted'). */
   status?: string | null;
+  /** True once the Services sub-flow is genuinely complete (item B4). When false,
+   *  the Services station reads "Ready" (reachable) rather than "Done". */
+  servicesComplete?: boolean;
   onContinueIntake: () => void;
   onPreviewBenefits: () => void;
   /** When omitted, the Roadmap phase stays locked until intake is done. */
@@ -31,15 +39,6 @@ interface JourneySpineProps {
 }
 
 type IntakeState = 'done' | 'in-progress' | 'not-started';
-
-// Statuses at/after submit — intake is complete regardless of a stale intakeStep.
-const INTAKE_COMPLETE_STATUSES = new Set(['submitted', 'approved', 'rejected', 'closed']);
-
-/** Source of truth for whether intake is finished: the assignment status, not
- *  intakeStep (which can lag — a submitted case may still read step 1). */
-export function isIntakeComplete(status?: string | null): boolean {
-  return !!status && INTAKE_COMPLETE_STATUSES.has(status.trim().toLowerCase());
-}
 
 function intakeState(step: number, total: number): IntakeState {
   if (total > 0 && step >= total) return 'done';
@@ -90,12 +89,15 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
   intakeStep,
   intakeTotalSteps,
   status,
+  servicesComplete,
   onContinueIntake,
   onPreviewBenefits,
   onViewRoadmap,
 }) => {
-  // Status is authoritative: a submitted+ case is Done even if intakeStep lags at 1.
-  // Only fall back to the step counter while intake is genuinely incomplete.
+  // Status is authoritative (shared isIntakeComplete predicate — same one the
+  // roadmap / benefit-comparison steppers use, so a submitted case reads identically
+  // everywhere): a submitted+ case is Done even if intakeStep lags at 1. Only fall
+  // back to the step counter while intake is genuinely incomplete.
   const state = isIntakeComplete(status) ? 'done' : intakeState(intakeStep, intakeTotalSteps);
   const intakeDone = state === 'done';
   const intakeStarted = state === 'in-progress';
@@ -109,8 +111,11 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
       : { status: 'upcoming', label: 'Not started' };
   const intakeCtaLabel = intakeDone ? 'Review intake' : intakeStarted ? 'Continue intake' : 'Start intake';
 
-  // The active station is Intake until it's done, then Services & policy.
+  // Intake is the active station until done; Services is reachable once intake is
+  // done (by status or completed steps), but only "Done" (✓) when the Services flow
+  // actually completed (B4).
   const intakeActive = !intakeDone;
+  const servicesDone = intakeDone && !!servicesComplete;
   const servicesActive = intakeDone;
 
   return (
@@ -157,13 +162,13 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
       </Station>
 
       {/* Services & policy */}
-      <Station kind={servicesActive ? 'active' : 'locked'} glyph="2">
+      <Station kind={servicesDone ? 'done' : servicesActive ? 'active' : 'locked'} glyph={servicesDone ? '✓' : '2'}>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`font-semibold text-sm ${servicesActive ? 'text-[#0b2b43]' : 'text-[#94a3b8]'}`}>
             Services &amp; policy
           </span>
-          <StatusPill status={servicesActive ? 'ready' : 'upcoming'}>
-            {servicesActive ? 'Ready' : 'Up next'}
+          <StatusPill status={servicesDone ? 'done' : servicesActive ? 'ready' : 'upcoming'}>
+            {servicesDone ? 'Done' : servicesActive ? 'Ready' : 'Up next'}
           </StatusPill>
         </div>
         {servicesActive ? (

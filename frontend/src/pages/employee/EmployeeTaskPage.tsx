@@ -11,6 +11,7 @@ import { servicesAPI, apiGet } from '../../api/client';
 import type { EmployeeTask, TaskType } from '../../api/client';
 import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../features/privacy/privacyNoticeContent';
+import { useSelectedCase } from '../../contexts/SelectedCaseContext';
 
 // ── Status colours ────────────────────────────────────────────────────────────
 
@@ -145,6 +146,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export const EmployeeTaskPage: React.FC = () => {
+  // A2: scope tasks to the viewed case so this page never shows another case's
+  // tasks. When no case is selected, getTasks() falls back server-side to the
+  // most-recently-updated case (matching the dashboard's active-case selection).
+  const { selectedCaseId } = useSelectedCase();
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -173,14 +178,14 @@ export const EmployeeTaskPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await servicesAPI.getTasks();
+      const res = await servicesAPI.getTasks(selectedCaseId ?? undefined);
       setTasks(res.tasks);
     } catch {
       setError('Could not load your tasks. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedCaseId]);
 
   useEffect(() => { void load(); }, [load]);
 
