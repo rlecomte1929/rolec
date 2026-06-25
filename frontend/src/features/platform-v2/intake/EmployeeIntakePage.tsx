@@ -5,6 +5,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { patchCase } from '../../../api/cases';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
+import { resolveIntakeIds } from './resolveIntakeIds';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
@@ -885,9 +886,17 @@ export function EmployeeIntakePage() {
   // and logged console 404s). Stay null until resolved so the guarded effects
   // below never fire a request with the wrong id.
   const { assignmentId: contextAssignmentId, linkedSummaries } = useEmployeeAssignment();
-  const assignmentId = routeCaseId
-    ? (linkedSummaries.find((r) => r.case_id === routeCaseId)?.assignment_id ?? null)
-    : contextAssignmentId;
+  // The :caseId route param can be EITHER a case_id (sidebar "Intake form") or an
+  // assignment_id (dashboard "Continue intake"). Normalize to both so both entry
+  // points run the identical hydration/autosave/submit path.
+  const resolvedIds = resolveIntakeIds(routeCaseId, linkedSummaries);
+  const assignmentId = routeCaseId ? resolvedIds.assignmentId : contextAssignmentId;
+  // Keep caseIdRef (used by the submit's PATCH /api/cases/{caseId}) pointed at the
+  // real case_id once linkedSummaries resolves — even when the param was an
+  // assignment_id. Falls back to the param for HR deep-links carrying a case UUID.
+  useEffect(() => {
+    if (resolvedIds.caseId) caseIdRef.current = resolvedIds.caseId;
+  }, [resolvedIds.caseId]);
   const hydratedStepRef = useRef(false);
   const lastPersistedStepRef = useRef<number | null>(null);
 

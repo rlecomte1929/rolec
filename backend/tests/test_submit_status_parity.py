@@ -51,3 +51,16 @@ def test_submit_advances_wizard_case_status_after_assignment_flip():
     # And it must be best-effort so it can never fail the submit.
     sync_idx = src.index("wc.status = AssignmentStatus.SUBMITTED.value")
     assert "try:" in src[:sync_idx]
+
+
+def test_submit_advances_intake_step_to_total():
+    # A submitted case must store completed intake progress (intake_step ==
+    # intake_total_steps) so the dashboard widget doesn't show "Step 1 of 5".
+    # The client's updateIntakeProgress is fire-and-forget, so the submit handler
+    # advances it server-side, after the assignment flip, best-effort.
+    src = _submit_assignment_source()
+    assert "update_assignment_intake_progress" in src
+    progress_idx = src.index("update_assignment_intake_progress")
+    assert src.index("set_assignment_submitted") < progress_idx
+    assert "step=_total" in src and "total_steps=_total" in src
+    assert "try:" in src[:progress_idx]  # best-effort, never fails the submit
