@@ -24,7 +24,6 @@ import {
   conversationFromSummary,
 } from '../../messages/utils';
 import type { Conversation, Message } from '../../messages/types';
-import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { AppShell } from '../../../components/AppShell';
 
 type MailboxKey = 'inbox' | 'hr' | 'vendors' | 'authorities' | 'family' | 'sent' | 'archive';
@@ -132,8 +131,6 @@ export function InboxV2Page() {
   const userName = getAuthItem('relopass_name') || getAuthItem('relopass_email') || 'You';
   const isHrLike = role === 'HR' || role === 'ADMIN';
 
-  const { company } = useHrCompanyContext();
-  const companyName = (company?.['name'] as string | undefined) || 'Workspace';
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -432,15 +429,9 @@ export function InboxV2Page() {
   return (
     <AppShell section={role === 'EMPLOYEE' ? 'Employee' : 'HR Operations'} title="Inbox" subtitle={undefined} wide>
       <div className="-mx-6 -my-6 flex h-[calc(100vh-10rem)] min-h-[560px] flex-col overflow-hidden bg-slate-100">
-        {/* Breadcrumb row */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 shrink-0">
-          <div className="flex items-center gap-1.5 text-[12.5px] text-slate-500">
-            <span>{companyName}</span>
-            <span className="text-slate-300">/</span>
-            <span>{isHrLike ? 'HR Operations' : 'Employee'}</span>
-            <span className="text-slate-300">/</span>
-            <span className="font-medium text-slate-800">Inbox</span>
-          </div>
+        {/* E4: breadcrumb removed — the AppShell already renders "Employee / Inbox".
+            Keep just the thread count to avoid a duplicated breadcrumb trail. */}
+        <div className="flex items-center justify-end border-b border-slate-200 bg-white px-6 py-3 shrink-0">
           <div className="text-xs text-slate-400">
             {filteredConversations.length} thread{filteredConversations.length === 1 ? '' : 's'}
           </div>

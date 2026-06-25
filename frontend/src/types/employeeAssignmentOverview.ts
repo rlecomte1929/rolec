@@ -73,8 +73,14 @@ export function formatDestinationLabel(dest?: EmployeeOverviewDestination | null
 export function formatCorridorLabel(dest?: EmployeeOverviewDestination | null): string {
   const origin = dest?.home_country?.trim() || dest?.home_city?.trim() || '';
   const destination = formatDestinationLabel(dest);
-  if (origin && destination !== 'Not set yet') return `${origin} → ${destination}`;
-  return destination;
+  if (!origin || destination === 'Not set yet') return destination;
+  // E2: guard against a double origin when the destination label is itself already
+  // a corridor (e.g. dest.label = "France → Germany") or already starts with the
+  // origin — otherwise we render "France → France → Germany".
+  if (destination.includes('→') || destination === origin || destination.startsWith(`${origin} `)) {
+    return destination;
+  }
+  return `${origin} → ${destination}`;
 }
 
 /**

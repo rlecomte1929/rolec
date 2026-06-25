@@ -184,7 +184,7 @@ export const EmployeeDossierPage: React.FC = () => {
               <Button unstyled
                 type="button"
                 disabled
-                title="Build dossier lands in P3-4 — coming soon"
+                title="Coming soon — you'll be able to download a complete document package here once your forms are ready."
                 className="px-4 py-2 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
               >
                 Build dossier
