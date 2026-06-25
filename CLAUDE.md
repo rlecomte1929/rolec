@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## What ReloPass is
+
+ReloPass turns a cross-border corporate relocation into a guided, compliant journey. It serves
+three personas: **Employee** (the relocating person — intake → services & policy → roadmap),
+**HR** (company command center), and **Admin** (CMS: countries, policies, suppliers, catalog).
+Stack: TypeScript + React (Vite) SPA frontend + Python FastAPI backend, Supabase/Postgres, on Render.
+
+> Full project overview: see [README.md](README.md).
+
 ## Commands
 
 ```bash
@@ -129,7 +138,7 @@ Backend:
 
 - **Frontend**: Render Static Site. Build: `npm --prefix frontend ci && npm --prefix frontend run build`. Publish dir: `frontend/dist`.
 - **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4 --proxy-headers`. Python 3.11.
-- **Database changes**: Commit a migration file and let the main-push workflow apply it on merge — see **Migration discipline (MANDATORY)** below. Never apply schema changes via MCP `apply_migration` or the Supabase dashboard SQL editor directly; always commit migration files.
+- **Database changes**: Commit a migration file for every schema change. **There is no automated apply-on-merge** — migrations are applied to production manually/out-of-band (operator-run: MCP `apply_migration`/`execute_sql` DDL or `supabase db push`), and the ledger is then reconciled by committing the matching file at the applied version. The PR CI only *validates* ledger consistency (the read-only `migration-drift` check); it never applies. See **Migration discipline (MANDATORY)** and **Ledger reconciliation** below.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
 
 ## Database Migrations — Security Rules (Hard Gates)
@@ -177,8 +186,11 @@ inserting into `supabase_migrations.schema_migrations`.
 The ONLY permitted workflow for schema changes:
   1. Create `supabase/migrations/<timestamp>_<name>.sql` with idempotent DDL.
   2. Commit and push to a feature branch.
-  3. Open a PR. The main-push migration workflow applies the file to production
-     on merge and records the repo file's timestamp as the version.
+  3. Open a PR. CI's read-only `migration-drift` check validates ledger
+     consistency — it does NOT apply the migration. Applying to production is a
+     manual/out-of-band step (operator-run; MCP `apply_migration`/`execute_sql`
+     DDL or `supabase db push`), after which the ledger is reconciled by recording
+     the repo file's timestamp as the applied version (see **Ledger reconciliation**).
 
 Legitimate use of `execute_sql` (MCP): read-only queries and one-time data
 backfills that carry no schema change. If you run a hotfix DDL via `execute_sql`,
