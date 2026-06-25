@@ -7,7 +7,7 @@ import { patchCase } from '../../../api/cases';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { resolveIntakeIds } from './resolveIntakeIds';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
-import { ROUTE_DEFS } from '../../../navigation/routes';
+import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
 import { MultiChip } from './MultiChip';
@@ -1395,7 +1395,13 @@ export function EmployeeIntakePage() {
                           TOTAL_STEPS,
                         ).catch(() => undefined);
                       }
-                      navigate(ROUTE_DEFS.employeeDashboard.path);
+                      // B5: land on the roadmap the submit just unlocked, not a
+                      // dashboard that can momentarily read as "intake not started".
+                      navigate(
+                        caseIdRef.current
+                          ? buildRoute('employeeCaseRoadmap', { caseId: caseIdRef.current })
+                          : ROUTE_DEFS.employeeDashboard.path,
+                      );
                     } catch (e) {
                       setSubmitError((e as Error).message ?? 'Submission failed. Please try again.');
                       setSubmitting(false);

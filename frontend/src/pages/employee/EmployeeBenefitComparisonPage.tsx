@@ -6,6 +6,7 @@ import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useResilientQuery } from '../../hooks/useResilientQuery';
 import { buildRoute } from '../../navigation/routes';
+import { resolveCaseStage, type StageState } from '../../features/employee-journey/caseStage';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
@@ -32,8 +33,16 @@ interface ComparisonData {
 }
 
 export const EmployeeBenefitComparisonPage: React.FC = () => {
-  const { assignmentId, isLoading: assignmentLoading, linkedCount } = useEmployeeAssignment();
+  const { assignmentId, isLoading: assignmentLoading, linkedCount, linkedSummaries } =
+    useEmployeeAssignment();
   const navigate = useNavigate();
+  // B1: stepper state from the ONE shared resolver, driven by the active case's
+  // real status (not hardcoded 'done'), so this page can't disagree with the
+  // dashboard / roadmap steppers for the same case.
+  const activeRow = linkedSummaries.find((r) => r.assignment_id === assignmentId);
+  const stage = resolveCaseStage({ status: activeRow?.status, servicesComplete: false });
+  const toBarStatus = (s: StageState): 'done' | 'current' | 'upcoming' =>
+    s === 'done' ? 'done' : s === 'active' ? 'current' : 'upcoming';
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   const { data, error, loading, isOffline, retry } = useResilientQuery<ComparisonData>(
@@ -162,12 +171,19 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
           <div className="mb-6">
             <PhaseContextBar
               phases={[
-                { key: 'intake', label: 'Intake', status: 'done' },
-                { key: 'services', label: 'Services & policy', status: 'current' },
-                { key: 'roadmap', label: 'Roadmap', status: 'upcoming' },
+                { key: 'intake', label: 'Intake', status: toBarStatus(stage.intake) },
+                { key: 'services', label: 'Services & policy', status: toBarStatus(stage.services) },
+                { key: 'roadmap', label: 'Roadmap', status: toBarStatus(stage.roadmap) },
               ]}
               onSelect={(key) => {
-                if (key === 'intake') navigate(buildRoute('employeeIntake'));
+                if (key === 'intake')
+                  navigate(
+                    activeRow?.case_id
+                      ? buildRoute('employeeCaseIntake', { caseId: activeRow.case_id })
+                      : buildRoute('employeeIntake'),
+                  );
+                if (key === 'roadmap' && stage.roadmap !== 'locked' && activeRow?.case_id)
+                  navigate(buildRoute('employeeCaseRoadmap', { caseId: activeRow.case_id }));
               }}
             />
           </div>
