@@ -13,6 +13,7 @@ import { CountryFlag } from '../../../components/antigravity/CountryFlag';
 import { getCountryName } from '../../../utils/countries';
 import { ownerLabel } from '../relocationPlanLabels';
 import { RoadmapActions } from '../../platform-v2/roadmap/RoadmapActions';
+import { deriveCanonicalProgress } from '../../employee-journey/caseStage';
 import type {
   RelocationPlanViewResponseDTO,
   RelocationPlanPhaseDTO,
@@ -81,8 +82,8 @@ function OwnerPill({ owner }: { owner: RelocationPlanPhaseTaskDTO['owner'] }) {
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
 function Hero({ data, header }: { data: RelocationPlanViewResponseDTO; header: RoadmapHeaderMeta | null }) {
-  const pct = Math.round((data.summary.completion_ratio ?? 0) * 100);
-  const { completed_tasks, total_tasks } = data.summary;
+  // One canonical progress definition (shared with the dashboard / Tasks page).
+  const { completed, total, pct, blocked, readyNow } = deriveCanonicalProgress(data.summary);
   const cities = header?.originCity && header?.destCity ? `${header.originCity} to ${header.destCity}` : 'Your relocation';
   const move = header?.targetMoveDate ? new Date(header.targetMoveDate) : null;
   const moveLabel = move ? move.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
@@ -105,7 +106,12 @@ function Hero({ data, header }: { data: RelocationPlanViewResponseDTO; header: R
         <div className="text-right">
           <div className="text-[11px] uppercase tracking-wide text-white/60">Overall progress</div>
           <div className="text-3xl font-bold leading-none">{pct}%</div>
-          <div className="mt-0.5 text-[12px] text-white/70">{completed_tasks} of {total_tasks} steps</div>
+          <div className="mt-0.5 text-[12px] text-white/70">{completed} of {total} tasks done</div>
+          {blocked > 0 && (
+            <div className="mt-0.5 text-[12px] text-white/70">
+              {readyNow} ready now · {blocked} waiting on earlier steps
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, StatusPill } from '../../components/antigravity';
 import type { JourneyStatus } from '../../components/antigravity';
-import { resolveCaseStage } from './caseStage';
+import { isIntakeComplete } from './caseStage';
 
 // Re-export so existing importers (`import { isIntakeComplete } from './JourneySpine'`)
 // keep working now that the canonical definition lives in caseStage.ts.
@@ -94,12 +94,11 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
   onPreviewBenefits,
   onViewRoadmap,
 }) => {
-  // Stage states come from the ONE shared resolver so this widget can never
-  // disagree with the roadmap / benefit-comparison steppers for the same case.
-  const stage = resolveCaseStage({ status, servicesComplete });
-  // Status is authoritative: a submitted+ case is Done even if intakeStep lags at 1.
-  // Only fall back to the step counter while intake is genuinely incomplete.
-  const state = stage.intake === 'done' ? 'done' : intakeState(intakeStep, intakeTotalSteps);
+  // Status is authoritative (shared isIntakeComplete predicate — same one the
+  // roadmap / benefit-comparison steppers use, so a submitted case reads identically
+  // everywhere): a submitted+ case is Done even if intakeStep lags at 1. Only fall
+  // back to the step counter while intake is genuinely incomplete.
+  const state = isIntakeComplete(status) ? 'done' : intakeState(intakeStep, intakeTotalSteps);
   const intakeDone = state === 'done';
   const intakeStarted = state === 'in-progress';
   const progressPct =
@@ -113,10 +112,11 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
   const intakeCtaLabel = intakeDone ? 'Review intake' : intakeStarted ? 'Continue intake' : 'Start intake';
 
   // Intake is the active station until done; Services is reachable once intake is
-  // done, but only "Done" (✓) when the Services flow actually completed (B4).
+  // done (by status or completed steps), but only "Done" (✓) when the Services flow
+  // actually completed (B4).
   const intakeActive = !intakeDone;
-  const servicesDone = stage.services === 'done';
-  const servicesActive = stage.services !== 'locked';
+  const servicesDone = intakeDone && !!servicesComplete;
+  const servicesActive = intakeDone;
 
   return (
     <ul className="relative m-0 list-none p-0">
