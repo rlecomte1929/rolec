@@ -10,8 +10,17 @@ import React from 'react';
 import { Card, Button } from '../../components/antigravity';
 
 interface RoadmapBeingBuiltProps {
+  /**
+   * Which non-ready state to show:
+   * - 'generating' (default): plan is still being built — reassuring "preparing" screen.
+   * - 'empty': resolved with zero steps — informative, with a "Check again" retry.
+   * - 'failed': load/generation error or timeout — error screen with a "Try again" retry.
+   */
+  variant?: 'generating' | 'empty' | 'failed';
   /** Optional CTA — omit to hide the "Message my relocation team" button. */
   onMessageTeam?: () => void;
+  /** Retry handler — shown for 'empty' and 'failed' so neither is a dead end. */
+  onRetry?: () => void;
 }
 
 const NAVY = '#0b2b43';
@@ -72,61 +81,97 @@ const REASSURANCE: { label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({ onMessageTeam }) => (
+const COPY = {
+  generating: {
+    title: "We're building your roadmap",
+    body:
+      "Now that your intake and services are confirmed, our team is putting together your " +
+      "personalised relocation plan. You'll get an email the moment it's ready — usually within " +
+      '2 working days.',
+    retryLabel: null as string | null,
+  },
+  empty: {
+    title: 'No roadmap steps yet',
+    body:
+      "Your plan doesn't have any steps yet — this can happen while your case is still being " +
+      'set up. Nothing is lost; check again shortly or message your relocation team.',
+    retryLabel: 'Check again',
+  },
+  failed: {
+    title: "We couldn't load your roadmap",
+    body:
+      'Something went wrong while building your plan. This is usually temporary — please try ' +
+      'again, or message your relocation team if it keeps happening.',
+    retryLabel: 'Try again',
+  },
+};
+
+export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({
+  variant = 'generating',
+  onMessageTeam,
+  onRetry,
+}) => {
+  const copy = COPY[variant];
+  const isFailed = variant === 'failed';
+  return (
   <div className="space-y-5">
     {/* Centerpiece */}
     <Card padding="lg" className="text-center">
       <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center">
-        <svg viewBox="0 0 64 64" fill="none" className="h-20 w-20" aria-hidden="true">
-          <path
-            d="M12 50c0-8 8-8 8-16S12 22 12 14"
-            stroke={TEAL}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeDasharray="2 5"
-          />
-          <path
-            d="M52 14c0 8-8 8-8 16s8 8 8 16"
-            stroke={NAVY}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeDasharray="2 5"
-          />
-          <circle cx="12" cy="14" r="4" fill={NAVY} />
-          <circle cx="52" cy="50" r="4" fill={NAVY} />
-        </svg>
-        {/* Teal pulse dot */}
-        <span className="absolute right-1 top-1 flex h-3 w-3">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1f8e8b] opacity-60" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-[#1f8e8b]" />
-        </span>
+        {isFailed ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" className="h-16 w-16" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+          </svg>
+        ) : (
+          <>
+            <svg viewBox="0 0 64 64" fill="none" className="h-20 w-20" aria-hidden="true">
+              <path d="M12 50c0-8 8-8 8-16S12 22 12 14" stroke={TEAL} strokeWidth={2.5} strokeLinecap="round" strokeDasharray="2 5" />
+              <path d="M52 14c0 8-8 8-8 16s8 8 8 16" stroke={NAVY} strokeWidth={2.5} strokeLinecap="round" strokeDasharray="2 5" />
+              <circle cx="12" cy="14" r="4" fill={NAVY} />
+              <circle cx="52" cy="50" r="4" fill={NAVY} />
+            </svg>
+            {variant === 'generating' && (
+              <span className="absolute right-1 top-1 flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1f8e8b] opacity-60" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-[#1f8e8b]" />
+              </span>
+            )}
+          </>
+        )}
       </div>
 
-      <h1 className="text-2xl font-semibold text-navy-800">We're building your roadmap</h1>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#475569]">
-        Now that your intake and services are confirmed, our team is putting together your
-        personalised relocation plan. You'll get an email the moment it's ready — usually within
-        2 working days.
-      </p>
+      <h1 className="text-2xl font-semibold text-navy-800">{copy.title}</h1>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#475569]">{copy.body}</p>
 
-      <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#1f8e8b]/30 bg-[#1f8e8b]/10 px-3 py-1 text-xs font-semibold text-[#197c79]">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-[#1f8e8b] opacity-60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#1f8e8b]" />
+      {variant === 'generating' && (
+        <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#1f8e8b]/30 bg-[#1f8e8b]/10 px-3 py-1 text-xs font-semibold text-[#197c79]">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-[#1f8e8b] opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#1f8e8b]" />
+          </span>
+          Preparing your plan
         </span>
-        Preparing your plan
-      </span>
-
-      {onMessageTeam && (
-        <div className="mt-6">
-          <Button variant="primary" onClick={onMessageTeam}>
-            Message my relocation team
-          </Button>
-        </div>
       )}
+
+      {(copy.retryLabel && onRetry) || onMessageTeam ? (
+        <div className="mt-6 flex items-center justify-center gap-3">
+          {copy.retryLabel && onRetry && (
+            <Button variant="primary" onClick={onRetry}>
+              {copy.retryLabel}
+            </Button>
+          )}
+          {onMessageTeam && (
+            <Button variant={copy.retryLabel && onRetry ? 'secondary' : 'primary'} onClick={onMessageTeam}>
+              Message my relocation team
+            </Button>
+          )}
+        </div>
+      ) : null}
     </Card>
 
-    {/* What will appear here — skeleton preview (no fabricated data) */}
+    {/* What will appear here — skeleton preview (no fabricated data). Hidden on
+        the failed screen (it would read as if a plan is coming when it errored). */}
+    {!isFailed && (
     <Card padding="lg">
       <h2 className="text-sm font-semibold text-navy-800">What will appear here</h2>
       <ul className="mt-4 space-y-3">
@@ -150,8 +195,10 @@ export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({ onMessageT
       </ul>
       <p className="mt-3 text-xs text-[#94a3b8]">Steps will appear here once your plan is ready.</p>
     </Card>
+    )}
 
-    {/* Reassurance row */}
+    {/* Reassurance row — only meaningful while we're still preparing the plan. */}
+    {variant === 'generating' && (
     <div className="grid gap-3 sm:grid-cols-3">
       {REASSURANCE.map((item) => (
         <div
@@ -165,5 +212,7 @@ export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({ onMessageT
         </div>
       ))}
     </div>
+    )}
   </div>
-);
+  );
+};
