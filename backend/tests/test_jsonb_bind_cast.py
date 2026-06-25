@@ -1,0 +1,62 @@
+"""Regression: JSON params must bind under the Postgres dialect.
+
+The historical ``f":{name}{_jb}"`` idiom rendered ``:param::jsonb`` on Postgres.
+SQLAlchemy's text() bind-parameter regex has a negative lookahead for ``:``
+after a placeholder, so ``:param`` immediately followed by ``::`` was NOT
+treated as a bind — the literal ``:param`` reached Postgres and raised
+``syntax error at or near ":"`` (a 500 on the employee policy-service-comparison
+endpoint, which writes a resolved-policy row via upsert_resolved_assignment_policy).
+
+These tests compile against the *postgresql* dialect on purpose: on SQLite
+(``_jb == ""``) the bug is masked, which is why the curated SQLite CI suite
+never caught it. They assert the param is bound, not left literal.
+"""
+
+from sqlalchemy import text
+from sqlalchemy.dialects import postgresql
+
+
+def _compiled(sql: str) -> str:
+    return str(text(sql).compile(dialect=postgresql.dialect()))
+
+
+def test_jbind_demonstrates_the_old_break():
+    """Document the exact failure mode: ``:ctx::jsonb`` is left literal."""
+    broken = _compiled("INSERT INTO t (a, ctx) VALUES (:a, :ctx::jsonb)")
+    # :a binds, but :ctx::jsonb survives un-bound — this is the prod 500.
+    assert "%(a)s" in broken
+    assert ":ctx" in broken  # literal placeholder reached the driver
+
+
+def test_jbind_binds_under_postgres(monkeypatch):
+    """The fix: CAST(:param AS jsonb) binds correctly under Postgres.
+
+    Forces the Postgres branch regardless of the test DB (CI runs SQLite, where
+    the helper degrades to a bare ``:param`` and the bug can't surface). Asserts
+    against backend.db.cases._jbind — the real helper on the reproduced
+    policy-service-comparison 500 path. (backend.database._jbind is identical
+    source but is a MagicMock under the test harness, so it can't be exercised
+    here; it is covered by code parity.)
+    """
+    import backend.db.cases as cases_mod
+
+    monkeypatch.setattr(cases_mod, "_is_sqlite", False)
+    fixed = _compiled(f"INSERT INTO t (a, ctx) VALUES (:a, {cases_mod._jbind('ctx')})")
+    assert "%(ctx)s" in fixed          # ctx is now a bound parameter
+    assert ":ctx" not in fixed         # no literal placeholder survives
+    assert "CAST" in fixed and "jsonb" in fixed
+
+
+def test_jbind_sqlite_emits_bare_param(monkeypatch):
+    """On SQLite (_is_sqlite True) the helper degrades to a bare ``:param``."""
+    import backend.db.cases as cases_mod
+
+    monkeypatch.setattr(cases_mod, "_is_sqlite", True)
+    assert cases_mod._jbind("ctx") == ":ctx"
+
+
+def test_jbind_postgres_wraps_in_cast(monkeypatch):
+    import backend.db.cases as cases_mod
+
+    monkeypatch.setattr(cases_mod, "_is_sqlite", False)
+    assert cases_mod._jbind("ctx") == "CAST(:ctx AS jsonb)"

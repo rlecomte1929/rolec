@@ -55,6 +55,18 @@ _is_sqlite = _raw_url.startswith("sqlite")
 # Postgres-only jsonb cast suffix; empty string on SQLite (TEXT columns used there).
 _jb = "" if _is_sqlite else "::jsonb"
 
+
+def _jbind(name: str) -> str:
+    """Bind a JSON param with the correct per-backend cast.
+
+    ``f":{name}{_jb}"`` produced ``:param::jsonb`` on Postgres, which SQLAlchemy's
+    text() bind regex refuses to bind (negative lookahead for ``:`` after a
+    placeholder), so the literal ``:param`` reached Postgres and raised
+    ``syntax error at or near ":"``. ``CAST(:param AS jsonb)`` binds correctly;
+    SQLite takes the bare ``:param``.
+    """
+    return f":{name}" if _is_sqlite else f"CAST(:{name} AS jsonb)"
+
 if _is_sqlite:
     @event.listens_for(_engine, "connect")
     def _sqlite_enable_foreign_keys(dbapi_connection, _connection_record) -> None:

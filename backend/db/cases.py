@@ -54,6 +54,19 @@ _is_sqlite = _raw_url.startswith("sqlite")
 # by extracted CasesMixin methods that build jsonb SQL.
 _jb = "" if _is_sqlite else "::jsonb"
 
+
+def _jbind(name: str) -> str:
+    """Bind a JSON param with the correct per-backend cast.
+
+    The historical ``f":{name}{_jb}"`` form produced ``:param::jsonb`` on
+    Postgres, but SQLAlchemy's text() bind regex has a negative lookahead for
+    ``:`` and so refuses to bind ``:param`` when it is immediately followed by
+    ``::``. The placeholder was passed to Postgres literally and raised
+    ``syntax error at or near ":"`` (a 500). ``CAST(:param AS jsonb)`` binds
+    correctly; SQLite (TEXT columns) just takes the bare ``:param``.
+    """
+    return f":{name}" if _is_sqlite else f"CAST(:{name} AS jsonb)"
+
 # public.cases.purpose CHECK allows only these four values. The wizard emits
 # free-er strings; map them onto the allowed set so the canonical-case bridge
 # never trips cases_purpose_check. Unknown/blank → 'work' (the column default).
@@ -2337,7 +2350,7 @@ class CasesMixin:
                     UPDATE resolved_assignment_policies SET
                     case_id = :cid, company_id = :coid, policy_id = :pid, policy_version_id = :vid,
                     canonical_case_id = :ccid, resolution_status = :status, resolved_at = :now,
-                    resolution_context_json = :ctx{_jb}, updated_at = :now
+                    resolution_context_json = {_jbind('ctx')}, updated_at = :now
                     WHERE assignment_id = :aid
                 """), {
                     "aid": assignment_id, "cid": case_id, "coid": company_id, "pid": policy_id,
@@ -2351,7 +2364,7 @@ class CasesMixin:
                     INSERT INTO resolved_assignment_policies
                     (id, assignment_id, case_id, company_id, policy_id, policy_version_id, canonical_case_id,
                      resolution_status, resolved_at, resolution_context_json, created_at, updated_at)
-                    VALUES (:id, :aid, :cid, :coid, :pid, :vid, :ccid, :status, :now, :ctx{_jb}, :now, :now)
+                    VALUES (:id, :aid, :cid, :coid, :pid, :vid, :ccid, :status, :now, {_jbind('ctx')}, :now, :now)
                 """), {
                     "id": rid, "aid": assignment_id, "cid": case_id, "coid": company_id, "pid": policy_id,
                     "vid": policy_version_id, "ccid": canonical_case_id, "status": resolution_status,
@@ -2371,7 +2384,7 @@ class CasesMixin:
                      currency, amount_unit, frequency, approval_required, evidence_required_json,
                      exclusions_json, condition_summary, source_rule_ids_json, created_at, updated_at)
                     VALUES (:id, :rid, :bk, :inc, :minv, :stdv, :maxv, :cur, :au, :freq, :apr,
-                            :evj{_jb}, :exj{_jb}, :cs, :srj{_jb}, :now, :now)
+                            {_jbind('evj')}, {_jbind('exj')}, :cs, {_jbind('srj')}, :now, :now)
                 """), {
                     "id": bid, "rid": rid, "bk": b["benefit_key"], "inc": inc,
                     "minv": b.get("min_value"), "stdv": b.get("standard_value"), "maxv": b.get("max_value"),
@@ -2387,7 +2400,7 @@ class CasesMixin:
                 conn.execute(text(f"""
                     INSERT INTO resolved_assignment_policy_exclusions
                     (id, resolved_policy_id, benefit_key, domain, description, source_rule_ids_json)
-                    VALUES (:id, :rid, :bk, :dom, :desc, :srj{_jb})
+                    VALUES (:id, :rid, :bk, :dom, :desc, {_jbind('srj')})
                 """), {
                     "id": eid, "rid": rid, "bk": e.get("benefit_key"), "dom": e["domain"],
                     "desc": e.get("description"), "srj": json.dumps(e.get("source_rule_ids_json") or []),
