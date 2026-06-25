@@ -14,6 +14,7 @@ import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
 import { formDocumentsAPI, type FormDocument } from '../../../api/dossier';
 import { logger } from '../../../lib/logger';
+import { assertSafeUrl } from '../../../utils/url';
 
 export interface RequiredDocument {
   key: string;
@@ -192,7 +193,7 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
             <li key={d.id} className="flex items-center gap-2 text-sm">
               {d.download_url ? (
                 <a
-                  href={d.download_url}
+                  href={assertSafeUrl(d.download_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[#0b2b43] hover:underline truncate"

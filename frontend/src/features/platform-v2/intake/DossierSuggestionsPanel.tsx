@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { dossierAPI } from '../../../api/client';
+import { assertSafeUrl } from '../../../utils/url';
 import type { DossierSuggestion, DossierSource } from '../../../types';
 
 /**
@@ -127,7 +128,7 @@ export function DossierSuggestionsPanel({ caseId }: { caseId: string }) {
                         src.url ? (
                           <a
                             key={sIdx}
-                            href={src.url}
+                            href={assertSafeUrl(src.url)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-xs text-[#1d4ed8] underline decoration-dotted"
@@ -162,7 +163,7 @@ export function DossierSuggestionsPanel({ caseId }: { caseId: string }) {
             {sources.map((src, idx) => (
               <li key={`${src.chunk_id || src.url}-${idx}`}>
                 {src.url ? (
-                  <a href={src.url} target="_blank" rel="noreferrer" className="text-[#1d4ed8] underline">
+                  <a href={assertSafeUrl(src.url)} target="_blank" rel="noreferrer" className="text-[#1d4ed8] underline">
                     {sourceLabel(src)}
                   </a>
                 ) : (

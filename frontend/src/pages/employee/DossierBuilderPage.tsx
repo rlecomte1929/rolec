@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/antigravity/Button';
 import { useNavigate, useParams } from 'react-router-dom';
+import { assertSafeUrl } from '../../utils/url';
 import {
   DndContext,
   closestCenter,
@@ -426,13 +427,15 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
   }, [caseId, result]);
 
   const handlePrint = useCallback(() => {
-    if (!result?.pdf_url) return;
-    window.open(result.pdf_url, '_blank', 'noopener,noreferrer');
+    const safe = assertSafeUrl(result?.pdf_url, '');
+    if (!safe) return;
+    window.open(safe, '_blank', 'noopener,noreferrer');
   }, [result]);
 
   const handleDownloadPdf = useCallback(() => {
-    if (!result?.pdf_url) return;
-    window.open(result.pdf_url, '_blank', 'noopener,noreferrer');
+    const safe = assertSafeUrl(result?.pdf_url, '');
+    if (!safe) return;
+    window.open(safe, '_blank', 'noopener,noreferrer');
   }, [result]);
 
   return (

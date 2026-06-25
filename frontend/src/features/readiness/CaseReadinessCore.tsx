@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
+import { assertSafeUrl } from '../../utils/url';
 
 type RouteRef = {
   source_key?: string;
@@ -235,7 +236,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                 <li key={r.source_key || r.source_title}>
                   {r.source_url ? (
                     <a
-                      href={r.source_url}
+                      href={assertSafeUrl(r.source_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#1d4ed8] hover:underline"
@@ -305,7 +306,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
             {summary.route_references.map((r) => (
               <li key={r.source_key || r.source_title}>
                 {r.source_url ? (
-                  <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="text-[#1d4ed8] hover:underline">
+                  <a href={assertSafeUrl(r.source_url)} target="_blank" rel="noopener noreferrer" className="text-[#1d4ed8] hover:underline">
                     {r.source_title}
                   </a>
                 ) : (
@@ -395,7 +396,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                                 <p className="text-xs mt-1">
                                   <span className="text-[#64748b]">Pointer: </span>
                                   <a
-                                    href={row.primary_reference.source_url}
+                                    href={assertSafeUrl(row.primary_reference.source_url)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-[#1d4ed8] hover:underline"

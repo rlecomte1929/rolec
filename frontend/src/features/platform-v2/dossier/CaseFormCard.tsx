@@ -17,6 +17,7 @@ import { buildRoute } from '../../../navigation/routes';
 import { formEditorAPI } from '../../../api/formEditor';
 import { OriginalPdfDrawer } from './OriginalPdfDrawer';
 import { FormDocuments } from './FormDocuments';
+import { assertSafeUrl } from '../../../utils/url';
 
 // ---------------------------------------------------------------------------
 // Status → label + colour + banner copy
@@ -313,7 +314,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
               )}
               {form.template.source_url && (
                 <a
-                  href={form.template.source_url}
+                  href={assertSafeUrl(form.template.source_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 font-medium text-[#0b2b43] hover:underline"

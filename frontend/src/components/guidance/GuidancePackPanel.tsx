@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card } from '../antigravity';
 import { guidanceAPI } from '../../api/client';
+import { assertSafeUrl } from '../../utils/url';
 import { useAdminContext } from '../../features/admin/useAdminContext';
 
 const GUIDANCE_ENABLED =
@@ -256,7 +257,7 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
                               .map((c) => sourceMap.get(c))
                               .filter(Boolean)
                               .map((s, i) => (
-                                <a key={`${s?.url}-${i}`} className="text-[#1d4ed8] underline mr-2" href={s?.url} target="_blank" rel="noreferrer">
+                                <a key={`${s?.url}-${i}`} className="text-[#1d4ed8] underline mr-2" href={assertSafeUrl(s?.url)} target="_blank" rel="noreferrer">
                                   {s?.title || s?.url}
                                 </a>
                               ))}
@@ -296,7 +297,7 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
                               .map((c) => sourceMap.get(c))
                               .filter(Boolean)
                               .map((s, i) => (
-                                <a key={`${s?.url}-${i}`} className="text-[#1d4ed8] underline mr-2" href={s?.url} target="_blank" rel="noreferrer">
+                                <a key={`${s?.url}-${i}`} className="text-[#1d4ed8] underline mr-2" href={assertSafeUrl(s?.url)} target="_blank" rel="noreferrer">
                                   {s?.title || s?.url}
                                 </a>
                               ))}
@@ -317,7 +318,7 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
               )}
               {pack.sources.map((s) => (
                 <div key={s.doc_id} className="text-sm">
-                  <a className="text-[#1d4ed8] underline" href={s.url} target="_blank" rel="noreferrer">
+                  <a className="text-[#1d4ed8] underline" href={assertSafeUrl(s.url)} target="_blank" rel="noreferrer">
                     {s.title || s.url}
                   </a>
                   {s.publisher && <span className="text-xs text-[#6b7280]"> · {s.publisher}</span>}

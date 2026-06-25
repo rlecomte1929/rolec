@@ -1,6 +1,7 @@
 import React from 'react';
 import type { SourceRecordDTO } from '../../types';
 import { StalenessBadge } from '../antigravity/StalenessBadge';
+import { assertSafeUrl } from '../../utils/url';
 
 interface CitationsProps {
   sources: SourceRecordDTO[];
@@ -21,7 +22,7 @@ export const Citations: React.FC<CitationsProps> = ({ sources }) => {
       {sources.slice(0, 3).map((source) => (
         <div key={source.id} className="flex items-center gap-2">
           <a
-            href={source.url}
+            href={assertSafeUrl(source.url)}
             target="_blank"
             rel="noreferrer"
             title={`Retrieved ${new Date(source.retrievedAt).toLocaleDateString('en-US')}`}
