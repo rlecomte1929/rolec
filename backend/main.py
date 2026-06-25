@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
 from datetime import datetime, date
@@ -587,12 +587,21 @@ def cors_headers_for_request_origin(request: Request) -> Dict[str, str]:
     allowed = origin in default_origins or bool(_cors_origin_pattern and _cors_origin_pattern.fullmatch(origin))
     if not allowed:
         return {}
-    return {
+    headers = {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Expose-Headers": "X-Request-ID",
         "Vary": "Origin",
     }
+    # Defense-in-depth: if an error fires on a preflight (OPTIONS) request, the
+    # browser still needs the preflight-specific headers or it rejects the result
+    # outright. Without these a 500 on OPTIONS is reported as a generic CORS error
+    # and the real cross-origin request is never sent.
+    if request.method == "OPTIONS":
+        headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Request-ID"
+        headers["Access-Control-Max-Age"] = "86400"
+    return headers
 
 
 # NOTE: Register HTTP middleware before CORSMiddleware. Starlette prepends each
