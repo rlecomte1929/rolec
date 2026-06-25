@@ -749,6 +749,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
 
       {editTarget && (
         <CompanyFormModal
+          key={editTarget.id}
           mode="edit"
           initial={editTarget}
           onClose={() => setEditTarget(null)}

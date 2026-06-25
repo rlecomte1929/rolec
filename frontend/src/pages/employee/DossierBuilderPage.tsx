@@ -10,6 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { assertSafeUrl } from '../../utils/assertSafeUrl';
 import { Button } from '../../components/antigravity/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -427,12 +428,12 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
 
   const handlePrint = useCallback(() => {
     if (!result?.pdf_url) return;
-    window.open(result.pdf_url, '_blank', 'noopener,noreferrer');
+    window.open(assertSafeUrl(result.pdf_url), '_blank', 'noopener,noreferrer');
   }, [result]);
 
   const handleDownloadPdf = useCallback(() => {
     if (!result?.pdf_url) return;
-    window.open(result.pdf_url, '_blank', 'noopener,noreferrer');
+    window.open(assertSafeUrl(result.pdf_url), '_blank', 'noopener,noreferrer');
   }, [result]);
 
   return (

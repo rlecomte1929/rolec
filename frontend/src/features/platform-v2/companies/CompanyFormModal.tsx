@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { adminAPI } from '../../../api/client';
@@ -75,11 +75,9 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Re-sync if the parent swaps the edit target while the modal is open.
-  useEffect(() => {
-    setForm(initial ? formFromCompany(initial) : emptyForm());
-    setError(null);
-  }, [initial]);
+  // RX-3: no prop→state mirroring effect. The parent passes key={editTarget.id}
+  // (CompaniesV2), so switching the edit target remounts the modal with fresh
+  // state from the useState initializer — deriving, not mirroring.
 
   function setField<K extends keyof FormPayload>(key: K, value: FormPayload[K]) {
     setForm((f) => ({ ...f, [key]: value }));
