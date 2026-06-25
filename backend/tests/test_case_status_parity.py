@@ -88,8 +88,18 @@ def test_both_endpoints_use_the_shared_resolver():
     assert "assignment_status=assignment_status" in wiz
     # compat_get_case must pass the user id (not gate on a lowercase role literal)
     cg = compat_src[compat_src.index("def compat_get_case("):]
+    cg = cg[: cg.index("\n@router.", 1)]
     assert "_get_wizard_case_dto(case_id, user.get(\"id\"))" in cg
     assert '== "employee"' not in cg  # the casing bug must not return
+    # The assignment status must be AUTHORITATIVE across every return path, not
+    # only inside _get_wizard_case_dto — else cases whose caseId is a relocation
+    # id (no wizard_cases row) fall through to _ensure_wizard_case and return
+    # 'created' while the list shows the assignment status (the 44/55 divergence).
+    assert "assignment_status = (" in cg
+    assert "db.resolve_case_status(case_id, user.get(\"id\"))" in cg
+    assert "db.resolve_case_status(case_id, None)" in cg
+    assert 'dto["status"] = assignment_status' in cg  # _ensure path override
+    assert '"status": assignment_status or row.get("status")' in cg  # shared tail
 
     cr_src = _read("app", "routers", "cases_read.py")
     gc = cr_src[cr_src.index("def get_case("):]

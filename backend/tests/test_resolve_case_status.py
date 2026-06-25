@@ -73,6 +73,19 @@ class ResolveCaseStatusTests(unittest.TestCase):
         self.assertIsNone(self.db.resolve_case_status("X", "empZ"))
         self.assertIsNone(self.db.resolve_case_status(""))
 
+    def test_resolves_relocation_id_caseid_with_no_wizard_row(self):
+        # The 44/55 bug: the caseId is a relocation_cases id (matches only via
+        # case_id, canonical NULL) and has no wizard_cases row. resolve only reads
+        # case_assignments, so it still finds the assignment — the detail can then
+        # report 'assigned' instead of falling through to 'created'.
+        with self.engine.begin() as c:
+            c.execute(text(
+                "INSERT INTO case_assignments VALUES "
+                "('reloc-A','reloc-case-1',NULL,'empA','assigned','2026-04-01')"
+            ))
+        self.assertEqual(self.db.resolve_case_status("reloc-case-1", "empA"), "assigned")
+        self.assertEqual(self.db.resolve_case_status("reloc-case-1", None), "assigned")
+
     def test_parity_across_every_lifecycle_state(self):
         # For every lifecycle status, a multi-employee case where empA holds that
         # status and empB holds a globally-newer DIFFERENT status. The detail (now
