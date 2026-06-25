@@ -674,6 +674,13 @@ export function EmployeeIntakePage() {
   const [locks, setLocks] = useState({ dest: false, destCity: false, email: false, job: false, contractType: false, contractStart: false, salary: false, office: false });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savedAt, setSavedAt] = useState(Date.now());
+  // Save indicator is bound to the ACTUAL server acknowledgement, not optimistic
+  // local state: 'saving' while the PATCH is in flight, 'saved' only after a 2xx
+  // (using the server's intakeUpdatedAt), 'error' (with a retry affordance) when
+  // the write fails. Previously the indicator flipped to "Auto-saved" before the
+  // request resolved and swallowed failures, so a dropped save showed a false
+  // positive — the kernel of the "silently fails to persist" report.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   // AIQ-976: case-scoped intake — when opened via /employee/case/:caseId/intake,
   // the clicked case drives the whole session (draft hydration, autosave, and the
   // services patch below). The bare /employee/intake route has no param, so it
@@ -702,6 +709,38 @@ export function EmployeeIntakePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Persist one draft snapshot and reflect the REAL outcome in the indicator.
+  // Resolves true only on a confirmed 2xx. On failure the payload is kept
+  // pending (so the next edit or an explicit retry re-sends it) and the
+  // indicator shows an error instead of a false "Auto-saved".
+  const runIntakeSave = useCallback(async (payload: IntakeData): Promise<boolean> => {
+    const aid = assignmentIdRef.current;
+    if (!aid) return false;
+    setSaveStatus('saving');
+    try {
+      const res = await employeeAPI.updateIntakeDraft(
+        aid,
+        payload as unknown as Record<string, unknown>,
+      );
+      const ts = res?.intakeUpdatedAt ? Date.parse(res.intakeUpdatedAt) : Date.now();
+      setSavedAt(Number.isNaN(ts) ? Date.now() : ts);
+      setSaveStatus('saved');
+      // Persisted — clear it so unmount-flush / retry don't re-send a stale copy.
+      // Guard on reference equality: a newer edit may have replaced it mid-flight.
+      if (pendingSaveDataRef.current === payload) pendingSaveDataRef.current = null;
+      return true;
+    } catch {
+      pendingSaveDataRef.current = payload;
+      setSaveStatus('error');
+      return false;
+    }
+  }, []);
+
+  const retryIntakeSave = useCallback(() => {
+    const pending = pendingSaveDataRef.current;
+    if (pending) void runIntakeSave(pending);
+  }, [runIntakeSave]);
+
   const setField = useCallback(<K extends keyof IntakeData>(k: K, v: IntakeData[K]) => {
     setData((d) => {
       const next = { ...d, [k]: v };
@@ -710,25 +749,17 @@ export function EmployeeIntakePage() {
       // and clobber the server draft (which replaces, not merges).
       if (draftHydratedRef.current) {
         // Always track the latest unsaved payload so the unmount-flush can
-        // pick it up even if the debounce timer hasn't fired yet.
+        // pick it up even if the debounce timer hasn't fired yet. Cleared by
+        // runIntakeSave only after a confirmed write.
         pendingSaveDataRef.current = next;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
-          pendingSaveDataRef.current = null; // mark as persisted
-          setSavedAt(Date.now());
-          const aid = assignmentIdRef.current;
-          if (aid) {
-            void employeeAPI
-              .updateIntakeDraft(aid, next as unknown as Record<string, unknown>)
-              .catch(() => {
-                /* swallow — next edit will retry, wizard stays usable */
-              });
-          }
+          void runIntakeSave(next);
         }, 700);
       }
       return next;
     });
-  }, []);
+  }, [runIntakeSave]);
 
   // Unmount flush: if the user navigates away before the 700ms debounce fires,
   // immediately persist any pending data so it's not lost.
@@ -956,7 +987,19 @@ export function EmployeeIntakePage() {
           <div className="border-b border-gray-100 px-5 pt-4 pb-3">
             <div className="flex items-center justify-between mb-2 text-xs text-gray-400">
               <span className="font-semibold text-gray-600">Detailed Intake</span>
-              <span>Auto-saved {savedLabel}</span>
+              {saveStatus === 'saving' ? (
+                <span className="text-gray-400">Saving…</span>
+              ) : saveStatus === 'error' ? (
+                <button
+                  type="button"
+                  onClick={retryIntakeSave}
+                  className="font-medium text-red-600 hover:underline"
+                >
+                  Couldn't save — retry
+                </button>
+              ) : (
+                <span>Auto-saved {savedLabel}</span>
+              )}
               <span>Step {step} / {TOTAL_STEPS}</span>
             </div>
             {/* Stepper: all 7 steps must be visible without horizontal scroll
