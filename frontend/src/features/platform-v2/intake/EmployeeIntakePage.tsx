@@ -13,6 +13,7 @@ import { getAuthItem } from '../../../utils/demo';
 import { MultiChip } from './MultiChip';
 import { DossierSuggestionsPanel } from './DossierSuggestionsPanel';
 import { INTAKE_STEP_LABELS } from './intakeSteps';
+import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
 import { PrivacyNotice } from '../../privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
 
@@ -251,8 +252,8 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
 
-function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
+function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled, testId }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean; testId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -275,6 +276,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
         <span className="px-3 text-base">{selected ? selected.flag : '🔍'}</span>
         <Input unstyled
           type="text"
+          data-testid={testId}
           className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
           value={open ? query : selected ? selected.name : ''}
           placeholder={placeholder}
@@ -303,7 +305,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   );
 }
 
-function CityCombo({ country, value, onChange }: { country: string; value: string; onChange: (v: string) => void }) {
+function CityCombo({ country, value, onChange, testId }: { country: string; value: string; onChange: (v: string) => void; testId?: string }) {
   const opts = CITIES_BY_COUNTRY[country] ?? [];
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -317,7 +319,7 @@ function CityCombo({ country, value, onChange }: { country: string; value: strin
     <div ref={ref} className="relative">
       <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
         <span className="px-3 text-gray-400 text-sm">📍</span>
-        <Input unstyled type="text" value={value} placeholder="Select or type a city" autoComplete="off"
+        <Input unstyled type="text" data-testid={testId} value={value} placeholder="Select or type a city" autoComplete="off"
           className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
           onChange={(v) => onChange(v)}
           onFocus={() => setOpen(true)} />
@@ -935,7 +937,7 @@ export function EmployeeIntakePage() {
 
     const saved = row?.intake_step;
     if (typeof saved === 'number' && saved > 0) {
-      const clamped = Math.min(Math.max(saved, 1), TOTAL_STEPS);
+      const clamped = clampIntakeStep(saved, TOTAL_STEPS);
       setStep(clamped);
       lastPersistedStepRef.current = clamped;
     } else if (typeof saved === 'number') {
@@ -966,27 +968,14 @@ export function EmployeeIntakePage() {
       .then((res) => {
         if (cancelled) return;
         if (res.intakeDraft && typeof res.intakeDraft === 'object') {
-          setData((d) => {
-            const merged = { ...d };
-            for (const [k, v] of Object.entries(res.intakeDraft as Record<string, unknown>)) {
-              const key = k as keyof IntakeData;
-              const cur = merged[key] as unknown;
-              // Apply the saved draft value unless the user actively typed something
-              // during the brief hydration load window. We detect "user edited" by
-              // comparing against the initial default: if the field still matches
-              // the default it hasn't been touched, so we overwrite with the saved
-              // value. Fields that are genuinely empty also always get the draft value.
-              // This fixes restoration of fields with non-empty defaults (members,
-              // purpose, contract_type, commute_mins) which the old isEmpty-only
-              // check never restored.
-              const initialDefault = (INITIAL_DATA as unknown as Record<string, unknown>)[key as string];
-              const isStillDefault = JSON.stringify(cur) === JSON.stringify(initialDefault);
-              const isEmpty = cur === '' || cur === null || cur === undefined
-                || (Array.isArray(cur) && cur.length === 0);
-              if (isEmpty || isStillDefault) (merged as Record<string, unknown>)[key as string] = v;
-            }
-            return merged;
-          });
+          // Apply the saved draft over each field unless the user actively typed
+          // something during the brief hydration window (detected by comparing
+          // against INITIAL_DATA: a field that still matches its default is
+          // untouched and gets the saved value; genuinely empty fields always do
+          // too). This restores fields with non-empty defaults (members, purpose,
+          // contract_type) which the old isEmpty-only check never restored. The
+          // merge is a pure function (intakeHydration.ts) so it's unit-tested.
+          setData((d) => mergeIntakeDraft(d, res.intakeDraft as Record<string, unknown>, INITIAL_DATA));
         }
         // Success — a real draft OR a legitimately-empty one (200 with null draft).
         // Only now is it safe to arm autosave; saving before a confirmed load could
@@ -1087,7 +1076,7 @@ export function EmployeeIntakePage() {
               ) : (
                 <span>Auto-saved {savedLabel}</span>
               )}
-              <span>Step {step} / {TOTAL_STEPS}</span>
+              <span data-testid="intake-step-indicator">Step {step} / {TOTAL_STEPS}</span>
             </div>
             {/* Stepper: all 7 steps must be visible without horizontal scroll
                 at the wizard's max-w-4xl width. flex-wrap is a safety net for
@@ -1135,30 +1124,30 @@ export function EmployeeIntakePage() {
                 <StepHd title="Where are you moving from and to?" sub="Just the basics — we'll use this to start drafting your roadmap." required />
                 <Grid>
                   <FieldWrap label="Origin country" required>
-                    <CountryCombo value={data.origin_country} onChange={(v) => setField('origin_country', v)} />
+                    <CountryCombo testId="intake-origin_country" value={data.origin_country} onChange={(v) => setField('origin_country', v)} />
                   </FieldWrap>
                   <FieldWrap label="Origin city" required>
-                    <CityCombo country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} />
+                    <CityCombo testId="intake-origin_city" country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} />
                   </FieldWrap>
                   <FieldWrap label="Destination country" required prefill={locks.dest} onUnlock={() => unlock('dest')}>
-                    <CountryCombo value={data.dest_country} onChange={(v) => setField('dest_country', v)} disabled={locks.dest} />
+                    <CountryCombo testId="intake-dest_country" value={data.dest_country} onChange={(v) => setField('dest_country', v)} disabled={locks.dest} />
                   </FieldWrap>
                   <FieldWrap label="Destination city" required prefill={locks.destCity} onUnlock={() => unlock('destCity')}>
-                    <CityCombo country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} />
+                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} />
                   </FieldWrap>
                   <FieldWrap label="Target move date" required>
-                    <Input unstyled type="date" className={inputCls()} value={data.target_date}
+                    <Input unstyled type="date" data-testid="intake-target_date" className={inputCls()} value={data.target_date}
                       onChange={(v) => setField('target_date', v)} />
                   </FieldWrap>
                   <FieldWrap label="Purpose of relocation" required>
-                    <select className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
+                    <select data-testid="intake-purpose" className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
                       <option>Employment</option><option>Study</option><option>Family</option><option>Other</option>
                     </select>
                   </FieldWrap>
                   <FieldWrap label="Will you be relocating with pets?" required hint="Just yes or no — if yes, you'll add pet details later when choosing services.">
                     <div className="flex gap-2">
                       {([['Yes', true], ['No', false]] as const).map(([lbl, val]) => (
-                        <Button key={lbl} unstyled type="button" onClick={() => setField('has_pets', val)}
+                        <Button key={lbl} unstyled type="button" data-testid={`intake-has_pets-${lbl.toLowerCase()}`} onClick={() => setField('has_pets', val)}
                           className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
                             data.has_pets === val
                               ? 'bg-accent-600 text-white border-accent-600'
@@ -1184,21 +1173,21 @@ export function EmployeeIntakePage() {
                 <StepHd title="A bit about you" sub="Your passport details kick off the immigration track." />
                 <Grid>
                   <FieldWrap label="Full name" required>
-                    <Input unstyled className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
+                    <Input unstyled data-testid="intake-full_name" className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
                       onChange={(v) => setField('full_name', v)} />
                   </FieldWrap>
                   <FieldWrap label="Email" required prefill={locks.email} onUnlock={() => unlock('email')}>
-                    <Input unstyled type="email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
+                    <Input unstyled type="email" data-testid="intake-email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
                       onChange={(v) => setField('email', v)} />
                   </FieldWrap>
                   <FieldWrap label="Nationality" required>
-                    <CountryCombo value={data.nationality} onChange={(v) => setField('nationality', v)} />
+                    <CountryCombo testId="intake-nationality" value={data.nationality} onChange={(v) => setField('nationality', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport country" required>
-                    <CountryCombo value={data.passport_country} onChange={(v) => setField('passport_country', v)} />
+                    <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport expiry" required>
-                    <Input unstyled type="date" className={inputCls()} value={data.passport_expiry}
+                    <Input unstyled type="date" data-testid="intake-passport_expiry" className={inputCls()} value={data.passport_expiry}
                       onChange={(v) => setField('passport_expiry', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
@@ -1354,7 +1343,7 @@ export function EmployeeIntakePage() {
           {/* Footer nav */}
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
             {step > 1 ? (
-              <Button unstyled type="button" onClick={() => void goTo(step - 1)}
+              <Button unstyled type="button" data-testid="intake-back" onClick={() => void goTo(step - 1)}
                 className="px-4 py-2 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 ← Back
               </Button>
@@ -1363,7 +1352,7 @@ export function EmployeeIntakePage() {
               🔒 Encrypted · only you and your HR team see this
             </div>
             {step < TOTAL_STEPS ? (
-              <Button unstyled type="button" onClick={() => void goTo(step + 1)} disabled={!stepValid(step)}
+              <Button unstyled type="button" data-testid="intake-continue" onClick={() => void goTo(step + 1)} disabled={!stepValid(step)}
                 aria-describedby={!stepValid(step) ? 'intake-step-hint' : undefined}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   stepValid(step) ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
