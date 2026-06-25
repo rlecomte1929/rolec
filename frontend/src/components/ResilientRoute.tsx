@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from './antigravity/Button';
+import { reportError } from '../lib/errorTracking';
 
 /**
  * AIQ-655 — resilient wrapper for top-level routes.
@@ -100,6 +101,8 @@ class ResilientErrorBoundary extends React.Component<BoundaryProps, BoundaryStat
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ResilientRoute]', error, info.componentStack);
+    // EH-1: report render crashes to the capture-error service (was console-only).
+    reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ResilientRoute' });
   }
 
   private reset = () => this.setState({ hasError: false, error: null });

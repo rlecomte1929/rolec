@@ -50,6 +50,33 @@ function computeFingerprint(message: string, stack: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
+// EH-2 — PII scrubbing. Error payloads go to an external sub-processor, so under
+// the repo's GDPR posture no raw PII may leave in a message/url/breadcrumb. We
+// strip URL query strings and redact emails / bearer-tokens-JWTs / UUIDs.
+// ---------------------------------------------------------------------------
+
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const TOKEN_RE = /\b(?:eyJ[A-Za-z0-9._-]{8,}|sk-[A-Za-z0-9]{8,})\b|Bearer\s+[A-Za-z0-9._-]+/gi;
+const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
+export function scrubPii(text: string): string {
+  return text
+    .replace(EMAIL_RE, '[email]')
+    .replace(TOKEN_RE, '[token]')
+    .replace(UUID_RE, '[id]');
+}
+
+/** Keep origin + path; drop the query string (it routinely carries ids/tokens). */
+export function redactUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return scrubPii(u.origin + u.pathname);
+  } catch {
+    return scrubPii(url.split('?')[0] ?? url);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Core report function — fire-and-forget, never throws
 // ---------------------------------------------------------------------------
 
@@ -87,13 +114,13 @@ export async function reportError(ctx: ErrorContext): Promise<void> {
 
   const payload = {
     fingerprint,
-    message:        ctx.message.slice(0, 1000),
-    stack:          ctx.stack?.slice(0, 5000) ?? null,
-    url:            window.location.href,
+    message:        scrubPii(ctx.message).slice(0, 1000),
+    stack:          ctx.stack ? scrubPii(ctx.stack).slice(0, 5000) : null,
+    url:            redactUrl(window.location.href),
     user_id:        userId,
     component_name: ctx.componentName ?? null,
     browser:        navigator.userAgent.slice(0, 300),
-    breadcrumbs:    [...breadcrumbs],
+    breadcrumbs:    breadcrumbs.map((b) => ({ ...b, message: scrubPii(b.message) })),
     severity:       ctx.severity ?? 'error',
   };
 
