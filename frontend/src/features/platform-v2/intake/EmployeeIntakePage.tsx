@@ -752,10 +752,7 @@ export function EmployeeIntakePage() {
     if (!aid) return false;
     setSaveStatus('saving');
     try {
-      const res = await employeeAPI.updateIntakeDraft(
-        aid,
-        payload as unknown as Record<string, unknown>,
-      );
+      const res = await employeeAPI.updateIntakeDraft(aid, payload);
       const ts = res?.intakeUpdatedAt ? Date.parse(res.intakeUpdatedAt) : Date.now();
       setSavedAt(Number.isNaN(ts) ? Date.now() : ts);
       setSaveStatus('saved');
@@ -817,7 +814,7 @@ export function EmployeeIntakePage() {
       if (pending && aid && draftHydratedRef.current) {
         // fire-and-forget — component is unmounting, can't update state
         void employeeAPI
-          .updateIntakeDraft(aid, pending as unknown as Record<string, unknown>)
+          .updateIntakeDraft(aid, pending)
           .catch(() => { /* best-effort */ });
       }
     };

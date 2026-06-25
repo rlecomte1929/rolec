@@ -96,7 +96,7 @@ export const AdminSupplierDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null);
-  const [categories, setCategories] = useState<string[]>(SERVICE_CATEGORIES as unknown as string[]);
+  const [categories, setCategories] = useState<string[]>([...SERVICE_CATEGORIES]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
