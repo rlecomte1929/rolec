@@ -6,7 +6,7 @@
  * collapsible phase sections). Header meta (cities / name / role / move date)
  * comes from the case-details endpoint; the plan + statuses from the plan-view.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { PhaseContextBar } from '../../components/antigravity';
@@ -30,7 +30,8 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const selectionRef = useRef<HTMLDivElement>(null);
   const { selection, clear } = useTextSelection(selectionRef);
 
-  const { data, loading, error } = useEmployeeRelocationPlanPageData(caseId);
+  const { data, loading, error, refetch, ensureDefaultsAndReload } =
+    useEmployeeRelocationPlanPageData(caseId);
   const runCta = useRelocationPlanCtaHandler(caseId ?? '', { resourceCaseId: data?.case_id });
   const handleCta = (t: RelocationPlanPhaseTaskDTO) => runCta(t.cta ?? null);
 
@@ -92,6 +93,47 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     </div>
   );
 
+  // ── Roadmap generation state machine ────────────────────────────────────────
+  // generating → ready | empty | failed. The plan builds asynchronously after
+  // submit (~60–90s), so an empty plan is polled for a bounded window before we
+  // resolve to `empty` — it must never spin indefinitely.
+  const POLL_MS = 4000;
+  const GEN_TIMEOUT_MS = 60000;
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+  const pollStartRef = useRef<number | null>(null);
+  const planEmpty = !!data && data.summary.total_tasks === 0;
+  const planReady = !!data && data.summary.total_tasks > 0 && data.phases.length > 0;
+
+  useEffect(() => {
+    if (loading || error) return;
+    if (!planEmpty) {
+      pollStartRef.current = null;
+      if (pollTimedOut) setPollTimedOut(false);
+      return;
+    }
+    if (pollStartRef.current === null) pollStartRef.current = Date.now();
+    if (Date.now() - pollStartRef.current >= GEN_TIMEOUT_MS) {
+      if (!pollTimedOut) setPollTimedOut(true);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void refetch();
+    }, POLL_MS);
+    return () => window.clearTimeout(t);
+  }, [loading, error, planEmpty, data, refetch, pollTimedOut]);
+
+  const retryGeneration = useCallback(() => {
+    pollStartRef.current = null;
+    setPollTimedOut(false);
+    void ensureDefaultsAndReload();
+  }, [ensureDefaultsAndReload]);
+
+  const retryFetch = useCallback(() => {
+    pollStartRef.current = null;
+    setPollTimedOut(false);
+    void refetch();
+  }, [refetch]);
+
   if (loading && !data) {
     return (
       <AppShell>
@@ -100,13 +142,22 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     );
   }
 
-  const isEmpty = !data || data.summary.total_tasks === 0 || data.phases.length === 0;
-  if (error || isEmpty) {
+  if (!planReady) {
+    // error → failed; bounded poll elapsed with no tasks → empty; otherwise still generating.
+    const variant: 'generating' | 'empty' | 'failed' = error
+      ? 'failed'
+      : planEmpty && pollTimedOut
+        ? 'empty'
+        : 'generating';
     return (
       <AppShell>
         {phaseBar}
         <div className="mx-auto max-w-5xl px-6 py-6">
-          <RoadmapBeingBuilt onMessageTeam={() => navigate(buildRoute('messages'))} />
+          <RoadmapBeingBuilt
+            variant={variant}
+            onMessageTeam={() => navigate(buildRoute('messages'))}
+            onRetry={variant === 'failed' ? retryFetch : variant === 'empty' ? retryGeneration : undefined}
+          />
         </div>
       </AppShell>
     );
