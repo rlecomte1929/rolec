@@ -62,6 +62,9 @@ export function DesignPreview() {
           key={selected.key}
           src={src}
           title={selected.label}
+          // SEC-FE-6: first-party design mockups (may be interactive) — sandbox
+          // for defense-in-depth while keeping scripts for the previews.
+          sandbox="allow-same-origin allow-scripts"
           style={{ width: '100%', height: '100%', border: 'none' }}
         />
         <Button unstyled
@@ -172,6 +175,9 @@ export function DesignPreview() {
         key={selected.key}
         src={src}
         title={selected.label}
+        // SEC-FE-6: first-party design mockups (may be interactive) — sandbox
+        // for defense-in-depth while keeping scripts for the previews.
+        sandbox="allow-same-origin allow-scripts"
         style={{ flex: 1, width: '100%', border: 'none', background: 'white' }}
       />
     </div>

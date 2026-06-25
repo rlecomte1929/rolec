@@ -75,6 +75,9 @@ export const PdfPanel: React.FC<PdfPanelProps> = ({ url, formName }) => {
       <iframe
         src={url}
         title={`${formName} PDF`}
+        // SEC-FE-6: user-uploaded document rendered same-origin — sandbox without
+        // allow-scripts so a malicious PDF/HTML can't execute in the app origin.
+        sandbox="allow-same-origin allow-popups"
         className="flex-1 w-full border border-slate-200 rounded-b-lg"
         onError={() => setIframeError(true)}
       />
