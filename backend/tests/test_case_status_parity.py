@@ -75,16 +75,25 @@ def test_both_endpoints_use_the_shared_resolver():
     list_body = list_body[: list_body.index("\n@app.")]
     assert "db.resolve_case_status(case_id, effective[\"id\"]" in list_body
 
-    # DETAIL — live (compat) and shadowed (cases_read), both via the resolver,
-    # both passing it into _case_dto.
+    # DETAIL — live (compat) and shadowed (cases_read), both scope by the
+    # requesting user's id with an unscoped fallback, both passing it into
+    # _case_dto. Scoping is by id, NOT a role-string check — guard against the
+    # case-sensitivity bug (role == "employee" vs the actual "EMPLOYEE") that made
+    # the live detail never scope (5b16522e divergence).
     compat_src = _read("routes", "compat.py")
     wiz = compat_src[compat_src.index("def _get_wizard_case_dto("):]
     wiz = wiz[: wiz.index("\ndef ", 1)]
-    assert "db.resolve_case_status(case_id, employee_user_id)" in wiz
+    assert "db.resolve_case_status(case_id, requesting_user_id)" in wiz
+    assert "db.resolve_case_status(case_id, None)" in wiz  # HR/no-assignment fallback
     assert "assignment_status=assignment_status" in wiz
+    # compat_get_case must pass the user id (not gate on a lowercase role literal)
+    cg = compat_src[compat_src.index("def compat_get_case("):]
+    assert "_get_wizard_case_dto(case_id, user.get(\"id\"))" in cg
+    assert '== "employee"' not in cg  # the casing bug must not return
 
     cr_src = _read("app", "routers", "cases_read.py")
     gc = cr_src[cr_src.index("def get_case("):]
     gc = gc[: gc.index("\n@router.", 1)]
-    assert "resolve_case_status(case_id, employee_user_id)" in gc
+    assert "resolve_case_status(case_id, user.get(\"id\"))" in gc
+    assert "resolve_case_status(case_id, None)" in gc
     assert "assignment_status=assignment_status" in gc
