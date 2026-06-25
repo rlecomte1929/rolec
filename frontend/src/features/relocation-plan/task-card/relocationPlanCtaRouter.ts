@@ -97,16 +97,11 @@ function uploadDocumentTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigat
     return { kind: 'internal', to: buildRoute('submissionCenter') };
   }
 
-  // Passport / document upload UI lives on wizard step 2. Routing
-  // straight to step 2 fails when intake step 1 isn't complete (the
-  // wizard blocks deep-links to later steps with "Complete the
-  // previous steps before continuing"). Route to step 1 instead — the
-  // wizard auto-normalizes to the FIRST INCOMPLETE step on landing,
-  // so a partway-through user lands somewhere they can act, and a
-  // ready-to-upload user lands on step 2 transparently.
-  // TODO(relopass): replace with `/employee/case/:id/documents` once
-  // a dedicated upload surface exists.
-  return { kind: 'internal', to: employeeCaseIntakeRoute(aid) };
+  // D1: document-upload tasks land on the case-scoped dossier — the surface that
+  // actually hosts uploads ("your forms and uploads are below") — instead of the
+  // intake wizard. Completing an upload there marks the document present, which the
+  // relocation-plan view re-derives to a completed task on its next fetch (D2).
+  return { kind: 'internal', to: buildRoute('employeeCaseDossier', { caseId: aid }) };
 }
 
 function completeWizardStepTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {

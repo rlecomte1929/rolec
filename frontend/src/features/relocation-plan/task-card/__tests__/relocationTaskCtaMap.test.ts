@@ -46,17 +46,17 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes upload_document to the canonical v2 intake (staged unification C1)', () => {
-    // Was the legacy /wizard/1; now the single v2 intake, which resumes to the
-    // first incomplete step. (PR3/D1 will split uploads to a document surface.)
+  it('routes upload_document to the case-scoped dossier (D1 — uploads live there)', () => {
+    // Upload tasks land on the dossier (the upload surface); data tasks land on
+    // intake. No task dead-ends or lands on an unrelated step.
     const cta: RelocationPlanCtaDTO = { type: 'upload_document', label: 'Upload' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/intake`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier`,
     });
   });
 
-  it('routes complete_wizard_step to the canonical v2 intake', () => {
+  it('routes complete_wizard_step (data task) to the canonical v2 intake', () => {
     const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
