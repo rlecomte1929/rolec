@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
@@ -8,6 +8,7 @@ import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { resolveIntakeIds } from './resolveIntakeIds';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
+import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidatedParams';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
 import { MultiChip } from './MultiChip';
@@ -707,7 +708,9 @@ export function EmployeeIntakePage() {
   // the clicked case drives the whole session (draft hydration, autosave, and the
   // services patch below). The bare /employee/intake route has no param, so it
   // falls back to a fresh session id / the primary linked case from context.
-  const { caseId: routeCaseId } = useParams<{ caseId: string }>();
+  // A brand-new case legitimately has no :caseId (a fresh session id is
+  // generated below), so validate-only here — never redirect on a missing param.
+  const routeCaseId = useValidatedParams(caseParamsSchema)?.caseId;
   // Stable case ID for the duration of this intake session.
   const caseIdRef = useRef<string>(routeCaseId ?? crypto.randomUUID());
   // Latest assignment id captured in a ref so the debounced autosave

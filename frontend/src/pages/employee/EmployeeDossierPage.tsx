@@ -11,7 +11,9 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/antigravity/Button';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
+import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
+import { ROUTE_DEFS } from '../../navigation/routes';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { fetchRelocationPlanView } from '../../api/relocationPlanView';
@@ -45,7 +47,9 @@ function matchesFilter(f: CaseFormSummary, key: FilterTabKey): boolean {
 }
 
 export const EmployeeDossierPage: React.FC = () => {
-  const { caseId } = useParams<{ caseId: string }>();
+  const caseId = useValidatedParams(caseParamsSchema, {
+    redirectTo: ROUTE_DEFS.employeeDashboard.path,
+  })?.caseId;
   const [searchParams, setSearchParams] = useSearchParams();
   // [P1-6] When the Roadmap "Documents" chip links here it appends
   // ?roadmap_step=<stepId>; scope the list to that step's forms until cleared.

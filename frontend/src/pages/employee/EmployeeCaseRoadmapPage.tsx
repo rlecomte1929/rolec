@@ -7,7 +7,7 @@
  * comes from the case-details endpoint; the plan + statuses from the plan-view.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { PhaseContextBar } from '../../components/antigravity';
 import { useTextSelection } from '../../hooks/useTextSelection';
@@ -21,12 +21,15 @@ import {
 } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { validateRoadmap } from '../../api/cases';
-import { buildRoute } from '../../navigation/routes';
+import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
+import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import { resolveCaseStage, type StageState } from '../../features/employee-journey/caseStage';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
 
 export const EmployeeCaseRoadmapPage: React.FC = () => {
-  const { caseId } = useParams<{ caseId: string }>();
+  const caseId = useValidatedParams(caseParamsSchema, {
+    redirectTo: ROUTE_DEFS.employeeDashboard.path,
+  })?.caseId;
   const navigate = useNavigate();
   const selectionRef = useRef<HTMLDivElement>(null);
   const { selection, clear } = useTextSelection(selectionRef);
