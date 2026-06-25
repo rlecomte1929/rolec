@@ -107,6 +107,13 @@ def _title_case_fallback(value: str) -> str:
 @router.get("/cases/{case_id}")
 def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
     token = _extract_bearer_token(authorization)
+    # Authoritative case status = the linked assignment's lifecycle status, the
+    # SAME source GET /api/employee/cases uses. resolve_case_status matches by
+    # canonical_case_id/case_id/id, so it works even when the caseId is a
+    # relocation_cases id with no wizard_cases row — the path where this detail
+    # used to fall through to _ensure_wizard_case and return 'created'. None when
+    # the case has no assignment (then the case-row status is used).
+    assignment_status: Optional[str] = None
     if _is_jwt(token):
         client, _ = _get_supabase_client_from_header(authorization)
         result = client.table("relocation_cases").select("*").eq("id", case_id).execute()
@@ -120,16 +127,21 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
         row = result.data[0] or {}
     else:
         user = _get_user_from_session_token(token)
-        # Scope status resolution to the requesting user (by id, not role) so the
-        # detail picks the same assignment row the employee's case list does;
-        # _get_wizard_case_dto falls back to the most-recent assignment when the
-        # requester has none (HR/admin).
+        # Scope to the requesting user (by id, not role); fall back to the
+        # most-recent assignment when the requester has none (HR/admin).
+        assignment_status = (
+            db.resolve_case_status(case_id, user.get("id"))
+            or db.resolve_case_status(case_id, None)
+        )
         wizard_case = _get_wizard_case_dto(case_id, user.get("id"))
         if wizard_case:
             return wizard_case
         row = _get_case_row_for_user(case_id, user["id"])
         if not row:
-            return _ensure_wizard_case(case_id)
+            dto = _ensure_wizard_case(case_id)
+            if assignment_status:
+                dto["status"] = assignment_status
+            return dto
     profile = _safe_parse_profile(row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
     # Convenience shortcut: expose employer at top level so clients don't need
@@ -138,7 +150,7 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
 
     return {
         "id": row.get("id", case_id),
-        "status": row.get("status") or "draft",
+        "status": assignment_status or row.get("status") or "draft",
         "stage": row.get("stage") or "incomplete",
         "home_country": row.get("home_country"),
         "host_country": row.get("host_country"),
