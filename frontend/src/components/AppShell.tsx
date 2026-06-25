@@ -93,6 +93,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
 
+  // A11Y-3: give every authenticated route a meaningful tab / screen-reader
+  // title — index.html's static title otherwise persists across in-app nav.
+  useEffect(() => {
+    if (!title) return;
+    const prev = document.title;
+    document.title = `ReloPass — ${title}`;
+    return () => { document.title = prev; };
+  }, [title]);
+
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
   useBrandingConfig();
   const { linkedCount, isLoading: employeeAssignmentLoading } = useEmployeeAssignment();
