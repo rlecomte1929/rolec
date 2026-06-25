@@ -25,6 +25,7 @@
  */
 
 import type { EventType, EventSource, EventInsert } from '../types/analytics';
+import { env } from '../config/env';
 
 // ─── Session state ────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ export function trackEvent(
   if (!ctx.enabled) return;
   if (!withinRateLimit()) return;
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supabaseUrl = env.supabaseUrl;
   if (!supabaseUrl) return;
 
   const payload: Omit<EventInsert, 'id' | 'created_at'> = {

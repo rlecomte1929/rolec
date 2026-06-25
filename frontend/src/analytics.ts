@@ -1,12 +1,13 @@
 import posthog from 'posthog-js';
+import { env } from './config/env';
 
 let enabled = false;
 
 export function initAnalytics(): void {
-  const key = import.meta.env.VITE_POSTHOG_KEY;
+  const key = env.posthogKey;
   if (!key) return;
 
-  const host = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
+  const host = env.posthogHost;
   posthog.init(key, {
     api_host: host,
     capture_pageview: true,
