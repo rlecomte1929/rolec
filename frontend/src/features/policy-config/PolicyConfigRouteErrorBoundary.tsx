@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Button } from '../../components/antigravity';
 import { logger } from '../../lib/logger';
+import { reportError } from '../../lib/errorTracking';
 
 interface Props {
   children: React.ReactNode;
@@ -27,6 +28,8 @@ export class PolicyConfigRouteErrorBoundary extends React.Component<Props, State
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logger.error('[PolicyConfigRouteErrorBoundary]', error.message, info.componentStack);
+    // EH-1: logger.error is a no-op in prod — also report to the capture-error service.
+    reportError({ message: error.message, stack: error.stack ?? null, componentName: 'PolicyConfigRouteErrorBoundary' });
   }
 
   render() {

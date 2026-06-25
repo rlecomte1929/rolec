@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { Button } from './antigravity/Button';
+import { reportError } from '../lib/errorTracking';
 interface Props {
   children: React.ReactNode;
 }
@@ -22,6 +23,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+    // EH-1: report render crashes to the capture-error service (was console-only).
+    reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ErrorBoundary' });
   }
 
   render() {
