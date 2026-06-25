@@ -17,10 +17,13 @@ import type { JourneyStatus } from '../../components/antigravity';
  * changes layout only, not capability.
  */
 interface JourneySpineProps {
-  /** Current intake step (0 = not started). */
+  /** Current intake step (0 = not started). Only used for in-progress granularity
+   *  while intake is genuinely incomplete — `status` is the source of truth. */
   intakeStep: number;
   /** Total intake steps (e.g. 5). */
   intakeTotalSteps: number;
+  /** Authoritative assignment lifecycle status (e.g. 'awaiting_intake', 'submitted'). */
+  status?: string | null;
   onContinueIntake: () => void;
   onPreviewBenefits: () => void;
   /** When omitted, the Roadmap phase stays locked until intake is done. */
@@ -28,6 +31,15 @@ interface JourneySpineProps {
 }
 
 type IntakeState = 'done' | 'in-progress' | 'not-started';
+
+// Statuses at/after submit — intake is complete regardless of a stale intakeStep.
+const INTAKE_COMPLETE_STATUSES = new Set(['submitted', 'approved', 'rejected', 'closed']);
+
+/** Source of truth for whether intake is finished: the assignment status, not
+ *  intakeStep (which can lag — a submitted case may still read step 1). */
+export function isIntakeComplete(status?: string | null): boolean {
+  return !!status && INTAKE_COMPLETE_STATUSES.has(status.trim().toLowerCase());
+}
 
 function intakeState(step: number, total: number): IntakeState {
   if (total > 0 && step >= total) return 'done';
@@ -77,11 +89,14 @@ const Station: React.FC<{
 export const JourneySpine: React.FC<JourneySpineProps> = ({
   intakeStep,
   intakeTotalSteps,
+  status,
   onContinueIntake,
   onPreviewBenefits,
   onViewRoadmap,
 }) => {
-  const state = intakeState(intakeStep, intakeTotalSteps);
+  // Status is authoritative: a submitted+ case is Done even if intakeStep lags at 1.
+  // Only fall back to the step counter while intake is genuinely incomplete.
+  const state = isIntakeComplete(status) ? 'done' : intakeState(intakeStep, intakeTotalSteps);
   const intakeDone = state === 'done';
   const intakeStarted = state === 'in-progress';
   const progressPct =

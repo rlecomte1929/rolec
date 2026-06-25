@@ -2458,6 +2458,11 @@ export const employeeAPI = {
   },
   submitAssignment: async (assignmentId: string): Promise<any> => {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/submit`);
+    // Submit advances the assignment to 'submitted' — bust the 60s overview/current
+    // caches so the dashboard reflects the new status (and roadmap-unlocked) on the
+    // post-submit redirect instead of serving the stale pre-submit row.
+    invalidateApiCache('employee:assignments-overview');
+    invalidateApiCache('employee:current-assignment');
     return response.data;
   },
   updateProfilePhoto: async (assignmentId: string, photoUrl: string): Promise<any> => {

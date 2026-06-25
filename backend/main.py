@@ -5716,6 +5716,30 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
 
     db.set_assignment_submitted(assignment_id)
 
+    # Advance stored intake progress to complete so it matches the submitted status.
+    # The wizard's client-side updateIntakeProgress(TOTAL, TOTAL) is fire-and-forget
+    # and can be lost, leaving intake_step=1 on a submitted case — which made the
+    # dashboard "Assignment status" widget show "In progress · Step 1 of 5".
+    # Best-effort: must never fail the submit the employee just completed.
+    try:
+        _cur_intake = db.get_assignment_intake(
+            assignment_id=assignment_id, employee_user_id=effective["id"]
+        )
+        _total = ((_cur_intake or {}).get("intake_total_steps")) or 5
+        db.update_assignment_intake_progress(
+            assignment_id=assignment_id,
+            employee_user_id=effective["id"],
+            step=_total,
+            total_steps=_total,
+        )
+    except Exception as exc:
+        log.warning(
+            "submit_assignment: intake_step advance failed assignment_id=%s error=%s",
+            assignment_id,
+            str(exc),
+            exc_info=True,
+        )
+
     # Keep the wizard case status in sync with the assignment lifecycle. The two
     # read models otherwise diverge: GET /api/employee/cases reports the (now
     # 'submitted') assignment status, while GET /api/cases/{id} reports
