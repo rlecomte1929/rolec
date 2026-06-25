@@ -62,6 +62,7 @@ from .app.services.policy_extractor import (
 )
 from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
 from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
+from .intake_completeness import incomplete_intake_detail, missing_intake_basics
 from .app.services.country_resources import (
     build_profile_context,
     get_personalization_hints,
@@ -5695,6 +5696,8 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
 
     profile = db.get_employee_profile(assignment_id)
     wizard_complete = False
+    # Which step-1 basics are missing → drives a field-level 400 below.
+    missing_basics: List[str] = []
     # If profile missing/incomplete, try syncing from wizard Case draft (wizard may use assignment_id or case_id as URL param)
     if not profile or (orchestrator.compute_completion_state(profile).get("profileCompleteness", 0) < 90):
         with SessionLocal() as session:
@@ -5703,26 +5706,20 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             )
             if case:
                 draft = json.loads(case.draft_json)
-                basics = draft.get("relocationBasics", {}) or {}
-                required_basics = ["originCountry", "originCity", "destCountry", "destCity", "purpose", "targetMoveDate"]
+                missing_basics = missing_intake_basics(draft)
                 # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
-                if all(basics.get(k) for k in required_basics):
+                if not missing_basics:
                     wizard_profile = _draft_to_relocation_profile(draft, assignment_id)
                     profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
                     db.save_employee_profile(assignment_id, profile)
                     wizard_complete = True
 
+    # These raise BEFORE set_assignment_submitted → no status transition on incomplete data.
     if not profile:
-        raise HTTPException(
-            status_code=400,
-            detail="Profile is not complete. Please complete all 5 wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context) and try again.",
-        )
+        raise HTTPException(status_code=400, detail=incomplete_intake_detail(missing_basics))
     completion_state = orchestrator.compute_completion_state(profile)
     if not wizard_complete and completion_state.get("profileCompleteness", 0) < 90:
-        raise HTTPException(
-            status_code=400,
-            detail="Profile is not complete. Please fill in all required fields in the wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context).",
-        )
+        raise HTTPException(status_code=400, detail=incomplete_intake_detail(missing_basics))
 
     eff_case_for_sync = _effective_relocation_case_id(assignment)
     if eff_case_for_sync:
