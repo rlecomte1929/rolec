@@ -152,6 +152,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       setDestinations(list);
       // Prefer an explicitly-passed key (right after a fresh approval), else
       // keep the current selection if still present, else first item.
+      const first = list[0];
       const preferred = preferKey && list.find((d) => destinationKey(d) === preferKey);
       if (preferred) {
         setSelectedDestinationKey(destinationKey(preferred));
@@ -159,9 +160,9 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         selectedDestinationKey
         && !list.find((d) => destinationKey(d) === selectedDestinationKey)
       ) {
-        setSelectedDestinationKey(list.length > 0 ? destinationKey(list[0]) : '');
-      } else if (!selectedDestinationKey && list.length > 0) {
-        setSelectedDestinationKey(destinationKey(list[0]));
+        setSelectedDestinationKey(first ? destinationKey(first) : '');
+      } else if (!selectedDestinationKey && first) {
+        setSelectedDestinationKey(destinationKey(first));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load destinations.';

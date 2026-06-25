@@ -151,7 +151,7 @@ export const FieldDefinitionEditor: React.FC<FieldDefinitionEditorProps> = ({
               {value.map((field, index) => (
                 <FieldRow
                   key={ids[index]}
-                  dndId={ids[index]}
+                  dndId={ids[index] ?? dndIdFor(field, index)}
                   field={field}
                   disabled={disabled}
                   onChange={(patch) => updateAt(index, patch)}

@@ -25,7 +25,7 @@ const COVERAGE_TYPES = ['global', 'country', 'city'] as const;
 
 export const AdminSupplierNew: React.FC = () => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<string[]>(SERVICE_CATEGORIES as unknown as string[]);
+  const [categories, setCategories] = useState<string[]>([...SERVICE_CATEGORIES]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -87,7 +87,9 @@ export const AdminSupplierNew: React.FC = () => {
   const updateCapability = useCallback((idx: number, patch: Record<string, unknown>) => {
     setForm((prev) => {
       const next = [...prev.capabilities];
-      next[idx] = { ...next[idx], ...patch };
+      const current = next[idx];
+      if (!current) return prev;
+      next[idx] = { ...current, ...patch };
       return { ...prev, capabilities: next };
     });
   }, []);

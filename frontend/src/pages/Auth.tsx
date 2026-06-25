@@ -325,7 +325,9 @@ export const Auth: React.FC = () => {
       hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'hr@testingapril.com',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? '' },
       employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'employee@testingapril.com', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? '' },
     };
-    const { user, pass } = credMap[demoRole];
+    const creds = credMap[demoRole];
+    if (!creds) return;
+    const { user, pass } = creds;
     setIdentifier(user);
     setPassword(pass);
     setMode('login');

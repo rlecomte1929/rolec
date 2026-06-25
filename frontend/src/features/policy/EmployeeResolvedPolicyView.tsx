@@ -115,9 +115,9 @@ function buildCategoryCards(benefits: ResolvedBenefit[], exclusions: ResolvedExc
 
     const status = deriveCoverageStatus(list);
     const includedList = list.filter((b) => b.included);
-    const valueCap = includedList.length
-      ? formatValue(includedList.find((b) => (b.max_value ?? b.standard_value ?? b.min_value) != null) ?? includedList[0]) ?? null
-      : null;
+    const capBenefit =
+      includedList.find((b) => (b.max_value ?? b.standard_value ?? b.min_value) != null) ?? includedList[0];
+    const valueCap = capBenefit ? formatValue(capBenefit) ?? null : null;
 
     const condParts = [...new Set(list.map((b) => b.condition_summary).filter(Boolean))] as string[];
     const conditionsSummary = condParts.length ? condParts.join('. ') : null;

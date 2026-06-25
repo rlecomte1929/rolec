@@ -156,12 +156,15 @@ export function scanAndRedactPii(query: string): PiiScanResult {
   let sanitized = query;
 
   for (const name of PII_SCAN_ORDER) {
+    const piiPattern = PII_PATTERNS[name];
+    const replacement = PII_REPLACEMENTS[name];
+    if (!piiPattern || replacement === undefined) continue;
     // Clone to get a fresh lastIndex each time
-    const pattern = new RegExp(PII_PATTERNS[name].source, 'g');
+    const pattern = new RegExp(piiPattern.source, 'g');
     if (pattern.test(sanitized)) {
       detected_types.push(name);
-      const replacePattern = new RegExp(PII_PATTERNS[name].source, 'g');
-      sanitized = sanitized.replace(replacePattern, PII_REPLACEMENTS[name]);
+      const replacePattern = new RegExp(piiPattern.source, 'g');
+      sanitized = sanitized.replace(replacePattern, replacement);
     }
   }
 

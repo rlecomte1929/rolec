@@ -122,13 +122,17 @@ export function numericClaimInContext(claim: string, chunks: string[]): boolean 
   // ±1 rounding tolerance for currency amounts
   const currencyMatch = claim.match(/(EUR|NOK|USD|GBP|CHF|SEK|DKK)\s*([\d,]+)/i);
   if (currencyMatch) {
-    const amount = parseInt(currencyMatch[2].replace(/,/g, ''), 10);
-    if (!isNaN(amount)) {
-      for (const delta of [-1, 0, 1]) {
-        const variant = `${currencyMatch[1].toUpperCase()} ${(amount + delta).toLocaleString('en-US')}`.toLowerCase();
-        if (combined.includes(variant)) return true;
-        // Also check without currency prefix (just the number)
-        if (combined.includes(String(amount + delta))) return true;
+    const currencyCode = currencyMatch[1];
+    const rawAmount = currencyMatch[2];
+    if (currencyCode && rawAmount) {
+      const amount = parseInt(rawAmount.replace(/,/g, ''), 10);
+      if (!isNaN(amount)) {
+        for (const delta of [-1, 0, 1]) {
+          const variant = `${currencyCode.toUpperCase()} ${(amount + delta).toLocaleString('en-US')}`.toLowerCase();
+          if (combined.includes(variant)) return true;
+          // Also check without currency prefix (just the number)
+          if (combined.includes(String(amount + delta))) return true;
+        }
       }
     }
   }
@@ -275,6 +279,7 @@ export async function checkFaithfulness(
   // Step 2: Numeric fast-path — handle deterministically
   for (let i = 0; i < sentences.length; i++) {
     const sentence = sentences[i];
+    if (sentence === undefined) continue;
     const numericResult = fastCheckNumeric(sentence, retrievedChunks);
     if (numericResult) {
       results[i] = numericResult;
@@ -299,7 +304,7 @@ export async function checkFaithfulness(
       nliQueue.forEach((q, i) => {
         results[q.index] = {
           sentence: q.sentence,
-          entailed: nliResults[i],
+          entailed: nliResults[i] ?? true,
           method: 'nli',
         };
       });

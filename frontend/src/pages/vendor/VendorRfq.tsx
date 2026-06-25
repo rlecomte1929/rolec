@@ -158,7 +158,9 @@ export const VendorRfq: React.FC = () => {
                   onChange={(v) =>
                     setLines((prev) => {
                       const next = [...prev];
-                      next[i] = { ...next[i], label: v };
+                      const current = next[i];
+                      if (!current) return prev;
+                      next[i] = { ...current, label: v };
                       return next;
                     })
                   }
@@ -170,7 +172,9 @@ export const VendorRfq: React.FC = () => {
                   onChange={(v) =>
                     setLines((prev) => {
                       const next = [...prev];
-                      next[i] = { ...next[i], amount: v };
+                      const current = next[i];
+                      if (!current) return prev;
+                      next[i] = { ...current, amount: v };
                       return next;
                     })
                   }

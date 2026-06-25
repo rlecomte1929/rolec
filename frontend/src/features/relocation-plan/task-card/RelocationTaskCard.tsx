@@ -118,6 +118,7 @@ export const RelocationTaskCard: React.FC<RelocationTaskCardProps> = ({
       return () => window.clearTimeout(id);
     }
     prevStatusRef.current = task.status;
+    return undefined;
   }, [task.status, expanded]);
 
   const hasDetailSections =

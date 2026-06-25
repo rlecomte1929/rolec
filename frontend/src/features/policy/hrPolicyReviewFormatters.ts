@@ -93,7 +93,7 @@ export function formatDocumentTypeLabel(raw: unknown): string {
 
 export function formatPolicyScopeLabel(raw: unknown): string {
   const k = normKey(raw).replace(/-/g, '_');
-  if (!k || k === 'unknown') return SCOPE_LABELS.unknown;
+  if (!k || k === 'unknown') return SCOPE_LABELS.unknown ?? 'Scope not determined';
   return SCOPE_LABELS[k] || humanizeToken(k);
 }
 

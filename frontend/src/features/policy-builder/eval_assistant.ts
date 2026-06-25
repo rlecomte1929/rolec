@@ -607,7 +607,7 @@ export function aggregateResults(
   const overall_pass = Object.values(metrics).every((m) => m.pass);
 
   return {
-    run_date: new Date().toISOString().split('T')[0],
+    run_date: new Date().toISOString().split('T')[0] ?? '',
     config: {
       company_id: config.companyId,
       employee_tier: config.employeeTier,
@@ -681,8 +681,10 @@ async function evaluateAnswerable(
     // Use the doc_id as a proxy; in production this would be resolved via policy_documents.
     // For the harness, we check section and page only (doc_name check is best-effort).
     const topChunk = chunks[0];
-    const docNameProxy = topChunk.doc_id ?? '';
-    result.citationAccurate = checkCitationAccuracy(topChunk, tc.ground_truth_citation, docNameProxy);
+    if (topChunk) {
+      const docNameProxy = topChunk.doc_id ?? '';
+      result.citationAccurate = checkCitationAccuracy(topChunk, tc.ground_truth_citation, docNameProxy);
+    }
   } catch (err) {
     result.error = err instanceof Error ? err.message : String(err);
     result.faithfulness = 0;
@@ -714,7 +716,7 @@ async function evaluateUnanswerable(
     // A question is correctly refused if top chunk score < MIN_RRF_SCORE.
     // We replicate the router's refusal logic here.
     const { MIN_RRF_SCORE } = await import('./assistant_router');
-    const topScore = chunks.length > 0 ? chunks[0].rrf_score : 0;
+    const topScore = chunks[0]?.rrf_score ?? 0;
     const triggeredRefusal = topScore < MIN_RRF_SCORE || chunks.length === 0;
 
     result.correctlyRefused = triggeredRefusal;
@@ -911,7 +913,7 @@ async function main(): Promise<void> {
   }
 
   const outDir = getArg('out', process.cwd());
-  const runDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const runDate = (new Date().toISOString().split('T')[0] ?? '').replace(/-/g, '');
 
   // ── Mock mode ──────────────────────────────────────────────────────────────
   if (isMock) {

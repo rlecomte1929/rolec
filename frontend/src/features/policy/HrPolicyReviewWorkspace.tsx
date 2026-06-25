@@ -461,9 +461,10 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const prevRulesRef = React.useRef<string | null>(null);
   useEffect(() => {
     const key = normalized?.benefit_rules?.length != null ? String(normalized.benefit_rules.length) : null;
-    if (key && key !== prevRulesRef.current && groupedBenefits.length > 0) {
+    const firstTopic = groupedBenefits[0];
+    if (key && key !== prevRulesRef.current && firstTopic) {
       prevRulesRef.current = key;
-      setExpandedTopics(new Set([groupedBenefits[0][0]]));
+      setExpandedTopics(new Set([firstTopic[0]]));
       setExpandAll(false);
     }
     if (!normalized) prevRulesRef.current = null;

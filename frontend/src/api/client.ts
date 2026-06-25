@@ -2,6 +2,8 @@ import axios from 'axios';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { signOutSupabase } from './supabaseAuth';
 import { parseResponse } from './schemas/parseResponse';
+import { env } from '../config/env';
+import type { IntakeData } from '../features/platform-v2/intake/EmployeeIntakePage';
 import {
   intakeEnvelopeSchema,
   assignmentsOverviewSchema,
@@ -61,8 +63,7 @@ import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-re
 //   - Development:  http://localhost:8000         (via frontend/.env.development)
 //   - Production:   https://api.relopass.com      (via frontend/.env.production)
 // Fallback keeps local dev working if .env.development is missing.
-const API_BASE_URL: string =
-  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
+const API_BASE_URL: string = env.apiUrl;
 
 export { API_BASE_URL };
 
@@ -2432,7 +2433,7 @@ export const employeeAPI = {
    */
   updateIntakeDraft: async (
     assignmentId: string,
-    data: Record<string, unknown>,
+    data: IntakeData,
   ): Promise<{ assignmentId: string; intakeUpdatedAt: string | null }> => {
     const response = await api.patch(
       `/api/employee/assignments/${assignmentId}/intake-draft`,

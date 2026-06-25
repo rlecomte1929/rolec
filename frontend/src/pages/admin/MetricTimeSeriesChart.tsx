@@ -52,6 +52,11 @@ export const MetricTimeSeriesChart: React.FC<MetricTimeSeriesChartProps> = ({
     );
   }
 
+  // n > 0 here (early return above), so first/last always exist.
+  const first = points[0];
+  const last = points[n - 1];
+  if (!first || !last) return null;
+
   const linePath = points
     .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xToPx(i, n).toFixed(1)} ${yToPx(p.aggregate).toFixed(1)}`)
     .join(' ');
@@ -64,7 +69,7 @@ export const MetricTimeSeriesChart: React.FC<MetricTimeSeriesChartProps> = ({
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       className="w-full h-auto"
       role="img"
-      aria-label={`${label} over time. Latest ${fmtPct(points[n - 1].aggregate)}, threshold ${fmtPct(threshold)}.`}
+      aria-label={`${label} over time. Latest ${fmtPct(last.aggregate)}, threshold ${fmtPct(threshold)}.`}
     >
       {/* Y gridlines + labels */}
       {gridValues.map((g) => (
@@ -115,11 +120,11 @@ export const MetricTimeSeriesChart: React.FC<MetricTimeSeriesChartProps> = ({
 
       {/* X axis: first + last date labels */}
       <text x={PAD.left} y={VIEW_H - 8} textAnchor="start" fontSize={10} fill="#94a3b8">
-        {fmtDate(points[0].date)}
+        {fmtDate(first.date)}
       </text>
       {n > 1 && (
         <text x={VIEW_W - PAD.right} y={VIEW_H - 8} textAnchor="end" fontSize={10} fill="#94a3b8">
-          {fmtDate(points[n - 1].date)}
+          {fmtDate(last.date)}
         </text>
       )}
     </svg>

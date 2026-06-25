@@ -104,7 +104,7 @@ export async function insertFeedback(params: {
       section: params.section,
       message: params.message.trim(),
     };
-    const decoded = JSON.parse(atob(token.split('.')[1]));
+    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
     payload.author_user_id = decoded.sub;
 
     const res = await fetchWithAuth('/rest/v1/case_feedback', {

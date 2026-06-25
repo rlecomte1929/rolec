@@ -207,26 +207,26 @@ function buildDefaultBenefits(tierName: string, lumpMode: boolean): Record<strin
 function tiersForTemplate(tplId: string): Tier[] {
   const tpls: Record<string, Omit<Tier, 'id' | 'benefits'>[]> = {
     standard: [
-      { name: 'Manager',  color: TIER_PALETTE[0], targeting: { level: ['manager'],  type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 14000, emp: 8 },
-      { name: 'Director', color: TIER_PALETTE[1], targeting: { level: ['director'], type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 28000, emp: 4 },
-      { name: 'VP',       color: TIER_PALETTE[2], targeting: { level: ['vp'],       type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 68000, emp: 2 },
+      { name: 'Manager',  color: TIER_PALETTE[0] ?? '', targeting: { level: ['manager'],  type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 14000, emp: 8 },
+      { name: 'Director', color: TIER_PALETTE[1] ?? '', targeting: { level: ['director'], type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 28000, emp: 4 },
+      { name: 'VP',       color: TIER_PALETTE[2] ?? '', targeting: { level: ['vp'],       type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 68000, emp: 2 },
     ],
     tech: [
-      { name: 'Engineer',   color: TIER_PALETTE[0], targeting: { level: ['entry','manager'], type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 18000, emp: 12 },
-      { name: 'Senior Eng', color: TIER_PALETTE[1], targeting: { level: ['director'],        type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 38000, emp: 5 },
+      { name: 'Engineer',   color: TIER_PALETTE[0] ?? '', targeting: { level: ['entry','manager'], type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 18000, emp: 12 },
+      { name: 'Senior Eng', color: TIER_PALETTE[1] ?? '', targeting: { level: ['director'],        type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 38000, emp: 5 },
     ],
     banking: [
-      { name: 'Manager',  color: TIER_PALETTE[0], targeting: { level: ['manager'],  type: ['long_term'],  family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 18000, emp: 14 },
-      { name: 'Director', color: TIER_PALETTE[1], targeting: { level: ['director'], type: ['long_term'],  family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 38000, emp: 6 },
-      { name: 'MD',       color: TIER_PALETTE[2], targeting: { level: ['vp'],       type: ['long_term'],  family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 72000, emp: 3 },
-      { name: 'C-Suite',  color: TIER_PALETTE[3], targeting: { level: ['c_suite'],  type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 120000, emp: 1 },
+      { name: 'Manager',  color: TIER_PALETTE[0] ?? '', targeting: { level: ['manager'],  type: ['long_term'],  family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 18000, emp: 14 },
+      { name: 'Director', color: TIER_PALETTE[1] ?? '', targeting: { level: ['director'], type: ['long_term'],  family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 38000, emp: 6 },
+      { name: 'MD',       color: TIER_PALETTE[2] ?? '', targeting: { level: ['vp'],       type: ['long_term'],  family: ['single','married','accompanied_family'] }, mode: 'caps', lump: 72000, emp: 3 },
+      { name: 'C-Suite',  color: TIER_PALETTE[3] ?? '', targeting: { level: ['c_suite'],  type: ['long_term','permanent'], family: ['single','married','accompanied_family'] }, mode: 'lump', lump: 120000, emp: 1 },
     ],
     short_term: [
-      { name: 'Standard', color: TIER_PALETTE[0], targeting: { level: ['manager'],  type: ['short_term','extended_business_trip'], family: ['single','married'] }, mode: 'caps', lump: 12000, emp: 6 },
-      { name: 'Senior',   color: TIER_PALETTE[1], targeting: { level: ['director'], type: ['short_term','extended_business_trip'], family: ['single','married'] }, mode: 'caps', lump: 22000, emp: 3 },
+      { name: 'Standard', color: TIER_PALETTE[0] ?? '', targeting: { level: ['manager'],  type: ['short_term','extended_business_trip'], family: ['single','married'] }, mode: 'caps', lump: 12000, emp: 6 },
+      { name: 'Senior',   color: TIER_PALETTE[1] ?? '', targeting: { level: ['director'], type: ['short_term','extended_business_trip'], family: ['single','married'] }, mode: 'caps', lump: 22000, emp: 3 },
     ],
   };
-  const arr = tpls[tplId] || tpls.standard;
+  const arr = tpls[tplId] ?? tpls.standard ?? [];
   return arr.map((t, i) => ({ ...t, id: `t${i}-${Date.now()}`, benefits: buildDefaultBenefits(t.name, t.mode === 'lump') }));
 }
 
@@ -303,7 +303,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
         const fullTiers: Tier[] = loaded.map((lt, i) => ({
           id: `loaded-${i}`,
           name: lt.name,
-          color: TIER_PALETTE[i % TIER_PALETTE.length],
+          color: TIER_PALETTE[i % TIER_PALETTE.length] ?? '',
           targeting: lt.targeting,
           mode: lt.mode,
           lump: lt.lump,
@@ -391,7 +391,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
     const id = `t-${Date.now()}`;
     const idx = tiers.length;
     setTiers(prev => [...prev, {
-      id, name: `Tier ${idx + 1}`, color: TIER_PALETTE[idx % TIER_PALETTE.length],
+      id, name: `Tier ${idx + 1}`, color: TIER_PALETTE[idx % TIER_PALETTE.length] ?? '',
       targeting: { level: [], type: [], family: [] }, mode: 'caps', lump: 10000, emp: 0,
       benefits: buildDefaultBenefits(`Tier ${idx + 1}`, false),
     }]);
@@ -399,8 +399,11 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const updateTier = (id: string, next: Partial<Tier>) =>
     setTiers(ts => ts.map(t => t.id === id ? { ...t, ...next } : t));
   const updateBenefit = (tierId: string, bKey: string, patch: Partial<BenefitValue>) =>
-    setTiers(ts => ts.map(t => t.id !== tierId ? t : {
-      ...t, benefits: { ...t.benefits, [bKey]: { ...t.benefits[bKey], ...patch } },
+    setTiers(ts => ts.map(t => {
+      if (t.id !== tierId) return t;
+      const existing = t.benefits[bKey];
+      if (!existing) return t;
+      return { ...t, benefits: { ...t.benefits, [bKey]: { ...existing, ...patch } } };
     }));
 
   useEffect(() => {
@@ -853,7 +856,7 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
     return sum;
   }, [tier, categories, isLump]);
 
-  const cur = CUR_SYM[currency];
+  const cur = CUR_SYM[currency] ?? currency;
   const fmt = (n: number) => cur + (n || 0).toLocaleString();
   const pct = Math.round((total / maxTotal) * 100);
 
@@ -1206,7 +1209,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
     return () => ts.forEach(clearTimeout);
   }, [step]);
 
-  const stage = STAGES[stageIdx] || STAGES[0];
+  const stage = STAGES[stageIdx] ?? STAGES[0] ?? { lbl: '', pct: 0 };
   const visibleLog = MOCK_LOG.slice(0, Math.min(MOCK_LOG.length, stageIdx + 2));
 
   const accepted = rules.filter(r => r.decision === 'accepted');

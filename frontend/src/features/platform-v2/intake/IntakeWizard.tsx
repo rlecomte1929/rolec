@@ -382,7 +382,9 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
   const [error, setError] = useState('');
 
   const totalSteps = INTAKE_QUESTIONS.length;
-  const question = INTAKE_QUESTIONS[step];
+  // step is clamped to [0, totalSteps-1] by handleNext/handleBack, and
+  // INTAKE_QUESTIONS is a non-empty module-level constant, so this is always defined.
+  const question = INTAKE_QUESTIONS[step]!;
   const progress = Math.round(((step) / totalSteps) * 100);
 
   const answer = (key: string) => answers[key] ?? '';

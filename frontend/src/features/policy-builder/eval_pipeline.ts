@@ -141,7 +141,7 @@ export function mockClassify(
   }
 
   const sorted = Object.entries(scores).sort(([, a], [, b]) => b - a);
-  const [bestCode, bestScore] = sorted[0];
+  const [bestCode, bestScore] = sorted[0] ?? ['UNCLASSIFIED', 0];
 
   const categoryCode = bestScore > 0 ? bestCode : 'UNCLASSIFIED';
   const cat = CATEGORIES.find((c) => c.code === categoryCode);
@@ -549,7 +549,7 @@ async function main(): Promise<void> {
   const modelArg = args.find((a) => a.startsWith('--model='));
   const model = modelArg ? modelArg.split('=')[1] : undefined;
   const outArg = args.find((a) => a.startsWith('--out='));
-  const outDir = outArg ? outArg.split('=')[1] : '.';
+  const outDir = outArg ? outArg.split('=')[1] ?? '.' : '.';
 
   if (!isMock && !apiKey) {
     console.error(

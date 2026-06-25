@@ -527,13 +527,14 @@ export async function batchClassifyChunks(
   const results: BatchClassifyResult[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
+    const chunkText = chunks[i] ?? '';
     try {
-      const output = await classifyChunk(chunks[i], options);
-      results.push({ index: i, chunkText: chunks[i], output, error: null });
+      const output = await classifyChunk(chunkText, options);
+      results.push({ index: i, chunkText, output, error: null });
     } catch (err) {
       results.push({
         index: i,
-        chunkText: chunks[i],
+        chunkText,
         output: null,
         error: err instanceof Error ? err.message : String(err),
       });

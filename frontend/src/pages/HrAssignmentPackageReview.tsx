@@ -193,7 +193,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
                     <div>• Storage beyond 30 days requires approval.</div>
                   </div>
                   <div className="border border-[#fde2e2] bg-[#fff5f5] rounded-lg p-3 text-xs text-[#7a2a2a]">
-                    Request exceeds the $10,000 cap by {formatCurrency(coverage[1].used - coverage[1].cap)}.
+                    Request exceeds the $10,000 cap by {formatCurrency((coverage[1]?.used ?? 0) - (coverage[1]?.cap ?? 0))}.
                     <div className="mt-2 flex gap-2">
                       <Button variant="outline" onClick={() => safeNavigate(navigate, 'hrPolicy')}>
                         Request exception

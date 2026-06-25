@@ -53,7 +53,7 @@ export async function listAssignedCasesForReview(): Promise<{
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
-    const decoded = JSON.parse(atob(token.split('.')[1]));
+    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
     const uid = decoded.sub;
 
     const path = `/rest/v1/case_assignments?hr_user_id=eq.${encodeURIComponent(uid)}&select=id,case_id,updated_at`;
@@ -163,7 +163,7 @@ export async function getEmployeeAssignmentId(idOrCaseId: string): Promise<{ ass
   try {
     const token = await getAccessToken();
     if (!token) return { assignmentId: null, error: 'Not authenticated' };
-    const decoded = JSON.parse(atob(token.split('.')[1]));
+    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
     const uid = decoded.sub;
 
     const path = `/rest/v1/case_assignments?employee_user_id=eq.${encodeURIComponent(uid)}&or=(id.eq.${encodeURIComponent(idOrCaseId)},case_id.eq.${encodeURIComponent(idOrCaseId)})&select=id&limit=1`;
@@ -181,7 +181,7 @@ export async function getAssignmentIdForCase(caseId: string): Promise<{ assignme
   try {
     const token = await getAccessToken();
     if (!token) return { assignmentId: null, error: 'Not authenticated' };
-    const decoded = JSON.parse(atob(token.split('.')[1]));
+    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
     const uid = decoded.sub;
 
     const path = `/rest/v1/case_assignments?case_id=eq.${encodeURIComponent(caseId)}&hr_user_id=eq.${encodeURIComponent(uid)}&select=id&limit=1`;

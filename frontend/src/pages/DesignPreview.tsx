@@ -38,13 +38,16 @@ const PROTOTYPES: PreviewEntry[] = [
   },
 ];
 
+// PROTOTYPES is a non-empty module-level literal, so [0] always exists.
+const DEFAULT_PROTOTYPE = PROTOTYPES[0]!;
+
 const BASE = '/design-preview';
 
 export function DesignPreview() {
   const [params, setParams] = useSearchParams();
   const requested = params.get('p') ?? 'platform';
   const selected = useMemo(
-    () => PROTOTYPES.find((p) => p.key === requested) ?? PROTOTYPES[0],
+    () => PROTOTYPES.find((p) => p.key === requested) ?? DEFAULT_PROTOTYPE,
     [requested],
   );
   const [chromeHidden, setChromeHidden] = useState(false);

@@ -10,6 +10,7 @@
  */
 
 import axios from 'axios';
+import { env } from '../config/env';
 
 // ── Token management ──────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ export function clearProviderToken(): void {
 
 function createPortalClient(token: string) {
   return axios.create({
-    baseURL: (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_BASE_URL ?? '',
+    baseURL: env.apiBaseUrl,
     headers: { Authorization: `Bearer ${token}` },
     timeout: 15_000,
   });
@@ -89,7 +90,7 @@ export interface TokenVerifyResult {
 /** Verify token via backend — public, no auth needed. */
 export async function verifyProviderToken(token: string): Promise<TokenVerifyResult> {
   // Uses the public HR-side verify endpoint (no portal client needed)
-  const base = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_BASE_URL ?? '';
+  const base = env.apiBaseUrl;
   const r = await axios.get<TokenVerifyResult>(`${base}/api/provider/auth/verify`, {
     params: { token },
     timeout: 10_000,

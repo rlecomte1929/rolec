@@ -72,7 +72,7 @@ async function resolveVariant(
   const bucket = await hashUserBucket(userId, flagName);
   let cumulative = 0;
   for (let i = 0; i < flag.traffic_split.length; i++) {
-    cumulative += flag.traffic_split[i];
+    cumulative += flag.traffic_split[i] ?? 0;
     if (bucket < cumulative) return flag.variants[i] ?? 'control';
   }
   return 'control';

@@ -86,6 +86,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
           {/* Segments between adjacent nodes */}
           {points.map((p, i) => {
             const next = points[(i + 1) % points.length];
+            if (!next) return null;
             return (
               <line
                 key={`seg-${i}`}
@@ -103,8 +104,10 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
         </svg>
         {/* Bubbles: content centered vertically; centers on circle for equidistance */}
         {steps.map((step, i) => {
-          const { x, y } = points[i];
+          const point = points[i];
           const Icon = STEP_ICONS[i % STEP_ICONS.length];
+          if (!point || !Icon) return null;
+          const { x, y } = point;
           const stepNum = i + 1;
           return (
             <div
