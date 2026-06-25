@@ -118,6 +118,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
     setMobileNavOpen(false);
   }, [location.pathname]);
 
+  // A11Y-3: give every in-app route a meaningful tab/screen-reader title
+  // (the static index.html title otherwise persists across the whole app).
+  useEffect(() => {
+    document.title = title ? `ReloPass — ${title}` : 'ReloPass';
+  }, [title]);
+
+  // A11Y-4: announce route changes to assistive tech and move focus to the main
+  // content on navigation (only on actual route change, not in-page state changes).
+  const [routeAnnouncement, setRouteAnnouncement] = useState('');
+  useEffect(() => {
+    setRouteAnnouncement(`${title || section || 'Page'} loaded`);
+    document.getElementById('main-content')?.focus();
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!isEmployeeRole) return;
     const id = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1]?.trim();
@@ -150,6 +164,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
       >
         Skip to main content
       </a>
+
+      {/* A11Y-4: visually-hidden live region announces the page on route change. */}
+      <div aria-live="polite" className="sr-only">{routeAnnouncement}</div>
 
       {/* AIQ-1017: mobile backdrop — only rendered when the drawer is open, below md. */}
       {mobileNavOpen && (
@@ -255,7 +272,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         )}
 
         {/* Main scrollable area */}
-        <main id="main-content" className="flex-1 overflow-y-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
           <div className={wide ? 'px-4 py-6 md:px-6' : 'px-4 py-6 md:px-8 md:py-7 max-w-7xl mx-auto'}>
             {title && (
               <div className="mb-6">

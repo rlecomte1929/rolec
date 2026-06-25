@@ -220,9 +220,11 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
     });
   }, [sorted, activeFilter]);
 
+  // RX-3: reset the note draft only when a different task is selected (keyed on
+  // id, not notes) — depending on selected.notes would clobber an in-progress edit.
   useEffect(() => {
     if (selected) setNoteDraft(selected.notes ?? '');
-  }, [selected?.id, selected?.notes]);
+  }, [selected?.id]);
 
   const nextCritical = useMemo(() => {
     return sorted.find((m) => {
