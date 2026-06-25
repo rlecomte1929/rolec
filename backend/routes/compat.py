@@ -50,7 +50,7 @@ def _get_case_row_for_user(case_id: str, user_id: str) -> Optional[Dict[str, Any
 
 
 def _get_wizard_case_dto(
-    case_id: str, employee_user_id: Optional[str] = None
+    case_id: str, requesting_user_id: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     with SessionLocal() as session:
         case = app_crud.get_case(session, case_id)
@@ -58,9 +58,15 @@ def _get_wizard_case_dto(
             return None
         draft = json.loads(case.draft_json)
         # Single source of truth: derive status via the shared resolver, scoped to
-        # the requesting employee, so the detail agrees with GET /api/employee/cases
-        # (both pick the SAME assignment row). None falls back to wizard_cases.status.
-        assignment_status = db.resolve_case_status(case_id, employee_user_id)
+        # the REQUESTING user so the detail agrees with that user's
+        # GET /api/employee/cases (both pick the same assignment row). When the
+        # requester has no assignment for the case (HR/admin), fall back to the
+        # most-recent assignment overall. Scoping by id (not role) keeps this immune
+        # to role-string casing — the bug that made the detail never scope.
+        assignment_status = (
+            db.resolve_case_status(case_id, requesting_user_id)
+            or db.resolve_case_status(case_id, None)
+        )
         return wizard_cases_router._case_dto(
             case, draft, assignment_status=assignment_status
         ).model_dump()
@@ -114,10 +120,11 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
         row = result.data[0] or {}
     else:
         user = _get_user_from_session_token(token)
-        # Scope status resolution to the requesting employee so the detail picks the
-        # same assignment row the employee's case list does (HR/admin → most-recent).
-        employee_user_id = user["id"] if user.get("role") == "employee" else None
-        wizard_case = _get_wizard_case_dto(case_id, employee_user_id)
+        # Scope status resolution to the requesting user (by id, not role) so the
+        # detail picks the same assignment row the employee's case list does;
+        # _get_wizard_case_dto falls back to the most-recent assignment when the
+        # requester has none (HR/admin).
+        wizard_case = _get_wizard_case_dto(case_id, user.get("id"))
         if wizard_case:
             return wizard_case
         row = _get_case_row_for_user(case_id, user["id"])

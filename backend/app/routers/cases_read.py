@@ -863,15 +863,16 @@ def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="Case not found")
         _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
-        # Single source of truth: derive status via the shared resolver (employee-
-        # scoped) so this detail can never disagree with GET /api/employee/cases.
-        # wizard_cases.status is only a fallback for cases with no assignment.
-        # NOTE: this modular handler is shadowed in prod by routes/compat.py
-        # (registered first); kept correct in case it is ever unshadowed.
-        employee_user_id = (
-            user.get("id") if (user.get("role") or "").upper() == "EMPLOYEE" else None
+        # Single source of truth: derive status via the shared resolver, scoped to
+        # the REQUESTING user (by id, not role) so this detail agrees with that
+        # user's GET /api/employee/cases; fall back to the most-recent assignment
+        # when the requester has none (HR/admin). NOTE: this modular handler is
+        # shadowed in prod by routes/compat.py (registered first); kept correct in
+        # case it is ever unshadowed.
+        assignment_status = (
+            main_db.resolve_case_status(case_id, user.get("id"))
+            or main_db.resolve_case_status(case_id, None)
         )
-        assignment_status = main_db.resolve_case_status(case_id, employee_user_id)
         return _case_dto(case, draft, assignment_status=assignment_status)
 
 

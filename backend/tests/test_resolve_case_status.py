@@ -73,6 +73,35 @@ class ResolveCaseStatusTests(unittest.TestCase):
         self.assertIsNone(self.db.resolve_case_status("X", "empZ"))
         self.assertIsNone(self.db.resolve_case_status(""))
 
+    def test_parity_across_every_lifecycle_state(self):
+        # For every lifecycle status, a multi-employee case where empA holds that
+        # status and empB holds a globally-newer DIFFERENT status. The detail (now
+        # scoped to the requester) and the list (scoped to the employee) both call
+        # resolve_case_status(case, empA) → empA's status; the unscoped HR view
+        # gets empB's (global newest). This is the 5b16522e bug (approved vs
+        # awaiting_intake) generalised to the full enum.
+        states = [
+            "created", "assigned", "awaiting_intake", "submitted",
+            "approved", "rejected", "closed",
+        ]
+        with self.engine.begin() as c:
+            for s in states:
+                other = "submitted" if s == "approved" else "approved"
+                ckey = f"case-{s}"
+                c.execute(text(
+                    "INSERT INTO case_assignments VALUES (:id,:k,:k,:e,:st,:t)"
+                ), {"id": f"{ckey}-A", "k": ckey, "e": "empA", "st": s, "t": "2026-02-01"})
+                c.execute(text(  # empB: globally newer, different status
+                    "INSERT INTO case_assignments VALUES (:id,:k,:k,:e,:st,:t)"
+                ), {"id": f"{ckey}-B", "k": ckey, "e": "empB", "st": other, "t": "2026-03-01"})
+        for s in states:
+            ckey = f"case-{s}"
+            other = "submitted" if s == "approved" else "approved"
+            # list & (now-scoped) detail both resolve empA's own status
+            self.assertEqual(self.db.resolve_case_status(ckey, "empA"), s, s)
+            # unscoped HR view = global newest (empB)
+            self.assertEqual(self.db.resolve_case_status(ckey, None), other, s)
+
 
 if __name__ == "__main__":
     unittest.main()
