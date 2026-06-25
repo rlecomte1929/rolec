@@ -329,10 +329,16 @@ def resolve_case_forms_case_id(case_id: str) -> str:
 # DTO mapping
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _case_dto(case: Any, draft: Dict[str, Any]) -> schemas.CaseDTO:
+def _case_dto(
+    case: Any, draft: Dict[str, Any], assignment_status: Optional[str] = None
+) -> schemas.CaseDTO:
+    # Single source of truth for case status: when the case has a linked assignment,
+    # report the assignment's (canonical) lifecycle status so the detail endpoint
+    # agrees with the list endpoint. wizard_cases.status (case.status) is only a
+    # fallback for cases with no assignment. (WI3.)
     return schemas.CaseDTO(
         id=case.id,
-        status=case.status,
+        status=assignment_status if assignment_status is not None else case.status,
         draft=draft,
         createdAt=case.created_at,
         updatedAt=case.updated_at,

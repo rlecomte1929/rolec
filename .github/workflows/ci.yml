@@ -293,7 +293,8 @@ jobs:
             backend/tests/test_rag_eval_fixture_precision.py \
             backend/tests/test_jsonb_bind_cast.py \
             backend/tests/test_cors_preflight_backstop.py \
-            backend/tests/test_submit_status_parity.py
+            backend/tests/test_submit_status_parity.py \
+            backend/tests/test_case_status_parity.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
