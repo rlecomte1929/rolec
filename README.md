@@ -216,7 +216,7 @@ Full security context and open items: see [docs/INDEX.md](docs/INDEX.md).
 
 - Treat `backend/main.py` as a live monolith being decomposed. New routes should go into `backend/app/routers/` when possible.
 - Frontend components with `:any` are technical debt — prefer typed props.
-- Test the golden path before opening a PR. CI is not yet in place (see docs/INDEX.md open items).
+- Test the golden path before opening a PR. CI **is** in place (`.github/workflows/ci.yml`): PRs run frontend build/types/lint/unit + the backend test suite + security/migration-ledger gates. It gates your PR (it does not gate the Render deploy).
 
 ---
 
