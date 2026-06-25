@@ -6,7 +6,7 @@ import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useResilientQuery } from '../../hooks/useResilientQuery';
 import { buildRoute } from '../../navigation/routes';
-import { resolveCaseStage, type StageState } from '../../features/employee-journey/caseStage';
+import { resolveCaseStage, isIntakeComplete, type StageState } from '../../features/employee-journey/caseStage';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
@@ -138,8 +138,9 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
       <Card padding="lg" className="border-[#e2e8f0]">
         <p className="mb-1 text-sm font-medium text-[#0b2b43]">Your benefits policy is published</p>
         <p className="text-sm text-[#64748b]">
-          No services have been matched to it yet — check back after you complete your intake, and
-          we&rsquo;ll show which services are covered and what you&rsquo;d owe.
+          {isIntakeComplete(activeRow?.status)
+            ? "No services have been matched to it yet — we'll show which services are covered and what you'd owe as your policy is applied to your case."
+            : "No services have been matched to it yet — check back after you complete your intake, and we'll show which services are covered and what you'd owe."}
         </p>
       </Card>
     );

@@ -22,6 +22,9 @@ type BadgeSpec =
 interface SidebarVisibilityCtx {
   role: SidebarRole;
   linkedCount: number;
+  /** True while the employee's assignments are still loading — used to keep
+   *  case-dependent items stable (don't hide-then-show) during load (E3). */
+  assignmentsLoading: boolean;
 }
 
 interface SectionItem {
@@ -71,7 +74,8 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.employeeIntake.path,
         // Wizard is meaningless without a linked case — hide until the user has one.
         // Admins keep it visible so they can preview the form.
-        hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
+        hidden: ({ linkedCount, role, assignmentsLoading }) =>
+          role !== 'ADMIN' && !assignmentsLoading && linkedCount === 0,
       },
       // No badge: the roadmap item count isn't wired into the sidebar's
       // NotifContext, and the hard-coded '3' showed even when the roadmap was
@@ -296,7 +300,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   // employee's primary linked case, so sidebar links resolve to the case-scoped roadmap/dossier
   // even from /employee/dashboard where there is no case in the URL and nothing was selected yet.
   const { selectedCaseId } = useSelectedCase();
-  const { linkedCount, primaryCaseId } = useEmployeeAssignment();
+  const { linkedCount, primaryCaseId, isLoading: assignmentsLoading } = useEmployeeAssignment();
   const effectiveCaseId = urlCaseId ?? selectedCaseId ?? primaryCaseId;
 
   // Resolve the effective `to` for an item, allowing case-scoped overrides
@@ -332,7 +336,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     return childTab === currentTab;
   };
 
-  const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount };
+  const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount, assignmentsLoading };
   const visibleSections = SECTIONS
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
     .map((s) => {

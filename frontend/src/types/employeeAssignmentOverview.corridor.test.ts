@@ -21,4 +21,10 @@ describe('formatCorridorLabel (EMP-1)', () => {
   it('prefers the API-provided destination label for the destination side', () => {
     expect(formatCorridorLabel({ home_country: 'France', label: 'Berlin, Germany' })).toBe('France → Berlin, Germany');
   });
+
+  it('E2: does not double the origin when the label is already a corridor', () => {
+    // dest.label already contains the full route — must not become "France → France → Germany".
+    expect(formatCorridorLabel({ home_country: 'France', label: 'France → Germany' })).toBe('France → Germany');
+    expect(formatCorridorLabel({ home_country: 'FR', label: 'FR → DE' })).toBe('FR → DE');
+  });
 });
