@@ -187,6 +187,7 @@ export function detectIntraDocConflicts(facts: PolicyFactInput[]): ConflictRepor
       for (let j = i + 1; j < group.length; j++) {
         const a = group[i];
         const b = group[j];
+        if (!a || !b) continue;
         if (a.id === b.id) continue;
 
         const severity = detectConflict(a, b);
@@ -235,6 +236,7 @@ export function detectInterDocConflicts(facts: PolicyFactInput[]): ConflictRepor
       for (let j = i + 1; j < group.length; j++) {
         const a = group[i];
         const b = group[j];
+        if (!a || !b) continue;
         if (a.id === b.id) continue;
         if (a.source_doc === b.source_doc) continue; // intra-doc — skip
 

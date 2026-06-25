@@ -169,9 +169,9 @@ function LineChart({
       {/* first + last x labels */}
       {data.length > 0 && (
         <>
-          <text x={PAD} y={H - 2} className="fill-slate-400" style={{ fontSize: 9 }}>{data[0].label}</text>
+          <text x={PAD} y={H - 2} className="fill-slate-400" style={{ fontSize: 9 }}>{data[0]?.label}</text>
           <text x={W - PAD} y={H - 2} textAnchor="end" className="fill-slate-400" style={{ fontSize: 9 }}>
-            {data[data.length - 1].label}
+            {data[data.length - 1]?.label}
           </text>
         </>
       )}
@@ -421,7 +421,7 @@ function CategoryRow({
   onToggle: () => void;
   vendorFilter: string;
 }) {
-  const meta = STATUS_META[cat.status] ?? STATUS_META.healthy;
+  const meta = STATUS_META[cat.status] ?? STATUS_META.healthy ?? { label: 'Healthy', cls: 'bg-emerald-50 text-emerald-700' };
   const filteredVendors = vendorFilter.trim()
     ? cat.vendors.filter((v) => v.name.toLowerCase().includes(vendorFilter.toLowerCase()))
     : cat.vendors;

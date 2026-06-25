@@ -227,7 +227,7 @@ function TimelineDot({ status }: { status: VisualStatus }) {
 }
 
 function OwnerChip({ owner }: { owner: string }) {
-  const chip = OWNER_CHIP[owner] ?? OWNER_CHIP.joint;
+  const chip = OWNER_CHIP[owner] ?? OWNER_CHIP.joint ?? { label: 'Joint', chipClass: 'bg-slate-100 text-slate-600 border border-slate-200' };
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${chip.chipClass}`}>
       {chip.label}
@@ -643,6 +643,7 @@ function BottomSheet({ open, task, caseId, role, onClose, onSaved }: BottomSheet
       if (focusable.length === 0) { e.preventDefault(); return; }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
       if (e.shiftKey) {
         if (document.activeElement === first) { e.preventDefault(); last.focus(); }
       } else {

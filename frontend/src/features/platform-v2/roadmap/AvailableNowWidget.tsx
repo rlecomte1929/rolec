@@ -208,12 +208,12 @@ function EmptyAvailableState({ steps }: { steps: AvailableNowStep[] }) {
   const blockers = computeBlockers(steps);
 
   let message: string;
-  if (blockers.length === 0) {
+  const first = blockers[0];
+  if (!first) {
     message = "You're all caught up — there's nothing waiting on you right now.";
   } else {
-    const first = blockers[0].title;
     const extra = blockers.length > 1 ? ` (+${blockers.length - 1} more)` : '';
-    message = `No actions available — waiting on "${first}"${extra}.`;
+    message = `No actions available — waiting on "${first.title}"${extra}.`;
   }
 
   return (

@@ -32,7 +32,7 @@ export function extractChunkIdsInOrder(text: string): string[] {
   CITATION_RE.lastIndex = 0;
   while ((m = CITATION_RE.exec(text)) !== null) {
     const id = m[1];
-    if (!seen.has(id)) {
+    if (id && !seen.has(id)) {
       seen.add(id);
       ids.push(id);
     }
@@ -187,16 +187,18 @@ export function formatAnswerWithCitations(
       );
     }
     const id = m[1];
-    const idx = indexById.get(id) ?? out.length + 1;
-    out.push(
-      <CitationChip
-        key={`cite-${segIdx++}-${id}`}
-        index={idx}
-        chunk={chunkById.get(id)}
-        rawId={id}
-        onActivate={onActivate}
-      />
-    );
+    if (id) {
+      const idx = indexById.get(id) ?? out.length + 1;
+      out.push(
+        <CitationChip
+          key={`cite-${segIdx++}-${id}`}
+          index={idx}
+          chunk={chunkById.get(id)}
+          rawId={id}
+          onActivate={onActivate}
+        />
+      );
+    }
     last = end;
   }
   if (last < text.length) {

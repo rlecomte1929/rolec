@@ -40,8 +40,9 @@ export function isTemplatePolicy(policy: Record<string, unknown> | null | undefi
 function templateTierLabel(policy: Record<string, unknown> | null | undefined): string | null {
   const tn = String(policy?.template_name || '');
   const m = tn.match(/^starter_(conservative|standard|premium)$/);
-  if (!m) return null;
-  return m[1].charAt(0).toUpperCase() + m[1].slice(1);
+  const tier = m?.[1];
+  if (!tier) return null;
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
 function versionHasUploadSource(ver: Record<string, unknown> | null | undefined): boolean {

@@ -143,7 +143,7 @@ export const ImmigrationChecklistPage: React.FC = () => {
     );
   }
 
-  const docs = REQUIRED_DOCS[immCase.permit_type] ?? REQUIRED_DOCS.other;
+  const docs = REQUIRED_DOCS[immCase.permit_type] ?? REQUIRED_DOCS.other ?? [];
   const statuses = immCase.document_statuses ?? {};
   const completedCount = docs.filter(
     (_, i) => statuses[String(i)] === 'uploaded' || statuses[String(i)] === 'verified',

@@ -223,8 +223,9 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   }, [approvedMissingFields, caseId, dossierQuestions]);
 
   const grouped = requirements?.requirements.reduce<Record<string, RequirementItemDTO[]>>((acc, item) => {
-    acc[item.pillar] = acc[item.pillar] || [];
-    acc[item.pillar].push(item);
+    const list = acc[item.pillar] ?? [];
+    list.push(item);
+    acc[item.pillar] = list;
     return acc;
   }, {}) || {};
 

@@ -258,18 +258,22 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
         ))}
 
         {/* X-axis labels */}
-        {labelIndices.map((i) => (
-          <text
-            key={i}
-            x={toX(i)}
-            y={H - 6}
-            textAnchor="middle"
-            fontSize={10}
-            fill="#9ca3af"
-          >
-            {fmtMonth(validPoints[i].month)}
-          </text>
-        ))}
+        {labelIndices.map((i) => {
+          const pt = validPoints[i];
+          if (!pt) return null;
+          return (
+            <text
+              key={i}
+              x={toX(i)}
+              y={H - 6}
+              textAnchor="middle"
+              fontSize={10}
+              fill="#9ca3af"
+            >
+              {fmtMonth(pt.month)}
+            </text>
+          );
+        })}
       </svg>
     </div>
   );

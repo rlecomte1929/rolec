@@ -185,6 +185,7 @@ async function devSimulate(
     if (signal.aborted) break;
     await new Promise(r => setTimeout(r, 18));
     const char = devReply[i];
+    if (char === undefined) break; // bounded by devReply.length
     accumulated += char;
     onChunk(char);
   }

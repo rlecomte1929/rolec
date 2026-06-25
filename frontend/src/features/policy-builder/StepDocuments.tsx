@@ -81,7 +81,7 @@ export const StepDocuments: React.FC<Props> = ({
   onNext,
 }) => {
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
-  const [expandedVisa, setExpandedVisa] = useState<string | null>(VISA_TYPES[0].key);
+  const [expandedVisa, setExpandedVisa] = useState<string | null>(VISA_TYPES[0]?.key ?? null);
 
   const getList = (visaKey: string): string[] => documents[visaKey] ?? [];
 

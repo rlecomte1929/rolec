@@ -260,7 +260,7 @@ export async function runOutputGuardrails(
 
   const crossTier = checkCrossTierLeak(response, chunks, employeeTier);
 
-  if (!crossTier.pass) {
+  if (!crossTier.pass && crossTier.leaks[0]) {
     const firstLeak = crossTier.leaks[0];
     const logEntry: OutputGuardrailLog = {
       session_id: sessionId,

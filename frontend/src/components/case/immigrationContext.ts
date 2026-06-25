@@ -21,7 +21,7 @@ export type ImmigrationContext = {
 const humanizeVisaType = (visa: string): string =>
   visa
     .split('_')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
     .join(' ');
 
 /**

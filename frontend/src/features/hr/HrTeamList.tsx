@@ -52,7 +52,8 @@ function initials(name: string): string {
 }
 
 function avatarColor(idx: number) {
-  return AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
+  // idx is a non-negative row index and AVATAR_PALETTE is non-empty, so the modulo index is always in bounds
+  return AVATAR_PALETTE[idx % AVATAR_PALETTE.length]!;
 }
 
 /** Display name: full_name → email → null (show placeholder) */
@@ -70,7 +71,7 @@ function useColumnResize(initial: number[]) {
   const onMouseDown = useCallback(
     (colIdx: number) => (e: React.MouseEvent) => {
       e.preventDefault();
-      dragging.current = { colIdx, startX: e.clientX, startW: widths[colIdx] };
+      dragging.current = { colIdx, startX: e.clientX, startW: widths[colIdx] ?? COL_MIN };
 
       const onMove = (mv: MouseEvent) => {
         if (!dragging.current) return;

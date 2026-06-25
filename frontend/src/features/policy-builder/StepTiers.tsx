@@ -62,6 +62,7 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
 
   const toggleLevel = (idx: number, level: string) => {
     const t = tiers[idx];
+    if (!t) return;
     const has = t.qualifying_levels.includes(level);
     updateTier(idx, {
       qualifying_levels: has

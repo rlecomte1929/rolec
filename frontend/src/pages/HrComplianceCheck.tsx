@@ -72,9 +72,12 @@ export const HrComplianceCheck: React.FC = () => {
       const data = res.assignments ?? [];
       setAssignments(data);
       if (!caseId && data.length > 0) {
-        const nextId = data[0].id;
-        localStorage.setItem('relopass_last_assignment_id', nextId);
-        setSearchParams({ caseId: nextId });
+        const first = data[0];
+        if (first) {
+          const nextId = first.id;
+          localStorage.setItem('relopass_last_assignment_id', nextId);
+          setSearchParams({ caseId: nextId });
+        }
       }
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -421,7 +424,7 @@ export const HrComplianceCheck: React.FC = () => {
                                     void handleAction(check.checkId, actionType);
                                   }}
                                 >
-                                  {showPending ? (isReq ? 'Requesting…' : 'Applying…') : actionLabel(action, employeeName.split(' ')[0])}
+                                  {showPending ? (isReq ? 'Requesting…' : 'Applying…') : actionLabel(action, employeeName.split(' ')[0] ?? '')}
                                 </Button>
                               );
                             })}

@@ -211,6 +211,7 @@ export function GlobeCanvas({ className, style }: GlobeCanvasProps) {
       // Draw arcs
       ARCS.forEach((arc, i) => {
         const st = states[i];
+        if (!st) return;
         const fromCity = cityMap.get(arc.from);
         const toCity   = cityMap.get(arc.to);
         if (!fromCity || !toCity) return;

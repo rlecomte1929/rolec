@@ -44,9 +44,10 @@ export const MentionAutocomplete: React.FC<Props> = ({
     const beforeCursor = v.slice(0, selStart);
     const atMatch = beforeCursor.match(/@([^\s@]*)$/);
     if (atMatch) {
+      const captured = atMatch[1] ?? '';
       setMentionStart(selStart - atMatch[0].length);
-      setFilter(atMatch[1].toLowerCase());
-      setShowDropdown(atMatch[1].length >= minChars || atMatch[1].length === 0);
+      setFilter(captured.toLowerCase());
+      setShowDropdown(captured.length >= minChars || captured.length === 0);
       setHighlightIdx(0);
     } else {
       setShowDropdown(false);

@@ -81,7 +81,9 @@ export function patchBenefitInPayload(
   const cats = normalizeCategoryBlocks(payload.categories);
   const bi = cats.findIndex((c) => c.category_key === categoryKey);
   if (bi < 0) return payload;
-  const benefits = [...(cats[bi].benefits ?? [])];
+  const cat = cats[bi];
+  if (!cat) return payload;
+  const benefits = [...(cat.benefits ?? [])];
   const ri = benefits.findIndex(
     (b) =>
       b.benefit_key === prev.benefit_key &&
@@ -108,7 +110,9 @@ export function upsertBenefitInPayload(
   const cats = normalizeCategoryBlocks(payload.categories);
   const bi = cats.findIndex((c) => c.category_key === categoryKey);
   if (bi < 0) return payload;
-  const benefits = [...(cats[bi].benefits ?? [])];
+  const cat = cats[bi];
+  if (!cat) return payload;
+  const benefits = [...(cat.benefits ?? [])];
   const cleanNext: PolicyConfigBenefitRow = { ...next, category: categoryKey };
   let ri = -1;
   if (prev) {

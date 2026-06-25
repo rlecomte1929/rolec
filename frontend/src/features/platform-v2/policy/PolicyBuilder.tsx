@@ -178,7 +178,7 @@ export function PolicyBuilder({ tiers, benefits, onSaveTier: _onSaveTier, onCrea
 
   // Keep selected tier in sync if tiers list changes
   useEffect(() => {
-    if (!selectedTierId && tiers.length > 0) {
+    if (!selectedTierId && tiers[0]) {
       setSelectedTierId(tiers[0].id);
     }
   }, [tiers, selectedTierId]);

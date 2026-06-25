@@ -162,7 +162,8 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
         <ol className="relative">
           {MILESTONE_DEFS.map((def, idx) => {
             const persisted = byType[def.type];
-            const computedISO = targetsByType[def.type];
+            // targetsByType is built from these same MILESTONE_DEFS and moveDateISO is set (early return above), so every def.type has a target
+            const computedISO = targetsByType[def.type]!;
             const targetISO = persisted?.target_date
               ? persisted.target_date.slice(0, 10)
               : computedISO;

@@ -47,7 +47,7 @@ function exceptionLabel(type: string): string {
 }
 
 function statusBadge(status: string) {
-  const s = STATUS_LABELS[status] ?? STATUS_LABELS.pending;
+  const s = STATUS_LABELS[status] ?? STATUS_LABELS.pending ?? { label: 'Pending', className: 'bg-[#e0f2fe] text-[#0369a1]' };
   return (
     <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${s.className}`}>
       {s.label}

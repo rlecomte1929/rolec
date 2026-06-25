@@ -169,7 +169,7 @@ export const HrPolicyManagement: React.FC = () => {
       if (field === 'allowed') {
         cats[key] = { ...cats[key], allowed: !!value };
       } else if (field.startsWith('maxAllowed.')) {
-        const tier = field.split('.')[1];
+        const tier = field.split('.')[1] ?? '';
         cats[key] = {
           ...cats[key],
           maxAllowed: { ...(cats[key].maxAllowed || {}), [tier]: Number(value) || 0 },

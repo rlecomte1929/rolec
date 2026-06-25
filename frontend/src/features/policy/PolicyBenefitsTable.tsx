@@ -85,8 +85,7 @@ export const PolicyBenefitsTable: React.FC<{
   const grouped = useMemo(() => {
     const groups: Record<string, PolicyBenefitRow[]> = {};
     for (const b of benefits) {
-      if (!groups[b.service_category]) groups[b.service_category] = [];
-      groups[b.service_category].push(b);
+      (groups[b.service_category] ??= []).push(b);
     }
     return groups;
   }, [benefits]);
@@ -96,6 +95,7 @@ export const PolicyBenefitsTable: React.FC<{
     const next = benefits.map((b) => ({ ...b }));
     const group = grouped[category] || [];
     const row = group[idx];
+    if (!row) return;
     const realIdx = benefits.findIndex((b) => b.benefit_key === row.benefit_key);
     if (realIdx >= 0) {
       (next[realIdx] as any)[key] = value;

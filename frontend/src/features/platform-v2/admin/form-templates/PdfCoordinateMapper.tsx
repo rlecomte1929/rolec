@@ -50,7 +50,7 @@ const NUDGE_PT_FAST = 10;    // shift+arrow nudge
 const DEFAULT_FONT_SIZE = 10;
 
 export function colourFor(index: number): string {
-  return DOT_COLOURS[index % DOT_COLOURS.length];
+  return DOT_COLOURS[index % DOT_COLOURS.length] ?? '#000000';
 }
 
 // ─────────────────────────────────────────────────────────────────────

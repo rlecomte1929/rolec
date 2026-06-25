@@ -337,7 +337,7 @@ function nameColor(name: string): string {
   const PALETTE = ['#1DBFA2', '#4A9AE8', '#EFA827', '#9B8DE8', '#E87D4A', '#4AE8C8'];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return PALETTE[Math.abs(hash) % PALETTE.length];
+  return PALETTE[Math.abs(hash) % PALETTE.length] ?? '#1DBFA2';
 }
 
 export function Avatar({ name, src, size = 32, color, style }: AvatarProps) {

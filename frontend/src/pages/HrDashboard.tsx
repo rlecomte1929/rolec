@@ -154,8 +154,9 @@ export const HrDashboard: React.FC = () => {
       if (signal?.aborted) return;
       const list = Array.isArray(res.assignments) ? res.assignments : [];
       const totalCount = typeof res.total === 'number' && Number.isFinite(res.total) ? res.total : list.length;
-      if (list.length > 0 && !append) {
-        localStorage.setItem('relopass_last_assignment_id', list[0].id);
+      const firstAssignment = list[0];
+      if (firstAssignment && !append) {
+        localStorage.setItem('relopass_last_assignment_id', firstAssignment.id);
       }
       setAssignments((prev) => (append ? [...prev, ...list] : list));
       setTotal(totalCount);

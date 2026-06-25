@@ -87,7 +87,9 @@ export const AdminSupplierNew: React.FC = () => {
   const updateCapability = useCallback((idx: number, patch: Record<string, unknown>) => {
     setForm((prev) => {
       const next = [...prev.capabilities];
-      next[idx] = { ...next[idx], ...patch };
+      const current = next[idx];
+      if (!current) return prev;
+      next[idx] = { ...current, ...patch };
       return { ...prev, capabilities: next };
     });
   }, []);

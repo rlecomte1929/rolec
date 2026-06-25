@@ -89,7 +89,7 @@ function parseResponseSegments(text: string): TextSegment[] {
     if (match.index > lastIndex) {
       segments.push({ type: 'text', content: text.slice(lastIndex, match.index) });
     }
-    segments.push({ type: 'cite', content: match[0], index: parseInt(match[1], 10) });
+    segments.push({ type: 'cite', content: match[0], index: parseInt(match[1] ?? '', 10) });
     lastIndex = match.index + match[0].length;
   }
 

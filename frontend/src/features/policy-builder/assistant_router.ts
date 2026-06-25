@@ -388,7 +388,7 @@ export async function processQuery(
   });
 
   const chunks = retrievalResult.chunks;
-  const topScore = chunks.length > 0 ? chunks[0].rrf_score : 0;
+  const topScore = chunks[0]?.rrf_score ?? 0;
 
   if (topScore < MIN_RRF_SCORE || chunks.length === 0) {
     const reason: FallbackReason = 'LOW_CONFIDENCE';

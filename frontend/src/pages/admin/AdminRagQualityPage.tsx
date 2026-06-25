@@ -22,7 +22,7 @@ const ALERT_LABEL: Record<string, { variant: 'success' | 'warning' | 'error' | '
 const fmtPct = (v: number | null): string => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
 
 const MetricCard: React.FC<{ metric: RagEvalMetric }> = ({ metric }) => {
-  const alert = ALERT_LABEL[metric.alert.reason] ?? ALERT_LABEL.no_data;
+  const alert = ALERT_LABEL[metric.alert.reason] ?? ALERT_LABEL.no_data ?? { variant: 'info', text: 'No data' };
   return (
     <Card className="border border-slate-200">
       <div className="flex items-start justify-between mb-3">

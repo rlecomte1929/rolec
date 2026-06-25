@@ -104,10 +104,10 @@ export const Messages: React.FC = () => {
             setActiveId(convId);
             searchParams.delete('assignmentId');
             setSearchParams(searchParams, { replace: true });
-          } else if (built.length > 0) {
+          } else if (built[0]) {
             setActiveId(built[0].id);
           }
-        } else if (built.length > 0) {
+        } else if (built[0]) {
           setActiveId(built[0].id);
         }
         setListError(null);

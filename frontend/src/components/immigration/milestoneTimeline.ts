@@ -41,7 +41,7 @@ const MS_PER_DAY = 86_400_000;
 
 /** Parse an ISO date (or datetime) to UTC midnight of its calendar date. */
 export function parseISODate(iso: string): Date {
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const [y = NaN, m = NaN, d = NaN] = iso.slice(0, 10).split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 }
 

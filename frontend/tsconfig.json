@@ -20,7 +20,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "useUnknownInCatchVariables": true,
-    "noImplicitReturns": true
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src"],
   /*

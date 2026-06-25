@@ -63,6 +63,8 @@ export const HrAssignmentReview: React.FC = () => {
       setAssignments(data);
       const paramCaseId = searchParams.get('caseId') || id || localStorage.getItem('relopass_last_assignment_id');
       if (data.length > 0) {
+        // data.length > 0 guarantees data[0] exists
+        const first = data[0]!;
         const match = paramCaseId
           ? data.find((item) => item.id === paramCaseId || item.caseId === paramCaseId)
           : null;
@@ -71,7 +73,7 @@ export const HrAssignmentReview: React.FC = () => {
           ? match.id
           : initial && data.some((item) => item.id === initial)
           ? initial
-          : data[0].id;
+          : first.id;
         setSelectedCaseId(nextId);
         localStorage.setItem('relopass_last_assignment_id', nextId);
       } else if (paramCaseId) {
