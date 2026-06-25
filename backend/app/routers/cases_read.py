@@ -38,7 +38,6 @@ from sqlalchemy import text as _sql_text
 from .. import crud, schemas
 from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
-from ..services.case_status import normalize_status
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
@@ -864,19 +863,15 @@ def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="Case not found")
         _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
-        # WI3 single source of truth: derive the case status from the linked
-        # assignment (the lifecycle owner) so this detail endpoint can never
-        # disagree with GET /api/employee/cases. wizard_cases.status is only a
-        # fallback for cases with no assignment.
-        row = db.execute(
-            _sql_text(
-                "SELECT status FROM case_assignments "
-                "WHERE (canonical_case_id = :cid OR case_id = :cid) "
-                "ORDER BY created_at DESC LIMIT 1"
-            ),
-            {"cid": case_id},
-        ).fetchone()
-        assignment_status = normalize_status(row[0]) if row else None
+        # Single source of truth: derive status via the shared resolver (employee-
+        # scoped) so this detail can never disagree with GET /api/employee/cases.
+        # wizard_cases.status is only a fallback for cases with no assignment.
+        # NOTE: this modular handler is shadowed in prod by routes/compat.py
+        # (registered first); kept correct in case it is ever unshadowed.
+        employee_user_id = (
+            user.get("id") if (user.get("role") or "").upper() == "EMPLOYEE" else None
+        )
+        assignment_status = main_db.resolve_case_status(case_id, employee_user_id)
         return _case_dto(case, draft, assignment_status=assignment_status)
 
 

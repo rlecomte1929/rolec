@@ -56,33 +56,35 @@ def test_detail_falls_back_to_case_status_without_assignment():
     assert dto.status == "created"
 
 
-def test_get_case_resolves_assignment_status():
-    """Wiring guard: the detail handler must query case_assignments and pass the
-    normalized assignment status into _case_dto."""
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "app", "routers", "cases_read.py"
-    )
+def _read(*parts: str) -> str:
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), *parts)
     with open(path, "r", encoding="utf-8") as fh:
-        src = fh.read()
-    start = src.index("def get_case(")
-    body = src[start: src.index("\n@router.", start + 1)]
-    assert "FROM case_assignments" in body
-    assert "normalize_status(" in body
-    assert "assignment_status=assignment_status" in body
+        return fh.read()
 
 
-def test_compat_handler_resolves_assignment_status():
-    """The LIVE GET /api/cases/{id} handler is backend.routes.compat.compat_get_case
-    (registered before cases_read, so it WINS). Its _get_wizard_case_dto must also
-    pass the assignment status into _case_dto — otherwise the detail endpoint falls
-    back to wizard_cases.status and diverges from the list (the prod bug found
-    2026-06-25 after #851 shipped to the shadowed handler)."""
-    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "routes", "compat.py")
-    with open(path, "r", encoding="utf-8") as fh:
-        src = fh.read()
-    start = src.index("def _get_wizard_case_dto(")
-    body = src[start: src.index("\ndef ", start + 1)]
-    assert "assignment_status=assignment_status" in body
-    assert "_resolve_assignment_status" in body
-    assert "FROM case_assignments" in src
-    assert "normalize_status(" in src
+def test_both_endpoints_use_the_shared_resolver():
+    """Single source of truth: BOTH the case list (get_employee_cases) and the LIVE
+    detail handler (routes/compat.py compat_get_case → _get_wizard_case_dto) must
+    derive status from db.resolve_case_status, so they can never disagree. The
+    shadowed cases_read.get_case is aligned too. (compat is the LIVE handler — see
+    reference_compat_handler_shadows_cases_read; guarding only cases_read is why
+    #851 was a no-op.)"""
+    # LIST
+    main_src = _read("main.py")
+    list_body = main_src[main_src.index("def get_employee_cases("):]
+    list_body = list_body[: list_body.index("\n@app.")]
+    assert "db.resolve_case_status(case_id, effective[\"id\"]" in list_body
+
+    # DETAIL — live (compat) and shadowed (cases_read), both via the resolver,
+    # both passing it into _case_dto.
+    compat_src = _read("routes", "compat.py")
+    wiz = compat_src[compat_src.index("def _get_wizard_case_dto("):]
+    wiz = wiz[: wiz.index("\ndef ", 1)]
+    assert "db.resolve_case_status(case_id, employee_user_id)" in wiz
+    assert "assignment_status=assignment_status" in wiz
+
+    cr_src = _read("app", "routers", "cases_read.py")
+    gc = cr_src[cr_src.index("def get_case("):]
+    gc = gc[: gc.index("\n@router.", 1)]
+    assert "resolve_case_status(case_id, employee_user_id)" in gc
+    assert "assignment_status=assignment_status" in gc
