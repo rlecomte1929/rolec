@@ -765,6 +765,18 @@ export function EmployeeIntakePage() {
     if (pending) void runIntakeSave(pending);
   }, [runIntakeSave]);
 
+  // Force-persist any pending debounced edit immediately and await the REAL
+  // outcome. Resolves true on a confirmed 2xx (or when there's nothing pending),
+  // false on a failed save (the indicator then shows "Couldn't save — retry").
+  // Used by step navigation and field blur so an edit is never lost, and never
+  // left merely "in flight", when the user moves on.
+  const flushSave = useCallback(async (): Promise<boolean> => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const pending = pendingSaveDataRef.current;
+    if (!pending || !draftHydratedRef.current || !assignmentIdRef.current) return true;
+    return runIntakeSave(pending);
+  }, [runIntakeSave]);
+
   const setField = useCallback(<K extends keyof IntakeData>(k: K, v: IntakeData[K]) => {
     setData((d) => {
       const next = { ...d, [k]: v };
@@ -825,7 +837,12 @@ export function EmployeeIntakePage() {
     return true;
   };
 
-  const goTo = (s: number) => {
+  const goTo = async (s: number) => {
+    // Force-persist any pending edit and wait for a real 2xx before moving on.
+    // On failure, stay on the current step (the indicator shows "Couldn't save
+    // — retry") so navigation never silently drops unsaved data.
+    const ok = await flushSave();
+    if (!ok) return;
     setStep(s);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1046,7 +1063,7 @@ export function EmployeeIntakePage() {
                 const isActive = n === step;
                 return (
                   <Button unstyled key={lbl} type="button"
-                    onClick={() => n < step && goTo(n)}
+                    onClick={() => { if (n < step) void goTo(n); }}
                     disabled={n > step}
                     title={onHold ? 'On hold — coming soon' : undefined}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
@@ -1072,7 +1089,7 @@ export function EmployeeIntakePage() {
           </div>
 
           {/* Step body */}
-          <div className="p-5">
+          <div className="p-5" onBlur={() => { void flushSave(); }}>
 
             {/* ── Step 1 — Journey ── */}
             {step === 1 && (
@@ -1299,7 +1316,7 @@ export function EmployeeIntakePage() {
           {/* Footer nav */}
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
             {step > 1 ? (
-              <Button unstyled type="button" onClick={() => goTo(step - 1)}
+              <Button unstyled type="button" onClick={() => void goTo(step - 1)}
                 className="px-4 py-2 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 ← Back
               </Button>
@@ -1308,7 +1325,7 @@ export function EmployeeIntakePage() {
               🔒 Encrypted · only you and your HR team see this
             </div>
             {step < TOTAL_STEPS ? (
-              <Button unstyled type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
+              <Button unstyled type="button" onClick={() => void goTo(step + 1)} disabled={!stepValid(step)}
                 aria-describedby={!stepValid(step) ? 'intake-step-hint' : undefined}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   stepValid(step) ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
@@ -1325,6 +1342,14 @@ export function EmployeeIntakePage() {
                     setSubmitting(true);
                     setSubmitError(null);
                     try {
+                      // Confirm the latest intake-draft is persisted before we
+                      // promote it and flip status. Block submit on a failed save.
+                      const saved = await flushSave();
+                      if (!saved) {
+                        setSubmitError("Couldn't save your latest changes. Please retry.");
+                        setSubmitting(false);
+                        return;
+                      }
                       // Persist the FULL intake onto the canonical case (not just
                       // services) so HR, the case record, and the plan/roadmap see
                       // everything the employee entered.
