@@ -127,96 +127,6 @@ function buildVariantADraft(
   };
 }
 
-const COUNTRY_OPTIONS = [
-  { name: 'Germany', cities: ['Berlin', 'Munich'] },
-  { name: 'Norway', cities: ['Bergen', 'Oslo'] },
-  { name: 'Singapore', cities: ['Singapore'] },
-  { name: 'United Kingdom', cities: ['London', 'Manchester'] },
-  { name: 'United States', cities: ['New York', 'San Francisco'] },
-];
-
-const seedFromString = (value: string) => {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-};
-
-const createRng = (seed: number) => {
-  let state = seed >>> 0;
-  return () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 2 ** 32;
-  };
-};
-
-const formatDate = (date: Date) => date.toISOString().slice(0, 10);
-
-const buildTestDraft = (seedKey: string, baseDraft: CaseDraftDTO, employerNameFallback?: string | null): CaseDraftDTO => {
-  const rng = createRng(seedFromString(seedKey));
-  const pick = <T,>(items: T[]) => items[Math.floor(rng() * items.length)];
-
-  const originCountry = pick(COUNTRY_OPTIONS);
-  const destinationCountry = pick(COUNTRY_OPTIONS.filter((c) => c.name !== originCountry.name));
-  const originCity = pick(originCountry.cities);
-  const destCity = pick(destinationCountry.cities);
-  const purpose = pick(['employment', 'study', 'family', 'other']);
-  const daysAhead = Math.floor(rng() * 180) + 1;
-  const targetMoveDate = formatDate(new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000));
-  const hasDependents = rng() > 0.5;
-  const durationMonths = Math.floor(rng() * 49) + 12;
-
-  const firstNames = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan'];
-  const lastNames = ['Lee', 'Patel', 'Ng', 'Garcia', 'Khan'];
-  const fullName = `${pick(firstNames)} ${pick(lastNames)}`;
-  const spouseName = `${pick(firstNames)} ${pick(lastNames)}`;
-  const childName = `${pick(firstNames)} ${pick(lastNames)}`;
-
-  const contractTypes = ['Permanent', 'Fixed-term', 'Secondment', 'Internship'];
-  const salaryBands = ['50–100 k€', '100–150 k€', '150–200 k€', '200–300 k€', '300k€+'];
-
-  return {
-    relocationBasics: {
-      ...baseDraft.relocationBasics,
-      originCountry: originCountry.name,
-      originCity,
-      destCountry: destinationCountry.name,
-      destCity,
-      purpose,
-      targetMoveDate,
-      durationMonths,
-      hasDependents,
-    },
-    employeeProfile: {
-      ...baseDraft.employeeProfile,
-      fullName,
-      nationality: originCountry.name,
-      passportCountry: originCountry.name,
-      passportExpiry: formatDate(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)),
-      residenceCountry: originCountry.name,
-      email: `${fullName.replace(/\s+/g, '.').toLowerCase()}@example.com`,
-    },
-    familyMembers: {
-      ...baseDraft.familyMembers,
-      maritalStatus: hasDependents ? 'Married' : 'Single',
-      spouse: hasDependents ? { fullName: spouseName, relationship: 'Spouse' } : undefined,
-      children: hasDependents ? [{ fullName: childName, relationship: 'Child' }] : [],
-    },
-    assignmentContext: {
-      ...baseDraft.assignmentContext,
-      employerName: (employerNameFallback && employerNameFallback.trim()) || 'Your employer',
-      employerCountry: destinationCountry.name,
-      workLocation: destCity,
-      contractStartDate: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
-      contractType: pick(contractTypes),
-      salaryBand: pick(salaryBands),
-      jobTitle: 'Product Manager',
-      seniorityBand: 'Mid',
-    },
-  };
-};
-
 export const CaseWizardPage: React.FC = () => {
   const { caseId: assignmentIdFromRoute, step } = useParams();
   const navigate = useNavigate();
@@ -237,10 +147,6 @@ export const CaseWizardPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [caseHydrating, setCaseHydrating] = useState(() => Boolean(assignmentIdFromRoute));
   const lastSavedDraftJsonRef = React.useRef<string | null>(null);
-  const userEmail = getAuthItem('relopass_email') || getAuthItem('relopass_username') || '';
-  const enableTestFill =
-    import.meta.env.DEV || userEmail.endsWith('@relopass.com');
-
   const stepFromRoute = step ? Number(step) : location.pathname.endsWith('/review') ? 5 : 1;
   const currentStep = Math.min(5, Math.max(1, stepFromRoute));
 
@@ -485,23 +391,6 @@ export const CaseWizardPage: React.FC = () => {
     navigate(`/employee/case/${assignmentId}/wizard/${currentStep - 1}`);
   };
 
-  const handleFillForTest = async () => {
-    if (!assignmentId) return;
-    setError('');
-    const baseDraft = caseToWizardDraft(caseData);
-    const empName =
-      linkedSummaries.find((r) => r.assignment_id === assignmentId)?.company?.name?.trim() || null;
-    const nextDraft = buildTestDraft(assignmentId, baseDraft, empName);
-    setIsSaving(true);
-    try {
-      await handleSave(nextDraft);
-    } catch (err: any) {
-      setError(err?.message || 'Unable to apply test data.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleClassify = async () => {
     if (!resolvedCaseId) return;
     setIsClassifying(true);
@@ -698,18 +587,6 @@ export const CaseWizardPage: React.FC = () => {
             <div className="text-sm font-semibold text-[#0b2b43]">Need help?</div>
             <div className="text-xs text-[#6b7280] mt-1">Our team can guide you through the wizard.</div>
             <Button unstyled className="mt-3 text-xs text-[#0b2b43] underline">Contact support</Button>
-            {enableTestFill && (
-              <div className="mt-4 border-t border-[#e2e8f0] pt-3">
-                <Button unstyled
-                  type="button"
-                  onClick={handleFillForTest}
-                  title="Demo only — fills the wizard with deterministic answers."
-                  className="text-xs text-[#94a3b8] hover:text-[#0b2b43] hover:underline"
-                >
-                  Fill for test (demo)
-                </Button>
-              </div>
-            )}
           </Card>
         </div>
       </div>

@@ -8,8 +8,11 @@ import type { RelocationPlanCtaDTO, RelocationPlanCtaTypeWire } from '../../../t
 import type { RelocationPlanCtaNavigateContext, CtaNavigateTarget, RelocationTaskCtaSemantic } from './relocationPlanCtaTypes';
 import { relocationTaskCtaSemantic } from './relocationTaskCtaSemantic';
 
-function employeeCaseWizardStep(routeCaseId: string, step: number): string {
-  return `/employee/case/${encodeURIComponent(routeCaseId)}/wizard/${step}`;
+// Staged unification (C1): intake-data tasks route to the canonical v2 intake, not
+// the legacy /wizard/:step. The v2 wizard resumes to the first incomplete step.
+// (PR3/D1 will further split upload tasks to a dedicated document surface.)
+function employeeCaseIntakeRoute(routeCaseId: string): string {
+  return buildRoute('employeeCaseIntake', { caseId: routeCaseId });
 }
 
 function employeeCaseSummary(routeCaseId: string): string {
@@ -79,7 +82,7 @@ function viewDetailsTargetForRole(ctx: RelocationPlanCtaNavigateContext, sem: Re
   if (sem === 'view_requirements') {
     // Requirements list lives in wizard step 5 today.
     // TODO(relopass): dedicated employee requirements/compliance page when available.
-    return { kind: 'internal', to: employeeCaseWizardStep(aid, 5) };
+    return { kind: 'internal', to: employeeCaseIntakeRoute(aid) };
   }
 
   // Employee "review_case" → intake summary (no separate employee case review route).
@@ -103,7 +106,7 @@ function uploadDocumentTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigat
   // ready-to-upload user lands on step 2 transparently.
   // TODO(relopass): replace with `/employee/case/:id/documents` once
   // a dedicated upload surface exists.
-  return { kind: 'internal', to: employeeCaseWizardStep(aid, 1) };
+  return { kind: 'internal', to: employeeCaseIntakeRoute(aid) };
 }
 
 function completeWizardStepTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {
@@ -115,7 +118,7 @@ function completeWizardStepTarget(ctx: RelocationPlanCtaNavigateContext): CtaNav
   }
 
   // Wizard normalizes to first incomplete step when landing on `/wizard/1`.
-  return { kind: 'internal', to: employeeCaseWizardStep(aid, 1) };
+  return { kind: 'internal', to: employeeCaseIntakeRoute(aid) };
 }
 
 function contactOrMessagesTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {
