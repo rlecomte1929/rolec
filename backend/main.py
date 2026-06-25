@@ -5874,15 +5874,18 @@ def _resolve_employee_case_id(user_id: str, case_id_override: Optional[str] = No
     Resolve the relocation case_id for the authenticated employee.
 
     Priority:
-      1. Explicit `case_id` query parameter (magic-link sessions pass this)
-      2. Primary linked assignment for the user
+      1. Explicit `case_id` query parameter (the active/viewed case — callers should
+         always pass this so tasks are scoped to the case on screen).
+      2. Fallback: the most-recently-UPDATED linked assignment. This matches the
+         dashboard's active-case selection (#857), so a no-context request and the
+         dashboard agree on "the active case" instead of pinning to list[0].
     """
     if case_id_override and case_id_override.strip():
         return case_id_override.strip()
     linked = db.list_linked_assignments_for_employee(user_id)
     if not linked:
         return None
-    primary = linked[0]
+    primary = max(linked, key=lambda a: (a.get("updated_at") or a.get("created_at") or ""))
     return _effective_relocation_case_id(primary) or None
 
 
