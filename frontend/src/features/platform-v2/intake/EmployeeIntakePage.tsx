@@ -725,6 +725,13 @@ export function EmployeeIntakePage() {
   // has loaded, so a reload that restores straight to the Review step doesn't
   // paint populated fields as "missing"/"—" before the fetch resolves.
   const [draftHydrated, setDraftHydrated] = useState(false);
+  // Set when the draft load FAILED (e.g. the request was blocked/errored). While
+  // true we keep autosave disarmed (draftHydratedRef stays false) — saving the
+  // empty defaults would overwrite the server draft — and surface a retry instead
+  // of a silent blank form. Bumping hydrateAttempt re-runs the hydration effect.
+  const [hydrateError, setHydrateError] = useState(false);
+  const [hydrateAttempt, setHydrateAttempt] = useState(0);
+  const retryHydrate = useCallback(() => setHydrateAttempt((n) => n + 1), []);
   // Tracks the latest unsaved data so the unmount-flush effect can access it
   // without a stale closure. Set in setField on every edit; cleared after
   // each successful debounced save so we don't re-send data that's already
@@ -944,6 +951,7 @@ export function EmployeeIntakePage() {
   useEffect(() => {
     if (draftHydratedRef.current || !assignmentId) return;
     let cancelled = false;
+    setHydrateError(false);
     void employeeAPI
       .getIntake(assignmentId)
       .then((res) => {
@@ -971,20 +979,22 @@ export function EmployeeIntakePage() {
             return merged;
           });
         }
+        // Success — a real draft OR a legitimately-empty one (200 with null draft).
+        // Only now is it safe to arm autosave; saving before a confirmed load could
+        // overwrite the server draft with empty defaults.
+        draftHydratedRef.current = true;
+        setDraftHydrated(true);
       })
       .catch(() => {
-        /* fall through to in-memory defaults */
-      })
-      .finally(() => {
-        if (!cancelled) {
-          draftHydratedRef.current = true;
-          setDraftHydrated(true);
-        }
+        // Load failed (e.g. blocked/errored request). Do NOT arm autosave — an
+        // empty-default save would clobber the saved draft — and surface a retry
+        // rather than silently showing a blank form.
+        if (!cancelled) setHydrateError(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [assignmentId]);
+  }, [assignmentId, hydrateAttempt]);
 
   // Persist step on every change once hydrated. Fire-and-forget — failures
   // shouldn't block navigation in the wizard.
@@ -1004,7 +1014,7 @@ export function EmployeeIntakePage() {
   // Only "loading" when there's an assignment whose saved draft hasn't resolved
   // yet. With no assignment (bare /employee/intake) there's nothing to fetch, so
   // the fresh empty defaults are correct and we don't skeleton.
-  const intakeLoading = !!assignmentId && !draftHydrated;
+  const intakeLoading = !!assignmentId && !draftHydrated && !hydrateError;
 
   return (
     <AppShell>
@@ -1026,6 +1036,25 @@ export function EmployeeIntakePage() {
           <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
             <span className="flex-shrink-0">ℹ</span>
             <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click "Edit" on any pre-filled field if anything looks wrong.</div>
+          </div>
+        )}
+
+        {/* Hydration-failure banner — the saved draft couldn't be loaded. We keep
+            autosave disarmed so we never overwrite the server draft with blanks,
+            and offer a retry instead of a silent blank form. */}
+        {hydrateError && (
+          <div className="flex items-start justify-between gap-3 p-3 mb-5 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700">
+            <div>
+              <strong>Couldn't load your saved answers.</strong> To avoid overwriting what
+              you've already saved, editing is paused until this loads.
+            </div>
+            <button
+              type="button"
+              onClick={retryHydrate}
+              className="flex-shrink-0 font-semibold text-red-700 underline hover:text-red-900"
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -1337,7 +1366,7 @@ export function EmployeeIntakePage() {
                 {submitError && (
                   <p className="text-xs text-red-500 mr-2">{submitError}</p>
                 )}
-                <Button unstyled type="button" disabled={!data.consent || submitting || intakeLoading}
+                <Button unstyled type="button" disabled={!data.consent || submitting || intakeLoading || hydrateError}
                   onClick={async () => {
                     setSubmitting(true);
                     setSubmitError(null);
