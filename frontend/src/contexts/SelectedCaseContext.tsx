@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 interface SelectedCaseContextValue {
@@ -40,8 +40,14 @@ export const SelectedCaseProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [setSearchParams],
   );
 
+  // RX-1: stable context value so consumers don't re-render every provider render.
+  const ctxValue = useMemo(
+    () => ({ selectedCaseId, setSelectedCaseId }),
+    [selectedCaseId, setSelectedCaseId],
+  );
+
   return (
-    <SelectedCaseContext.Provider value={{ selectedCaseId, setSelectedCaseId }}>
+    <SelectedCaseContext.Provider value={ctxValue}>
       {children}
     </SelectedCaseContext.Provider>
   );

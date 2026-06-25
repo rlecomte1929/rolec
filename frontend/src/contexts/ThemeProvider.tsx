@@ -8,7 +8,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,8 +97,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // RX-1: stable context value so theme consumers don't re-render every render.
+  const ctxValue = useMemo(
+    () => ({ theme: resolved, preference, toggle, setPreference }),
+    [resolved, preference, toggle, setPreference],
+  );
+
   return (
-    <ThemeContext.Provider value={{ theme: resolved, preference, toggle, setPreference }}>
+    <ThemeContext.Provider value={ctxValue}>
       {children}
     </ThemeContext.Provider>
   );

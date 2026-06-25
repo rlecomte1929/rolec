@@ -19,6 +19,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import { supabase, onAuthChange, signIn as supabaseSignIn, signOut as supabaseSignOut } from '../lib/supabase';
@@ -153,8 +154,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // RX-1: stable context value — AuthProvider wraps the whole app, so an unmemoized
+  // value object re-rendered every consumer on every provider render.
+  const ctxValue = useMemo(
+    () => ({ user, loading, signIn, signOut }),
+    [user, loading, signIn, signOut],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={ctxValue}>
       {children}
     </AuthContext.Provider>
   );

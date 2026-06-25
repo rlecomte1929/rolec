@@ -50,8 +50,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
 
   // `unstyled` callers own their full appearance (incl. disabled/hover states)
   // via className — the design system only lends the semantic element + a11y.
+  // Keyboard focus visibility is non-negotiable though: even unstyled buttons get
+  // a focus-visible ring (A11Y-1) so the AUDIT-B2-migrated bespoke buttons don't
+  // silently lose focus indication. className still wins for everything else.
+  const focusRing =
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#1f8e8b]';
   const composedClassName = unstyled
-    ? className
+    ? `${focusRing} ${className}`
     : `${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${disabledClass} ${className}`;
 
   // `...rest` carries every native button attribute (onClick, style, title,
