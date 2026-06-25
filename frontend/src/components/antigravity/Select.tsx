@@ -14,16 +14,16 @@ interface SelectProps {
   fullWidth?: boolean;
 }
 
-export const Select: React.FC<SelectProps> = ({
+export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
   value,
   onChange,
   options,
   placeholder,
   label,
   fullWidth = false,
-}) => {
+}, ref) => {
   const widthClass = fullWidth ? 'w-full' : '';
-  
+
   return (
     <div className={widthClass}>
       {label && (
@@ -32,6 +32,7 @@ export const Select: React.FC<SelectProps> = ({
         </label>
       )}
       <select
+        ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43] transition-all bg-white ${widthClass}`}
@@ -45,4 +46,6 @@ export const Select: React.FC<SelectProps> = ({
       </select>
     </div>
   );
-};
+});
+
+Select.displayName = 'Select';
