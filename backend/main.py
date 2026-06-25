@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
 from datetime import datetime, date
@@ -587,12 +587,21 @@ def cors_headers_for_request_origin(request: Request) -> Dict[str, str]:
     allowed = origin in default_origins or bool(_cors_origin_pattern and _cors_origin_pattern.fullmatch(origin))
     if not allowed:
         return {}
-    return {
+    headers = {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Expose-Headers": "X-Request-ID",
         "Vary": "Origin",
     }
+    # Defense-in-depth: if an error fires on a preflight (OPTIONS) request, the
+    # browser still needs the preflight-specific headers or it rejects the result
+    # outright. Without these a 500 on OPTIONS is reported as a generic CORS error
+    # and the real cross-origin request is never sent.
+    if request.method == "OPTIONS":
+        headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Request-ID"
+        headers["Access-Control-Max-Age"] = "86400"
+    return headers
 
 
 # NOTE: Register HTTP middleware before CORSMiddleware. Starlette prepends each
@@ -5749,6 +5758,36 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             )
 
     db.set_assignment_submitted(assignment_id)
+
+    # Keep the wizard case status in sync with the assignment lifecycle. The two
+    # read models otherwise diverge: GET /api/employee/cases reports the (now
+    # 'submitted') assignment status, while GET /api/cases/{id} reports
+    # wizard_cases.status, which submit never advanced (stayed 'created'). Advance
+    # it here so both surfaces agree. Best-effort: a sync failure must never fail
+    # the submit the employee just completed. Resolution mirrors the draft-sync
+    # block above (the wizard case may be keyed by the relocation case id, the
+    # assignment id, or the assignment's case_id).
+    try:
+        with SessionLocal() as session:
+            wc = (
+                (app_crud.get_case(session, eff_case_for_sync) if eff_case_for_sync else None)
+                or app_crud.get_case(session, assignment_id)
+                or (
+                    app_crud.get_case(session, (assignment.get("case_id") or "").strip())
+                    if (assignment.get("case_id") or "").strip()
+                    else None
+                )
+            )
+            if wc and wc.status != AssignmentStatus.SUBMITTED.value:
+                wc.status = AssignmentStatus.SUBMITTED.value
+                session.commit()
+    except Exception as exc:
+        log.warning(
+            "submit_assignment: wizard_cases status sync failed assignment_id=%s error=%s",
+            assignment_id,
+            str(exc),
+            exc_info=True,
+        )
 
     case_id = _effective_relocation_case_id(assignment)
     event_type = "assignment.submitted"
