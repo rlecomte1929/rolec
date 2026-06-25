@@ -51,7 +51,9 @@ const HrServiceProvidersPage = lazy(() => import('./pages/HrServiceProvidersPage
 const HrPolicy = lazy(() => import('./pages/HrPolicy').then((module) => ({ default: module.HrPolicy })));
 const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPage').then((module) => ({ default: module.EmployeePolicyPage })));
 const EmployeeBenefitComparisonPage = lazy(() => import('./pages/employee/EmployeeBenefitComparisonPage').then((module) => ({ default: module.EmployeeBenefitComparisonPage })));
-const CaseWizardPage = lazy(() => import('./pages/employee/CaseWizardPage').then((module) => ({ default: module.CaseWizardPage })));
+// Legacy CaseWizardPage is no longer routed (staged unification C1) — its routes
+// redirect to the canonical v2 intake. The component file stays dormant.
+const LegacyWizardRedirect = lazy(() => import('./pages/employee/LegacyWizardRedirect').then((module) => ({ default: module.LegacyWizardRedirect })));
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
 // [P1-5] Dossier & Forms list view
@@ -349,9 +351,9 @@ function App() {
         <Route path={ROUTE_DEFS.employeeBenefitsComparison.path} element={<RequireEmployeeRoute><EmployeeBenefitComparisonPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<RequireHrRoute><Navigate to={ROUTE_DEFS.hrPolicy.path} replace /></RequireHrRoute>} />
-        <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
-        <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
-        <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<RequireEmployeeRoute><LegacyWizardRedirect /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<RequireEmployeeRoute><LegacyWizardRedirect /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<RequireEmployeeRoute><LegacyWizardRedirect /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<RequireEmployeeRoute><EmployeeCaseSummary /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><EmployeeRelocationPlanPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseImmigration.path} element={<RequireEmployeeRoute><ImmigrationPage /></RequireEmployeeRoute>} />

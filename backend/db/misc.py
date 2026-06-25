@@ -501,7 +501,8 @@ class MiscMixin:
                     -- Intake wizard progress. Mirrors Postgres migration
                     -- 20260529130000_case_assignments_intake_progress.sql.
                     intake_step INTEGER NOT NULL DEFAULT 0,
-                    intake_total_steps INTEGER NOT NULL DEFAULT 7,
+                    -- 5 = the canonical v2 intake step count (was a stale 7).
+                    intake_total_steps INTEGER NOT NULL DEFAULT 5,
                     intake_updated_at TEXT
                 )
             """))

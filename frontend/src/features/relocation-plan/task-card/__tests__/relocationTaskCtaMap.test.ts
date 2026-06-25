@@ -46,25 +46,21 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes upload_document to employee wizard step 1 (auto-normalizes to first incomplete step)', () => {
-    // Was: routed straight to step 2 (where the upload UI lives) but
-    // the wizard blocks deep-links to later steps when previous steps
-    // are incomplete, leaving the user staring at "Complete the
-    // previous steps before continuing." Step 1 normalizes to the
-    // first incomplete step on landing — partway-through users get
-    // somewhere actionable, ready-to-upload users land on step 2.
+  it('routes upload_document to the canonical v2 intake (staged unification C1)', () => {
+    // Was the legacy /wizard/1; now the single v2 intake, which resumes to the
+    // first incomplete step. (PR3/D1 will split uploads to a document surface.)
     const cta: RelocationPlanCtaDTO = { type: 'upload_document', label: 'Upload' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/wizard/1`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/intake`,
     });
   });
 
-  it('routes complete_wizard_step to employee wizard entry', () => {
+  it('routes complete_wizard_step to the canonical v2 intake', () => {
     const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/wizard/1`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/intake`,
     });
   });
 
@@ -76,11 +72,11 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes view_details (requirements) to wizard step 5', () => {
+  it('routes view_details (requirements) to the canonical v2 intake', () => {
     const cta: RelocationPlanCtaDTO = { type: 'view_details', label: 'View requirements' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/wizard/5`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/intake`,
     });
   });
 
