@@ -12,7 +12,6 @@ import { getAuthItem } from '../../../utils/demo';
 import { PrivacyNotice } from '../../privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
 import { MultiChip } from './MultiChip';
-import { DossierSuggestionsPanel } from './DossierSuggestionsPanel';
 import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
 import { resolveIntakeIds } from './resolveIntakeIds';
@@ -1212,9 +1211,6 @@ export function EmployeeIntakePage() {
               <>
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
                 <ReviewSummary data={data} goTo={goTo} loading={intakeLoading} />
-                {/* P3-RAG-04: surface the RAG dossier suggestions (corpus-grounded,
-                    cited) in the active v2 flow — previously only in the legacy wizard. */}
-                <DossierSuggestionsPanel caseId={caseIdRef.current} />
                 {/* H-07 (AIQ-1254): the messaging panel was removed from the Review
                     step — a chat UI at the moment of submission was cognitive overload.
                     Point the employee to the Inbox instead. */}

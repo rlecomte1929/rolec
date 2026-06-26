@@ -19,6 +19,7 @@ import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { fetchRelocationPlanView } from '../../api/relocationPlanView';
 import { Alert, isSourceStale } from '../../components/antigravity';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
+import { DossierSuggestionsPanel } from '../../features/platform-v2/intake/DossierSuggestionsPanel';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
 
 type FilterTabKey = 'all' | 'action_needed' | 'blocked' | 'ready' | 'submitted';
@@ -185,6 +186,15 @@ export const EmployeeDossierPage: React.FC = () => {
             </div>
           )}
         </header>
+
+        {/* M-06 (AIQ-1264): the AI suggested-questions panel was moved here from the
+            intake Review step — it belongs where the employee works on their forms,
+            not at the moment of submission. */}
+        {caseId && (
+          <div className="mb-6">
+            <DossierSuggestionsPanel caseId={caseId} />
+          </div>
+        )}
 
         {/* [Validate gate] Soft gate: nudge the employee to validate their
             roadmap first. Forms below stay reachable (dimmed), never blocked. */}
