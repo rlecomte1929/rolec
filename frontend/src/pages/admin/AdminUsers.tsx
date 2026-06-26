@@ -337,8 +337,15 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Edit person</h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
@@ -456,8 +463,15 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Add person</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
