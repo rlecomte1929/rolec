@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { signOutSupabase } from './supabaseAuth';
@@ -3258,8 +3259,8 @@ export const policyConfigMatrixAPI = {
 };
 
 export const companyPolicyAPI = {
-  list: async (params?: { company_id?: string }): Promise<{ policies: any[] }> => {
-    const response = await api.get<{ policies: any[] }>('/api/company-policies', { params });
+  list: async (params?: { company_id?: string }): Promise<{ policies: CompanyPolicySummary[] }> => {
+    const response = await api.get<{ policies: CompanyPolicySummary[] }>('/api/company-policies', { params });
     return response.data;
   },
   getLatest: async (): Promise<{ policy: any; benefits: any[]; company_name?: string }> => {
@@ -3294,37 +3295,11 @@ export const companyPolicyAPI = {
   getNormalized: async (
     policyId: string,
     opts?: { detail?: 'full' | 'summary'; includeReadiness?: boolean }
-  ): Promise<{
-    policy: any;
-    version: any;
-    benefit_rules: any[];
-    exclusions: any[];
-    evidence_requirements: any[];
-    conditions: any[];
-    assignment_applicability: any[];
-    family_applicability: any[];
-    source_links: any[];
-    /** Present when a published version exists for this company policy. */
-    published_version?: any;
-    /** Result of evaluate_version_comparison_readiness on the published version. */
-    published_comparison_readiness?: {
-      comparison_ready?: boolean;
-      comparison_blockers?: string[];
-    };
-    /** Normalization vs publish vs comparison tiers (backend policy_processing_readiness). */
-    policy_readiness?: {
-      normalization_readiness?: { status?: string; issues?: Array<{ code?: string; message?: string; field?: string }> };
-      publish_readiness?: { status?: string; issues?: Array<{ code?: string; message?: string; field?: string }> };
-      comparison_readiness?: { status?: string; issues?: Array<{ code?: string; message?: string; field?: string }> };
-    };
-    /** Persisted draft snapshot (policy_versions.normalization_draft_json). */
-    normalization_draft?: Record<string, unknown> | null;
-    detail?: string;
-  }> => {
+  ): Promise<NormalizedPolicyResponse> => {
     const params: Record<string, string | boolean> = {};
     if (opts?.detail === 'summary') params.detail = 'summary';
     if (opts?.includeReadiness === false) params.include_readiness = 'false';
-    const response = await api.get(`/api/company-policies/${policyId}/normalized`, {
+    const response = await api.get<NormalizedPolicyResponse>(`/api/company-policies/${policyId}/normalized`, {
       params: Object.keys(params).length ? params : undefined,
     });
     return response.data;
@@ -3485,15 +3460,15 @@ export const policyDocumentsAPI = {
     const response = await api.get('/api/hr/policy-documents/health');
     return response.data;
   },
-  list: async (params?: { company_id?: string }): Promise<{ documents: any[] }> => {
-    const response = await api.get<{ documents: any[] }>('/api/hr/policy-documents', { params });
+  list: async (params?: { company_id?: string }): Promise<{ documents: PolicyDocument[] }> => {
+    const response = await api.get<{ documents: PolicyDocument[] }>('/api/hr/policy-documents', { params });
     return response.data;
   },
-  get: async (docId: string): Promise<{ document: any }> => {
-    const response = await api.get<{ document: any }>(`/api/hr/policy-documents/${docId}`);
+  get: async (docId: string): Promise<{ document: PolicyDocument }> => {
+    const response = await api.get<{ document: PolicyDocument }>(`/api/hr/policy-documents/${docId}`);
     return response.data;
   },
-  upload: async (file: File, companyId?: string | null): Promise<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }> => {
+  upload: async (file: File, companyId?: string | null): Promise<{ ok: boolean; document: PolicyDocument; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }> => {
     // Backend expects field name "file". When admin is viewing a company's policy workspace, pass company_id so the doc is stored for that company.
     const form = new FormData();
     form.append('file', file);
@@ -3508,28 +3483,28 @@ export const policyDocumentsAPI = {
       });
       logger.info('policy upload form keys', [...form.keys()]);
     }
-    const response = await api.post<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }>('/api/hr/policy-documents/upload', form, { params, timeout: 120_000 });
+    const response = await api.post<{ ok: boolean; document: PolicyDocument; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }>('/api/hr/policy-documents/upload', form, { params, timeout: 120_000 });
     return response.data;
   },
-  reprocess: async (docId: string): Promise<{ document: any }> => {
-    const response = await api.post<{ document: any }>(`/api/hr/policy-documents/${docId}/reprocess`, undefined, { timeout: 120_000 });
+  reprocess: async (docId: string): Promise<{ document: PolicyDocument }> => {
+    const response = await api.post<{ document: PolicyDocument }>(`/api/hr/policy-documents/${docId}/reprocess`, undefined, { timeout: 120_000 });
     return response.data;
   },
-  listClauses: async (docId: string, clauseType?: string): Promise<{ clauses: any[] }> => {
+  listClauses: async (docId: string, clauseType?: string): Promise<{ clauses: PolicyDocumentClause[] }> => {
     const params = clauseType ? { clause_type: clauseType } : {};
-    const response = await api.get<{ clauses: any[] }>(`/api/hr/policy-documents/${docId}/clauses`, { params });
+    const response = await api.get<{ clauses: PolicyDocumentClause[] }>(`/api/hr/policy-documents/${docId}/clauses`, { params });
     return response.data;
   },
-  getClause: async (docId: string, clauseId: string): Promise<{ clause: any }> => {
-    const response = await api.get<{ clause: any }>(`/api/hr/policy-documents/${docId}/clauses/${clauseId}`);
+  getClause: async (docId: string, clauseId: string): Promise<{ clause: PolicyDocumentClause }> => {
+    const response = await api.get<{ clause: PolicyDocumentClause }>(`/api/hr/policy-documents/${docId}/clauses/${clauseId}`);
     return response.data;
   },
   patchClause: async (
     docId: string,
     clauseId: string,
     body: { clause_type?: string; title?: string; hr_override_notes?: string }
-  ): Promise<{ clause: any }> => {
-    const response = await api.patch<{ clause: any }>(
+  ): Promise<{ clause: PolicyDocumentClause }> => {
+    const response = await api.patch<{ clause: PolicyDocumentClause }>(
       `/api/hr/policy-documents/${docId}/clauses/${clauseId}`,
       body
     );

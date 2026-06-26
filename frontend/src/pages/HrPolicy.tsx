@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import type { PolicyDocument, PolicyDocumentClause } from '../features/policy/types';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { FileInput } from '../components/antigravity/FileInput';
 import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
@@ -446,7 +447,7 @@ function NormalizedHintsDisplay({ hints }: { hints: Record<string, unknown> }) {
 }
 
 function DocumentStructureTab({ docId }: { docId: string }) {
-  const [clauses, setClauses] = useState<any[]>([]);
+  const [clauses, setClauses] = useState<PolicyDocumentClause[]>([]);
   const [loading, setLoading] = useState(false);
   const [clauseTypeFilter, setClauseTypeFilter] = useState<string>('');
   const [patchingId, setPatchingId] = useState<string | null>(null);
@@ -687,7 +688,7 @@ export function PolicyDocumentIntakeSection({
   onDocumentsChange?: () => void;
   adminCompanyId?: string | null;
 }) {
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<PolicyDocument[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
@@ -1113,9 +1114,9 @@ export function PolicyDocumentIntakeSection({
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[#6b7280]">
                       <span>Status: {doc.processing_status}</span>
                       <span>•</span>
-                      <span>Type: {DOC_TYPE_LABELS[doc.detected_document_type] || doc.detected_document_type || '-'}</span>
+                      <span>Type: {DOC_TYPE_LABELS[doc.detected_document_type ?? ""] || doc.detected_document_type || '-'}</span>
                       <span>•</span>
-                      <span>Scope: {SCOPE_LABELS[doc.detected_policy_scope] || doc.detected_policy_scope || '-'}</span>
+                      <span>Scope: {SCOPE_LABELS[doc.detected_policy_scope ?? ""] || doc.detected_policy_scope || '-'}</span>
                       <span>•</span>
                       <span>Uploaded: {formatDateTime(doc.uploaded_at)}</span>
                       {needsReview && (
