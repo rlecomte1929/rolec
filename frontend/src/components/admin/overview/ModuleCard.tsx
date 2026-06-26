@@ -1,0 +1,53 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Skeleton } from './Skeleton';
+
+export interface ModuleRow {
+  label: string;
+  value: string | number | null;
+}
+
+interface ModuleCardProps {
+  testId: string;
+  to: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  metric: string | number | null;
+  rows?: ModuleRow[];
+  loading?: boolean;
+}
+
+const MetricValue: React.FC<{ value: string | number | null }> = ({ value }) =>
+  value === null ? <span className="text-base font-medium text-amber-700">Unavailable</span> : <>{value}</>;
+
+export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtitle, metric, rows, loading }) => (
+  <Link data-testid={testId} to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+          {icon}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+          <p className="text-xs text-slate-400">{subtitle}</p>
+        </div>
+      </div>
+      <span className="text-2xl font-semibold text-slate-900">
+        {loading ? <Skeleton className="h-6 w-10" /> : <MetricValue value={metric} />}
+      </span>
+    </div>
+    {rows && rows.length > 0 && (
+      <div className="space-y-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">{row.label}</span>
+            <span className="text-xs font-medium text-slate-700">
+              {loading ? <Skeleton className="h-3 w-8" /> : <MetricValue value={row.value} />}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+  </Link>
+);
