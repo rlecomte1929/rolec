@@ -141,6 +141,35 @@ export async function reportError(ctx: ErrorContext): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// EH-3 — instrument intentional swallows
+// ---------------------------------------------------------------------------
+
+/**
+ * Route an intentionally-ignored ("fire-and-forget") error through the
+ * observability path instead of dropping it on the floor with `() => undefined`.
+ *
+ * Logs a dev-only warning (stripped in prod by `logger`) and forwards a
+ * `severity: 'warning'` report to error tracking (PII-scrubbed, fire-and-forget,
+ * never throws). Returns `undefined` so it drops straight into a `.catch`:
+ *
+ *   somePromise().catch((e) => swallow(e, 'GuidancePackPanel: prefetch'));
+ *
+ * Use ONLY for genuinely non-load-bearing work (best-effort prefetch, mark-read,
+ * analytics, clipboard). For load-bearing operations (autosave / publish / save)
+ * surface a real UI error state instead of swallowing.
+ */
+export function swallow(err: unknown, context: string): void {
+  const e = err instanceof Error ? err : new Error(typeof err === 'string' ? err : 'Non-Error thrown');
+  logger.warn(`[swallow] ${context}:`, err);
+  void reportError({
+    message: `[swallowed] ${context}: ${e.message}`,
+    stack: e.stack ?? null,
+    componentName: context,
+    severity: 'warning',
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Global handlers — called by initErrorTracking() in main.tsx
 // ---------------------------------------------------------------------------
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { assertSafeUrl } from '../../utils/assertSafeUrl';
 import { Button, Card } from '../antigravity';
 import { guidanceAPI } from '../../api/client';
+import { swallow } from '../../lib/errorTracking';
 import { useAdminContext } from '../../features/admin/useAdminContext';
 
 const GUIDANCE_ENABLED =
@@ -85,14 +86,14 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
     if (!GUIDANCE_ENABLED || !caseId) return;
     guidanceAPI.getLatest(caseId)
       .then((res) => setPack(res))
-      .catch(() => undefined);
+      .catch((e) => swallow(e, 'GuidancePackPanel: getLatest'));
   }, [caseId]);
 
   useEffect(() => {
     if (!GUIDANCE_ENABLED || !caseId || tab !== 'explain') return;
     guidanceAPI.explain(caseId)
       .then((res) => setExplain(res))
-      .catch(() => undefined);
+      .catch((e) => swallow(e, 'GuidancePackPanel: explain'));
   }, [caseId, tab]);
 
   const missingInfoLabels: Record<string, string> = {

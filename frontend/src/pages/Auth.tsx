@@ -7,6 +7,7 @@ import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/api
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import { supabase } from '../api/supabase';
+import { swallow } from '../lib/errorTracking';
 
 // ── Globe SVG ─────────────────────────────────────────────────────────────────
 
@@ -252,7 +253,7 @@ export const Auth: React.FC = () => {
     } catch (err) {
       const transport = getClientTransportErrorMessage(err);
       const msg = transport ?? getApiErrorMessage(err, 'Login failed. Check your email and password, then try again.');
-      try { localStorage.setItem('debug_last_auth_error', msg); } catch { /* ignore */ }
+      try { localStorage.setItem('debug_last_auth_error', msg); } catch (e) { swallow(e, 'Auth: persist debug breadcrumb'); }
       setError(msg);
     } finally {
       authInFlight.current = false;
@@ -290,7 +291,7 @@ export const Auth: React.FC = () => {
     } catch (err) {
       const e = err as { response?: { data?: { detail?: unknown }; status?: number } };
       const transport = getClientTransportErrorMessage(err);
-      if (transport) { try { localStorage.setItem('debug_last_auth_error', transport); } catch { /* ignore */ } setError(transport); return; }
+      if (transport) { try { localStorage.setItem('debug_last_auth_error', transport); } catch (e) { swallow(e, 'Auth: persist debug breadcrumb'); } setError(transport); return; }
       const detail = e.response?.data?.detail;
       let msg: string;
       const detailStr = (d: unknown): string => Array.isArray(d) ? ((d[0] as { msg?: string })?.msg || JSON.stringify(d)) : (typeof d === 'string' ? d : JSON.stringify(d));
@@ -305,7 +306,7 @@ export const Auth: React.FC = () => {
       } else {
         msg = detail ? (detailStr(detail)) : 'Registration failed. Try again.';
       }
-      try { localStorage.setItem('debug_last_auth_error', msg); } catch { /* ignore */ }
+      try { localStorage.setItem('debug_last_auth_error', msg); } catch (e) { swallow(e, 'Auth: persist debug breadcrumb'); }
       setError(msg);
     } finally {
       authInFlight.current = false;

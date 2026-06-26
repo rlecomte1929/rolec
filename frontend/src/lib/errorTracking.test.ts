@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { scrubPii, redactUrl } from './errorTracking';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { scrubPii, redactUrl, swallow } from './errorTracking';
 
 describe('scrubPii', () => {
   it('redacts emails', () => {
@@ -18,6 +18,27 @@ describe('scrubPii', () => {
 
   it('leaves clean text untouched', () => {
     expect(scrubPii('Cannot read property x of undefined')).toBe('Cannot read property x of undefined');
+  });
+});
+
+describe('swallow (EH-3)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('returns undefined so it drops into a .catch handler', () => {
+    expect(swallow(new Error('boom'), 'ctx')).toBeUndefined();
+  });
+
+  it('warns (dev) with the context', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    swallow(new Error('boom'), 'GuidancePackPanel: prefetch');
+    expect(warn).toHaveBeenCalledWith('[swallow] GuidancePackPanel: prefetch:', expect.any(Error));
+  });
+
+  it('never throws on non-Error inputs', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(() => swallow('a string', 'ctx')).not.toThrow();
+    expect(() => swallow(null, 'ctx')).not.toThrow();
+    expect(() => swallow({ weird: true }, 'ctx')).not.toThrow();
   });
 });
 
