@@ -1703,11 +1703,11 @@ export const suppliersAPI = {
     limit?: number;
     offset?: number;
   }) => {
-    const response = await api.get('/api/suppliers', { params: params || {} });
+    const response = await api.get<{ suppliers: unknown[]; total?: number }>('/api/suppliers', { params: params || {} });
     return response.data;
   },
   get: async (supplierId: string) => {
-    const response = await api.get(`/api/suppliers/${supplierId}`);
+    const response = await api.get<unknown>(`/api/suppliers/${supplierId}`);
     return response.data;
   },
   search: async (params: {
@@ -1716,31 +1716,31 @@ export const suppliersAPI = {
     destination_city?: string;
     limit?: number;
   }) => {
-    const response = await api.get('/api/suppliers/search', { params });
+    const response = await api.get<{ suppliers: unknown[]; total?: number }>('/api/suppliers/search', { params });
     return response.data;
   },
   getCategories: async () => {
-    const response = await api.get('/api/suppliers/categories');
+    const response = await api.get<{ categories: unknown[] }>('/api/suppliers/categories');
     return response.data;
   },
   getCountries: async () => {
-    const response = await api.get('/api/suppliers/countries');
+    const response = await api.get<{ countries: unknown[] }>('/api/suppliers/countries');
     return response.data;
   },
   create: async (payload: Record<string, unknown>) => {
-    const response = await api.post('/api/suppliers', payload);
+    const response = await api.post<unknown>('/api/suppliers', payload);
     return response.data;
   },
   update: async (supplierId: string, payload: Record<string, unknown>) => {
-    const response = await api.patch(`/api/suppliers/${supplierId}`, payload);
+    const response = await api.patch<unknown>(`/api/suppliers/${supplierId}`, payload);
     return response.data;
   },
   setStatus: async (supplierId: string, status: 'active' | 'inactive' | 'draft') => {
-    const response = await api.patch(`/api/suppliers/${supplierId}/status`, { status });
+    const response = await api.patch<unknown>(`/api/suppliers/${supplierId}/status`, { status });
     return response.data;
   },
   addCapability: async (supplierId: string, payload: Record<string, unknown>) => {
-    const response = await api.post(`/api/suppliers/${supplierId}/capabilities`, payload);
+    const response = await api.post<unknown>(`/api/suppliers/${supplierId}/capabilities`, payload);
     return response.data;
   },
   updateCapability: async (
@@ -1748,27 +1748,27 @@ export const suppliersAPI = {
     capabilityId: string,
     payload: Record<string, unknown>
   ) => {
-    const response = await api.patch(
+    const response = await api.patch<unknown>(
       `/api/suppliers/${supplierId}/capabilities/${capabilityId}`,
       payload
     );
     return response.data;
   },
   removeCapability: async (supplierId: string, capabilityId: string) => {
-    const response = await api.delete(
+    const response = await api.delete<unknown>(
       `/api/suppliers/${supplierId}/capabilities/${capabilityId}`
     );
     return response.data;
   },
   updateScoring: async (supplierId: string, payload: Record<string, unknown>) => {
-    const response = await api.patch(`/api/suppliers/${supplierId}/scoring`, payload);
+    const response = await api.patch<unknown>(`/api/suppliers/${supplierId}/scoring`, payload);
     return response.data;
   },
   getRankingDebug: async (
     supplierId: string,
     params?: { service_category?: string; destination_country?: string; destination_city?: string }
   ) => {
-    const response = await api.get(`/api/suppliers/${supplierId}/ranking-debug`, { params });
+    const response = await api.get<unknown>(`/api/suppliers/${supplierId}/ranking-debug`, { params });
     return response.data;
   },
 };
