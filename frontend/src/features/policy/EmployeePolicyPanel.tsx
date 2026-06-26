@@ -1,7 +1,8 @@
 /**
  * Employee-facing read-only policy + entitlements, with maturity-aware copy and optional service comparison.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
@@ -293,34 +294,16 @@ export const EmployeePolicyPanel: React.FC<{
   pack: AssignmentPackagePolicyPayload | null;
   loading: boolean;
 }> = ({ pack, loading }) => {
-  const [comp, setComp] = useState<Awaited<ReturnType<typeof employeeAPI.getPolicyServiceComparison>> | null>(null);
-  const [compLoading, setCompLoading] = useState(false);
-
   const assignmentId = pack?.assignment_id ? String(pack.assignment_id) : null;
   const shouldFetchComp = pack?.status === 'found' && Boolean(assignmentId);
 
-  useEffect(() => {
-    if (!shouldFetchComp || !assignmentId) {
-      setComp(null);
-      return;
-    }
-    let cancelled = false;
-    setCompLoading(true);
-    employeeAPI
-      .getPolicyServiceComparison(assignmentId)
-      .then((res) => {
-        if (!cancelled) setComp(res);
-      })
-      .catch(() => {
-        if (!cancelled) setComp(null);
-      })
-      .finally(() => {
-        if (!cancelled) setCompLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [shouldFetchComp, assignmentId]);
+  const compQuery = useQuery({
+    queryKey: ['employee', 'policy-service-comparison', assignmentId],
+    queryFn: () => employeeAPI.getPolicyServiceComparison(assignmentId as string),
+    enabled: shouldFetchComp && Boolean(assignmentId),
+  });
+  const comp = compQuery.data ?? null;
+  const compLoading = compQuery.isLoading;
 
   const benefits = useMemo(() => (Array.isArray(pack?.benefits) ? (pack.benefits as PackBenefitRow[]) : []), [pack?.benefits]);
 

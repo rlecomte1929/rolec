@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // HrPolicyConfigPage (/hr/policy-config) retired — the HR-facing structured
 // matrix page was removed. AdminPolicyConfigPage (/admin/policy-config) was
 // retired earlier. The row-drawer editor inside the Policy Workspace has
@@ -169,12 +170,15 @@ describe('Compensation & Allowance — routes render', () => {
   // outside the integrated app shell. Skip-with-todo until fixed in
   // AUDIT-CITESTS-followup (Notion).
   it('renders /employee/policy with covered benefit only', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MemoryRouter initialEntries={['/employee/policy']}>
-        <Routes>
-          <Route path="/employee/policy" element={<EmployeePolicyPage />} />
-        </Routes>
-      </MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/employee/policy']}>
+          <Routes>
+            <Route path="/employee/policy" element={<EmployeePolicyPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
     await waitFor(() => expect(apiMocks.employeeGet).toHaveBeenCalled());
     await waitFor(() => {

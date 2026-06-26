@@ -13,6 +13,7 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 expect.extend(matchers);
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -44,12 +45,15 @@ const MOCK_CASE = {
 const DARK_TOKENS = ['1e293b', '0f172a', '1e3a5f', '475569', '14532d', 'f1f5f9', '94a3b8', '3b82f6', '60a5fa'];
 
 function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[`/employee/case/${CASE_ID}/immigration/checklist`]}>
-      <Routes>
-        <Route path="/employee/case/:caseId/immigration/checklist" element={<ImmigrationChecklistPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/employee/case/${CASE_ID}/immigration/checklist`]}>
+        <Routes>
+          <Route path="/employee/case/:caseId/immigration/checklist" element={<ImmigrationChecklistPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

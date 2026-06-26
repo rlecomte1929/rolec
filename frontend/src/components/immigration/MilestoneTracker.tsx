@@ -10,7 +10,8 @@
  * Pure Tailwind — no external timeline library.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import {
@@ -49,27 +50,21 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
   corridorFrom,
   corridorTo,
 }) => {
-  const [apiMilestones, setApiMilestones] = useState<ApiMilestone[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [savingType, setSavingType] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const milestonesQuery = useQuery({
+    queryKey: ['immigration-milestones', caseId],
+    queryFn: async () => {
       const resp = await hrAPI.listImmigrationMilestones(caseId);
-      setApiMilestones(resp.milestones || []);
-    } catch {
-      setError('Failed to load milestones.');
-    } finally {
-      setLoading(false);
-    }
-  }, [caseId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+      return resp.milestones || [];
+    },
+  });
+  const apiMilestones = milestonesQuery.data ?? [];
+  const loading = milestonesQuery.isLoading;
+  // The mark-done mutation below also writes `error`; surface a load failure alongside it.
+  const displayedError = error || (milestonesQuery.isError ? 'Failed to load milestones.' : null);
 
   const moveDateISO = useMemo(() => {
     if (!moveDate) return null;
@@ -115,14 +110,14 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
           status: 'completed',
           completed_date: today,
         });
-        await load();
+        await queryClient.invalidateQueries({ queryKey: ['immigration-milestones', caseId] });
       } catch {
         setError('Could not update the milestone. Please try again.');
       } finally {
         setSavingType(null);
       }
     },
-    [caseId, bookEarlyMessage, load],
+    [caseId, bookEarlyMessage, queryClient],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -152,9 +147,9 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
       {loading && (
         <div className="py-4 text-center text-sm text-[#94a3b8]">Loading milestones…</div>
       )}
-      {error && (
+      {displayedError && (
         <div className="mb-3 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-3 py-2 text-xs text-[#b91c1c]">
-          {error}
+          {displayedError}
         </div>
       )}
 

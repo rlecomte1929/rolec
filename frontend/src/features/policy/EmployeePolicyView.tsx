@@ -17,7 +17,8 @@
  * Renders body only (no AppShell, no Container) so the parent page
  * controls the page chrome.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI, policyConfigMatrixAPI } from '../../api/client';
@@ -141,58 +142,33 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
   const assignmentType = normalizeAssignmentType(assignmentTypeRaw ?? '') ?? undefined;
   const familyStatus = normalizeFamilyStatus(familyStatusRaw ?? '') ?? undefined;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<EmployeePolicyPayload | null>(null);
-  const [servicesPolicyCtx, setServicesPolicyCtx] = useState<ServicesPolicyContext | null>(null);
+  // Don't attempt a network call if there's nothing to load against — the
+  // early-return above already handles the no-assignment UI state.
+  const hasPolicyParams = Boolean(assignmentId || caseId || assignmentType || familyStatus);
 
-  const load = useCallback(async () => {
-    // Don't attempt a network call if there's nothing to load against — the
-    // early-return above already handles the no-assignment UI state.
-    if (!assignmentId && !caseId && !assignmentType && !familyStatus) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await policyConfigMatrixAPI.employeeGet({
+  const policyQuery = useQuery({
+    queryKey: ['employee', 'policy-config', { assignmentId, caseId, assignmentType, familyStatus }],
+    queryFn: () =>
+      policyConfigMatrixAPI.employeeGet({
         assignmentId: assignmentId ?? undefined,
         caseId,
         assignmentType,
         familyStatus,
-      });
-      setData(res);
-    } catch {
-      setError('We could not load your compensation policy right now. Please try again later.');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [assignmentId, caseId, assignmentType, familyStatus]);
+      }),
+    enabled: hasPolicyParams,
+  });
+  const data: EmployeePolicyPayload | null = policyQuery.data ?? null;
+  const loading = policyQuery.isLoading;
+  const error = policyQuery.isError
+    ? 'We could not load your compensation policy right now. Please try again later.'
+    : null;
 
-  useEffect(() => {
-    load().catch(() => undefined);
-  }, [load]);
-
-  useEffect(() => {
-    if (!assignmentId) {
-      setServicesPolicyCtx(null);
-      return;
-    }
-    let cancelled = false;
-    employeeAPI
-      .getServicesPolicyContext(assignmentId)
-      .then((ctx) => {
-        if (!cancelled) setServicesPolicyCtx(ctx);
-      })
-      .catch(() => {
-        if (!cancelled) setServicesPolicyCtx(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [assignmentId]);
+  const servicesCtxQuery = useQuery({
+    queryKey: ['employee', 'services-policy-context', assignmentId],
+    queryFn: () => employeeAPI.getServicesPolicyContext(assignmentId as string),
+    enabled: Boolean(assignmentId),
+  });
+  const servicesPolicyCtx: ServicesPolicyContext | null = servicesCtxQuery.data ?? null;
 
   const categoryOrder = useMemo(
     () => new Map(POLICY_CONFIG_CATEGORIES.map((c, i) => [c.key, i])),

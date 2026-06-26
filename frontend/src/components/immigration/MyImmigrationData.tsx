@@ -12,7 +12,8 @@
  * Route: /employee/case/:caseId/my-data
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { Checkbox } from '../antigravity/Checkbox';
 import { AppShell } from '../AppShell';
@@ -148,10 +149,7 @@ function formatValue(value: unknown): string {
 export const MyImmigrationData: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
 
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<ImmigrationProfile | null>(null);
-  const [consent, setConsent] = useState<ConsentRecord[]>([]);
+  const queryClient = useQueryClient();
 
   const [showFullPassport, setShowFullPassport] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -163,38 +161,32 @@ export const MyImmigrationData: React.FC = () => {
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!caseId) {
-      setLoadError('No case ID in the URL.');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
+  const dataQuery = useQuery({
+    queryKey: ['employee', 'immigration-data', caseId],
+    queryFn: async () => {
       const [profileResp, consentResp] = await Promise.all([
-        api.get<{ profile: ImmigrationProfile | null }>(
-          `/api/employee/cases/${caseId}/profile`,
-        ),
-        api.get<{ consent_records: ConsentRecord[] }>(
-          `/api/employee/cases/${caseId}/consent`,
-        ),
+        api.get<{ profile: ImmigrationProfile | null }>(`/api/employee/cases/${caseId}/profile`),
+        api.get<{ consent_records: ConsentRecord[] }>(`/api/employee/cases/${caseId}/consent`),
       ]);
-      setProfile(profileResp.data.profile);
-      setConsent(consentResp.data.consent_records || []);
-    } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Failed to load your data. Please try again.';
-      setLoadError(detail);
-    } finally {
-      setLoading(false);
-    }
-  }, [caseId]);
+      return {
+        profile: profileResp.data.profile,
+        consent: consentResp.data.consent_records || [],
+      };
+    },
+    enabled: !!caseId,
+  });
+  const profile: ImmigrationProfile | null = dataQuery.data?.profile ?? null;
+  const consent: ConsentRecord[] = dataQuery.data?.consent ?? [];
+  const loading = caseId ? dataQuery.isLoading : false;
+  const loadError = !caseId
+    ? 'No case ID in the URL.'
+    : dataQuery.isError
+      ? ((dataQuery.error as { response?: { data?: { detail?: string } } } | null)?.response?.data
+          ?.detail || 'Failed to load your data. Please try again.')
+      : null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const reloadData = () =>
+    queryClient.invalidateQueries({ queryKey: ['employee', 'immigration-data', caseId] });
 
   const handleDownload = async () => {
     if (!caseId) return;
@@ -238,7 +230,7 @@ export const MyImmigrationData: React.FC = () => {
         purpose: 'vendor_sharing',
       });
       setActionNotice('Your consent for sharing data with providers has been withdrawn.');
-      await load();
+      await reloadData();
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
@@ -290,7 +282,7 @@ export const MyImmigrationData: React.FC = () => {
       {!loading && loadError && (
         <div className="max-w-lg mx-auto">
           <Alert variant="error" className="mb-4">{loadError}</Alert>
-          <Button variant="outline" onClick={() => void load()}>Try again</Button>
+          <Button variant="outline" onClick={() => void reloadData()}>Try again</Button>
         </div>
       )}
 
