@@ -110,7 +110,7 @@ jobs:
       # Find the draft PR opened by autofix-pipeline (DEV-LOOP-2C)
       - name: Find associated PR
         id: find_pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -182,7 +182,7 @@ jobs:
       # Convert draft PR to ready and squash-merge
       - name: Squash-merge PR to main
         id: merge
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
@@ -246,7 +246,7 @@ jobs:
       # Rollback: if deploy failed, revert the squash commit on main
       - name: Rollback on deploy failure
         if: steps.deploy.outcome == 'failure' && steps.merge.outputs.merged == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
@@ -366,7 +366,7 @@ jobs:
 
       - name: Add failure comment to PR
         if: needs.validate.outputs.pr_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
