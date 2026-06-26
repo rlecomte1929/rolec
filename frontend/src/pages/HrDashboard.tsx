@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -66,10 +66,15 @@ export const HrDashboard: React.FC = () => {
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [destinationFilter, setDestinationFilter] = useState('');
-  const [appliedStatus, setAppliedStatus] = useState<string>('all');
-  const [appliedDestination, setAppliedDestination] = useState('');
+  // RX-5: the applied server-side filters (status + destination) are URL state
+  // (?status=&destination=) so reload / back-button / deep-links preserve the view.
+  // The modal "draft" (statusFilter/destinationFilter) and the client-side
+  // date-range stay local — they only become URL state on Apply.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedStatus = searchParams.get('status') ?? 'all';
+  const appliedDestination = searchParams.get('destination') ?? '';
+  const [statusFilter, setStatusFilter] = useState<string>(appliedStatus);
+  const [destinationFilter, setDestinationFilter] = useState(appliedDestination);
   // NAV-HR-1: client-side "submitted between" date-range filter (the list API has
   // no date param, so this narrows the loaded rows). Draft state lives in the modal;
   // `applied*` is what the table actually filters on.
@@ -86,6 +91,23 @@ export const HrDashboard: React.FC = () => {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routePerfStartedAt = useRef<number | null>(null);
   const identifierRef = useRef<HTMLInputElement>(null);
+
+  // RX-5: write the applied status/destination filters into the URL query string
+  // (omitting defaults to keep the URL clean). Pushes a history entry so the
+  // back-button steps through filter changes; preserves any other params.
+  const applyFiltersToUrl = useCallback(
+    (status: string, destination: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (status && status !== 'all') next.set('status', status);
+        else next.delete('status');
+        if (destination) next.set('destination', destination);
+        else next.delete('destination');
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
 
   // null = unknown/loading; gate the publish nudge on `=== false` only.
   const policyPublished = usePolicyPublished();
@@ -813,8 +835,7 @@ export const HrDashboard: React.FC = () => {
                     setDestinationFilter('');
                     setDateFrom('');
                     setDateTo('');
-                    setAppliedStatus('all');
-                    setAppliedDestination('');
+                    applyFiltersToUrl('all', '');
                     setAppliedDateFrom('');
                     setAppliedDateTo('');
                     setIsFilterOpen(false);
@@ -824,8 +845,7 @@ export const HrDashboard: React.FC = () => {
                 </Button>
                 <Button
                   onClick={() => {
-                    setAppliedStatus(statusFilter);
-                    setAppliedDestination(destinationFilter);
+                    applyFiltersToUrl(statusFilter, destinationFilter);
                     setAppliedDateFrom(dateFrom);
                     setAppliedDateTo(dateTo);
                     setIsFilterOpen(false);
