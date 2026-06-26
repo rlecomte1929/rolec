@@ -2090,7 +2090,7 @@ export const adminFormTemplatesAPI = {
 
 // Admin Staging Review API (admin-only)
 export const adminStagingAPI = {
-  getDashboard: () => api.get('/api/admin/staging/dashboard').then((r) => r.data),
+  getDashboard: () => api.get<unknown>('/api/admin/staging/dashboard').then((r) => r.data),
   listResourceCandidates: (params?: {
     status?: string;
     country_code?: string;
@@ -2101,13 +2101,13 @@ export const adminStagingAPI = {
     search?: string;
     limit?: number;
     offset?: number;
-  }) => api.get('/api/admin/staging/resources', { params }).then((r) => r.data),
+  }): Promise<{ items: unknown[]; total: number }> => api.get<{ items: unknown[]; total: number }>('/api/admin/staging/resources', { params }).then((r) => r.data),
   getResourceCandidate: (id: string) =>
-    api.get(`/api/admin/staging/resources/${id}`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/staging/resources/${id}`).then((r) => r.data),
   getResourceCandidateMatches: (id: string) =>
-    api.get(`/api/admin/staging/resources/${id}/matches`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/staging/resources/${id}/matches`).then((r) => r.data),
   approveResourceAsNew: (id: string, reason?: string) =>
-    api.post(`/api/admin/staging/resources/${id}/approve-new`, { reason }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/resources/${id}/approve-new`, { reason }).then((r) => r.data),
   mergeResource: (
     id: string,
     payload: {
@@ -2116,9 +2116,9 @@ export const adminStagingAPI = {
       fields_to_merge?: string[];
       reason?: string;
     }
-  ) => api.post(`/api/admin/staging/resources/${id}/merge`, payload).then((r) => r.data),
+  ) => api.post<unknown>(`/api/admin/staging/resources/${id}/merge`, payload).then((r) => r.data),
   rejectResource: (id: string, reason?: string) =>
-    api.post(`/api/admin/staging/resources/${id}/reject`, { reason }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/resources/${id}/reject`, { reason }).then((r) => r.data),
   markResourceDuplicate: (
     id: string,
     payload: {
@@ -2126,11 +2126,11 @@ export const adminStagingAPI = {
       duplicate_of_live_resource_id?: string;
       reason?: string;
     }
-  ) => api.post(`/api/admin/staging/resources/${id}/mark-duplicate`, payload).then((r) => r.data),
+  ) => api.post<unknown>(`/api/admin/staging/resources/${id}/mark-duplicate`, payload).then((r) => r.data),
   ignoreResource: (id: string, reason?: string) =>
-    api.post(`/api/admin/staging/resources/${id}/ignore`, { reason }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/resources/${id}/ignore`, { reason }).then((r) => r.data),
   restoreResourceToReview: (id: string) =>
-    api.post(`/api/admin/staging/resources/${id}/restore-review`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/resources/${id}/restore-review`).then((r) => r.data),
   listEventCandidates: (params?: {
     status?: string;
     country_code?: string;
@@ -2140,13 +2140,13 @@ export const adminStagingAPI = {
     search?: string;
     limit?: number;
     offset?: number;
-  }) => api.get('/api/admin/staging/events', { params }).then((r) => r.data),
+  }): Promise<{ items: unknown[]; total: number }> => api.get<{ items: unknown[]; total: number }>('/api/admin/staging/events', { params }).then((r) => r.data),
   getEventCandidate: (id: string) =>
-    api.get(`/api/admin/staging/events/${id}`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/staging/events/${id}`).then((r) => r.data),
   getEventCandidateMatches: (id: string) =>
-    api.get(`/api/admin/staging/events/${id}/matches`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/staging/events/${id}/matches`).then((r) => r.data),
   approveEventAsNew: (id: string, reason?: string) =>
-    api.post(`/api/admin/staging/events/${id}/approve-new`, { reason }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/events/${id}/approve-new`, { reason }).then((r) => r.data),
   mergeEvent: (
     id: string,
     payload: {
@@ -2155,9 +2155,9 @@ export const adminStagingAPI = {
       fields_to_merge?: string[];
       reason?: string;
     }
-  ) => api.post(`/api/admin/staging/events/${id}/merge`, payload).then((r) => r.data),
+  ) => api.post<unknown>(`/api/admin/staging/events/${id}/merge`, payload).then((r) => r.data),
   rejectEvent: (id: string, reason?: string) =>
-    api.post(`/api/admin/staging/events/${id}/reject`, { reason }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/events/${id}/reject`, { reason }).then((r) => r.data),
   markEventDuplicate: (
     id: string,
     payload: {
@@ -2165,11 +2165,11 @@ export const adminStagingAPI = {
       duplicate_of_live_event_id?: string;
       reason?: string;
     }
-  ) => api.post(`/api/admin/staging/events/${id}/mark-duplicate`, payload).then((r) => r.data),
+  ) => api.post<unknown>(`/api/admin/staging/events/${id}/mark-duplicate`, payload).then((r) => r.data),
   ignoreEvent: (id: string, reason?: string) =>
-    api.post(`/api/admin/staging/events/${id}/ignore`, { reason }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/events/${id}/ignore`, { reason }).then((r) => r.data),
   restoreEventToReview: (id: string) =>
-    api.post(`/api/admin/staging/events/${id}/restore-review`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/staging/events/${id}/restore-review`).then((r) => r.data),
 };
 
 // Admin Freshness & Crawl API (admin-only)

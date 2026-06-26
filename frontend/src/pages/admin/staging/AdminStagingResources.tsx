@@ -50,7 +50,7 @@ export const AdminStagingResources: React.FC = () => {
         search: filters.search || undefined,
         limit: 50,
       });
-      const listItems = res.items || [];
+      const listItems = (res.items || []) as ResourceCandidate[];
       setItems(listItems);
       setTotal(res.total ?? 0);
       if (listItems.length > 0) {

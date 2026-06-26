@@ -29,7 +29,7 @@ export const AdminStagingDashboard: React.FC = () => {
     adminStagingAPI
       .getDashboard()
       .then((d) => {
-        if (!cancelled) setData(d);
+        if (!cancelled) setData(d as DashboardData);
       })
       .catch((e) => {
         if (!cancelled) setError((e as Error)?.message || 'Failed to load dashboard');

@@ -36,8 +36,8 @@ export const AdminStagingEventDetail: React.FC = () => {
         adminStagingAPI.getEventCandidate(id),
         adminStagingAPI.getEventCandidateMatches(id),
       ]);
-      setCandidate(c);
-      setMatches(m.matches || []);
+      setCandidate(c as Candidate);
+      setMatches(((m as { matches?: Match[] }).matches) || []);
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load candidate');
     } finally {
