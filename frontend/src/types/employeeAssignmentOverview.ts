@@ -1,4 +1,5 @@
 /** Shapes from GET /api/employee/assignments/overview (snake_case keys from API). */
+import { getCountryName } from '../utils/countries';
 export type EmployeeOverviewCompany = {
   id?: string | null;
   name?: string | null;
@@ -56,7 +57,9 @@ export function formatDestinationLabel(dest?: EmployeeOverviewDestination | null
   const label = dest?.label?.trim();
   if (label) return label;
   const city = dest?.host_city?.trim();
-  const country = dest?.host_country?.trim();
+  // M-03 (AIQ-1261): resolve ISO codes to full names ("AE" → "United Arab
+  // Emirates"); getCountryName passes already-full names and unknowns through.
+  const country = getCountryName(dest?.host_country);
   if (city && country) return `${city}, ${country}`;
   if (country) return country;
   if (city) return city;
@@ -71,7 +74,7 @@ export function formatDestinationLabel(dest?: EmployeeOverviewDestination | null
  * when neither is. Country-level for a clean, scannable corridor.
  */
 export function formatCorridorLabel(dest?: EmployeeOverviewDestination | null): string {
-  const origin = dest?.home_country?.trim() || dest?.home_city?.trim() || '';
+  const origin = getCountryName(dest?.home_country) || dest?.home_city?.trim() || '';
   const destination = formatDestinationLabel(dest);
   if (!origin || destination === 'Not set yet') return destination;
   // E2: guard against a double origin when the destination label is itself already

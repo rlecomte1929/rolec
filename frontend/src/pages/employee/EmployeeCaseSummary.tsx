@@ -9,6 +9,7 @@ import { AppShell } from '../../components/AppShell';
 import { Alert, Card, LoadingButton } from '../../components/antigravity';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { getAuthItem } from '../../utils/demo';
+import { getCountryName } from '../../utils/countries';
 import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
 import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
@@ -219,8 +220,8 @@ export const EmployeeCaseSummary: React.FC = () => {
       {!isLoading && draft && (
         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           <SummarySection title="Relocation Basics">
-            <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
-            <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Origin: {[b.originCity, getCountryName(b.originCountry)].filter(Boolean).join(', ') || '-'}</div>
+            <div>Destination: {[b.destCity, getCountryName(b.destCountry)].filter(Boolean).join(', ') || '-'}</div>
             <div>Purpose: {b.purpose || '-'}</div>
             <div>Target move date: {b.targetMoveDate || '-'}</div>
             <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '-'}</div>
@@ -228,8 +229,8 @@ export const EmployeeCaseSummary: React.FC = () => {
           <SummarySection title="Employee Profile">
             <div>Name: {ep.fullName || '-'}</div>
             <div>Email: {ep.email || '-'}</div>
-            <div>Nationality: {ep.nationality || '-'}</div>
-            <div>Passport country: {ep.passportCountry || '-'}</div>
+            <div>Nationality: {getCountryName(ep.nationality) || '-'}</div>
+            <div>Passport country: {getCountryName(ep.passportCountry) || '-'}</div>
             <div>Residence country: {ep.residenceCountry || '-'}</div>
           </SummarySection>
           <SummarySection title="Family Members">

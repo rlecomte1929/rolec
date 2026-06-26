@@ -22,6 +22,13 @@ describe('formatCorridorLabel (EMP-1)', () => {
     expect(formatCorridorLabel({ home_country: 'France', label: 'Berlin, Germany' })).toBe('France → Berlin, Germany');
   });
 
+  it('M-03 (AIQ-1261): resolves ISO codes to full country names', () => {
+    expect(formatCorridorLabel({ home_country: 'CA', host_country: 'AE' })).toBe(
+      'Canada → United Arab Emirates',
+    );
+    expect(formatCorridorLabel({ host_country: 'AE' })).toBe('United Arab Emirates');
+  });
+
   it('E2: does not double the origin when the label is already a corridor', () => {
     // dest.label already contains the full route — must not become "France → France → Germany".
     expect(formatCorridorLabel({ home_country: 'France', label: 'France → Germany' })).toBe('France → Germany');
