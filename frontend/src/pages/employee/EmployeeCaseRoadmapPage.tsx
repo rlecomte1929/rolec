@@ -47,7 +47,16 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const { data, loading, error, refetch, ensureDefaultsAndReload } =
     useEmployeeRelocationPlanPageData(caseId);
   const runCta = useRelocationPlanCtaHandler(caseId ?? '', { resourceCaseId: data?.case_id });
-  const handleCta = (t: RelocationPlanPhaseTaskDTO) => runCta(t.cta ?? null);
+  const handleCta = (t: RelocationPlanPhaseTaskDTO) => {
+    const documentInput = t.required_inputs.find((input) => input.type === 'document');
+    if (caseId && t.cta?.type === 'upload_document' && documentInput?.key) {
+      navigate(
+        `${buildRoute('employeeCaseDossier', { caseId })}?form=${encodeURIComponent(documentInput.key)}`,
+      );
+      return;
+    }
+    runCta(t.cta ?? null);
+  };
 
   // Header meta (cities / employee / role / move date) — separate endpoint.
   const [header, setHeader] = useState<RoadmapHeaderMeta | null>(null);

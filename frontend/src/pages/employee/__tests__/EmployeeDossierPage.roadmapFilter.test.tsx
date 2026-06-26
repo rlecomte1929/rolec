@@ -46,8 +46,20 @@ vi.mock('../../../components/AppShell', () => ({
 
 // Render each card as a simple testid so we can assert which forms are shown.
 vi.mock('../../../features/platform-v2/dossier/CaseFormCard', () => ({
-  CaseFormCard: ({ form }: { form: { id: string } }) => (
-    <div data-testid={`form-${form.id}`} />
+  CaseFormCard: ({
+    form,
+    initialExpanded,
+    highlighted,
+  }: {
+    form: { id: string };
+    initialExpanded?: boolean;
+    highlighted?: boolean;
+  }) => (
+    <div
+      data-testid={`form-${form.id}`}
+      data-expanded={initialExpanded ? 'true' : 'false'}
+      data-highlighted={highlighted ? 'true' : 'false'}
+    />
   ),
 }));
 
@@ -65,6 +77,11 @@ function makeForm(id: string, roadmapStepId: string | null) {
     completion_pct: 0,
     blocker_form_id: null,
     roadmap_step_id: roadmapStepId,
+    template: {
+      id: `tpl-${id}`,
+      code: `CODE-${id}`,
+      required_documents: id === 'b' ? [{ key: 'passport_copy', label: 'Passport copy' }] : [],
+    },
   };
 }
 
@@ -91,6 +108,7 @@ describe('EmployeeDossierPage roadmap-step filter', () => {
   beforeEach(() => {
     mockList.mockReset();
     mockList.mockResolvedValue(FORMS);
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   it('scopes the list to the roadmap step and shows the banner', async () => {
@@ -122,5 +140,16 @@ describe('EmployeeDossierPage roadmap-step filter', () => {
     expect(screen.getByTestId('form-c')).toBeInTheDocument();
     expect(screen.getByTestId('form-d')).toBeInTheDocument();
     expect(screen.queryByTestId('roadmap-step-filter-banner')).not.toBeInTheDocument();
+  });
+
+  it('expands and highlights the matching form when ?form targets a required-document key', async () => {
+    renderAt('?form=passport_copy');
+
+    const target = await screen.findByTestId('form-b');
+    expect(target).toHaveAttribute('data-expanded', 'true');
+    expect(target).toHaveAttribute('data-highlighted', 'true');
+    await waitFor(() => {
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
   });
 });

@@ -9,7 +9,7 @@
  * makes newly-triggered forms appear without refresh, plus the overall
  * completion-% header tile and "Build dossier" CTA.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
@@ -54,6 +54,8 @@ export const EmployeeDossierPage: React.FC = () => {
   // [P1-6] When the Roadmap "Documents" chip links here it appends
   // ?roadmap_step=<stepId>; scope the list to that step's forms until cleared.
   const roadmapStep = searchParams.get('roadmap_step');
+  const formDeepLink = searchParams.get('form');
+  const formRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [forms, setForms] = useState<CaseFormSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +147,32 @@ export const EmployeeDossierPage: React.FC = () => {
     () => scopedForms.filter((f) => matchesFilter(f, filter)),
     [scopedForms, filter],
   );
+
+  const targetedFormId = useMemo(() => {
+    if (!formDeepLink) return null;
+    const target = formDeepLink.trim().toLowerCase();
+    const match = forms.find((form) => {
+      const candidates = [
+        form.id,
+        form.template.id,
+        form.template.code,
+        ...form.template.required_documents.map((doc) => doc.key),
+      ];
+      return candidates.some((candidate) => candidate?.trim().toLowerCase() === target);
+    });
+    return match?.id ?? null;
+  }, [formDeepLink, forms]);
+
+  useEffect(() => {
+    if (targetedFormId && filter !== 'all') setFilter('all');
+  }, [filter, targetedFormId]);
+
+  useEffect(() => {
+    if (!targetedFormId || loading) return;
+    window.requestAnimationFrame(() => {
+      formRefs.current[targetedFormId]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [loading, targetedFormId]);
 
   // [P2-08d] Count forms whose official source hasn't been verified within its
   // staleness threshold, so the user is warned at the dossier level before they
@@ -308,7 +336,19 @@ export const EmployeeDossierPage: React.FC = () => {
         ) : (
           <div className="grid gap-3">
             {visible.map((form) => (
-              <CaseFormCard key={form.id} form={form} />
+              <div
+                key={form.id}
+                data-form-id={form.id}
+                ref={(node) => {
+                  formRefs.current[form.id] = node;
+                }}
+              >
+                <CaseFormCard
+                  form={form}
+                  initialExpanded={form.id === targetedFormId}
+                  highlighted={form.id === targetedFormId}
+                />
+              </div>
             ))}
           </div>
         )}

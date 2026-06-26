@@ -99,6 +99,16 @@ describe('CaseFormCard — official source link + roadmap step', () => {
     expect(screen.getByText(/Last verified ·/)).toBeInTheDocument();
   });
 
+  it('does not expose internal form code, version, or update metadata', () => {
+    renderCard(makeForm());
+    fireEvent.click(screen.getByText('D-number application'));
+
+    expect(screen.queryByText('GP-7-04')).not.toBeInTheDocument();
+    expect(screen.queryByText(/v1\.0\.0/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/updated/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Last generated:/i)).not.toBeInTheDocument();
+  });
+
   it('omits both the link and step label when neither is present', () => {
     renderCard(
       makeForm({

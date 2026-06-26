@@ -7,7 +7,7 @@
  * Visual style uses antigravity primitives for consistency with the rest of
  * the new Phase 1 admin/employee surfaces.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { Badge, Card, StalenessBadge, isSourceStale } from '../../../components/antigravity';
@@ -175,13 +175,19 @@ function deadlineChip(deadline: string | null): { tone: string; text: string } |
 
 export interface CaseFormCardProps {
   form: CaseFormSummary;
+  initialExpanded?: boolean;
+  highlighted?: boolean;
 }
 
-export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
-  const [expanded, setExpanded] = useState(false);
+export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpanded = false, highlighted = false }) => {
+  const [expanded, setExpanded] = useState(initialExpanded);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (initialExpanded) setExpanded(true);
+  }, [initialExpanded]);
 
   const canDownloadPdf =
     form.status !== 'not_started' && displayStatus(form) !== 'blocked';
@@ -208,18 +214,18 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
     totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : form.completion_pct;
 
   return (
-    <Card padding="lg" className="hover:shadow-sm transition-shadow">
+    <Card
+      padding="lg"
+      className={`hover:shadow-sm transition-shadow ${highlighted ? 'ring-2 ring-teal-500 ring-offset-2' : ''}`}
+    >
       <Button unstyled
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         className="w-full text-left grid grid-cols-12 items-center gap-3"
       >
-        {/* Left: code badge + name + person */}
+        {/* Left: name + person */}
         <div className="col-span-5 flex items-start gap-2 min-w-0">
-          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            {form.template.code}
-          </span>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-slate-900 truncate">{form.template.name}</div>
             <div className="text-xs text-slate-500 truncate">
@@ -391,11 +397,6 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                     'Download PDF'
                   )}
                 </Button>
-                {form.draft_pdf_url && !isDownloadingPdf && (
-                  <span className="text-[10px] text-slate-400 mt-0.5">
-                    Last generated: {new Date(form.updated_at).toLocaleString()}
-                  </span>
-                )}
               </div>
             ) : null}
             {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL */}
@@ -406,10 +407,6 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
             >
               View original PDF
             </Button>
-            <span className="text-xs text-slate-400 ml-auto">
-              v{form.template.version} · updated{' '}
-              {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}
-            </span>
           </div>
 
           {/* [P1-05c] Supporting documents upload + list (not for ad-hoc forms,
@@ -431,7 +428,6 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
         caseId={form.case_id}
         formId={form.id}
         formName={form.template.name}
-        formCode={form.template.code}
       />
     </Card>
   );

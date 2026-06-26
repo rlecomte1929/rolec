@@ -26,8 +26,8 @@ export interface OriginalPdfDrawerProps {
   formId: string;
   /** Display name shown in the drawer header. */
   formName: string;
-  /** Form code shown as a chip in the drawer header (e.g. "UTL-2011"). */
-  formCode: string;
+  /** Optional form code shown as a chip in admin/internal contexts. */
+  formCode?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ export const OriginalPdfDrawer: React.FC<OriginalPdfDrawerProps> = ({
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = `${formCode}_original.pdf`;
+      anchor.download = `${formCode ? `${formCode}_` : ''}original.pdf`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
@@ -134,9 +134,11 @@ export const OriginalPdfDrawer: React.FC<OriginalPdfDrawerProps> = ({
       >
         {/* ── Header ── */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 shrink-0">
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#0b2b43] text-white tracking-wide">
-            {formCode}
-          </span>
+          {formCode && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#0b2b43] text-white tracking-wide">
+              {formCode}
+            </span>
+          )}
           <span className="flex-1 text-sm font-semibold text-slate-800 truncate">
             {formName}
           </span>

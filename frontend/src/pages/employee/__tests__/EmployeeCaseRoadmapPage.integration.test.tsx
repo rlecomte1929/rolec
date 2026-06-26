@@ -12,8 +12,8 @@
  * custom data hook (not useQuery), so only MemoryRouter (for :caseId) is needed.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { RelocationPlanViewResponseDTO } from '../../../types/relocationPlanView';
 
 // ── Stub AppShell ────────────────────────────────────────────────────────────
@@ -78,7 +78,8 @@ const READY_PLAN: RelocationPlanViewResponseDTO = {
           blocked_by: [],
           depends_on: [],
           instructions: ['Gather your passport and contract.'],
-          required_inputs: [],
+          required_inputs: [{ type: 'document', key: 'passport_copy', label: 'Passport copy', present: false }],
+          cta: { type: 'upload_document', label: 'Upload passport copy' },
           auto_completion_source: 'manual',
           notes_enabled: true,
         },
@@ -93,11 +94,17 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe">{location.pathname}{location.search}</div>;
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/employee/case/c1/roadmap']}>
       <Routes>
         <Route path="/employee/case/:caseId/roadmap" element={<EmployeeCaseRoadmapPage />} />
+        <Route path="/employee/case/:caseId/dossier" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -121,5 +128,17 @@ describe('EmployeeCaseRoadmapPage — roadmap orchestration', () => {
     // The Roadmap stepper step is present (PhaseContextBar).
     expect(screen.getAllByText('Roadmap').length).toBeGreaterThan(0);
     expect(fetchRelocationPlanView).toHaveBeenCalledWith('c1', expect.objectContaining({ role: 'employee' }));
+  });
+
+  it('deep-links upload Start now actions to the matching dossier form', async () => {
+    fetchRelocationPlanView.mockResolvedValue(READY_PLAN);
+    renderPage();
+
+    const buttons = await screen.findAllByRole('button', { name: /start now/i });
+    fireEvent.click(buttons[0]);
+
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent(
+      '/employee/case/c1/dossier?form=passport_copy',
+    );
   });
 });
