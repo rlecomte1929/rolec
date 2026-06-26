@@ -58,8 +58,8 @@ export const AdminSuppliers: React.FC = () => {
 
   // Load categories and countries on mount only: do not load suppliers yet
   useEffect(() => {
-    suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories || [])).catch(() => {});
-    suppliersAPI.getCountries().then((r) => setCountries(r.countries || [])).catch(() => {});
+    suppliersAPI.getCategories().then((r) => r.categories && setCategories((r.categories || []) as string[])).catch(() => {});
+    suppliersAPI.getCountries().then((r) => setCountries((r.countries || []) as string[])).catch(() => {});
   }, []);
 
   const loadSuppliers = useCallback(async () => {
@@ -76,7 +76,7 @@ export const AdminSuppliers: React.FC = () => {
       if (countryFilter) params.country_code = countryFilter;
       if (statusFilter) params.status = statusFilter;
       const res = await suppliersAPI.list(params);
-      setSuppliers(res.suppliers || []);
+      setSuppliers((res.suppliers || []) as Supplier[]);
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err

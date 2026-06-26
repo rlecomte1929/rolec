@@ -10,10 +10,15 @@ export const landingContent = {
     // SITE-1: re-anchored to the infrastructure category (was the 'Mobility AI /
     // EU AI Act–ready' framing, which contradicted the Why/Platform/footer
     // positioning). Primary CTA matches the approved access-page string.
+    // AIQ-1241: cost-reduction hero (Friday Digest #7) — leads on budget
+    // pressure while the subheadline keeps the operating-layer/one-record
+    // substance so it doesn't contradict the rest of the page. No specific
+    // % savings claim (we have no benchmark yet); directional only.
+    // Prior headline (for A/B reference): 'The operating layer for cross-border relocation.'
     eyebrow: 'Global mobility infrastructure',
-    headline: 'The operating layer for cross-border relocation.',
+    headline: 'Cut the cost of every cross-border move.',
     subheadline:
-      'Every case, document, provider, and deadline on one record — visible to HR, actioned by providers, on time for the employee.',
+      'One system for cases, documents, providers, and deadlines — so HR runs relocation on less budget, without dropping a move.',
     brandPromise:
       'The coordination layer across HR, employees, and providers.',
     primaryCta: 'Structure how you run relocation. Start with one case.',
