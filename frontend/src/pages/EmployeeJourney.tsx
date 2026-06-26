@@ -20,29 +20,22 @@ import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentL
 import { statusLabel } from '../lib/statusLabel';
 import { getApiErrorCode } from '../utils/apiDetail';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
-import { getLastVisited } from '../utils/employeeCaseProgress';
 
 /**
- * Resolve where to send the user when they click "Open case" on the
- * dashboard. Honor the last route they visited inside this assignment
- * (so re-entering doesn't force them through the wizard again). Falls
- * back to the case summary page when no last-visited is recorded.
+ * Resolve where to send the user when they click "Open case" on the dashboard.
  *
- * Both `assigned` (fresh assignment from HR, employee hasn't started
- * intake yet) and `awaiting_intake` (employee started intake but hasn't
- * submitted) are pre-intake states whose entry point is the intake wizard.
- *
- * AIQ-976: route pre-intake to the CASE-SCOPED intake (/employee/case/{id}/intake)
- * rather than the bare /employee/intake. The bare route renders the v2
- * EmployeeIntakePage against the *primary* case from EmployeeAssignmentContext,
- * so for a multi-case employee every row opened the same (first) case. The
- * case-scoped route makes EmployeeIntakePage read the clicked case from the URL.
+ * C-04 (AIQ-1247): always route to a STABLE hub, never a mid-flow deep link.
+ * Previously this returned getLastVisited(), which could teleport the user into
+ * an arbitrary sub-step (e.g. /services/estimate). Now: a submitted-or-beyond
+ * case (isIntakeComplete — the same canonical predicate the JourneySpine/roadmap
+ * use) opens the roadmap; a pre-submission case opens the case-scoped intake
+ * wizard (/employee/case/{id}/intake — AIQ-976, so a multi-case employee opens
+ * the clicked case, not the primary one).
  */
 function openCaseHref(assignmentId: string, status?: string | null): string {
-  if (status === 'awaiting_intake' || status === 'assigned') {
-    return `/employee/case/${assignmentId}/intake`;
-  }
-  return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
+  return isIntakeComplete(status)
+    ? `/employee/case/${assignmentId}/roadmap`
+    : `/employee/case/${assignmentId}/intake`;
 }
 
 /** Pattern to detect a case code pasted into the wrong field. */
@@ -641,7 +634,11 @@ export const EmployeeJourney: React.FC = () => {
                 // Do not trust the stored intake_total_steps — historical rows hold a stale 7.
                 const totalSteps = INTAKE_TOTAL_STEPS;
                 const currentStep = row.intake_step ?? 0;
-                const intakeSubmitted = totalSteps > 0 && currentStep >= totalSteps;
+                // C-01a (AIQ-1244): a submitted-or-beyond case is "Submitted" even if
+                // intake_step lags (the AIQ-1243 backend fix syncs it to 5, but the UI
+                // must not contradict the JourneySpine's Done badge in the meantime).
+                const intakeSubmitted =
+                  isIntakeComplete(row.status) || (totalSteps > 0 && currentStep >= totalSteps);
                 const intakeStarted = currentStep > 0 && !intakeSubmitted;
                 return (
                   <li

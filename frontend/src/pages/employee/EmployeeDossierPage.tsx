@@ -169,35 +169,21 @@ export const EmployeeDossierPage: React.FC = () => {
             </p>
           </div>
 
-          {/* [P1-5B] Completion summary + Build dossier CTA */}
-          <div className="flex items-center gap-4">
-            {forms.length > 0 && (
-              <div className="text-right">
-                <div className="text-2xl font-semibold text-slate-900 leading-none">
-                  {overall.pct}%
-                </div>
-                {/* EMP-3: the % is fields filled, distinct from forms ready to submit —
-                    label both so "83% / 0 ready" can't read as a contradiction. */}
-                <div className="text-xs text-slate-500 mt-1">
-                  fields filled · {overall.ready} of {overall.total} form{overall.total === 1 ? '' : 's'} ready to submit
-                </div>
+          {/* [P1-5B] Completion summary. C-02 (AIQ-1245): the disabled "Build dossier"
+              COMING SOON CTA was removed — employees act via the individual form cards
+              (Open form / Download PDF); no placeholder primary CTA. */}
+          {forms.length > 0 && (
+            <div className="text-right">
+              <div className="text-2xl font-semibold text-slate-900 leading-none">
+                {overall.pct}%
               </div>
-            )}
-            {/* EMP-3: surface the "coming soon" gating visibly, not just as a hover title. */}
-            <div className="text-center">
-              <Button unstyled
-                type="button"
-                disabled
-                title="Coming soon — you'll be able to download a complete document package here once your forms are ready."
-                className="px-4 py-2 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
-              >
-                Build dossier
-              </Button>
-              <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                Coming soon
-              </span>
+              {/* EMP-3: the % is fields filled, distinct from forms ready to submit —
+                  label both so "83% / 0 ready" can't read as a contradiction. */}
+              <div className="text-xs text-slate-500 mt-1">
+                fields filled · {overall.ready} of {overall.total} form{overall.total === 1 ? '' : 's'} ready to submit
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         {/* [Validate gate] Soft gate: nudge the employee to validate their
