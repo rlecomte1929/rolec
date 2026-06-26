@@ -24,6 +24,8 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
 import noClickableDiv from './eslint-rules/no-clickable-div.js';
 
 export default tseslint.config(
@@ -33,8 +35,18 @@ export default tseslint.config(
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommendedTypeChecked,
+      // LINT-2 (AIQ-1194): react + react-hooks were never installed, so the 20
+      // exhaustive-deps/no-danger disable comments scattered through the app
+      // targeted rules that did not exist (phantom "rule not found" errors) and
+      // Rules of Hooks were entirely unenforced. jsx-runtime drops the stale
+      // "React must be in scope" rules (the project uses the automatic JSX runtime).
+      react.configs.flat.recommended,
+      react.configs.flat['jsx-runtime'],
       jsxA11y.flatConfigs.recommended,
     ],
+    settings: {
+      react: { version: 'detect' },
+    },
     languageOptions: {
       parserOptions: {
         // Enables type-aware linting (no-floating-promises, no-unsafe-*, etc.).
@@ -50,8 +62,21 @@ export default tseslint.config(
           'no-clickable-div': noClickableDiv,
         },
       },
+      // react-hooks plugin (v7). NOTE: v7's `recommended` also enables the new
+      // React Compiler rule set (react-hooks/set-state-in-effect, purity,
+      // static-components, immutability, refs …) — a large, separate adoption
+      // decision the codebase hasn't made. We deliberately enable only the classic
+      // Rules of Hooks + exhaustive-deps here (the audit's intent + what the 20
+      // phantom disables target); the compiler rules can be turned on later as a
+      // deliberate, scoped follow-up.
+      'react-hooks': reactHooks,
     },
     rules: {
+      // Classic Rules of Hooks — real bugs (conditional hooks, wrong call order).
+      'react-hooks/rules-of-hooks': 'error',
+      // Stale-closure guard — warn (the existing disables target exactly this rule).
+      'react-hooks/exhaustive-deps': 'warn',
+
       /**
        * Prohibit <div onClick={...}> without role + tabIndex + onKeyDown.
        * WCAG 2.1 SC 2.1.1 (Keyboard). Hard accessibility blocker.
