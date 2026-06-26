@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Input } from '../../../components/antigravity/Input';
 import { Card, Button } from '../../../components/antigravity';
@@ -28,11 +29,9 @@ function asWorkingPayload(raw: unknown): PolicyConfigWorkingPayload | null {
 
 export const PolicyWorkspacePage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const [companies, setCompanies] = useState<AdminCompany[]>([]);
+  const queryClient = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const pcw = usePolicyConfigWorkspace({ mode: 'admin', adminCompanyId: selectedCompanyId || undefined });
-  const [data, setData] = useState<AdminPoliciesByCompany | null>(null);
-  const [loading, setLoading] = useState(false);
   const [draftActionLoading, setDraftActionLoading] = useState(false);
   const [publishedOpen, setPublishedOpen] = useState(false);
   const [publishedPayload, setPublishedPayload] = useState<PolicyConfigWorkingPayload | null>(null);
@@ -41,46 +40,33 @@ export const PolicyWorkspacePage: React.FC = () => {
   const [publishEffectiveDate, setPublishEffectiveDate] = useState('');
   const [publishModalError, setPublishModalError] = useState<string | null>(null);
 
-  const loadCompanies = useCallback(async () => {
-    const res = await adminAPI.listCompanies();
-    setCompanies(res.companies);
-  }, []);
+  const companiesQuery = useQuery({
+    queryKey: ['admin', 'companies-list'],
+    queryFn: async () => {
+      const res = await adminAPI.listCompanies();
+      return res.companies;
+    },
+  });
+  const companies: AdminCompany[] = companiesQuery.data ?? [];
 
-  const loadPolicies = useCallback(async (companyId: string) => {
-    if (!companyId.trim()) return;
-    setLoading(true);
-    try {
-      const result = await adminAPI.listAdminPolicies(companyId);
-      setData(result);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCompanies().catch(() => undefined);
-  }, [loadCompanies]);
+  const policiesQuery = useQuery({
+    queryKey: ['admin', 'admin-policies', selectedCompanyId],
+    queryFn: () => adminAPI.listAdminPolicies(selectedCompanyId),
+    enabled: !!selectedCompanyId.trim(),
+  });
+  const data: AdminPoliciesByCompany | null = policiesQuery.data ?? null;
+  const loading = policiesQuery.isLoading;
 
   useEffect(() => {
     const cid = searchParams.get('company_id')?.trim();
     if (cid) setSelectedCompanyId(cid);
   }, [searchParams]);
 
-  useEffect(() => {
-    if (selectedCompanyId) {
-      loadPolicies(selectedCompanyId).catch(() => undefined);
-    } else {
-      setData(null);
-    }
-  }, [selectedCompanyId, loadPolicies]);
-
   const refreshAll = useCallback(() => {
     if (!selectedCompanyId) return;
-    loadPolicies(selectedCompanyId).catch(() => undefined);
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'admin-policies', selectedCompanyId] });
     pcw.load().catch(() => undefined);
-  }, [selectedCompanyId, loadPolicies, pcw.load]);
+  }, [selectedCompanyId, pcw.load, queryClient]);
 
   const createDraftFromPublished = useCallback(async () => {
     if (!selectedCompanyId) return;

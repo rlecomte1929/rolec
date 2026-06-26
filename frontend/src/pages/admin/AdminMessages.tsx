@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { logger } from '../../lib/logger';
@@ -110,107 +111,106 @@ function ThreadRow({
 
 export const AdminMessages: React.FC = () => {
   const navigate = useNavigate();
-  const [threads, setThreads] = useState<Thread[]>([]);
-  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  // `error` is dismissable and folds in read errors below; no mutation writes it.
   const [error, setError] = useState<string | null>(null);
   const [companyFilter, setCompanyFilter] = useState('');
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
-  const [threadDetail, setThreadDetail] = useState<HrThreadDetail | null>(null);
-  const [collabComments, setCollabComments] = useState<Array<{ id: string; body: string; created_at: string; author_display_name?: string }>>([]);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'conversations' | 'tickets'>('conversations');
-  const [supportCases, setSupportCases] = useState<AdminSupportCase[]>([]);
   const [editingTicket, setEditingTicket] = useState<AdminSupportCase | null>(null);
   const [ticketPatchForm, setTicketPatchForm] = useState<{ priority: string; status: string; assignee_id: string; category: string }>({ priority: 'medium', status: 'open', assignee_id: '', category: 'other' });
   const [groupBy, setGroupBy] = useState<GroupBy>('person');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
-  const loadThreads = useCallback(async () => {
-    if (!companyFilter) return;
-    setLoading(true);
-    setError(null);
-    try {
+  const threadsQuery = useQuery({
+    queryKey: ['admin', 'message-threads', companyFilter],
+    queryFn: async (): Promise<Thread[]> => {
       const res = await adminAPI.listMessageThreads({
         company_id: companyFilter,
         limit: 100,
         offset: 0,
       });
-      setThreads(res.threads || []);
-    } catch (err: unknown) {
-      const ex = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+      return res.threads || [];
+    },
+    enabled: activeTab === 'conversations' && !!companyFilter,
+  });
+  const threads: Thread[] = threadsQuery.data ?? [];
+  const loading = threadsQuery.isLoading;
+
+  const companiesQuery = useQuery({
+    queryKey: ['admin', 'companies-list'],
+    queryFn: async () => {
+      const res = await adminAPI.listCompanies();
+      return (res.companies || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name || c.id }));
+    },
+  });
+  const companies: Array<{ id: string; name: string }> = companiesQuery.data ?? [];
+
+  const supportCasesQuery = useQuery({
+    queryKey: ['admin', 'support-cases', companyFilter],
+    queryFn: async () => {
+      const res = await adminAPI.listSupportCases({ company_id: companyFilter || undefined });
+      return res.support_cases || [];
+    },
+    enabled: activeTab === 'tickets',
+  });
+  const supportCases: AdminSupportCase[] = supportCasesQuery.data ?? [];
+  const reloadSupportCases = () => queryClient.invalidateQueries({ queryKey: ['admin', 'support-cases'] });
+
+  const detailQuery = useQuery({
+    queryKey: ['admin', 'thread-detail', selectedThread?.thread_type ?? '', selectedThread?.assignment_id ?? selectedThread?.thread_id ?? ''],
+    queryFn: async (): Promise<{
+      threadDetail: HrThreadDetail | null;
+      collabComments: Array<{ id: string; body: string; created_at: string; author_display_name?: string }>;
+    }> => {
+      const t = selectedThread!;
+      if (t.thread_type === 'hr_employee' && t.assignment_id) {
+        const res = await adminAPI.getHrThreadDetail(t.assignment_id);
+        return { threadDetail: res as HrThreadDetail, collabComments: [] };
+      }
+      if (t.thread_type === 'collaboration') {
+        const [, commentsRes] = await Promise.all([
+          adminCollaborationAPI.getThreadById(t.thread_id),
+          adminCollaborationAPI.getComments(t.thread_id),
+        ]);
+        return {
+          threadDetail: null,
+          collabComments: (commentsRes?.comments || []).map((c: any) => ({
+            id: c.id,
+            body: c.body,
+            created_at: c.created_at,
+            author_display_name: c.author_display_name || c.author_user_id?.slice(0, 8) + '…',
+          })),
+        };
+      }
+      return { threadDetail: null, collabComments: [] };
+    },
+    enabled: !!selectedThread,
+  });
+  const threadDetail: HrThreadDetail | null = detailQuery.data?.threadDetail ?? null;
+  const collabComments = detailQuery.data?.collabComments ?? [];
+  const detailLoading = detailQuery.isLoading;
+
+  // Fold read errors (threads + thread detail) into the dismissable `error`.
+  useEffect(() => {
+    if (threadsQuery.isError) {
+      const ex = threadsQuery.error as { response?: { status?: number; data?: { detail?: string } }; message?: string };
       const detail = ex?.response?.data?.detail;
       const status = ex?.response?.status;
       const msg = typeof detail === 'string' ? detail : ex?.message || 'Failed to load threads';
       setError(status ? `[${status}] ${msg}` : msg);
-      setThreads([]);
-    } finally {
-      setLoading(false);
     }
-  }, [companyFilter]);
-
-  const loadCompanies = useCallback(async () => {
-    try {
-      const res = await adminAPI.listCompanies();
-      setCompanies((res.companies || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name || c.id })));
-    } catch {
-      setCompanies([]);
-    }
-  }, []);
-
-  const loadSupportCases = useCallback(async () => {
-    try {
-      const res = await adminAPI.listSupportCases({
-        company_id: companyFilter || undefined,
-      });
-      setSupportCases(res.support_cases || []);
-    } catch {
-      setSupportCases([]);
-    }
-  }, [companyFilter]);
+  }, [threadsQuery.isError, threadsQuery.error]);
 
   useEffect(() => {
-    if (companyFilter && activeTab === 'conversations') void loadThreads();
-    else if (activeTab === 'conversations') setThreads([]);
-  }, [companyFilter, activeTab, loadThreads]);
+    if (detailQuery.isError) {
+      setError((detailQuery.error)?.message || 'Failed to load thread');
+    }
+  }, [detailQuery.isError, detailQuery.error]);
 
-  useEffect(() => {
-    void loadCompanies();
-  }, [loadCompanies]);
-
-  useEffect(() => {
-    if (activeTab === 'tickets') void loadSupportCases();
-  }, [activeTab, loadSupportCases]);
-
-  const loadThreadDetail = useCallback(async (t: Thread) => {
+  const loadThreadDetail = (t: Thread) => {
     setSelectedThread(t);
-    setThreadDetail(null);
-    setCollabComments([]);
-    setDetailLoading(true);
-    try {
-      if (t.thread_type === 'hr_employee' && t.assignment_id) {
-        const res = await adminAPI.getHrThreadDetail(t.assignment_id);
-        setThreadDetail(res);
-      } else if (t.thread_type === 'collaboration') {
-        const [_thread, commentsRes] = await Promise.all([
-          adminCollaborationAPI.getThreadById(t.thread_id),
-          adminCollaborationAPI.getComments(t.thread_id),
-        ]);
-        void _thread;
-        setThreadDetail(null);
-        setCollabComments((commentsRes?.comments || []).map((c: any) => ({
-          id: c.id,
-          body: c.body,
-          created_at: c.created_at,
-          author_display_name: c.author_display_name || c.author_user_id?.slice(0, 8) + '…',
-        })));
-      }
-    } catch (e) {
-      setError((e as Error)?.message || 'Failed to load thread');
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  };
 
   const formatDate = (s?: string) => (s ? new Date(s).toLocaleString() : '-');
   const formatTimeAgo = (s?: string) => {
@@ -289,7 +289,7 @@ export const AdminMessages: React.FC = () => {
         category: ticketPatchForm.category,
       });
       setEditingTicket(null);
-      void loadSupportCases();
+      void reloadSupportCases();
     } catch (e) {
       logger.error(e);
     }
@@ -393,7 +393,7 @@ export const AdminMessages: React.FC = () => {
                               const note = window.prompt('Internal note:');
                               if (note) {
                                 const reason = window.prompt('Reason for note (required):');
-                                if (reason) adminAPI.addSupportNote(c.id, { note, reason }).then(loadSupportCases).catch(logger.error);
+                                if (reason) adminAPI.addSupportNote(c.id, { note, reason }).then(reloadSupportCases).catch(logger.error);
                               }
                             }}
                           >
@@ -489,7 +489,7 @@ export const AdminMessages: React.FC = () => {
             <Alert variant="error" className="mb-4">
               {error}
               <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" onClick={() => { setError(null); void loadThreads(); }}>Retry</Button>
+                <Button variant="outline" size="sm" onClick={() => { setError(null); void threadsQuery.refetch(); }}>Retry</Button>
                 <Button variant="outline" size="sm" onClick={() => setError(null)}>Dismiss</Button>
               </div>
             </Alert>

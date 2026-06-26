@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
@@ -35,11 +36,7 @@ export const HrAssignmentReview: React.FC = () => {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
-  const [compliance, setCompliance] = useState<ComplianceReport | null>(null);
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [selectedCaseId, setSelectedCaseId] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('timeline');
   const [isSwitchOpen, setIsSwitchOpen] = useState(false);
@@ -48,134 +45,125 @@ export const HrAssignmentReview: React.FC = () => {
   const [messages, setMessages] = useState<CaseMessage[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
   const [messageInput, setMessageInput] = useState('');
-  const [intakeDraft, setIntakeDraft] = useState<CaseDraftDTO | null>(null);
-  const [intakeError, setIntakeError] = useState('');
-  const [intakeLoading, setIntakeLoading] = useState(false);
-  const [hrFeedback, setHrFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [hrFeedbackInput, setHrFeedbackInput] = useState('');
   const [hrFeedbackSending, setHrFeedbackSending] = useState(false);
+  // `hrFeedbackError` is written by the send-feedback mutation; the read error is
+  // folded into `displayedFeedbackError` below.
   const [hrFeedbackError, setHrFeedbackError] = useState('');
 
-  const loadAssignments = async () => {
-    try {
+  const assignmentsQuery = useQuery({
+    queryKey: ['hr', 'assignments'],
+    queryFn: async () => {
       const res = await hrAPI.listAssignments();
-      const data = res.assignments ?? [];
-      setAssignments(data);
-      const paramCaseId = searchParams.get('caseId') || id || localStorage.getItem('relopass_last_assignment_id');
-      if (data.length > 0) {
-        // data.length > 0 guarantees data[0] exists
-        const first = data[0]!;
-        const match = paramCaseId
-          ? data.find((item) => item.id === paramCaseId || item.caseId === paramCaseId)
-          : null;
-        const initial = match ? match.id : paramCaseId;
-        const nextId = match
-          ? match.id
-          : initial && data.some((item) => item.id === initial)
+      return res.assignments ?? [];
+    },
+  });
+  const assignments: AssignmentSummary[] = assignmentsQuery.data ?? [];
+
+  const assignmentQuery = useQuery({
+    queryKey: ['hr', 'assignment', selectedCaseId],
+    queryFn: async () => {
+      const data = await hrAPI.getAssignment(selectedCaseId);
+      localStorage.setItem('relopass_last_assignment_id', data.id);
+      return data;
+    },
+    enabled: !!selectedCaseId,
+  });
+  const assignment: AssignmentDetail | null = assignmentQuery.data ?? null;
+  const compliance: ComplianceReport | null = assignmentQuery.data?.complianceReport ?? null;
+
+  const intakeQuery = useQuery({
+    queryKey: ['hr', 'case-details', assignment?.id],
+    queryFn: async (): Promise<{ draft: CaseDraftDTO | null; errorMsg: string }> => {
+      const { data, error } = await getCaseDetailsByAssignmentId(assignment!.id);
+      if (error) {
+        return {
+          draft: null,
+          errorMsg: error.includes('Case row missing')
+            ? error
+            : 'Assignment not found or not visible under RLS. The employee may not have started the wizard yet.',
+        };
+      }
+      if (data) return { draft: data.case?.draft ?? null, errorMsg: '' };
+      return { draft: null, errorMsg: 'Unable to load intake responses. The employee may not have started the wizard yet.' };
+    },
+    enabled: !!assignment?.id,
+  });
+  const intakeDraft: CaseDraftDTO | null = intakeQuery.data?.draft ?? null;
+  const intakeError = intakeQuery.isError
+    ? 'Assignment not found or not visible under RLS.'
+    : intakeQuery.data?.errorMsg ?? '';
+  const intakeLoading = intakeQuery.isLoading;
+
+  const feedbackQuery = useQuery({
+    queryKey: ['hr', 'feedback', assignment?.id],
+    queryFn: async (): Promise<Array<{ id: string; message: string; created_at: string }>> => {
+      const data = await hrAPI.getFeedback(assignment!.id);
+      return data?.map((f) => ({ id: f.id, message: f.message, created_at: f.created_at })) ?? [];
+    },
+    enabled: !!assignment?.id,
+  });
+  const hrFeedback = feedbackQuery.data ?? [];
+  const feedbackReadError = feedbackQuery.isError
+    ? (feedbackQuery.error instanceof Error ? feedbackQuery.error.message : 'Failed to load feedback')
+    : '';
+  const displayedFeedbackError = hrFeedbackError || feedbackReadError;
+
+  const assignments401 =
+    (assignmentsQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const assignment401 =
+    (assignmentQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const error =
+    assignmentsQuery.isError && !assignments401
+      ? 'Unable to load cases.'
+      : assignmentQuery.isError && !assignment401
+        ? 'Assignment not found or not visible under RLS.'
+        : '';
+  // Original kept isLoading=true until an assignment load resolved; with no case
+  // selected it never flips false.
+  const isLoading = selectedCaseId ? assignmentQuery.isLoading : true;
+
+  // Initial case selection (mirrors the old loadAssignments side effect). Runs
+  // once — guarded on an empty selection so a refetch can't override a manual switch.
+  useEffect(() => {
+    const data = assignmentsQuery.data;
+    if (!data || selectedCaseId) return;
+    const paramCaseId = searchParams.get('caseId') || id || localStorage.getItem('relopass_last_assignment_id');
+    if (data.length > 0) {
+      // data.length > 0 guarantees data[0] exists
+      const first = data[0]!;
+      const match = paramCaseId
+        ? data.find((item) => item.id === paramCaseId || item.caseId === paramCaseId)
+        : null;
+      const initial = match ? match.id : paramCaseId;
+      const nextId = match
+        ? match.id
+        : initial && data.some((item) => item.id === initial)
           ? initial
           : first.id;
-        setSelectedCaseId(nextId);
-        localStorage.setItem('relopass_last_assignment_id', nextId);
-      } else if (paramCaseId) {
-        setSelectedCaseId(paramCaseId);
-      }
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load cases.');
-      }
+      setSelectedCaseId(nextId);
+      localStorage.setItem('relopass_last_assignment_id', nextId);
+    } else if (paramCaseId) {
+      setSelectedCaseId(paramCaseId);
     }
-  };
+  }, [assignmentsQuery.data, selectedCaseId, id, searchParams]);
 
-  const loadAssignment = async (caseId: string) => {
-    if (!caseId) return;
-    setIsLoading(true);
-    setError('');
-    try {
-      const data = await hrAPI.getAssignment(caseId);
-      setAssignment(data);
-      setCompliance(data.complianceReport || null);
-      localStorage.setItem('relopass_last_assignment_id', data.id);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Assignment not found or not visible under RLS.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Preserve the 401 → landing redirect from both reads.
   useEffect(() => {
-    void loadAssignments();
-  }, []);
+    if ((assignmentsQuery.isError && assignments401) || (assignmentQuery.isError && assignment401)) {
+      safeNavigate(navigate, 'landing');
+    }
+  }, [assignmentsQuery.isError, assignments401, assignmentQuery.isError, assignment401, navigate]);
 
   useEffect(() => {
     if (selectedCaseId) {
-      void loadAssignment(selectedCaseId);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('caseId', selectedCaseId);
         return next;
       });
     }
-  }, [selectedCaseId]);
-
-  const loadIntakeDraft = useCallback(async (assignmentId: string) => {
-    setIntakeError('');
-    setIntakeLoading(true);
-    try {
-      const { data, error } = await getCaseDetailsByAssignmentId(assignmentId);
-      if (error) {
-        setIntakeDraft(null);
-        setIntakeError(
-          error.includes('Case row missing')
-            ? error
-            : 'Assignment not found or not visible under RLS. The employee may not have started the wizard yet.'
-        );
-      } else if (data) {
-        setIntakeDraft(data.case?.draft ?? null);
-      } else {
-        setIntakeDraft(null);
-        setIntakeError('Unable to load intake responses. The employee may not have started the wizard yet.');
-      }
-    } catch {
-      setIntakeDraft(null);
-      setIntakeError('Assignment not found or not visible under RLS.');
-    } finally {
-      setIntakeLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (assignment?.id) {
-      void loadIntakeDraft(assignment.id);
-    } else {
-      setIntakeDraft(null);
-      setIntakeError('');
-      setIntakeLoading(false);
-    }
-  }, [assignment?.id, loadIntakeDraft]);
-
-  const loadHrFeedback = useCallback(async (assignmentId: string) => {
-    setHrFeedbackError('');
-    try {
-      const data = await hrAPI.getFeedback(assignmentId);
-      setHrFeedback(data?.map((f) => ({ id: f.id, message: f.message, created_at: f.created_at })) ?? []);
-    } catch (err: unknown) {
-      setHrFeedbackError(err instanceof Error ? err.message : 'Failed to load feedback');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (assignment?.id) {
-      void loadHrFeedback(assignment.id);
-    } else {
-      setHrFeedback([]);
-    }
-  }, [assignment?.id, loadHrFeedback]);
+  }, [selectedCaseId, setSearchParams]);
 
   const handleSendHrFeedback = async () => {
     if (!assignment?.id || !hrFeedbackInput.trim()) return;
@@ -184,7 +172,7 @@ export const HrAssignmentReview: React.FC = () => {
     try {
       await hrAPI.postFeedback(assignment.id, hrFeedbackInput.trim());
       setHrFeedbackInput('');
-      await loadHrFeedback(assignment.id);
+      await queryClient.invalidateQueries({ queryKey: ['hr', 'feedback', assignment.id] });
     } catch (err: unknown) {
       setHrFeedbackError(err instanceof Error ? err.message : 'Failed to send feedback');
     } finally {
@@ -670,8 +658,8 @@ export const HrAssignmentReview: React.FC = () => {
                   rows={3}
                   className="w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
                 />
-                {hrFeedbackError && (
-                  <div className="text-xs text-red-600 mt-2">{hrFeedbackError}</div>
+                {displayedFeedbackError && (
+                  <div className="text-xs text-red-600 mt-2">{displayedFeedbackError}</div>
                 )}
                 <Button
                   onClick={handleSendHrFeedback}

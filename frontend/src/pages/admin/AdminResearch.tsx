@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
@@ -62,53 +63,86 @@ const CORE_URL_SETS: Record<string, Array<{ url: string; domain_area: string }>>
 
 export const AdminResearch: React.FC = () => {
   const role = getAuthItem('relopass_role');
+  const queryClient = useQueryClient();
+  const isAdmin = role === 'ADMIN';
   const [destination, setDestination] = useState('US');
   const [domainArea, setDomainArea] = useState('immigration');
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [docs, setDocs] = useState<KnowledgeDoc[]>([]);
   const [manualUrl, setManualUrl] = useState('');
   const [batchUrls, setBatchUrls] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [health, setHealth] = useState<any>(null);
   const [ingestResults, setIngestResults] = useState<any>(null);
   const [activeDoc, setActiveDoc] = useState<KnowledgeDoc | null>(null);
-  const [entities, setEntities] = useState<RequirementEntity[]>([]);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
-  const [facts, setFacts] = useState<RequirementFact[]>([]);
-  const [criteriaFacts, setCriteriaFacts] = useState<RequirementFact[]>([]);
 
+  const candidatesDocsQuery = useQuery({
+    queryKey: ['admin', 'research-candidates-docs', destination],
+    queryFn: async (): Promise<{ candidates: Candidate[]; docs: KnowledgeDoc[]; fallback: boolean }> => {
+      const [candRes, docRes] = await Promise.all([
+        adminAPI.listResearchCandidates({ destination_country: destination, status: 'pending' }),
+        adminAPI.listKnowledgeDocs({ destination_country: destination }),
+      ]);
+      return { candidates: candRes.candidates || [], docs: docRes.docs || [], fallback: Boolean(docRes.fallback) };
+    },
+    enabled: isAdmin,
+  });
+  const candidates: Candidate[] = candidatesDocsQuery.data?.candidates ?? [];
+  const docs: KnowledgeDoc[] = candidatesDocsQuery.data?.docs ?? [];
+
+  const entitiesQuery = useQuery({
+    queryKey: ['admin', 'requirement-entities', destination],
+    queryFn: async (): Promise<RequirementEntity[]> => {
+      const entRes = await adminAPI.listRequirementEntities({ destination, status: 'pending' });
+      return entRes.entities || [];
+    },
+    enabled: isAdmin,
+  });
+  const entities: RequirementEntity[] = entitiesQuery.data ?? [];
+
+  const criteriaQuery = useQuery({
+    queryKey: ['admin', 'requirement-criteria', destination],
+    queryFn: async (): Promise<RequirementFact[]> => {
+      const critRes = await adminAPI.listRequirementCriteria({ destination, status: 'pending' });
+      return critRes.facts || [];
+    },
+    enabled: isAdmin,
+  });
+  const criteriaFacts: RequirementFact[] = criteriaQuery.data ?? [];
+
+  const healthQuery = useQuery({
+    queryKey: ['admin', 'research-health', destination],
+    queryFn: () => adminAPI.researchHealth({ destination }),
+    enabled: isAdmin,
+  });
+  const health: any = healthQuery.data ?? null;
+
+  const factsQuery = useQuery({
+    queryKey: ['admin', 'requirement-facts', activeEntityId],
+    queryFn: async (): Promise<RequirementFact[]> => {
+      const res = await adminAPI.listRequirementFacts(activeEntityId!, { status: 'pending' });
+      return res.facts || [];
+    },
+    enabled: isAdmin && !!activeEntityId,
+  });
+  const facts: RequirementFact[] = factsQuery.data ?? [];
+
+  // Mutations re-read by invalidating the destination-scoped queries.
   const refresh = async () => {
-    if (role !== 'ADMIN') return;
-    const [candRes, docRes] = await Promise.all([
-      adminAPI.listResearchCandidates({ destination_country: destination, status: 'pending' }),
-      adminAPI.listKnowledgeDocs({ destination_country: destination }),
+    if (!isAdmin) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin', 'research-candidates-docs', destination] }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'requirement-entities', destination] }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'requirement-criteria', destination] }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'research-health', destination] }),
     ]);
-    setCandidates(candRes.candidates || []);
-    setDocs(docRes.docs || []);
-    if (docRes.fallback) {
+  };
+
+  // Surface the "showing all docs" fallback notice the same way the old read did.
+  useEffect(() => {
+    if (candidatesDocsQuery.data?.fallback) {
       setMessage('No destination-specific docs found. Showing all knowledge docs.');
     }
-    const entRes = await adminAPI.listRequirementEntities({ destination, status: 'pending' });
-    setEntities(entRes.entities || []);
-    const critRes = await adminAPI.listRequirementCriteria({ destination, status: 'pending' });
-    setCriteriaFacts(critRes.facts || []);
-    const healthRes = await adminAPI.researchHealth({ destination });
-    setHealth(healthRes);
-  };
-  useEffect(() => {
-    if (!activeEntityId) {
-      setFacts([]);
-      return;
-    }
-    adminAPI.listRequirementFacts(activeEntityId, { status: 'pending' })
-      .then((res) => setFacts(res.facts || []))
-      .catch(() => setFacts([]));
-  }, [activeEntityId]);
-
-  useEffect(() => {
-    refresh().catch(() => undefined);
-  }, [destination]);
+  }, [candidatesDocsQuery.data]);
 
   if (role !== 'ADMIN') {
     return (
@@ -396,7 +430,7 @@ https://www.uscis.gov/..."
                     variant="outline"
                     onClick={async () => {
                       await adminAPI.approveRequirementFacts({ fact_ids: [f.id] });
-                      setFacts(facts.filter((x) => x.id !== f.id));
+                      queryClient.setQueryData(['admin', 'requirement-facts', activeEntityId], (old: RequirementFact[] | undefined) => (old ?? []).filter((x) => x.id !== f.id));
                     }}
                   >
                     Approve
@@ -405,7 +439,7 @@ https://www.uscis.gov/..."
                     variant="outline"
                     onClick={async () => {
                       await adminAPI.rejectRequirementFacts({ fact_ids: [f.id] });
-                      setFacts(facts.filter((x) => x.id !== f.id));
+                      queryClient.setQueryData(['admin', 'requirement-facts', activeEntityId], (old: RequirementFact[] | undefined) => (old ?? []).filter((x) => x.id !== f.id));
                     }}
                   >
                     Reject
@@ -434,7 +468,7 @@ https://www.uscis.gov/..."
                   variant="outline"
                   onClick={async () => {
                     await adminAPI.approveRequirementFacts({ fact_ids: [f.id] });
-                    setCriteriaFacts(criteriaFacts.filter((x) => x.id !== f.id));
+                    queryClient.setQueryData(['admin', 'requirement-criteria', destination], (old: RequirementFact[] | undefined) => (old ?? []).filter((x) => x.id !== f.id));
                   }}
                 >
                   Approve
@@ -443,7 +477,7 @@ https://www.uscis.gov/..."
                   variant="outline"
                   onClick={async () => {
                     await adminAPI.rejectRequirementFacts({ fact_ids: [f.id] });
-                    setCriteriaFacts(criteriaFacts.filter((x) => x.id !== f.id));
+                    queryClient.setQueryData(['admin', 'requirement-criteria', destination], (old: RequirementFact[] | undefined) => (old ?? []).filter((x) => x.id !== f.id));
                   }}
                 >
                   Reject
