@@ -260,10 +260,10 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                 <p className="text-xs font-semibold text-[#374151]">Enter quote details</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-[#64748b] mb-1">
+                    <label htmlFor="prf-amount" className="block text-xs text-[#64748b] mb-1">
                       Amount <span className="text-[#ef4444]">*</span>
                     </label>
-                    <Input unstyled
+                    <Input id="prf-amount" unstyled
                       type="number"
                       min="0"
                       step="0.01"
@@ -274,8 +274,8 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#64748b] mb-1">Currency</label>
-                    <select
+                    <label htmlFor="prf-currency" className="block text-xs text-[#64748b] mb-1">Currency</label>
+                    <select id="prf-currency"
                       value={quoteForm.quote_currency}
                       onChange={(e) => setQuoteForm((f) => ({ ...f, quote_currency: e.target.value }))}
                       className="w-full rounded-lg border border-[#d1d5db] px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
@@ -286,8 +286,8 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-[#64748b] mb-1">Deadline</label>
-                    <Input unstyled
+                    <label htmlFor="prf-deadline" className="block text-xs text-[#64748b] mb-1">Deadline</label>
+                    <Input id="prf-deadline" unstyled
                       type="date"
                       value={quoteForm.quote_deadline}
                       onChange={(v) => setQuoteForm((f) => ({ ...f, quote_deadline: v }))}
@@ -295,8 +295,8 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#64748b] mb-1">Deliverable</label>
-                    <Input unstyled
+                    <label htmlFor="prf-deliverable" className="block text-xs text-[#64748b] mb-1">Deliverable</label>
+                    <Input id="prf-deliverable" unstyled
                       type="text"
                       value={quoteForm.quote_deliverable}
                       onChange={(v) => setQuoteForm((f) => ({ ...f, quote_deliverable: v }))}

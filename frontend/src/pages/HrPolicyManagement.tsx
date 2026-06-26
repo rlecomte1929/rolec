@@ -293,24 +293,24 @@ export const HrPolicyManagement: React.FC = () => {
             <h3 className="font-semibold text-[#0b2b43] mb-4">Policy overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#0b2b43] mb-1">Policy name</label>
-                <Input
+                <label htmlFor="hpm-policy-name" className="block text-sm font-medium text-[#0b2b43] mb-1">Policy name</label>
+                <Input id="hpm-policy-name"
                   value={form.policyName || ''}
                   onChange={(v) => setForm((p) => ({ ...p, policyName: v }))}
                   fullWidth
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#0b2b43] mb-1">Company entity</label>
-                <Input
+                <label htmlFor="hpm-company-entity" className="block text-sm font-medium text-[#0b2b43] mb-1">Company entity</label>
+                <Input id="hpm-company-entity"
                   value={form.companyEntity || ''}
                   onChange={(v) => setForm((p) => ({ ...p, companyEntity: v }))}
                   fullWidth
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#0b2b43] mb-1">Effective date</label>
-                <Input
+                <label htmlFor="hpm-effective-date" className="block text-sm font-medium text-[#0b2b43] mb-1">Effective date</label>
+                <Input id="hpm-effective-date"
                   type="date"
                   value={form.effectiveDate || ''}
                   onChange={(v) => setForm((p) => ({ ...p, effectiveDate: v }))}
@@ -318,7 +318,7 @@ export const HrPolicyManagement: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#0b2b43] mb-1">Assignment types</label>
+                <span className="block text-sm font-medium text-[#0b2b43] mb-1">Assignment types</span>
                 <div className="flex flex-wrap gap-2">
                   {['Long-Term', 'Permanent', 'Short-Term'].map((t) => (
                     <label key={t} className="flex items-center gap-2">

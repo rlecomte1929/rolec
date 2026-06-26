@@ -399,7 +399,7 @@ function RequestCountryModal({
 
           {/* Contract type */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: NAVY, display: 'block', marginBottom: 8 }}>Contract type <span style={{ color: '#ef4444' }}>*</span></label>
+            <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, display: 'block', marginBottom: 8 }}>Contract type <span style={{ color: '#ef4444' }}>*</span></span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {['Permanent hire', 'Secondment', 'Contractor', 'Intra-company transfer', 'Short-term assignment'].map((ct) => (
                 <label key={ct} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${contractType === ct ? T : '#e2e8f0'}`, background: contractType === ct ? TL : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: contractType === ct ? T : '#374151', transition: 'all .14s' }}>
@@ -412,8 +412,8 @@ function RequestCountryModal({
 
           {/* Target start date */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: NAVY, display: 'block', marginBottom: 6 }}>Target start date <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>(optional)</span></label>
-            <Input unstyled
+            <label htmlFor="rpi-target-start-date-optional" style={{ fontSize: 12, fontWeight: 700, color: NAVY, display: 'block', marginBottom: 6 }}>Target start date <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>(optional)</span></label>
+            <Input id="rpi-target-start-date-optional" unstyled
               type="date"
               value={startDate}
               onChange={(v) => setStartDate(v)}
@@ -423,8 +423,8 @@ function RequestCountryModal({
 
           {/* Note for HR */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: NAVY, display: 'block', marginBottom: 6 }}>Note for HR <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>(optional)</span></label>
-            <textarea
+            <label htmlFor="rpi-note-for-hr-optional" style={{ fontSize: 12, fontWeight: 700, color: NAVY, display: 'block', marginBottom: 6 }}>Note for HR <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>(optional)</span></label>
+            <textarea id="rpi-note-for-hr-optional"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}

@@ -232,8 +232,8 @@ export const HrPreferredSuppliers: React.FC = () => {
             <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Add preferred supplier</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#4b5563] mb-1">Supplier</label>
-                <select
+                <label htmlFor="hps-supplier" className="block text-sm font-medium text-[#4b5563] mb-1">Supplier</label>
+                <select id="hps-supplier"
                   value={addSupplierId}
                   onChange={(e) => setAddSupplierId(e.target.value)}
                   className="w-full px-3 py-2 border border-[#e2e8f0] rounded-lg"
@@ -247,8 +247,8 @@ export const HrPreferredSuppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#4b5563] mb-1">Service category</label>
-                <select
+                <label htmlFor="hps-service-category" className="block text-sm font-medium text-[#4b5563] mb-1">Service category</label>
+                <select id="hps-service-category"
                   value={addServiceCategory}
                   onChange={(e) => setAddServiceCategory(e.target.value)}
                   className="w-full px-3 py-2 border border-[#e2e8f0] rounded-lg"
@@ -262,8 +262,8 @@ export const HrPreferredSuppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#4b5563] mb-1">Priority (lower = higher)</label>
-                <Input unstyled
+                <label htmlFor="hps-priority-lower-higher" className="block text-sm font-medium text-[#4b5563] mb-1">Priority (lower = higher)</label>
+                <Input id="hps-priority-lower-higher" unstyled
                   type="number"
                   value={addPriorityRank}
                   onChange={(v) => setAddPriorityRank(parseInt(v, 10) || 0)}
@@ -271,8 +271,8 @@ export const HrPreferredSuppliers: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#4b5563] mb-1">Notes</label>
-                <textarea
+                <label htmlFor="hps-notes" className="block text-sm font-medium text-[#4b5563] mb-1">Notes</label>
+                <textarea id="hps-notes"
                   value={addNotes}
                   onChange={(e) => setAddNotes(e.target.value)}
                   rows={2}
