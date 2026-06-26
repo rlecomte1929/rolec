@@ -5,10 +5,8 @@ import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/
 import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { JourneySpine, isIntakeComplete } from '../features/employee-journey/JourneySpine';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
-import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
@@ -131,23 +129,6 @@ export const EmployeeJourney: React.FC = () => {
     pendingSummaries,
     overviewError,
   } = useEmployeeAssignment();
-  // "Pick up where you left off": the most-recently-updated assignment whose intake
-  // is still INCOMPLETE; if none are incomplete, the most-recently-updated overall
-  // (so a submitted-only employee sees its real completed state, not list[0]).
-  const journeyPick = useMemo(() => {
-    const recency = (r: { updated_at?: string | null; intake_updated_at?: string | null }) =>
-      r.updated_at ?? r.intake_updated_at ?? '';
-    const byRecencyDesc = (
-      a: { updated_at?: string | null; intake_updated_at?: string | null },
-      b: { updated_at?: string | null; intake_updated_at?: string | null },
-    ) => recency(b).localeCompare(recency(a));
-    const incomplete = linkedSummaries.filter((r) => !isIntakeComplete(r.status));
-    return (
-      [...incomplete].sort(byRecencyDesc)[0] ??
-      [...linkedSummaries].sort(byRecencyDesc)[0] ??
-      linkedSummaries[0]
-    );
-  }, [linkedSummaries]);
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
   const [claimEmail, setClaimEmail] = useState(
@@ -597,23 +578,6 @@ export const EmployeeJourney: React.FC = () => {
                 ? 'HR has set up a case for you. Accept it below to get started.'
                 : 'Sign in with the email HR used for your move, or enter the case code HR sent you.'}
           </p>
-          {linkedSummaries.length > 0 && journeyPick ? (
-            <JourneySpine
-              intakeStep={journeyPick.intake_step ?? 0}
-              intakeTotalSteps={INTAKE_TOTAL_STEPS}
-              status={journeyPick.status}
-              onContinueIntake={() => navigate(`/employee/case/${journeyPick.assignment_id}/intake`)}
-              onPreviewBenefits={() => navigate(buildRoute('employeeBenefitsComparison'))}
-              onViewRoadmap={
-                isIntakeComplete(journeyPick.status)
-                  ? () =>
-                      navigate(
-                        buildRoute('employeeCaseRoadmap', { caseId: journeyPick.assignment_id }),
-                      )
-                  : undefined
-              }
-            />
-          ) : null}
         </Card>
       ) : null}
 
