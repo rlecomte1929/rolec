@@ -51,7 +51,7 @@ interface ModuleCardProps {
   title: string;
   subtitle: string;
   metric: string | number | null;
-  rows: ModuleRow[];
+  rows?: ModuleRow[];
   loading?: boolean;
 }
 
@@ -71,16 +71,18 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtit
         {loading ? <Skeleton className="h-6 w-10" /> : <MetricValue value={metric} />}
       </span>
     </div>
-    <div className="space-y-1.5">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">{row.label}</span>
-          <span className="text-xs font-medium text-slate-700">
-            {loading ? <Skeleton className="h-3 w-8" /> : <MetricValue value={row.value} />}
-          </span>
-        </div>
-      ))}
-    </div>
+    {rows && rows.length > 0 && (
+      <div className="space-y-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">{row.label}</span>
+            <span className="text-xs font-medium text-slate-700">
+              {loading ? <Skeleton className="h-3 w-8" /> : <MetricValue value={row.value} />}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
   </Link>
 );
 
@@ -231,7 +233,6 @@ export const AdminOverviewPage: React.FC = () => {
           subtitle="SLA, bottlenecks, reviewer load"
           metric={null}
           loading={loading}
-          rows={[{ label: 'Status', value: 'No aggregate endpoint connected' }]}
         />
         <ModuleCard
           testId="module-workflow-analytics"
@@ -241,7 +242,6 @@ export const AdminOverviewPage: React.FC = () => {
           subtitle="Recommendations, RFQ conversion"
           metric={null}
           loading={loading}
-          rows={[{ label: 'Status', value: 'No aggregate endpoint connected' }]}
         />
         <ModuleCard
           testId="module-resources"
@@ -251,7 +251,6 @@ export const AdminOverviewPage: React.FC = () => {
           subtitle="Guides, requirements, taxonomy"
           metric={null}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open the CMS for live counts' }]}
         />
         <ModuleCard
           testId="module-prospects"
@@ -261,7 +260,6 @@ export const AdminOverviewPage: React.FC = () => {
           subtitle="HR pipeline · ICP-scored"
           metric={null}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open pipeline for live counts' }]}
         />
         <ModuleCard
           testId="module-rag-quality"
@@ -271,7 +269,6 @@ export const AdminOverviewPage: React.FC = () => {
           subtitle="Retrieval & generation health over time"
           metric={null}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open dashboard for live metrics' }]}
         />
       </div>
 
