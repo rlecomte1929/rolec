@@ -40,7 +40,7 @@ export function InferredOnboardingPanel({
 
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       try {
         const data = await hrAPI.getInferredOnboardingConfig();
         if (!active) return;
