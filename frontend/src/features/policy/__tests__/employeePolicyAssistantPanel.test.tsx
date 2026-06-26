@@ -108,22 +108,21 @@ describe('EmployeePolicyAssistantPanel', () => {
     await waitFor(() => expect(ta).toHaveFocus());
   });
 
-  it('shows inline hint when Ask is clicked with an empty question', async () => {
-    // The panel sets the empty hint, then (via setTimeout(0)) focuses the
-    // textarea, whose onFocus immediately clears the hint again. fireEvent
-    // asserted before that deferred focus ran; user-event's async flush lets
-    // it run and wipe the hint. No-op the textarea focus for this test so the
-    // hint persists, preserving the original assertion (and the API guard).
+  it('shows inline hint on empty Ask and it PERSISTS through the auto-focus', async () => {
+    // Regression guard: empty-Ask sets the hint AND auto-focuses the textarea
+    // (setTimeout(0)). The hint must survive that programmatic focus — a previous
+    // onFocus-clear wiped it ~instantly so the user never saw it. We deliberately
+    // do NOT mock focus here: with real focus running, the hint must still be
+    // visible (and no query fired).
     const user = userEvent.setup();
-    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(() => {});
-    try {
-      render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-      await user.click(screen.getByRole('button', { name: /^ask$/i }));
-      expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).toBeInTheDocument();
-      expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
-    } finally {
-      focusSpy.mockRestore();
-    }
+    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+    expect(await screen.findByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).toBeInTheDocument();
+    expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
+
+    // ...and it clears once the user actually types (the onChange path).
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'x');
+    expect(screen.queryByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).not.toBeInTheDocument();
   });
 
   it('shows response region label and empty placeholder before first answer', () => {
