@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { AppShell } from '../components/AppShell';
@@ -42,10 +43,7 @@ const statusBadge = (status?: AssignmentStatus) => {
 export const HrCaseSummary: React.FC = () => {
   const { caseId } = useParams();
   const navigate = useNavigate();
-  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
-  const [draftCase, setDraftCase] = useState<{ id: string; status: 'draft'; created_at: string | null } | null>(null);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [isDecisionOpen, setIsDecisionOpen] = useState(false);
   const [decisionNotes, setDecisionNotes] = useState('');
@@ -64,57 +62,73 @@ export const HrCaseSummary: React.FC = () => {
     'Assignment / Context',
   ];
 
-  const loadAssignment = async () => {
-    if (!caseId) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError('');
-    setDraftCase(null);
-    try {
+  type CaseSummaryData = {
+    assignment: AssignmentDetail | null;
+    draftCase: { id: string; status: 'draft'; created_at: string | null } | null;
+  };
+
+  const caseQuery = useQuery<CaseSummaryData>({
+    queryKey: ['hr', 'case-summary', caseId],
+    enabled: !!caseId,
+    // The hand-rolled read never retried; the draft fallback below is handled
+    // inside the queryFn, so don't let the shared 5xx retry policy re-fire.
+    retry: false,
+    queryFn: async (): Promise<CaseSummaryData> => {
       // Use a short timeout so draft cases surface quickly instead of waiting
       // the full 12 s default — if no assignment exists the server 404s fast,
       // but network hiccups shouldn't leave users on a blank loading screen.
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 8000);
-      const data = await hrAPI
-        .getAssignment(caseId, { signal: ac.signal })
-        .finally(() => clearTimeout(timer));
-      setAssignment(data);
-      localStorage.setItem('relopass_last_assignment_id', data.id);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-        return;
-      }
-      // B10 fix: try the draft-case fallback for ANY non-auth error, not just
-      // 404. A 5xx or network timeout on the assignment lookup should still
-      // reveal the draft card when the underlying case exists.
-      const isAuthError =
-        err.response?.status === 401 || err.response?.status === 403;
-      if (!isAuthError) {
-        try {
-          const draft = await hrAPI.getDraftCase(caseId);
-          setDraftCase(draft);
-        } catch {
-          setError(
-            err.response?.status === 404
-              ? 'Case not found or not visible.'
-              : 'Unable to load case. Please try again.',
-          );
+      try {
+        const data = await hrAPI
+          .getAssignment(caseId as string, { signal: ac.signal })
+          .finally(() => clearTimeout(timer));
+        localStorage.setItem('relopass_last_assignment_id', data.id);
+        return { assignment: data, draftCase: null };
+      } catch (err: any) {
+        if (err.response?.status === 401) throw err; // handled by the 401 effect
+        // B10 fix: try the draft-case fallback for ANY non-auth error, not just
+        // 404. A 5xx or network timeout on the assignment lookup should still
+        // reveal the draft card when the underlying case exists.
+        const isAuthError =
+          err.response?.status === 401 || err.response?.status === 403;
+        if (!isAuthError) {
+          try {
+            const draft = await hrAPI.getDraftCase(caseId as string);
+            return { assignment: null, draftCase: draft };
+          } catch {
+            throw new Error(
+              err.response?.status === 404
+                ? 'Case not found or not visible.'
+                : 'Unable to load case. Please try again.',
+            );
+          }
         }
-      } else {
-        setError('Unable to load case. Please try again.');
+        throw new Error('Unable to load case. Please try again.');
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+  });
 
+  const assignment: AssignmentDetail | null = caseQuery.data?.assignment ?? null;
+  const draftCase: { id: string; status: 'draft'; created_at: string | null } | null =
+    caseQuery.data?.draftCase ?? null;
+  const isLoading = caseQuery.isLoading;
+
+  // Preserve the 401 → landing redirect from the read.
+  const readStatus =
+    (caseQuery.error as { response?: { status?: number } } | null)?.response?.status;
   useEffect(() => {
-    void loadAssignment();
-  }, [caseId]);
+    if (caseQuery.isError && readStatus === 401) safeNavigate(navigate, 'landing');
+  }, [caseQuery.isError, readStatus, navigate]);
+
+  // `error` is also written by the case mutations below; fold the read error in.
+  const readError =
+    caseQuery.isError && readStatus !== 401
+      ? caseQuery.error instanceof Error
+        ? caseQuery.error.message
+        : 'Unable to load case. Please try again.'
+      : '';
+  const displayedError = error || readError;
 
   const handleRunCompliance = async () => {
     if (!assignment?.id) return;
@@ -122,7 +136,7 @@ export const HrCaseSummary: React.FC = () => {
     setIsRunning(true);
     try {
       await hrAPI.runCompliance(assignment.id);
-      await loadAssignment();
+      await caseQuery.refetch();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to run compliance checks.');
     } finally {
@@ -139,7 +153,7 @@ export const HrCaseSummary: React.FC = () => {
       setIsDecisionOpen(false);
       setDecisionNotes('');
       setRequestedSections([]);
-      await loadAssignment();
+      await caseQuery.refetch();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to approve case.');
     } finally {
@@ -163,7 +177,7 @@ export const HrCaseSummary: React.FC = () => {
       setIsDecisionOpen(false);
       setDecisionNotes('');
       setRequestedSections([]);
-      await loadAssignment();
+      await caseQuery.refetch();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to request changes.');
     } finally {
@@ -192,7 +206,7 @@ export const HrCaseSummary: React.FC = () => {
     setIsReopenOpen(false);
     setReopenNote('');
     setReopenSuccess('Reopened for employee edits.');
-    await loadAssignment();
+    await caseQuery.refetch();
   };
 
   const essentials = useMemo(
@@ -236,9 +250,9 @@ export const HrCaseSummary: React.FC = () => {
         <span aria-hidden="true" className="text-[#94a3b8]"> / </span>
         <span className="text-[#475569]" aria-current="page">{headerName}</span>
       </nav>
-      {error && (
+      {displayedError && (
         <Alert variant="error">
-          {error}
+          {displayedError}
           {import.meta.env.DEV && caseId && (
             <div className="mt-2 text-xs font-mono text-[#6b7280]">assignmentId/caseId: {caseId}</div>
           )}

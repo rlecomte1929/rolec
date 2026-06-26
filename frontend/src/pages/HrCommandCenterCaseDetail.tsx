@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
 import { Card, Button } from '../components/antigravity';
@@ -50,35 +51,53 @@ function corridorLabel(destCountry?: string): string {
   return dest ? `Relocating to ${dest}` : 'Corridor not set';
 }
 
+type CaseDetail = {
+  id: string;
+  employeeIdentifier: string;
+  destCountry?: string;
+  status: string;
+  riskStatus: string;
+  budgetLimit?: number;
+  budgetEstimated?: number;
+  expectedStartDate?: string;
+  tasksTotal: number;
+  tasksDone: number;
+  tasksOverdue: number;
+  phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>;
+  events: Array<{ event_type: string; description?: string; created_at: string }>;
+};
+
 export const HrCommandCenterCaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const role = getAuthItem('relopass_role');
   useEffect(() => {
     if (role && role !== 'HR' && role !== 'ADMIN') {
       safeNavigate(navigate, 'landing');
     }
   }, [role, navigate]);
-  const [detail, setDetail] = useState<{
-    id: string;
-    employeeIdentifier: string;
-    destCountry?: string;
-    status: string;
-    riskStatus: string;
-    budgetLimit?: number;
-    budgetEstimated?: number;
-    expectedStartDate?: string;
-    tasksTotal: number;
-    tasksDone: number;
-    tasksOverdue: number;
-    phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>;
-    events: Array<{ event_type: string; description?: string; created_at: string }>;
-  } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const detailQuery = useQuery({
+    queryKey: ['hr', 'cc-case-detail', id],
+    enabled: !!id,
+    queryFn: () => hrAPI.getCommandCenterCaseDetail(id as string),
+  });
+  const detail: CaseDetail | null = detailQuery.data ?? null;
+  const isLoading = detailQuery.isLoading;
+
+  // Preserve the 401 → landing redirect from the detail read.
+  useEffect(() => {
+    const status = (detailQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    if (detailQuery.isError && status === 401) safeNavigate(navigate, 'landing');
+  }, [detailQuery.isError, detailQuery.error, navigate]);
 
   // Quote requests for this case
-  const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
+  const quoteRequestsQuery = useQuery({
+    queryKey: ['hr', 'cc-quote-requests', id],
+    enabled: !!id,
+    queryFn: () => hrAPI.getQuoteRequests({ case_id: id as string }).then((res) => res.quote_requests),
+  });
+  const quoteRequests: QuoteRequest[] = quoteRequestsQuery.data ?? [];
   const [updatingQrId, setUpdatingQrId] = useState<string | null>(null);
 
   // Vendor browse panel + RFQ modal
@@ -98,18 +117,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   const [reassignSuccessMsg, setReassignSuccessMsg] = useState('');
   const [rfqListKey, setRfqListKey] = useState(0);
 
-  const loadQuoteRequests = useCallback(() => {
-    if (!id) return;
-    hrAPI
-      .getQuoteRequests({ case_id: id })
-      .then((res) => setQuoteRequests(res.quote_requests))
-      .catch(() => setQuoteRequests([]));
-  }, [id]);
-
-  useEffect(() => {
-    loadQuoteRequests();
-  }, [loadQuoteRequests]);
-
   const handleQuoteStatusUpdate = async (
     qrId: string,
     status: 'acknowledged' | 'fulfilled'
@@ -117,26 +124,13 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
     setUpdatingQrId(qrId);
     try {
       await hrAPI.updateQuoteRequestStatus(qrId, status);
-      loadQuoteRequests();
+      await quoteRequestsQuery.refetch();
     } catch {
       // silently fail — HR can retry
     } finally {
       setUpdatingQrId(null);
     }
   };
-
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    hrAPI.getCommandCenterCaseDetail(id)
-      .then((d) => { if (!cancelled) setDetail(d); })
-      .catch((err: { response?: { status?: number } }) => {
-        if (!cancelled && err?.response?.status === 401) safeNavigate(navigate, 'landing');
-        if (!cancelled) setDetail(null);
-      })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [id, navigate, location.key]);
 
   const budgetStatus = (): 'Within' | 'Approaching' | 'Exceeded' | null => {
     if (!detail?.budgetLimit || detail.budgetEstimated == null) return null;
@@ -540,7 +534,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         onSuccess={() => {
           setReassignOpen(false);
           setReassignSuccessMsg('Case reassigned — the new owner now sees it in their command center.');
-          if (id) hrAPI.getCommandCenterCaseDetail(id).then(setDetail).catch(() => {});
+          void detailQuery.refetch();
         }}
       />
     </AppShell>
