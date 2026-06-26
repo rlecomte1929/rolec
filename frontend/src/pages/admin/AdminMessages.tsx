@@ -305,8 +305,8 @@ export const AdminMessages: React.FC = () => {
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-4">
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Company</label>
-            <select
+            <label htmlFor="am-company" className="block text-sm font-medium text-[#374151] mb-1">Company</label>
+            <select id="am-company"
               value={companyFilter}
               onChange={(e) => setCompanyFilter(e.target.value)}
               className="border border-[#d1d5db] rounded px-3 py-2 text-sm min-w-[200px]"
@@ -429,8 +429,8 @@ export const AdminMessages: React.FC = () => {
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Update ticket</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#374151] mb-1">Priority</label>
-                <select
+                <label htmlFor="am-priority" className="block text-sm font-medium text-[#374151] mb-1">Priority</label>
+                <select id="am-priority"
                   value={ticketPatchForm.priority}
                   onChange={(e) => setTicketPatchForm((f) => ({ ...f, priority: e.target.value }))}
                   className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
@@ -441,8 +441,8 @@ export const AdminMessages: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#374151] mb-1">Status</label>
-                <select
+                <label htmlFor="am-status" className="block text-sm font-medium text-[#374151] mb-1">Status</label>
+                <select id="am-status"
                   value={ticketPatchForm.status}
                   onChange={(e) => setTicketPatchForm((f) => ({ ...f, status: e.target.value }))}
                   className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
@@ -453,8 +453,8 @@ export const AdminMessages: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#374151] mb-1">Category</label>
-                <select
+                <label htmlFor="am-category" className="block text-sm font-medium text-[#374151] mb-1">Category</label>
+                <select id="am-category"
                   value={ticketPatchForm.category}
                   onChange={(e) => setTicketPatchForm((f) => ({ ...f, category: e.target.value }))}
                   className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
@@ -465,8 +465,8 @@ export const AdminMessages: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#374151] mb-1">Assignee (profile ID)</label>
-                <Input unstyled
+                <label htmlFor="am-assignee-profile-id" className="block text-sm font-medium text-[#374151] mb-1">Assignee (profile ID)</label>
+                <Input id="am-assignee-profile-id" unstyled
                   type="text"
                   value={ticketPatchForm.assignee_id}
                   onChange={(v) => setTicketPatchForm((f) => ({ ...f, assignee_id: v }))}
@@ -501,8 +501,8 @@ export const AdminMessages: React.FC = () => {
                 <h2 className="text-lg font-semibold text-[#0b2b43]">Thread list</h2>
                 {companyFilter && threads.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="text-sm text-[#6b7280]">Group by</label>
-                    <select
+                    <label htmlFor="am-group-by" className="text-sm text-[#6b7280]">Group by</label>
+                    <select id="am-group-by"
                       value={groupBy}
                       onChange={(e) => setGroupBy(e.target.value as GroupBy)}
                       className="border border-[#d1d5db] rounded px-2 py-1 text-sm"
