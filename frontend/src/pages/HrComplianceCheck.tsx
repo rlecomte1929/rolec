@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { AppShell } from '../components/AppShell';
@@ -6,7 +7,6 @@ import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravi
 import { hrAPI } from '../api/client';
 import type {
   AssignmentDetail,
-  AssignmentSummary,
   ComplianceCaseReport,
   ComplianceCheckItem,
   PolicyResponse,
@@ -49,13 +49,11 @@ export const HrComplianceCheck: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { selectedCaseId } = useSelectedCase();
+  const queryClient = useQueryClient();
 
-  const [_assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
-  const [policy, setPolicy] = useState<PolicyResponse | null>(null);
-  const [report, setReport] = useState<ComplianceCaseReport | null>(null);
+  // `error` is also written by the compliance mutations, so keep it local and
+  // fold the read errors into what we render.
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   /** Re-run compliance API in flight. */
   const [complianceRunPending, setComplianceRunPending] = useState(false);
   /** Single in-flight compliance mutation: `exception:${checkId}` or `${checkId}|${actionType}`. */
@@ -66,59 +64,69 @@ export const HrComplianceCheck: React.FC = () => {
 
   const caseId = id || searchParams.get('caseId') || selectedCaseId || '';
 
-  const loadAssignments = async () => {
-    try {
+  const assignmentsQuery = useQuery({
+    queryKey: ['hr', 'assignments'],
+    queryFn: async () => {
       const res = await hrAPI.listAssignments();
-      const data = res.assignments ?? [];
-      setAssignments(data);
-      if (!caseId && data.length > 0) {
-        const first = data[0];
-        if (first) {
-          const nextId = first.id;
-          localStorage.setItem('relopass_last_assignment_id', nextId);
-          setSearchParams({ caseId: nextId });
-        }
-      }
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load assignments.');
-      }
-    }
-  };
+      return res.assignments ?? [];
+    },
+  });
 
-  const loadCompliance = async (selectedId: string) => {
-    if (!selectedId) return;
-    setIsLoading(true);
-    try {
+  const complianceQuery = useQuery({
+    queryKey: ['hr', 'case-compliance', caseId],
+    queryFn: async () => {
       const [assignmentData, policyData, complianceData] = await Promise.all([
-        hrAPI.getAssignment(selectedId),
-        hrAPI.getPolicy(selectedId),
-        hrAPI.getCaseCompliance(selectedId),
+        hrAPI.getAssignment(caseId),
+        hrAPI.getPolicy(caseId),
+        hrAPI.getCaseCompliance(caseId),
       ]);
-      setAssignment(assignmentData);
-      setPolicy(policyData);
-      setReport(complianceData);
-      localStorage.setItem('relopass_last_assignment_id', selectedId);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load compliance data.');
+      localStorage.setItem('relopass_last_assignment_id', caseId);
+      return { assignment: assignmentData, policy: policyData, report: complianceData };
+    },
+    enabled: !!caseId,
+  });
+
+  const assignment: AssignmentDetail | null = complianceQuery.data?.assignment ?? null;
+  const policy: PolicyResponse | null = complianceQuery.data?.policy ?? null;
+  const report: ComplianceCaseReport | null = complianceQuery.data?.report ?? null;
+
+  // Original kept isLoading=true until a compliance load resolved; with no case
+  // selected it never flips false.
+  const isLoading = caseId ? complianceQuery.isLoading : true;
+
+  const assignments401 =
+    (assignmentsQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const compliance401 =
+    (complianceQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const readError =
+    assignmentsQuery.isError && !assignments401
+      ? 'Unable to load assignments.'
+      : complianceQuery.isError && !compliance401
+        ? 'Unable to load compliance data.'
+        : '';
+  const displayedError = error || readError;
+
+  // Auto-select the first assignment when no case is in scope (mirrors the old
+  // loadAssignments side effect).
+  useEffect(() => {
+    const data = assignmentsQuery.data;
+    if (!data) return;
+    if (!caseId && data.length > 0) {
+      const first = data[0];
+      if (first) {
+        const nextId = first.id;
+        localStorage.setItem('relopass_last_assignment_id', nextId);
+        setSearchParams({ caseId: nextId });
       }
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [assignmentsQuery.data, caseId, setSearchParams]);
 
+  // Preserve the 401 → landing redirect from both reads.
   useEffect(() => {
-    loadAssignments();
-  }, []);
-
-  useEffect(() => {
-    if (caseId) loadCompliance(caseId);
-  }, [caseId]);
+    if ((assignmentsQuery.isError && assignments401) || (complianceQuery.isError && compliance401)) {
+      safeNavigate(navigate, 'landing');
+    }
+  }, [assignmentsQuery.isError, assignments401, complianceQuery.isError, compliance401, navigate]);
 
   const complianceMutationsBusy = complianceRunPending || complianceMutationKey !== null;
 
@@ -128,7 +136,11 @@ export const HrComplianceCheck: React.FC = () => {
     setComplianceRunPending(true);
     try {
       const complianceData = await hrAPI.runCaseCompliance(caseId);
-      setReport(complianceData);
+      queryClient.setQueryData(
+        ['hr', 'case-compliance', caseId],
+        (old: { assignment: AssignmentDetail; policy: PolicyResponse; report: ComplianceCaseReport } | undefined) =>
+          old ? { ...old, report: complianceData } : old,
+      );
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to run compliance.');
     } finally {
@@ -165,7 +177,7 @@ export const HrComplianceCheck: React.FC = () => {
         category,
         reason: 'Auto-requested from Compliance Check.',
       });
-      await loadCompliance(caseId);
+      await queryClient.invalidateQueries({ queryKey: ['hr', 'case-compliance', caseId] });
     } catch (err: any) {
       setError(
         typeof err.response?.data?.detail === 'string'
@@ -237,7 +249,7 @@ export const HrComplianceCheck: React.FC = () => {
 
   return (
     <AppShell title="Compliance" subtitle={`${employeeName}: requirements check`}>
-      {error && <Alert variant="error">{error}</Alert>}
+      {displayedError && <Alert variant="error">{displayedError}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading compliance checks...</div>}
 
       {!isLoading && !caseId && (

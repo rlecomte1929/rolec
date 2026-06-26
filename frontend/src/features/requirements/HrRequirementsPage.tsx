@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card, Badge } from '../../components/antigravity';
@@ -71,25 +71,22 @@ export function HrRequirementsPage() {
 
   // Page-level fetch powers the summary bar + category health. The Immigration
   // panel still does its own detail fetch; this is a light counts-only read.
-  const [imm, setImm] = useState<{ covered: boolean; requirements: unknown[]; risk_flags: { severity: string }[] } | null>(null);
-  const [exceptions, setExceptions] = useState<ExceptionRequest[]>([]);
+  const immQuery = useQuery({
+    queryKey: ['hr', 'immigration-requirements', caseId],
+    queryFn: () => hrAPI.getImmigrationRequirements(caseId),
+    enabled: !!caseId,
+  });
+  const imm: { covered: boolean; requirements: unknown[]; risk_flags: { severity: string }[] } | null =
+    immQuery.data
+      ? { covered: immQuery.data.covered, requirements: immQuery.data.requirements ?? [], risk_flags: immQuery.data.risk_flags ?? [] }
+      : null;
 
-  useEffect(() => {
-    if (!caseId) return;
-    let cancelled = false;
-    void Promise.allSettled([
-      hrAPI.getImmigrationRequirements(caseId),
-      listExceptionRequestsForCase(caseId),
-    ]).then(([immRes, excRes]) => {
-      if (cancelled) return;
-      if (immRes.status === 'fulfilled') {
-        const v = immRes.value;
-        setImm({ covered: v.covered, requirements: v.requirements ?? [], risk_flags: v.risk_flags ?? [] });
-      }
-      if (excRes.status === 'fulfilled') setExceptions(excRes.value);
-    });
-    return () => { cancelled = true; };
-  }, [caseId]);
+  const exceptionsQuery = useQuery({
+    queryKey: ['hr', 'exception-requests', caseId],
+    queryFn: () => listExceptionRequestsForCase(caseId),
+    enabled: !!caseId,
+  });
+  const exceptions: ExceptionRequest[] = exceptionsQuery.data ?? [];
 
   if (!caseId) {
     return (

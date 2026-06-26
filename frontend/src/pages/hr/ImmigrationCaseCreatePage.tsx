@@ -5,7 +5,8 @@
  * Route: /hr/immigration/new
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { AppShell } from '../../components/AppShell';
@@ -70,8 +71,6 @@ const SelectWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 export const ImmigrationCaseCreatePage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
@@ -88,21 +87,18 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
 
   // ── Load active assignments ─────────────────────────────────────────────
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { assignments: list } = await hrAPI.listAssignments({ limit: 100 });
-        if (!cancelled) setAssignments(list);
-      } catch {
-        if (!cancelled) setError('Failed to load cases. Please refresh.');
-      } finally {
-        if (!cancelled) setLoadingAssignments(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, []);
+  const assignmentsQuery = useQuery({
+    queryKey: ['hr', 'assignments', { limit: 100 }],
+    queryFn: async () => {
+      const { assignments: list } = await hrAPI.listAssignments({ limit: 100 });
+      return list;
+    },
+  });
+  const assignments: AssignmentSummary[] = assignmentsQuery.data ?? [];
+  const loadingAssignments = assignmentsQuery.isLoading;
+  // `error` is also written by the submit handler, so keep the local state and
+  // fold the read error into what we render.
+  const displayedError = error || (assignmentsQuery.isError ? 'Failed to load cases. Please refresh.' : null);
 
   // ── Handle case selection — auto-fill corridor ──────────────────────────
 
@@ -198,12 +194,12 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
           Create a permit tracking record for an employee relocation.
         </p>
 
-        {error && (
+        {displayedError && (
           <div
             role="alert"
             className="mb-6 rounded-lg bg-[#450a0a] border border-[#7f1d1d] text-[#fca5a5] px-4 py-3 text-sm"
           >
-            {error}
+            {displayedError}
           </div>
         )}
 
