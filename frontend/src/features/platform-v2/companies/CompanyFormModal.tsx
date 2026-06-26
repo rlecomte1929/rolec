@@ -164,12 +164,13 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
-      <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 className="text-base font-semibold text-slate-900">
             {mode === 'create' ? 'Add tenant' : `Edit ${initial?.name ?? 'company'}`}
@@ -196,7 +197,6 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
               value={form.name}
               onChange={(v) => setField('name', v)}
               placeholder="Company name"
-              autoFocus
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </Field>
