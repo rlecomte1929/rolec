@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card } from '../components/antigravity';
@@ -20,33 +21,29 @@ type CoverageItem = {
 export const HrAssignmentPackageReview: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
-  const [compliance, setCompliance] = useState<ComplianceReport | null>(null);
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
 
-  const loadAssignment = async () => {
-    if (!id) return;
-    setIsLoading(true);
-    try {
-      const data = await hrAPI.getAssignment(id);
-      setAssignment(data);
-      setCompliance(data.complianceReport || null);
+  const assignmentQuery = useQuery({
+    queryKey: ['hr', 'assignment', id],
+    queryFn: async () => {
+      const data = await hrAPI.getAssignment(id as string);
       localStorage.setItem('relopass_last_assignment_id', data.id);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load package review.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const assignment: AssignmentDetail | null = assignmentQuery.data ?? null;
+  const compliance: ComplianceReport | null = assignment?.complianceReport ?? null;
+  // Preserve original: with no id the page stays in its loading state.
+  const isLoading = !id || assignmentQuery.isLoading;
+  const is401 = (assignmentQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const error = assignmentQuery.isError && !is401 ? 'Unable to load package review.' : '';
 
   useEffect(() => {
-    loadAssignment();
-  }, [id]);
+    if (assignmentQuery.isError && is401) {
+      safeNavigate(navigate, 'landing');
+    }
+  }, [assignmentQuery.isError, is401, navigate]);
 
   const profile = assignment?.profile;
   const fullName = profile?.primaryApplicant?.fullName || assignment?.employeeIdentifier || 'Employee';

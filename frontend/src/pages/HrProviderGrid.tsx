@@ -2,35 +2,27 @@
  * HrProviderGrid — Provider × Case status matrix for HR (AIQ-14).
  * Fetches the grid from the backend and renders ProviderStatusGrid.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AppShell } from '../components/AppShell';
 import { ProviderStatusGrid } from '../components/providers/ProviderStatusGrid';
 import { hrAPI } from '../api/client';
 import type { ProviderGridRow } from '../api/client';
 
 export const HrProviderGrid: React.FC = () => {
-  const [rows, setRows] = useState<ProviderGridRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const gridQuery = useQuery({
+    queryKey: ['hr', 'provider-status-grid'],
+    queryFn: () => hrAPI.getProviderStatusGrid(),
+  });
 
-  const fetchGrid = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await hrAPI.getProviderStatusGrid();
-      setRows(data.rows);
-      setLastRefreshed(new Date());
-    } catch {
-      setError('Failed to load provider grid. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchGrid();
-  }, [fetchGrid]);
+  const rows: ProviderGridRow[] = gridQuery.data?.rows ?? [];
+  const loading = gridQuery.isLoading;
+  const lastRefreshed: Date | null = gridQuery.dataUpdatedAt
+    ? new Date(gridQuery.dataUpdatedAt)
+    : null;
+  const error = gridQuery.isError
+    ? 'Failed to load provider grid. Please try again.'
+    : null;
 
   return (
     <AppShell>
@@ -52,7 +44,7 @@ export const HrProviderGrid: React.FC = () => {
           rows={rows}
           loading={loading}
           lastRefreshed={lastRefreshed}
-          onRefresh={fetchGrid}
+          onRefresh={() => gridQuery.refetch()}
         />
       </div>
     </AppShell>

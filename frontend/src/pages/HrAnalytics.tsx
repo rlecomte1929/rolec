@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AppShell } from '../components/AppShell';
 import { Card } from '../components/antigravity';
 import { hrAPI } from '../api/client';
@@ -284,33 +285,17 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
 // ---------------------------------------------------------------------------
 
 export const HrAnalytics: React.FC = () => {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const acRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const ac = new AbortController();
-    acRef.current = ac;
-
-    (async () => {
-      try {
-        setLoading(true);
-        const result = await hrAPI.getAnalytics();
-        if (!ac.signal.aborted) setData(result);
-      } catch (err: unknown) {
-        if (!ac.signal.aborted) {
-          setError(
-            err instanceof Error ? err.message : 'Failed to load analytics data.',
-          );
-        }
-      } finally {
-        if (!ac.signal.aborted) setLoading(false);
-      }
-    })();
-
-    return () => ac.abort();
-  }, []);
+  const analyticsQuery = useQuery({
+    queryKey: ['hr', 'analytics'],
+    queryFn: () => hrAPI.getAnalytics(),
+  });
+  const data: AnalyticsData | null = analyticsQuery.data ?? null;
+  const loading = analyticsQuery.isLoading;
+  const error = analyticsQuery.isError
+    ? (analyticsQuery.error instanceof Error
+        ? analyticsQuery.error.message
+        : 'Failed to load analytics data.')
+    : '';
 
   const ws = data?.workspace;
   const ind = data?.industry;

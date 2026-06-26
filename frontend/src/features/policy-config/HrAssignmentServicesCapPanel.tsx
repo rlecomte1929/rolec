@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { hrAPI } from '../../api/client';
 import { benefitKeyForProviderService, humanizeServiceKey } from './providerServiceBenefitMap';
 import { PolicyCapEstimateRow } from './PolicyCapEstimateRow';
@@ -15,55 +16,44 @@ type SvcRow = {
 };
 
 export const HrAssignmentServicesCapPanel: React.FC<{ assignmentId: string }> = ({ assignmentId }) => {
-  const [loadingSvc, setLoadingSvc] = useState(true);
-  const [svcError, setSvcError] = useState<string | null>(null);
-  const [rows, setRows] = useState<SvcRow[]>([]);
-  const [assignmentType, setAssignmentType] = useState<string | null>(null);
-  const [familyStatus, setFamilyStatus] = useState<string | null>(null);
+  const svcQuery = useQuery({
+    queryKey: ['hr', 'assignment-services-cap', assignmentId],
+    queryFn: async () => {
+      const [svcRes, polRes] = await Promise.all([
+        hrAPI.getAssignmentServices(assignmentId),
+        hrAPI.getResolvedPolicy(assignmentId),
+      ]);
+      const rc = (polRes.resolution_context || {}) as {
+        assignment_type?: string;
+        family_status?: string;
+      };
+      const list = svcRes.services ?? [];
+      const rows: SvcRow[] = list
+        .filter((s) => s.selected === true || s.selected === 1)
+        .map((s) => ({
+          key: s.id || s.service_key,
+          service_key: s.service_key,
+          label: humanizeServiceKey(s.service_key),
+          estimate: s.estimated_cost != null ? Number(s.estimated_cost) : null,
+          currency: (s.currency || 'USD').trim() || 'USD',
+          benefit_key: benefitKeyForProviderService(s.service_key),
+        }));
+      return {
+        rows,
+        assignmentType: rc.assignment_type ?? null,
+        familyStatus: rc.family_status ?? null,
+      };
+    },
+    enabled: !!assignmentId,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingSvc(true);
-    setSvcError(null);
-    void (async () => {
-      try {
-        const [svcRes, polRes] = await Promise.all([
-          hrAPI.getAssignmentServices(assignmentId),
-          hrAPI.getResolvedPolicy(assignmentId),
-        ]);
-        if (cancelled) return;
-        const rc = (polRes.resolution_context || {}) as {
-          assignment_type?: string;
-          family_status?: string;
-        };
-        setAssignmentType(rc.assignment_type ?? null);
-        setFamilyStatus(rc.family_status ?? null);
-
-        const list = svcRes.services ?? [];
-        const next: SvcRow[] = list
-          .filter((s) => s.selected === true || s.selected === 1)
-          .map((s) => ({
-            key: s.id || s.service_key,
-            service_key: s.service_key,
-            label: humanizeServiceKey(s.service_key),
-            estimate: s.estimated_cost != null ? Number(s.estimated_cost) : null,
-            currency: (s.currency || 'USD').trim() || 'USD',
-            benefit_key: benefitKeyForProviderService(s.service_key),
-          }));
-        setRows(next);
-      } catch (e: unknown) {
-        if (!cancelled) {
-          setSvcError(e instanceof Error ? e.message : 'Failed to load services');
-          setRows([]);
-        }
-      } finally {
-        if (!cancelled) setLoadingSvc(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [assignmentId]);
+  const rows: SvcRow[] = svcQuery.data?.rows ?? [];
+  const assignmentType: string | null = svcQuery.data?.assignmentType ?? null;
+  const familyStatus: string | null = svcQuery.data?.familyStatus ?? null;
+  const loadingSvc = svcQuery.isLoading;
+  const svcError: string | null = svcQuery.isError
+    ? (svcQuery.error instanceof Error ? svcQuery.error.message : 'Failed to load services')
+    : null;
 
   const estimates = useMemo(
     () =>

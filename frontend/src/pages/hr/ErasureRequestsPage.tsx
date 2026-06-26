@@ -7,7 +7,8 @@
  * decision only). Route: /hr/compliance/erasure-requests
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell } from '../../components/AppShell';
 import { Badge, Button, Card } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
@@ -43,27 +44,19 @@ function daysUntil(dateStr: string | null): number | null {
 }
 
 export const ErasureRequestsPage: React.FC = () => {
-  const [requests, setRequests] = useState<ErasureRequest[]>([]);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  // `error` is also written by the approve/reject mutation, so keep it local.
   const [error, setError] = useState<string | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await hrAPI.listErasureRequests('pending');
-      setRequests(res.requests);
-      setPendingCount(res.pending_count);
-    } catch {
-      setError('Could not load erasure requests.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const requestsQuery = useQuery({
+    queryKey: ['hr', 'erasure-requests', 'pending'],
+    queryFn: () => hrAPI.listErasureRequests('pending'),
+  });
+  const requests: ErasureRequest[] = requestsQuery.data?.requests ?? [];
+  const pendingCount = requestsQuery.data?.pending_count ?? 0;
+  const loading = requestsQuery.isLoading;
+  const displayedError = error || (requestsQuery.isError ? 'Could not load erasure requests.' : null);
 
   const handleAction = async (
     req: ErasureRequest,
@@ -80,7 +73,8 @@ export const ErasureRequestsPage: React.FC = () => {
         request_id: req.id,
         decision,
       });
-      await load();
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ['hr', 'erasure-requests', 'pending'] });
     } catch {
       setError(`Could not ${decision} the request. Please retry.`);
     } finally {
@@ -105,8 +99,8 @@ export const ErasureRequestsPage: React.FC = () => {
           )}
         </div>
 
-        {error && (
-          <div role="alert" className="mb-4 text-sm text-[#fca5a5]">{error}</div>
+        {displayedError && (
+          <div role="alert" className="mb-4 text-sm text-[#fca5a5]">{displayedError}</div>
         )}
 
         {loading ? (

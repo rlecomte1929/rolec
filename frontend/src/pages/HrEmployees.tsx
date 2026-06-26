@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button } from '../components/antigravity';
@@ -11,32 +12,25 @@ import { HrTeamList } from '../features/hr/HrTeamList';
 export const HrEmployees: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [employees, setEmployees] = useState<HrCompanyEmployee[]>([]);
-  const [hasCompany, setHasCompany] = useState<boolean | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const loadEmployees = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const { employees: list, has_company } = await hrAPI.listCompanyEmployees();
-      setEmployees(list || []);
-      setHasCompany(has_company ?? true);
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load employees.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate]);
+  const employeesQuery = useQuery({
+    queryKey: ['hr', 'company-employees', location.key],
+    queryFn: () => hrAPI.listCompanyEmployees(),
+  });
+
+  const employees: HrCompanyEmployee[] = employeesQuery.data?.employees ?? [];
+  const hasCompany: boolean | undefined = employeesQuery.data
+    ? (employeesQuery.data.has_company ?? true)
+    : undefined;
+  const isLoading = employeesQuery.isLoading;
+  const is401 = (employeesQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const error = employeesQuery.isError && !is401 ? 'Unable to load employees.' : '';
 
   useEffect(() => {
-    void loadEmployees();
-  }, [location.key, loadEmployees]);
+    if (employeesQuery.isError && is401) {
+      safeNavigate(navigate, 'landing');
+    }
+  }, [employeesQuery.isError, is401, navigate]);
 
   return (
     <AppShell title="Team" subtitle="People at your company on ReloPass">
@@ -72,7 +66,11 @@ export const HrEmployees: React.FC = () => {
             </div>
           </div>
         ) : (
-          <HrTeamList employees={employees} isLoading={isLoading} onReload={loadEmployees} />
+          <HrTeamList
+            employees={employees}
+            isLoading={isLoading}
+            onReload={() => employeesQuery.refetch()}
+          />
         )}
       </div>
     </AppShell>

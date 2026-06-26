@@ -6,7 +6,8 @@
  * Route: /hr/immigration/:immigrationCaseId
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Badge, Button, Card } from '../../components/antigravity';
@@ -78,26 +79,18 @@ export const ImmigrationCasePage: React.FC = () => {
   const { immigrationCaseId } = useParams<{ immigrationCaseId: string }>();
   const navigate = useNavigate();
 
-  const [immCase, setImmCase] = useState<ImmigrationCase | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!immigrationCaseId) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await api.get(`/api/hr/immigration/cases/${immigrationCaseId}`);
-        if (!cancelled) setImmCase(res.data as ImmigrationCase);
-      } catch {
-        if (!cancelled) setError('Could not load immigration case.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [immigrationCaseId]);
+  const immCaseQuery = useQuery({
+    queryKey: ['hr', 'immigration-case', immigrationCaseId],
+    queryFn: async () => {
+      const res = await api.get(`/api/hr/immigration/cases/${immigrationCaseId}`);
+      return res.data as ImmigrationCase;
+    },
+    enabled: !!immigrationCaseId,
+  });
+  const immCase: ImmigrationCase | null = immCaseQuery.data ?? null;
+  // Preserve original: with no id the page stays in its loading state.
+  const loading = !immigrationCaseId || immCaseQuery.isLoading;
+  const error = immCaseQuery.isError ? 'Could not load immigration case.' : null;
 
   if (loading) {
     return (
