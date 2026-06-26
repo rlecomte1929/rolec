@@ -1136,11 +1136,11 @@ export function EmployeeIntakePage() {
                     <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} />
                   </FieldWrap>
                   <FieldWrap label="Target move date" required>
-                    <Input unstyled type="date" data-testid="intake-target_date" className={inputCls()} value={data.target_date}
+                    <Input unstyled type="date" data-testid="intake-target_date" aria-label="Target move date" className={inputCls()} value={data.target_date}
                       onChange={(v) => setField('target_date', v)} />
                   </FieldWrap>
                   <FieldWrap label="Purpose of relocation" required>
-                    <select data-testid="intake-purpose" className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
+                    <select data-testid="intake-purpose" aria-label="Purpose of relocation" className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
                       <option>Employment</option><option>Study</option><option>Family</option><option>Other</option>
                     </select>
                   </FieldWrap>
