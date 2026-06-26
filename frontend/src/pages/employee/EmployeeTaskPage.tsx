@@ -253,8 +253,9 @@ export const EmployeeTaskPage: React.FC = () => {
   });
   const tasks: EmployeeTask[] = tasksQuery.data ?? [];
 
-  // AIQ-1248b: employee-owned roadmap steps that still need attention (excludes
-  // completed/skipped). Merged into the same 3 sections as HR tasks below.
+  // AIQ-1248b: employee-owned roadmap steps surfaced as tasks. Completed steps are
+  // kept so they show under "Done" (progress visibility); only 'skipped' (not
+  // applicable to this case) is dropped. Merged into the same 3 sections as HR tasks.
   const roadmapQuery = useQuery({
     queryKey: ['employee', 'roadmap-tasks', roadmapCaseId ?? null],
     queryFn: async () => {
@@ -264,7 +265,7 @@ export const EmployeeTaskPage: React.FC = () => {
     enabled: Boolean(roadmapCaseId),
   });
   const roadmapSteps: RoadmapV2Step[] = (roadmapQuery.data ?? []).filter(
-    (s) => s.owner === 'employee' && s.status !== 'completed' && s.status !== 'skipped',
+    (s) => s.owner === 'employee' && s.status !== 'skipped',
   );
 
   const loading = tasksQuery.isLoading || (Boolean(roadmapCaseId) && roadmapQuery.isLoading);
