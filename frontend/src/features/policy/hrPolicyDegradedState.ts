@@ -3,6 +3,8 @@
  * Align with docs/policy/policy-degraded-states.md
  */
 
+import type { PolicyDocument, NormalizedPolicyResponse } from './types';
+
 export type HrPolicyPipelineState =
   | 'workspace_empty'
   | 'uploaded_not_normalized'
@@ -17,7 +19,7 @@ export type HrPolicyPipelineDerived = {
   detail?: string;
 };
 
-function sortDocsNewestFirst(documents: any[]): any[] {
+function sortDocsNewestFirst(documents: PolicyDocument[]): PolicyDocument[] {
   return [...(documents || [])].sort(
     (a, b) =>
       new Date(b?.uploaded_at || 0).getTime() - new Date(a?.uploaded_at || 0).getTime()
@@ -29,8 +31,8 @@ function sortDocsNewestFirst(documents: any[]): any[] {
  * `normalized` is the API shape from GET /api/company-policies/{id}/normalized (includes published_* fields).
  */
 export function deriveHrPolicyPipelineState(
-  documents: any[],
-  normalized: any | null
+  documents: PolicyDocument[],
+  normalized: NormalizedPolicyResponse | null
 ): HrPolicyPipelineDerived {
   const primaryDoc = sortDocsNewestFirst(documents)[0] ?? null;
   const pub = normalized?.published_version;
