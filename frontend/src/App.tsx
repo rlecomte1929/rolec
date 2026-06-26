@@ -71,6 +71,7 @@ const ErasureRequestsPage = lazy(() => import('./pages/hr/ErasureRequestsPage').
 const ImmigrationChecklistPage = lazy(() => import('./pages/employee/ImmigrationChecklistPage').then((module) => ({ default: module.ImmigrationChecklistPage })));
 const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
+const LegacyServicesRedirect = lazy(() => import('./features/services/LegacyServicesRedirect').then((module) => ({ default: module.LegacyServicesRedirect })));
 const Messages = lazy(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
 const InboxV2Page = lazy(() => import('./features/platform-v2/inbox/InboxV2Page').then((module) => ({ default: module.InboxV2Page })));
 const Resources = lazy(() => import('./pages/Resources').then((module) => ({ default: module.Resources })));
@@ -333,15 +334,21 @@ function App() {
           path={ROUTE_DEFS.providers.path}
           element={<Navigate to={ROUTE_DEFS.services.path} replace />}
         />
-        <Route
-          path={ROUTE_DEFS.services.path}
-          element={<ProvidersPage />}
-        />
-        <Route path={ROUTE_DEFS.servicesQuestions.path} element={<ServicesQuestions />} />
-        <Route path={ROUTE_DEFS.servicesRecommendations.path} element={<ServicesRecommendations />} />
-        <Route path={ROUTE_DEFS.servicesEstimate.path} element={<ServicesEstimate />} />
-        <Route path={ROUTE_DEFS.servicesRfqNew.path} element={<ServicesRfqNew />} />
-        <Route path={ROUTE_DEFS.servicesConclusion.path} element={<ServicesConclusion />} />
+        {/* [AIQ-1285/H-05] Case-scoped services flow — canonical routes. */}
+        <Route path={ROUTE_DEFS.caseServices.path} element={<ProvidersPage />} />
+        <Route path={ROUTE_DEFS.caseServicesQuestions.path} element={<ServicesQuestions />} />
+        <Route path={ROUTE_DEFS.caseServicesRecommendations.path} element={<ServicesRecommendations />} />
+        <Route path={ROUTE_DEFS.caseServicesEstimate.path} element={<ServicesEstimate />} />
+        <Route path={ROUTE_DEFS.caseServicesRfqNew.path} element={<ServicesRfqNew />} />
+        <Route path={ROUTE_DEFS.caseServicesConclusion.path} element={<ServicesConclusion />} />
+        {/* Legacy /services/* → redirect to the case-scoped equivalents (back-compat
+            for deep links + last-visited entries). */}
+        <Route path={ROUTE_DEFS.services.path} element={<LegacyServicesRedirect to="caseServices" />} />
+        <Route path={ROUTE_DEFS.servicesQuestions.path} element={<LegacyServicesRedirect to="caseServicesQuestions" />} />
+        <Route path={ROUTE_DEFS.servicesRecommendations.path} element={<LegacyServicesRedirect to="caseServicesRecommendations" />} />
+        <Route path={ROUTE_DEFS.servicesEstimate.path} element={<LegacyServicesRedirect to="caseServicesEstimate" />} />
+        <Route path={ROUTE_DEFS.servicesRfqNew.path} element={<LegacyServicesRedirect to="caseServicesRfqNew" />} />
+        <Route path={ROUTE_DEFS.servicesConclusion.path} element={<LegacyServicesRedirect to="caseServicesConclusion" />} />
         <Route path={ROUTE_DEFS.quotesInbox.path} element={<QuotesInbox />} />
         <Route path={ROUTE_DEFS.quoteRfqDetail.path} element={<QuoteRfqDetail />} />
         <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />

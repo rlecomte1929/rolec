@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../../components/antigravity';
@@ -11,10 +11,10 @@ import { useServicesWorkflowState } from '../../features/services/useServicesWor
 import { servicesAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
-import { ROUTE_DEFS, buildRoute } from '../../navigation/routes';
+import { ROUTE_DEFS, buildRoute, type RouteKey } from '../../navigation/routes';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
@@ -44,7 +44,12 @@ export const ServicesQuestions: React.FC = () => {
     linkedSummaries,
     isLoading: assignmentLoading,
   } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  // [AIQ-1285] caseId from the path is authoritative; fall back to legacy ?assignment=.
+  const { caseId: pathCaseId } = useParams<{ caseId?: string }>();
+  const queryAssignmentId = useMemo(
+    () => pathCaseId ?? parseAssignmentSearchParam(location.search),
+    [pathCaseId, location.search],
+  );
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
@@ -53,6 +58,11 @@ export const ServicesQuestions: React.FC = () => {
         queryAssignmentId,
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
+  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
+  const caseStep = useCallback(
+    (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' }),
+    [assignmentId],
   );
   const workflow = useServicesWorkflowState();
 
@@ -267,7 +277,7 @@ export const ServicesQuestions: React.FC = () => {
           <Button
             className="mt-4"
             onClick={() =>
-              navigate({ pathname: buildRoute('services'), search: location.search })
+              navigate(caseStep('caseServices'))
             }
           >
             Back to services
@@ -313,7 +323,7 @@ export const ServicesQuestions: React.FC = () => {
       setRecommendations(results);
       setShortlist(new Map());
       workflow.toRecommendationsReady();
-      navigate(withAssignmentQuery(buildRoute('servicesRecommendations'), assignmentId));
+      navigate(caseStep('caseServicesRecommendations'));
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -368,7 +378,7 @@ export const ServicesQuestions: React.FC = () => {
       <Card padding="lg" className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <Button unstyled
-            onClick={() => navigate({ pathname: buildRoute('services'), search: location.search })}
+            onClick={() => navigate(caseStep('caseServices'))}
             className="text-sm text-[#0b2b43] hover:underline"
           >
             ← Change services
@@ -408,7 +418,7 @@ export const ServicesQuestions: React.FC = () => {
       )}
 
       <div className="flex flex-wrap items-center gap-3 mt-6">
-        <Button variant="outline" onClick={() => navigate({ pathname: buildRoute('services'), search: location.search })}>
+        <Button variant="outline" onClick={() => navigate(caseStep('caseServices'))}>
           Back
         </Button>
         <Button variant="outline" onClick={onExplicitSave} disabled={isSavingAnswers || workflow.isBusy}>
