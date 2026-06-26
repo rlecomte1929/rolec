@@ -6,13 +6,17 @@ import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
+import { Badge } from '../../components/antigravity/Badge';
 import { AppShell } from '../../components/AppShell';
 import { buildRoute } from '../../navigation/routes';
 import { servicesAPI, apiGet } from '../../api/client';
 import type { EmployeeTask, TaskType } from '../../api/client';
+import { getCaseRoadmapV2 } from '../../api/roadmapV2';
+import type { RoadmapV2Step } from '../../api/roadmapV2';
 import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../features/privacy/privacyNoticeContent';
 import { useSelectedCase } from '../../contexts/SelectedCaseContext';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 
 // ── Status colours ────────────────────────────────────────────────────────────
 
@@ -79,6 +83,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
+          <div className="mb-1.5">
+            <Badge variant="info" size="sm">HR request</Badge>
+          </div>
           <h3 className="font-medium text-slate-900">{task.title}</h3>
           {task.due_date && (
             <p className="text-xs text-slate-400 mt-0.5">
@@ -144,6 +151,76 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
   );
 };
 
+// ── Roadmap (move) tasks ────────────────────────────────────────────────────────
+// AIQ-1248b: surface employee-owned roadmap steps alongside HR-requested tasks so
+// "Tasks" is the single place an employee sees everything they need to act on.
+
+type TaskSection = 'action' | 'review' | 'done';
+
+const ROADMAP_STATUS_LABEL: Record<RoadmapV2Step['status'], string> = {
+  pending:            'To do',
+  in_progress:        'In progress',
+  awaiting_employee:  'Your action',
+  awaiting_vendor:    'With vendor',
+  awaiting_hr:        'With HR',
+  blocked:            'Blocked',
+  completed:          'Done',
+  skipped:            'Skipped',
+};
+
+const ROADMAP_STATUS_STYLE: Record<RoadmapV2Step['status'], string> = {
+  pending:            'bg-amber-100 text-amber-800',
+  in_progress:        'bg-blue-100 text-blue-800',
+  awaiting_employee:  'bg-amber-100 text-amber-800',
+  awaiting_vendor:    'bg-slate-100 text-slate-700',
+  awaiting_hr:        'bg-slate-100 text-slate-700',
+  blocked:            'bg-red-100 text-red-800',
+  completed:          'bg-green-100 text-green-800',
+  skipped:            'bg-slate-100 text-slate-500',
+};
+
+/** Which of the 3 sections a roadmap step belongs to (null = not shown). */
+function roadmapSection(status: RoadmapV2Step['status']): TaskSection | null {
+  switch (status) {
+    case 'pending':
+    case 'in_progress':
+    case 'awaiting_employee':
+    case 'blocked':
+      return 'action';
+    case 'awaiting_vendor':
+    case 'awaiting_hr':
+      return 'review';
+    case 'completed':
+      return 'done';
+    default:
+      return null;
+  }
+}
+
+const RoadmapStepCard: React.FC<{ step: RoadmapV2Step }> = ({ step }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-start justify-between gap-3 mb-3">
+      <div>
+        <div className="mb-1.5">
+          <Badge variant="neutral" size="sm">Move task</Badge>
+        </div>
+        <h3 className="font-medium text-slate-900">{step.title}</h3>
+        {step.due_date && (
+          <p className="text-xs text-slate-400 mt-0.5">
+            Due {new Date(step.due_date).toLocaleDateString()}
+          </p>
+        )}
+      </div>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROADMAP_STATUS_STYLE[step.status]}`}>
+        {ROADMAP_STATUS_LABEL[step.status]}
+      </span>
+    </div>
+    {step.description && (
+      <p className="text-sm text-slate-600">{step.description}</p>
+    )}
+  </div>
+);
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export const EmployeeTaskPage: React.FC = () => {
@@ -151,6 +228,12 @@ export const EmployeeTaskPage: React.FC = () => {
   // tasks. When no case is selected, getTasks() falls back server-side to the
   // most-recently-updated case (matching the dashboard's active-case selection).
   const { selectedCaseId } = useSelectedCase();
+  const { primaryCaseId } = useEmployeeAssignment();
+  // AIQ-1248b: the roadmap is fetched for the same case the page is scoped to;
+  // fall back to the employee's primary case when nothing is selected. The
+  // case-scoped roadmap route accepts the assignment id (matching how the roadmap
+  // page is linked elsewhere), so selectedCaseId works directly.
+  const roadmapCaseId = selectedCaseId ?? primaryCaseId;
   const queryClient = useQueryClient();
   const tasksQueryKey = ['employee', 'tasks', selectedCaseId ?? null];
   // PRIV-005: one-time persistent privacy-notice gate. Submission stays blocked
@@ -169,7 +252,24 @@ export const EmployeeTaskPage: React.FC = () => {
     },
   });
   const tasks: EmployeeTask[] = tasksQuery.data ?? [];
-  const loading = tasksQuery.isLoading;
+
+  // AIQ-1248b: employee-owned roadmap steps that still need attention (excludes
+  // completed/skipped). Merged into the same 3 sections as HR tasks below.
+  const roadmapQuery = useQuery({
+    queryKey: ['employee', 'roadmap-tasks', roadmapCaseId ?? null],
+    queryFn: async () => {
+      const res = await getCaseRoadmapV2(roadmapCaseId as string);
+      return res.tracks.flatMap((t) => t.steps);
+    },
+    enabled: Boolean(roadmapCaseId),
+  });
+  const roadmapSteps: RoadmapV2Step[] = (roadmapQuery.data ?? []).filter(
+    (s) => s.owner === 'employee' && s.status !== 'completed' && s.status !== 'skipped',
+  );
+
+  const loading = tasksQuery.isLoading || (Boolean(roadmapCaseId) && roadmapQuery.isLoading);
+  // Only the HR-task source failing is surfaced as an error; a missing/empty
+  // roadmap is a normal state, not an error.
   const error = tasksQuery.isError ? 'Could not load your tasks. Please try again.' : null;
 
   const consentQuery = useQuery({
@@ -206,6 +306,17 @@ export const EmployeeTaskPage: React.FC = () => {
   const submitted = tasks.filter((t) => t.status === 'submitted');
   const approved  = tasks.filter((t) => t.status === 'approved');
 
+  // Roadmap steps split into the same 3 sections (action / review / done).
+  const rmAction = roadmapSteps.filter((s) => roadmapSection(s.status) === 'action');
+  const rmReview = roadmapSteps.filter((s) => roadmapSection(s.status) === 'review');
+  const rmDone   = roadmapSteps.filter((s) => roadmapSection(s.status) === 'done');
+
+  const actionCount = pending.length + rmAction.length;
+  const reviewCount = submitted.length + rmReview.length;
+  const doneCount   = approved.length + rmDone.length;
+  // Empty only when BOTH sources have nothing to show.
+  const bothEmpty = tasks.length === 0 && roadmapSteps.length === 0;
+
   return (
     <AppShell>
       <div className="px-4 py-6 max-w-2xl mx-auto">
@@ -237,7 +348,7 @@ export const EmployeeTaskPage: React.FC = () => {
 
         {loading ? (
           <div className="text-center py-16 text-sm text-slate-400">Loading your tasks…</div>
-        ) : tasks.length === 0 && !error ? (
+        ) : bothEmpty && !error ? (
           <div className="text-center py-16">
             <p className="text-slate-500 text-sm">No tasks yet — your HR team hasn&rsquo;t assigned anything.</p>
             {/* EMP-2: don't dead-end — point the employee back to where they can make progress. */}
@@ -249,33 +360,36 @@ export const EmployeeTaskPage: React.FC = () => {
           </div>
         ) : (
           <>
-            {pending.length > 0 && (
+            {actionCount > 0 && (
               <section className="mb-8">
                 <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                  Action needed · {pending.length}
+                  Action needed · {actionCount}
                 </h2>
                 <div className="space-y-3">
                   {pending.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
+                  {rmAction.map((s) => <RoadmapStepCard key={s.id} step={s} />)}
                 </div>
               </section>
             )}
-            {submitted.length > 0 && (
+            {reviewCount > 0 && (
               <section className="mb-8">
                 <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                  Awaiting review · {submitted.length}
+                  Awaiting review · {reviewCount}
                 </h2>
                 <div className="space-y-3">
                   {submitted.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
+                  {rmReview.map((s) => <RoadmapStepCard key={s.id} step={s} />)}
                 </div>
               </section>
             )}
-            {approved.length > 0 && (
+            {doneCount > 0 && (
               <section className="mb-8">
                 <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                  Done · {approved.length}
+                  Done · {doneCount}
                 </h2>
                 <div className="space-y-3">
                   {approved.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
+                  {rmDone.map((s) => <RoadmapStepCard key={s.id} step={s} />)}
                 </div>
               </section>
             )}
