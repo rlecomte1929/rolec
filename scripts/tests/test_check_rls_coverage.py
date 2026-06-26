@@ -93,3 +93,46 @@ def test_qualify_table_qualifies_non_public():
     # rce (and any non-public) tables are schema-qualified so a policy-less rce
     # table surfaces distinctly and needs an `rce.<name>` allowlist entry.
     assert crc.qualify_table("rce", "contradictions") == "rce.contradictions"
+
+
+# ── SEC-01 (AIQ-1164): the core fail path — RLS-less table is caught ───────────
+
+
+def test_policyless_table_not_on_allowlist_is_missing():
+    # A new public table with no RLS policy and no allowlist entry MUST surface
+    # as missing → the gate returns exit 1 and the PR fails.
+    missing = crc.missing_from_allowlist(["new_pii_table"], {"audit_log"})
+    assert missing == ["new_pii_table"]
+
+
+def test_policyless_table_on_allowlist_passes():
+    missing = crc.missing_from_allowlist(["audit_log"], {"audit_log"})
+    assert missing == []
+
+
+def test_policyless_rce_table_not_on_allowlist_is_missing():
+    # Non-public schemas are schema-qualified; an unlisted rce table still fails.
+    missing = crc.missing_from_allowlist(["rce.secrets"], {"rce.audit"})
+    assert missing == ["rce.secrets"]
+
+
+def test_main_exits_1_on_unlisted_policyless_table(monkeypatch, tmp_path):
+    """End-to-end: a policy-less table absent from the allowlist makes main()
+    return 1 (CI fail), without touching a live DB."""
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# server-only\naudit_log\n")
+    monkeypatch.setattr(crc, "ALLOWLIST_FILE", allowlist)
+    monkeypatch.setattr(crc, "query_policy_less_tables", lambda _url: ["leaky_table"])
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(sys, "argv", ["check_rls_coverage.py"])
+    assert crc.main() == 1
+
+
+def test_main_exits_0_when_all_policyless_tables_allowlisted(monkeypatch, tmp_path):
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# server-only\nleaky_table  # internal ops table\n")
+    monkeypatch.setattr(crc, "ALLOWLIST_FILE", allowlist)
+    monkeypatch.setattr(crc, "query_policy_less_tables", lambda _url: ["leaky_table"])
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(sys, "argv", ["check_rls_coverage.py"])
+    assert crc.main() == 0
