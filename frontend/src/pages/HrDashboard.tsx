@@ -20,6 +20,9 @@ import { usePolicyPublished } from '../hooks/usePolicyPublished';
 import { CalibrationAlertBanner } from '../components/CalibrationAlertBanner';
 import { AnswerProvenanceWidget } from '../components/AnswerProvenanceWidget';
 import { trackFirstCaseCreated } from '../perf/hrOnboardingInstrumentation';
+import { useVariant } from '../lib/feature-flags';
+import { registerSuperProperties } from '../analytics';
+import { InferredOnboardingPanel } from '../features/platform-v2/InferredOnboardingPanel';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -46,6 +49,10 @@ function CasesEmptyState({ onCreateCase }: { onCreateCase: () => void }) {
 
 export const HrDashboard: React.FC = () => {
   const { setSelectedCaseId } = useSelectedCase();
+  // AIQ-1223e: A/B arm for inference-based onboarding. 'inferred' shows the
+  // suggested-setup surface; anything else (control / error / disabled) keeps
+  // the manual empty-state. Resolved deterministically by useVariant.
+  const onboardingVariant = useVariant('hr_inference_onboarding');
   const [error, setError] = useState('');
   // CASE-3: field-level validation error for the employee identifier, shown inline
   // next to the input (not the page-top banner).
@@ -123,6 +130,12 @@ export const HrDashboard: React.FC = () => {
     trackRouteEntry('/hr/dashboard');
     trackShellRender('/hr/dashboard');
   }, []);
+
+  // AIQ-1223e: attach the resolved arm as a PostHog super-property so PR-A's HR
+  // onboarding events (AIQ-1223b) split by experiment arm. No-op without a key.
+  useEffect(() => {
+    registerSuperProperties({ hr_inference_onboarding: onboardingVariant });
+  }, [onboardingVariant]);
 
   // Assignments list as a TanStack infinite query (RX-2). The filters are part of
   // the query key, so changing one refetches from page 0 automatically — no manual
@@ -649,7 +662,9 @@ export const HrDashboard: React.FC = () => {
           {/* E1.1–E1.2: first-time HR (no cases at all) → onboarding empty state
               that explains what a case is and how to open the first one. */}
           {!isLoading && hasNoCases && (
-            <CasesEmptyState onCreateCase={openNewCaseForm} />
+            onboardingVariant === 'inferred'
+              ? <InferredOnboardingPanel onCreateCase={openNewCaseForm} />
+              : <CasesEmptyState onCreateCase={openNewCaseForm} />
           )}
           {/* Search/filter matched nothing, but the HR does have cases. */}
           {!isLoading && !hasNoCases && displayedAssignments.length === 0 && (

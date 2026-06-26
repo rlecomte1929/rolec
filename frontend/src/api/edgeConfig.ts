@@ -51,6 +51,9 @@ const FLAG_DEFAULTS: FlagsMap = {
   onboarding_flow_v2: { enabled: false, variants: ['control', 'variant_a'], traffic_split: [100, 0] },
   hr_policy_assistant_v2: { enabled: false, variants: ['control', 'variant_a'], traffic_split: [100, 0] },
   employee_dashboard_v2: { enabled: false, variants: ['control', 'variant_a'], traffic_split: [100, 0] },
+  // AIQ-1223e — inference-based HR onboarding. control = manual empty-state,
+  // inferred = deterministic suggested-setup surface. Off by default → control.
+  hr_inference_onboarding: { enabled: false, variants: ['control', 'inferred'], traffic_split: [100, 0] },
 };
 
 /**

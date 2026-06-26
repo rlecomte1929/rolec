@@ -48,6 +48,14 @@ const FLAG_DEFAULTS: Record<string, FeatureFlag> = {
     traffic_split: [100, 0],
     description: "Platform V2 employee dashboard.",
   },
+  // AIQ-1223e — inference-based HR onboarding. control = manual empty-state,
+  // inferred = deterministic suggested-setup surface. Off by default → control.
+  hr_inference_onboarding: {
+    enabled: false,
+    variants: ["control", "inferred"],
+    traffic_split: [100, 0],
+    description: "Inference-based HR first-run onboarding (deterministic suggested setup) vs manual empty-state.",
+  },
 };
 
 interface FeatureFlag {
