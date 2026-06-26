@@ -589,8 +589,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     const isStarter = ts === 'default_platform_template' || tn.startsWith('starter_');
     const m = tn.match(/^starter_(conservative|standard|premium)$/);
     const k = m?.[1];
-    const templateKey =
-      k === 'conservative' || k === 'standard' || k === 'premium' ? (k) : null;
+    const isStarterKey = (v: string | undefined): v is StarterTemplateKey =>
+      v === 'conservative' || v === 'standard' || v === 'premium';
+    const templateKey = isStarterKey(k) ? k : null;
     return { isStarter, templateKey };
   }, [normalized?.policy]);
 
