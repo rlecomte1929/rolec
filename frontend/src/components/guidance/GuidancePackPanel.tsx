@@ -95,8 +95,6 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
       .catch(() => undefined);
   }, [caseId, tab]);
 
-  if (!GUIDANCE_ENABLED) return null;
-
   const missingInfoLabels: Record<string, string> = {
     origin_country: 'Origin country',
     destination_country: 'Destination country',
@@ -133,6 +131,9 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
     (pack?.sources || []).forEach((s) => map.set(s.doc_id, s));
     return map;
   }, [pack?.sources]);
+
+  // Feature-flag gate — after all hooks so they're never called conditionally (rules-of-hooks).
+  if (!GUIDANCE_ENABLED) return null;
 
   return (
     <Card padding="lg">

@@ -135,6 +135,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // onAuthChange will handle clearing user state after sign-out
   }, []);
 
+  // RX-1: stable context value — AuthProvider wraps the whole app, so an unmemoized
+  // value object re-rendered every consumer on every provider render. Declared above
+  // the loading early-return so the hook is never called conditionally (rules-of-hooks).
+  const ctxValue = useMemo(
+    () => ({ user, loading, signIn, signOut }),
+    [user, loading, signIn, signOut],
+  );
+
   // Show a full-screen spinner while the initial auth state resolves
   if (loading) {
     return (
@@ -153,13 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  // RX-1: stable context value — AuthProvider wraps the whole app, so an unmemoized
-  // value object re-rendered every consumer on every provider render.
-  const ctxValue = useMemo(
-    () => ({ user, loading, signIn, signOut }),
-    [user, loading, signIn, signOut],
-  );
 
   return (
     <AuthContext.Provider value={ctxValue}>
