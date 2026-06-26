@@ -46,7 +46,7 @@ export const AssignmentDebugPanel: React.FC<AssignmentDebugPanelProps> = ({ assi
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const { data } = await supabase.auth.getSession();
       const uid = data?.session?.user?.id ?? null;
       if (!cancelled) setAuthUid(uid);

@@ -160,7 +160,7 @@ export function InboxV2Page() {
     if (!isHrLike) return;
     let cancelled = false;
     const ac = new AbortController();
-    (async () => {
+    void (async () => {
       try {
         setLoading(true);
         setListError(null);
@@ -206,7 +206,7 @@ export function InboxV2Page() {
   useEffect(() => {
     if (isHrLike) return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         setLoading(true);
         setListError(null);
@@ -290,7 +290,7 @@ export function InboxV2Page() {
     if (activeConversation.thread_loaded) return;
     const aid = activeConversation.assignment_id;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await hrAPI.getMessageThread(aid);
         const built = buildConversationsFromMessages(
@@ -707,7 +707,7 @@ export function InboxV2Page() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault();
-                        handleSend();
+                        void handleSend();
                       }
                     }}
                     rows={3}

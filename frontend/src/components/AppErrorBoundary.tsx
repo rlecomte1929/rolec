@@ -38,7 +38,7 @@ export const AppErrorBoundary: React.FC<Props> = ({
       fallback={fallback ?? <DefaultFallback />}
       onError={(error: unknown) => {
         const err = error instanceof Error ? error : new Error(String(error));
-        reportError({
+        void reportError({
           message:       err.message,
           stack:         err.stack ?? null,
           componentName: componentName ?? null,

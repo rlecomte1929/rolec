@@ -75,7 +75,7 @@ export const HrPreferredSuppliers: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, [filterCategory]);
 
   const openAddModal = async () => {
@@ -105,7 +105,7 @@ export const HrPreferredSuppliers: React.FC = () => {
         notes: addNotes.trim() || undefined,
       });
       setAddModalOpen(false);
-      load();
+      void load();
     } catch (e) {
       setError(String((e as Error).message ?? 'Failed to add'));
     } finally {
@@ -117,7 +117,7 @@ export const HrPreferredSuppliers: React.FC = () => {
     try {
       await hrPreferredSuppliersAPI.remove(supplier_id, service_category ?? undefined);
       setRemoveConfirm(null);
-      load();
+      void load();
     } catch (e) {
       setError(String((e as Error).message ?? 'Failed to remove'));
     }

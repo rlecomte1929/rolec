@@ -98,7 +98,7 @@ export function subscribeToNotifications(
       // ignore
     }
   };
-  poll();
+  void poll();
   const id = setInterval(poll, intervalMs);
   return () => clearInterval(id);
 }

@@ -21,7 +21,7 @@ export const AdminOpsDestinationsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const items = data?.items ?? [];

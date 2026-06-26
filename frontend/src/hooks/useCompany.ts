@@ -42,7 +42,7 @@ export function useCompany(opts?: UseCompanyOptions): UseCompanyResult {
   };
 
   useEffect(() => {
-    fetchCompany();
+    void fetchCompany();
   }, [opts?.skip]);
 
   return { company, loading, refresh: fetchCompany };

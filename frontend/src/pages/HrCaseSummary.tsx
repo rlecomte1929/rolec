@@ -113,7 +113,7 @@ export const HrCaseSummary: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAssignment();
+    void loadAssignment();
   }, [caseId]);
 
   const handleRunCompliance = async () => {
@@ -545,7 +545,7 @@ export const HrCaseSummary: React.FC = () => {
                   <Button
                     onClick={() => {
                       setApproveConfirmOpen(false);
-                      handleApprove();
+                      void handleApprove();
                     }}
                     disabled={isDeciding}
                   >

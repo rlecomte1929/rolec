@@ -291,7 +291,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   // picker shows as before.
   useEffect(() => {
     let alive = true;
-    (async () => {
+    void (async () => {
       try {
         const payload = (await policyConfigMatrixAPI.hrGet()) as {
           policy_version?: string | null;

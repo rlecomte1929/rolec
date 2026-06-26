@@ -38,7 +38,7 @@ export const VendorInbox: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   if (loading) {

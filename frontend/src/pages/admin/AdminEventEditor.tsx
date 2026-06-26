@@ -52,11 +52,11 @@ export const AdminEventEditor: React.FC = () => {
   };
 
   useEffect(() => {
-    loadSources();
+    void loadSources();
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [id]);
 
   const update = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
@@ -98,7 +98,7 @@ export const AdminEventEditor: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isNew && id) loadAudit();
+    if (!isNew && id) void loadAudit();
   }, [id, isNew]);
 
   const workflow = async (action: string, notes?: string) => {
@@ -127,8 +127,8 @@ export const AdminEventEditor: React.FC = () => {
         default:
           return;
       }
-      load();
-      loadAudit();
+      void load();
+      void loadAudit();
     } catch (e) {
       alert((e as Error).message || 'Action failed');
     } finally {
@@ -204,7 +204,7 @@ export const AdminEventEditor: React.FC = () => {
             <label className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
             <textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4" />
             <div className="flex gap-2">
-              <Button onClick={() => { workflow('approve', approveNotes || undefined); setApproveModalOpen(false); setApproveNotes(''); }} disabled={saving}>
+              <Button onClick={() => { void workflow('approve', approveNotes || undefined); setApproveModalOpen(false); setApproveNotes(''); }} disabled={saving}>
                 {saving ? 'Approving…' : 'Approve'}
               </Button>
               <Button variant="secondary" onClick={() => { setApproveModalOpen(false); setApproveNotes(''); }}>Cancel</Button>

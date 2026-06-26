@@ -24,7 +24,7 @@ export const AdminOpsNotificationsPage: React.FC = () => {
   }, [days]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const byType = (data?.by_type as Record<string, number>) ?? {};

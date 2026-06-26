@@ -534,7 +534,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
     }
   }, [caseId]);
 
-  useEffect(() => { loadMessages(); }, [loadMessages]);
+  useEffect(() => { void loadMessages(); }, [loadMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -599,7 +599,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
           placeholder="Write a message…"
           value={input}
           onChange={(v) => setInput(v)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); } }}
           disabled={sending}
         />
         <Button unstyled type="button" onClick={handleSend} disabled={!input.trim() || sending}

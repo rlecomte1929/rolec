@@ -51,7 +51,7 @@ export const AdminReviewQueueWorkloadPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const now = new Date();

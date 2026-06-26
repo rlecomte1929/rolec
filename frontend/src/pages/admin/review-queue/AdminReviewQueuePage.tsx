@@ -105,7 +105,7 @@ export const AdminReviewQueuePage: React.FC = () => {
   }, [status, priorityBand, assigneeId, countryCode, itemType, overdueOnly, unassignedOnly, searchText, sort]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const updateFilter = (key: string, value: string | undefined) => {

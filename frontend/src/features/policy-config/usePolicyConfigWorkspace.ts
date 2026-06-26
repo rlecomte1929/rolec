@@ -339,7 +339,7 @@ export function usePolicyConfigWorkspace(args: {
 
   /** Discard local edits by reloading from server */
   const cancelChanges = useCallback(() => {
-    load();
+    void load();
   }, [load]);
 
   useEffect(() => {

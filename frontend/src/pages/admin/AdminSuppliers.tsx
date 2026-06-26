@@ -92,7 +92,7 @@ export const AdminSuppliers: React.FC = () => {
   // Load suppliers only when a category is selected (and when filters change)
   useEffect(() => {
     if (selectedCategory.trim()) {
-      loadSuppliers();
+      void loadSuppliers();
     } else {
       setSuppliers([]);
       setError(null);

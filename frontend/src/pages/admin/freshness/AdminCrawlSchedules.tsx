@@ -42,7 +42,7 @@ export const AdminCrawlSchedules: React.FC = () => {
   }, [activeOnly]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const handleTrigger = async (id: string) => {

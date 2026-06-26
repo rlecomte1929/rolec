@@ -109,12 +109,12 @@ export const HrAssignmentReview: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAssignments();
+    void loadAssignments();
   }, []);
 
   useEffect(() => {
     if (selectedCaseId) {
-      loadAssignment(selectedCaseId);
+      void loadAssignment(selectedCaseId);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('caseId', selectedCaseId);
@@ -151,7 +151,7 @@ export const HrAssignmentReview: React.FC = () => {
 
   useEffect(() => {
     if (assignment?.id) {
-      loadIntakeDraft(assignment.id);
+      void loadIntakeDraft(assignment.id);
     } else {
       setIntakeDraft(null);
       setIntakeError('');
@@ -171,7 +171,7 @@ export const HrAssignmentReview: React.FC = () => {
 
   useEffect(() => {
     if (assignment?.id) {
-      loadHrFeedback(assignment.id);
+      void loadHrFeedback(assignment.id);
     } else {
       setHrFeedback([]);
     }

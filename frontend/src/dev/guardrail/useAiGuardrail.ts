@@ -20,7 +20,7 @@ export function useAiGuardrail() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       setLoading(true);
       const { data, error: fetchErr } = await supabase
         .from('rp_debug_kv')

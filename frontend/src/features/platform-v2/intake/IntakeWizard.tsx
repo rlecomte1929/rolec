@@ -459,7 +459,7 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
     function handler(e: KeyboardEvent) {
       if (e.key === 'Enter' && !e.shiftKey) {
         if (step < totalSteps - 1) handleNext();
-        else handleSubmit();
+        else void handleSubmit();
       }
       if (e.key === 'ArrowLeft' || (e.altKey && e.key === 'ArrowLeft')) handleBack();
     }

@@ -30,7 +30,7 @@ export const HrReviewDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const formatDate = (s: string | null) => {

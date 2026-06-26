@@ -60,7 +60,7 @@ export const HrEmployeeDetail: React.FC = () => {
   };
 
   useEffect(() => {
-    loadEmployee();
+    void loadEmployee();
   }, [id, navigate]);
 
   const handleSave = async () => {

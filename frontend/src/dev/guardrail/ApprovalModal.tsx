@@ -52,7 +52,7 @@ export function ApprovalModal() {
 
   // Initial fetch + Realtime subscription
   useEffect(() => {
-    (async () => {
+    void (async () => {
       const { data } = await supabase
         .from('ai_spend_requests')
         .select('id, function_name, description, estimated_cost_cents, created_at')
@@ -71,7 +71,7 @@ export function ApprovalModal() {
       .subscribe();
 
     channelRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
+    return () => { void supabase.removeChannel(channel); };
   }, [addToQueue]);
 
   const handleDecision = useCallback(async (approved: boolean) => {

@@ -57,7 +57,7 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
   useEffect(() => {
     if (step !== 'pick') return;
     setLoadingProviders(true);
-    listOrgProviders()
+    void listOrgProviders()
       .then(setOrgProviders)
       .finally(() => setLoadingProviders(false));
   }, [step]);

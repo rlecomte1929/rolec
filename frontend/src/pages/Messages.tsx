@@ -130,7 +130,7 @@ export const Messages: React.FC = () => {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -190,7 +190,7 @@ export const Messages: React.FC = () => {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
+    void load();
     return () => {
       cancelled = true;
       ac.abort();
@@ -204,7 +204,7 @@ export const Messages: React.FC = () => {
     if (!conv || conv.thread_loaded) return;
     const aid = conv.assignment_id;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await hrAPI.getMessageThread(aid);
         const raw = (res.messages || []) as Record<string, unknown>[];

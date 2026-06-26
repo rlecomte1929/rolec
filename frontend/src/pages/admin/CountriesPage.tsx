@@ -10,7 +10,7 @@ export const CountriesPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    listCountries().then(setData);
+    void listCountries().then(setData);
   }, []);
 
   return (

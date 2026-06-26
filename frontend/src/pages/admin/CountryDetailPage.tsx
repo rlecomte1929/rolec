@@ -16,7 +16,7 @@ export const CountryDetailPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadProfile();
+    void loadProfile();
   }, [countryCode]);
 
   return (

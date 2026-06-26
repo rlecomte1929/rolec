@@ -111,7 +111,7 @@ export const AdminProspects: React.FC = () => {
   }, [statusFilter]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   // Auto-refresh while anything is still enriching so the list animates

@@ -121,7 +121,7 @@ export function FeedbackTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const updateStatus = async (row: FeedbackRow, newStatus: FeedbackStatus) => {
     setSavingId(row.id);

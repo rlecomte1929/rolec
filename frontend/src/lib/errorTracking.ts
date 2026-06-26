@@ -148,7 +148,7 @@ export function initErrorTracking(): void {
   if (typeof window === 'undefined') return;
 
   window.onerror = (message, _source, _lineno, _colno, error) => {
-    reportError({
+    void reportError({
       message: error?.message ?? String(message),
       stack:   error?.stack ?? null,
     });
@@ -157,7 +157,7 @@ export function initErrorTracking(): void {
 
   window.addEventListener('unhandledrejection', (event) => {
     const err = event.reason;
-    reportError({
+    void reportError({
       message: err instanceof Error ? err.message : String(err),
       stack:   err instanceof Error ? err.stack ?? null : null,
     });

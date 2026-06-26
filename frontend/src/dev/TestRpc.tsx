@@ -49,7 +49,7 @@ export default function TestRpc() {
 
   // refresh session once on load
   useState(() => {
-    refreshSession();
+    void refreshSession();
   });
 
   return (

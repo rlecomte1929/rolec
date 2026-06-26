@@ -108,7 +108,7 @@ export function HrPolicyDashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       // Each source is independent — settle all so one failure (e.g. no
       // published policy) doesn't blank the whole dashboard.
       const [policyRes, assignRes, excRes, healthRes] = await Promise.allSettled([

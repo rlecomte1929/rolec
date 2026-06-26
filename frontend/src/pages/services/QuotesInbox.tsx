@@ -56,7 +56,7 @@ export const QuotesInbox: React.FC = () => {
   }, [assignmentId, needsPicker]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   if (assignmentLoading) {

@@ -52,7 +52,7 @@ export const NotificationBell: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchCount();
+    void fetchCount();
   }, [fetchCount]);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export const NotificationBell: React.FC = () => {
         type="button"
         onClick={() => {
           setOpen((o) => !o);
-          if (!open) fetchList();
+          if (!open) void fetchList();
         }}
         onFocus={fetchCount}
         className="relative p-2 rounded-lg hover:bg-[#eef4f8] text-[#0b2b43] transition-colors"

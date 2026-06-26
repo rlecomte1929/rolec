@@ -11,7 +11,7 @@ import { reportError } from '../lib/errorTracking';
 export function useErrorReporter() {
   return useCallback((error: unknown, componentName?: string) => {
     const err = error instanceof Error ? error : new Error(String(error));
-    reportError({
+    void reportError({
       message:       err.message,
       stack:         err.stack ?? null,
       componentName: componentName ?? null,

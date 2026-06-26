@@ -170,16 +170,16 @@ export const AdminMessages: React.FC = () => {
   }, [companyFilter]);
 
   useEffect(() => {
-    if (companyFilter && activeTab === 'conversations') loadThreads();
+    if (companyFilter && activeTab === 'conversations') void loadThreads();
     else if (activeTab === 'conversations') setThreads([]);
   }, [companyFilter, activeTab, loadThreads]);
 
   useEffect(() => {
-    loadCompanies();
+    void loadCompanies();
   }, [loadCompanies]);
 
   useEffect(() => {
-    if (activeTab === 'tickets') loadSupportCases();
+    if (activeTab === 'tickets') void loadSupportCases();
   }, [activeTab, loadSupportCases]);
 
   const loadThreadDetail = useCallback(async (t: Thread) => {
@@ -289,7 +289,7 @@ export const AdminMessages: React.FC = () => {
         category: ticketPatchForm.category,
       });
       setEditingTicket(null);
-      loadSupportCases();
+      void loadSupportCases();
     } catch (e) {
       logger.error(e);
     }
@@ -489,7 +489,7 @@ export const AdminMessages: React.FC = () => {
             <Alert variant="error" className="mb-4">
               {error}
               <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" onClick={() => { setError(null); loadThreads(); }}>Retry</Button>
+                <Button variant="outline" size="sm" onClick={() => { setError(null); void loadThreads(); }}>Retry</Button>
                 <Button variant="outline" size="sm" onClick={() => setError(null)}>Dismiss</Button>
               </div>
             </Alert>

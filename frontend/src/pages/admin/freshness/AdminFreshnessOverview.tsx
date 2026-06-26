@@ -54,7 +54,7 @@ export const AdminFreshnessOverview: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const handleRefresh = async () => {

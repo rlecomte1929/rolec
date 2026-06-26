@@ -21,7 +21,7 @@ export const ProcessingTimeCard: React.FC<ProcessingTimeCardProps> = ({ caseId }
 
   useEffect(() => {
     let active = true;
-    getProcessingTime(caseId).then((result) => {
+    void getProcessingTime(caseId).then((result) => {
       if (active) setEstimate(result);
     });
     return () => {

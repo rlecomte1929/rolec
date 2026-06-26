@@ -406,7 +406,7 @@ export function AIPanel({ open, route, onClose }: AIPanelProps) {
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendMessage(input);
+        void sendMessage(input);
       }
     },
     [input, sendMessage]

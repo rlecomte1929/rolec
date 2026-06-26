@@ -70,7 +70,7 @@ export const AdminStagingResources: React.FC = () => {
   }, [filters]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const statusColor = (s: string) => {

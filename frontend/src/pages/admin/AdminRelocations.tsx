@@ -30,7 +30,7 @@ export const AdminRelocations: React.FC = () => {
         stage: c.stage,
       },
     });
-    load();
+    void load();
   };
 
   return (

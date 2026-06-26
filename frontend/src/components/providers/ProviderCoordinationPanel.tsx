@@ -56,7 +56,7 @@ export const ProviderCoordinationPanel: React.FC<ProviderCoordinationPanelProps>
     }
   }, [caseId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   // Realtime: re-fetch on any insert/update to provider_tasks
   useProviderRealtime(caseId, load);
@@ -71,13 +71,13 @@ export const ProviderCoordinationPanel: React.FC<ProviderCoordinationPanelProps>
     setTasks((prev) => [...prev, task]);
     // Ensure the provider is in the list
     if (!providers.find((p) => p.id === task.provider_id)) {
-      load();
+      void load();
     }
     setAssignTarget(null);
   };
 
   const handleInviteSent = () => {
-    load(); // re-fetch provider list in case new provider was just created
+    void load(); // re-fetch provider list in case new provider was just created
     setInviteTarget(null);
     setShowInviteNew(false);
   };

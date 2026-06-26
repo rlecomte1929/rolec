@@ -24,7 +24,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logger.error('[ErrorBoundary]', error, info.componentStack);
     // EH-1: report render crashes to the capture-error service (was console-only).
-    reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ErrorBoundary' });
+    void reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ErrorBoundary' });
   }
 
   render() {

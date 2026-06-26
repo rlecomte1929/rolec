@@ -55,7 +55,7 @@ export const NotificationSettings: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const updatePref = async (

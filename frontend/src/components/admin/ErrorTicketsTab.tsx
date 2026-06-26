@@ -183,7 +183,7 @@ export function ErrorTicketsTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const updateStatus = async (ticket: ErrorTicket, newStatus: TicketStatus) => {
     setSavingId(ticket.id);

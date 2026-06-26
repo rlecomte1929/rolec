@@ -265,7 +265,7 @@ export const AdminUsers: React.FC = () => {
           onClose={() => setEditOpen(null)}
           onSaved={() => {
             setEditOpen(null);
-            loadPeople();
+            void loadPeople();
           }}
         />
       )}

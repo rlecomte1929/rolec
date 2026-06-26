@@ -23,7 +23,7 @@ export const AdminOpsQueuePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const byStatus = (backlog?.by_status as Record<string, number>) ?? {};

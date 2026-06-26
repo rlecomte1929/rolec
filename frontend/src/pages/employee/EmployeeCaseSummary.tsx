@@ -110,7 +110,7 @@ export const EmployeeCaseSummary: React.FC = () => {
   }, [assignmentId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   // Remember the user's last position so the dashboard's "Open case" can

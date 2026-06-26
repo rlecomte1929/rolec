@@ -103,7 +103,7 @@ export const CalibrationAlertBanner: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchAlerts();
+    void fetchAlerts();
   }, [fetchAlerts]);
 
   const handleDismiss = useCallback(async (alertId: string) => {

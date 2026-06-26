@@ -65,7 +65,7 @@ export const HrCaseReview: React.FC = () => {
   }, [caseId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const handleSendFeedback = async () => {

@@ -136,7 +136,7 @@ export const AdminSupplierDetail: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    load();
+    void load();
     suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories)).catch(() => {});
   }, [load]);
 

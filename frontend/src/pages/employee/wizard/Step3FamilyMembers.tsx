@@ -187,7 +187,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
                 return;
               }
               setError('');
-              onNext(nextDraft);
+              void onNext(nextDraft);
             }}
           >
             {isSaving ? 'Saving…' : 'Next'}

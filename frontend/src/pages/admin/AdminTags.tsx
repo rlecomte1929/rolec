@@ -34,14 +34,14 @@ export const AdminTags: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, [filterGroup]);
 
   const update = async (id: string, payload: { key?: string; label?: string; tag_group?: string }) => {
     try {
       await adminResourcesAPI.updateTag(id, payload);
       setEditing(null);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Update failed');
     }
@@ -71,7 +71,7 @@ export const AdminTags: React.FC = () => {
       setNewKey('');
       setNewLabel('');
       setNewGroup('');
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Create failed');
     }
@@ -172,7 +172,7 @@ export const AdminTags: React.FC = () => {
                     const labelInp = document.getElementById(`edit-label-${t.id}`) as HTMLInputElement;
                     const keyInp = document.getElementById(`edit-key-${t.id}`) as HTMLInputElement;
                     const groupInp = document.getElementById(`edit-group-${t.id}`) as HTMLSelectElement;
-                    if (labelInp?.value) update(t.id, { label: labelInp.value, key: keyInp?.value || t.key, tag_group: groupInp?.value || undefined });
+                    if (labelInp?.value) void update(t.id, { label: labelInp.value, key: keyInp?.value || t.key, tag_group: groupInp?.value || undefined });
                   }}>Save</Button>
                   <Button size="sm" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button>
                 </div>
