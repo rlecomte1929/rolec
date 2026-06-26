@@ -15,6 +15,7 @@ import {
   BenefitComparisonDashboard,
   type PolicyFooter,
 } from '../../features/policy/BenefitComparisonDashboard';
+import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import type { PolicyServiceComparisonResponse } from '../../types';
 
 /**
@@ -144,16 +145,22 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
       </Card>
     );
   } else if (comp && rows.length === 0) {
-    // Policy resolved, but no services matched to it yet.
+    // [AIQ-1253/H-06] Policy resolved but no services matched yet. Show the policy
+    // benefit caps table from existing data (BudgetSummaryTable fetches per-case
+    // caps independently of service matching), and demote the "no services matched"
+    // copy to a note below — so the page is no longer an empty dead end.
     body = (
-      <Card padding="lg" className="border-[#e2e8f0]">
-        <p className="mb-1 text-sm font-medium text-[#0b2b43]">Your benefits policy is published</p>
-        <p className="text-sm text-[#64748b]">
-          {isIntakeComplete(activeRow?.status)
-            ? "No services have been matched to it yet — we'll show which services are covered and what you'd owe as your policy is applied to your case."
-            : "No services have been matched to it yet — check back after you complete your intake, and we'll show which services are covered and what you'd owe."}
-        </p>
-      </Card>
+      <div className="space-y-4">
+        {assignmentId && <BudgetSummaryTable caseId={assignmentId} displayCurrency="USD" />}
+        <Card padding="lg" className="border-[#e2e8f0]">
+          <p className="mb-1 text-sm font-medium text-[#0b2b43]">No services matched yet</p>
+          <p className="text-sm text-[#64748b]">
+            {isIntakeComplete(activeRow?.status)
+              ? "Your benefits policy is published and the caps above apply to your case. We'll show which services are covered and what you'd owe as your policy is matched to services."
+              : "Your benefits policy is published and the caps above apply to your case. Complete your intake and we'll match services and show what you'd owe."}
+          </p>
+        </Card>
+      </div>
     );
   } else {
     body = <BenefitComparisonDashboard rows={rows} caseId={caseId} policy={policy} />;
