@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
@@ -128,13 +129,10 @@ const metricSummary = (value: number | null, suffix: string): string =>
 
 export const AdminOverviewPage: React.FC = () => {
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
-  const [stats, setStats] = useState<OverviewStats>(EMPTY_STATS);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (role !== 'ADMIN') return;
-    const load = async () => {
-      setLoading(true);
+  const statsQuery = useQuery({
+    queryKey: ['admin', 'overview-stats'],
+    queryFn: async (): Promise<OverviewStats> => {
       const results = await Promise.allSettled([
         adminAPI.listCompanies(),
         adminAPI.listHrUsers(),
@@ -145,7 +143,7 @@ export const AdminOverviewPage: React.FC = () => {
         suppliersAPI.list({ status: 'active' }),
       ]);
 
-      setStats({
+      return {
         companies: settledArrayCount(results[0], (value) => value.companies),
         hrUsers: settledArrayCount(results[1], (value) => value.hr_users),
         employees: settledArrayCount(results[2], (value) => value.employees),
@@ -153,11 +151,12 @@ export const AdminOverviewPage: React.FC = () => {
         reviewOpen: settledNumber(results[4], (value) => value.open_items_count),
         reviewUnassigned: settledNumber(results[4], (value) => value.unassigned_count),
         activeSuppliers: settledArrayCount(results[5], (value) => value.suppliers),
-      });
-      setLoading(false);
-    };
-    void load();
-  }, [role]);
+      };
+    },
+    enabled: role === 'ADMIN',
+  });
+  const stats: OverviewStats = statsQuery.data ?? EMPTY_STATS;
+  const loading = statsQuery.isLoading;
 
   if (role !== 'ADMIN') {
     return (

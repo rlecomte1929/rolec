@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { Card, Badge, Button } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
@@ -17,46 +18,34 @@ import { AdminLayout } from './AdminLayout';
 export const AdminCompanyDetail: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const location = useLocation();
-  const [company, setCompany] = useState<AdminCompany | null>(null);
-  const [hrUsers, setHrUsers] = useState<AdminHrUser[]>([]);
-  const [employees, setEmployees] = useState<AdminEmployee[]>([]);
-  const [assignments, setAssignments] = useState<AdminCompanyDetailAssignment[]>([]);
-  const [policies, setPolicies] = useState<AdminCompanyDetailPolicy[]>([]);
-  const [counts, setCounts] = useState<AdminCompanyDetailCounts | null>(null);
-  const [orphanDiagnostics, setOrphanDiagnostics] = useState<AdminCompanyDetailOrphanDiagnostics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadDetail = useCallback(() => {
-    if (!companyId) return Promise.resolve();
-    setLoading(true);
-    setError(null);
-    return adminAPI
-      .getCompanyDetail(companyId)
-      .then((res) => {
-        setCompany(res.company);
-        setHrUsers(res.hr_users ?? []);
-        setEmployees(res.employees ?? []);
-        setAssignments(res.assignments ?? []);
-        setPolicies(res.policies ?? []);
-        const summary = (res as { summary?: AdminCompanyDetailCounts; counts_summary?: AdminCompanyDetailCounts }).summary
-          ?? (res as { counts_summary?: AdminCompanyDetailCounts }).counts_summary ?? null;
-        setCounts(summary);
-        setOrphanDiagnostics(res.orphan_diagnostics ?? null);
-      })
-      .catch((e: unknown) => {
-        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+  // location.key in the key preserves the original effect's refetch-on-navigation.
+  const detailQuery = useQuery({
+    queryKey: ['admin', 'company-detail', companyId, location.key],
+    queryFn: () => adminAPI.getCompanyDetail(companyId!),
+    enabled: !!companyId,
+  });
+  const res = detailQuery.data;
+  const company: AdminCompany | null = res?.company ?? null;
+  const hrUsers: AdminHrUser[] = res?.hr_users ?? [];
+  const employees: AdminEmployee[] = res?.employees ?? [];
+  const assignments: AdminCompanyDetailAssignment[] = res?.assignments ?? [];
+  const policies: AdminCompanyDetailPolicy[] = res?.policies ?? [];
+  const counts: AdminCompanyDetailCounts | null = res
+    ? (res as { summary?: AdminCompanyDetailCounts; counts_summary?: AdminCompanyDetailCounts }).summary
+        ?? (res as { counts_summary?: AdminCompanyDetailCounts }).counts_summary ?? null
+    : null;
+  const orphanDiagnostics: AdminCompanyDetailOrphanDiagnostics | null = res?.orphan_diagnostics ?? null;
+  const loading = detailQuery.isFetching;
+  const error: string | null = detailQuery.isError
+    ? (() => {
+        const err = detailQuery.error as { response?: { status?: number; data?: { detail?: string } }; message?: string };
         const detail = err?.response?.data?.detail;
         const status = err?.response?.status;
         const msg = typeof detail === 'string' ? detail : err?.message || 'Failed to load company';
-        setError(status ? `[${status}] ${msg}` : msg);
-      })
-      .finally(() => setLoading(false));
-  }, [companyId]);
-
-  useEffect(() => {
-    void loadDetail();
-  }, [loadDetail, location.key]);
+        return status ? `[${status}] ${msg}` : msg;
+      })()
+    : null;
 
   const hasOrphanIssues =
     orphanDiagnostics &&
@@ -131,7 +120,7 @@ export const AdminCompanyDetail: React.FC = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => void loadDetail()} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => void detailQuery.refetch()} disabled={loading}>
               {loading ? 'Refreshing…' : 'Refresh'}
             </Button>
             <Link

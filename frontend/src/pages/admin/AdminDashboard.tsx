@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '../../components/antigravity/Button';
 import { Card } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
@@ -7,29 +8,26 @@ import { AdminLayout } from './AdminLayout';
 
 export const AdminDashboard: React.FC = () => {
   const role = getAuthItem('relopass_role');
-  const [stats, setStats] = useState({
-    companies: 0,
-    supportOpen: 0,
-    relocationsBlocked: 0,
-  });
   const [purging, setPurging] = useState(false);
 
-  useEffect(() => {
-    if (role !== 'ADMIN') return;
-    Promise.all([
-      adminAPI.listCompanies(),
-      adminAPI.listSupportCases({ status: 'open' }),
-      adminAPI.listRelocations({ status: 'blocked' }),
-    ]).then(([companies, support, relocations]) => {
-      setStats({
+  const statsQuery = useQuery({
+    queryKey: ['admin', 'dashboard-stats'],
+    queryFn: async () => {
+      const [companies, support, relocations] = await Promise.all([
+        adminAPI.listCompanies(),
+        adminAPI.listSupportCases({ status: 'open' }),
+        adminAPI.listRelocations({ status: 'blocked' }),
+      ]);
+      return {
         companies: companies.companies.length,
         supportOpen: support.support_cases.length,
         relocationsBlocked: relocations.relocations.length,
-      });
-    }).catch(() => {
-      // Ignore errors for now
-    });
-  }, [role]);
+      };
+    },
+    enabled: role === 'ADMIN',
+  });
+  const stats: { companies: number; supportOpen: number; relocationsBlocked: number } =
+    statsQuery.data ?? { companies: 0, supportOpen: 0, relocationsBlocked: 0 };
 
   if (role !== 'ADMIN') {
     return (
