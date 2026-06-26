@@ -21,3 +21,32 @@ export async function loginAsEmployee(page: Page): Promise<void> {
     timeout: 20_000,
   });
 }
+
+export type Role = 'EMPLOYEE' | 'HR' | 'ADMIN';
+
+/**
+ * QG-5b: "log in" WITHOUT a backend by seeding the localStorage auth artefacts the
+ * client-side route guards read (relopass_token + relopass_role). Set via
+ * addInitScript so they exist BEFORE the app's first render — the guard then sees
+ * the role and allows the route. Pair with mockApi() to feed page data. For a real
+ * end-to-end login (live mode), use loginAsEmployee above instead.
+ */
+export async function seedAuth(
+  page: Page,
+  role: Role = 'EMPLOYEE',
+  // Spaces are intentional: never a real token (the guard only checks presence +
+  // role), and they keep gitleaks' generic-api-key heuristic from flagging it.
+  token = 'e2e seeded session',
+): Promise<void> {
+  await page.addInitScript(
+    ([r, t]) => {
+      localStorage.setItem('relopass_token', t);
+      localStorage.setItem('relopass_role', r);
+      localStorage.setItem('relopass_user_id', 'e2e-user');
+      localStorage.setItem('relopass_email', 'e2e@test.relopass');
+      localStorage.setItem('relopass_username', 'e2e');
+      localStorage.setItem('relopass_name', 'E2E User');
+    },
+    [role, token] as const,
+  );
+}
