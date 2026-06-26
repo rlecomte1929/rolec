@@ -1,0 +1,31 @@
+# QG-3 — automated dependency update PRs. Keeps the shipped bundle patched so
+# advisories don't accumulate silently (the DEP-1/DEP-2 backlog is why this exists).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Batch patch/minor bumps into one PR to cut review noise; majors stay separate.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /apps/hr-dashboard
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
