@@ -59,9 +59,22 @@ def repo(tmp_path):
     hook.write_text(HOOK_SRC.read_text())
     hook.chmod(0o755)
 
+    # Ignore node_modules so the fake tsc bin below (created on disk for the QG-7
+    # guard) is never swept into a commit by _commit_file's `git add -A` — which
+    # would otherwise make a backend-only push look like a frontend change.
+    (repo / ".gitignore").write_text("node_modules/\n")
+
     # A frontend/ dir so need_build=1 reaches the (faked) build, not the
     # "frontend/ not found" early-out.
     base_sha = _commit_file(repo, "frontend/package.json", '{"name":"x"}\n', "init")
+
+    # QG-7: the hook now skips the build when frontend/node_modules is absent
+    # (graceful fresh-worktree handling). Provide a fake tsc bin (on disk, gitignored)
+    # so the build path is exercised; the missing-node_modules skip is covered below.
+    tsc = repo / "frontend" / "node_modules" / ".bin" / "tsc"
+    tsc.parent.mkdir(parents=True, exist_ok=True)
+    tsc.write_text("#!/bin/sh\nexit 0\n")
+    tsc.chmod(0o755)
 
     # Fake npm: build always succeeds, instantly, with no Node required.
     shim = tmp_path / "bin"
@@ -152,4 +165,19 @@ def test_branch_deletion_is_noop(repo):
     stdin = f"(delete) {ZERO} refs/heads/old {repo['base_sha']}\n"
     code, out = _run_hook(repo, stdin)
     assert code == 0, out
+    assert not _builds(out), out
+
+
+# QG-7: a frontend change with node_modules ABSENT (fresh worktree) must skip
+# gracefully — clear message, exit 0 — not hard-error with "tsc: command not found".
+def test_missing_node_modules_skips_gracefully(repo):
+    import shutil as _shutil
+
+    path = repo["path"]
+    _shutil.rmtree(path / "frontend" / "node_modules")  # simulate a fresh clone
+    tip = _commit_file(path, "frontend/src/App.tsx", "export const x = 1\n", "fe")
+    stdin = f"refs/heads/main {tip} refs/heads/main {repo['base_sha']}\n"
+    code, out = _run_hook(repo, stdin)
+    assert code == 0, out
+    assert "node_modules is missing" in out, out
     assert not _builds(out), out

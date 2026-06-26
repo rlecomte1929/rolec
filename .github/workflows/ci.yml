@@ -238,103 +238,31 @@ jobs:
           pip install ruff
           ruff check --select F821 backend/db/
 
-      - name: Pytest (P1 deterministic suite)
+      - name: Pytest (full-suite discovery)
+        # QG-2 (AIQ-1176): run the WHOLE backend suite via discovery instead of a
+        # hardcoded ~77-file allowlist, so a new/unlisted test gates automatically
+        # (previously 361 of 438 tests never ran in CI). The `integration` marker
+        # (backend/pytest.ini) tags live-DB/Supabase tests needing real services —
+        # excluded with `-m "not integration"`. Any other env-dependent/flaky test
+        # is opted OUT with its own skip/skipif marker (allowlist SKIPS, never
+        # inclusions). pytest-asyncio (requirements.txt + asyncio_mode=auto in
+        # pytest.ini) lets async tests collect.
         run: |
-          # NOTE: the RAG context-precision eval (test_eval_rag_context_precision.py +
-          # test_rag_eval_fixture_precision.py, W3-4/AIQ-777) is back in the blocking
-          # suite as of AIQ-1089. The two failures #786 de-gated it for are fixed: the
-          # adapter (eval_rag_context_precision.ImmigrationRetrieverAdapter) now
-          # dispatches on engine dialect — SQLite routes through the shared retriever's
-          # in-Python cosine leg (no pgvector `<=>` / CAST AS vector → no "near '>'"),
-          # and reads the db handle off immigration_retriever.db so the fixture's
-          # mock.patch is honoured. Fixture vector p@5 is back to 0.2400 (floor 0.20).
-          # The live-corpus gate (≥0.62 vs the v13 baseline) runs separately with secrets.
-          python -m pytest -q \
-            backend/tests/test_admin_form_templates_router.py \
-            backend/tests/test_immigration_documents.py \
-            backend/tests/test_document_extraction_queue.py \
-            backend/tests/crawler/test_llm_resource_extractor.py \
-            backend/tests/crawler/test_pipeline_llm_fallback.py \
-            backend/tests/test_trigger_engine.py \
-            backend/tests/test_case_dossier_forms.py \
-            backend/tests/test_dossier_suggestions.py \
-            backend/tests/test_validators_tax_id.py \
-            backend/tests/test_validators_residency.py \
-            backend/tests/test_tax_cert_findings.py \
-            backend/tests/test_extraction_tax_cert.py \
-            backend/tests/test_immigration_retriever.py \
-            backend/tests/test_roadmap_generator_prompt.py \
-            backend/tests/test_factual_verifier.py \
-            backend/tests/test_rag_roadmap_pipeline.py \
-            backend/tests/test_rag_integration.py \
-            backend/tests/test_eval_rag_context_precision.py \
-            backend/tests/test_deliverable_integrity.py \
-            backend/tests/test_queue_status_hygiene.py \
-            backend/tests/test_correction_analytics.py \
-            backend/tests/test_policy_propagation.py \
-            backend/tests/test_policy_config_matrix_propagation.py \
-            backend/tests/test_policy_config_matrix_service.py \
-            backend/tests/test_e1b_extraction_persist.py \
-            backend/tests/test_policy_canonical_chunking.py \
-            backend/tests/test_corridor_persistence.py \
-            backend/tests/test_hr_no_company_policy_graceful.py \
-            backend/tests/test_case_engine_bridge.py \
-            backend/tests/test_admin_create_person_password.py \
-            backend/tests/test_hr_assign_tenant_scope.py \
-            backend/tests/test_hr_mutation_tenant_scope.py \
-            backend/tests/test_tenant_isolation_behavioral.py \
-            backend/tests/test_session_ttl.py \
-            backend/tests/test_sec_fe_4_role_spoof.py \
-            backend/tests/test_hr_vendors_corridors.py \
-            backend/tests/test_policy_assistant_rag_input_classifier.py \
-            backend/tests/test_pii_eval.py \
-            backend/tests/test_embedding_migration_dryrun.py \
-            backend/tests/test_embedding_recall.py \
-            backend/tests/test_bridge_comparison_config_matrix.py \
-            backend/tests/test_rule_change_notifier.py \
-            backend/tests/test_llm_tracing.py \
-            backend/tests/test_hr_set_employee_level.py \
-            backend/tests/test_notion_ready_queue.py \
-            backend/tests/test_pre_push_hook.py \
-            backend/tests/test_exception_requests_router.py \
-            backend/tests/test_eu_passport_recognizer.py \
-            backend/tests/test_normalize_advances_status.py \
-            backend/tests/test_database_no_duplicate_method_defs.py \
-            backend/tests/test_supabase_password_sync.py \
-            backend/tests/test_employee_steps_alias.py \
-            backend/tests/test_hr_vendor_widgets_bare_paths.py \
-            backend/tests/test_hr_catalog_router.py \
+          # Call 1 — full-suite discovery. Env-dependent / import-broken files are in
+          # collect_ignore (backend/tests/conftest.py). The 3 --ignore'd files below
+          # PASS in isolation but leak/collide when run with the whole suite (shared
+          # sqlite state); they keep gating via Call 2 (isolation fix is a follow-up).
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
+            backend/tests scripts/tests \
+            -m "not integration and not policy_assistant_audit" \
+            --ignore=backend/tests/test_llm_client_text.py \
+            --ignore=backend/tests/test_policy_propagation.py \
+            --ignore=backend/tests/test_supabase_password_sync.py
+          # Call 2 — the isolation-sensitive previously-gated files, on their own.
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests/test_llm_client_text.py \
-            backend/tests/test_cron_crawl_schedules.py \
-            backend/tests/test_crawl_tier_scheduler.py \
-            backend/tests/test_policy_assistant_embedder_factory.py \
-            backend/tests/test_auth_deps_canonical.py \
-            backend/tests/test_plan_versions_service.py \
-            backend/tests/test_injection_envelopes.py \
-            backend/tests/test_prompt_caching.py \
-            backend/tests/test_hr_export.py \
-            scripts/tests/test_check_rls_coverage.py \
-            backend/tests/test_sla_rules.py \
-            backend/tests/test_case_escalation_service.py \
-            backend/tests/test_hr_escalation_router.py \
-            backend/tests/test_i4_case_plan_delivery.py \
-            backend/tests/test_corridor_registry.py \
-            backend/tests/test_answer_provenance.py \
-            backend/tests/test_immigration_hybrid_retriever.py \
-            backend/tests/test_cases_is_sqlite.py \
-            backend/tests/test_db_healthcheck_regression.py \
-            backend/tests/test_corridor_prompt_selection.py \
-            backend/tests/test_corridor_intake_questions.py \
-            backend/tests/test_corridor_sla.py \
-            backend/tests/test_corridor_pathways.py \
-            backend/tests/test_budget_summary_policy_config.py \
-            backend/tests/test_rag_eval_fixture_precision.py \
-            backend/tests/test_jsonb_bind_cast.py \
-            backend/tests/test_cors_preflight_backstop.py \
-            backend/tests/test_submit_status_parity.py \
-            backend/tests/test_case_status_parity.py \
-            backend/tests/test_resolve_case_status.py \
-            backend/tests/test_pii_masking_llm_egress.py
+            backend/tests/test_policy_propagation.py \
+            backend/tests/test_supabase_password_sync.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
