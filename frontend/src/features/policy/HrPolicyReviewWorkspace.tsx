@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../api/client';
+import type { NormalizedPolicyResponse, NormalizedBenefitRule, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from './types';
 import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
 import { buildEmployeePreviewCompare } from './hrPolicyEmployeePreviewCompare';
 import { HrPolicyWorkspaceLayout } from './HrPolicyWorkspaceLayout';
@@ -88,15 +89,15 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   adminCompanyId = null,
   hasPublishedMatrix = false,
 }) => {
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [policies, setPolicies] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<PolicyDocument[]>([]);
+  const [policies, setPolicies] = useState<CompanyPolicySummary[]>([]);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
-  const [normalized, setNormalized] = useState<any | null>(null);
+  const [normalized, setNormalized] = useState<NormalizedPolicyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageVariant, setMessageVariant] = useState<'success' | 'error'>('error');
-  const [sourceClause, setSourceClause] = useState<any | null>(null);
-  const [editingRule, setEditingRule] = useState<any | null>(null);
+  const [sourceClause, setSourceClause] = useState<PolicyDocumentClause | null>(null);
+  const [editingRule, setEditingRule] = useState<NormalizedBenefitRule | null>(null);
   const [savingRule, setSavingRule] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -155,8 +156,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           onBindComplete?.();
           return bindPolicyId;
         }
-        if (!current && pols.length) return pols[0].id;
-        if (current && !pols.some((p: any) => p.id === current) && pols.length) return pols[0].id;
+        if (!current && pols.length) return pols[0]?.id ?? current;
+        if (current && !pols.some((p: any) => p.id === current) && pols.length) return pols[0]?.id ?? current;
         return current;
       });
     });
@@ -453,7 +454,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       if (byCat[cat]?.length) ordered.push([cat, byCat[cat]]);
     }
     const others = Object.keys(byCat).filter((c) => !POLICY_TOPIC_ORDER.includes(c));
-    for (const c of others) ordered.push([c, byCat[c]]);
+    for (const c of others) ordered.push([c, byCat[c] ?? []]);
     return ordered;
   }, [normalized?.benefit_rules]);
 
@@ -981,7 +982,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           {link ? (
                             <Button unstyled
                               type="button"
-                              onClick={() => openSourceClause(link.clause_id)}
+                              onClick={() => link.clause_id && openSourceClause(link.clause_id)}
                               className="text-xs text-[#059669] hover:underline text-left"
                             >
                               p.{link.source_page_start ?? '?'}
@@ -1000,12 +1001,12 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                             <Button
                               size="sm"
                               onClick={() => handlePatchBenefit(r.id, {
-                                amount_value: editingRule.amount_value,
-                                amount_unit: editingRule.amount_unit,
-                                currency: editingRule.currency,
-                                description: editingRule.description,
-                                benefit_key: editingRule.benefit_key,
-                                metadata_json: editingRule.metadata_json,
+                                amount_value: editingRule?.amount_value,
+                                amount_unit: editingRule?.amount_unit,
+                                currency: editingRule?.currency,
+                                description: editingRule?.description,
+                                benefit_key: editingRule?.benefit_key,
+                                metadata_json: editingRule?.metadata_json,
                               })}
                               disabled={savingRule === r.id}
                             >
