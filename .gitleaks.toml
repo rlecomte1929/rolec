@@ -1,0 +1,31 @@
+# gitleaks config for ReloPass — SEC-FE-7 (AP-02 Layer 4).
+# Used by the `secrets-scan` job in .github/workflows/ci.yml, which scans each
+# PR's commit range and FAILS on a secret-shaped string.
+
+title = "ReloPass gitleaks config"
+
+[extend]
+# Start from gitleaks' built-in rule set (AWS, GCP, Stripe, JWT, generic, …).
+useDefault = true
+
+[allowlist]
+description = "Intentionally-public values and known false positives"
+
+# --- Public Supabase ANON keys -------------------------------------------------
+# The Supabase anon key is public by design — it ships in the frontend bundle and
+# is subject to RLS. It also appears in a few migrations/edge-function calls. The
+# base64 fragment below is `"role":"anon"` inside the JWT payload, so this
+# allowlists ONLY anon JWTs. A SERVICE_ROLE key (`"role":"service_role"`, base64
+# `cm9sZSI6InNlcnZpY2Vfcm9sZSI`) does NOT match and still fails the scan.
+regexes = [
+  '''cm9sZSI6ImFub24''',
+]
+
+# --- Known false-positive paths ------------------------------------------------
+# Seed-data slugs (e.g. "stable_key": "nl_30pct_ruling") trip the generic-api-key
+# heuristic, and long-form design docs contain prose that looks key-shaped.
+# Neither carries real secrets.
+paths = [
+  '''backend/seed_data/.*\.json''',
+  '''docs/superpowers/.*\.md''',
+]

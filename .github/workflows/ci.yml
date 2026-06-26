@@ -67,6 +67,24 @@ jobs:
         with:
           files: ".github/workflows/*.yml"
 
+  # SEC-FE-7: scan every PR for secret-shaped strings and FAIL on a hit. Not
+  # gated on `changes` — a leaked credential can appear in any diff. Uses the
+  # root .gitleaks.toml allowlist (public Supabase anon key + known false-
+  # positive paths); a service_role key or any other real secret still fails.
+  secrets-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs the PR commit range (base..head) to scan the diff.
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
+
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).
   # The three separate jobs each did their own checkout + setup-node + `npm ci`,
