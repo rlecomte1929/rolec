@@ -16,6 +16,13 @@ import {
 } from '../api/feedback';
 import { buildRoute } from '../navigation/routes';
 
+type CaseDraft = {
+  relocationBasics?: { originCity?: string; originCountry?: string; destCity?: string; destCountry?: string; purpose?: string; targetMoveDate?: string; durationMonths?: number };
+  employeeProfile?: { fullName?: string; email?: string; nationality?: string; roleTitle?: string };
+  familyMembers?: { spouse?: { fullName?: string }; children?: unknown[] };
+  assignmentContext?: { employer?: string; contractStart?: string };
+};
+
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card padding="md" className="mb-4">
@@ -28,7 +35,7 @@ function SummarySection({ title, children }: { title: string; children: React.Re
 export const HrCaseReview: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<any>(null);
+  const [draft, setDraft] = useState<CaseDraft | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<CaseFeedbackRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
