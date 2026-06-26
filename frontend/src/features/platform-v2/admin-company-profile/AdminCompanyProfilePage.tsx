@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { AdminLayout } from '../../../pages/admin/AdminLayout';
 import { adminAPI } from '../../../api/client';
@@ -24,39 +24,33 @@ import { CompanyProfileForm } from '../company-profile/CompanyProfileForm';
  */
 export function AdminCompanyProfilePage() {
   const { companyId } = useParams<{ companyId: string }>();
-  const [company, setCompany] = useState<AdminCompany | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    if (!companyId) {
-      setLoadError('Missing :companyId in URL.');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await adminAPI.getCompanyDetail(companyId);
-      setCompany(res.company);
-    } catch (e) {
-      const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
-      const status = err?.response?.status;
-      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to load tenant';
-      setLoadError(status ? `[${status}] ${detail}` : detail);
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const companyQuery = useQuery({
+    queryKey: ['admin', 'company-detail', companyId],
+    queryFn: () => adminAPI.getCompanyDetail(companyId as string),
+    enabled: !!companyId,
+  });
+  const company: AdminCompany | null = companyQuery.data?.company ?? null;
+  const loading = companyId ? companyQuery.isLoading : false;
+  const loadError = !companyId
+    ? 'Missing :companyId in URL.'
+    : companyQuery.isError
+      ? (() => {
+          const err = companyQuery.error as {
+            response?: { status?: number; data?: { detail?: string } };
+            message?: string;
+          } | null;
+          const status = err?.response?.status;
+          const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to load tenant';
+          return status ? `[${status}] ${detail}` : detail;
+        })()
+      : null;
 
   async function handleSave(payload: CompanyProfilePayload) {
     if (!companyId) throw new Error('Missing :companyId');
     await adminAPI.updateCompany(companyId, payload);
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['admin', 'company-detail', companyId] });
   }
 
   const tenantName = company?.name ?? '…';

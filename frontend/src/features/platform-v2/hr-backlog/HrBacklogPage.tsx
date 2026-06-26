@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
@@ -125,32 +126,22 @@ function ownerInitials(name: string | null | undefined, fallbackId: string | nul
 
 export function HrBacklogPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<HrBacklogTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasCompany, setHasCompany] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await hrAPI.getBacklog();
-      setItems(res.items ?? []);
-      setHasCompany(res.has_company);
-    } catch (e) {
-      const err = e as { response?: { status?: number; data?: { detail?: string } } };
-      const detail = err?.response?.data?.detail;
-      const status = err?.response?.status;
-      setItems([]);
-      setError(detail ?? (status ? `Server returned ${status}` : 'Could not load backlog.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const backlogQuery = useQuery({
+    queryKey: ['hr', 'backlog'],
+    queryFn: () => hrAPI.getBacklog(),
+  });
+  const items: HrBacklogTask[] = backlogQuery.data?.items ?? [];
+  const hasCompany = backlogQuery.data?.has_company ?? true;
+  const loading = backlogQuery.isLoading;
+  const error = backlogQuery.isError
+    ? (() => {
+        const err = backlogQuery.error as { response?: { status?: number; data?: { detail?: string } } } | null;
+        const detail = err?.response?.data?.detail;
+        const status = err?.response?.status;
+        return detail ?? (status ? `Server returned ${status}` : 'Could not load backlog.');
+      })()
+    : null;
 
   // KPIs computed from the items array.
   const kpis = useMemo(() => {
@@ -313,7 +304,7 @@ export function HrBacklogPage() {
             <div className="ml-auto flex items-center gap-2">
               <Button unstyled
                 type="button"
-                onClick={() => void load()}
+                onClick={() => void backlogQuery.refetch()}
                 disabled={loading}
                 className="text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50"
               >
@@ -347,7 +338,7 @@ export function HrBacklogPage() {
             <span>{error}</span>
             <Button unstyled
               type="button"
-              onClick={() => void load()}
+              onClick={() => void backlogQuery.refetch()}
               className="text-amber-700 hover:underline"
             >
               Retry

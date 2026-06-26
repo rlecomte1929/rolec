@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { adminAPI } from '../../../api/client';
 import { listToV2Shape, type CompanyV2 } from './adapter';
 
@@ -23,26 +23,22 @@ export function useCompaniesV2(): {
   error: string | null;
   refresh: () => Promise<void>;
 } {
-  const [companies, setCompanies] = useState<CompanyV2[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const query = useQuery({
+    queryKey: ['companies', 'v2'],
+    queryFn: async () => {
       const res = await adminAPI.listCompanies();
-      setCompanies(listToV2Shape(res.companies ?? []));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load companies');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return listToV2Shape(res.companies ?? []);
+    },
+  });
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const companies: CompanyV2[] = query.data ?? [];
+  const loading = query.isLoading;
+  const error = query.isError
+    ? (query.error instanceof Error ? query.error.message : 'Failed to load companies')
+    : null;
+  const refresh = async () => {
+    await query.refetch();
+  };
 
   return { companies, loading, error, refresh };
 }

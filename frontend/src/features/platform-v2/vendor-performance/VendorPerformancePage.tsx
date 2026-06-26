@@ -10,7 +10,8 @@
  *
  * Data: GET /api/hr/vendor-performance (hr_vendor_performance router)
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
@@ -476,10 +477,6 @@ function CategoryRow({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function VendorPerformancePage({ embedded = false }: { embedded?: boolean }) {
-  const [data, setData] = useState<VendorPerformanceData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Time range — persisted in the URL like the parent ?tab= (HrServiceProvidersPage).
   const [searchParams, setSearchParams] = useSearchParams();
   const rawRange = searchParams.get('range');
@@ -492,6 +489,16 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
     },
     [searchParams, setSearchParams],
   );
+
+  const perfQuery = useQuery({
+    queryKey: ['hr', 'vendor-performance', range],
+    queryFn: () => fetchVendorPerformance(range),
+  });
+  const data: VendorPerformanceData | null = perfQuery.data ?? null;
+  const loading = perfQuery.isLoading;
+  const error = perfQuery.isError
+    ? 'Could not load vendor performance data. Please try again.'
+    : null;
 
   // Filters
   const [catFilter, setCatFilter] = useState<string>('all');
@@ -508,21 +515,6 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
       return next;
     });
   }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const d = await fetchVendorPerformance(range);
-      setData(d);
-    } catch {
-      setError('Could not load vendor performance data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [range]);
-
-  useEffect(() => { void load(); }, [load]);
 
   // ── Derived: filtered categories ─────────────────────────────────────────
   const filteredCats = useMemo(() => {
@@ -623,7 +615,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <Button
           unstyled
           type="button"
-          onClick={() => void load()}
+          onClick={() => void perfQuery.refetch()}
           disabled={loading}
           className="ml-auto text-xs font-medium text-[#1f8e8b] underline-offset-2 hover:underline disabled:opacity-50"
         >
