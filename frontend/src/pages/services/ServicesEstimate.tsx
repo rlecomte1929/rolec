@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
@@ -7,10 +7,9 @@ import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
 import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
+import { useServicesScope } from '../../features/services/useServicesScope';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
-import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
 import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
@@ -27,17 +26,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export const ServicesEstimate: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { recommendations, shortlist, displayCurrency, setActiveCaseId } = useServicesFlow();
-  const {
-    assignmentId: primaryAssignmentId,
-    linkedSummaries,
-  } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
-  const { effectiveId: assignmentId } = useMemo(
-    () => resolveScopedAssignmentId({ linkedSummaries, primaryAssignmentId, queryAssignmentId }),
-    [linkedSummaries, primaryAssignmentId, queryAssignmentId],
-  );
+  const { assignmentId, linkTo } = useServicesScope();
   useEffect(() => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
@@ -47,7 +37,7 @@ export const ServicesEstimate: React.FC = () => {
   // restart of the services flow.
   useTrackLastVisited(assignmentId || null);
   const moveBanner = useServicesMoveBanner(assignmentId || null);
-  const go = (path: string) => navigate({ pathname: path, search: location.search });
+  const go = (path: string) => navigate(path);
 
   if (!recommendations) {
     return (
@@ -72,8 +62,8 @@ export const ServicesEstimate: React.FC = () => {
             comes out of pocket. Your selections save automatically — you can come back any time.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => go(buildRoute('services'))}>Start picking services</Button>
-            <Button variant="outline" onClick={() => go(buildRoute('servicesRecommendations'))}>
+            <Button onClick={() => go(linkTo('services'))}>Start picking services</Button>
+            <Button variant="outline" onClick={() => go(linkTo('recommendations'))}>
               See recommendations
             </Button>
           </div>
@@ -105,7 +95,7 @@ export const ServicesEstimate: React.FC = () => {
       <Alert variant="info" className="mb-4">
         <p className="text-sm">
           Estimates and policy comparison below use <strong>{displayCurrency}</strong>. To change currency, go back to{' '}
-          <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium underline">
+          <Link to={linkTo('services')} className="font-medium underline">
             Select services
           </Link>
           .
@@ -127,12 +117,12 @@ export const ServicesEstimate: React.FC = () => {
         selectedPackage={shortlist}
         categoryLabels={CATEGORY_LABELS}
         displayCurrency={displayCurrency}
-        onBack={() => go(buildRoute('servicesRecommendations'))}
-        onStartOver={() => go(buildRoute('services'))}
+        onBack={() => go(linkTo('recommendations'))}
+        onStartOver={() => go(linkTo('services'))}
       />
       {isRfqEnabled() && (
         <div className="mt-6 flex items-center justify-end">
-          <Button disabled={!hasShortlist} onClick={() => go(buildRoute('servicesRfqNew'))}>
+          <Button disabled={!hasShortlist} onClick={() => go(linkTo('rfqNew'))}>
             Request quotations
           </Button>
         </div>
@@ -148,7 +138,7 @@ export const ServicesEstimate: React.FC = () => {
           primaryLabel="View my relocation plan →"
           primaryHref={buildRoute('employeeCasePlan', { caseId: assignmentId })}
           secondaryLabel="Back to recommendations"
-          secondaryHref={`${buildRoute('servicesRecommendations')}${location.search}`}
+          secondaryHref={linkTo('recommendations')}
         />
       )}
     </AppShell>

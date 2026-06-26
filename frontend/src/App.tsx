@@ -28,6 +28,7 @@ import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { AdminViewingCompanyProvider } from './features/admin/AdminViewingCompanyContext';
 // V2Gate removed — all promoted flags now render V2 unconditionally
 import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
+import { ServicesLegacyRedirect } from './features/services/ServicesLegacyRedirect';
 import { RequireHrRoute } from './features/hr/RequireHrRoute';
 import { NotFoundRedirect } from './components/NotFoundRedirect';
 import { ROUTES as WIZARD_ROUTES } from './routes';
@@ -333,15 +334,25 @@ function App() {
           path={ROUTE_DEFS.providers.path}
           element={<Navigate to={ROUTE_DEFS.services.path} replace />}
         />
+        {/* [AIQ-1249a] Case-id-native services flow. The legacy /services/* routes
+            below stay alive but redirect here once a case resolves (back-compat). */}
+        <Route path={ROUTE_DEFS.employeeCaseServices.path} element={<RequireEmployeeRoute><ProvidersPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseServicesQuestions.path} element={<RequireEmployeeRoute><ServicesQuestions /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseServicesRecommendations.path} element={<RequireEmployeeRoute><ServicesRecommendations /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseServicesEstimate.path} element={<RequireEmployeeRoute><ServicesEstimate /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseServicesRfqNew.path} element={<RequireEmployeeRoute><ServicesRfqNew /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseServicesConclusion.path} element={<RequireEmployeeRoute><ServicesConclusion /></RequireEmployeeRoute>} />
+        {/* Legacy /services/* — kept for back-compat; redirect to the case-scoped
+            equivalent when a single case resolves, else render the legacy page. */}
         <Route
           path={ROUTE_DEFS.services.path}
-          element={<ProvidersPage />}
+          element={<ServicesLegacyRedirect step="services"><ProvidersPage /></ServicesLegacyRedirect>}
         />
-        <Route path={ROUTE_DEFS.servicesQuestions.path} element={<ServicesQuestions />} />
-        <Route path={ROUTE_DEFS.servicesRecommendations.path} element={<ServicesRecommendations />} />
-        <Route path={ROUTE_DEFS.servicesEstimate.path} element={<ServicesEstimate />} />
-        <Route path={ROUTE_DEFS.servicesRfqNew.path} element={<ServicesRfqNew />} />
-        <Route path={ROUTE_DEFS.servicesConclusion.path} element={<ServicesConclusion />} />
+        <Route path={ROUTE_DEFS.servicesQuestions.path} element={<ServicesLegacyRedirect step="questions"><ServicesQuestions /></ServicesLegacyRedirect>} />
+        <Route path={ROUTE_DEFS.servicesRecommendations.path} element={<ServicesLegacyRedirect step="recommendations"><ServicesRecommendations /></ServicesLegacyRedirect>} />
+        <Route path={ROUTE_DEFS.servicesEstimate.path} element={<ServicesLegacyRedirect step="estimate"><ServicesEstimate /></ServicesLegacyRedirect>} />
+        <Route path={ROUTE_DEFS.servicesRfqNew.path} element={<ServicesLegacyRedirect step="rfqNew"><ServicesRfqNew /></ServicesLegacyRedirect>} />
+        <Route path={ROUTE_DEFS.servicesConclusion.path} element={<ServicesLegacyRedirect step="conclusion"><ServicesConclusion /></ServicesLegacyRedirect>} />
         <Route path={ROUTE_DEFS.quotesInbox.path} element={<QuotesInbox />} />
         <Route path={ROUTE_DEFS.quoteRfqDetail.path} element={<QuoteRfqDetail />} />
         <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />

@@ -95,6 +95,34 @@ export function resolveScopedAssignmentId(input: {
   return { effectiveId: null, needsPicker: true };
 }
 
+/**
+ * [AIQ-1249a] Resolve the assignment_id for a case_id by matching the linked
+ * overview rows (rows carry both). The services APIs key on assignment_id; the
+ * URL is case-id-native, so case-scoped pages map caseId → assignment_id here.
+ * Returns null when the case isn't among the user's linked rows (e.g. not loaded
+ * yet, or a case the user can't access — we never fall back to another case).
+ */
+export function resolveAssignmentIdForCaseId(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  caseId: string | null | undefined,
+): string | null {
+  const cid = (caseId || '').trim();
+  if (!cid) return null;
+  const row = linkedSummaries.find((r) => (r.case_id || '').trim() === cid);
+  return (row?.assignment_id || '').trim() || null;
+}
+
+/** Inverse of resolveAssignmentIdForCaseId — case_id for a known assignment_id. */
+export function resolveCaseIdForAssignmentId(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  assignmentId: string | null | undefined,
+): string | null {
+  const aid = (assignmentId || '').trim();
+  if (!aid) return null;
+  const row = linkedSummaries.find((r) => (r.assignment_id || '').trim() === aid);
+  return (row?.case_id || '').trim() || null;
+}
+
 /** Append or replace `assignment` query param (keeps other params). */
 export function withAssignmentQuery(path: string, assignmentId: string): string {
   const [base, existing] = path.split('?');

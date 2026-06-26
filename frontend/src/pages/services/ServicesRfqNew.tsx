@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Button, Card, Input } from '../../components/antigravity';
@@ -8,8 +8,8 @@ import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { employeeAPI } from '../../api/client';
 import { RfqWorkflowDiagram } from '../../features/services/RfqWorkflowDiagram';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { useServicesScope } from '../../features/services/useServicesScope';
 import { buildRoute } from '../../navigation/routes';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 
 const SERVICE_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -25,23 +25,9 @@ const RFQ_SUBTITLE =
 
 export const ServicesRfqNew: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { recommendations, shortlist } = useServicesFlow();
-  const {
-    assignmentId: primaryAssignmentId,
-    linkedSummaries,
-    isLoading: assignmentLoading,
-  } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
-  const { effectiveId: assignmentId, needsPicker } = useMemo(
-    () =>
-      resolveScopedAssignmentId({
-        linkedSummaries,
-        primaryAssignmentId,
-        queryAssignmentId,
-      }),
-    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
-  );
+  const { linkedSummaries } = useEmployeeAssignment();
+  const { assignmentId, needsPicker, isLoading: assignmentLoading, linkTo } = useServicesScope();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -136,7 +122,7 @@ export const ServicesRfqNew: React.FC = () => {
           </p>
           <Button
             onClick={() =>
-              navigate(withAssignmentQuery(buildRoute('servicesRecommendations'), assignmentId))
+              navigate(linkTo('recommendations'))
             }
           >
             Back to recommendations

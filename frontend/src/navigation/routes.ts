@@ -74,6 +74,15 @@ export const ROUTE_DEFS = {
   servicesEstimate: { path: '/services/estimate', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   servicesRfqNew: { path: '/services/rfq/new', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   servicesConclusion: { path: '/services/conclusion', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** [AIQ-1249a] Case-scoped services flow — case-id-native URLs mirroring the
+   *  employeeCaseRoadmap pattern. The legacy /services/* routes above stay as
+   *  back-compat aliases that redirect here once a case resolves. */
+  employeeCaseServices: { path: '/employee/case/:caseId/services', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  employeeCaseServicesQuestions: { path: '/employee/case/:caseId/services/questions', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  employeeCaseServicesRecommendations: { path: '/employee/case/:caseId/services/recommendations', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  employeeCaseServicesEstimate: { path: '/employee/case/:caseId/services/estimate', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  employeeCaseServicesRfqNew: { path: '/employee/case/:caseId/services/rfq/new', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  employeeCaseServicesConclusion: { path: '/employee/case/:caseId/services/conclusion', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   quotesInbox: { path: '/quotes', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   quoteRfqDetail: { path: '/quotes/rfq/:rfqId', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   vendorInbox: { path: '/vendor/inbox', roles: ['ADMIN', 'EMPLOYEE', 'HR'] as RouteRole[] },

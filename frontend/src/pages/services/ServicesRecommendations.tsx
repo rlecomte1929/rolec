@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
@@ -7,10 +7,8 @@ import { RecommendationResults } from '../../features/recommendations/Recommenda
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
 import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
+import { useServicesScope } from '../../features/services/useServicesScope';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
-import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
-import { buildRoute } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -31,20 +29,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export const ServicesRecommendations: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { recommendations, shortlist, setShortlist, displayCurrency, setActiveCaseId } = useServicesFlow();
-  const { assignmentId: primaryAssignmentId, linkedSummaries } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
-  const { effectiveId: assignmentId } = useMemo(
-    () => resolveScopedAssignmentId({ linkedSummaries, primaryAssignmentId, queryAssignmentId }),
-    [linkedSummaries, primaryAssignmentId, queryAssignmentId],
-  );
+  const { assignmentId, linkTo } = useServicesScope();
   useEffect(() => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
   }, [assignmentId, setActiveCaseId]);
   const moveBanner = useServicesMoveBanner(assignmentId || null);
-  const go = (path: string) => navigate({ pathname: path, search: location.search });
+  const go = (path: string) => navigate(path);
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
     return (
@@ -53,7 +45,7 @@ export const ServicesRecommendations: React.FC = () => {
           <p className="text-sm text-[#6b7280] mb-4">
             Complete the service questions to unlock recommendations.
           </p>
-          <Button onClick={() => go(buildRoute('servicesQuestions'))}>Answer questions</Button>
+          <Button onClick={() => go(linkTo('questions'))}>Answer questions</Button>
         </Card>
       </AppShell>
     );
@@ -75,7 +67,7 @@ export const ServicesRecommendations: React.FC = () => {
       <Alert variant="info" className="mb-4">
         <p className="text-sm">
           Estimates on this page are shown in <strong>{displayCurrency}</strong>. To change currency, go back to{' '}
-          <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium underline">
+          <Link to={linkTo('services')} className="font-medium underline">
             Select services
           </Link>
           .
@@ -86,8 +78,8 @@ export const ServicesRecommendations: React.FC = () => {
         categoryLabels={CATEGORY_LABELS}
         selectedPackage={shortlist}
         onSelectedPackageChange={setShortlist}
-        onStartOver={() => go(buildRoute('services'))}
-        onViewSummary={() => go(buildRoute('servicesEstimate'))}
+        onStartOver={() => go(linkTo('services'))}
+        onViewSummary={() => go(linkTo('estimate'))}
         displayCurrency={displayCurrency}
         caseId={assignmentId || undefined}
       />

@@ -11,10 +11,9 @@ import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import {
   parseAssignmentSearchParam,
-  resolveScopedAssignmentId,
   setPreferredEmployeeAssignmentId,
-  withAssignmentQuery,
 } from '../utils/employeeAssignmentScope';
+import { useServicesScope } from '../features/services/useServicesScope';
 import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
@@ -84,21 +83,12 @@ type ServiceState = {
 export const ProvidersPage: React.FC = () => {
   const location = useLocation();
   const {
-    assignmentId: primaryAssignmentId,
     linkedSummaries,
     isLoading: assignmentLoading,
     refetch,
   } = useEmployeeAssignment();
   const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
-  const { effectiveId: assignmentId, needsPicker } = useMemo(
-    () =>
-      resolveScopedAssignmentId({
-        linkedSummaries,
-        primaryAssignmentId,
-        queryAssignmentId,
-      }),
-    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
-  );
+  const { assignmentId, needsPicker, linkTo } = useServicesScope();
 
   useEffect(() => {
     if (!queryAssignmentId || needsPicker || assignmentId !== queryAssignmentId) return;
@@ -272,7 +262,7 @@ export const ProvidersPage: React.FC = () => {
         .map(([k]) => k as ServiceKey)
     );
     setSelectedServices(selected);
-    navigate(withAssignmentQuery(buildRoute('servicesQuestions'), assignmentId));
+    navigate(linkTo('questions'));
   };
 
   if (assignmentLoading || isLoading) {
