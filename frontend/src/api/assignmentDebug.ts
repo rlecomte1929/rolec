@@ -9,13 +9,26 @@ import { supabase } from './supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const FALLBACK_ACCESS_TOKEN = import.meta.env.VITE_SUPABASE_ACCESS_TOKEN;
+const FALLBACK_ACCESS_TOKEN = import.meta.env.VITE_SUPABASE_ACCESS_TOKEN as string | undefined;
+
+interface RpcError {
+  message?: string;
+  error?: string;
+  details?: string;
+}
+
+/** Extract a message from a PostgREST/RPC error body (parsed as unknown), or `HTTP <status>`. */
+const rpcErrorMessage = (json: unknown, status: number): string => {
+  const e = (json ?? {}) as RpcError;
+  const msg = e.message || e.error || e.details;
+  return typeof msg === 'string' && msg ? msg : `HTTP ${status}`;
+};
 
 const isJwt = (v?: string | null) => typeof v === 'string' && v.split('.').length === 3;
 
 async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
-  let token = data?.session?.access_token || FALLBACK_ACCESS_TOKEN;
+  let token: string | null | undefined = data?.session?.access_token || FALLBACK_ACCESS_TOKEN;
   if (token && isJwt(token)) return token;
   if (data?.session?.refresh_token) {
     const { data: refreshed } = await supabase.auth.refreshSession({ refresh_token: data.session.refresh_token });
@@ -54,10 +67,9 @@ async function fetchViaSupabase(assignmentId: string): Promise<{ data: GetAssign
       },
       body: JSON.stringify({ p_assignment_id: assignmentId }),
     });
-    const json = await res.json();
+    const json: unknown = await res.json();
     if (!res.ok) {
-      let msg = json?.message || json?.error || json?.details || `HTTP ${res.status}`;
-      if (typeof msg !== 'string') msg = JSON.stringify(msg);
+      let msg = rpcErrorMessage(json, res.status);
       if (msg.toLowerCase().includes('jwt expired') || msg.includes('PGRST301') || msg.includes('PGRST302')) {
         msg += ' Sign in with Supabase (e.g. /debug/auth) to refresh your session.';
       }
@@ -126,10 +138,9 @@ export async function assertAssignmentLinks(
         p_expected_hr: expectedHrUuid,
       }),
     });
-    const json = await res.json();
+    const json: unknown = await res.json();
     if (!res.ok) {
-      const msg = json?.message || json?.error || json?.details || `HTTP ${res.status}`;
-      return { data: null, error: typeof msg === 'string' ? msg : JSON.stringify(msg) };
+      return { data: null, error: rpcErrorMessage(json, res.status) };
     }
     return { data: json as AssertLinksResult, error: null };
   } catch (err) {
