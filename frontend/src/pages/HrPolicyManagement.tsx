@@ -50,21 +50,38 @@ function getDefaultPolicy() {
     companyEntity: '',
     effectiveDate: new Date().toISOString().slice(0, 10),
     expiryDate: null as string | null,
-    status: 'draft' as const,
+    status: 'draft' as string,
     employeeBands: ['Band1', 'Band2', 'Band3', 'Band4'],
     assignmentTypes: ['Long-Term', 'Permanent', 'Short-Term'],
     benefitCategories,
   };
 }
 
+type PolicyForm = ReturnType<typeof getDefaultPolicy>;
+type BenefitCategory = typeof DEFAULT_BENEFIT;
+interface HrLegacyPolicySummary {
+  id?: string;
+  policyId?: string;
+  policyName?: string;
+  companyEntity?: string;
+  effectiveDate?: string;
+  expiryDate?: string | null;
+  version?: string | number;
+  status?: string;
+  employeeBands?: string[];
+  assignmentTypes?: string[];
+  benefitCategories?: Record<string, Partial<BenefitCategory>>;
+  _meta?: { version?: string | number; status?: string };
+}
+
 export const HrPolicyManagement: React.FC = () => {
   const navigate = useNavigate();
-  const [policies, setPolicies] = useState<any[]>([]);
+  const [policies, setPolicies] = useState<HrLegacyPolicySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'upload'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Record<string, any>>(getDefaultPolicy());
+  const [form, setForm] = useState<PolicyForm>(getDefaultPolicy());
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -94,7 +111,7 @@ export const HrPolicyManagement: React.FC = () => {
     setView('create');
   };
 
-  const handleEdit = (policy: any) => {
+  const handleEdit = (policy: HrLegacyPolicySummary) => {
     const id = policy.id || policy.policyId;
     setForm({
       policyName: policy.policyName || 'Untitled',
@@ -104,9 +121,9 @@ export const HrPolicyManagement: React.FC = () => {
       status: policy._meta?.status || policy.status || 'draft',
       employeeBands: policy.employeeBands || ['Band1', 'Band2', 'Band3', 'Band4'],
       assignmentTypes: policy.assignmentTypes || ['Permanent', 'Long-Term', 'Short-Term'],
-      benefitCategories: { ...getDefaultPolicy().benefitCategories, ...(policy.benefitCategories || {}) },
+      benefitCategories: { ...getDefaultPolicy().benefitCategories, ...(policy.benefitCategories || {}) } as Record<string, BenefitCategory>,
     });
-    setEditingId(id);
+    setEditingId(id ?? null);
     setView('edit');
   };
 
@@ -175,7 +192,7 @@ export const HrPolicyManagement: React.FC = () => {
           maxAllowed: { ...(cats[key].maxAllowed || {}), [tier]: Number(value) || 0 },
         };
       } else {
-        (cats[key])[field] = value;
+        (cats[key] as Record<string, unknown>)[field] = value;
       }
       return { ...prev, benefitCategories: cats };
     });
