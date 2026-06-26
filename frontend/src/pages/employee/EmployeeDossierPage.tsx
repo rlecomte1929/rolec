@@ -9,7 +9,7 @@
  * makes newly-triggered forms appear without refresh, plus the overall
  * completion-% header tile and "Build dossier" CTA.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
@@ -20,6 +20,15 @@ import { fetchRelocationPlanView } from '../../api/relocationPlanView';
 import { Alert, isSourceStale } from '../../components/antigravity';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
+
+// AIQ-1264: lazy-load so the panel's API-client → supabase import chain isn't pulled
+// into this page's static module graph (it threw "supabaseUrl is required" in the
+// jsdom unit tests, which have no VITE_SUPABASE_* env).
+const DossierSuggestionsPanel = lazy(() =>
+  import('../../features/platform-v2/intake/DossierSuggestionsPanel').then((m) => ({
+    default: m.DossierSuggestionsPanel,
+  })),
+);
 
 type FilterTabKey = 'all' | 'action_needed' | 'blocked' | 'ready' | 'submitted';
 
@@ -185,6 +194,17 @@ export const EmployeeDossierPage: React.FC = () => {
             </div>
           )}
         </header>
+
+        {/* M-06 (AIQ-1264): the AI suggested-questions panel was moved here from the
+            intake Review step — it belongs where the employee works on their forms,
+            not at the moment of submission. */}
+        {caseId && (
+          <Suspense fallback={null}>
+            <div className="mb-6">
+              <DossierSuggestionsPanel caseId={caseId} />
+            </div>
+          </Suspense>
+        )}
 
         {/* [Validate gate] Soft gate: nudge the employee to validate their
             roadmap first. Forms below stay reachable (dimmed), never blocked. */}
