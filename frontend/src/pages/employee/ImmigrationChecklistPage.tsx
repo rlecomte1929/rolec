@@ -7,7 +7,8 @@
  * Shows required documents per permit type with status badges and upload placeholder.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card, StatusPill } from '../../components/antigravity';
@@ -88,28 +89,22 @@ export const ImmigrationChecklistPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
 
-  const [immCase, setImmCase] = useState<ImmigrationCase | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [uploadToast, setUploadToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!caseId) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        // Fetch the immigration case for this relocation case
-        const res = await api.get(`/api/employee/cases/${caseId}/immigration`);
-        if (!cancelled) setImmCase(res.data as ImmigrationCase);
-      } catch {
-        if (!cancelled) setError('Could not load your immigration case. Please contact HR.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [caseId]);
+  const immigrationQuery = useQuery({
+    queryKey: ['employee', 'immigration-case', caseId],
+    queryFn: async () => {
+      const res = await api.get(`/api/employee/cases/${caseId}/immigration`);
+      return res.data as ImmigrationCase;
+    },
+    enabled: !!caseId,
+  });
+  const immCase = immigrationQuery.data ?? null;
+  // Preserve the original: with no caseId the page stays in its loading state.
+  const loading = !caseId || immigrationQuery.isLoading;
+  const error = immigrationQuery.isError
+    ? 'Could not load your immigration case. Please contact HR.'
+    : null;
 
   const handleUpload = useCallback((docName: string) => {
     setUploadToast(`Upload coming soon — please send "${docName}" directly to your immigration partner.`);
