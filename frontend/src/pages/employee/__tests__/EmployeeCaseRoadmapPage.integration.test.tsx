@@ -118,8 +118,9 @@ describe('EmployeeCaseRoadmapPage — roadmap orchestration', () => {
     expect(taskMatches.length).toBeGreaterThan(0);
     // Phase rendered (appears in both the hero mini-timeline and the phase section).
     expect(screen.getAllByText('Immigration & visas').length).toBeGreaterThan(0);
-    // The Roadmap stepper step is present (PhaseContextBar).
-    expect(screen.getAllByText('Roadmap').length).toBeGreaterThan(0);
+    // The page heading renders. (PhaseContextBar's "Roadmap" stepper step was
+    // removed in AIQ-1246c; the page now leads with the "My roadmap" heading.)
+    expect(screen.getByText('My roadmap')).toBeInTheDocument();
     expect(fetchRelocationPlanView).toHaveBeenCalledWith('c1', expect.objectContaining({ role: 'employee' }));
   });
 });
