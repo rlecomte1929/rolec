@@ -73,9 +73,9 @@ function readPersistedConsent(caseId: string): { consentedAt: string; version: s
   try {
     const raw = typeof window !== 'undefined' ? window.localStorage.getItem(consentStorageKey(caseId)) : null;
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as { consentedAt?: unknown; version?: unknown };
     if (parsed && typeof parsed.consentedAt === 'string' && typeof parsed.version === 'string') {
-      return parsed;
+      return { consentedAt: parsed.consentedAt, version: parsed.version };
     }
   } catch {
     // Corrupt entry — treat as missing.
@@ -115,7 +115,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     return !!existing && existing.version === PRIVACY_CONSENT_VERSION;
   });
   const [dossierQuestions, setDossierQuestions] = useState<DossierQuestion[]>([]);
-  const [dossierAnswers, setDossierAnswers] = useState<Record<string, any>>({});
+  const [dossierAnswers, setDossierAnswers] = useState<Record<string, unknown>>({});
   const [dossierComplete, setDossierComplete] = useState(true);
   const [dossierSources, setDossierSources] = useState<DossierSource[]>([]);
   const [dossierLoading, setDossierLoading] = useState(false);
@@ -229,7 +229,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     return acc;
   }, {}) || {};
 
-  const isAnswered = (value: any) => {
+  const isAnswered = (value: unknown) => {
     if (value === null || value === undefined) return false;
     if (typeof value === 'string') return value.trim().length > 0;
     if (Array.isArray(value)) return value.length > 0;
@@ -278,17 +278,19 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       if (nextRoute) {
         navigate(nextRoute);
       }
-    } catch (err: any) {
-      const resData = err?.response?.data;
-      const detail = err?.detail ?? resData?.detail;
-      if (detail && typeof detail === 'object' && detail.message) {
-        const missing = Array.isArray(detail.missingFields) ? detail.missingFields : [];
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown; message?: unknown } }; detail?: unknown };
+      const resData = e?.response?.data;
+      const detail = e?.detail ?? resData?.detail;
+      const detailObj = detail && typeof detail === 'object' ? (detail as { message?: string; missingFields?: unknown }) : null;
+      if (detailObj?.message) {
+        const missing = Array.isArray(detailObj.missingFields) ? detailObj.missingFields : [];
         setError(missing.length
-          ? `${detail.message}. Complete Step 1 (Relocation Basics) required fields.`
-          : detail.message);
-      } else if (detail && typeof detail === 'string') {
+          ? `${detailObj.message}. Complete Step 1 (Relocation Basics) required fields.`
+          : detailObj.message);
+      } else if (typeof detail === 'string') {
         setError(detail);
-      } else if (resData && typeof resData === 'object' && resData.message) {
+      } else if (resData && typeof resData === 'object' && typeof resData.message === 'string') {
         setError(resData.message);
       } else {
         setError("Couldn't save. Try again.");
@@ -483,7 +485,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
                   </div>
                   {q.answer_type === 'text' && (
                     <Input
-                      value={dossierAnswers[q.id] ?? ''}
+                      value={(dossierAnswers[q.id] as string) ?? ''}
                       onChange={(value) => setDossierAnswers((prev) => ({ ...prev, [q.id]: value }))}
                       placeholder="Type your answer"
                       fullWidth
@@ -492,7 +494,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
                   {q.answer_type === 'date' && (
                     <Input
                       type="date"
-                      value={dossierAnswers[q.id] ?? ''}
+                      value={(dossierAnswers[q.id] as string) ?? ''}
                       onChange={(value) => setDossierAnswers((prev) => ({ ...prev, [q.id]: value }))}
                       fullWidth
                     />
@@ -513,7 +515,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
                   )}
                   {q.answer_type === 'select' && (
                     <Select
-                      value={dossierAnswers[q.id] ?? ''}
+                      value={(dossierAnswers[q.id] as string) ?? ''}
                       onChange={(value) => setDossierAnswers((prev) => ({ ...prev, [q.id]: value }))}
                       options={(q.options || []).map((opt) => ({ value: opt, label: opt }))}
                       placeholder="Select"
@@ -523,7 +525,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
                   {q.answer_type === 'multiselect' && (
                     <div className="space-y-2">
                       {(q.options || []).map((opt) => {
-                        const current = Array.isArray(dossierAnswers[q.id]) ? dossierAnswers[q.id] : [];
+                        const current = Array.isArray(dossierAnswers[q.id]) ? (dossierAnswers[q.id] as string[]) : [];
                         const checked = current.includes(opt);
                         return (
                           <label key={opt} className="flex items-center gap-2 text-sm text-[#4b5563]">
