@@ -6,7 +6,10 @@
 #
 # Gates on eslint ERRORS only (not the ~3451 'warn' backlog the TS/a11y/async epics
 # own) — consistent with the CI lint step — so editing a warning-laden file isn't
-# blocked. eslint --fix auto-fixes what it can; lint-staged re-stages the result.
+# blocked. NOTE: deliberately NO `--fix` — `eslint --fix` auto-applies
+# no-unnecessary-type-assertion (a warn-level autofixable rule that false-positives)
+# and STRIPS necessary `as X` casts during commit, after the local tsc, committing a
+# tsc-broken file that only fails in CI (B8 / #951). lint-staged just CHECKS now.
 #
 # Bypass in genuine emergencies with:  git commit --no-verify
 
