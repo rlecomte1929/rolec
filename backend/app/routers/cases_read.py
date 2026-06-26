@@ -41,6 +41,7 @@ from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
+from ..services.roadmap_lead_times import lead_time_days_for
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
 from ..services.roadmap_staleness import annotate_staleness
@@ -77,6 +78,10 @@ class RoadmapStepV2(BaseModel):
     status: str
     owner: str
     due_date: Optional[str] = None
+    # [AIQ-1258c] True when due_date was not a real form deadline but was
+    # auto-estimated from the case move date (move_date − track lead time).
+    # Real deadlines always keep this False and are never overwritten.
+    due_date_is_suggested: bool = False
     sort_order: int
     ai_suggestion: Optional[str] = None
     dependency_ids: List[str] = []
@@ -123,6 +128,30 @@ def _bucket_confidence(pct: Optional[int]) -> Optional[str]:
     if pct >= 50:
         return "MEDIUM"
     return "LOW"
+
+
+def _suggested_due_date(
+    due_date: Optional[str],
+    track_key: str,
+    move_date: Optional["_dt.date"],
+) -> tuple[Optional[str], bool]:
+    """[AIQ-1258c] Resolve a roadmap step's due date + suggestion flag.
+
+    Returns ``(due_date, is_suggested)``. A real form deadline is always kept
+    untouched (``is_suggested=False``). A step with no deadline is given a
+    suggested ISO due date of ``move_date − lead_time_days_for(track_key)`` when
+    both a move date and a known lead time exist; otherwise it stays ``None``
+    (no suggestion). Never overwrites an existing deadline; never guesses when
+    the move date is unknown.
+    """
+    if due_date is not None:
+        return due_date, False
+    if move_date is None:
+        return None, False
+    lead = lead_time_days_for(track_key)
+    if lead is None:
+        return None, False
+    return (move_date - _dt.timedelta(days=lead)).isoformat(), True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -965,21 +994,41 @@ def get_case_roadmap_tracks(
     # handling; each form becomes a step in its track bucket.
     summaries = _load_case_form_summaries(case_id)
     projected = project_tracks(summaries)
-    tracks = [
-        RoadmapTrackV2(
-            id=t.key,
-            name=t.name,
-            icon=t.icon,
-            sort_order=t.sort_order,
-            progress_pct=t.progress_pct,
-            steps=[
+
+    # [AIQ-1258c] Load the case move date once so steps with no real form
+    # deadline can show a suggested due date (move_date − track lead time).
+    # The roadmap's forms are keyed by the canonical case id (case_forms.case_id
+    # == wizard_cases.id), so resolve it the same way the form loader does and
+    # read the move date off the same ORM path GET /api/cases/{id} uses. If the
+    # case can't be loaded or has no move date, move_date stays None and no
+    # suggestion is made — a real deadline is never overwritten either way.
+    move_date: Optional[_dt.date] = None
+    try:
+        resolved_case_id = resolve_case_forms_case_id(case_id)
+        with SessionLocal() as db:
+            _case = crud.get_case(db, resolved_case_id)
+        if _case is not None:
+            move_date = getattr(_case, "target_move_date", None)
+    except Exception:
+        logger.exception("roadmap: failed to load move date for case_id=%s", case_id)
+        move_date = None
+
+    tracks = []
+    for t in projected:
+        step_models = []
+        for s in t.steps:
+            due_date, due_date_is_suggested = _suggested_due_date(
+                s.due_date, t.key, move_date
+            )
+            step_models.append(
                 RoadmapStepV2(
                     id=s.id,
                     title=s.title,
                     description=None,
                     status=s.status,
                     owner=s.owner,
-                    due_date=s.due_date,
+                    due_date=due_date,
+                    due_date_is_suggested=due_date_is_suggested,
                     sort_order=s.sort_order,
                     ai_suggestion=None,
                     dependency_ids=[],
@@ -990,11 +1039,17 @@ def get_case_roadmap_tracks(
                     worst_doc_status=None,
                     estimated_effort=s.estimated_effort,  # [AIQ-869]
                 )
-                for s in t.steps
-            ],
+            )
+        tracks.append(
+            RoadmapTrackV2(
+                id=t.key,
+                name=t.name,
+                icon=t.icon,
+                sort_order=t.sort_order,
+                progress_pct=t.progress_pct,
+                steps=step_models,
+            )
         )
-        for t in projected
-    ]
     return RoadmapTracksResponse(tracks=tracks)
 
 
