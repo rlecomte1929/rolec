@@ -2,7 +2,8 @@
  * EmployeeTaskPage — lists and allows submission of tasks assigned to the employee.
  * Uses servicesAPI.getTasks() (AIQ-34-B).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
@@ -150,14 +151,42 @@ export const EmployeeTaskPage: React.FC = () => {
   // tasks. When no case is selected, getTasks() falls back server-side to the
   // most-recently-updated case (matching the dashboard's active-case selection).
   const { selectedCaseId } = useSelectedCase();
-  const [tasks, setTasks] = useState<EmployeeTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const tasksQueryKey = ['employee', 'tasks', selectedCaseId ?? null];
   // PRIV-005: one-time persistent privacy-notice gate. Submission stays blocked
   // until the current notice version is acknowledged; a version bump re-prompts.
+  // Kept as local state so the PrivacyNotice can still toggle it; seeded from
+  // the consent query below.
   const [acknowledged, setAcknowledged] = useState(false);
   // audit 3.4: id of the task whose completion confirmation is currently showing.
   const [completedTaskId, setCompletedTaskId] = useState<string | null>(null);
+
+  const tasksQuery = useQuery({
+    queryKey: tasksQueryKey,
+    queryFn: async () => {
+      const res = await servicesAPI.getTasks(selectedCaseId ?? undefined);
+      return res.tasks;
+    },
+  });
+  const tasks: EmployeeTask[] = tasksQuery.data ?? [];
+  const loading = tasksQuery.isLoading;
+  const error = tasksQuery.isError ? 'Could not load your tasks. Please try again.' : null;
+
+  const consentQuery = useQuery({
+    queryKey: ['privacy', 'consents', PRIVACY_NOTICE_VERSION],
+    queryFn: async () => {
+      const res = await apiGet<{ acknowledged: boolean }>(
+        `/api/privacy/consents?notice_version=${encodeURIComponent(PRIVACY_NOTICE_VERSION)}`,
+      );
+      return res.acknowledged;
+    },
+  });
+
+  // Seed the acknowledgement gate from the consent query (defaults to false,
+  // matching the old fetch's catch).
+  useEffect(() => {
+    if (consentQuery.data !== undefined) setAcknowledged(consentQuery.data);
+  }, [consentQuery.data]);
 
   // Auto-dismiss the completion confirmation after ~4s.
   useEffect(() => {
@@ -166,31 +195,10 @@ export const EmployeeTaskPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [completedTaskId]);
 
-  useEffect(() => {
-    void apiGet<{ acknowledged: boolean }>(
-      `/api/privacy/consents?notice_version=${encodeURIComponent(PRIVACY_NOTICE_VERSION)}`,
-    )
-      .then((res) => setAcknowledged(res.acknowledged))
-      .catch(() => setAcknowledged(false));
-  }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await servicesAPI.getTasks(selectedCaseId ?? undefined);
-      setTasks(res.tasks);
-    } catch {
-      setError('Could not load your tasks. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCaseId]);
-
-  useEffect(() => { void load(); }, [load]);
-
   const handleSubmit = (updated: EmployeeTask) => {
-    setTasks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+    queryClient.setQueryData<EmployeeTask[]>(tasksQueryKey, (prev) =>
+      prev ? prev.map((t) => (t.id === updated.id ? updated : t)) : prev,
+    );
     setCompletedTaskId(updated.id);
   };
 
@@ -211,7 +219,7 @@ export const EmployeeTaskPage: React.FC = () => {
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {error}
-            <Button unstyled onClick={load} className="ml-2 underline">Retry</Button>
+            <Button unstyled onClick={() => void tasksQuery.refetch()} className="ml-2 underline">Retry</Button>
           </div>
         )}
 

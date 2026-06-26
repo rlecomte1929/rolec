@@ -7,10 +7,13 @@
  * Each alert can be dismissed individually. When all are dismissed the banner
  * disappears.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { logger } from '../lib/logger';
 import { hrAPI, type CalibrationAlert } from '../api/client';
 import { Button } from './antigravity/Button';
+
+const CALIBRATION_ALERTS_KEY = ['hr', 'calibration-alerts'] as const;
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVG — no extra dep)
@@ -85,38 +88,35 @@ const AlertRow: React.FC<AlertRowProps> = ({ alert, onDismiss, dismissingId }) =
 // Main banner
 // ---------------------------------------------------------------------------
 export const CalibrationAlertBanner: React.FC = () => {
-  const [alerts, setAlerts] = useState<CalibrationAlert[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
-  const fetchAlerts = useCallback(async () => {
-    try {
+  const alertsQuery = useQuery({
+    queryKey: CALIBRATION_ALERTS_KEY,
+    queryFn: async () => {
       const data = await hrAPI.listCalibrationAlerts();
-      setAlerts(data ?? []);
-    } catch (err) {
-      // Silently swallow — the banner is non-critical and shouldn't break the page
-      logger.warn('CalibrationAlertBanner: failed to fetch alerts', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchAlerts();
-  }, [fetchAlerts]);
+      return data ?? [];
+    },
+  });
+  // Non-critical banner: a load failure resolves to no alerts (the old fetch
+  // swallowed errors and left the list empty), so the banner just stays hidden.
+  const alerts: CalibrationAlert[] = alertsQuery.data ?? [];
+  const loading = alertsQuery.isLoading;
 
   const handleDismiss = useCallback(async (alertId: string) => {
     setDismissingId(alertId);
     try {
       await hrAPI.dismissCalibrationAlert(alertId);
-      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      queryClient.setQueryData<CalibrationAlert[]>(CALIBRATION_ALERTS_KEY, (prev) =>
+        prev ? prev.filter((a) => a.id !== alertId) : prev,
+      );
     } catch (err) {
       logger.error('CalibrationAlertBanner: dismiss failed', err);
     } finally {
       setDismissingId(null);
     }
-  }, []);
+  }, [queryClient]);
 
   // Nothing to show while loading or when there are no undismissed alerts
   if (loading || alerts.length === 0) return null;

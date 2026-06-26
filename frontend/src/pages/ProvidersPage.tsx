@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -103,22 +104,53 @@ export const ProvidersPage: React.FC = () => {
     if (!queryAssignmentId || needsPicker || assignmentId !== queryAssignmentId) return;
     setPreferredEmployeeAssignmentId(queryAssignmentId);
   }, [queryAssignmentId, needsPicker, assignmentId]);
+  const queryClient = useQueryClient();
+  // `services` is form-local (toggled by handleToggle), seeded from the query.
   const [services, setServices] = useState<Record<string, ServiceState>>({});
-  const [svcPolicy, setSvcPolicy] = useState<Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>> | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [loadError, setLoadError] = useState('');
-  const [loadErrorDetails, setLoadErrorDetails] = useState('');
   const { setSelectedServices, displayCurrency, setDisplayCurrency, setActiveCaseId } = useServicesFlow();
+  const navigate = useNavigate();
+
+  const servicesQuery = useQuery({
+    queryKey: ['employee', 'assignment-services', assignmentId],
+    queryFn: async () => {
+      const [serviceRes, ctxRes] = await Promise.all([
+        employeeAPI.getAssignmentServices(assignmentId!),
+        employeeAPI.getServicesPolicyContext(assignmentId!).catch(() => null),
+      ]);
+      return { serviceRes, ctxRes };
+    },
+    enabled: !assignmentLoading && !!assignmentId && !needsPicker,
+  });
+
+  const svcPolicy: Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>> | null =
+    servicesQuery.data?.ctxRes ?? null;
+  const isLoading = servicesQuery.isLoading;
+  const load401 =
+    (servicesQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
+  const loadError = servicesQuery.isError && !load401 ? 'Couldn’t load services data. Try again.' : '';
+  const loadErrorDetails = useMemo(() => {
+    if (!servicesQuery.isError || load401) return '';
+    const err = servicesQuery.error as {
+      response?: { status?: number; data?: { detail?: string; message?: string } };
+      config?: { url?: string };
+      message?: string;
+    } | null;
+    if (import.meta.env.DEV) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message;
+      return `status=${status || 'n/a'} url=${err?.config?.url || ''} detail=${detail || ''}`;
+    }
+    if (!API_BASE_URL) return 'Missing VITE_API_URL in frontend build.';
+    return '';
+  }, [servicesQuery.isError, servicesQuery.error, load401]);
+
   useEffect(() => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
   }, [assignmentId, setActiveCaseId]);
   const [pendingCurrency, setPendingCurrency] = useState<string>(displayCurrency);
-  const navigate = useNavigate();
   // Keep the picker in sync if the committed currency changes from elsewhere
   // (e.g. when policy resolution forces a default on first load).
   useEffect(() => {
@@ -135,63 +167,45 @@ export const ProvidersPage: React.FC = () => {
     }
   }, [svcPolicy?.currency, setDisplayCurrency]);
 
+  // Seed the form-local `services` map from the loaded data, and sync the
+  // selected set to context so the questions page has the right selection on a
+  // direct visit.
   useEffect(() => {
-    if (assignmentLoading) return;
-    if (!assignmentId || needsPicker) {
-      setIsLoading(false);
-      return;
+    const serviceRes = servicesQuery.data?.serviceRes;
+    if (!serviceRes) return;
+    const baseState: Record<string, ServiceState> = {};
+    ENABLED_SERVICES.forEach((svc) => {
+      baseState[svc.key] = { selected: false, estimated_cost: '' };
+    });
+    serviceRes.services?.forEach((row) => {
+      if (!baseState[row.service_key]) return;
+      baseState[row.service_key] = {
+        selected: Boolean(row.selected),
+        estimated_cost: row.estimated_cost !== null && row.estimated_cost !== undefined ? String(row.estimated_cost) : '',
+      };
+    });
+    setServices(baseState);
+    const selected = new Set(
+      (serviceRes.services || [])
+        .filter((r) => r.selected)
+        .map((r) => r.service_key as ServiceKey)
+    );
+    setSelectedServices(selected);
+  }, [servicesQuery.data?.serviceRes, setSelectedServices]);
+
+  // Preserve the 401 → landing redirect from the read.
+  useEffect(() => {
+    if (servicesQuery.isError && load401) {
+      navigate(buildRoute('landing'));
     }
-    const load = async () => {
-      setIsLoading(true);
-      setLoadError('');
-      setLoadErrorDetails('');
-      try {
-        const [serviceRes, ctxRes] = await Promise.all([
-          employeeAPI.getAssignmentServices(assignmentId),
-          employeeAPI.getServicesPolicyContext(assignmentId).catch(() => null),
-        ]);
-        setSvcPolicy(ctxRes);
-        const baseState: Record<string, ServiceState> = {};
-        ENABLED_SERVICES.forEach((svc) => {
-          baseState[svc.key] = { selected: false, estimated_cost: '' };
-        });
-        serviceRes.services?.forEach((row) => {
-          if (!baseState[row.service_key]) return;
-          baseState[row.service_key] = {
-            selected: Boolean(row.selected),
-            estimated_cost: row.estimated_cost !== null && row.estimated_cost !== undefined ? String(row.estimated_cost) : '',
-          };
-        });
-        setServices(baseState);
-        // Sync selected services to context so questions page has correct selection on direct visit
-        const selected = new Set(
-          (serviceRes.services || [])
-            .filter((r) => r.selected)
-            .map((r) => r.service_key as ServiceKey)
-        );
-        setSelectedServices(selected);
-      } catch (err: any) {
-        if (err?.response?.status === 401) {
-          navigate(buildRoute('landing'));
-          return;
-        }
-        const status = err?.response?.status;
-        const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message;
-        setLoadError('Couldn’t load services data. Try again.');
-        if (import.meta.env.DEV) {
-          setLoadErrorDetails(`status=${status || 'n/a'} url=${err?.config?.url || ''} detail=${detail || ''}`);
-          logger.error('[services] load error', err);
-        }
-        if (!API_BASE_URL && !import.meta.env.DEV) {
-          setLoadErrorDetails('Missing VITE_API_URL in frontend build.');
-        }
-        setSvcPolicy(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    void load();
-  }, [assignmentId, assignmentLoading, needsPicker, navigate]);
+  }, [servicesQuery.isError, load401, navigate]);
+
+  // DEV-only diagnostics for a non-401 load failure (matches the old catch).
+  useEffect(() => {
+    if (servicesQuery.isError && !load401 && import.meta.env.DEV) {
+      logger.error('[services] load error', servicesQuery.error);
+    }
+  }, [servicesQuery.isError, servicesQuery.error, load401]);
 
   const selectedKeys = useMemo(
     () => new Set(Object.entries(services).filter(([, v]) => v.selected).map(([k]) => k)),
@@ -231,6 +245,8 @@ export const ProvidersPage: React.FC = () => {
       });
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
       setMessage('Saved.');
+      // Refetch so the form re-seeds from the saved server state.
+      await queryClient.invalidateQueries({ queryKey: ['employee', 'assignment-services', assignmentId] });
       return true;
     } catch (err: unknown) {
       const errAny = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
