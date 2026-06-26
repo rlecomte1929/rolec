@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# QG-8 (AIQ-1181): pre-commit gate — run lint-staged (eslint --fix) on STAGED
+# frontend TS/TSX, so format/lint errors are caught before the commit instead of
+# only in CI. Self-installs via the same core.hooksPath=.githooks mechanism as the
+# pre-push hook (frontend/scripts/install-git-hooks.mjs, QG-7).
+#
+# Gates on eslint ERRORS only (not the ~3451 'warn' backlog the TS/a11y/async epics
+# own) — consistent with the CI lint step — so editing a warning-laden file isn't
+# blocked. eslint --fix auto-fixes what it can; lint-staged re-stages the result.
+#
+# Bypass in genuine emergencies with:  git commit --no-verify
+
+set -euo pipefail
+
+# No-op in CI (the lint already runs there) and in non-interactive automation.
+[ -n "${CI:-}" ] && exit 0
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Only relevant when frontend source is staged — skip fast otherwise.
+if ! git diff --cached --name-only --diff-filter=ACM | grep -qE '^frontend/src/.*\.(ts|tsx)$'; then
+  exit 0
+fi
+
+# A fresh clone/worktree may have no node_modules — degrade gracefully (mirrors the
+# pre-push guard) instead of hard-erroring with "lint-staged: command not found".
+if [ ! -x frontend/node_modules/.bin/lint-staged ]; then
+  echo "pre-commit: ⚠️  frontend/node_modules is missing — run 'npm ci' in frontend/ to"
+  echo "pre-commit:     enable the staged-lint check. Skipping for this commit."
+  exit 0
+fi
+
+echo "pre-commit: linting staged frontend files (lint-staged)…"
+if ( cd frontend && npx lint-staged ); then
+  exit 0
+else
+  status=$?
+  echo ""
+  echo "pre-commit: ❌ staged-lint failed — commit aborted."
+  echo "            Fix the eslint error(s) above, or bypass with: git commit --no-verify"
+  exit "$status"
+fi
