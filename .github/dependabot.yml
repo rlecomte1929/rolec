@@ -1,31 +1,43 @@
 # QG-3 — automated dependency update PRs. Keeps the shipped bundle patched so
 # advisories don't accumulate silently (the DEP-1/DEP-2 backlog is why this exists).
+#
+# TRIMMED after the initial config opened ~12 PRs at once and exhausted the
+# private repo's metered Actions minutes (each PR runs the full CI matrix on every
+# push). Now: MONTHLY, max 2 open PRs/ecosystem, grouped minor+patch, and major
+# bumps ignored (they need deliberate manual review — react-pdf 9→10, react-leaflet
+# 4→5, typescript 5→6, react-router 6→7, etc. — not an auto-PR flood).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     groups:
-      # Batch patch/minor bumps into one PR to cut review noise; majors stay separate.
       minor-and-patch:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /apps/hr-dashboard
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     groups:
       minor-and-patch:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 2
