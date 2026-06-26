@@ -13,6 +13,7 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ImmigrationStatusPanel } from '../ImmigrationStatusPanel';
 import { hrAPI } from '../../../api/client';
@@ -82,15 +83,21 @@ const covered = (estimated_timeline_days: number | null) => ({
   risk_flags: [],
 });
 
-const renderPanel = () =>
-  render(
-    <ImmigrationStatusPanel
-      caseId="case-1"
-      moveDate={null}
-      onFindVendor={() => {}}
-      onViewProfile={() => {}}
-    />,
+const renderPanel = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ImmigrationStatusPanel
+        caseId="case-1"
+        moveDate={null}
+        onFindVendor={() => {}}
+        onViewProfile={() => {}}
+      />
+    </QueryClientProvider>,
   );
+};
 
 afterEach(() => {
   cleanup();

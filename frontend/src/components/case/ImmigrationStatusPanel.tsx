@@ -13,7 +13,8 @@
  * Privacy: does NOT display passport_number or date_of_birth.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import { MilestoneTracker } from '../immigration/MilestoneTracker';
@@ -126,29 +127,20 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
   onFindVendor,
   onViewProfile,
 }) => {
-  const [immData, setImmData] = useState<ImmigrationData | null>(null);
-  const [interview, setInterview] = useState<InterviewStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const load = useCallback(() => {
-    setLoading(true);
-    setError('');
-    Promise.all([
-      hrAPI.getImmigrationRequirements(caseId),
-      hrAPI.getImmigrationInterviewStatus(caseId),
-    ])
-      .then(([imm, iv]) => {
-        setImmData(imm);
-        setInterview(iv);
-      })
-      .catch(() => setError('Failed to load immigration data.'))
-      .finally(() => setLoading(false));
-  }, [caseId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const immStatusQuery = useQuery({
+    queryKey: ['immigration-status', caseId],
+    queryFn: async () => {
+      const [imm, iv] = await Promise.all([
+        hrAPI.getImmigrationRequirements(caseId),
+        hrAPI.getImmigrationInterviewStatus(caseId),
+      ]);
+      return { immData: imm, interview: iv };
+    },
+  });
+  const immData: ImmigrationData | null = immStatusQuery.data?.immData ?? null;
+  const interview: InterviewStatus | null = immStatusQuery.data?.interview ?? null;
+  const loading = immStatusQuery.isLoading;
+  const error = immStatusQuery.isError ? 'Failed to load immigration data.' : '';
 
   // IMM-15: snapshot the case's immigration context for a vendor RFQ pre-fill.
   // move_date is injected by the parent (sourced from the case record).
@@ -178,7 +170,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
         {error}
         <Button unstyled
           type="button"
-          onClick={load}
+          onClick={() => void immStatusQuery.refetch()}
           className="ml-3 underline hover:no-underline"
         >
           Retry

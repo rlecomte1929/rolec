@@ -8,7 +8,8 @@
  * Fails silently (renders nothing) if the fetch errors or returns an
  * empty list.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../api/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -51,18 +52,14 @@ interface CaseBudgetPanelProps {
 }
 
 export const CaseBudgetPanel: React.FC<CaseBudgetPanelProps> = ({ caseId }) => {
-  const [lines, setLines] = useState<BudgetLine[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(() => {
-    if (!caseId) { setLoading(false); return; }
-    apiGet<BudgetLine[]>(`/api/cases/${caseId}/budget-lines`)
-      .then(setLines)
-      .catch(() => setLines([]))
-      .finally(() => setLoading(false));
-  }, [caseId]);
-
-  useEffect(() => { load(); }, [load]);
+  const budgetQuery = useQuery({
+    queryKey: ['case', caseId, 'budget-lines'],
+    queryFn: () => apiGet<BudgetLine[]>(`/api/cases/${caseId}/budget-lines`),
+    enabled: !!caseId,
+  });
+  // Fail silently (errors → []) — preserve the original soft-fail behaviour.
+  const lines: BudgetLine[] = budgetQuery.data ?? [];
+  const loading = budgetQuery.isLoading;
 
   if (loading || lines.length === 0) return null;
 

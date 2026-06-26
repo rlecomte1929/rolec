@@ -8,7 +8,8 @@
  * Fails silently (renders nothing) if the fetch errors or returns an
  * empty list — keeps the HR page clean for cases with no vendors assigned.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../api/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -62,18 +63,14 @@ interface CaseVendorsPanelProps {
 }
 
 export const CaseVendorsPanel: React.FC<CaseVendorsPanelProps> = ({ caseId }) => {
-  const [vendors, setVendors] = useState<VendorRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(() => {
-    if (!caseId) { setLoading(false); return; }
-    apiGet<VendorRow[]>(`/api/cases/${caseId}/vendors`)
-      .then(setVendors)
-      .catch(() => setVendors([]))
-      .finally(() => setLoading(false));
-  }, [caseId]);
-
-  useEffect(() => { load(); }, [load]);
+  const vendorsQuery = useQuery({
+    queryKey: ['case', caseId, 'vendors'],
+    queryFn: () => apiGet<VendorRow[]>(`/api/cases/${caseId}/vendors`),
+    enabled: !!caseId,
+  });
+  // Fail silently (errors → []) — preserve the original soft-fail behaviour.
+  const vendors: VendorRow[] = vendorsQuery.data ?? [];
+  const loading = vendorsQuery.isLoading;
 
   if (loading || vendors.length === 0) return null;
 
