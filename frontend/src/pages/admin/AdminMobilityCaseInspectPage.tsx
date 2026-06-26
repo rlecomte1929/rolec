@@ -101,7 +101,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
     }
   }, [caseId, load]);
 
-  const context = payload?.context as Record<string, unknown> | undefined;
+  const context = payload?.context;
   const caseRow = context?.case as Record<string, unknown> | null | undefined;
   const op = payload?.operational;
   const auditLogs = payload?.audit_logs || [];

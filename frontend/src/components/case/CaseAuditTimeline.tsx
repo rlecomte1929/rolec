@@ -43,7 +43,7 @@ function verbLabel(e: CaseAuditEvent): string {
 
 function reasonOf(e: CaseAuditEvent): string | null {
   const nv = e.new_value;
-  const r = nv && typeof nv === 'object' ? (nv as Record<string, unknown>).reason : null;
+  const r = nv && typeof nv === 'object' ? (nv).reason : null;
   return typeof r === 'string' && r.trim() ? r : null;
 }
 
@@ -56,7 +56,7 @@ function reversedIds(events: CaseAuditEvent[]): Set<string> {
   const ids = new Set<string>();
   for (const e of events) {
     if (e.event === 'AUDIT_REVERSED' && e.new_value && typeof e.new_value === 'object') {
-      const ref = (e.new_value as Record<string, unknown>).reverses;
+      const ref = (e.new_value).reverses;
       if (typeof ref === 'string') ids.add(ref);
     }
   }
@@ -221,13 +221,13 @@ export function CaseAuditTimeline({ caseId }: { caseId: string }) {
 
                     {editing && (
                       <div className="mt-2 space-y-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2">
-                        <div className="text-[11px] font-medium text-[#0b2b43] capitalize">{target!.kind} this entry</div>
+                        <div className="text-[11px] font-medium text-[#0b2b43] capitalize">{target.kind} this entry</div>
                         <textarea
                           value={reason}
                           onChange={(ev) => setReason(ev.target.value)}
                           rows={2}
                           maxLength={1000}
-                          placeholder={target!.kind === 'amend' ? 'What is being corrected?' : 'Why is this being reversed?'}
+                          placeholder={target.kind === 'amend' ? 'What is being corrected?' : 'Why is this being reversed?'}
                           className="w-full rounded-md border border-[#cbd5e1] bg-white px-2 py-1 text-xs text-[#0b2b43] focus:border-[#0b2b43] focus:outline-none"
                           disabled={submitting}
                         />
@@ -237,7 +237,7 @@ export function CaseAuditTimeline({ caseId }: { caseId: string }) {
                             Cancel
                           </Button>
                           <Button onClick={submitAnnotation} disabled={submitting} className="text-xs">
-                            {submitting ? 'Saving…' : `Confirm ${target!.kind}`}
+                            {submitting ? 'Saving…' : `Confirm ${target.kind}`}
                           </Button>
                         </div>
                       </div>

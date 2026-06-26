@@ -58,10 +58,10 @@ export const AdminResourceEditor: React.FC = () => {
     if (isNew) return;
     setLoading(true);
     try {
-      const r = await adminResourcesAPI.getResource(id!) as Record<string, unknown>;
+      const r = await adminResourcesAPI.getResource(id) as Record<string, unknown>;
       setForm({
         ...r,
-        tag_ids: (r.tag_ids as string[]) || [],
+        tag_ids: (r.tag_ids) || [],
       });
     } catch {
       setForm({});
@@ -81,7 +81,7 @@ export const AdminResourceEditor: React.FC = () => {
   const loadAudit = async () => {
     if (isNew || !id) return;
     try {
-      const res = await adminResourcesAPI.getResourceAudit(id!, 20) as { entries?: Array<{ action_type: string; created_at: string; performed_by_user_id?: string; previous_status?: string; new_status?: string; change_summary?: string }> };
+      const res = await adminResourcesAPI.getResourceAudit(id, 20) as { entries?: Array<{ action_type: string; created_at: string; performed_by_user_id?: string; previous_status?: string; new_status?: string; change_summary?: string }> };
       setAuditEntries(res.entries || []);
     } catch {
       setAuditEntries([]);
@@ -98,7 +98,7 @@ export const AdminResourceEditor: React.FC = () => {
     setSaving(true);
     try {
       const payload = { ...form } as Record<string, unknown>;
-      payload.tag_ids = (form.tag_ids as string[]) || [];
+      payload.tag_ids = (form.tag_ids) || [];
       delete payload.id;
       delete payload.created_at;
       delete payload.updated_at;
@@ -113,7 +113,7 @@ export const AdminResourceEditor: React.FC = () => {
         const created = await adminResourcesAPI.createResource(payload) as { id: string };
         navigate(buildRoute('adminResourcesEdit', { id: created.id }), { replace: true });
       } else {
-        await adminResourcesAPI.updateResource(id!, payload);
+        await adminResourcesAPI.updateResource(id, payload);
         load();
       }
     } catch (e) {

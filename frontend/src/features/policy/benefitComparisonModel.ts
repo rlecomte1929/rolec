@@ -108,8 +108,8 @@ function rowOutOfPocket(
 }
 
 export function mapComparisonRow(row: EffectiveServiceComparisonRow): ComparisonRow {
-  const policy = (row.policy_limit_snapshot || {}) as Record<string, unknown>;
-  const selected = (row.selected_value_snapshot || {}) as Record<string, unknown>;
+  const policy = (row.policy_limit_snapshot || {});
+  const selected = (row.selected_value_snapshot || {});
   const coverage = coverageBadge(row);
   const policyCap = policyCapFromSnapshot(policy);
   const ask = firstNumber(selected, ['estimated_cost']);

@@ -43,8 +43,8 @@ export async function submitDemoBooking(input: DemoBookingInput): Promise<DemoBo
       };
     }
 
-    if (data && typeof data === 'object' && 'ok' in data && data.ok === true && typeof (data as any).demoId === 'string') {
-      return { ok: true, demoId: (data as any).demoId };
+    if (data && typeof data === 'object' && 'ok' in data && data.ok === true && typeof (data).demoId === 'string') {
+      return { ok: true, demoId: (data).demoId };
     }
 
     return {

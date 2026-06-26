@@ -60,7 +60,7 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     .from('notification_preferences')
     .select('type, in_app, email, muted_until');
   if (error) throw new Error(error.message);
-  return (data || []) as NotificationPreference[];
+  return (data || []);
 }
 
 /** 6C: Upsert preference (Supabase RPC). */

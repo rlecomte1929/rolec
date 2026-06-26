@@ -123,7 +123,7 @@ export const AdminCrawlJobRunDetail: React.FC = () => {
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="mb-3 font-medium text-slate-800">Changed documents</h3>
             <ul className="space-y-1 text-sm">
-              {((changes?.items ?? []) as Array<Record<string, unknown>>).map((c) => {
+              {((changes?.items ?? [])).map((c) => {
                 const label = `${String(c.source_name ?? 'Unknown')} · ${String(c.change_type ?? '-')}`;
                 return (
                   <li key={String(c.id)}>

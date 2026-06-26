@@ -71,7 +71,7 @@ export function usePolicyConfigWorkspace(args: {
         mode === 'admin'
           ? await policyConfigMatrixAPI.adminGet(adminCompanyId as string)
           : await policyConfigMatrixAPI.hrGet(hrQuery);
-      const next = normalizePayload(raw as PolicyConfigWorkingPayload);
+      const next = normalizePayload(raw);
       setPayload(next);
       setBaselineSig(sigForDirty(next));
     } catch {
@@ -167,7 +167,7 @@ export function usePolicyConfigWorkspace(args: {
           mode === 'admin'
             ? await policyConfigMatrixAPI.adminPutDraft(adminCompanyId as string, body)
             : await policyConfigMatrixAPI.hrPutDraft(body, hrQuery);
-        const next = normalizePayload(raw as PolicyConfigWorkingPayload);
+        const next = normalizePayload(raw);
         setPayload(next);
         setBaselineSig(sigForDirty(next));
         setServerErrorsByBenefitKey({});
@@ -220,7 +220,7 @@ export function usePolicyConfigWorkspace(args: {
         mode === 'admin'
           ? await policyConfigMatrixAPI.adminPublish(adminCompanyId as string, body)
           : await policyConfigMatrixAPI.hrPublish(body, hrQuery);
-      const next = normalizePayload(raw as PolicyConfigWorkingPayload);
+      const next = normalizePayload(raw);
       setPayload(next);
       setBaselineSig(sigForDirty(next));
       setReadOnlySnapshot(null);
@@ -257,7 +257,7 @@ export function usePolicyConfigWorkspace(args: {
         mode === 'admin'
           ? await policyConfigMatrixAPI.adminPostDraft(adminCompanyId as string)
           : await policyConfigMatrixAPI.hrPostDraft(hrQuery);
-      const next = normalizePayload(raw as PolicyConfigWorkingPayload);
+      const next = normalizePayload(raw);
       setPayload(next);
       setBaselineSig(sigForDirty(next));
       setReadOnlySnapshot(null);
@@ -275,7 +275,7 @@ export function usePolicyConfigWorkspace(args: {
         mode === 'admin'
           ? await policyConfigMatrixAPI.adminPublished(adminCompanyId as string)
           : await policyConfigMatrixAPI.hrPublished(hrQuery);
-      const view = normalizePayload(data as PolicyConfigWorkingPayload);
+      const view = normalizePayload(data);
       if (!view.policy_version && (view.status === 'none' || view.categories?.length === 0)) {
         setError('No published version is available yet.');
         return;
@@ -299,7 +299,7 @@ export function usePolicyConfigWorkspace(args: {
           mode === 'admin'
             ? await policyConfigMatrixAPI.adminGetVersion(adminCompanyId as string, versionId)
             : await policyConfigMatrixAPI.hrGetVersion(versionId, hrQuery);
-        const view = normalizePayload(raw as PolicyConfigWorkingPayload);
+        const view = normalizePayload(raw);
         const st = (meta.status || '').toLowerCase();
         const title =
           st === 'archived' ? `Version ${meta.version_number} (archived)` : `Version ${meta.version_number} (published)`;

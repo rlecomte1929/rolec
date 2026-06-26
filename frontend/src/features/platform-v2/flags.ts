@@ -55,7 +55,7 @@ export type V2FlagKey =
 const LS_PREFIX = 'platform_v2_';
 const ENV_PREFIX = 'VITE_PLATFORM_V2_';
 
-const ENV: Record<string, string | undefined> = (import.meta.env ?? {}) as Record<string, string | undefined>;
+const ENV: Record<string, string | undefined> = (import.meta.env ?? {});
 
 function readEnv(key: V2FlagKey): boolean {
   const raw = ENV[ENV_PREFIX + key.toUpperCase()];

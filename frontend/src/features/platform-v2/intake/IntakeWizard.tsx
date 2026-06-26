@@ -637,8 +637,8 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
-                  onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent-border)'}
-                  onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border-default)'}
+                  onFocus={e => (e.target).style.borderColor = 'var(--accent-border)'}
+                  onBlur={e => (e.target).style.borderColor = 'var(--border-default)'}
                 />
               </div>
             </div>

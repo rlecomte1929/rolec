@@ -42,7 +42,7 @@ export const AdminEventEditor: React.FC = () => {
     if (isNew) return;
     setLoading(true);
     try {
-      const e = await adminResourcesAPI.getEvent(id!);
+      const e = await adminResourcesAPI.getEvent(id);
       setForm(e);
     } catch {
       setForm({});
@@ -74,7 +74,7 @@ export const AdminEventEditor: React.FC = () => {
         const created = await adminResourcesAPI.createEvent(payload);
         navigate(buildRoute('adminEventsEdit', { id: created.id }), { replace: true });
       } else {
-        await adminResourcesAPI.updateEvent(id!, payload);
+        await adminResourcesAPI.updateEvent(id, payload);
       }
     } catch (e) {
       alert((e as Error).message || 'Save failed');
@@ -90,7 +90,7 @@ export const AdminEventEditor: React.FC = () => {
   const loadAudit = async () => {
     if (isNew || !id) return;
     try {
-      const res = await adminResourcesAPI.getEventAudit(id!, 20) as { entries?: Array<{ action_type: string; created_at: string; previous_status?: string; new_status?: string; change_summary?: string }> };
+      const res = await adminResourcesAPI.getEventAudit(id, 20) as { entries?: Array<{ action_type: string; created_at: string; previous_status?: string; new_status?: string; change_summary?: string }> };
       setAuditEntries(res.entries || []);
     } catch {
       setAuditEntries([]);
@@ -402,7 +402,7 @@ export const AdminEventEditor: React.FC = () => {
                   <div key={i} className="flex flex-wrap gap-2 py-1 border-b border-slate-100 last:border-0">
                     <span className="font-medium">{String(entry.action_type)}</span>
                     {entry.previous_status && entry.new_status && <span className="text-slate-500">{entry.previous_status} → {entry.new_status}</span>}
-                    <span className="text-slate-400 text-xs">{entry.created_at ? new Date(entry.created_at as string).toLocaleString() : ''}</span>
+                    <span className="text-slate-400 text-xs">{entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}</span>
                   </div>
                 ))}
               </div>

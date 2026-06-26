@@ -17,7 +17,7 @@ const entryEnabled = () =>
 export function logEmployeeJourney(event: string, detail?: Record<string, unknown>): void {
   if (!perfEnabled()) return;
   const payload = { t: performance.now(), event, ...detail };
-  // eslint-disable-next-line no-console
+   
   console.info('[employee-journey]', payload);
 }
 
@@ -25,6 +25,6 @@ export function logEmployeeJourney(event: string, detail?: Record<string, unknow
 export function logEmployeeEntry(event: string, detail?: Record<string, unknown>): void {
   if (!entryEnabled()) return;
   const payload = { t: performance.now(), event, ...detail };
-  // eslint-disable-next-line no-console
+   
   console.info('[employee-entry]', payload);
 }

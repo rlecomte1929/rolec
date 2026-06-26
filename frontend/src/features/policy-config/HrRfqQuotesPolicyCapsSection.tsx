@@ -31,7 +31,7 @@ const HrSingleQuoteCapCompare: React.FC<{
         return { row, unmapped: false as const, result: null as PolicyCapCompareResultRow | null };
       }
       const r = results?.[j++];
-      return { row, unmapped: false as const, result: (r ?? null) as PolicyCapCompareResultRow | null };
+      return { row, unmapped: false as const, result: (r ?? null) };
     });
   }, [rows, results, loading]);
 

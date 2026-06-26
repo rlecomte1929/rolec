@@ -38,7 +38,7 @@ export function readProgramDetails(row: PolicyConfigBenefitRow): ProgramDetails 
   if (!isRecord(cap)) return {};
   const raw = cap[PROGRAM_DETAILS_KEY];
   if (!isRecord(raw)) return {};
-  return { ...raw } as ProgramDetails;
+  return { ...raw };
 }
 
 export function patchProgramDetails(

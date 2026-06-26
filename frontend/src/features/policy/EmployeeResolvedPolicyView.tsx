@@ -249,7 +249,7 @@ export const EmployeeResolvedPolicyView: React.FC<{
     employeeAPI
       .getResolvedPolicy(assignmentId)
       .then((res) => {
-        if (!cancelled) setData(res as ResolvedPolicyResponse);
+        if (!cancelled) setData(res);
       })
       .catch(() => {
         if (!cancelled) setData(null);

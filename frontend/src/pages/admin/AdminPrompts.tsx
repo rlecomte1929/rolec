@@ -48,7 +48,7 @@ export const AdminPrompts: React.FC = () => {
           try {
             return [taskKey, await promptsAPI.winRates(taskKey)] as const;
           } catch {
-            return [taskKey, {} as Record<string, WinRate>] as const;
+            return [taskKey, {}] as const;
           }
         })
       );

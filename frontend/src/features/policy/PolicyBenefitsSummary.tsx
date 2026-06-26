@@ -139,7 +139,7 @@ export const PolicyBenefitsSummary: React.FC<{ companyId?: string | null }> = ({
       {/* Amber banner above the fold when the policy is not current. */}
       {showAmberBanner && (
         <Alert variant="warning" title="Policy not current">
-          {BANNER_COPY[status_banner as 'under_review' | 'expired']}
+          {BANNER_COPY[status_banner]}
         </Alert>
       )}
 

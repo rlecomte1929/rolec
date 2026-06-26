@@ -166,7 +166,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const t = await adminFormTemplatesAPI.get(id!);
+      const t = await adminFormTemplatesAPI.get(id);
       setForm(templateToForm(t));
       setLoadedVersion(t.version);
       setFields(normalizeFields(t.fields ?? []));
@@ -235,7 +235,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
           replace: true,
         });
       } else {
-        const updated = await adminFormTemplatesAPI.update(id!, payload);
+        const updated = await adminFormTemplatesAPI.update(id, payload);
         if (updated.id !== id) {
           navigate(buildRoute('adminFormTemplatesEdit', { id: updated.id }), {
             replace: true,
@@ -438,7 +438,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
                     {fields.length} field{fields.length === 1 ? '' : 's'} · drag to reorder
                   </span>
                   <Link
-                    to={buildRoute('adminFormTemplatesMap', { id: id! })}
+                    to={buildRoute('adminFormTemplatesMap', { id: id })}
                     className="text-xs font-medium text-[#0b2b43] hover:underline focus:outline-none focus:underline"
                   >
                     Map coordinates →

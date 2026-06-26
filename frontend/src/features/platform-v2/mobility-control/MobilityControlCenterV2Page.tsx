@@ -86,7 +86,7 @@ function resolveISO2(raw?: string | null): string | null {
   if (!raw) return null;
   const norm = raw.trim().toUpperCase();
   if (!norm) return null;
-  if (ALIAS_TO_ISO2[norm]) return ALIAS_TO_ISO2[norm]!;
+  if (ALIAS_TO_ISO2[norm]) return ALIAS_TO_ISO2[norm];
   if (norm.length === 2 && /^[A-Z]{2}$/.test(norm)) return norm; // unknown but valid ISO-2 shape
   return null;
 }

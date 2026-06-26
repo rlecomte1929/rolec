@@ -103,7 +103,7 @@ export interface AssistantResponse {
 // Allows this module to be imported in test environments without Supabase env vars.
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 async function getSupabase(): Promise<any> {
   const { supabase } = await import('../../lib/supabase');
   return supabase;

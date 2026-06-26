@@ -227,7 +227,7 @@ function RecCard({
   const costType = item.metadata?.cost_type;
   const costLabel = formatEstimationFromUsd(costUsd, costType, displayCurrency);
 
-  const mapQuery = item.metadata?.map_query as string | undefined;
+  const mapQuery = item.metadata?.map_query;
   const officeAddress = (criteriaEcho?.office_address as string) || '';
   const showMapActions = mapQuery && (category === 'living_areas' || category === 'schools');
 
@@ -301,7 +301,7 @@ function RecCard({
           {showMapActions && (
             <>
               <a
-                href={mapsUrl(mapQuery!)}
+                href={mapsUrl(mapQuery)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-[#0b2b43] hover:underline flex items-center gap-1"
@@ -311,7 +311,7 @@ function RecCard({
               </a>
               {officeAddress && (
                 <a
-                  href={mapsDirectionsUrl(officeAddress, mapQuery!)}
+                  href={mapsDirectionsUrl(officeAddress, mapQuery)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-[#0b2b43] hover:underline flex items-center gap-1"
@@ -380,7 +380,7 @@ function RecCard({
             const dims = expl?.score_dimensions ?? item.breakdown ?? {};
             const entries = Object.entries(dims).filter(
               ([, v]) => typeof v === 'number'
-            ) as Array<[string, number]>;
+            );
             if (entries.length === 0) return null;
             // Sort highest contribution first so the strongest factors
             // lead — that's what HR / employees actually want to scan.

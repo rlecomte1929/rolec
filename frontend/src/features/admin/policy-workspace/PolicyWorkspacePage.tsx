@@ -23,7 +23,7 @@ import { buildRoute } from '../../../navigation/routes';
 
 function asWorkingPayload(raw: unknown): PolicyConfigWorkingPayload | null {
   if (!raw || typeof raw !== 'object') return null;
-  return raw as PolicyConfigWorkingPayload;
+  return raw;
 }
 
 export const PolicyWorkspacePage: React.FC = () => {

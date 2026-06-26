@@ -260,14 +260,14 @@ export const CanonicalPolicyDiffView: React.FC<Props> = ({
       const res = await companyPolicyAPI.hrCanonicalDiffForCompany(
         adminCompanyId ?? undefined
       );
-      setPayload(res as Payload);
+      setPayload(res);
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { detail?: string | { message?: string } } } };
       const d = ax.response?.data?.detail;
       setErr(
         typeof d === 'string'
           ? d
-          : (d && typeof d === 'object' && 'message' in d && (d as { message?: string }).message) ||
+          : (d && typeof d === 'object' && 'message' in d && (d).message) ||
               'Could not load the document-policy diff.'
       );
     } finally {

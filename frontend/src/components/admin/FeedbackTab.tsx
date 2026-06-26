@@ -117,7 +117,7 @@ export function FeedbackTab() {
       .limit(500);
 
     if (err) setError('Failed to load feedback.');
-    else setRows((data as FeedbackRow[]) ?? []);
+    else setRows((data) ?? []);
     setLoading(false);
   }, []);
 
@@ -190,8 +190,8 @@ export function FeedbackTab() {
                 className={`text-xs px-3 py-1 rounded-md font-medium transition-colors ${
                   filterStatus === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>
-                {f === 'all' ? 'All status' : STATUS_LABEL[f as FeedbackStatus]}
-                {' '}<span className="opacity-50">{f === 'all' ? counts.all : counts[f as FeedbackStatus]}</span>
+                {f === 'all' ? 'All status' : STATUS_LABEL[f]}
+                {' '}<span className="opacity-50">{f === 'all' ? counts.all : counts[f]}</span>
               </Button>
             ))}
           </div>
@@ -203,8 +203,8 @@ export function FeedbackTab() {
                 className={`text-xs px-3 py-1 rounded-md font-medium transition-colors ${
                   filterCategory === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>
-                {f === 'all' ? 'All types' : `${CAT_ICON[f as FeedbackCategory]} ${f}`}
-                {f !== 'all' && <span className="opacity-50 ml-1">{counts[f as FeedbackCategory]}</span>}
+                {f === 'all' ? 'All types' : `${CAT_ICON[f]} ${f}`}
+                {f !== 'all' && <span className="opacity-50 ml-1">{counts[f]}</span>}
               </Button>
             ))}
           </div>
@@ -279,7 +279,7 @@ export function FeedbackTab() {
                         {row.screenshot_data ? (
                           <button
                             className="w-12 h-8 rounded border border-gray-200 overflow-hidden hover:ring-2 ring-blue-400 transition-all"
-                            onClick={(e) => { e.stopPropagation(); setLightbox(row.screenshot_data!); }}
+                            onClick={(e) => { e.stopPropagation(); setLightbox(row.screenshot_data); }}
                             title="View screenshot"
                           >
                             <img src={row.screenshot_data} alt="" className="w-full h-full object-cover" />
@@ -332,7 +332,7 @@ export function FeedbackTab() {
                         </div>
                         {row.screenshot_data && (
                           <button
-                            onClick={() => setLightbox(row.screenshot_data!)}
+                            onClick={() => setLightbox(row.screenshot_data)}
                             className="shrink-0 w-40 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 ring-blue-400 transition-all"
                             title="View full screenshot"
                           >

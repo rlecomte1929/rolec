@@ -30,10 +30,10 @@ export function useV2Flag(key: V2FlagKey): {
     };
 
     window.addEventListener('storage', onStorage);
-    window.addEventListener('platform-v2-flag-change', onCustom as EventListener);
+    window.addEventListener('platform-v2-flag-change', onCustom);
     return () => {
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('platform-v2-flag-change', onCustom as EventListener);
+      window.removeEventListener('platform-v2-flag-change', onCustom);
     };
   }, [key]);
 

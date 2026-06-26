@@ -20,7 +20,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 function looksLikeAnswer(v: unknown): v is PolicyAssistantAnswer {
   if (!isPlainObject(v)) return false;
-  const a = v as Record<string, unknown>;
+  const a = v;
   // Stored turns are produced by this app; require a minimal shape so tampered localStorage is ignored.
   return typeof a.answer_type === 'string' && typeof a.answer_text === 'string' && Array.isArray(a.evidence);
 }

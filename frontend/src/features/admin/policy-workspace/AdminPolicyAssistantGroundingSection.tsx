@@ -76,7 +76,7 @@ export const AdminPolicyAssistantGroundingSection: React.FC<{ companyId: string 
     setDiff(null);
     try {
       const out = await adminAPI.getPolicyAssistantSnapshotDiff(companyId, olderSnap, newerSnap);
-      setDiff(out as Record<string, unknown>);
+      setDiff(out);
     } catch (e: unknown) {
       setDiff({ error: e instanceof Error ? e.message : 'diff failed' });
     } finally {

@@ -77,8 +77,8 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
     } else if (sortKey === 'move_date') {
       cmp = (a.move_date || '').localeCompare(b.move_date || '');
     } else {
-      const ao = COORD_ORDER[a.coordination_status as CoordinationStatus] ?? 99;
-      const bo = COORD_ORDER[b.coordination_status as CoordinationStatus] ?? 99;
+      const ao = COORD_ORDER[a.coordination_status] ?? 99;
+      const bo = COORD_ORDER[b.coordination_status] ?? 99;
       cmp = ao - bo;
     }
     return sortAsc ? cmp : -cmp;
@@ -200,14 +200,14 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
             </thead>
             <tbody>
               {sorted.map(row => {
-                const coord = row.coordination_status as CoordinationStatus;
+                const coord = row.coordination_status;
                 const badge = COORD_BADGE[coord] ?? COORD_BADGE['not-started'];
                 return (
                   <tr
                     key={row.case_id}
                     style={{ transition: 'background 0.1s' }}
-                    onMouseEnter={e => ((e.currentTarget as HTMLTableRowElement).style.background = '#f9fafb')}
-                    onMouseLeave={e => ((e.currentTarget as HTMLTableRowElement).style.background = '')}
+                    onMouseEnter={e => ((e.currentTarget).style.background = '#f9fafb')}
+                    onMouseLeave={e => ((e.currentTarget).style.background = '')}
                   >
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 500, color: '#111827' }}>{row.employee_name}</div>

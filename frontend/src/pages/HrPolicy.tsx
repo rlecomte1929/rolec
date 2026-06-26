@@ -966,7 +966,7 @@ export function PolicyDocumentIntakeSection({
                       };
                       const skipped = res.skipped ?? [];
                       const reasons = Array.from(
-                        new Set(skipped.map((s) => s.reason).filter(Boolean) as string[])
+                        new Set(skipped.map((s) => s.reason).filter(Boolean))
                       );
                       const primary = reasons[0];
                       const keptCount = ids.length - (res.deleted ?? 0);

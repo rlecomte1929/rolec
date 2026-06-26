@@ -322,7 +322,7 @@ export const EmployeePolicyPanel: React.FC<{
     };
   }, [shouldFetchComp, assignmentId]);
 
-  const benefits = useMemo(() => (Array.isArray(pack?.benefits) ? (pack!.benefits as PackBenefitRow[]) : []), [pack?.benefits]);
+  const benefits = useMemo(() => (Array.isArray(pack?.benefits) ? (pack.benefits as PackBenefitRow[]) : []), [pack?.benefits]);
 
   const effectiveRows = comp?.effective_service_comparison ?? [];
 
@@ -403,7 +403,7 @@ export const EmployeePolicyPanel: React.FC<{
   const assignmentTypeLabel = ctx.assignment_type ? String(ctx.assignment_type).replace(/_/g, ' ') : null;
 
   const showInfoStamp = maturity === 'under_review' || maturity === 'partial_comparison';
-  const legacyComparisons = Array.isArray(comp?.comparisons) ? comp!.comparisons : [];
+  const legacyComparisons = Array.isArray(comp?.comparisons) ? comp.comparisons : [];
 
   return (
     <div className="space-y-6">

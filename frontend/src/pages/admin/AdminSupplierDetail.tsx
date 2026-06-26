@@ -104,7 +104,7 @@ export const AdminSupplierDetail: React.FC = () => {
   const [addingCapability, setAddingCapability] = useState(false);
   const [newCap, setNewCap] = useState({
     service_category: 'movers',
-    coverage_scope_type: 'country' as string,
+    coverage_scope_type: 'country',
     country_code: '',
     city_name: '',
     specialization_tags: [] as string[],

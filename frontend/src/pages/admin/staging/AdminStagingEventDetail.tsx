@@ -293,11 +293,11 @@ export const AdminStagingEventDetail: React.FC = () => {
                     : '-'}
                 </dd>
               </div>
-              {Boolean((prov as Record<string, unknown>)?.snippet) && (
+              {Boolean((prov)?.snippet) && (
                 <div>
                   <dt className="block font-medium">Snippet</dt>
                   <dd className="mt-1 rounded bg-white p-2 text-xs">
-                    {String((prov as Record<string, unknown>)?.snippet ?? '').slice(0, 300)}...
+                    {String((prov)?.snippet ?? '').slice(0, 300)}...
                   </dd>
                 </div>
               )}

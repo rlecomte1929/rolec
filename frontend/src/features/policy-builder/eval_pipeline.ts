@@ -150,7 +150,7 @@ export function mockClassify(
     category_code: categoryCode,
     category_name: cat?.name ?? 'Unknown',
     applicable_tiers: [],
-    extracted_values: mockExtractedValues as ExtractedValue[],
+    extracted_values: mockExtractedValues,
     confidence_score: bestScore > 1 ? 0.92 : bestScore > 0 ? 0.75 : 0.30,
     confidence_rationale: `Keyword classifier: ${bestScore} keyword matches`,
   };

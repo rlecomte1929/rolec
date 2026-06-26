@@ -32,7 +32,7 @@ export function trackAssignmentFlow(event: string, detail?: Record<string, unkno
   const row = { t: typeof performance !== 'undefined' ? performance.now() : Date.now(), event, detail };
   buffer.push(row);
   if (buffer.length > MAX_BUFFER) buffer.shift();
-  // eslint-disable-next-line no-console
+   
   console.info('[assignment-flow]', row);
 }
 
