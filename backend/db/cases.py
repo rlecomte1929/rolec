@@ -366,10 +366,17 @@ class CasesMixin:
     def set_assignment_submitted(self, assignment_id: str, request_id: Optional[str] = None) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
+            # AIQ-1243 (C-01b): mark intake complete in the SAME write that flips the
+            # status. The client's updateIntakeProgress is fire-and-forget and the
+            # best-effort server advance keys on employee_user_id (so an id-resolution
+            # mismatch can miss the row), which left submitted cases reading
+            # "4/5 steps · Continue". Setting intake_step = intake_total_steps here is
+            # unconditional (WHERE id only) and satisfies the intake_step<=total CHECK.
             self._exec(
                 conn,
                 "UPDATE case_assignments "
-                "SET status = :status, submitted_at = :now, updated_at = :now "
+                "SET status = :status, intake_step = intake_total_steps, "
+                "    submitted_at = :now, updated_at = :now "
                 "WHERE id = :id",
                 {"status": "submitted", "now": now, "id": assignment_id},
                 op_name="set_assignment_submitted",
