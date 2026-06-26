@@ -556,7 +556,7 @@ export const Auth: React.FC = () => {
                     variant="ghost"
                     onClick={() => setShowPassword((p) => !p)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     <EyeIcon open={showPassword} />
                   </Button>
                 </div>

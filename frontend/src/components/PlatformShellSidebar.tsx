@@ -536,7 +536,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
                 <p className="text-[10px] text-slate-400 truncate">{user?.role ?? role.toLowerCase()}</p>
               </div>
-              <Button unstyled className="text-slate-400 hover:text-slate-600 shrink-0">
+              <Button unstyled aria-label="Account menu" className="text-slate-400 hover:text-slate-600 shrink-0">
                 <ChevronRight size={14} />
               </Button>
             </>
