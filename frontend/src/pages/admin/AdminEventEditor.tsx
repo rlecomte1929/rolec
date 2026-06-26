@@ -32,7 +32,7 @@ export const AdminEventEditor: React.FC = () => {
   const loadSources = async () => {
     try {
       const res = await adminResourcesAPI.listSources();
-      setSources(res.sources || []);
+      setSources((res.sources || []) as { id: string; source_name: string }[]);
     } catch {
       //
     }
@@ -42,7 +42,7 @@ export const AdminEventEditor: React.FC = () => {
     if (isNew) return;
     setLoading(true);
     try {
-      const e = await adminResourcesAPI.getEvent(id);
+      const e = (await adminResourcesAPI.getEvent(id)) as Record<string, unknown>;
       setForm(e);
     } catch {
       setForm({});
@@ -71,7 +71,7 @@ export const AdminEventEditor: React.FC = () => {
       delete payload.created_at;
       delete payload.updated_at;
       if (isNew) {
-        const created = await adminResourcesAPI.createEvent(payload);
+        const created = (await adminResourcesAPI.createEvent(payload)) as { id: string };
         navigate(buildRoute('adminEventsEdit', { id: created.id }), { replace: true });
       } else {
         await adminResourcesAPI.updateEvent(id, payload);

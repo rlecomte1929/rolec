@@ -1946,7 +1946,7 @@ export const adminRecommendationsAPI = {
 
 // Admin Resources CMS API
 export const adminResourcesAPI = {
-  getCounts: async () => api.get('/api/admin/resources/counts').then((r) => r.data),
+  getCounts: async (): Promise<Record<string, number>> => api.get<Record<string, number>>('/api/admin/resources/counts').then((r) => r.data),
   listResources: async (params?: {
     country_code?: string;
     city?: string;
@@ -1958,28 +1958,28 @@ export const adminResourcesAPI = {
     search?: string;
     limit?: number;
     offset?: number;
-  }) => api.get('/api/admin/resources', { params }).then((r) => r.data),
-  getResource: async (id: string) => api.get(`/api/admin/resources/${id}`).then((r) => r.data),
+  }): Promise<{ items: unknown[]; total: number }> => api.get<{ items: unknown[]; total: number }>('/api/admin/resources', { params }).then((r) => r.data),
+  getResource: async (id: string) => api.get<unknown>(`/api/admin/resources/${id}`).then((r) => r.data),
   createResource: async (payload: Record<string, unknown>) =>
-    api.post('/api/admin/resources', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/resources', payload).then((r) => r.data),
   updateResource: async (id: string, payload: Record<string, unknown>) =>
-    api.put(`/api/admin/resources/${id}`, payload).then((r) => r.data),
+    api.put<unknown>(`/api/admin/resources/${id}`, payload).then((r) => r.data),
   submitForReview: async (id: string) =>
-    api.post(`/api/admin/resources/${id}/submit-for-review`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/${id}/submit-for-review`).then((r) => r.data),
   approveResource: async (id: string, notes?: string) =>
-    api.post(`/api/admin/resources/${id}/approve`, { notes }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/${id}/approve`, { notes }).then((r) => r.data),
   publishResource: async (id: string) =>
-    api.post(`/api/admin/resources/${id}/publish`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/${id}/publish`).then((r) => r.data),
   unpublishResource: async (id: string) =>
-    api.post(`/api/admin/resources/${id}/unpublish`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/${id}/unpublish`).then((r) => r.data),
   archiveResource: async (id: string) =>
-    api.post(`/api/admin/resources/${id}/archive`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/${id}/archive`).then((r) => r.data),
   restoreResource: async (id: string) =>
-    api.post(`/api/admin/resources/${id}/restore`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/${id}/restore`).then((r) => r.data),
   getResourceAudit: async (id: string, limit?: number) =>
-    api.get(`/api/admin/resources/${id}/audit`, { params: { limit } }).then((r) => r.data),
+    api.get<unknown>(`/api/admin/resources/${id}/audit`, { params: { limit } }).then((r) => r.data),
   getGlobalAuditLog: async (params?: { entity_type?: string; limit?: number; offset?: number }) =>
-    api.get('/api/admin/resources/audit-log', { params }).then((r) => r.data),
+    api.get<unknown>('/api/admin/resources/audit-log', { params }).then((r) => r.data),
   listEvents: async (params?: {
     country_code?: string;
     city?: string;
@@ -1990,44 +1990,44 @@ export const adminResourcesAPI = {
     date_to?: string;
     limit?: number;
     offset?: number;
-  }) => api.get('/api/admin/resources/events', { params }).then((r) => r.data),
-  getEvent: async (id: string) => api.get(`/api/admin/resources/events/${id}`).then((r) => r.data),
+  }): Promise<{ items: unknown[]; total: number }> => api.get<{ items: unknown[]; total: number }>('/api/admin/resources/events', { params }).then((r) => r.data),
+  getEvent: async (id: string) => api.get<unknown>(`/api/admin/resources/events/${id}`).then((r) => r.data),
   createEvent: async (payload: Record<string, unknown>) =>
-    api.post('/api/admin/resources/events', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/resources/events', payload).then((r) => r.data),
   updateEvent: async (id: string, payload: Record<string, unknown>) =>
-    api.put(`/api/admin/resources/events/${id}`, payload).then((r) => r.data),
+    api.put<unknown>(`/api/admin/resources/events/${id}`, payload).then((r) => r.data),
   publishEvent: async (id: string) =>
-    api.post(`/api/admin/resources/events/${id}/publish`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/events/${id}/publish`).then((r) => r.data),
   archiveEvent: async (id: string) =>
-    api.post(`/api/admin/resources/events/${id}/archive`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/events/${id}/archive`).then((r) => r.data),
   submitEventForReview: async (id: string) =>
-    api.post(`/api/admin/resources/events/${id}/submit-for-review`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/events/${id}/submit-for-review`).then((r) => r.data),
   approveEvent: async (id: string, notes?: string) =>
-    api.post(`/api/admin/resources/events/${id}/approve`, { notes }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/events/${id}/approve`, { notes }).then((r) => r.data),
   unpublishEvent: async (id: string) =>
-    api.post(`/api/admin/resources/events/${id}/unpublish`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/events/${id}/unpublish`).then((r) => r.data),
   restoreEvent: async (id: string) =>
-    api.post(`/api/admin/resources/events/${id}/restore`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/resources/events/${id}/restore`).then((r) => r.data),
   getEventAudit: async (id: string, limit?: number) =>
-    api.get(`/api/admin/resources/events/${id}/audit`, { params: { limit } }).then((r) => r.data),
-  listCategories: async () => api.get('/api/admin/resources/taxonomy/categories').then((r) => r.data),
+    api.get<unknown>(`/api/admin/resources/events/${id}/audit`, { params: { limit } }).then((r) => r.data),
+  listCategories: async (): Promise<{ categories: unknown[] }> => api.get<{ categories: unknown[] }>('/api/admin/resources/taxonomy/categories').then((r) => r.data),
   createCategory: async (payload: Record<string, unknown>) =>
-    api.post('/api/admin/resources/taxonomy/categories', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/resources/taxonomy/categories', payload).then((r) => r.data),
   updateCategory: async (id: string, payload: Record<string, unknown>) =>
-    api.put(`/api/admin/resources/taxonomy/categories/${id}`, payload).then((r) => r.data),
+    api.put<unknown>(`/api/admin/resources/taxonomy/categories/${id}`, payload).then((r) => r.data),
   deactivateCategory: async (id: string) =>
-    api.delete(`/api/admin/resources/taxonomy/categories/${id}`).then((r) => r.data),
-  listTags: async (tag_group?: string) =>
-    api.get('/api/admin/resources/taxonomy/tags', { params: { tag_group } }).then((r) => r.data),
+    api.delete<unknown>(`/api/admin/resources/taxonomy/categories/${id}`).then((r) => r.data),
+  listTags: async (tag_group?: string): Promise<{ tags: unknown[] }> =>
+    api.get<{ tags: unknown[] }>('/api/admin/resources/taxonomy/tags', { params: { tag_group } }).then((r) => r.data),
   createTag: async (payload: Record<string, unknown>) =>
-    api.post('/api/admin/resources/taxonomy/tags', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/resources/taxonomy/tags', payload).then((r) => r.data),
   updateTag: async (id: string, payload: Record<string, unknown>) =>
-    api.put(`/api/admin/resources/taxonomy/tags/${id}`, payload).then((r) => r.data),
-  listSources: async () => api.get('/api/admin/resources/taxonomy/sources').then((r) => r.data),
+    api.put<unknown>(`/api/admin/resources/taxonomy/tags/${id}`, payload).then((r) => r.data),
+  listSources: async (): Promise<{ sources: unknown[] }> => api.get<{ sources: unknown[] }>('/api/admin/resources/taxonomy/sources').then((r) => r.data),
   createSource: async (payload: Record<string, unknown>) =>
-    api.post('/api/admin/resources/taxonomy/sources', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/resources/taxonomy/sources', payload).then((r) => r.data),
   updateSource: async (id: string, payload: Record<string, unknown>) =>
-    api.put(`/api/admin/resources/taxonomy/sources/${id}`, payload).then((r) => r.data),
+    api.put<unknown>(`/api/admin/resources/taxonomy/sources/${id}`, payload).then((r) => r.data),
 };
 
 // [P1-2] Admin Form Templates API — catalog of official government forms.

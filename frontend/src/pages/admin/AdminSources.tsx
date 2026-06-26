@@ -25,7 +25,7 @@ export const AdminSources: React.FC = () => {
     setLoading(true);
     try {
       const res = await adminResourcesAPI.listSources();
-      setItems(res.sources || []);
+      setItems((res.sources || []) as Source[]);
     } catch {
       setItems([]);
     } finally {
