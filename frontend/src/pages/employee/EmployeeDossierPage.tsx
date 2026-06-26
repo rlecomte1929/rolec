@@ -9,7 +9,7 @@
  * makes newly-triggered forms appear without refresh, plus the overall
  * completion-% header tile and "Build dossier" CTA.
  */
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
@@ -157,6 +157,33 @@ export const EmployeeDossierPage: React.FC = () => {
     () => scopedForms.filter((f) => matchesFilter(f, filter)),
     [scopedForms, filter],
   );
+
+  // [AIQ-1252] Deep-link target: a roadmap "Start now" appends ?form=<key>. Match
+  // it against a form's id, template code, a required-document key (roadmap upload
+  // tasks reference supporting-doc keys), or a title substring. Best-effort —
+  // resolves to null (no-op) when nothing matches.
+  const formParam = searchParams.get('form');
+  const matchedFormId = useMemo(() => {
+    if (!formParam) return null;
+    const v = formParam.trim().toLowerCase();
+    if (!v) return null;
+    const hit = forms.find((f) => {
+      if (f.id.toLowerCase() === v) return true;
+      if ((f.template?.code ?? '').toLowerCase() === v) return true;
+      if ((f.template?.required_documents ?? []).some((d) => (d.key ?? '').toLowerCase() === v)) return true;
+      const name = (f.template?.name ?? '').toLowerCase();
+      return v.length >= 4 && name.includes(v);
+    });
+    return hit?.id ?? null;
+  }, [formParam, forms]);
+
+  // Scroll the matched card into view once forms have loaded.
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  useEffect(() => {
+    if (!matchedFormId) return;
+    const el = cardRefs.current[matchedFormId];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [matchedFormId, visible]);
 
   // [P2-08d] Count forms whose official source hasn't been verified within its
   // staleness threshold, so the user is warned at the dossier level before they
@@ -331,7 +358,18 @@ export const EmployeeDossierPage: React.FC = () => {
         ) : (
           <div className="grid gap-3">
             {visible.map((form) => (
-              <CaseFormCard key={form.id} form={form} />
+              <div
+                key={form.id}
+                ref={(el) => {
+                  cardRefs.current[form.id] = el;
+                }}
+              >
+                <CaseFormCard
+                  form={form}
+                  initialExpanded={form.id === matchedFormId}
+                  highlight={form.id === matchedFormId}
+                />
+              </div>
             ))}
           </div>
         )}
