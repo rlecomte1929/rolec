@@ -309,5 +309,111 @@ class TestPerFieldConfidenceCarriesThrough(unittest.TestCase):
         self.assertLessEqual(bench["tax_assistance"]["confidence"], 0.2)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AIQ-1219 — Fable-5 swap (PR1): model wiring, whole-document ingestion, cost.
+#
+# All LLM interaction is MOCKED (reuses _fake_anthropic_returning above). No
+# real Anthropic/Fable-5 call is ever made — the human cost gate is preserved.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestFable5ModelAndWholeDoc(unittest.TestCase):
+    """The policy extractor defaults to claude-fable-5 and stops truncating to 12k."""
+
+    def setUp(self):
+        # The default-model path requires the operator override and the cap
+        # override to be absent so we exercise the literal defaults.
+        self._saved_model = os.environ.pop("RELOPASS_LLM_POLICY_MODEL", None)
+        self._saved_max = os.environ.pop("RELOPASS_LLM_POLICY_MAX_INPUT_CHARS", None)
+
+    def tearDown(self):
+        if self._saved_model is not None:
+            os.environ["RELOPASS_LLM_POLICY_MODEL"] = self._saved_model
+        if self._saved_max is not None:
+            os.environ["RELOPASS_LLM_POLICY_MAX_INPUT_CHARS"] = self._saved_max
+
+    def _run(self, lines):
+        """Run extraction against a mocked Anthropic client; return (result, create_mock)."""
+        tool_input = {"policy_meta": {"title": "Acme"}, "benefits": []}
+        fake = _fake_anthropic_returning(tool_input)
+        # Force the literal-default model path: no registry prompt active.
+        with patch.dict(sys.modules, {"anthropic": fake}), \
+                patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test-noop"}), \
+                patch(
+                    "backend.app.services.prompt_registry.get_active_prompt",
+                    return_value=None,
+                ):
+            result = llm_policy_extractor.extract_policy_with_llm(lines)
+        create = fake.Anthropic.return_value.messages.create
+        return result, create
+
+    def test_default_model_is_fable5(self):
+        # (a) The extractor requests model="claude-fable-5".
+        result, create = self._run(SAMPLE_LINES)
+        self.assertIsNotNone(result)
+        self.assertEqual(create.call_args.kwargs["model"], "claude-fable-5")
+        self.assertEqual(result["model"], "claude-fable-5")
+
+    def test_large_doc_not_truncated_on_fable_path(self):
+        # (b) A >12k-char document reaches the model in full (no 12k truncation).
+        big_lines = ["filler clause %04d xxxxxxxxxxxxxxxxxxxxxxxxxxxx" % i for i in range(2000)]
+        big_lines.append("ENDOFDOCSENTINEL_AIQ1219")
+        doc = "\n".join(big_lines)
+        self.assertGreater(len(doc), 12_000)  # comfortably past the legacy cap
+
+        result, create = self._run(big_lines)
+        self.assertIsNotNone(result)
+
+        user_content = create.call_args.kwargs["messages"][0]["content"]
+        # The trailing sentinel only survives if the full doc was sent.
+        self.assertIn("ENDOFDOCSENTINEL_AIQ1219", user_content)
+        self.assertGreater(len(user_content), 12_000)
+        self.assertIn("truncated=False", user_content)
+        self.assertFalse(result["truncated"])
+
+
+class TestFable5CostLogging(unittest.TestCase):
+    """cost_usd_estimated is non-zero and correct for a Fable-5 call ($10 / $50 per 1M)."""
+
+    def test_router_costs_yaml_prices_fable5(self):
+        from backend.relopass.llm import router
+
+        router.reset_costs_cache()
+        # $10/1M input + $50/1M output → 10 + 50 for 1M each.
+        self.assertAlmostEqual(
+            router.usd_cost("claude-fable-5", 1_000_000, 1_000_000), 60.0, places=6
+        )
+
+    def test_trace_logger_computes_nonzero_fable5_cost(self):
+        # The policy extractor logs cost via TraceSession → router.usd_cost → costs.yaml.
+        from backend.app.services.ai_trace_logger import TraceSession
+
+        tracer = TraceSession(
+            session_id=None,
+            query="<policy extraction>",
+            company_id="test-co",
+            feature_key="policy_extraction",
+        )
+        tracer.record_llm_call(
+            model="claude-fable-5",
+            input_tokens=200_000,
+            output_tokens=50_000,
+            latency_ms=10,
+        )
+        econ = tracer._compute_unit_economics()
+        # 200k/1e6*$10 + 50k/1e6*$50 = 2.0 + 2.5 = 4.5
+        self.assertGreater(econ["cost_usd_estimated"], 0.0)
+        self.assertAlmostEqual(econ["cost_usd_estimated"], 4.5, places=6)
+
+    def test_estimate_cost_usd_prices_fable5(self):
+        # Defense-in-depth: the chat-path pricing table also prices Fable-5.
+        from backend.app.services.policy_assistant_llm_client import estimate_cost_usd
+
+        cost = estimate_cost_usd(
+            {"input_tokens": 1_000_000, "output_tokens": 1_000_000}, "claude-fable-5"
+        )
+        self.assertAlmostEqual(cost, 60.0, places=6)
+
+
 if __name__ == "__main__":
     unittest.main()
