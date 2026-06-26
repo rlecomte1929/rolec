@@ -679,10 +679,10 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
               <strong>{form.template.authority_name ?? form.template.authority_code ?? 'the authority'}</strong>.
             </p>
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-slate-700">
+              <label htmlFor="hcf-receipt-reference" className="block text-xs font-medium text-slate-700">
                 Receipt / Reference <span className="text-rose-500">*</span>
               </label>
-              <Input unstyled
+              <Input id="hcf-receipt-reference" unstyled
                 type="text"
                 value={submitReceiptRef}
                 onChange={(v) => setSubmitReceiptRef(v)}
@@ -690,8 +690,8 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                 autoFocus
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
               />
-              <label className="block text-xs font-medium text-slate-700 mt-2">Note (optional)</label>
-              <Input unstyled
+              <label htmlFor="hcf-note-optional" className="block text-xs font-medium text-slate-700 mt-2">Note (optional)</label>
+              <Input id="hcf-note-optional" unstyled
                 type="text"
                 value={submitNote}
                 onChange={(v) => setSubmitNote(v)}
@@ -730,10 +730,10 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
               The employee will see this reason in their dossier view. Be specific about what needs to be corrected.
             </p>
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-slate-700">
+              <label htmlFor="hcf-rejection-reason" className="block text-xs font-medium text-slate-700">
                 Rejection reason <span className="text-rose-500">*</span>
               </label>
-              <textarea
+              <textarea id="hcf-rejection-reason"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="e.g. Missing apostille on birth certificate."
@@ -742,8 +742,8 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none"
               />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
+            <label htmlFor="hcf-reopen-for-employee-correcti" className="flex items-center gap-2 cursor-pointer select-none">
+              <Checkbox id="hcf-reopen-for-employee-correcti"
                 checked={reopenForCorrection}
                 onChange={(e) => setReopenForCorrection(e.target.checked)}
                 className="rounded border-slate-300 text-[#0b2b43] focus:ring-[#0b2b43]"
