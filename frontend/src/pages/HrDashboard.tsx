@@ -5,22 +5,21 @@ import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { Card, Button, Input, Alert, Badge, Select } from '../components/antigravity';
 import { RefreshButton } from '../components/RefreshButton';
-import { hrAPI, policyConfigMatrixAPI } from '../api/client';
+import { hrAPI } from '../api/client';
 import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
-import { trackAuthPerf } from '../perf/authPerf';
 import { buildRoute } from '../navigation/routes';
 import { displayNameOrEmail, orEmptyLabel } from '../utils/caseDisplay';
 import { useRegisterNav } from '../navigation/registry';
-import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { getCaseStatusLabel } from '../utils/caseStatusLabel';
-import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+import { trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+import { useHrAssignments } from '../hooks/useHrAssignments';
+import { usePolicyPublished } from '../hooks/usePolicyPublished';
 import { CalibrationAlertBanner } from '../components/CalibrationAlertBanner';
 import { AnswerProvenanceWidget } from '../components/AnswerProvenanceWidget';
 
-const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
 /**
@@ -46,11 +45,6 @@ function CasesEmptyState({ onCreateCase }: { onCreateCase: () => void }) {
 
 export const HrDashboard: React.FC = () => {
   const { setSelectedCaseId } = useSelectedCase();
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
   // CASE-3: field-level validation error for the employee identifier, shown inline
   // next to the input (not the page-top banner).
@@ -66,8 +60,6 @@ export const HrDashboard: React.FC = () => {
   // submits a valid employee identifier (prevents orphan empty cases on open).
   const [formOpen, setFormOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // Has this company published a benefits policy? null = unknown/loading.
-  const [policyPublished, setPolicyPublished] = useState<boolean | null>(null);
   const [policyBannerDismissed, setPolicyBannerDismissed] = useState<boolean>(
     () => localStorage.getItem('relopass_hr_policy_publish_banner_dismissed') === '1',
   );
@@ -92,35 +84,11 @@ export const HrDashboard: React.FC = () => {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const navigate = useNavigate();
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const acRef = useRef<AbortController | null>(null);
-  const offsetRef = useRef(0);
   const routePerfStartedAt = useRef<number | null>(null);
   const identifierRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    offsetRef.current = offset;
-  }, [offset]);
 
-  // Detect whether this company has published a benefits policy. When not, we
-  // surface a dismissible nudge — employees can't compare services until then.
-  useEffect(() => {
-    let cancelled = false;
-    policyConfigMatrixAPI
-      .hrPublished()
-      .then((resp) => {
-        if (cancelled) return;
-        const r = (resp || {}) as { version_number?: number | null; published_at?: string | null };
-        const published =
-          Boolean(r.published_at) || (typeof r.version_number === 'number' && r.version_number > 0);
-        setPolicyPublished(published);
-      })
-      .catch(() => {
-        // Unknown on error — don't nag if we couldn't determine status.
-        if (!cancelled) setPolicyPublished(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // null = unknown/loading; gate the publish nudge on `=== false` only.
+  const policyPublished = usePolicyPublished();
 
   const dismissPolicyBanner = useCallback(() => {
     localStorage.setItem('relopass_hr_policy_publish_banner_dismissed', '1');
@@ -133,55 +101,29 @@ export const HrDashboard: React.FC = () => {
     trackShellRender('/hr/dashboard');
   }, []);
 
-  const loadAssignments = useCallback(async (append = false, signal?: AbortSignal) => {
-    const nextOffset = append ? offsetRef.current : 0;
-    const nextLimit = PAGE_SIZE;
-    const isAppend = append && nextOffset > 0;
-    if (isAppend) setIsLoadingMore(true);
-    else setIsLoading(true);
-    setError('');
-    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    trackAuthPerf({ stage: 'bootstrap_start', route: '/hr/dashboard', meta: { endpoint: 'listAssignments' } });
-    try {
-      const res = await hrAPI.listAssignments({
-        signal,
-        limit: nextLimit,
-        offset: nextOffset,
-        search: searchDebounced.trim() || undefined,
-        status: appliedStatus !== 'all' ? appliedStatus : undefined,
-        destination: appliedDestination.trim() || undefined,
-      });
-      if (signal?.aborted) return;
-      const list = Array.isArray(res.assignments) ? res.assignments : [];
-      const totalCount = typeof res.total === 'number' && Number.isFinite(res.total) ? res.total : list.length;
-      const firstAssignment = list[0];
-      if (firstAssignment && !append) {
-        localStorage.setItem('relopass_last_assignment_id', firstAssignment.id);
-      }
-      setAssignments((prev) => (append ? [...prev, ...list] : list));
-      setTotal(totalCount);
-      setOffset(nextOffset + list.length);
-      if (!append && routePerfStartedAt.current != null) {
-        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        trackFirstMeaningfulContent('/hr/dashboard', now - routePerfStartedAt.current);
-        routePerfStartedAt.current = null;
-      }
-      const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', count: list.length } });
-    } catch (err: any) {
-      if (err?.name === 'AbortError' || signal?.aborted) return;
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load assignments.');
-      }
-      const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', error: true } });
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-    }
-  }, [searchDebounced, appliedStatus, appliedDestination, navigate]);
+  // Assignments list as a TanStack infinite query (RX-2). The filters are part of
+  // the query key, so changing one refetches from page 0 automatically — no manual
+  // AbortController / refetch effect needed.
+  const {
+    assignments,
+    total,
+    isLoading,
+    isLoadingMore,
+    isFetching: assignmentsFetching,
+    isError: assignmentsError,
+    hasMore,
+    loadMore,
+    reload: reloadAssignments,
+  } = useHrAssignments(
+    { search: searchDebounced, status: appliedStatus, destination: appliedDestination },
+    routePerfStartedAt,
+  );
+
+  // Parity with the old loadAssignments, which cleared any transient mutation/
+  // validation error at the start of every fetch.
+  useEffect(() => {
+    if (assignmentsFetching) setError('');
+  }, [assignmentsFetching]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -190,15 +132,6 @@ export const HrDashboard: React.FC = () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, [search]);
-
-  useEffect(() => {
-    acRef.current = new AbortController();
-    loadAssignments(false, acRef.current.signal);
-    return () => {
-      acRef.current?.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when filters change, not when loadAssignments identity changes
-  }, [searchDebounced, appliedStatus, appliedDestination]);
 
   useEffect(() => {
     if (isFilterOpen) {
@@ -259,7 +192,7 @@ export const HrDashboard: React.FC = () => {
       if (response.inviteToken) {
         setInviteToken(response.inviteToken);
       }
-      await loadAssignments(false);
+      await reloadAssignments();
     } catch (err: any) {
       const data = err.response?.data;
       const msg = data?.detail || data?.error || 'Unable to assign case.';
@@ -296,7 +229,7 @@ export const HrDashboard: React.FC = () => {
       setSelectedForRemoval(new Set());
       setIsConfirmingRemoval(false);
       setIsManageMode(false);
-      await loadAssignments(false);
+      await reloadAssignments();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to remove some cases.');
     } finally {
@@ -405,6 +338,10 @@ export const HrDashboard: React.FC = () => {
     ? 'grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,1fr,1fr,0.3fr]'
     : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,1fr,1fr,0.3fr]';
 
+  // One error channel: local mutation/validation errors take precedence, falling
+  // back to the assignments-query failure message.
+  const displayedError = error || (assignmentsError ? 'Unable to load assignments.' : '');
+
   return (
     <AppShell section="HR Operations" title="Cases" subtitle="Every cross-border relocation starts here. Create a case to build a plan, assign documents, and track progress — for each employee, from offer to arrival.">
       <div className="space-y-6">
@@ -431,13 +368,13 @@ export const HrDashboard: React.FC = () => {
           </Alert>
         )}
 
-        {error && (
+        {displayedError && (
           <Alert variant="error">
-            <span>{error}</span>
+            <span>{displayedError}</span>
             <Button
               variant="outline"
               className="ml-4 text-xs py-1 px-3"
-              onClick={() => loadAssignments()}
+              onClick={() => reloadAssignments()}
             >
               Retry
             </Button>
@@ -601,7 +538,7 @@ export const HrDashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               {!isManageMode ? (
                 <>
-                  <RefreshButton onClick={() => loadAssignments(false)} label="Refresh" />
+                  <RefreshButton onClick={() => reloadAssignments()} label="Refresh" />
                   <Button variant="outline" onClick={() => setIsManageMode(true)}>Remove cases</Button>
                 </>
               ) : (
@@ -628,12 +565,12 @@ export const HrDashboard: React.FC = () => {
             </div>
           </div>
           )}
-          {assignments.length < total && !isManageMode && (
+          {hasMore && !isManageMode && (
             <div className="mb-3 text-xs text-[#6b7280] flex items-center gap-2">
               Showing {assignments.length} of {total} cases.
               <Button
                 variant="outline"
-                onClick={() => loadAssignments(true)}
+                onClick={loadMore}
                 disabled={isLoadingMore}
               >
                 {isLoadingMore ? 'Loading…' : 'Load more'}

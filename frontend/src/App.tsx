@@ -1,5 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { ResilientRoute } from './components/ResilientRoute';
@@ -222,6 +224,7 @@ function QueryRedirect() {
 function App() {
   return (
     <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
     <Router>
       <FeatureFlagProvider>
       <ScrollToTop />
@@ -525,6 +528,7 @@ function App() {
       <PerfPanel />
       </FeatureFlagProvider>
     </Router>
+    </QueryClientProvider>
     </ErrorBoundary>
   );
 }
