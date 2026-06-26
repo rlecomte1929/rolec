@@ -6,7 +6,8 @@
  *
  * Route: /employee/quote-request  (see routes.ts → employeeQuoteRequest)
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { AppShell } from '../../components/AppShell';
@@ -36,26 +37,20 @@ export const QuoteRequestPage: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [budgetRange, setBudgetRange] = useState('');
-  const [availableCategories, setAvailableCategories] = useState<string[]>(FALLBACK_CATEGORIES);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load service categories from API
-  useEffect(() => {
-    hrAPI
-      .getServiceCategories()
-      .then((res) => {
-        if (res.service_categories?.length) {
-          setAvailableCategories(res.service_categories);
-        }
-      })
-      .catch(() => {
-        // Keep FALLBACK_CATEGORIES
-      });
-  }, []);
+  // Load service categories from API (falls back to FALLBACK_CATEGORIES).
+  const categoriesQuery = useQuery({
+    queryKey: ['service-categories'],
+    queryFn: () => hrAPI.getServiceCategories(),
+  });
+  const fetchedCategories = categoriesQuery.data?.service_categories;
+  const availableCategories =
+    fetchedCategories && fetchedCategories.length ? fetchedCategories : FALLBACK_CATEGORIES;
 
   const toggleCategory = (cat: string) => {
     setCategories((prev) =>

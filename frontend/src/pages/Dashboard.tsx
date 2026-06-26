@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Card, Badge, Button, ProgressBar, Alert } from '../components/antigravity';
 import { RecommendationPanel } from '../components/RecommendationPanel';
@@ -8,27 +9,21 @@ import { AppShell } from '../components/AppShell';
 import { statusLabel } from '../lib/statusLabel';
 
 export const Dashboard: React.FC = () => {
-  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'housing' | 'schools' | 'movers' | 'documents'>('overview');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+  const dashboardQuery = useQuery({
+    queryKey: ['employee', 'dashboard'],
+    queryFn: () => dashboardAPI.get(),
+  });
+  const dashboard: DashboardResponse | null = dashboardQuery.data ?? null;
+  const isLoading = dashboardQuery.isLoading;
 
-  const loadDashboard = async () => {
-    try {
-      const data = await dashboardAPI.get();
-      setDashboard(data);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        navigate('/');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Preserve the original 401 -> home redirect (the axios interceptor also fires).
+  useEffect(() => {
+    const status = (dashboardQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    if (dashboardQuery.isError && status === 401) navigate('/');
+  }, [dashboardQuery.isError, dashboardQuery.error, navigate]);
 
   const getReadinessColor = (status: string) => {
     switch (status) {

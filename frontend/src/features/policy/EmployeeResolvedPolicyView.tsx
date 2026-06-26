@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import {
@@ -231,36 +232,13 @@ export const EmployeeResolvedPolicyView: React.FC<{
   /** Preferred on employee package page: data from GET /api/employee/me/assignment-package-policy (status=found) */
   resolvedSnapshot?: ResolvedPolicyResponse | null;
 }> = ({ assignmentId, resolvedSnapshot }) => {
-  const [data, setData] = useState<ResolvedPolicyResponse | null>(resolvedSnapshot ?? null);
-  const [loading, setLoading] = useState(() => !resolvedSnapshot && Boolean(assignmentId));
-
-  useEffect(() => {
-    if (resolvedSnapshot) {
-      setData(resolvedSnapshot);
-      setLoading(false);
-      return;
-    }
-    if (!assignmentId) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    employeeAPI
-      .getResolvedPolicy(assignmentId)
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch(() => {
-        if (!cancelled) setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [assignmentId, resolvedSnapshot]);
+  const resolvedQuery = useQuery({
+    queryKey: ['employee', 'resolved-policy', assignmentId],
+    queryFn: () => employeeAPI.getResolvedPolicy(assignmentId as string),
+    enabled: !resolvedSnapshot && Boolean(assignmentId),
+  });
+  const data: ResolvedPolicyResponse | null = resolvedSnapshot ?? resolvedQuery.data ?? null;
+  const loading = !resolvedSnapshot && Boolean(assignmentId) && resolvedQuery.isLoading;
 
   if (loading) {
     return (

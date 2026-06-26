@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EmployeePolicyPanel } from '../EmployeePolicyPanel';
 import { mockEmployeePackage } from './hrPolicyTestUtils';
 import type { EffectiveServiceComparisonRow } from '../../../types';
@@ -40,10 +41,13 @@ function row(
 }
 
 function renderPanel(pack: ReturnType<typeof mockEmployeePackage>, loading = false) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <EmployeePolicyPanel pack={pack} loading={loading} />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <EmployeePolicyPanel pack={pack} loading={loading} />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
