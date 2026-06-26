@@ -14,7 +14,7 @@ export const AdminOpsQueuePage: React.FC = () => {
     setError(null);
     try {
       const res = await adminOpsAnalyticsAPI.getQueueBacklog();
-      setBacklog(res);
+      setBacklog(res as Record<string, unknown>);
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
     } finally {

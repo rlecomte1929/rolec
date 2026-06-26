@@ -2216,11 +2216,11 @@ export const adminFreshnessAPI = {
 // P2-02d — admin material-change review queue (approve before users are notified).
 export const sourceChangeReviewAPI = {
   listPending: (params?: { limit?: number; offset?: number }) =>
-    api.get('/api/admin/source-change-reviews', { params }).then((r) => r.data),
+    api.get<{ items: unknown[]; total?: number }>('/api/admin/source-change-reviews', { params }).then((r) => r.data),
   approve: (id: string) =>
-    api.post(`/api/admin/source-change-reviews/${id}/approve`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/source-change-reviews/${id}/approve`).then((r) => r.data),
   reject: (id: string, note?: string) =>
-    api.post(`/api/admin/source-change-reviews/${id}/reject`, { note }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/source-change-reviews/${id}/reject`, { note }).then((r) => r.data),
 };
 
 // Admin Review Queue API (admin-only)
@@ -2238,32 +2238,32 @@ export const adminReviewQueueAPI = {
     limit?: number;
     offset?: number;
     sort?: 'priority' | 'created' | 'due' | 'age';
-  }) => api.get('/api/admin/review-queue', { params }).then((r) => r.data),
-  getStats: () => api.get('/api/admin/review-queue/stats').then((r) => r.data),
+  }) => api.get<{ items: unknown[]; total?: number }>('/api/admin/review-queue', { params }).then((r) => r.data),
+  getStats: () => api.get<unknown>('/api/admin/review-queue/stats').then((r) => r.data),
   getAssignees: (limit?: number) =>
-    api.get('/api/admin/review-queue/assignees', { params: { limit } }).then((r) => r.data),
-  getItem: (id: string) => api.get(`/api/admin/review-queue/${id}`).then((r) => r.data),
+    api.get<unknown>('/api/admin/review-queue/assignees', { params: { limit } }).then((r) => r.data),
+  getItem: (id: string) => api.get<unknown>(`/api/admin/review-queue/${id}`).then((r) => r.data),
   getActivity: (id: string, limit?: number) =>
-    api.get(`/api/admin/review-queue/${id}/activity`, { params: { limit } }).then((r) => r.data),
+    api.get<unknown>(`/api/admin/review-queue/${id}/activity`, { params: { limit } }).then((r) => r.data),
   assign: (id: string, assigneeUserId: string) =>
-    api.post(`/api/admin/review-queue/${id}/assign`, { assignee_user_id: assigneeUserId }).then((r) => r.data),
-  claim: (id: string) => api.post(`/api/admin/review-queue/${id}/claim`).then((r) => r.data),
-  unassign: (id: string) => api.post(`/api/admin/review-queue/${id}/unassign`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/review-queue/${id}/assign`, { assignee_user_id: assigneeUserId }).then((r) => r.data),
+  claim: (id: string) => api.post<unknown>(`/api/admin/review-queue/${id}/claim`).then((r) => r.data),
+  unassign: (id: string) => api.post<unknown>(`/api/admin/review-queue/${id}/unassign`).then((r) => r.data),
   setStatus: (id: string, status: string, note?: string) =>
-    api.post(`/api/admin/review-queue/${id}/status`, { status, note }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/review-queue/${id}/status`, { status, note }).then((r) => r.data),
   defer: (id: string, dueAt?: string, note?: string) =>
-    api.post(`/api/admin/review-queue/${id}/defer`, { due_at: dueAt, note }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/review-queue/${id}/defer`, { due_at: dueAt, note }).then((r) => r.data),
   resolve: (id: string, resolutionSummary?: string) =>
-    api.post(`/api/admin/review-queue/${id}/resolve`, { resolution_summary: resolutionSummary }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/review-queue/${id}/resolve`, { resolution_summary: resolutionSummary }).then((r) => r.data),
   reopen: (id: string, note?: string) =>
-    api.post(`/api/admin/review-queue/${id}/reopen`, { note }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/review-queue/${id}/reopen`, { note }).then((r) => r.data),
   updateNotes: (id: string, notes: string) =>
-    api.patch(`/api/admin/review-queue/${id}/notes`, { notes }).then((r) => r.data),
+    api.patch<unknown>(`/api/admin/review-queue/${id}/notes`, { notes }).then((r) => r.data),
   bulkAssign: (itemIds: string[], assigneeUserId: string) =>
-    api.post('/api/admin/review-queue/bulk-assign', { item_ids: itemIds, assignee_user_id: assigneeUserId }).then((r) => r.data),
+    api.post<unknown>('/api/admin/review-queue/bulk-assign', { item_ids: itemIds, assignee_user_id: assigneeUserId }).then((r) => r.data),
   bulkStatus: (itemIds: string[], status: string, note?: string) =>
-    api.post('/api/admin/review-queue/bulk-status', { item_ids: itemIds, status, note }).then((r) => r.data),
-  backfill: () => api.post('/api/admin/review-queue/backfill').then((r) => r.data),
+    api.post<unknown>('/api/admin/review-queue/bulk-status', { item_ids: itemIds, status, note }).then((r) => r.data),
+  backfill: () => api.post<unknown>('/api/admin/review-queue/backfill').then((r) => r.data),
 };
 
 // Admin Ops Notifications API (admin-only)
@@ -2277,40 +2277,40 @@ export const adminNotificationsAPI = {
     open_only?: boolean;
     limit?: number;
     offset?: number;
-  }) => api.get('/api/admin/notifications', { params }).then((r) => r.data),
-  getStats: () => api.get('/api/admin/notifications/stats').then((r) => r.data),
+  }) => api.get<{ items: unknown[]; total?: number }>('/api/admin/notifications', { params }).then((r) => r.data),
+  getStats: () => api.get<unknown>('/api/admin/notifications/stats').then((r) => r.data),
   getFeed: (params?: { limit?: number; critical_first?: boolean }) =>
-    api.get('/api/admin/notifications/feed', { params }).then((r) => r.data),
-  getOne: (id: string) => api.get(`/api/admin/notifications/${id}`).then((r) => r.data),
+    api.get<unknown>('/api/admin/notifications/feed', { params }).then((r) => r.data),
+  getOne: (id: string) => api.get<unknown>(`/api/admin/notifications/${id}`).then((r) => r.data),
   getEvents: (id: string, limit?: number) =>
-    api.get(`/api/admin/notifications/${id}/events`, { params: { limit } }).then((r) => r.data),
-  acknowledge: (id: string) => api.post(`/api/admin/notifications/${id}/acknowledge`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/notifications/${id}/events`, { params: { limit } }).then((r) => r.data),
+  acknowledge: (id: string) => api.post<unknown>(`/api/admin/notifications/${id}/acknowledge`).then((r) => r.data),
   resolve: (id: string, reason?: string) =>
-    api.post(`/api/admin/notifications/${id}/resolve`, null, { params: { reason } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/notifications/${id}/resolve`, null, { params: { reason } }).then((r) => r.data),
   suppress: (id: string, until?: string) =>
-    api.post(`/api/admin/notifications/${id}/suppress`, null, { params: { until } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/notifications/${id}/suppress`, null, { params: { until } }).then((r) => r.data),
   reopen: (id: string, reason?: string) =>
-    api.post(`/api/admin/notifications/${id}/reopen`, null, { params: { reason } }).then((r) => r.data),
-  recompute: () => api.post('/api/admin/notifications/recompute').then((r) => r.data),
-  sync: () => api.post('/api/admin/notifications/sync').then((r) => r.data),
+    api.post<unknown>(`/api/admin/notifications/${id}/reopen`, null, { params: { reason } }).then((r) => r.data),
+  recompute: () => api.post<unknown>('/api/admin/notifications/recompute').then((r) => r.data),
+  sync: () => api.post<unknown>('/api/admin/notifications/sync').then((r) => r.data),
 };
 
 // Admin Ops Analytics API (admin-only)
 export const adminOpsAnalyticsAPI = {
   getSlaOverview: (params?: { country_code?: string; days?: number }) =>
-    api.get('/api/admin/ops/sla/overview', { params }).then((r) => r.data),
+    api.get<unknown>('/api/admin/ops/sla/overview', { params }).then((r) => r.data),
   getQueueBacklog: (params?: { country_code?: string }) =>
-    api.get('/api/admin/ops/queue/backlog', { params }).then((r) => r.data),
+    api.get<unknown>('/api/admin/ops/queue/backlog', { params }).then((r) => r.data),
   getQueueBreaches: (params?: { country_code?: string; limit?: number }) =>
-    api.get('/api/admin/ops/queue/breaches', { params }).then((r) => r.data),
-  getReviewerWorkload: () => api.get('/api/admin/ops/reviewers/workload').then((r) => r.data),
-  getDestinations: () => api.get('/api/admin/ops/destinations').then((r) => r.data),
+    api.get<unknown>('/api/admin/ops/queue/breaches', { params }).then((r) => r.data),
+  getReviewerWorkload: () => api.get<unknown>('/api/admin/ops/reviewers/workload').then((r) => r.data),
+  getDestinations: () => api.get<unknown>('/api/admin/ops/destinations').then((r) => r.data),
   /** Top destinations selected by users across all relocation cases (request-driven, not ops backlog). */
   getTopDestinationsByRequest: (params?: { limit?: number }) =>
-    api.get('/api/admin/ops/destinations/requests', { params }).then((r) => r.data),
+    api.get<unknown>('/api/admin/ops/destinations/requests', { params }).then((r) => r.data),
   getNotificationMetrics: (params?: { days?: number }) =>
-    api.get('/api/admin/ops/notifications', { params }).then((r) => r.data),
-  getBottlenecks: () => api.get('/api/admin/ops/bottlenecks').then((r) => r.data),
+    api.get<unknown>('/api/admin/ops/notifications', { params }).then((r) => r.data),
+  getBottlenecks: () => api.get<unknown>('/api/admin/ops/bottlenecks').then((r) => r.data),
 };
 
 // Admin Collaboration API (admin-only, internal threads)

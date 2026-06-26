@@ -12,7 +12,7 @@ export const AdminOpsReviewersPage: React.FC = () => {
     setError(null);
     try {
       const res = await adminOpsAnalyticsAPI.getReviewerWorkload();
-      setData(res);
+      setData(res as Record<string, unknown>);
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
     } finally {

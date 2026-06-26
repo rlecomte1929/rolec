@@ -9,7 +9,7 @@ export const AdminNotificationBadge: React.FC = () => {
     adminNotificationsAPI
       .getStats()
       .then((s) => {
-        if (!cancelled) setCount(s.open_count ?? 0);
+        if (!cancelled) setCount((s as { open_count?: number }).open_count ?? 0);
       })
       .catch(() => {});
     return () => {

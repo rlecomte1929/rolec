@@ -12,7 +12,7 @@ export const AdminOpsDestinationsPage: React.FC = () => {
     setError(null);
     try {
       const res = await adminOpsAnalyticsAPI.getDestinations();
-      setData(res);
+      setData(res as { items?: Record<string, unknown>[] });
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
     } finally {

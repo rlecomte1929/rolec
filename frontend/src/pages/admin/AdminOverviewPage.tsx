@@ -148,8 +148,8 @@ export const AdminOverviewPage: React.FC = () => {
         hrUsers: settledArrayCount(results[1], (value) => value.hr_users),
         employees: settledArrayCount(results[2], (value) => value.employees),
         assignments: settledArrayCount(results[3], (value) => value.assignments),
-        reviewOpen: settledNumber(results[4], (value) => value.open_items_count),
-        reviewUnassigned: settledNumber(results[4], (value) => value.unassigned_count),
+        reviewOpen: settledNumber(results[4], (value) => (value as { open_items_count?: number }).open_items_count),
+        reviewUnassigned: settledNumber(results[4], (value) => (value as { unassigned_count?: number }).unassigned_count),
         activeSuppliers: settledArrayCount(results[5], (value) => value.suppliers),
       };
     },
