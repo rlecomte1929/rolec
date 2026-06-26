@@ -336,8 +336,8 @@ export const profileAPI = {
     return response.data;
   },
 
-  complete: async (): Promise<any> => {
-    const response = await api.post('/api/profile/complete');
+  complete: async (): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/profile/complete');
     return response.data;
   },
 };
@@ -624,8 +624,8 @@ export const hrAPI = {
   requestPolicyException: async (
     caseId: string,
     payload: { category: string; reason?: string; amount?: number }
-  ): Promise<any> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
+  ): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
     return response.data;
   },
   getCompanyProfile: async (): Promise<{ company: any | null }> => {
@@ -656,8 +656,8 @@ export const hrAPI = {
   deleteEmployee: async (employeeId: string): Promise<void> => {
     await api.delete(`/api/hr/employees/${employeeId}`);
   },
-  saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<any> => {
-    const response = await api.post('/api/hr/company-profile', payload);
+  saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/hr/company-profile', payload);
     invalidateApiCache('hr:company-profile');
     invalidateApiCache('company:get');
     return response.data;
@@ -736,32 +736,32 @@ export const hrAPI = {
   recordComplianceAction: async (
     caseId: string,
     payload: { actionType: string; checkId: string; notes?: string; payload?: any }
-  ): Promise<any> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/compliance/actions`, payload);
+  ): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/hr/cases/${caseId}/compliance/actions`, payload);
     return response.data;
   },
-  runCompliance: async (assignmentId: string): Promise<any> => {
-    const response = await api.post(`/api/hr/assignments/${assignmentId}/run-compliance`);
+  runCompliance: async (assignmentId: string): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/hr/assignments/${assignmentId}/run-compliance`);
     return response.data;
   },
   decide: async (
     assignmentId: string,
     decision: 'approved' | 'rejected',
     opts?: { notes?: string; requestedSections?: string[] }
-  ): Promise<any> => {
-    const response = await api.post(`/api/hr/assignments/${assignmentId}/decision`, {
+  ): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/hr/assignments/${assignmentId}/decision`, {
       decision,
       notes: opts?.notes,
       requestedSections: opts?.requestedSections,
     });
     return response.data;
   },
-  updateIdentifier: async (assignmentId: string, employeeIdentifier: string): Promise<any> => {
-    const response = await api.post(`/api/hr/assignments/${assignmentId}/identifier`, { employeeIdentifier });
+  updateIdentifier: async (assignmentId: string, employeeIdentifier: string): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/hr/assignments/${assignmentId}/identifier`, { employeeIdentifier });
     return response.data;
   },
-  deleteAssignment: async (assignmentId: string): Promise<any> => {
-    const response = await api.delete(`/api/hr/assignments/${assignmentId}`);
+  deleteAssignment: async (assignmentId: string): Promise<unknown> => {
+    const response = await api.delete<unknown>(`/api/hr/assignments/${assignmentId}`);
     return response.data;
   },
   postFeedback: async (assignmentId: string, message: string): Promise<{ ok: boolean; id: string; created_at: string }> => {
@@ -2348,8 +2348,8 @@ export const adminCollaborationAPI = {
 };
 
 export const requirementsAPI = {
-  getSufficiency: async (caseId: string): Promise<any> => {
-    const response = await api.get('/api/requirements/sufficiency', { params: { case_id: caseId } });
+  getSufficiency: async (caseId: string): Promise<{ missing_fields?: string[]; compute_status?: string; message?: string }> => {
+    const response = await api.get<{ missing_fields?: string[]; compute_status?: string; message?: string }>('/api/requirements/sufficiency', { params: { case_id: caseId } });
     return response.data;
   },
 };
@@ -2464,8 +2464,8 @@ export const employeeAPI = {
     const response = await api.post<EmployeeJourneyResponse>('/api/employee/journey/answer', { assignmentId, questionId, answer });
     return response.data;
   },
-  submitAssignment: async (assignmentId: string): Promise<any> => {
-    const response = await api.post(`/api/employee/assignments/${assignmentId}/submit`);
+  submitAssignment: async (assignmentId: string): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/employee/assignments/${assignmentId}/submit`);
     // Submit advances the assignment to 'submitted' — bust the 60s overview/current
     // caches so the dashboard reflects the new status (and roadmap-unlocked) on the
     // post-submit redirect instead of serving the stale pre-submit row.
@@ -2473,8 +2473,8 @@ export const employeeAPI = {
     invalidateApiCache('employee:current-assignment');
     return response.data;
   },
-  updateProfilePhoto: async (assignmentId: string, photoUrl: string): Promise<any> => {
-    const response = await api.post(`/api/employee/assignments/${assignmentId}/photo`, {
+  updateProfilePhoto: async (assignmentId: string, photoUrl: string): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/employee/assignments/${assignmentId}/photo`, {
       assignmentId,
       photoUrl,
     });
@@ -3065,16 +3065,16 @@ export const hrPolicyAPI = {
     const response = await api.get<{ policies: any[] }>('/api/hr/policies', { params: params || {} });
     return response.data;
   },
-  get: async (policyId: string): Promise<any> => {
-    const response = await api.get(`/api/hr/policies/${policyId}`);
+  get: async (policyId: string): Promise<unknown> => {
+    const response = await api.get<unknown>(`/api/hr/policies/${policyId}`);
     return response.data;
   },
   create: async (policy: Record<string, unknown>): Promise<{ policyId: string; policy: any }> => {
     const response = await api.post<{ policyId: string; policy: any }>('/api/hr/policies', policy);
     return response.data;
   },
-  update: async (policyId: string, policy: Record<string, unknown>): Promise<any> => {
-    const response = await api.put(`/api/hr/policies/${policyId}`, policy);
+  update: async (policyId: string, policy: Record<string, unknown>): Promise<unknown> => {
+    const response = await api.put<unknown>(`/api/hr/policies/${policyId}`, policy);
     return response.data;
   },
   upload: async (file: File): Promise<{ policyId: string; policy: any }> => {
@@ -3689,8 +3689,8 @@ export const dossierAPI = {
     const response = await api.post<DossierSearchSuggestionsResponse>('/api/dossier/search-suggestions', { case_id: caseId });
     return response.data;
   },
-  addCaseQuestion: async (payload: { case_id: string; question_text: string; answer_type: string; options?: string[] | null; is_mandatory?: boolean; sources?: DossierSource[] }): Promise<any> => {
-    const response = await api.post('/api/dossier/case-questions', payload);
+  addCaseQuestion: async (payload: { case_id: string; question_text: string; answer_type: string; options?: string[] | null; is_mandatory?: boolean; sources?: DossierSource[] }): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/dossier/case-questions', payload);
     return response.data;
   },
 };
