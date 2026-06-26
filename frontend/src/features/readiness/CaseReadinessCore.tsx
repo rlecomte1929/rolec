@@ -107,7 +107,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
     hrAPI
       .getReadinessSummary(assignmentId, { signal: ac.signal })
       .then((data) => {
-        if (!cancelled) setSummary(data as Summary);
+        if (!cancelled) setSummary(data);
       })
       .catch(() => {
         if (!cancelled)
@@ -164,7 +164,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
       await hrAPI.patchReadinessChecklistItem(assignmentId, itemId, { status });
       await loadDetail();
       const s = await hrAPI.getReadinessSummary(assignmentId);
-      setSummary(s as Summary);
+      setSummary(s);
     } finally {
       setActionBusy(null);
     }
@@ -176,7 +176,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
       await hrAPI.patchReadinessMilestone(assignmentId, milestoneId, { completed });
       await loadDetail();
       const s = await hrAPI.getReadinessSummary(assignmentId);
-      setSummary(s as Summary);
+      setSummary(s);
     } finally {
       setActionBusy(null);
     }

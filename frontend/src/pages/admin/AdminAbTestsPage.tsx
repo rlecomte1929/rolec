@@ -92,7 +92,7 @@ export const AdminAbTestsPage: React.FC = () => {
         }
 
         if (summary?.raw_counts) {
-          setAnalysis(summary.raw_counts as unknown as AnalysisPayload);
+          setAnalysis(summary.raw_counts);
           setLastUpdated(summary.date as string);
         }
       } catch (err) {

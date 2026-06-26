@@ -178,7 +178,7 @@ export function ErrorTicketsTab() {
     if (err) {
       setError('Failed to load error tickets.');
     } else {
-      setTickets((data as ErrorTicket[]) ?? []);
+      setTickets((data) ?? []);
     }
     setLoading(false);
   }, []);
@@ -284,7 +284,7 @@ export function ErrorTicketsTab() {
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
             }`}
           >
-            {f === 'all' ? 'All' : STATUS_LABELS[f as TicketStatus]}
+            {f === 'all' ? 'All' : STATUS_LABELS[f]}
             <span className="ml-1.5 opacity-60">{counts[f]}</span>
           </Button>
         ))}
@@ -294,7 +294,7 @@ export function ErrorTicketsTab() {
       {displayed.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-sm font-medium text-gray-600 mb-1">
-            {filter === 'all' ? 'No errors recorded yet.' : `No ${STATUS_LABELS[filter as TicketStatus].toLowerCase()} tickets.`}
+            {filter === 'all' ? 'No errors recorded yet.' : `No ${STATUS_LABELS[filter].toLowerCase()} tickets.`}
           </p>
           <p className="text-xs text-gray-400">
             {filter === 'all' ? 'The capture layer is active — errors will appear here when they occur.' : ''}

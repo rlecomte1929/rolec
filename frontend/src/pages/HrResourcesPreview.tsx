@@ -152,7 +152,7 @@ export const HrResourcesPreview: React.FC = () => {
 
   const companyDefault = useMemo(() => {
     if (!company) return null;
-    const c = company as Record<string, unknown>;
+    const c = company;
     return (
       (c.default_destination_country as string | undefined) ??
       (c.defaultDestinationCountry as string | undefined) ??

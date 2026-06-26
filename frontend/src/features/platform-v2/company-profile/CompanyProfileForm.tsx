@@ -225,7 +225,7 @@ export function CompanyProfileForm({
 
   const logoUrl = useMemo(() => {
     if (!company) return null;
-    const v = (company['logo_url'] ?? (company as Record<string, unknown>)['logoUrl']) as string | undefined;
+    const v = (company['logo_url'] ?? (company)['logoUrl']) as string | undefined;
     return v ? String(v) : null;
   }, [company]);
 
@@ -248,7 +248,7 @@ export function CompanyProfileForm({
 
   function flashSection(key: SectionKey) {
     setSectionFlash((s) => ({ ...s, [key]: true }));
-    if (flashTimers.current[key]) clearTimeout(flashTimers.current[key]!);
+    if (flashTimers.current[key]) clearTimeout(flashTimers.current[key]);
     flashTimers.current[key] = setTimeout(() => {
       setSectionFlash((s) => ({ ...s, [key]: false }));
     }, 2200);

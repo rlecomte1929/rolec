@@ -44,7 +44,7 @@ export function trackAuthPerf(entry: AuthPerfEntry): void {
     ? ` ${JSON.stringify(entry.meta)}`
     : '';
 
-  // eslint-disable-next-line no-console
+   
   console.log(`[auth-perf] stage=${entry.stage}${route}${dur}${rid}${meta}`);
 
   if (typeof performance !== 'undefined' && performance.mark) {

@@ -193,7 +193,7 @@ export const AdminSupplierNew: React.FC = () => {
               <label className="block text-sm font-medium text-[#374151] mb-1">Status</label>
               <select
                 value={form.status}
-                onChange={(e) => updateForm({ status: e.target.value as 'active' | 'inactive' | 'draft' })}
+                onChange={(e) => updateForm({ status: e.target.value })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
               >
                 <option value="active">Active</option>

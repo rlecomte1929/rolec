@@ -43,7 +43,7 @@ function isIso2(code: string): boolean {
 export const COUNTRY_NAME = (code?: string): string => {
   if (!code) return '—';
   const upper = code.trim().toUpperCase();
-  if (COUNTRY_NAMES[upper]) return COUNTRY_NAMES[upper]!;
+  if (COUNTRY_NAMES[upper]) return COUNTRY_NAMES[upper];
   // Fall through to a humanized version of the raw value (e.g. "GERMANY" → "Germany").
   if (upper.length > 2) return upper.charAt(0) + upper.slice(1).toLowerCase();
   return upper;

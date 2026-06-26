@@ -37,12 +37,12 @@ function parseEnvJson(raw: string): Partial<Record<Tier, number>> | null {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    // eslint-disable-next-line no-console
+     
     console.warn(`staleness: ${ENV_VAR} is not valid JSON; using defaults`);
     return null;
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    // eslint-disable-next-line no-console
+     
     console.warn(`staleness: ${ENV_VAR} must be a JSON object; using defaults`);
     return null;
   }
@@ -51,7 +51,7 @@ function parseEnvJson(raw: string): Partial<Record<Tier, number>> | null {
     const v = (parsed as Record<string, unknown>)[tier];
     if (v === undefined) continue; // missing → fall back per-tier
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
-      // eslint-disable-next-line no-console
+       
       console.warn(
         `staleness: ${ENV_VAR}.${tier} must be a non-negative integer (got ${String(v)}); using default`,
       );
@@ -64,7 +64,7 @@ function parseEnvJson(raw: string): Partial<Record<Tier, number>> | null {
 
 export function loadConfig(env?: Record<string, string | undefined>): StalenessConfig {
   // import.meta.env is the Vite source; tests can pass an explicit env map.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const source: Record<string, string | undefined> = env ?? ((import.meta as any)?.env ?? {});
   const raw = source[ENV_VAR];
   if (!raw) return { thresholdsDays: { ...DEFAULT_THRESHOLDS_DAYS } };

@@ -79,10 +79,10 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
   }, [moveDate]);
 
   const targetsByType = useMemo(() => {
-    if (!moveDateISO) return {} as Record<string, string>;
+    if (!moveDateISO) return {};
     return Object.fromEntries(
       computeMilestoneTargets(moveDateISO).map((t) => [t.type, t.targetISO]),
-    ) as Record<string, string>;
+    );
   }, [moveDateISO]);
 
   const bookEarlyMessage = corridorFrom && corridorTo

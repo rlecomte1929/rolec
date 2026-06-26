@@ -36,7 +36,7 @@ export function buildQuoteCapRowModels(
         amount = share;
       }
     }
-    const lineHint = lines.length === items.length && lines[i] ? ` · ${lines[i]!.label}` : '';
+    const lineHint = lines.length === items.length && lines[i] ? ` · ${lines[i].label}` : '';
     return {
       key: `${sk}-${i}`,
       label: `${humanizeServiceKey(sk)}${lineHint}`,

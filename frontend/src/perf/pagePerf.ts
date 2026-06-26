@@ -36,7 +36,7 @@ const now = () => (typeof performance !== 'undefined' ? performance.now() : Date
 function log(msg: string, data?: object) {
   if (!ENABLED) return;
   const payload = data ? ` ${JSON.stringify(data)}` : '';
-  // eslint-disable-next-line no-console
+   
   console.log(`[page-perf] ${msg}${payload}`);
 }
 

@@ -155,8 +155,8 @@ function PasswordInput({
           boxSizing: 'border-box',
           transition: 'border-color var(--transition-fast)',
         }}
-        onFocus={e => { if (!error) (e.target as HTMLInputElement).style.borderColor = 'var(--accent-border)'; }}
-        onBlur={e => { if (!error) (e.target as HTMLInputElement).style.borderColor = 'var(--border-default)'; }}
+        onFocus={e => { if (!error) (e.target).style.borderColor = 'var(--accent-border)'; }}
+        onBlur={e => { if (!error) (e.target).style.borderColor = 'var(--border-default)'; }}
       />
       <Button unstyled
         type="button"
@@ -549,8 +549,8 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
                     placeholder="you@company.com"
                     disabled={siLoading}
                     style={inputStyle(!!siError)}
-                    onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent-border)'}
-                    onBlur={e => (e.target as HTMLInputElement).style.borderColor = siError ? 'var(--status-error, #E53E3E)' : 'var(--border-default)'}
+                    onFocus={e => (e.target).style.borderColor = 'var(--accent-border)'}
+                    onBlur={e => (e.target).style.borderColor = siError ? 'var(--status-error, #E53E3E)' : 'var(--border-default)'}
                   />
                 </div>
 

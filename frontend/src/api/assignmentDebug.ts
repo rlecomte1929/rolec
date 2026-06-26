@@ -48,7 +48,7 @@ async function fetchViaSupabase(assignmentId: string): Promise<{ data: GetAssign
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_assignment_by_id`, {
       method: 'POST',
       headers: {
-        apikey: SUPABASE_ANON_KEY!,
+        apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
@@ -116,7 +116,7 @@ export async function assertAssignmentLinks(
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/assert_assignment_links`, {
       method: 'POST',
       headers: {
-        apikey: SUPABASE_ANON_KEY!,
+        apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },

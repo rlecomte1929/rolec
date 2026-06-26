@@ -108,7 +108,7 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
       .then((row) => {
         if (cancelled) return;
         if (row?.state) {
-          const s = row.state as Record<string, unknown>;
+          const s = row.state;
           if (Array.isArray(s.selectedServices)) {
             setSelectedServices(new Set(s.selectedServices as ServiceKey[]));
           }

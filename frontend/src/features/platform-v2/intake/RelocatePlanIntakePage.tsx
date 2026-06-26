@@ -874,7 +874,7 @@ export function RelocatePlanIntakePage() {
     if (!caseId) return;
     setSaving(true);
     try {
-      await patchCase(caseId, patch as any);
+      await patchCase(caseId, patch);
     } catch (err) {
       // Non-blocking — show in console only
       logger.warn('[RelocatePlanIntake] save failed', err);

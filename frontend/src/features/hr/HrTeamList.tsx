@@ -522,7 +522,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                               className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium"
                               style={hasProfile ? { background: av.bg, color: av.color } : { background: '#f3f4f6', color: '#9ca3af' }}
                             >
-                              {hasProfile ? initials(name!) : '?'}
+                              {hasProfile ? initials(name) : '?'}
                             </div>
                             <div className="min-w-0">
                               {hasProfile ? (

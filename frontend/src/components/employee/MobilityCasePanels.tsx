@@ -92,7 +92,7 @@ export function MobilityCasePanels({ mobilityCaseId, relocationBasics, familyMem
         setRouteDestination(labelCountry(relocationBasics?.destCountry || undefined));
         setCaseTypeLabel(formatCaseType(relocationBasics?.purpose || null));
       }
-      const meta = c?.metadata && typeof c.metadata === 'object' ? (c.metadata as Record<string, unknown>) : {};
+      const meta = c?.metadata && typeof c.metadata === 'object' ? (c.metadata) : {};
       const householdSpouse = Boolean(meta.household_includes_spouse);
       const familyExtra =
         householdSpouse && !draftFamilyLine.toLowerCase().includes('spouse')

@@ -22,7 +22,7 @@ import { Button } from '../../components/antigravity/Button';
 import { supabase } from '../../api/supabase';
 
 const APPROVE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-ai-request`;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 interface SpendRequest {
   id: string;

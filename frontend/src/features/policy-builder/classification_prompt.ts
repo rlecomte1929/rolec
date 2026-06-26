@@ -408,8 +408,8 @@ export function parseClassificationOutput(raw: string): ClassificationOutput {
     category_name: obj.category_name,
     applicable_tiers: obj.applicable_tiers as string[],
     extracted_values: obj.extracted_values as ExtractedValue[],
-    confidence_score: Math.max(0, Math.min(1, obj.confidence_score as number)),
-    confidence_rationale: (obj.confidence_rationale as string).slice(0, 120),
+    confidence_score: Math.max(0, Math.min(1, obj.confidence_score)),
+    confidence_rationale: (obj.confidence_rationale).slice(0, 120),
   };
 }
 

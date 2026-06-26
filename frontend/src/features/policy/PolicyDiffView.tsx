@@ -213,14 +213,14 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
     setErr(null);
     try {
       const res = await policyConfigMatrixAPI.hrDiff(adminCompanyId ?? undefined);
-      setPayload(res as DiffPayload);
+      setPayload(res);
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { detail?: string | { message?: string } } } };
       const d = ax.response?.data?.detail;
       setErr(
         typeof d === 'string'
           ? d
-          : (d && typeof d === 'object' && 'message' in d && (d as { message?: string }).message) ||
+          : (d && typeof d === 'object' && 'message' in d && (d).message) ||
               'Could not load the Draft vs Live diff. Try again.'
       );
     } finally {
@@ -245,14 +245,14 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
           { benefit_key: bk, targeting_signature: ts },
           adminCompanyId ?? undefined
         );
-        setPayload(res as DiffPayload);
+        setPayload(res);
       } catch (e: unknown) {
         const ax = e as { response?: { data?: { detail?: string | { message?: string } } } };
         const d = ax.response?.data?.detail;
         setErr(
           typeof d === 'string'
             ? d
-            : (d && typeof d === 'object' && 'message' in d && (d as { message?: string }).message) ||
+            : (d && typeof d === 'object' && 'message' in d && (d).message) ||
                 'Revert failed. Try again.'
         );
       } finally {

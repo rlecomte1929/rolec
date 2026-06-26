@@ -152,7 +152,7 @@ export const AdminFormTemplateMap: React.FC = () => {
         original_pdf_url: template.original_pdf_url ?? null,
         version: template.version,
         fields: withComputedPositions(fields) as unknown as Array<Record<string, unknown>>,
-        trigger_rules: (template.trigger_rules ?? {}) as Record<string, unknown>,
+        trigger_rules: (template.trigger_rules ?? {}),
       });
       setSaveSuccess(true);
     } catch (e) {

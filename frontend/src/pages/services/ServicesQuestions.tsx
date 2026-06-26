@@ -127,12 +127,12 @@ export const ServicesQuestions: React.FC = () => {
         if (selected.size > 0) setSelectedServices(selected);
 
         const ctx = res.case_context || {};
-        const destCity = (ctx.destCity ?? ctx.destCountry ?? '') as string;
-        const destCountry = (ctx.destCountry ?? '') as string;
+        const destCity = (ctx.destCity ?? ctx.destCountry ?? '');
+        const destCountry = (ctx.destCountry ?? '');
         setCaseContext({
           destCity: destCity || undefined,
           destCountry: destCountry || undefined,
-          originCountry: (ctx.originCountry as string | undefined) || undefined,
+          originCountry: (ctx.originCountry) || undefined,
         });
 
         const fromCase = caseToInitialAnswers(null, {
@@ -155,7 +155,7 @@ export const ServicesQuestions: React.FC = () => {
             withDefaults[q.question_key] = q.default;
           }
         }
-        (setInitialAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(() => merged);
+        (setInitialAnswers)(() => merged);
         (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(() => withDefaults);
         setQuestions(qs);
         setCaseDetailsLoaded(true);
@@ -183,7 +183,7 @@ export const ServicesQuestions: React.FC = () => {
     [setAnswers]
   );
 
-  const selectedServiceKeys = useMemo(() => Array.from(wizardServices) as ServiceKey[], [wizardServices]);
+  const selectedServiceKeys = useMemo(() => Array.from(wizardServices), [wizardServices]);
 
   const questionsForSelected = useMemo(() => {
     const selected = new Set(selectedServiceKeys);

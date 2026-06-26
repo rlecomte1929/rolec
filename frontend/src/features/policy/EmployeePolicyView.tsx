@@ -162,7 +162,7 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
         assignmentType,
         familyStatus,
       });
-      setData(res as EmployeePolicyPayload);
+      setData(res);
     } catch {
       setError('We could not load your compensation policy right now. Please try again later.');
       setData(null);

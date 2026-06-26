@@ -138,7 +138,7 @@ export const EmployeeDossierPage: React.FC = () => {
       blocked:       scopedForms.filter((f) => matchesFilter(f, 'blocked')).length,
       ready:         scopedForms.filter((f) => matchesFilter(f, 'ready')).length,
       submitted:     scopedForms.filter((f) => matchesFilter(f, 'submitted')).length,
-    } as Record<FilterTabKey, number>;
+    };
   }, [scopedForms]);
 
   const visible = useMemo(

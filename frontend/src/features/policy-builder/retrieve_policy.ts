@@ -23,7 +23,7 @@
 // this module can be imported in test environments without Supabase env vars.
 type SupabaseClient = Awaited<ReturnType<typeof import('../../lib/supabase').supabase.auth.getSession>> extends never
   ? never
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   : any;
 
 async function getSupabase(): Promise<SupabaseClient> {
@@ -139,7 +139,7 @@ export async function retrievePolicy(
   const supabase = await getSupabase();
   const supabaseUrl: string =
     (supabase as unknown as { supabaseUrl?: string }).supabaseUrl ??
-    (import.meta.env.VITE_SUPABASE_URL as string);
+    (import.meta.env.VITE_SUPABASE_URL);
 
   const functionUrl = `${supabaseUrl}/functions/v1/retrieve-policy`;
 
@@ -147,14 +147,14 @@ export async function retrievePolicy(
   const { data: { session } } = await supabase.auth.getSession();
   const authHeader = session?.access_token
     ? `Bearer ${session.access_token}`
-    : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY as string}`;
+    : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
 
   const response = await fetch(functionUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: authHeader,
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({ query, employee_tier, company_id, k }),
   });

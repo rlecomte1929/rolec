@@ -12,7 +12,7 @@ export function humanizeUnitFrequency(uf: string | undefined | null): string {
 function capSummary(b: PolicyConfigBenefitRow): string | null {
   const cap = b.allowance_cap;
   if (!cap || typeof cap !== 'object') return null;
-  const o = cap as Record<string, unknown>;
+  const o = cap;
   const amount = o.amount;
   const currency = (o.currency as string) || (o.cap_currency as string) || '';
   if (typeof amount === 'number') {

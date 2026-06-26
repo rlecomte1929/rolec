@@ -23,4 +23,4 @@ export const logger = {
   error: isProd ? () => undefined : (...args: unknown[]) => console.error(...args),
   log:   isProd ? () => undefined : (...args: unknown[]) => console.log(...args),
 } as const;
-/* eslint-enable no-console */
+ 

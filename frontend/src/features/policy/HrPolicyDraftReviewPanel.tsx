@@ -475,7 +475,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
                         Your adjustment:{' '}
                         <span className="text-[#111827]">
                           {hrOv.amount_value_override != null
-                            ? TraceAmount({ amount_value: hrOv.amount_value_override, currency: hrOv.currency_override, amount_unit: hrOv.amount_unit_override } as Record<string, unknown>)
+                            ? TraceAmount({ amount_value: hrOv.amount_value_override, currency: hrOv.currency_override, amount_unit: hrOv.amount_unit_override })
                             : 'Applied (see benefit table for detail)'}
                         </span>
                       </div>

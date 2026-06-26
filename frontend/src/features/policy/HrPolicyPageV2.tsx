@@ -397,7 +397,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         return;
       }
       setDocuments(Array.isArray(docsRes?.documents) ? (docsRes.documents as PolicyDocumentListItem[]) : []);
-      setMatrixPayload((matrixRes as PolicyConfigWorkingPayload | null) ?? null);
+      setMatrixPayload((matrixRes) ?? null);
       if (hardError) setLoadError('Unable to load your policy. Try again or contact support.');
 
       // Canonical (document-normalized) policy status is loaded lazily by

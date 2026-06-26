@@ -25,7 +25,7 @@ async function fetchWithAuth(path: string, opts?: RequestInit) {
   return fetch(`${SUPABASE_URL}${path}`, {
     ...opts,
     headers: {
-      apikey: SUPABASE_ANON_KEY!,
+      apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...opts?.headers,

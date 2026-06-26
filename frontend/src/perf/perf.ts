@@ -86,7 +86,7 @@ export function recordRequestPerf(entry: RequestPerfEntry) {
       typeof entry.serverMs === 'number'
         ? ` network_ms=${Math.max(0, totalMs - entry.serverMs).toFixed(1)}`
         : '';
-    // eslint-disable-next-line no-console
+     
     console.log(
       `[perf] req ${entry.requestId} ${entry.method} ${entry.path} ` +
         `status=${entry.status} ok=${entry.ok} total_ms=${totalMs.toFixed(1)}${serverStr}${networkStr}`
@@ -138,7 +138,7 @@ export async function endInteraction(handle: InteractionHandle): Promise<void> {
   }
 
   if (PERF_CONSOLE_ENABLED) {
-    // eslint-disable-next-line no-console
+     
     console.log(
       `[perf] interaction ${handle.name} id=${handle.id} ` +
         `click_to_render_ms=${clickToRenderMs.toFixed(1)} requests=${entry.requestCount}`

@@ -175,7 +175,7 @@ export const HrPolicyManagement: React.FC = () => {
           maxAllowed: { ...(cats[key].maxAllowed || {}), [tier]: Number(value) || 0 },
         };
       } else {
-        (cats[key] as any)[field] = value;
+        (cats[key])[field] = value;
       }
       return { ...prev, benefitCategories: cats };
     });

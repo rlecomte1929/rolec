@@ -167,9 +167,9 @@ interface OcrErrorCardProps {
 
 const OcrErrorCard: React.FC<OcrErrorCardProps> = ({ error, onSkip }) => {
   const isStructured = typeof error === 'object' && error !== null;
-  const code = isStructured ? (error as OcrErrorDetail).code : 'unknown';
-  const message = isStructured ? (error as OcrErrorDetail).message : String(error);
-  const hint = isStructured ? (error as OcrErrorDetail).hint : '';
+  const code = isStructured ? (error).code : 'unknown';
+  const message = isStructured ? (error).message : String(error);
+  const hint = isStructured ? (error).hint : '';
 
   const config = OCR_ERROR_CONFIG[code] ?? FALLBACK_ERROR_CONFIG;
 

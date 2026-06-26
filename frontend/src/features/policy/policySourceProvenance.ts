@@ -18,7 +18,7 @@ export function getSourceProvenance(meta: unknown): PolicySourceProvenanceV1 | n
   const m = meta as Record<string, unknown>;
   const sp = m.source_provenance;
   if (!sp || typeof sp !== 'object') return null;
-  return sp as PolicySourceProvenanceV1;
+  return sp;
 }
 
 /** e.g. "Source: section 2.1" for HR review tables */

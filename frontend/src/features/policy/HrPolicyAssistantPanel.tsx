@@ -399,7 +399,7 @@ export const HrPolicyAssistantPanel: React.FC<{
         typeof d === 'string'
           ? d
           : d && typeof d === 'object' && 'message' in d
-            ? String((d as { message?: string }).message)
+            ? String((d).message)
             : ax.message || 'Could not load a policy answer. Try again.';
       setError(msg);
     } finally {

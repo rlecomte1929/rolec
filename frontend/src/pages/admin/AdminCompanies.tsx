@@ -641,7 +641,7 @@ export const AdminCompanies: React.FC = () => {
                           value={editingId === c.id && editDraft.plan_tier !== undefined ? editDraft.plan_tier : planTier(c)}
                           onChange={(e) => {
                             if (editingId !== c.id) setEditingId(c.id);
-                            setEditDraft((d) => ({ ...d, plan_tier: e.target.value as CompanyPlanTier }));
+                            setEditDraft((d) => ({ ...d, plan_tier: e.target.value }));
                           }}
                           className="rounded border border-[#d1d5db] px-2 py-1 text-sm"
                         >

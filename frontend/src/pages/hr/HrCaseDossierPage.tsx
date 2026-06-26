@@ -86,7 +86,7 @@ export const HrCaseDossierPage: React.FC = () => {
     blocked:       forms.filter((f) => matchesFilter(f as never, 'blocked')).length,
     flagged:       forms.filter((f) => matchesFilter(f as never, 'flagged')).length,
     submitted:     forms.filter((f) => matchesFilter(f as never, 'submitted')).length,
-  } as Record<FilterKey, number>), [forms]);
+  }), [forms]);
 
   const visible = useMemo(
     () => forms.filter((f) => matchesFilter(f as never, filter)),

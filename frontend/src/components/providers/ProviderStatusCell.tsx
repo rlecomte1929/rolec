@@ -89,8 +89,8 @@ export const ProviderStatusCell: React.FC<ProviderStatusCellProps> = ({
         whiteSpace: 'nowrap',
         transition: 'opacity 0.15s',
       }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.8')}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
+      onMouseEnter={(e) => ((e.currentTarget).style.opacity = '0.8')}
+      onMouseLeave={(e) => ((e.currentTarget).style.opacity = '1')}
     >
       <span
         style={{

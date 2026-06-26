@@ -108,8 +108,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
       const custom = event as CustomEvent<string>;
       setNavError(custom.detail || null);
     };
-    window.addEventListener('nav-error', handler as EventListener);
-    return () => window.removeEventListener('nav-error', handler as EventListener);
+    window.addEventListener('nav-error', handler);
+    return () => window.removeEventListener('nav-error', handler);
   }, []);
 
   // AIQ-1017: close the mobile nav drawer on route change so a tap-through

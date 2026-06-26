@@ -164,7 +164,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                   <span
                     className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-xs font-medium text-[#1d4ed8]"
                     title={summarizeOverrides(
-                      row.jurisdiction_overrides as PolicyJurisdictionOverride[]
+                      row.jurisdiction_overrides
                     )}
                   >
                     {row.jurisdiction_overrides.length} override
@@ -405,7 +405,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                 Section is hidden entirely (not just disabled) when off. */}
             {isSectionCOverridesEnabled() && (
               <JurisdictionOverridesEditor
-                overrides={(row.jurisdiction_overrides || []) as PolicyJurisdictionOverride[]}
+                overrides={(row.jurisdiction_overrides || [])}
                 disabled={disabled}
                 onChange={(next) => onChange({ ...row, jurisdiction_overrides: next })}
               />

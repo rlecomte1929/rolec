@@ -141,9 +141,9 @@ function rowToBenefitValue(row: DraftBenefitRow, isLump: boolean): LoadedBenefit
   // safely recoverable, so they stay 0 (the note text still renders).
 
   const cap =
-    !!(row.cap_rule_json && (row.cap_rule_json as Record<string, unknown>).capped) ||
-    !!(row.conditions_json && (row.conditions_json as Record<string, unknown>).cap);
-  const conditions = !!(row.conditions_json && (row.conditions_json as Record<string, unknown>).conditional);
+    !!(row.cap_rule_json && (row.cap_rule_json).capped) ||
+    !!(row.conditions_json && (row.conditions_json).cap);
+  const conditions = !!(row.conditions_json && (row.conditions_json).conditional);
 
   return {
     covered: row.covered !== false,
@@ -203,7 +203,7 @@ export function configDraftToCanvasPolicy(payload: DraftPayload | null | undefin
     let lump = 0;
     let isLump = false;
     for (const r of g.rows) {
-      const budget = r.conditions_json && (r.conditions_json as Record<string, unknown>).lump_sum_budget;
+      const budget = r.conditions_json && (r.conditions_json).lump_sum_budget;
       if (budget != null) {
         isLump = true;
         lump = asNumber(budget);

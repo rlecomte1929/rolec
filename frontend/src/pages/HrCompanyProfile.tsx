@@ -50,7 +50,7 @@ export const HrCompanyProfile: React.FC = () => {
 
   useEffect(() => {
     if (company) {
-      const c = company as Record<string, unknown>;
+      const c = company;
       const pick = (snake: string, camel: string) =>
         String((c[snake] ?? c[camel] ?? '') || '').trim();
       setName(pick('name', 'name'));
