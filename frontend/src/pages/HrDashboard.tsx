@@ -19,6 +19,7 @@ import { useHrAssignments } from '../hooks/useHrAssignments';
 import { usePolicyPublished } from '../hooks/usePolicyPublished';
 import { CalibrationAlertBanner } from '../components/CalibrationAlertBanner';
 import { AnswerProvenanceWidget } from '../components/AnswerProvenanceWidget';
+import { trackFirstCaseCreated } from '../perf/hrOnboardingInstrumentation';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -204,6 +205,11 @@ export const HrDashboard: React.FC = () => {
     try {
       // Create the case only now that we have a valid identifier, then assign.
       const created = await hrAPI.createCase();
+      // AIQ-1223b: HR onboarding signal — fire only on the genuinely first case
+      // (no prior assignments). PII-free: a single count.
+      if (assignments.length === 0) {
+        trackFirstCaseCreated({ prior_case_count: assignments.length });
+      }
       setCaseId(created.caseId);
       const response = await hrAPI.assignCase(created.caseId, employeeIdentifier.trim(), {
         firstName: employeeFirstName || undefined,
