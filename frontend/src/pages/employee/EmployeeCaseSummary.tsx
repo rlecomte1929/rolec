@@ -14,6 +14,7 @@ import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextAct
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 import { buildRoute } from '../../navigation/routes';
+import { getCountryName } from '../../utils/countries';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -22,6 +23,32 @@ function SummarySection({ title, children }: { title: string; children: React.Re
       <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
     </Card>
   );
+}
+
+function hasDisplayValue(value: React.ReactNode): boolean {
+  if (value == null) return false;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed !== '' && trimmed !== '-';
+  }
+  return true;
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  if (!hasDisplayValue(value)) return null;
+  return (
+    <div>
+      {label}: {value}
+    </div>
+  );
+}
+
+function formatCountry(value: string | null | undefined): string {
+  return getCountryName(value);
+}
+
+function formatLocation(city: string | null | undefined, country: string | null | undefined): string {
+  return [city, formatCountry(country)].filter(hasDisplayValue).join(', ');
 }
 
 function buildDefaultDraft(): CaseDraftDTO {
@@ -123,12 +150,15 @@ export const EmployeeCaseSummary: React.FC = () => {
   const ep = draft?.employeeProfile || {};
   const fm = draft?.familyMembers || {};
   const ac = draft?.assignmentContext || {};
+  const spouseName = fm.spouse?.fullName;
+  const childrenCount = fm.children?.length ?? 0;
 
   const hasAnyData =
-    (b.originCountry || b.originCity || b.destCountry || b.destCity || b.purpose || b.targetMoveDate != null) ||
-    (ep.fullName || ep.email || ep.nationality) ||
-    (fm.spouse?.fullName || (fm.children?.length ?? 0) > 0) ||
-    (ac.employerName || ac.jobTitle || ac.contractStartDate);
+    [b.originCountry, b.originCity, b.destCountry, b.destCity, b.purpose, b.targetMoveDate].some(hasDisplayValue) ||
+    [ep.fullName, ep.email, ep.nationality, ep.passportCountry, ep.residenceCountry].some(hasDisplayValue) ||
+    hasDisplayValue(spouseName) ||
+    childrenCount > 0 ||
+    [ac.employerName, ac.jobTitle, ac.contractStartDate, ac.contractType].some(hasDisplayValue);
 
   const planHref = assignmentId ? buildRoute('employeeCasePlan', { caseId: assignmentId }) : buildRoute('employeeDashboard');
   const immigrationHref = assignmentId ? buildRoute('employeeCaseImmigration', { caseId: assignmentId }) : null;
@@ -219,28 +249,28 @@ export const EmployeeCaseSummary: React.FC = () => {
       {!isLoading && draft && (
         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           <SummarySection title="Relocation Basics">
-            <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
-            <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>
-            <div>Purpose: {b.purpose || '-'}</div>
-            <div>Target move date: {b.targetMoveDate || '-'}</div>
-            <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '-'}</div>
+            <SummaryRow label="Origin" value={formatLocation(b.originCity, b.originCountry)} />
+            <SummaryRow label="Destination" value={formatLocation(b.destCity, b.destCountry)} />
+            <SummaryRow label="Purpose" value={b.purpose} />
+            <SummaryRow label="Target move date" value={b.targetMoveDate} />
+            <SummaryRow label="Duration" value={b.durationMonths != null ? `${b.durationMonths} months` : null} />
           </SummarySection>
           <SummarySection title="Employee Profile">
-            <div>Name: {ep.fullName || '-'}</div>
-            <div>Email: {ep.email || '-'}</div>
-            <div>Nationality: {ep.nationality || '-'}</div>
-            <div>Passport country: {ep.passportCountry || '-'}</div>
-            <div>Residence country: {ep.residenceCountry || '-'}</div>
+            <SummaryRow label="Name" value={ep.fullName} />
+            <SummaryRow label="Email" value={ep.email} />
+            <SummaryRow label="Nationality" value={formatCountry(ep.nationality)} />
+            <SummaryRow label="Passport country" value={formatCountry(ep.passportCountry)} />
+            <SummaryRow label="Residence country" value={formatCountry(ep.residenceCountry)} />
           </SummarySection>
           <SummarySection title="Family Members">
-            <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '-'}</div>
-            <div>Children: {fm.children?.length ? `${fm.children.length} child(ren)` : '-'}</div>
+            <SummaryRow label="Spouse" value={spouseName} />
+            <SummaryRow label="Children" value={childrenCount > 0 ? `${childrenCount} child(ren)` : null} />
           </SummarySection>
           <SummarySection title="Assignment / Context">
-            <div>Employer: {ac.employerName || '-'}</div>
-            <div>Job title: {ac.jobTitle || '-'}</div>
-            <div>Contract start: {ac.contractStartDate || '-'}</div>
-            <div>Contract type: {ac.contractType || '-'}</div>
+            <SummaryRow label="Employer" value={ac.employerName} />
+            <SummaryRow label="Job title" value={ac.jobTitle} />
+            <SummaryRow label="Contract start" value={ac.contractStartDate} />
+            <SummaryRow label="Contract type" value={ac.contractType} />
           </SummarySection>
         </div>
       )}

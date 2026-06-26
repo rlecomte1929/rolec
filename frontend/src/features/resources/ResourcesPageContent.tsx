@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Card, Button, Input } from '../../components/antigravity';
+import { getCountryName } from '../../utils/countries';
 import type {
   ResourcesPagePayload,
   PublicResource,
@@ -116,8 +117,9 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const context = payload?.context ?? null;
+  const displayCountry = context ? getCountryName(context.countryName || context.countryCode) : '';
   const destination = context
-    ? [context.cityName, context.countryName].filter(Boolean).join(', ') || context.countryName || 'Your destination'
+    ? [context.cityName, displayCountry].filter(Boolean).join(', ') || displayCountry || 'Your destination'
     : null;
 
   const categoryKeyById = useMemo(() => {
@@ -464,7 +466,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         >
           <h2 className="text-lg font-semibold text-[#0b2b43] mb-4 flex items-center gap-2">
             <span aria-hidden>🎭</span>
-            Events in {context?.cityName || context?.countryName || 'your area'}
+            Events in {context?.cityName || displayCountry || 'your area'}
           </h2>
           {filteredEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -81,7 +81,17 @@ function OwnerPill({ owner }: { owner: RelocationPlanPhaseTaskDTO['owner'] }) {
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
-function Hero({ data, header }: { data: RelocationPlanViewResponseDTO; header: RoadmapHeaderMeta | null }) {
+function Hero({
+  data,
+  header,
+  validated,
+  validatedAt,
+}: {
+  data: RelocationPlanViewResponseDTO;
+  header: RoadmapHeaderMeta | null;
+  validated: boolean;
+  validatedAt: string | null;
+}) {
   // One canonical progress definition (shared with the dashboard / Tasks page).
   const { completed, total, pct, blocked, readyNow } = deriveCanonicalProgress(data.summary);
   const cities = header?.originCity && header?.destCity ? `${header.originCity} to ${header.destCity}` : 'Your relocation';
@@ -110,6 +120,12 @@ function Hero({ data, header }: { data: RelocationPlanViewResponseDTO; header: R
           {blocked > 0 && (
             <div className="mt-0.5 text-[12px] text-white/70">
               {readyNow} ready now · {blocked} waiting on earlier steps
+            </div>
+          )}
+          {validated && (
+            <div className="mt-2 inline-flex items-center justify-end gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-semibold text-white ring-1 ring-white/20">
+              <Check size={13} />
+              Roadmap validated{validatedAt ? ` ${new Date(validatedAt).toLocaleDateString()}` : ''}
             </div>
           )}
         </div>
@@ -279,7 +295,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
 
   return (
     <div className="space-y-4">
-      <Hero data={data} header={header} />
+      <Hero data={data} header={header} validated={validated} validatedAt={validatedAt} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[13px] font-semibold">
@@ -350,14 +366,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
             <Check size={16} /> {validating ? 'Validating…' : 'Validate & start tasks'}
           </button>
         </div>
-      ) : (
-        <div className="flex items-center gap-2 px-1 text-[12.5px] text-teal-700">
-          <Check size={15} />
-          <span>
-            Roadmap validated{validatedAt ? ` on ${new Date(validatedAt).toLocaleDateString()}` : ''}. Your tasks are unlocked.
-          </span>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 };

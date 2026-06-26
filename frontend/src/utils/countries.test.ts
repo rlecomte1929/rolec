@@ -5,6 +5,8 @@ describe('getCountryName', () => {
   it('resolves an ISO code to its display name', () => {
     expect(getCountryName('NO')).toBe('Norway');
     expect(getCountryName('FR')).toBe('France');
+    expect(getCountryName('AE')).toBe('United Arab Emirates');
+    expect(getCountryName('CA')).toBe('Canada');
   });
 
   it('is case-insensitive on the code', () => {

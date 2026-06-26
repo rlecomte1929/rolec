@@ -9,7 +9,7 @@
 // is authoritative. Service selection is no longer collected here — it lives in
 // the Service providers tab (/services), which the post-intake roadmap reflects.
 export const INTAKE_STEP_LABELS = [
-  'Journey',
+  'Move details',
   'About You',
   'My People',
   'Work & Place',
