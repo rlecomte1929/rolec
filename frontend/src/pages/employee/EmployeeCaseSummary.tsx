@@ -25,6 +25,13 @@ function SummarySection({ title, children }: { title: string; children: React.Re
   );
 }
 
+// AIQ-1271: render a "Label: value" row only when the value is non-empty — hides the
+// row entirely instead of showing a bare "-" placeholder.
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  if (value == null || value === '' || value === false) return null;
+  return <div>{label}: {value}</div>;
+}
+
 function buildDefaultDraft(): CaseDraftDTO {
   const name = getAuthItem('relopass_name');
   const email = getAuthItem('relopass_email');
@@ -220,28 +227,28 @@ export const EmployeeCaseSummary: React.FC = () => {
       {!isLoading && draft && (
         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           <SummarySection title="Relocation Basics">
-            <div>Origin: {[b.originCity, getCountryName(b.originCountry)].filter(Boolean).join(', ') || '-'}</div>
-            <div>Destination: {[b.destCity, getCountryName(b.destCountry)].filter(Boolean).join(', ') || '-'}</div>
-            <div>Purpose: {b.purpose || '-'}</div>
-            <div>Target move date: {b.targetMoveDate || '-'}</div>
-            <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '-'}</div>
+            <Field label="Origin" value={[b.originCity, getCountryName(b.originCountry)].filter(Boolean).join(', ')} />
+            <Field label="Destination" value={[b.destCity, getCountryName(b.destCountry)].filter(Boolean).join(', ')} />
+            <Field label="Purpose" value={b.purpose} />
+            <Field label="Target move date" value={b.targetMoveDate} />
+            <Field label="Duration" value={b.durationMonths != null ? `${b.durationMonths} months` : null} />
           </SummarySection>
           <SummarySection title="Employee Profile">
-            <div>Name: {ep.fullName || '-'}</div>
-            <div>Email: {ep.email || '-'}</div>
-            <div>Nationality: {getCountryName(ep.nationality) || '-'}</div>
-            <div>Passport country: {getCountryName(ep.passportCountry) || '-'}</div>
-            <div>Residence country: {ep.residenceCountry || '-'}</div>
+            <Field label="Name" value={ep.fullName} />
+            <Field label="Email" value={ep.email} />
+            <Field label="Nationality" value={getCountryName(ep.nationality)} />
+            <Field label="Passport country" value={getCountryName(ep.passportCountry)} />
+            <Field label="Residence country" value={ep.residenceCountry} />
           </SummarySection>
           <SummarySection title="Family Members">
-            <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '-'}</div>
-            <div>Children: {fm.children?.length ? `${fm.children.length} child(ren)` : '-'}</div>
+            <Field label="Spouse" value={fm.spouse?.fullName} />
+            <Field label="Children" value={fm.children?.length ? `${fm.children.length} child(ren)` : null} />
           </SummarySection>
           <SummarySection title="Assignment / Context">
-            <div>Employer: {ac.employerName || '-'}</div>
-            <div>Job title: {ac.jobTitle || '-'}</div>
-            <div>Contract start: {ac.contractStartDate || '-'}</div>
-            <div>Contract type: {ac.contractType || '-'}</div>
+            <Field label="Employer" value={ac.employerName} />
+            <Field label="Job title" value={ac.jobTitle} />
+            <Field label="Contract start" value={ac.contractStartDate} />
+            <Field label="Contract type" value={ac.contractType} />
           </SummarySection>
         </div>
       )}
