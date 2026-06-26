@@ -9,7 +9,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { PhaseContextBar } from '../../components/antigravity';
 import { useTextSelection } from '../../hooks/useTextSelection';
 import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
@@ -23,7 +22,6 @@ import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { validateRoadmap } from '../../api/cases';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
-import { resolveCaseStage, type StageState } from '../../features/employee-journey/caseStage';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
 
 export const EmployeeCaseRoadmapPage: React.FC = () => {
@@ -91,33 +89,6 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     }
   };
 
-  // B1/B4: stage from the ONE shared resolver, not hardcoded — so this stepper can
-  // never disagree with the dashboard / benefit-comparison steppers, and Services
-  // is never falsely marked done. The roadmap page is gated to post-submit, so
-  // intake is complete here; Services is only "done" when its flow truly completed
-  // (no signal yet → reads as reachable, not complete).
-  const stage = resolveCaseStage({ status: 'submitted', servicesComplete: false });
-  const toBarStatus = (s: StageState): 'done' | 'current' | 'upcoming' =>
-    s === 'done' ? 'done' : s === 'active' ? 'current' : 'upcoming';
-  const phaseBar = (
-    <div className="mx-auto max-w-5xl px-6 pt-6">
-      <PhaseContextBar
-        phases={[
-          { key: 'intake', label: 'Intake', status: toBarStatus(stage.intake) },
-          { key: 'services', label: 'Services & policy', status: toBarStatus(stage.services) },
-          { key: 'roadmap', label: 'Roadmap', status: 'current' },
-        ]}
-        onSelect={(key) => {
-          if (key === 'intake')
-            navigate(
-              caseId ? buildRoute('employeeCaseIntake', { caseId }) : buildRoute('employeeIntake'),
-            );
-          if (key === 'services') navigate(buildRoute('services'));
-        }}
-      />
-    </div>
-  );
-
   // ── Roadmap generation state machine ────────────────────────────────────────
   // generating → ready | empty | failed. The plan builds asynchronously after
   // submit (~60–90s), so an empty plan is polled for a bounded window before we
@@ -176,7 +147,6 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
         : 'generating';
     return (
       <AppShell>
-        {phaseBar}
         <div className="mx-auto max-w-5xl px-6 py-6">
           <RoadmapBeingBuilt
             variant={variant}
@@ -190,7 +160,6 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   return (
     <AppShell>
-      {phaseBar}
       <div ref={selectionRef} className="mx-auto max-w-5xl px-6 py-6">
         {/* H-08 (AIQ-1255): page heading so the employee has orientation above the hero. */}
         <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
