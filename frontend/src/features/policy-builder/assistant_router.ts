@@ -104,7 +104,7 @@ export interface AssistantResponse {
 // ---------------------------------------------------------------------------
 
  
-async function getSupabase(): Promise<any> {
+async function getSupabase() {
   const { supabase } = await import('../../lib/supabase');
   return supabase;
 }
@@ -147,7 +147,7 @@ export async function isPolicyExpired(companyId: string): Promise<boolean> {
 
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - POLICY_MAX_AGE_DAYS);
-    const effectiveDate = new Date(data.effective_date);
+    const effectiveDate = new Date(data.effective_date as string);
     const expired = effectiveDate < thresholdDate;
 
     if (expired) {
