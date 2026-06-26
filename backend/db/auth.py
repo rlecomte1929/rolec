@@ -10,7 +10,7 @@ Login behaviour is byte-for-byte identical — this is a pure relocation.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -21,6 +21,29 @@ from ..db_config import DATABASE_URL as _raw_url
 log = logging.getLogger(__name__)
 
 _is_sqlite = _raw_url.startswith("sqlite")
+
+# SEC-FE-1 (AIQ-1168): bound the ReloPass session-token lifetime. Tokens live in
+# localStorage (JS-readable, Option A pre-launch), so an absolute TTL caps the
+# window a stolen token is usable. Expiry is derived from the existing created_at
+# column (created_at + TTL) — no schema change, and checked in Python so the
+# validation query stays a single cross-DB SELECT. A 401 from an expired token
+# routes the user back to login (the existing client.ts interceptor); a seamless
+# sliding/refresh-token mechanism is a documented follow-up.
+SESSION_TTL_DAYS = 14
+
+
+def _session_is_expired(created_at: Optional[str]) -> bool:
+    """True if a session is older than SESSION_TTL_DAYS. A missing/garbage
+    created_at is treated as EXPIRED (fail-closed) — every session row has one."""
+    if not created_at:
+        return True
+    try:
+        created = datetime.fromisoformat(
+            str(created_at).replace("Z", "+00:00")
+        ).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return True
+    return created + timedelta(days=SESSION_TTL_DAYS) <= datetime.utcnow()
 
 
 class AuthMixin:
@@ -41,8 +64,15 @@ class AuthMixin:
 
     def get_user_by_token(self, token: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT user_id FROM sessions WHERE token = :token"), {"token": token}).fetchone()
+            row = conn.execute(
+                text("SELECT user_id, created_at FROM sessions WHERE token = :token"),
+                {"token": token},
+            ).fetchone()
         if not row:
+            return None
+        # SEC-FE-1: reject sessions past their TTL (treat an expired token as
+        # unknown, so the caller 401s and the user re-authenticates).
+        if _session_is_expired(row._mapping.get("created_at")):
             return None
         return self.get_user_by_id(row._mapping["user_id"])
 
@@ -60,7 +90,8 @@ class AuthMixin:
                 u.username,
                 p.full_name,
                 p.company_id::text AS company_id,
-                (LOWER(u.role) = 'admin') AS is_admin
+                (LOWER(u.role) = 'admin') AS is_admin,
+                s.created_at AS session_created_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             LEFT JOIN profiles p ON p.id::text = u.id
@@ -72,6 +103,9 @@ class AuthMixin:
         if not row:
             return None
         m = row._mapping
+        # SEC-FE-1: reject sessions past their TTL (treat as unknown → 401).
+        if _session_is_expired(m.get("session_created_at")):
+            return None
         return {
             "id":          m["id"],
             "email":       m["email"],
