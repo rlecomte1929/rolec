@@ -14,7 +14,8 @@
  *  - onRequestQuote  : called when HR clicks "Request Quote" on a vendor card
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import type { ImmigrationContext } from './immigrationContext';
@@ -55,38 +56,33 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   immigrationContext,
   onRequestQuote,
 }) => {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [corridors, setCorridors] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
   // Filters — initialCategory pre-selects service category (e.g. from immigration panel)
   const [selectedCategory, setSelectedCategory] = useState(initialCategory ?? '');
   const [selectedCorridor, setSelectedCorridor] = useState('');
 
-  // Load corridors once on open
-  useEffect(() => {
-    if (!isOpen) return;
-    hrAPI
-      .getVendorCorridors()
-      .then((res) => setCorridors(res.corridors ?? []))
-      .catch(() => setCorridors([]));
-  }, [isOpen]);
+  // Load corridors once on open — soft-fail to [].
+  const corridorsQuery = useQuery({
+    queryKey: ['vendor-corridors'],
+    queryFn: async () => (await hrAPI.getVendorCorridors()).corridors ?? [],
+    enabled: isOpen,
+  });
+  const corridors: string[] = corridorsQuery.data ?? [];
 
   // Load vendors whenever filters change (or panel opens)
-  useEffect(() => {
-    if (!isOpen) return;
-    setLoading(true);
-    setError('');
-    hrAPI
-      .getVendors({
+  const vendorsQuery = useQuery({
+    queryKey: ['vendors', selectedCategory, selectedCorridor],
+    queryFn: async () => {
+      const res = await hrAPI.getVendors({
         ...(selectedCategory ? { category: selectedCategory } : {}),
         ...(selectedCorridor ? { corridor: selectedCorridor } : {}),
-      })
-      .then((res) => setVendors(res.vendors))
-      .catch(() => setError('Failed to load vendors.'))
-      .finally(() => setLoading(false));
-  }, [isOpen, selectedCategory, selectedCorridor]);
+      });
+      return res.vendors;
+    },
+    enabled: isOpen,
+  });
+  const vendors: Vendor[] = vendorsQuery.data ?? [];
+  const loading = vendorsQuery.isLoading;
+  const error = vendorsQuery.isError ? 'Failed to load vendors.' : '';
 
   if (!isOpen) return null;
 

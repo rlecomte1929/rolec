@@ -14,7 +14,8 @@
  * `pet_relocation` key (auto-saved to services-state with the rest of the
  * services flow) — i.e. scoped to the service, no new persistence path.
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, Input, Select } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { isPetRelocationAvailableForCorridor } from './petCorridorAvailability';
@@ -50,35 +51,16 @@ export const PetRelocationCard: React.FC<Props> = ({
   answers,
   onChange,
 }) => {
-  const [hasPets, setHasPets] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!assignmentId) {
-      setHasPets(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    employeeAPI
-      .getIntake(assignmentId)
-      .then((res) => {
-        if (cancelled) return;
-        const draft = res.intakeDraft || {};
-        setHasPets(draft.has_pets === true);
-      })
-      .catch(() => {
-        // Soft failure — if we can't read the draft, don't surface the card.
-        if (!cancelled) setHasPets(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [assignmentId]);
+  const intakeQuery = useQuery({
+    queryKey: ['employee', 'intake', assignmentId],
+    queryFn: () => employeeAPI.getIntake(assignmentId!),
+    enabled: !!assignmentId,
+  });
+  // Soft failure — if we can't read the draft, don't surface the card.
+  const hasPets: boolean | null = intakeQuery.isSuccess
+    ? (intakeQuery.data.intakeDraft || {}).has_pets === true
+    : null;
+  const loading = intakeQuery.isLoading;
 
   // Nothing to show until we know has_pets, or when the employee has no pets.
   if (loading || hasPets !== true) return null;

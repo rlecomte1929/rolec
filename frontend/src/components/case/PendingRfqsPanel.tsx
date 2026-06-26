@@ -11,7 +11,8 @@
  * "Accept Quote" calls PATCH /api/hr/rfq-requests/{id} with status=accepted.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '../antigravity/Input';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
@@ -42,8 +43,20 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
-  const [rfqs, setRfqs] = useState<Rfq[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const rfqsQuery = useQuery({
+    queryKey: ['rfq-requests', caseId],
+    queryFn: async () => {
+      const res = await hrAPI.getRfqRequests({ case_id: caseId });
+      return res.rfqs;
+    },
+  });
+  // Read fails silently (errors → []); the mutations below own the `error` state.
+  const rfqs: Rfq[] = rfqsQuery.data ?? [];
+  const loading = rfqsQuery.isLoading;
+
+  const reload = () => queryClient.invalidateQueries({ queryKey: ['rfq-requests', caseId] });
 
   // Which RFQ is showing the "Mark received" inline form
   const [receivingId, setReceivingId] = useState<string | null>(null);
@@ -56,16 +69,6 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
 
   const [actingId, setActingId] = useState<string | null>(null);
   const [error, setError] = useState('');
-
-  const load = useCallback(() => {
-    hrAPI
-      .getRfqRequests({ case_id: caseId })
-      .then((res) => setRfqs(res.rfqs))
-      .catch(() => setRfqs([]))
-      .finally(() => setLoading(false));
-  }, [caseId]);
-
-  useEffect(() => { load(); }, [load]);
 
   const handleMarkReceived = async (rfq: Rfq) => {
     if (!quoteForm.quote_amount) {
@@ -83,7 +86,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
       });
       setReceivingId(null);
       setQuoteForm({ quote_amount: '', quote_currency: 'EUR', quote_deadline: '', quote_deliverable: '' });
-      load();
+      await reload();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to update.');
     } finally {
@@ -96,7 +99,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
     setError('');
     try {
       await hrAPI.updateRfqStatus(rfq.id, 'accepted');
-      load();
+      await reload();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to accept quote.');
     } finally {
@@ -109,7 +112,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
     setError('');
     try {
       await hrAPI.updateRfqStatus(rfq.id, 'cancelled');
-      load();
+      await reload();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to cancel.');
     } finally {

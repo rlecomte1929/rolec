@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { assertSafeUrl } from '../../utils/assertSafeUrl';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Badge } from '../../components/antigravity';
@@ -86,73 +87,36 @@ interface CaseReadinessCoreProps {
  * Copy comes from API (templates), not hardcoded in the component.
  */
 export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignmentId }) => {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<ChecklistRow[]>([]);
-  const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [detailFetched, setDetailFetched] = useState(false);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
-  const [retryTick, setRetryTick] = useState(0);
 
-  useEffect(() => {
-    if (!assignmentId) return;
-    let cancelled = false;
-    const ac = new AbortController();
-    setSummaryLoading(true);
-    setSummaryError(null);
-    hrAPI
-      .getReadinessSummary(assignmentId, { signal: ac.signal })
-      .then((data) => {
-        if (!cancelled) setSummary(data);
-      })
-      .catch(() => {
-        if (!cancelled)
-          setSummaryError(
-            'Route readiness couldn’t load — the destination or policy template may not be configured yet.',
-          );
-      })
-      .finally(() => {
-        if (!cancelled) setSummaryLoading(false);
-      });
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
-  }, [assignmentId, retryTick]);
+  const summaryQuery = useQuery({
+    queryKey: ['readiness-summary', assignmentId],
+    queryFn: () => hrAPI.getReadinessSummary(assignmentId),
+    enabled: !!assignmentId,
+  });
+  const summary: Summary | null = summaryQuery.data ?? null;
+  const summaryLoading = summaryQuery.isLoading;
+  const summaryError = summaryQuery.isError
+    ? 'Route readiness couldn’t load — the destination or policy template may not be configured yet.'
+    : null;
 
+  // Detail loads lazily — only once the section is expanded.
+  const detailQuery = useQuery({
+    queryKey: ['readiness-detail', assignmentId],
+    queryFn: () => hrAPI.getReadinessDetail(assignmentId),
+    enabled: !!assignmentId && expanded,
+  });
+  const checklistItems: ChecklistRow[] = (detailQuery.data?.checklist_items as ChecklistRow[]) ?? [];
+  const milestones: MilestoneRow[] = (detailQuery.data?.milestones as MilestoneRow[]) ?? [];
+  const detailLoading = detailQuery.isLoading;
+  const detailError = detailQuery.isError ? 'Could not load checklist and timeline.' : null;
+
+  // Collapse when switching assignments (data resets via the query key).
   useEffect(() => {
-    setDetailFetched(false);
-    setChecklistItems([]);
-    setMilestones([]);
-    setDetailError(null);
     setExpanded(false);
   }, [assignmentId]);
-
-  const loadDetail = useCallback(async () => {
-    if (!assignmentId) return;
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      const data = await hrAPI.getReadinessDetail(assignmentId);
-      setChecklistItems((data.checklist_items as ChecklistRow[]) || []);
-      setMilestones((data.milestones as MilestoneRow[]) || []);
-      setDetailFetched(true);
-    } catch {
-      setDetailError('Could not load checklist and timeline.');
-      setDetailFetched(true);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, [assignmentId]);
-
-  useEffect(() => {
-    if (!expanded || detailFetched || detailLoading) return;
-    void loadDetail();
-  }, [expanded, detailFetched, detailLoading, loadDetail]);
 
   const onToggleExpand = () => {
     setExpanded((e) => !e);
@@ -162,9 +126,8 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
     setActionBusy(`chk-${itemId}`);
     try {
       await hrAPI.patchReadinessChecklistItem(assignmentId, itemId, { status });
-      await loadDetail();
-      const s = await hrAPI.getReadinessSummary(assignmentId);
-      setSummary(s);
+      await queryClient.invalidateQueries({ queryKey: ['readiness-detail', assignmentId] });
+      await queryClient.invalidateQueries({ queryKey: ['readiness-summary', assignmentId] });
     } finally {
       setActionBusy(null);
     }
@@ -174,9 +137,8 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
     setActionBusy(`ms-${milestoneId}`);
     try {
       await hrAPI.patchReadinessMilestone(assignmentId, milestoneId, { completed });
-      await loadDetail();
-      const s = await hrAPI.getReadinessSummary(assignmentId);
-      setSummary(s);
+      await queryClient.invalidateQueries({ queryKey: ['readiness-detail', assignmentId] });
+      await queryClient.invalidateQueries({ queryKey: ['readiness-summary', assignmentId] });
     } finally {
       setActionBusy(null);
     }
@@ -198,7 +160,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
             'Route readiness couldn’t load — the destination or policy template may not be configured yet.'}
         </div>
         <div className="mt-3">
-          <Button variant="ghost" onClick={() => setRetryTick((t) => t + 1)}>
+          <Button variant="ghost" onClick={() => void summaryQuery.refetch()}>
             Try again
           </Button>
         </div>
