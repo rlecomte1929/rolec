@@ -227,8 +227,8 @@ export const Auth: React.FC = () => {
       setInviteDone(true);
       const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
       navigate(buildRoute(key), { replace: true });
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to set password. The invite link may have expired.');
+    } catch (err) {
+      setError((err as { message?: string })?.message ?? 'Failed to set password. The invite link may have expired.');
     } finally {
       authInFlight.current = false;
       setIsLoading(false);
@@ -249,7 +249,7 @@ export const Auth: React.FC = () => {
     setIsLoading(true);
     try {
       await login({ identifier: id, password: pw });
-    } catch (err: any) {
+    } catch (err) {
       const transport = getClientTransportErrorMessage(err);
       const msg = transport ?? getApiErrorMessage(err, 'Login failed. Check your email and password, then try again.');
       try { localStorage.setItem('debug_last_auth_error', msg); } catch { /* ignore */ }
@@ -287,23 +287,25 @@ export const Auth: React.FC = () => {
         company_name: role !== 'EMPLOYEE' ? (companyName.trim() || undefined) : undefined,
         company_size: role === 'HR' ? (companySize || undefined) : undefined,
       });
-    } catch (err: any) {
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown }; status?: number } };
       const transport = getClientTransportErrorMessage(err);
-      if (transport) { try { localStorage.setItem('debug_last_auth_error', transport); } catch {} setError(transport); return; }
-      const detail = err.response?.data?.detail;
+      if (transport) { try { localStorage.setItem('debug_last_auth_error', transport); } catch { /* ignore */ } setError(transport); return; }
+      const detail = e.response?.data?.detail;
       let msg: string;
-      if (err.response?.status === 400 && detail && typeof detail === 'object' && !Array.isArray(detail)) {
+      const detailStr = (d: unknown): string => Array.isArray(d) ? ((d[0] as { msg?: string })?.msg || JSON.stringify(d)) : (typeof d === 'string' ? d : JSON.stringify(d));
+      if (e.response?.status === 400 && detail && typeof detail === 'object' && !Array.isArray(detail)) {
         const code = (detail as { code?: string }).code;
         const message = (detail as { message?: string }).message;
         msg = (code === 'AUTH_EMAIL_TAKEN' || code === 'AUTH_USERNAME_TAKEN') && message ? message : (message ?? 'Registration failed.');
-      } else if (err.response?.status === 400 && detail) {
-        msg = Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail);
-      } else if (!err.response) {
+      } else if (e.response?.status === 400 && detail) {
+        msg = detailStr(detail);
+      } else if (!e.response) {
         msg = 'Cannot reach the server. Check your connection and try again.';
       } else {
-        msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Try again.';
+        msg = detail ? (detailStr(detail)) : 'Registration failed. Try again.';
       }
-      try { localStorage.setItem('debug_last_auth_error', msg); } catch {}
+      try { localStorage.setItem('debug_last_auth_error', msg); } catch { /* ignore */ }
       setError(msg);
     } finally {
       authInFlight.current = false;
@@ -321,9 +323,9 @@ export const Auth: React.FC = () => {
       // Never embed a working admin password in the shipped bundle — no hardcoded
       // fallback. The dev-only admin one-click (below) relies on VITE_DEMO_ADMIN_PASS
       // being set locally; in production the admin button isn't rendered at all.
-      admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',        pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? '' },
-      hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'hr@testingapril.com',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? '' },
-      employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'employee@testingapril.com', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? '' },
+      admin:    { user: (import.meta.env.VITE_DEMO_ADMIN_USER as string | undefined) ?? 'admin@relopass.com',        pass: (import.meta.env.VITE_DEMO_ADMIN_PASS as string | undefined) ?? '' },
+      hr:       { user: (import.meta.env.VITE_DEMO_HR_USER as string | undefined)    ?? 'hr@testingapril.com',       pass: (import.meta.env.VITE_DEMO_HR_PASS as string | undefined)    ?? '' },
+      employee: { user: (import.meta.env.VITE_DEMO_EMP_USER as string | undefined)   ?? 'employee@testingapril.com', pass: (import.meta.env.VITE_DEMO_EMP_PASS as string | undefined)   ?? '' },
     };
     const creds = credMap[demoRole];
     if (!creds) return;
