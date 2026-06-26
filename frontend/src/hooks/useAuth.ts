@@ -30,6 +30,9 @@ export const useAuth = () => {
     if (user.email) setAuthItem('relopass_email', user.email);
     if (user.username) setAuthItem('relopass_username', user.username);
     if (user.name) setAuthItem('relopass_name', user.name);
+    // SEC-FE-4: role is sourced from the SERVER login response (response.user.role).
+    // This localStorage copy is a cache/UX hint only — it is NOT the access boundary
+    // (the backend re-derives role + company-scope from the token on every request).
     setAuthItem('relopass_role', normalizeStoredRole(user.role));
   };
 

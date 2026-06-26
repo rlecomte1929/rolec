@@ -18,6 +18,12 @@ interface RequireHrRouteProps {
  *
  * Pass allowEmployee={true} for routes that ROUTE_DEFS marks as EMPLOYEE-accessible
  * (e.g. /hr/policy, roles: ['HR','EMPLOYEE','ADMIN']).
+ *
+ * SECURITY (SEC-FE-4): this guard is a COSMETIC UX hint only. `relopass_role` is read
+ * from localStorage, which is user-editable in devtools, so it must NEVER be the access
+ * boundary. The real control is server-side: every /api/hr/** endpoint independently
+ * enforces HR/Admin role + company-scope from the session token (see
+ * docs/security/SEC-FE-4_authz_coverage.md).
  */
 export const RequireHrRoute: React.FC<RequireHrRouteProps> = ({ children, allowEmployee = false }) => {
   const role = (getAuthItem('relopass_role') || '').toUpperCase();
