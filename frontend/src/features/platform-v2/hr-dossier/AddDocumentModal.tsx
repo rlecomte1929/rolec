@@ -75,28 +75,29 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
         <div>
           <h2 className="text-base font-semibold text-slate-900">Add document</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Attach a custom document that isn't part of the standard form set.
+            Attach a custom document that isn&apos;t part of the standard form set.
           </p>
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="add-doc-name" className="block text-xs font-medium text-slate-700 mb-1">
               Document name <span className="text-rose-500">*</span>
             </label>
             <Input unstyled
+              id="add-doc-name"
               type="text"
               value={name}
               onChange={(v) => setName(v)}
               placeholder="e.g. Apostilled birth certificate"
-              autoFocus
               className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Issuing authority</label>
+            <label htmlFor="add-doc-authority" className="block text-xs font-medium text-slate-700 mb-1">Issuing authority</label>
             <Input unstyled
+              id="add-doc-authority"
               type="text"
               value={authority}
               onChange={(v) => setAuthority(v)}
@@ -107,8 +108,9 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
           {people.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">For person</label>
+              <label htmlFor="add-doc-person" className="block text-xs font-medium text-slate-700 mb-1">For person</label>
               <select
+                id="add-doc-person"
                 value={personId}
                 onChange={(e) => setPersonId(e.target.value)}
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
@@ -122,8 +124,9 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
           )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Deadline</label>
+            <label htmlFor="add-doc-deadline" className="block text-xs font-medium text-slate-700 mb-1">Deadline</label>
             <Input unstyled
+              id="add-doc-deadline"
               type="date"
               value={deadline}
               onChange={(v) => setDeadline(v)}
@@ -132,8 +135,9 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">PDF (optional)</label>
+            <label htmlFor="add-doc-file" className="block text-xs font-medium text-slate-700 mb-1">PDF (optional)</label>
             <FileInput
+              id="add-doc-file"
               accept="application/pdf"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="w-full text-sm text-slate-600 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
@@ -141,8 +145,9 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
+            <label htmlFor="add-doc-notes" className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
             <textarea
+              id="add-doc-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Internal notes for this document…"
