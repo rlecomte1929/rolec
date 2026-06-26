@@ -3298,7 +3298,13 @@ class PoliciesMixin:
                     "cc": json.dumps(list(cited_chunk_ids or [])),
                     "ak": answer_kind,
                     "gv": grounding_verdict,
-                    "vs": (1 if verification_skipped else 0) if verification_skipped is not None else None,
+                    # OBS-1 (AIQ-1242): bind a real bool — the column is Postgres
+                    # `boolean`, and binding int 1/0 makes Postgres reject the INSERT
+                    # ("type boolean but expression is of type integer"), which the
+                    # tracer swallows → every successful policy-assistant trace was
+                    # silently dropped (only None/NULL fallbacks survived). SQLite
+                    # accepts int-into-boolean, so unit tests never caught it.
+                    "vs": bool(verification_skipped) if verification_skipped is not None else None,
                     "gs": float(grounding_score) if grounding_score is not None else None,
                     "now": now,
                 },
