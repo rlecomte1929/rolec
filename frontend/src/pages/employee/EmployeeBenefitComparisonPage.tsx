@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card, Container, PhaseContextBar } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { useResilientQuery } from '../../hooks/useResilientQuery';
+import { useIsOffline } from '../../hooks/useOnlineStatus';
 import { buildRoute } from '../../navigation/routes';
 import { resolveCaseStage, isIntakeComplete, type StageState } from '../../features/employee-journey/caseStage';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
@@ -23,9 +24,9 @@ import type { PolicyServiceComparisonResponse } from '../../types';
  * Fetches the honest comparison engine output + the resolved policy surface
  * (for the footer / expiry), then hands both to the presentational dashboard.
  *
- * AIQ-655: data fetch goes through useResilientQuery so the page renders
- * exactly one of skeleton / offline / error (with Retry) / content, with a
- * stale response after navigation never landing.
+ * AIQ-655 / RX-3g: data fetch goes through TanStack Query (useQuery) + useIsOffline
+ * so the page renders exactly one of skeleton / offline / error (with Retry) /
+ * content; query keying prevents a stale response after navigation from landing.
  */
 interface ComparisonData {
   comp: PolicyServiceComparisonResponse | null;
@@ -45,8 +46,11 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
     s === 'done' ? 'done' : s === 'active' ? 'current' : 'upcoming';
   const [assistantOpen, setAssistantOpen] = useState(false);
 
-  const { data, error, loading, isOffline, retry } = useResilientQuery<ComparisonData>(
-    async () => {
+  const comparisonQuery = useQuery({
+    queryKey: ['employee', 'benefit-comparison', assignmentId],
+    // Auto-reload when the connection returns (preserves the retired resilient behavior).
+    refetchOnReconnect: true,
+    queryFn: async (): Promise<ComparisonData> => {
       if (!assignmentId) return { comp: null, policy: null };
       const [compRes, ctxRes] = await Promise.allSettled([
         employeeAPI.getPolicyServiceComparison(assignmentId),
@@ -75,8 +79,15 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
       }
       return { comp: compRes.value, policy };
     },
-    [assignmentId],
-  );
+  });
+
+  const data: ComparisonData | null = comparisonQuery.data ?? null;
+  const loading = comparisonQuery.isLoading;
+  const error = comparisonQuery.error;
+  const isOffline = useIsOffline();
+  const retry = () => {
+    void comparisonQuery.refetch();
+  };
 
   const comp = data?.comp ?? null;
   const policy = data?.policy ?? null;
