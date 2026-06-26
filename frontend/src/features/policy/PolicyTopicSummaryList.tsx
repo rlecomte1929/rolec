@@ -24,12 +24,12 @@ import type {
   PolicyConfigCategoryBlock,
   PolicyConfigWorkingPayload,
 } from '../policy-config/types';
-import { referenceToElementId } from './policyAssistantCitations';
 import {
   humanizeAssignmentTypeLabel,
   humanizeFamilyStatusLabel,
   humanizeEmployeeLevelLabel,
 } from '../policy-config/policyTargeting';
+import { referenceToElementId } from './policyAssistantCitations';
 
 // --- helpers ---------------------------------------------------------------
 

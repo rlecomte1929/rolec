@@ -16,12 +16,12 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
+import { companyPolicyAPI } from '../../api/client';
 import {
   CollapsibleCategory,
   groupByCategory,
   shouldDefaultOpen,
 } from './diffCategoryGrouping';
-import { companyPolicyAPI } from '../../api/client';
 
 // --- Types -----------------------------------------------------------------
 

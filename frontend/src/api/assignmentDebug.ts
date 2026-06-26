@@ -3,8 +3,8 @@
  * Verify case_assignments visibility. Uses backend (relopass_token) first to avoid JWT expiry.
  */
 
-import api from './client';
 import { getAuthItem } from '../utils/demo';
+import api from './client';
 import { supabase } from './supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;

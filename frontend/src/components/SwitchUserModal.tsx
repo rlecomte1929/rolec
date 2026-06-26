@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Button } from './antigravity/Button';
-import { Card } from './antigravity';
 import { TEST_ACCOUNTS, type TestAccount } from '../config/testAccounts';
 import { authAPI } from '../api/client';
 import { signInSupabase, signOutSupabase } from '../api/supabaseAuth';
 import { clearAuthItems, normalizeStoredRole, setAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
+import { Card } from './antigravity';
+import { Button } from './antigravity/Button';
 
 interface Props {
   open: boolean;

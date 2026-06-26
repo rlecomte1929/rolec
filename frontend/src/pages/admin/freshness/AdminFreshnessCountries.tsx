@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../../api/client';
+import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 
 type CountryItem = {
   country_code?: string;

@@ -8,8 +8,6 @@
  * Drag-and-drop uses @dnd-kit/sortable (same package as DataTable).
  */
 import React, { useCallback, useMemo } from 'react';
-import { Checkbox } from '../../../../components/antigravity/Checkbox';
-import { Input } from '../../../../components/antigravity/Input';
 import {
   DndContext,
   PointerSensor,
@@ -28,6 +26,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { Input } from '../../../../components/antigravity/Input';
+import { Checkbox } from '../../../../components/antigravity/Checkbox';
 import { Button } from '../../../../components/antigravity';
 
 // ─────────────────────────────────────────────────────────────────────

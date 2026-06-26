@@ -5,7 +5,6 @@
  * safe to drop onto any case page unconditionally.
  */
 import React, { useEffect, useState } from 'react';
-
 import { getProcessingTime } from '../../api/processingTime';
 import { Card } from '../../components/antigravity';
 import {

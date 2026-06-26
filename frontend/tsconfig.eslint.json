@@ -1,0 +1,10 @@
+{
+  // LINT-3 close: a lint-only TS project that INCLUDES the test files
+  // (tsconfig.json excludes them from the deploy build). ESLint's type-aware rules
+  // need every linted file to belong to a TS program, otherwise tests report
+  // "was not found by the project service" parse errors — which would fail a
+  // blocking lint gate. Used by eslint.config.js's parserOptions.projectService.
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "exclude": []
+}

@@ -4,13 +4,13 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Input } from '../../components/antigravity/Input';
-import { Button } from '../../components/antigravity/Button';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AdminLayout } from './AdminLayout';
+import { Button } from '../../components/antigravity/Button';
+import { Input } from '../../components/antigravity/Input';
 import { Card } from '../../components/antigravity';
 import { adminAPI, type AdminMobilityOperationalInspect } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
+import { AdminLayout } from './AdminLayout';
 
 function JsonBlock({ value }: { value: unknown }) {
   if (value == null) return <span className="text-[#9ca3af]"> - </span>;

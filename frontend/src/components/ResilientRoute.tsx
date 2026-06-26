@@ -1,9 +1,8 @@
 import React, { Suspense } from 'react';
-import { logger } from '../lib/logger';
 import { useLocation, useNavigate } from 'react-router-dom';
-
-import { Button } from './antigravity/Button';
+import { logger } from '../lib/logger';
 import { reportError } from '../lib/errorTracking';
+import { Button } from './antigravity/Button';
 
 /**
  * AIQ-655 — resilient wrapper for top-level routes.

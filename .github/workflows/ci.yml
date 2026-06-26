@@ -130,11 +130,15 @@ jobs:
         run: npx tsc --noEmit
 
       - name: ESLint
-        # Non-blocking until the AIQ-397 (no-clickable-div) + AIQ-398 (no-console)
-        # cleanup sprints drain the pre-existing violations. Flip to blocking
-        # (`continue-on-error: false`) once they reach 0.
-        run: npx eslint src --ext .ts,.tsx --max-warnings 0
-        continue-on-error: true
+        # LINT-3 (AIQ-1195) close: lint is now BLOCKING on errors. The large structural
+        # rule-families (no-unsafe-*, no-clickable-div, jsx-a11y, promise-handling) are
+        # demoted to 'warn' in eslint.config.js and tracked as epics (TS type-safety,
+        # accessibility, async-safety), so the warn-backlog doesn't fail the build —
+        # but any ERROR-level violation (Rules of Hooks, no-console, no-unused-vars,
+        # unresolved imports, unused eslint-disable directives) now blocks the PR.
+        # `--max-warnings 0` is intentionally dropped so the tracked warn-backlog passes.
+        run: npx eslint src --ext .ts,.tsx
+        continue-on-error: false
 
       - name: Build
         run: npm run build

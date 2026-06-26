@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Input } from '../../components/antigravity/Input';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { InternalThreadPanel } from '../../components/admin/collaboration/InternalThreadPanel';
+import { AdminLayout } from './AdminLayout';
 
 const EVENT_TYPES = ['cinema', 'concert', 'family_activity', 'festival', 'museum', 'networking', 'sports', 'theater'];
 

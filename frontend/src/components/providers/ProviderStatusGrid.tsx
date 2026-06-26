@@ -12,11 +12,11 @@
  *  - Horizontally scrollable on narrow viewports (≥ 768 px reads clean)
  */
 import React, { useState, useCallback } from 'react';
-import { Button } from '../antigravity/Button';
 import { Link } from 'react-router-dom';
-import { ProviderStatusCell } from './ProviderStatusCell';
+import { Button } from '../antigravity/Button';
 import type { ProviderGridRow, CoordinationStatus } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
+import { ProviderStatusCell } from './ProviderStatusCell';
 
 const PROVIDER_COLUMNS: Array<{ key: keyof ProviderGridRow['cells']; label: string }> = [
   { key: 'housing',      label: 'Housing' },

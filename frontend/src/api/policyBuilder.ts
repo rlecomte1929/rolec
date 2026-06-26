@@ -2,7 +2,6 @@
  * AIQ-37-B · Policy Builder API client
  * Typed wrappers for the /api/hr/policies endpoints (hr_policies.py).
  */
-import { API_BASE_URL } from './client';
 import type {
   RelocationPolicyJson,
   RelocationPolicyRow,
@@ -10,6 +9,7 @@ import type {
   ActivePolicyResponse,
   CreatePolicyVersionRequest,
 } from '../types/relocationPolicy';
+import { API_BASE_URL } from './client';
 
 // ---------------------------------------------------------------------------
 // Helpers

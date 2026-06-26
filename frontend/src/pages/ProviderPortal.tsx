@@ -9,8 +9,8 @@
  * This page intentionally does NOT use AppShell (no HR/employee nav needed).
  */
 import React, { useEffect, useState } from 'react';
-import { Button } from '../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from '../components/antigravity/Button';
 import {
   storeProviderToken,
   getStoredProviderToken,

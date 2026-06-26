@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Input } from '../../../components/antigravity/Input';
-import { Button } from '../../../components/antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Search,
@@ -9,6 +7,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { buildRoute, type RouteKey } from '../../../navigation/routes';
 import { NAV_ICONS } from './navIcons';
 

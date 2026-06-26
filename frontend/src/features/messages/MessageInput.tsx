@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback } from 'react';
-
 import { Button } from '../../components/antigravity/Button';
 interface MessageInputProps {
   onSend: (text: string) => void;

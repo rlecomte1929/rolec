@@ -1,6 +1,6 @@
 import React from 'react';
-import { AdminLayout } from './AdminLayout';
 import { FeedbackTab } from '../../components/admin/FeedbackTab';
+import { AdminLayout } from './AdminLayout';
 
 const AdminFeedback: React.FC = () => {
   return (

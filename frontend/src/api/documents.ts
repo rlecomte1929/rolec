@@ -7,10 +7,10 @@
  * endpoint, update `documentsAPI.list` to call it and remove the mapping helpers.
  */
 
-import api from './client';
 import type { CaseRequirementsDTO, RequirementItemDTO } from '../types';
 import type { DocStatus } from '../types/relopass-api-contracts';
 import type { DocumentItem, RequirementCategory } from '../features/platform-v2/documents/DocumentsScreen';
+import api from './client';
 
 // ── Pillar → UI category ───────────────────────────────────────────────────────
 

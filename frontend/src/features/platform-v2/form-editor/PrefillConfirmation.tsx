@@ -12,7 +12,6 @@
  * committed without explicit user action.
  */
 import React from 'react';
-
 import { Badge, Button, Card } from '../../../components/antigravity';
 import type { FieldValueItem } from '../../../api/formEditor';
 

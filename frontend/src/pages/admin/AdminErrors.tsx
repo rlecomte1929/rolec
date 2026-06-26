@@ -1,6 +1,6 @@
 import React from 'react';
-import { AdminLayout } from './AdminLayout';
 import { ErrorTicketsTab } from '../../components/admin/ErrorTicketsTab';
+import { AdminLayout } from './AdminLayout';
 
 export const AdminErrors: React.FC = () => {
   return (

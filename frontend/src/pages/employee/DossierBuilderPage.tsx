@@ -10,8 +10,6 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { assertSafeUrl } from '../../utils/assertSafeUrl';
-import { Button } from '../../components/antigravity/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   DndContext,
@@ -32,6 +30,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { GripVertical, CheckSquare, Square, ChevronRight, ChevronLeft, Download, Loader2, X, FileText } from 'lucide-react';
+import { Button } from '../../components/antigravity/Button';
+import { assertSafeUrl } from '../../utils/assertSafeUrl';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, dossierPackageAPI, type CaseFormSummary } from '../../api/dossier';
 import { buildRoute } from '../../navigation/routes';

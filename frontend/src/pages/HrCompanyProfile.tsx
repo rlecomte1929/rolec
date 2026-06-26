@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { FileInput } from '../components/antigravity/FileInput';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import { useLocation } from 'react-router-dom';
 import { trackAuthPerf } from '../perf/authPerf';
 import { trackRouteEntry, trackShellRender, trackFirstMeaningfulContent } from '../perf/pagePerf';
 import { useHrCompanyContext } from '../contexts/HrCompanyContext';

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Input } from '../components/antigravity/Input';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
 import { hrAPI } from '../api/client';
@@ -9,8 +9,8 @@ import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceRepor
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { blockerSummaryMessage } from '../features/cases/blockerSummaryCopy';
-import { AssignmentDebugPanel } from './AssignmentDebugPanel';
 import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
+import { AssignmentDebugPanel } from './AssignmentDebugPanel';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 

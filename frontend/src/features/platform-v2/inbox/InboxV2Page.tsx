@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Input } from '../../../components/antigravity/Input';
-import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import {
   Archive,
@@ -15,6 +13,8 @@ import {
   Star,
   Users,
 } from 'lucide-react';
+import { Input } from '../../../components/antigravity/Input';
+import { Button } from '../../../components/antigravity/Button';
 import { hrAPI, employeeAPI } from '../../../api/client';
 import { markConversationRead } from '../../../api/messageNotifications';
 import { getAuthItem } from '../../../utils/demo';

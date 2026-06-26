@@ -24,11 +24,11 @@ import {
   type BudgetSummaryResponse,
   type BudgetSummaryStatus,
 } from '../../api/budget';
+import { logger } from '../../lib/logger';
 import {
   convertUsdToDisplay,
   formatServicesMoney,
 } from './servicesCurrency';
-import { logger } from '../../lib/logger';
 
 // ── Category label map ─────────────────────────────────────────────────────────
 // Matches the canonical labels used in PackageSummary / ServicesEstimate.

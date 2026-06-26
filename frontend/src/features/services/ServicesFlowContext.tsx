@@ -1,8 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { RecommendationResponse } from '../recommendations/types';
+import { getServicesState, saveServicesState } from '../../api/servicesState';
 import type { ServiceKey } from './serviceConfig';
 import { normalizeServicesCurrency, SERVICES_DISPLAY_CURRENCY_STORAGE_KEY } from './servicesCurrency';
-import { getServicesState, saveServicesState } from '../../api/servicesState';
 
 interface ServicesFlowState {
   selectedServices: Set<ServiceKey>;

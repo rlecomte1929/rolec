@@ -5,7 +5,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Input } from '../../components/antigravity/Input';
-import { AdminLayout } from './AdminLayout';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
   addAllowlistEntry,
@@ -20,6 +19,7 @@ import {
   type IntakeCorridor,
 } from '../../api/adminCatalog';
 import type { DestinationRequest } from '../../api/hrCatalog';
+import { AdminLayout } from './AdminLayout';
 
 const STATUS_TABS: { value: 'pending' | 'approved' | 'rejected'; label: string }[] = [
   { value: 'pending', label: 'Pending' },

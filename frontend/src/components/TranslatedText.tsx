@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Badge } from './antigravity/Badge';
 import { translateText, type TranslationDomain } from '../api/translation';
+import { Badge } from './antigravity/Badge';
 
 interface TranslatedTextProps {
   text: string;

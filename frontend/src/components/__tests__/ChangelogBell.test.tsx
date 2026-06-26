@@ -32,7 +32,6 @@ const SAMPLE_ENTRIES = [
 ];
 
 function mockChangelogFetch(payload: unknown = SAMPLE_ENTRIES) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetchMock = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve(payload),

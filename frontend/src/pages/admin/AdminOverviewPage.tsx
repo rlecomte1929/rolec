@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
-import { AdminLayout } from './AdminLayout';
+import { Button } from '../../components/antigravity/Button';
 import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
+import { AdminLayout } from './AdminLayout';
 
 // ── Loading skeleton ───────────────────────────────────────────────────────────
 // A muted pulse instead of a bare '…', which read as a broken/WIP value (UI9).

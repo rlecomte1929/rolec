@@ -1,6 +1,6 @@
 import React from 'react';
-import { logger } from './lib/logger';
 import ReactDOM from 'react-dom/client';
+import { logger } from './lib/logger';
 import App from './App';
 import { initAnalytics } from './analytics';
 import { initErrorTracking } from './lib/errorTracking';

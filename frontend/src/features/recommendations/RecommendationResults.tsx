@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Badge, Button, Alert } from '../../components/antigravity';
-import type { RecommendationItem, RecommendationResponse } from './types';
 import { formatEstimationFromUsd } from '../services/servicesCurrency';
 import { createAIDecision } from '../../api/aiDecisions';
+import type { RecommendationItem, RecommendationResponse } from './types';
 import { rateProvider } from './api';
 
 const TIER_LABELS: Record<string, string> = {

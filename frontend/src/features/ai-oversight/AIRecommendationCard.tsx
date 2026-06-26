@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
+import { Button } from '../../components/antigravity/Button';
 import { createAIDecision } from '../../api/aiDecisions';
 import type { AIDecisionAction, AIDecisionRecord } from '../../api/aiDecisions';
 

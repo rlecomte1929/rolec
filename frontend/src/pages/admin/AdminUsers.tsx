@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Input } from '../../components/antigravity/Input';
 import { useSearchParams, useLocation } from 'react-router-dom';
+import { Input } from '../../components/antigravity/Input';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Badge, Alert } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminProfile, AdminCompany } from '../../types';
+import { AdminLayout } from './AdminLayout';
 
 const ROLE_OPTIONS = [
   { value: '', label: 'All roles' },

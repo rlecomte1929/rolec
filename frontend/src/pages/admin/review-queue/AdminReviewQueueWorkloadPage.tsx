@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AdminReviewQueueLayout } from './AdminReviewQueueLayout';
 import { adminReviewQueueAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
+import { AdminReviewQueueLayout } from './AdminReviewQueueLayout';
 
 type WorkloadRow = {
   assignee_id: string;

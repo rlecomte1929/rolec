@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { FreshnessStatusBadge } from '../../../components/admin/freshness/FreshnessStatusBadge';
 import { adminFreshnessAPI } from '../../../api/client';
+import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 
 type SourceItem = {
   source_name?: string;

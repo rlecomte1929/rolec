@@ -30,12 +30,12 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
-import { HrNoCompanyOnboarding, httpStatusOf, isNoCompanyError } from './hrNoCompanyOnboarding';
 import {
   policyConfigMatrixAPI,
   policyDocumentsAPI,
 } from '../../api/client';
 import type { PolicyConfigWorkingPayload } from '../policy-config/types';
+import { HrNoCompanyOnboarding, httpStatusOf, isNoCompanyError } from './hrNoCompanyOnboarding';
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { PolicyAssistantDockedShell } from './PolicyAssistantDockedShell';

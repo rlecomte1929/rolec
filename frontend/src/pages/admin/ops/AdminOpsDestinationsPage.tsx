@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AdminOpsLayout } from './AdminOpsLayout';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
+import { AdminOpsLayout } from './AdminOpsLayout';
 
 export const AdminOpsDestinationsPage: React.FC = () => {
   const [data, setData] = useState<{ items?: Array<Record<string, unknown>> } | null>(null);

@@ -16,10 +16,10 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Radio } from '../../../components/antigravity/Radio';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 // useNavigate is used in the completion screen CTA
 import { AppShell } from '../../../components/AppShell';
 import { logger } from '../../../lib/logger';

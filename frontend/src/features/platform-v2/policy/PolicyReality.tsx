@@ -4,7 +4,6 @@
  */
 
 import type { PolicyBenefit, BenefitValueType, CorridorCode } from '../../../types/relopass-api-contracts';
-
 import { Button } from '../../../components/antigravity/Button';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

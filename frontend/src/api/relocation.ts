@@ -1,4 +1,3 @@
-import { apiGet, apiPost } from './client';
 import type {
   RelocationCase,
   RelocationCaseListItem,
@@ -8,6 +7,7 @@ import type {
   CaseClassification,
   NextAction,
 } from '../types';
+import { apiGet, apiPost } from './client';
 
 const missingFieldLabels: Record<string, string> = {
   origin_country: 'Origin country',

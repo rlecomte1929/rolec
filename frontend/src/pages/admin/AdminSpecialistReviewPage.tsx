@@ -11,7 +11,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AdminLayout } from './AdminLayout';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
   RoadmapStepDiff,
@@ -19,6 +18,7 @@ import {
   type StepReviewValue,
 } from '../../features/admin/specialist-review/RoadmapStepDiff';
 import { specialistReviewAPI } from '../../api/client';
+import { AdminLayout } from './AdminLayout';
 
 export function AdminSpecialistReviewPage() {
   const { case_id: caseId } = useParams<{ case_id: string }>();

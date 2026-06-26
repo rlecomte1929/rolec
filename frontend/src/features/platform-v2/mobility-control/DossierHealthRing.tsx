@@ -3,7 +3,6 @@
  * Used in the Mobility Control case list Dossier column.
  */
 import React from 'react';
-
 import { Button } from '../../../components/antigravity/Button';
 export type DossierRingStatus = 'green' | 'amber' | 'red' | 'empty';
 

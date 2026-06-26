@@ -8,7 +8,6 @@
  *   - "Mark ready" button → PATCH status to 'ready'; handles 422 inline
  */
 import React from 'react';
-
 import { Button } from '../../../components/antigravity/Button';
 interface ActionBarProps {
   missingCount: number;

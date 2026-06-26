@@ -20,8 +20,8 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { ArrowRight, Download, Loader2, MessageSquare, RefreshCcw } from 'lucide-react';
+import { Button } from '../../components/antigravity/Button';
 import { employeeAPI } from '../../api/client';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 

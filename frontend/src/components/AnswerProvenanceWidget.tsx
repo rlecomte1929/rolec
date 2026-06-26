@@ -10,9 +10,9 @@
  * an empty state would just be noise on the HR dashboard.
  */
 import React, { useEffect, useState } from 'react';
-import { Card, Badge } from './antigravity';
 import { getAnswerProvenance, type AnswerProvenanceResponse } from '../api/hrAnalytics';
 import { logger } from '../lib/logger';
+import { Card, Badge } from './antigravity';
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 

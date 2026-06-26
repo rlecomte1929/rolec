@@ -8,8 +8,8 @@
  * Route: /hr/policy-builder/documents
  */
 import { useEffect, useState } from 'react';
-import { Button } from '../../../components/antigravity/Button';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
 import {

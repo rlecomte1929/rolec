@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { Card, Badge, Button } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import type {
@@ -13,6 +12,7 @@ import type {
   AdminCompanyDetailCounts,
   AdminCompanyDetailOrphanDiagnostics,
 } from '../../types';
+import { AdminLayout } from './AdminLayout';
 
 export const AdminCompanyDetail: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();

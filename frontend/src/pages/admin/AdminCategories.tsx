@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
+import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
+import { AdminLayout } from './AdminLayout';
 
 type Category = { id: string; key: string; label: string; description?: string; icon_name?: string; sort_order?: number; is_active?: boolean };
 

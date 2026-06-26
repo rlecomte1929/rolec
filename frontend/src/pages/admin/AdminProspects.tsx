@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Checkbox } from '../../components/antigravity/Checkbox';
-import { AdminLayout } from './AdminLayout';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import { RefreshButton } from '../../components/RefreshButton';
 import {
@@ -10,6 +9,7 @@ import {
   type ProspectSeedItem,
 } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
+import { AdminLayout } from './AdminLayout';
 
 const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: '', label: 'All' },

@@ -4,6 +4,7 @@ import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { adminAPI } from '../../../api/client';
+import { useV2Flag } from '../useV2Flag';
 import type {
   CompanyV2,
   CompanyV2PlanTier,
@@ -13,7 +14,6 @@ import type {
 import { CompanyFormModal } from './CompanyFormModal';
 import { RowActionMenu } from './RowActionMenu';
 import { DeleteCompanyDialog } from './DeleteCompanyDialog';
-import { useV2Flag } from '../useV2Flag';
 import { CompaniesV2Table } from './CompaniesV2Table';
 
 // ── Visual helpers ──────────────────────────────────────────────────────────

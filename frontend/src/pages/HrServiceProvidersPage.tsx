@@ -15,7 +15,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card, Badge } from '../components/antigravity';
-import { HrVendorCuration } from './HrVendorCuration';
 import { VendorPerformancePage } from '../features/platform-v2/vendor-performance/VendorPerformancePage';
 import {
   getHrNotificationCounts,
@@ -23,6 +22,7 @@ import {
   type HrNotificationCounts,
   type EmployeeDemandRow,
 } from '../api/hrCatalog';
+import { HrVendorCuration } from './HrVendorCuration';
 
 type ServiceTab = 'dashboard' | 'vendor' | 'providers';
 

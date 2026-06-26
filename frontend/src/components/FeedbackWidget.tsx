@@ -12,8 +12,8 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from './antigravity/Button';
 import { supabase } from '../api/supabase';
+import { Button } from './antigravity/Button';
 
 type Category    = 'bug' | 'idea' | 'other';
 type WidgetState = 'idle' | 'open' | 'capturing' | 'submitting' | 'success' | 'error';

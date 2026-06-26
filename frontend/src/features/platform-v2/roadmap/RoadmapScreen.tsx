@@ -5,12 +5,12 @@
  */
 
 import { useState } from 'react';
-import { Button } from '../../../components/antigravity/Button';
 import { Link } from 'react-router-dom';
+import { Button } from '../../../components/antigravity/Button';
 import type { RoadmapTrack, RoadmapStep, StepStatus } from '../../../types/relopass-api-contracts';
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
-import { AvailableNowWidget } from './AvailableNowWidget';
 import { computeAvailableNow } from '../../../utils/roadmapAvailability';
+import { AvailableNowWidget } from './AvailableNowWidget';
 import { SuccessProbabilityDial, FactorsPanel } from './scoring';
 import type { SuccessProbabilityResult } from './scoring';
 import { ConfidenceBadge } from './ConfidenceBadge';

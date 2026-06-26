@@ -1,12 +1,12 @@
 // HrPolicyBuilderV2Page.tsx — Policy Builder canvas + benefit matrix
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Checkbox } from '../../../components/antigravity/Checkbox';
-import { Input } from '../../../components/antigravity/Input';
 import {
   Sparkles, Check, Eye, Clock, Plus, Filter,
   ChevronDown, ChevronRight, Info, Users, X, Upload,
   Pencil, Activity, Minus, AlertTriangle, MessageSquare,
 } from 'lucide-react';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
+import { Input } from '../../../components/antigravity/Input';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Alert } from '../../../components/antigravity';
@@ -14,11 +14,11 @@ import { Breadcrumb } from '../../../components/Breadcrumb';
 import { policyConfigMatrixAPI, policyDocumentsAPI } from '../../../api/client';
 import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssistantDockedShell';
 import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
-import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
-import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
 import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
 import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
 import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
+import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
+import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';

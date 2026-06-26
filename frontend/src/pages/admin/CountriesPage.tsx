@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { CountryTable } from '../../components/admin/CountryTable';
 import { listCountries } from '../../api/admin';
 import type { CountryListDTO } from '../../types';
-import { useNavigate } from 'react-router-dom';
 
 export const CountriesPage: React.FC = () => {
   const [data, setData] = useState<CountryListDTO | null>(null);

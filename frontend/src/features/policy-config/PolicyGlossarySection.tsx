@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card } from '../../components/antigravity';
 import { HelpCircle } from 'lucide-react';
+import { Card } from '../../components/antigravity';
 import { COMPENSATION_GLOSSARY } from './compensationGlossary';
 
 type Props = {

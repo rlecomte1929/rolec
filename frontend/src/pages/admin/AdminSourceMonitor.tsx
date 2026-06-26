@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { AdminFreshnessLayout } from './freshness/AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../api/client';
+import { AdminFreshnessLayout } from './freshness/AdminFreshnessLayout';
 
 type SourcePage = {
   id?: string;

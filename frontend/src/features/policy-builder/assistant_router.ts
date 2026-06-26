@@ -33,13 +33,13 @@
  *   the policy is treated as expired and the POLICY_EXPIRED_MSG is returned.
  */
 
+import { logger } from '../../lib/logger';
 import { classifyQuery } from './topic_classifier';
 import type { FallbackReason } from './topic_classifier';
 import { retrievePolicy } from './retrieve_policy';
 import type { PolicyChunk } from './retrieve_policy';
 import { runOutputGuardrails } from './output_guardrails';
 import { runGuardrails } from './input_guardrails';
-import { logger } from '../../lib/logger';
 
 // Re-export so consumers have a single import point
 export type { FallbackReason };

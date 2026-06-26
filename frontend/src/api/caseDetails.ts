@@ -3,8 +3,8 @@
  * Never query cases directly by URL param; always gate through assignment.
  */
 
-import api from './client';
 import type { CaseDTO, CaseDraftDTO } from '../types';
+import api from './client';
 
 export interface CaseAssignment {
   id: string;

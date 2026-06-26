@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { HelpCircle } from 'lucide-react';
+import { Button } from '../../components/antigravity/Button';
 import type { CompensationGlossaryId } from './compensationGlossary';
 import { getCompensationGlossaryEntry } from './compensationGlossary';
 

@@ -2,15 +2,8 @@ import axios from 'axios';
 import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
-import { signOutSupabase } from './supabaseAuth';
-import { parseResponse } from './schemas/parseResponse';
 import { env } from '../config/env';
 import type { IntakeData } from '../features/platform-v2/intake/EmployeeIntakePage';
-import {
-  intakeEnvelopeSchema,
-  assignmentsOverviewSchema,
-  currentAssignmentSchema,
-} from './schemas/employee';
 import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
 import type {
   LoginRequest,
@@ -57,9 +50,16 @@ import type {
   DossierSource,
 } from '../types';
 import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryResponse } from '../types/policyAssistant';
-import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
 import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
 import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
+import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
+import {
+  intakeEnvelopeSchema,
+  assignmentsOverviewSchema,
+  currentAssignmentSchema,
+} from './schemas/employee';
+import { parseResponse } from './schemas/parseResponse';
+import { signOutSupabase } from './supabaseAuth';
 
 // VITE_API_URL must be set for every environment:
 //   - Development:  http://localhost:8000         (via frontend/.env.development)
@@ -524,7 +524,7 @@ export const hrAPI = {
   /** AIQ-378d — behind-schedule ("case health") cases for the HR's company. */
   getCaseHealth: async (opts?: { signal?: AbortSignal }): Promise<{ cases: CaseHealthFlag[] }> => {
     const response = await api.get<{ cases: CaseHealthFlag[] }>('/api/hr/cases/behind-schedule', { signal: opts?.signal });
-    const cases = Array.isArray(response.data?.cases) ? (response.data.cases as CaseHealthFlag[]) : [];
+    const cases = Array.isArray(response.data?.cases) ? (response.data.cases) : [];
     return { cases };
   },
   getAssignment: async (assignmentId: string, opts?: { signal?: AbortSignal }): Promise<AssignmentDetail> => {
@@ -2742,7 +2742,7 @@ export const employeeAPI = {
       { assignment_id: assignmentId, turns },
       { responseType: 'blob' }
     );
-    return response.data as Blob;
+    return response.data;
   },
 };
 

@@ -1,5 +1,4 @@
 import React from 'react';
-
 import { Button } from '../antigravity/Button';
 interface WizardSidebarProps {
   currentStep: number;

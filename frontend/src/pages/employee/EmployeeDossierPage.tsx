@@ -10,8 +10,8 @@
  * completion-% header tile and "Build dossier" CTA.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { useSearchParams, Link } from 'react-router-dom';
+import { Button } from '../../components/antigravity/Button';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { AppShell } from '../../components/AppShell';

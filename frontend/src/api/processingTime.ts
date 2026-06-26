@@ -6,8 +6,8 @@
  * one of those cases we resolve to null so the caller renders nothing (never a
  * processing time without a source).
  */
-import api from './client';
 import type { ProcessingTimeEstimate } from '../components/ProcessingTimeBadge';
+import api from './client';
 
 export async function getProcessingTime(
   caseId: string,
