@@ -74,8 +74,27 @@ export const CompliancePage: React.FC = () => {
         </FadeIn>
       </Section>
 
-      {/* 3. HUMAN OVERSIGHT — the real Art. 14 flow */}
+      {/* 2b. AI SYSTEMS INVENTORY — EU AI Act transparency (Art. 13) */}
       <Section spacing="lg" background="transparent">
+        <FadeIn>
+          <SectionHeader
+            eyebrow={c.aiSystems.sectionHeader}
+            title={c.aiSystems.title}
+            subtitle={c.aiSystems.body}
+            align="center"
+          />
+        </FadeIn>
+        <div className="mt-12 sm:mt-16 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 lg:gap-8">
+          {c.aiSystems.cards.map((card, i) => (
+            <FadeIn key={card.title} delay={i * 80}>
+              <FeatureCard title={card.title} description={card.body} className="h-full" />
+            </FadeIn>
+          ))}
+        </div>
+      </Section>
+
+      {/* 3. HUMAN OVERSIGHT — the real Art. 14 flow */}
+      <Section spacing="lg" background="muted">
         <FadeIn>
           <SectionHeader
             eyebrow={c.oversight.sectionHeader}
@@ -99,7 +118,7 @@ export const CompliancePage: React.FC = () => {
       </Section>
 
       {/* 4. TRANSPARENCY & DATA PROCESSING */}
-      <Section spacing="lg" background="muted">
+      <Section spacing="lg" background="transparent">
         <FadeIn>
           <SectionHeader
             eyebrow={c.transparency.sectionHeader}
@@ -109,6 +128,24 @@ export const CompliancePage: React.FC = () => {
         </FadeIn>
         <div className="mt-12 sm:mt-16 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {c.transparency.cards.map((card, i) => (
+            <FadeIn key={card.title} delay={i * 80}>
+              <FeatureCard title={card.title} description={card.body} className="h-full" />
+            </FadeIn>
+          ))}
+        </div>
+      </Section>
+
+      {/* 4b. DATA GOVERNANCE & GDPR */}
+      <Section spacing="lg" background="muted">
+        <FadeIn>
+          <SectionHeader
+            eyebrow={c.dataGovernance.sectionHeader}
+            title={c.dataGovernance.title}
+            align="center"
+          />
+        </FadeIn>
+        <div className="mt-12 sm:mt-16 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 lg:gap-8">
+          {c.dataGovernance.cards.map((card, i) => (
             <FadeIn key={card.title} delay={i * 80}>
               <FeatureCard title={card.title} description={card.body} className="h-full" />
             </FadeIn>
