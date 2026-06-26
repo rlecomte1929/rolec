@@ -184,6 +184,12 @@ def create_app() -> FastAPI:
     app.include_router(policy_canonical.read_router, prefix="/api")
     app.include_router(policy_templates.router)
 
+    # [P4-4 / AIQ-1220] Cron HTTP triggers (inline CRON_SECRET auth). Mounted in
+    # backend/main.py already; registered here too so the modular app + tests see
+    # the /api/crons/* routes (e.g. the weekly hr-mobility-briefing endpoint).
+    from .routers import crons  # noqa: PLC0415 — local import mirrors auth above
+    app.include_router(crons.router)
+
     # ── Month-1 TODO: Tier 4 routers blocked on Month-0 P3 extraction ─────────
     # TODO [AUDIT-C2.3 / Month-0 P3]: add hr_policy_config + employee_policy_config
     # once those routers are extracted from the inline APIRouter objects in backend/main.py.

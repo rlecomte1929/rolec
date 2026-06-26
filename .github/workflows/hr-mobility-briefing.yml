@@ -1,0 +1,83 @@
+name: Weekly HR mobility briefing
+
+# [AIQ-1220] Calls POST /api/crons/hr-mobility-briefing once a week (Monday 08:00
+# UTC) so each active HR company's admin gets a deterministic mobility briefing:
+# active assignments + status, at-risk relocations, and upcoming compliance
+# deadlines. Data-driven (no LLM). Sends via Resend (RESEND_API_KEY / EMAIL_FROM)
+# on the backend; falls back to logging when the key is unset.
+#
+# Gated behind `vars.HR_BRIEFING_CRON_ENABLED` so it is a no-op until the repo
+# var + secrets are configured. Endpoint auth is the shared CRON_SECRET (Bearer),
+# the same the other /api/crons/* endpoints use.
+#
+# Beta-test safely from the Actions UI (workflow_dispatch): set `dry_run=true` to
+# compose without sending, or `to_override` to land every briefing in one inbox.
+
+on:
+  schedule:
+    # 08:00 UTC every Monday.
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Compose payloads but send nothing"
+        type: boolean
+        default: false
+      only_company_id:
+        description: "Restrict to a single company id (optional)"
+        type: string
+        default: ""
+      to_override:
+        description: "Send every briefing to this single address (optional)"
+        type: string
+        default: ""
+
+concurrency:
+  group: hr-mobility-briefing
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  briefing:
+    name: Send HR mobility briefing
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.HR_BRIEFING_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.HR_BRIEFING_API_BASE }}     # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      ONLY_COMPANY_ID: ${{ inputs.only_company_id }}
+      TO_OVERRIDE: ${{ inputs.to_override }}
+    steps:
+      - name: POST /api/crons/hr-mobility-briefing
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          # Build query string from any workflow_dispatch inputs (empty on schedule).
+          query=""
+          if [ "${DRY_RUN:-}" = "true" ]; then query="${query}&dry_run=true"; fi
+          if [ -n "${ONLY_COMPANY_ID:-}" ]; then query="${query}&only_company_id=${ONLY_COMPANY_ID}"; fi
+          if [ -n "${TO_OVERRIDE:-}" ]; then query="${query}&to_override=${TO_OVERRIDE}"; fi
+          query="${query#&}"
+          url="${API_BASE}/api/crons/hr-mobility-briefing"
+          if [ -n "${query}" ]; then url="${url}?${query}"; fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${url}")
+          echo "$response"
+          {
+            echo "## HR mobility briefing"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
