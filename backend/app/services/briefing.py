@@ -12,10 +12,12 @@ Sync (not async): the HR routers in this codebase are sync, and the policy-assis
 existing ``AnthropicClient`` is sync; matching that avoids an ``asyncio.run`` round-trip
 inside a threadpool-run handler.
 
-NOTE on PII / data governance: unlike the policy-assistant (which masks PII before
-egress), this endpoint intentionally sends the employee's real name + the full policy
-to Anthropic — masking would defeat the personalisation. Employee PII + policy text
-therefore cross the Anthropic API boundary (30-day retention). Flagged for review.
+NOTE on PII / data governance (SEC-03): the employee's name is anonymised
+([REDACTED_PERSON]) and the free-text dependants field is passed through
+``mask_pii`` before egress, so no raw employee PII crosses the Anthropic API
+boundary. The briefing still personalises via grade / assignment / route / dates.
+The policy document text is published corporate-policy content (not individual
+PII) and is sent in full to use the 1M-token context.
 """
 from __future__ import annotations
 
@@ -63,18 +65,29 @@ def build_user_prompt(policy_text: str, employee: Dict[str, Any]) -> str:
     departure_date, dependants. Missing values are rendered "not provided" so the
     model treats them as gaps rather than inventing.
     """
+    # GDPR Art. 28/44 (SEC-03): the employee's name (and any names/contact
+    # details typed into the free-text dependants field) are personal data and
+    # must not cross the Anthropic API boundary. mask_pii() only reliably catches
+    # context-cued names, so the raw name is replaced with an anonymised token
+    # (the briefing still personalises by grade / route / dates / dependants),
+    # and the free-text dependants field is run through mask_pii() to strip any
+    # email / phone / ID an HR user may have entered there. The structured fields
+    # (grade, countries, date) are NOT masked — mask_pii false-positives on
+    # ISO dates (treats them as phone numbers).
+    from .pii_masker import mask_pii
+
     def field(key: str) -> str:
         val = employee.get(key)
         return str(val) if val not in (None, "", []) else "not provided"
 
     details = (
-        f"- Name: {field('name')}\n"
+        "- Name: [REDACTED_PERSON]\n"
         f"- Grade / band: {field('grade')}\n"
         f"- Assignment type: {field('assignment_type')}\n"
         f"- Home country: {field('home_country')}\n"
         f"- Destination: {field('destination')}\n"
         f"- Departure date: {field('departure_date')}\n"
-        f"- Dependants: {field('dependants')}"
+        f"- Dependants: {mask_pii(field('dependants'))}"
     )
     return (
         "Here is the full corporate mobility policy document. Read all of it.\n\n"

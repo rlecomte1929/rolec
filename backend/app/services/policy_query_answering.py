@@ -43,10 +43,13 @@ STOPWORDS = {
 
 
 def redact_pii_from_query(query: str) -> str:
-    out = re.sub(r"\b[\w.+-]+@[\w.-]+\.\w+\b", "[REDACTED_EMAIL]", query)
-    out = re.sub(r"\b(?:\+?\d[\d\s().-]{7,}\d)\b", "[REDACTED_PHONE]", out)
-    out = re.sub(r"\b[A-Z]{1,2}\d{5,}\b", "[REDACTED_ID]", out)
-    return out
+    # GDPR Art. 28/44 (SEC-03): delegate to the canonical mask_pii so the query
+    # is scrubbed of IBAN/passport/SSN/national-ID/name too — the previous
+    # bespoke regex only caught email/phone/loose-ID and let those through to
+    # the OpenAI retrieval + answer call. mask_pii is the mandated masker.
+    from .pii_masker import mask_pii
+
+    return mask_pii(query)
 
 
 def _tokens(text: str) -> List[str]:
