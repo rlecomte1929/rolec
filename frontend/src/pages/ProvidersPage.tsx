@@ -53,7 +53,6 @@ function policyHintFromCategory(entry: ServicesCategoryEntry | undefined): Servi
 }
 
 const ENABLED_SERVICES = SERVICE_CONFIG.filter((svc) => svc.enabled);
-const ALL_SERVICES = SERVICE_CONFIG;
 
 const CATEGORY_MAP: Record<ServiceKey, string> = {
   visa: 'immigration',
@@ -423,25 +422,31 @@ export const ProvidersPage: React.FC = () => {
             </div>
             <ServiceGroupSection
               group="before"
-              items={ALL_SERVICES.filter((s) => s.group === 'before')}
+              items={ENABLED_SERVICES.filter((s) => s.group === 'before')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
             />
             <ServiceGroupSection
               group="arrival"
-              items={ALL_SERVICES.filter((s) => s.group === 'arrival')}
+              items={ENABLED_SERVICES.filter((s) => s.group === 'arrival')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
             />
             <ServiceGroupSection
               group="settle"
-              items={ALL_SERVICES.filter((s) => s.group === 'settle')}
+              items={ENABLED_SERVICES.filter((s) => s.group === 'settle')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
             />
+            {/* H-09 (AIQ-1256): non-functional "Coming soon" cards were removed from
+                the selection grid (only enabled, selectable categories render). Point
+                employees to HR for the categories that aren't self-serve yet. */}
+            <p className="mt-2 mb-6 text-sm text-slate-600">
+              More services available soon. Contact your HR team for Pets, Temporary accommodation, and Visa support.
+            </p>
             <StickyContinueBar
               selectedCount={selectedKeys.size}
               onContinue={handleContinue}
