@@ -189,6 +189,44 @@ def case_health_scan(request: Request) -> Dict[str, Any]:
     return {"ok": True, **result}
 
 
+@router.post("/hr-mobility-briefing")
+def hr_mobility_briefing_cron(
+    request: Request,
+    dry_run: bool = False,
+    only_company_id: Optional[str] = None,
+    to_override: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    [AIQ-1220] Weekly HR mobility briefing. Emails each active HR company's admin a
+    deterministic, data-driven summary: active assignments + status, at-risk
+    relocations, and upcoming compliance deadlines. NO LLM call (no LLM cost / no
+    PII leaving the platform). Sends via Resend, falling back to logging when
+    RESEND_API_KEY is unset. Designed to run weekly (Monday 08:00) via
+    `.github/workflows/hr-mobility-briefing.yml`.
+
+    Safety params for a targeted beta test:
+      * `dry_run`        — compose + return payloads under `previews`, send nothing.
+      * `only_company_id`— restrict the run to one company.
+      * `to_override`    — send every briefing to this single address (preview it
+                           in a tester's inbox instead of each company's admin).
+    """
+    _verify_cron_secret(request)
+    log.info(
+        "hr_mobility_briefing cron triggered (dry_run=%s, only_company_id=%s, to_override=%s)",
+        dry_run,
+        only_company_id,
+        bool(to_override),
+    )
+    from ..services.hr_mobility_briefing_service import run_hr_mobility_briefing
+
+    result = run_hr_mobility_briefing(
+        dry_run=dry_run,
+        only_company_id=only_company_id,
+        to_override=to_override,
+    )
+    return {"ok": True, **result}
+
+
 @router.post("/promote-hr-vendors")
 def promote_hr_vendors_cron(
     request: Request,

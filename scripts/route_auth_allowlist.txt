@@ -148,6 +148,9 @@ backend/app/routers/crons.py:snapshot_vendor_metrics_cron
 # CRON (NAV-SP-2 Tier 3): _verify_cron_secret(request) inline. Daily
 # vendor-metric snapshot, invoked by the vendor-metric-snapshot-daily workflow,
 # not an end user.
+backend/app/routers/crons.py:hr_mobility_briefing_cron
+# CRON (AIQ-1220): _verify_cron_secret(request) inline. Weekly Monday-08:00 HR
+# mobility briefing, invoked by the hr-mobility-briefing workflow, not an end user.
 
 # CRON (PERMANENT): calls _verify_cron_secret(request) in the body — fail-closed
 # (503 if CRON_SECRET unset, 401 on mismatch). Inline, not a Depends().
