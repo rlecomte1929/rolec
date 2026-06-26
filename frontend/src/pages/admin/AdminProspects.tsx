@@ -119,7 +119,7 @@ export const AdminProspects: React.FC = () => {
   useEffect(() => {
     const anyPending = rows.some((r) => r.status === 'pending_enrichment');
     if (!anyPending) return;
-    const t = setTimeout(load, 8_000);
+    const t = setTimeout(() => void load(), 8_000);
     return () => clearTimeout(t);
   }, [rows, load]);
 

@@ -325,7 +325,7 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
     setTab('sign_in');
     setSiError('');
     // Auto-submit after short delay for UX
-    setTimeout(() => handleSignIn(persona.email, persona.password), 80);
+    setTimeout(() => void handleSignIn(persona.email, persona.password), 80);
   }, [handleSignIn]);
 
   const handleOAuth = useCallback(async (provider: 'google' | 'azure') => {

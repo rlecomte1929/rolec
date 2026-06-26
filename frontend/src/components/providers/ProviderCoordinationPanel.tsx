@@ -59,7 +59,7 @@ export const ProviderCoordinationPanel: React.FC<ProviderCoordinationPanelProps>
   useEffect(() => { void load(); }, [load]);
 
   // Realtime: re-fetch on any insert/update to provider_tasks
-  useProviderRealtime(caseId, load);
+  useProviderRealtime(caseId, () => void load());
 
   // ── Local optimistic updates ───────────────────────────────────────────────
 

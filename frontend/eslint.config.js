@@ -199,7 +199,13 @@ export default tseslint.config(
       '@typescript-eslint/restrict-template-expressions': 'warn',
 
       // — Async-safety epic —
-      '@typescript-eslint/no-misused-promises': 'warn',
+      // no-misused-promises: DRAINED + re-promoted to 'error' (Epic A2). The
+      // `checksVoidReturn.attributes: false` opt-out stops flagging async JSX event
+      // handlers (onClick={asyncFn} etc.) — idiomatic + safe in React (React ignores
+      // the returned promise; rejection-safety is no-floating-promises' job, already
+      // enforced). The dangerous misuses (async passed to a void-expecting *function
+      // argument* — subscriptions, timers) ARE still caught and were fixed in A2.
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
       // no-floating-promises: DRAINED to 0 + re-promoted to 'error' (reverts to the
       // recommendedTypeChecked default) — Epic A1. New floating promises now fail CI.
 
