@@ -14,7 +14,6 @@ import React from 'react';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
 import { ImmigrationStatusPanel } from '../ImmigrationStatusPanel';
 import { hrAPI } from '../../../api/client';
 
@@ -111,11 +110,7 @@ describe('ImmigrationStatusPanel — uncovered-corridor state (AIQ-847)', () => 
 
     renderPanel();
 
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Immigration guidance for FR→JP isn't available yet/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/Immigration guidance for FR→JP isn't available yet/i)).toBeInTheDocument();
     // The misleading generic state must NOT be shown for an uncovered corridor.
     expect(screen.queryByText('Immigration setup not started')).toBeNull();
   });
@@ -126,11 +121,7 @@ describe('ImmigrationStatusPanel — uncovered-corridor state (AIQ-847)', () => 
 
     renderPanel();
 
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Immigration guidance for this corridor isn't available yet/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/Immigration guidance for this corridor isn't available yet/i)).toBeInTheDocument();
     expect(screen.queryByText('Immigration setup not started')).toBeNull();
   });
 
@@ -140,9 +131,7 @@ describe('ImmigrationStatusPanel — uncovered-corridor state (AIQ-847)', () => 
 
     renderPanel();
 
-    await waitFor(() =>
-      expect(screen.getByText('Document checklist (1)')).toBeInTheDocument(),
-    );
+    expect(await screen.findByText('Document checklist (1)')).toBeInTheDocument();
     expect(screen.getByText('~30d processing')).toBeInTheDocument();
     expect(screen.queryByText(/isn't available yet/i)).toBeNull();
   });
@@ -153,9 +142,7 @@ describe('ImmigrationStatusPanel — uncovered-corridor state (AIQ-847)', () => 
 
     renderPanel();
 
-    await waitFor(() =>
-      expect(screen.getByText('Document checklist (1)')).toBeInTheDocument(),
-    );
+    expect(await screen.findByText('Document checklist (1)')).toBeInTheDocument();
     expect(screen.queryByText(/processing/i)).toBeNull();
   });
 });

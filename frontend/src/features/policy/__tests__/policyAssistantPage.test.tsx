@@ -18,7 +18,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
   PolicyAssistantPage,
@@ -44,6 +44,17 @@ vi.mock('../../../api/client', () => ({
     postPolicyAssistantQuery: (...args: unknown[]) => postPolicyAssistantQuery(...args),
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Query helpers (semantic-first)
+// ---------------------------------------------------------------------------
+
+/** The suggested-question tiles are buttons inside the role="group" grid. */
+function tileButtons() {
+  return within(
+    screen.getByRole('group', { name: /suggested policy questions/i }),
+  ).getAllByRole('button');
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -175,7 +186,7 @@ describe('QuestionTileGrid', () => {
     render(
       <QuestionTileGrid tiles={QUESTION_TILES} disabled={false} onTileClick={onTileClick} />,
     );
-    const tiles = screen.getAllByTestId('question-tile');
+    const tiles = screen.getAllByRole('button');
     expect(tiles).toHaveLength(QUESTION_TILES.length);
   });
 
@@ -193,7 +204,7 @@ describe('QuestionTileGrid', () => {
     render(
       <QuestionTileGrid tiles={QUESTION_TILES} disabled={false} onTileClick={onTileClick} />,
     );
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
+    fireEvent.click(screen.getAllByRole('button')[0]);
     expect(onTileClick).toHaveBeenCalledWith(QUESTION_TILES[0]);
   });
 
@@ -202,7 +213,7 @@ describe('QuestionTileGrid', () => {
     render(
       <QuestionTileGrid tiles={QUESTION_TILES} disabled={true} onTileClick={onTileClick} />,
     );
-    const tiles = screen.getAllByTestId('question-tile');
+    const tiles = screen.getAllByRole('button');
     for (const tile of tiles) {
       expect(tile).toBeDisabled();
     }
@@ -245,7 +256,7 @@ describe('ResponseCard', () => {
   it('renders escalation button with correct href', () => {
     const turn = makeTurn();
     render(<ResponseCard turn={turn} />);
-    const btn = screen.getByTestId('escalation-button');
+    const btn = screen.getByRole('link', { name: 'Discuss this with HR' });
     expect(btn).toBeInTheDocument();
     const href = btn.getAttribute('href') ?? '';
     expect(href).toMatch(/^mailto:/);
@@ -255,10 +266,7 @@ describe('ResponseCard', () => {
 
   it('escalation button label is "Discuss with HR"', () => {
     render(<ResponseCard turn={makeTurn()} />);
-    expect(screen.getByTestId('escalation-button')).toHaveAttribute(
-      'aria-label',
-      'Discuss this with HR',
-    );
+    expect(screen.getByRole('link')).toHaveAttribute('aria-label', 'Discuss this with HR');
   });
 
   it('uses refusal text in escalation href when answer_text is empty', () => {
@@ -269,7 +277,7 @@ describe('ResponseCard', () => {
       }),
     });
     render(<ResponseCard turn={turn} />);
-    const href = screen.getByTestId('escalation-button').getAttribute('href') ?? '';
+    const href = screen.getByRole('link', { name: 'Discuss this with HR' }).getAttribute('href') ?? '';
     expect(href).toContain(encodeURIComponent('Cannot answer.'));
   });
 });
@@ -281,40 +289,40 @@ describe('ResponseCard', () => {
 describe('PolicyAssistantPage — render', () => {
   it('renders the page container', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    expect(screen.getByTestId('policy-assistant-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Policy Assistant' })).toBeInTheDocument();
   });
 
   it('renders the scope label', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    expect(screen.getByTestId('scope-label')).toHaveTextContent(SCOPE_LABEL);
+    expect(screen.getByText(SCOPE_LABEL)).toBeInTheDocument();
   });
 
   it('renders question tiles on initial load', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    expect(screen.getByTestId('question-tile-grid')).toBeInTheDocument();
-    expect(screen.getAllByTestId('question-tile')).toHaveLength(QUESTION_TILES.length);
+    expect(screen.getByRole('group', { name: /suggested policy questions/i })).toBeInTheDocument();
+    expect(tileButtons()).toHaveLength(QUESTION_TILES.length);
   });
 
   it('renders the text input and submit button', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    expect(screen.getByTestId('question-input')).toBeInTheDocument();
-    expect(screen.getByTestId('submit-button')).toBeInTheDocument();
+    expect(screen.getByLabelText('Policy question')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeInTheDocument();
   });
 
   it('submit button disabled when input is empty', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    expect(screen.getByTestId('submit-button')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
   });
 
   it('shows no-assignment guard when assignmentId is null', () => {
     render(<PolicyAssistantPage assignmentId={null} />);
-    expect(screen.queryByTestId('question-tile-grid')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /suggested policy questions/i })).not.toBeInTheDocument();
     expect(screen.getByText(/link an active assignment/i)).toBeInTheDocument();
   });
 
   it('shows no-assignment guard when assignmentId is undefined', () => {
     render(<PolicyAssistantPage assignmentId={undefined} />);
-    expect(screen.queryByTestId('question-tile-grid')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /suggested policy questions/i })).not.toBeInTheDocument();
   });
 });
 
@@ -327,7 +335,7 @@ describe('PolicyAssistantPage — tile click', () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
+    fireEvent.click(tileButtons()[0]);
 
     await waitFor(() => {
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('assign-1', QUESTION_TILES[0]);
@@ -338,10 +346,10 @@ describe('PolicyAssistantPage — tile click', () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
+    fireEvent.click(tileButtons()[0]);
 
     await waitFor(() => {
-      expect(screen.queryByTestId('question-tile-grid')).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /suggested policy questions/i })).not.toBeInTheDocument();
     });
   });
 
@@ -349,11 +357,9 @@ describe('PolicyAssistantPage — tile click', () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[2]);
+    fireEvent.click(tileButtons()[2]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('response-card')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('article')).toBeInTheDocument();
     expect(screen.getByText(QUESTION_TILES[2])).toBeInTheDocument();
   });
 
@@ -361,11 +367,9 @@ describe('PolicyAssistantPage — tile click', () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
+    fireEvent.click(tileButtons()[0]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('new-question-button')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('button', { name: 'New question' })).toBeInTheDocument();
   });
 });
 
@@ -376,19 +380,19 @@ describe('PolicyAssistantPage — tile click', () => {
 describe('PolicyAssistantPage — text input', () => {
   it('typing enables the submit button', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    fireEvent.change(screen.getByTestId('question-input'), {
+    fireEvent.change(screen.getByLabelText('Policy question'), {
       target: { value: 'What is my housing allowance?' },
     });
-    expect(screen.getByTestId('submit-button')).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ask' })).not.toBeDisabled();
   });
 
   it('clicking submit calls postPolicyAssistantQuery with typed text', async () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    fireEvent.change(screen.getByTestId('question-input'), {
+    fireEvent.change(screen.getByLabelText('Policy question'), {
       target: { value: 'My custom question?' },
     });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => {
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('assign-1', 'My custom question?');
@@ -398,7 +402,7 @@ describe('PolicyAssistantPage — text input', () => {
   it('Enter key submits the query', async () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    const input = screen.getByTestId('question-input');
+    const input = screen.getByLabelText('Policy question');
     fireEvent.change(input, { target: { value: 'Enter key test?' } });
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
@@ -410,7 +414,7 @@ describe('PolicyAssistantPage — text input', () => {
   it('Shift+Enter does NOT submit', async () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    const input = screen.getByTestId('question-input');
+    const input = screen.getByLabelText('Policy question');
     fireEvent.change(input, { target: { value: 'Shift enter test?' } });
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
 
@@ -421,9 +425,9 @@ describe('PolicyAssistantPage — text input', () => {
   it('clears input after successful submit', async () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    const input = screen.getByTestId('question-input');
+    const input = screen.getByLabelText('Policy question');
     fireEvent.change(input, { target: { value: 'My question?' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => {
       expect(input).toHaveValue('');
@@ -440,13 +444,11 @@ describe('PolicyAssistantPage — HR escalation', () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const question = QUESTION_TILES[0];
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
+    fireEvent.click(tileButtons()[0]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('escalation-button')).toBeInTheDocument();
-    });
+    const link = await screen.findByRole('link', { name: 'Discuss this with HR' });
 
-    const href = screen.getByTestId('escalation-button').getAttribute('href') ?? '';
+    const href = link.getAttribute('href') ?? '';
     expect(href).toContain(encodeURIComponent(question));
   });
 
@@ -454,13 +456,11 @@ describe('PolicyAssistantPage — HR escalation', () => {
     const answer = makeAnswer({ answer_text: 'USD 5000 per month.' });
     mockApiSuccess(answer);
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
+    fireEvent.click(tileButtons()[0]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('escalation-button')).toBeInTheDocument();
-    });
+    const link = await screen.findByRole('link', { name: 'Discuss this with HR' });
 
-    const href = screen.getByTestId('escalation-button').getAttribute('href') ?? '';
+    const href = link.getAttribute('href') ?? '';
     expect(href).toContain(encodeURIComponent('USD 5000 per month.'));
   });
 });
@@ -475,35 +475,37 @@ describe('PolicyAssistantPage — New question', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
     // Submit to hide tiles
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
-    await waitFor(() => expect(screen.queryByTestId('question-tile-grid')).not.toBeInTheDocument());
+    fireEvent.click(tileButtons()[0]);
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: /suggested policy questions/i })).not.toBeInTheDocument(),
+    );
 
     // Restore tiles
-    fireEvent.click(screen.getByTestId('new-question-button'));
-    expect(screen.getByTestId('question-tile-grid')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    expect(screen.getByRole('group', { name: /suggested policy questions/i })).toBeInTheDocument();
   });
 
   it('"New question" hides the "New question" button itself', async () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
-    await waitFor(() => expect(screen.getByTestId('new-question-button')).toBeInTheDocument());
+    fireEvent.click(tileButtons()[0]);
+    await screen.findByRole('button', { name: 'New question' });
 
-    fireEvent.click(screen.getByTestId('new-question-button'));
-    expect(screen.queryByTestId('new-question-button')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    expect(screen.queryByRole('button', { name: 'New question' })).not.toBeInTheDocument();
   });
 
   it('"New question" clears the text input', async () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    const input = screen.getByTestId('question-input');
+    const input = screen.getByLabelText('Policy question');
     fireEvent.change(input, { target: { value: 'Some text' } });
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
-    await waitFor(() => expect(screen.getByTestId('new-question-button')).toBeInTheDocument());
+    fireEvent.click(tileButtons()[0]);
+    await screen.findByRole('button', { name: 'New question' });
 
-    fireEvent.click(screen.getByTestId('new-question-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
     expect(input).toHaveValue('');
   });
 
@@ -511,11 +513,11 @@ describe('PolicyAssistantPage — New question', () => {
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
-    await waitFor(() => expect(screen.getByTestId('response-card')).toBeInTheDocument());
+    fireEvent.click(tileButtons()[0]);
+    await screen.findByRole('article');
 
-    fireEvent.click(screen.getByTestId('new-question-button'));
-    expect(screen.getByTestId('response-card')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    expect(screen.getByRole('article')).toBeInTheDocument();
   });
 });
 
@@ -528,14 +530,12 @@ describe('PolicyAssistantPage — errors', () => {
     mockApiError("Couldn't reach the server.");
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.change(screen.getByTestId('question-input'), {
+    fireEvent.change(screen.getByLabelText('Policy question'), {
       target: { value: 'My question?' },
     });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('error-message')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('shows API detail string in error banner', async () => {
@@ -546,16 +546,12 @@ describe('PolicyAssistantPage — errors', () => {
     postPolicyAssistantQuery.mockRejectedValue(axiosError);
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.change(screen.getByTestId('question-input'), {
+    fireEvent.change(screen.getByLabelText('Policy question'), {
       target: { value: 'My question?' },
     });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('error-message')).toHaveTextContent(
-        'Policy engine unavailable.',
-      );
-    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Policy engine unavailable.');
   });
 
   it('clears error on successful next submission', async () => {
@@ -569,26 +565,26 @@ describe('PolicyAssistantPage — errors', () => {
     });
 
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    const input = screen.getByTestId('question-input');
+    const input = screen.getByLabelText('Policy question');
 
     fireEvent.change(input, { target: { value: 'First?' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
-    await waitFor(() => expect(screen.getByTestId('error-message')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
 
     fireEvent.change(input, { target: { value: 'Second?' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
-    await waitFor(() => expect(screen.queryByTestId('error-message')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('does not add a turn on API failure', async () => {
     mockApiError('oops');
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.change(screen.getByTestId('question-input'), { target: { value: 'Q?' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.change(screen.getByLabelText('Policy question'), { target: { value: 'Q?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    await waitFor(() => expect(screen.getByTestId('error-message')).toBeInTheDocument());
-    expect(screen.queryByTestId('response-card')).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
 });
 
@@ -605,14 +601,14 @@ describe('PolicyAssistantPage — multiple turns', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
     // First question via tile
-    fireEvent.click(screen.getAllByTestId('question-tile')[0]);
-    await waitFor(() => expect(screen.getAllByTestId('response-card')).toHaveLength(1));
+    fireEvent.click(tileButtons()[0]);
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1));
 
     // Second question via text input (tiles hidden; use text + submit)
-    const input = screen.getByTestId('question-input');
+    const input = screen.getByLabelText('Policy question');
     fireEvent.change(input, { target: { value: 'Second question?' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    await waitFor(() => expect(screen.getAllByTestId('response-card')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2));
   });
 });

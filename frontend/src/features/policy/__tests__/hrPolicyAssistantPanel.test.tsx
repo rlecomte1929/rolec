@@ -194,7 +194,7 @@ describe('HrPolicyAssistantPanel', () => {
       target: { value: 'How should we beat competitors on benefits?' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
+    expect(await screen.findByText(/no policy answer/i)).toBeInTheDocument();
     expect(screen.getByText(/within-policy examples/i)).toBeInTheDocument();
     expect(screen.getByText('What do employees see for temporary housing?')).toBeInTheDocument();
   });
@@ -254,11 +254,7 @@ describe('HrPolicyAssistantPanel', () => {
       target: { value: 'give me legal advice' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    await waitFor(() =>
-      expect(
-        screen.getByText(/i don't see this in your company's policy\. check with your hr team\./i)
-      ).toBeInTheDocument()
-    );
+    expect(await screen.findByText(/i don't see this in your company's policy\. check with your hr team\./i)).toBeInTheDocument();
     expect(screen.getByText(/no policy answer/i)).toBeInTheDocument();
   });
 });

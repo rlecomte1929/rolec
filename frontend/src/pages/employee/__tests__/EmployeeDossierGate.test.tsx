@@ -64,14 +64,14 @@ describe('EmployeeDossierPage validate-roadmap soft gate', () => {
   it('shows the gate when the roadmap is not validated', async () => {
     mockPlanView.mockResolvedValue({ roadmap_validated: false });
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('form-a')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-a')).toBeInTheDocument();
     expect(screen.getByTestId('validate-roadmap-gate')).toBeInTheDocument();
   });
 
   it('hides the gate when the roadmap is validated', async () => {
     mockPlanView.mockResolvedValue({ roadmap_validated: true });
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('form-a')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-a')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByTestId('validate-roadmap-gate')).not.toBeInTheDocument(),
     );

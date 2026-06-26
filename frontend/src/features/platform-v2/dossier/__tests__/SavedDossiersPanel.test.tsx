@@ -94,14 +94,12 @@ describe('SavedDossiersPanel — empty state', () => {
 
   it('shows empty message when there are no packages', async () => {
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByText(/no saved dossier packages yet/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/no saved dossier packages yet/i)).toBeInTheDocument();
   });
 
   it('does not render the saved-dossiers-panel testid when empty', async () => {
     renderPanel();
-    await waitFor(() => screen.getByText(/no saved dossier packages yet/i));
+    await screen.findByText(/no saved dossier packages yet/i);
     expect(screen.queryByTestId('saved-dossiers-panel')).not.toBeInTheDocument();
   });
 });
@@ -114,17 +112,13 @@ describe('SavedDossiersPanel — error state', () => {
   it('shows error message when API rejects', async () => {
     mockList.mockRejectedValue(new Error('Server error'));
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByText(/server error/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/server error/i)).toBeInTheDocument();
   });
 
   it('shows API detail error when available', async () => {
     mockList.mockRejectedValue({ response: { data: { detail: 'Forbidden' } } });
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByText('Forbidden')).toBeInTheDocument(),
-    );
+    expect(await screen.findByText('Forbidden')).toBeInTheDocument();
   });
 });
 
@@ -139,30 +133,22 @@ describe('SavedDossiersPanel — package rows', () => {
 
   it('renders the panel testid after loading', async () => {
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByTestId('saved-dossiers-panel')).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId('saved-dossiers-panel')).toBeInTheDocument();
   });
 
   it('shows the package name', async () => {
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByText('My Dossier')).toBeInTheDocument(),
-    );
+    expect(await screen.findByText('My Dossier')).toBeInTheDocument();
   });
 
   it('shows form count in metadata line', async () => {
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByText(/2 forms/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/2 forms/i)).toBeInTheDocument();
   });
 
   it('renders download PDF and ZIP links', async () => {
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByTestId('download-pdf-link')).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId('download-pdf-link')).toBeInTheDocument();
     expect(screen.getByTestId('download-zip-link')).toBeInTheDocument();
   });
 
@@ -180,9 +166,7 @@ describe('SavedDossiersPanel — package rows', () => {
 
   it('renders regenerate and delete buttons', async () => {
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByTestId('regenerate-button')).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId('regenerate-button')).toBeInTheDocument();
     expect(screen.getByTestId('delete-button')).toBeInTheDocument();
   });
 
@@ -208,26 +192,20 @@ describe('SavedDossiersPanel — stale badge', () => {
   it('shows stale badge when is_stale=true', async () => {
     mockList.mockResolvedValue([makePackage({ is_stale: true })]);
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByTestId('stale-badge')).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId('stale-badge')).toBeInTheDocument();
   });
 
   it('does not show stale badge when is_stale=false', async () => {
     mockList.mockResolvedValue([makePackage({ is_stale: false })]);
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByTestId('saved-dossier-row')).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId('saved-dossier-row')).toBeInTheDocument();
     expect(screen.queryByTestId('stale-badge')).not.toBeInTheDocument();
   });
 
   it('shows staleness warning banner when is_stale=true', async () => {
     mockList.mockResolvedValue([makePackage({ is_stale: true })]);
     renderPanel();
-    await waitFor(() =>
-      expect(screen.getByText(/form fields were updated/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/form fields were updated/i)).toBeInTheDocument();
   });
 });
 
@@ -254,9 +232,7 @@ describe('SavedDossiersPanel — regenerate', () => {
     renderPanel();
 
     // Stale badge should be present before regenerate
-    await waitFor(() =>
-      expect(screen.getByTestId('stale-badge')).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId('stale-badge')).toBeInTheDocument();
 
     const btn = screen.getByTestId('regenerate-button');
     await act(async () => { fireEvent.click(btn); });

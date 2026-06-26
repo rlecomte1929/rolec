@@ -13,7 +13,6 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
 import { ChangelogBell } from '../ChangelogBell';
 
 const SAMPLE_ENTRIES = [
@@ -35,7 +34,7 @@ function mockChangelogFetch(payload: unknown = SAMPLE_ENTRIES) {
   const fetchMock = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve(payload),
-  } as unknown as Response);
+  });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).fetch = fetchMock;
   return fetchMock;
@@ -91,9 +90,7 @@ describe('ChangelogBell', () => {
   it('shows the unread dot when seen-date is unset and there are entries', async () => {
     mockChangelogFetch();
     render(<ChangelogBell />);
-    await waitFor(() => {
-      expect(screen.getByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
-    });
+    expect(await screen.findByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
   });
 
   it('opens the panel on click, lists entries, and clears the unread dot', async () => {
@@ -101,9 +98,7 @@ describe('ChangelogBell', () => {
     render(<ChangelogBell />);
 
     // Wait for entries to load (unread dot appears).
-    await waitFor(() => {
-      expect(screen.getByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
-    });
+    expect(await screen.findByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /what'?s new/i }));
 
@@ -120,9 +115,7 @@ describe('ChangelogBell', () => {
     mockChangelogFetch();
     render(<ChangelogBell />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
-    });
+    expect(await screen.findByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /what'?s new/i }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -138,8 +131,6 @@ describe('ChangelogBell', () => {
     render(<ChangelogBell />);
 
     fireEvent.click(screen.getByRole('button', { name: /what'?s new/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/no updates yet/i)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/no updates yet/i)).toBeInTheDocument();
   });
 });

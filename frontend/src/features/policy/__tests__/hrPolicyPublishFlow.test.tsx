@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { mockPolicyReviewPayload, mockPolicyState } from './hrPolicyTestUtils';
 import { PublishPreflightModal } from '../PublishPreflightModal';
 import { HrPolicyReviewWorkspace } from '../HrPolicyReviewWorkspace';
+import { mockPolicyReviewPayload, mockPolicyState } from './hrPolicyTestUtils';
 
 /** Avoid importing real `client.ts` (pulls Supabase) — stub only what `HrPolicyReviewWorkspace` needs. */
 const policyClientMocks = vi.hoisted(() => ({
@@ -171,7 +171,7 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
 
-    await waitFor(() => expect(screen.getByTestId('hr-policy-replacement-warning')).toBeInTheDocument());
+    expect(await screen.findByTestId('hr-policy-replacement-warning')).toBeInTheDocument();
     await waitFor(() => {
       const b = screen.getByRole('button', { name: /^publish version$/i });
       expect(b).not.toBeDisabled();
@@ -189,7 +189,7 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /publish policy/i })).toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: /publish policy/i })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: /publish policy/i })).toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: /publish policy/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

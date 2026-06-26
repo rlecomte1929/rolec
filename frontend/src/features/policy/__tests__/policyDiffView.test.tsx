@@ -30,7 +30,7 @@ function diffPayload(overrides: Record<string, unknown> = {}) {
       changed: [],
       unchanged_count: 6,
       summary: { added: 0, removed: 0, changed: 0, unchanged: 6 },
-      ...(overrides as Record<string, unknown>),
+      ...(overrides),
     },
   };
 }
@@ -116,9 +116,7 @@ describe('PolicyDiffView', () => {
       undefined
     );
     // After revert succeeds, the clean-state message replaces the changed row.
-    await waitFor(() =>
-      expect(screen.getByText(/Your draft matches the live version/i)).toBeInTheDocument()
-    );
+    expect(await screen.findByText(/Your draft matches the live version/i)).toBeInTheDocument();
   });
 
   it('surfaces an API error inline', async () => {

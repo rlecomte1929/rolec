@@ -96,7 +96,7 @@ describe('EmployeeDossierPage roadmap-step filter', () => {
   it('scopes the list to the roadmap step and shows the banner', async () => {
     renderAt('?roadmap_step=step-1');
 
-    await waitFor(() => expect(screen.getByTestId('form-a')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-a')).toBeInTheDocument();
     expect(screen.getByTestId('form-b')).toBeInTheDocument();
     // forms from other steps / unlinked are excluded
     expect(screen.queryByTestId('form-c')).not.toBeInTheDocument();
@@ -107,10 +107,10 @@ describe('EmployeeDossierPage roadmap-step filter', () => {
   it('clears the filter and shows all forms when "Clear filter" is clicked', async () => {
     renderAt('?roadmap_step=step-1');
 
-    await waitFor(() => expect(screen.getByTestId('form-a')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-a')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Clear filter'));
 
-    await waitFor(() => expect(screen.getByTestId('form-c')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-c')).toBeInTheDocument();
     expect(screen.getByTestId('form-d')).toBeInTheDocument();
     expect(screen.queryByTestId('roadmap-step-filter-banner')).not.toBeInTheDocument();
   });
@@ -118,7 +118,7 @@ describe('EmployeeDossierPage roadmap-step filter', () => {
   it('shows no banner and all forms when no param is present', async () => {
     renderAt('');
 
-    await waitFor(() => expect(screen.getByTestId('form-a')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-a')).toBeInTheDocument();
     expect(screen.getByTestId('form-c')).toBeInTheDocument();
     expect(screen.getByTestId('form-d')).toBeInTheDocument();
     expect(screen.queryByTestId('roadmap-step-filter-banner')).not.toBeInTheDocument();
