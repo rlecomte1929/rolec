@@ -6,6 +6,18 @@ import { adminAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
 
+type IngestResultRow = { url: string; status: string; facts_created?: number; error?: string };
+type IngestResults = { succeeded?: number; attempted?: number; results?: IngestResultRow[] };
+type ResearchHealth = {
+  db_provider?: string;
+  knowledge_docs?: number;
+  knowledge_rules?: number;
+  knowledge_packs?: number;
+  ingest_jobs_24h?: number;
+  last_job?: { status?: string; error?: string } | null;
+};
+
+
 type Candidate = {
   id: string;
   destination_country: string;
@@ -71,7 +83,7 @@ export const AdminResearch: React.FC = () => {
   const [batchUrls, setBatchUrls] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [ingestResults, setIngestResults] = useState<any>(null);
+  const [ingestResults, setIngestResults] = useState<IngestResults | null>(null);
   const [activeDoc, setActiveDoc] = useState<KnowledgeDoc | null>(null);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
 
@@ -79,8 +91,8 @@ export const AdminResearch: React.FC = () => {
     queryKey: ['admin', 'research-candidates-docs', destination],
     queryFn: async (): Promise<{ candidates: Candidate[]; docs: KnowledgeDoc[]; fallback: boolean }> => {
       const [candRes, docRes] = await Promise.all([
-        adminAPI.listResearchCandidates({ destination_country: destination, status: 'pending' }),
-        adminAPI.listKnowledgeDocs({ destination_country: destination }),
+        adminAPI.listResearchCandidates({ destination_country: destination, status: 'pending' }) as Promise<{ candidates?: Candidate[] }>,
+        adminAPI.listKnowledgeDocs({ destination_country: destination }) as Promise<{ docs?: KnowledgeDoc[]; fallback?: boolean }>,
       ]);
       return { candidates: candRes.candidates || [], docs: docRes.docs || [], fallback: Boolean(docRes.fallback) };
     },
@@ -92,7 +104,7 @@ export const AdminResearch: React.FC = () => {
   const entitiesQuery = useQuery({
     queryKey: ['admin', 'requirement-entities', destination],
     queryFn: async (): Promise<RequirementEntity[]> => {
-      const entRes = await adminAPI.listRequirementEntities({ destination, status: 'pending' });
+      const entRes = (await adminAPI.listRequirementEntities({ destination, status: 'pending' })) as { entities?: RequirementEntity[] };
       return entRes.entities || [];
     },
     enabled: isAdmin,
@@ -102,7 +114,7 @@ export const AdminResearch: React.FC = () => {
   const criteriaQuery = useQuery({
     queryKey: ['admin', 'requirement-criteria', destination],
     queryFn: async (): Promise<RequirementFact[]> => {
-      const critRes = await adminAPI.listRequirementCriteria({ destination, status: 'pending' });
+      const critRes = (await adminAPI.listRequirementCriteria({ destination, status: 'pending' })) as { facts?: RequirementFact[] };
       return critRes.facts || [];
     },
     enabled: isAdmin,
@@ -114,12 +126,12 @@ export const AdminResearch: React.FC = () => {
     queryFn: () => adminAPI.researchHealth({ destination }),
     enabled: isAdmin,
   });
-  const health: any = healthQuery.data ?? null;
+  const health = (healthQuery.data ?? null) as ResearchHealth | null;
 
   const factsQuery = useQuery({
     queryKey: ['admin', 'requirement-facts', activeEntityId],
     queryFn: async (): Promise<RequirementFact[]> => {
-      const res = await adminAPI.listRequirementFacts(activeEntityId!, { status: 'pending' });
+      const res = (await adminAPI.listRequirementFacts(activeEntityId!, { status: 'pending' })) as { facts?: RequirementFact[] };
       return res.facts || [];
     },
     enabled: isAdmin && !!activeEntityId,
@@ -214,7 +226,7 @@ export const AdminResearch: React.FC = () => {
                     setLoading(true);
                     setMessage('');
                     try {
-                      const res = await adminAPI.approveResearchCandidate(c.id, { domain_area: domainArea });
+                      const res = (await adminAPI.approveResearchCandidate(c.id, { domain_area: domainArea })) as { fetch_status?: string };
                       setMessage(`Approved and ingested: ${res.fetch_status}`);
                       await refresh();
                     } finally {
@@ -259,7 +271,7 @@ export const AdminResearch: React.FC = () => {
               setMessage('');
               setIngestResults(null);
               try {
-                const res = await adminAPI.ingestUrl({ url: manualUrl, destination_country: destination, domain_area: domainArea });
+                const res = (await adminAPI.ingestUrl({ url: manualUrl, destination_country: destination, domain_area: domainArea })) as IngestResults;
                 setMessage(`Ingested ${res.succeeded}/${res.attempted} URL(s).`);
                 setIngestResults(res);
                 setManualUrl('');
@@ -291,7 +303,7 @@ https://www.uscis.gov/..."
                 setMessage('');
                 setIngestResults(null);
                 try {
-                  const res = await adminAPI.ingestBatch({ urls, destination_country: destination, domain_area: domainArea });
+                  const res = (await adminAPI.ingestBatch({ urls, destination_country: destination, domain_area: domainArea })) as IngestResults;
                   setMessage(`Batch ingested ${res.succeeded}/${res.attempted} URL(s).`);
                   setIngestResults(res);
                   setBatchUrls('');
@@ -315,10 +327,10 @@ https://www.uscis.gov/..."
               setIngestResults(null);
               try {
                 const items = CORE_URL_SETS[destination] || [];
-                const res = await adminAPI.ingestBatch({
+                const res = (await adminAPI.ingestBatch({
                   urls: items,
                   destination_country: destination,
-                });
+                })) as IngestResults;
                 setMessage(`Core set ingested for ${destination}: ${res.succeeded}/${res.attempted}.`);
                 setIngestResults(res);
                 await refresh();
@@ -330,20 +342,20 @@ https://www.uscis.gov/..."
           >
             Ingest core set
           </Button>
-          {ingestResults?.results?.some((r: any) => r.status !== 'fetched') && (
+          {ingestResults?.results?.some((r) => r.status !== 'fetched') && (
             <Button
               variant="outline"
               onClick={async () => {
-                const failed = ingestResults.results.filter((r: any) => r.status !== 'fetched').map((r: any) => r.url);
+                const failed = (ingestResults.results ?? []).filter((r) => r.status !== 'fetched').map((r) => r.url);
                 if (!failed.length) return;
                 setLoading(true);
                 setMessage('');
                 try {
-                  const res = await adminAPI.ingestBatch({
+                  const res = (await adminAPI.ingestBatch({
                     urls: failed,
                     destination_country: destination,
                     domain_area: domainArea,
-                  });
+                  })) as IngestResults;
                   setMessage(`Retry completed: ${res.succeeded}/${res.attempted}.`);
                   setIngestResults(res);
                   await refresh();
@@ -359,7 +371,7 @@ https://www.uscis.gov/..."
         </div>
         {ingestResults?.results?.length ? (
           <div className="mt-3 text-xs text-[#6b7280]">
-            {ingestResults.results.map((r: any, idx: number) => (
+            {(ingestResults.results ?? []).map((r, idx: number) => (
               <div key={`${r.url}-${idx}`}>
                 {r.status === 'fetched' ? '✅' : '⚠️'} {r.url}
                 {typeof r.facts_created === 'number' ? ` · facts: ${r.facts_created}` : ''}
