@@ -29,6 +29,12 @@ export type HrPolicyDraftReviewPanelProps = {
   reviewLoading?: boolean;
 };
 
+type GroupedPolicyItem = { title?: string; summary?: string; source_ref?: string; canonical_key?: string; business_display?: string; grouped_item_id?: string; merged_draft_candidate_count?: number; [key: string]: unknown };
+type ClauseCandidate = { clause_id?: string; confidence?: number; intent_category?: string; raw_text_preview?: string; service_match_candidate_benefit_key?: string; [key: string]: unknown };
+type MissingStructureItem = { field?: string; issue?: string; [key: string]: unknown };
+type EntitlementPreviewRow = { benefit_key?: string; benefit_rule_id?: string; [key: string]: unknown };
+type DraftRuleCandidate = { candidate_category?: string; candidate_service_key?: string; clause_id?: string; confidence?: number; publishability_assessment?: string; source_excerpt?: string; [key: string]: unknown };
+
 function pickReadiness(review: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!review?.readiness || typeof review.readiness !== 'object') return null;
   return review.readiness as Record<string, unknown>;
@@ -47,7 +53,7 @@ function bannerToneClasses(tone: 'neutral' | 'warning' | 'success' | 'danger'): 
   }
 }
 
-function TraceAmount(line: Record<string, unknown> | null | undefined): string {
+function TraceAmount(line: { amount_value?: string | number; currency?: string; amount_unit?: string } | null | undefined): string {
   if (!line) return '—';
   const v = line.amount_value;
   const c = line.currency;
@@ -81,7 +87,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
     [employeeSeesPublished, comparisonReadinessStatus, comparisonReadyStrict]
   );
 
-  const sourceDoc = (policyReview?.source_document || null) as Record<string, unknown> | null;
+  const sourceDoc = (policyReview?.source_document || null) as { filename?: string; [key: string]: unknown } | null;
   const detected = (policyReview?.detected_classification || null) as Record<string, unknown> | null;
   const layer1 = (sourceDoc?.layer1 as Record<string, unknown> | undefined)?.classification as
     | Record<string, unknown>
@@ -97,19 +103,19 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
       : undefined;
   const processing = detected?.processing_status ?? sourceDoc?.processing_status ?? normDraftMeta?.processing_status;
 
-  const clauseCandidates = useMemo(() => {
+  const clauseCandidates = useMemo<ClauseCandidate[]>(() => {
     const raw = policyReview?.clause_candidates;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+    return Array.isArray(raw) ? (raw as ClauseCandidate[]) : [];
   }, [policyReview?.clause_candidates]);
 
-  const draftRuleCandidates = useMemo(() => {
+  const draftRuleCandidates = useMemo<DraftRuleCandidate[]>(() => {
     const raw = policyReview?.draft_rule_candidates;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+    return Array.isArray(raw) ? (raw as DraftRuleCandidate[]) : [];
   }, [policyReview?.draft_rule_candidates]);
 
-  const groupedPolicyItems = useMemo(() => {
+  const groupedPolicyItems = useMemo<GroupedPolicyItem[]>(() => {
     const raw = policyReview?.grouped_policy_items;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+    return Array.isArray(raw) ? (raw as GroupedPolicyItem[]) : [];
   }, [policyReview?.grouped_policy_items]);
 
   const comparisonSubrules = useMemo(() => {
@@ -122,14 +128,14 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
     return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
   }, [policyReview?.issues]);
 
-  const missingStructure = useMemo(() => {
+  const missingStructure = useMemo<MissingStructureItem[]>(() => {
     const raw = policyReview?.missing_structure;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+    return Array.isArray(raw) ? (raw as MissingStructureItem[]) : [];
   }, [policyReview?.missing_structure]);
 
-  const entitlementPreview = useMemo(() => {
+  const entitlementPreview = useMemo<EntitlementPreviewRow[]>(() => {
     const raw = policyReview?.entitlement_effective_preview;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+    return Array.isArray(raw) ? (raw as EntitlementPreviewRow[]) : [];
   }, [policyReview?.entitlement_effective_preview]);
 
   const supportId =
@@ -475,7 +481,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
                         Your adjustment:{' '}
                         <span className="text-[#111827]">
                           {hrOv.amount_value_override != null
-                            ? TraceAmount({ amount_value: hrOv.amount_value_override, currency: hrOv.currency_override, amount_unit: hrOv.amount_unit_override })
+                            ? TraceAmount({ amount_value: hrOv.amount_value_override as string | number | undefined, currency: hrOv.currency_override as string | undefined, amount_unit: hrOv.amount_unit_override as string | undefined })
                             : 'Applied (see benefit table for detail)'}
                         </span>
                       </div>
