@@ -215,7 +215,10 @@ function DetailPanel({ company, onClose }: DetailPanelProps) {
       <div
         className="fixed inset-0 z-30 bg-slate-900/30"
         onClick={onClose}
-        aria-hidden
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        role="button"
+        tabIndex={-1}
+        aria-label="Close company detail"
       />
       <aside
         role="dialog"
@@ -668,6 +671,9 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                   <tr
                     key={c.id}
                     onClick={() => openCompanyDetail(c)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCompanyDetail(c); } }}
+                    role="button"
+                    tabIndex={0}
                     className={`cursor-pointer hover:bg-slate-50 ${
                       activeId === c.id ? 'bg-accent-50' : ''
                     }`}
