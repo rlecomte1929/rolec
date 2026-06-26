@@ -1,24 +1,29 @@
 /**
  * Navigation ribbon for Services flow - allows users to jump between sections.
+ *
+ * AIQ-1249c: step links are built via useServicesScope().linkTo so they are
+ * case-id-native (/employee/case/:caseId/services/...) when a case is known, and
+ * fall back to the legacy /services/... + ?assignment= form otherwise.
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { buildRoute } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
+import { useServicesScope } from './useServicesScope';
+import type { ServicesStep } from './servicesRoutes';
 
-const ALL_STEPS = [
-  { key: 'services', path: '/services', label: 'Select services' },
-  { key: 'questions', path: '/services/questions', label: 'Preferences' },
-  { key: 'recommendations', path: '/services/recommendations', label: 'Recommendations' },
-  { key: 'estimate', path: '/services/estimate', label: 'Review & budget' },
-  { key: 'rfq', path: '/services/rfq/new', label: 'Request quotes' },
-] as const;
+const ALL_STEPS: Array<{ key: ServicesStep; label: string }> = [
+  { key: 'services', label: 'Select services' },
+  { key: 'questions', label: 'Preferences' },
+  { key: 'recommendations', label: 'Recommendations' },
+  { key: 'estimate', label: 'Review & budget' },
+  { key: 'rfqNew', label: 'Request quotes' },
+];
 
 export const ServicesNavRibbon: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
-  const qs = location.search || '';
-  const STEPS = isRfqEnabled() ? ALL_STEPS : ALL_STEPS.filter((s) => s.key !== 'rfq');
+  const { linkTo } = useServicesScope();
+  const STEPS = isRfqEnabled() ? ALL_STEPS : ALL_STEPS.filter((s) => s.key !== 'rfqNew');
 
   return (
     <nav
@@ -26,11 +31,11 @@ export const ServicesNavRibbon: React.FC = () => {
       aria-label="Services flow navigation"
     >
       {STEPS.map((step, idx) => {
+        const to = linkTo(step.key);
+        const path = to.split('?')[0];
         const isActive =
-          step.path === currentPath ||
-          (step.path !== '/services' && currentPath.startsWith(step.path));
-        const isServices = step.key === 'services';
-        const path = (isServices ? buildRoute('services') : step.path) + qs;
+          currentPath === path ||
+          (step.key !== 'services' && currentPath.startsWith(`${path}/`));
 
         return (
           <React.Fragment key={step.key}>
@@ -40,7 +45,7 @@ export const ServicesNavRibbon: React.FC = () => {
               </span>
             )}
             <Link
-              to={path}
+              to={to}
               className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
                 isActive
                   ? 'bg-[#0b2b43] text-white'

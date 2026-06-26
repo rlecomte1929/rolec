@@ -8,6 +8,7 @@ import { Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import type { EffectiveServiceComparisonRow, PolicyServiceComparisonItem } from '../../types';
 import { buildRoute } from '../../navigation/routes';
+import { withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 import { getAuthItem } from '../../utils/demo';
 import { formatBenefitLabel } from './benefitCategories';
 import {
@@ -361,7 +362,7 @@ export const EmployeePolicyPanel: React.FC<{
       <div className="space-y-4">
         <MaturityBanner maturity="no_policy" />
         <div>
-          <Link to={buildRoute('services')}>
+          <Link to={assignmentId ? withAssignmentQuery(buildRoute('services'), assignmentId) : buildRoute('services')}>
             <Button variant="outline">Back to Services</Button>
           </Link>
         </div>
@@ -393,7 +394,7 @@ export const EmployeePolicyPanel: React.FC<{
       <MaturityBanner maturity={maturity} />
 
       <div>
-        <Link to={buildRoute('services')}>
+        <Link to={assignmentId ? withAssignmentQuery(buildRoute('services'), assignmentId) : buildRoute('services')}>
           <Button variant="outline">Back to Services</Button>
         </Link>
       </div>

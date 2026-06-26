@@ -7,7 +7,8 @@ import { rfqAPI } from '../../api/client';
 import type { RfqSummary } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { buildRoute } from '../../navigation/routes';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
+import { parseAssignmentSearchParam, resolveCaseIdForAssignmentId, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { servicesStepPath } from '../../features/services/servicesRoutes';
 import { statusLabel } from '../../lib/statusLabel';
 
 export const QuotesInbox: React.FC = () => {
@@ -27,6 +28,12 @@ export const QuotesInbox: React.FC = () => {
         queryAssignmentId,
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
+  // AIQ-1249c: case-id-native services links where the case resolves; falls back
+  // to legacy /services/... + ?assignment=.
+  const caseId = useMemo(
+    () => resolveCaseIdForAssignmentId(linkedSummaries, assignmentId),
+    [linkedSummaries, assignmentId]
   );
   const [rfqs, setRfqs] = useState<RfqSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,7 +122,7 @@ export const QuotesInbox: React.FC = () => {
             <p className="text-sm text-[#6b7280]">
               No RFQs yet. Create one from the services flow after shortlisting vendors.
             </p>
-            <Button onClick={() => navigate(withAssignmentQuery(buildRoute('servicesRfqNew'), assignmentId))}>
+            <Button onClick={() => navigate(servicesStepPath('rfqNew', { caseId, assignmentId }))}>
               Create RFQ
             </Button>
           </div>

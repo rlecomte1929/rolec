@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import {
   Search,
   ChevronsUpDown,
@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
-import { buildRoute, type RouteKey } from '../../../navigation/routes';
+import { buildRoute, ROUTE_DEFS, type RouteKey } from '../../../navigation/routes';
+import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { NAV_ICONS } from './navIcons';
 
 const COLLAPSE_KEY = 'platform_sidebar_collapsed';
@@ -134,7 +135,25 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
     }
   }, [collapsed]);
 
-  const resolvedSections = useMemo(() => sections ?? defaultSections(), [sections]);
+  // AIQ-1249c: case-scope the employee "Services" link when a case resolves
+  // (URL case first, then the employee's primary linked case), mirroring the
+  // live PlatformShellSidebar. Falls back to the legacy /services route, which
+  // itself redirects to the case-scoped URL once a case resolves.
+  const { caseId: urlCaseId } = useParams();
+  const { primaryCaseId } = useEmployeeAssignment();
+  const effectiveCaseId = (urlCaseId || '').trim() || primaryCaseId;
+  const resolvedSections = useMemo(() => {
+    const base = sections ?? defaultSections();
+    if (!effectiveCaseId) return base;
+    return base.map((section) => ({
+      ...section,
+      items: section.items.map((item) =>
+        item.id === 'service-providers' && item.to === ROUTE_DEFS.services.path
+          ? { ...item, to: buildRoute('employeeCaseServices', { caseId: effectiveCaseId }) }
+          : item,
+      ),
+    }));
+  }, [sections, effectiveCaseId]);
 
   const isActive = (to: string) => {
     if (!to || to === '#') return false;

@@ -665,7 +665,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
             {isSaving || dossierSaving ? 'Saving...' : 'Save & Exit'}
           </Button>
           <Button
-            onClick={() => handleSave(buildRoute('services'))}
+            onClick={() => handleSave(buildRoute('employeeCaseServices', { caseId }))}
             disabled={isSaving || dossierSaving || !consented}
           >
             {isSaving || dossierSaving ? 'Saving...' : 'Save & go to Services'}

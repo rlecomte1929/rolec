@@ -102,7 +102,10 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
             navigate(
               caseId ? buildRoute('employeeCaseIntake', { caseId }) : buildRoute('employeeIntake'),
             );
-          if (key === 'services') navigate(buildRoute('services'));
+          if (key === 'services')
+            navigate(
+              caseId ? buildRoute('employeeCaseServices', { caseId }) : buildRoute('services'),
+            );
         }}
       />
     </div>

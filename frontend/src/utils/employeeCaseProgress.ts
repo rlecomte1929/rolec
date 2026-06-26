@@ -14,8 +14,11 @@
  * column with the same public API.
  *
  * Routes we track: any /employee/case/<id>/<segment> URL the user
- * actively works in (summary, wizard/N, plan). Services routes are
- * separately tracked because they live under /services/ not /employee/.
+ * actively works in (summary, wizard/N, plan). As of AIQ-1249 the services
+ * flow is also case-id-native (/employee/case/<id>/services/...), so its
+ * last-visited entries are stored in the same case-scoped form — still keyed
+ * by assignmentId. The legacy /services/... URLs remain valid as redirecting
+ * back-compat aliases.
  */
 
 const STORAGE_PREFIX = 'relopass_last_visited_';

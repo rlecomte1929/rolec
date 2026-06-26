@@ -317,6 +317,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     if (item.id === 'detailed-intake' && effectiveCaseId) {
       return buildRoute('employeeCaseIntake', { caseId: effectiveCaseId });
     }
+    // AIQ-1249c: case-scope the employee "Services" link (NAV-EMP-2). Guard on
+    // item.to so the HR 'service-providers' item (→ hrServiceProviders) is untouched.
+    if (item.id === 'service-providers' && item.to === ROUTE_DEFS.services.path && effectiveCaseId) {
+      return buildRoute('employeeCaseServices', { caseId: effectiveCaseId });
+    }
     return item.toByRole?.[role] ?? item.to;
   };
 
