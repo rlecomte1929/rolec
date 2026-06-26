@@ -244,16 +244,8 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         <Card padding="lg" className="mb-6">
           <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Suggested for you</h2>
           <div className="space-y-4">
-            {recommended.recommendedForYou?.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-[#64748b] mb-2">Top picks</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                  {recommended.recommendedForYou.slice(0, 5).map((r) => (
-                    <ResourceCard key={r.id} resource={r} />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* M-07a (AIQ-1265): the "Top picks" section duplicated the same items as
+                "First steps" below — removed it; First steps is the canonical list. */}
             {recommended.firstSteps?.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium text-[#64748b] mb-2">First steps</h3>
