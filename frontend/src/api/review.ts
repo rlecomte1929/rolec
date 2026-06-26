@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const FALLBACK_ACCESS_TOKEN = import.meta.env.VITE_SUPABASE_ACCESS_TOKEN;
+const FALLBACK_ACCESS_TOKEN = import.meta.env.VITE_SUPABASE_ACCESS_TOKEN as string | undefined;
 
 const isJwt = (v?: string | null) => typeof v === 'string' && v.split('.').length === 3;
 
@@ -33,6 +33,51 @@ async function fetchWithAuth(path: string, opts?: RequestInit) {
   return res;
 }
 
+/** Decoded Supabase JWT claims we read (the `sub` is the auth user id). */
+interface JwtClaims {
+  sub?: string;
+}
+
+/** The wizard-case `draft_json` blob, narrowed to the fields these reviews read. */
+interface WizardDraftBasics {
+  originCity?: string;
+  originCountry?: string;
+  destCity?: string;
+  destCountry?: string;
+  targetMoveDate?: string;
+}
+interface WizardDraft {
+  relocationBasics?: WizardDraftBasics;
+  employeeProfile?: { fullName?: string };
+  [key: string]: unknown;
+}
+
+/** A `wizard_cases` row as selected by getWizardCaseForReview (`select=*`). */
+interface WizardCaseRow {
+  draft_json?: string | null;
+  origin_country?: string | null;
+  origin_city?: string | null;
+  dest_country?: string | null;
+  dest_city?: string | null;
+  target_move_date?: string | null;
+}
+
+const errMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error ? err.message : fallback;
+
+const decodeUid = (token: string): string => {
+  const decoded = JSON.parse(atob(token.split('.')[1] ?? '')) as JwtClaims;
+  return decoded.sub ?? '';
+};
+
+const parseDraft = (raw?: string | null): WizardDraft => {
+  try {
+    return JSON.parse(raw || '{}') as WizardDraft;
+  } catch {
+    return {};
+  }
+};
+
 export interface AssignedCaseForReview {
   id: string;
   case_id: string;
@@ -53,8 +98,7 @@ export async function listAssignedCasesForReview(): Promise<{
     if (!token) {
       return { data: null, error: 'Not authenticated' };
     }
-    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
-    const uid = decoded.sub;
+    const uid = decodeUid(token);
 
     const path = `/rest/v1/case_assignments?hr_user_id=eq.${encodeURIComponent(uid)}&select=id,case_id,updated_at`;
     const res = await fetchWithAuth(path);
@@ -94,19 +138,13 @@ export async function listAssignedCasesForReview(): Promise<{
       let destination = '-';
       let targetMoveDate: string | null = null;
       if (wc) {
-        try {
-          const draft = JSON.parse(wc.draft_json || '{}');
-          const basics = draft?.relocationBasics || {};
-          const prof = draft?.employeeProfile || {};
-          caseName = prof?.fullName || basics?.originCountry || caseName;
-          origin = [basics?.originCity, basics?.originCountry].filter(Boolean).join(', ') || [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '-';
-          destination = [basics?.destCity, basics?.destCountry].filter(Boolean).join(', ') || [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '-';
-          targetMoveDate = basics?.targetMoveDate || wc.target_move_date || null;
-        } catch {
-          origin = [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '-';
-          destination = [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '-';
-          targetMoveDate = wc.target_move_date;
-        }
+        const draft = parseDraft(wc.draft_json);
+        const basics = draft.relocationBasics || {};
+        const prof = draft.employeeProfile || {};
+        caseName = prof.fullName || basics.originCountry || caseName;
+        origin = [basics.originCity, basics.originCountry].filter(Boolean).join(', ') || [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '-';
+        destination = [basics.destCity, basics.destCountry].filter(Boolean).join(', ') || [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '-';
+        targetMoveDate = basics.targetMoveDate || wc.target_move_date || null;
       }
       return {
         id: a.id,
@@ -121,14 +159,14 @@ export async function listAssignedCasesForReview(): Promise<{
 
     result.sort((a, b) => (b.lastUpdated || '').localeCompare(a.lastUpdated || ''));
     return { data: result, error: null };
-  } catch (err: any) {
-    return { data: null, error: err?.message || 'Failed to load assigned cases' };
+  } catch (err) {
+    return { data: null, error: errMessage(err, 'Failed to load assigned cases') };
   }
 }
 
 /** Get a single wizard case by id (for read-only summary) */
 export async function getWizardCaseForReview(caseId: string): Promise<{
-  data: { draft: any; origin?: string; dest?: string; targetDate?: string } | null;
+  data: { draft: WizardDraft; origin?: string; dest?: string; targetDate?: string } | null;
   error: string | null;
 }> {
   try {
@@ -137,24 +175,19 @@ export async function getWizardCaseForReview(caseId: string): Promise<{
     if (!res.ok) {
       return { data: null, error: 'Case not found' };
     }
-    const rows = (await res.json()) as any[];
+    const rows = (await res.json()) as WizardCaseRow[];
     const row = rows?.[0];
     if (!row) return { data: null, error: 'Case not found' };
 
-    let draft: any = {};
-    try {
-      draft = JSON.parse(row.draft_json || '{}');
-    } catch {
-      // keep {}
-    }
-    const basics = draft?.relocationBasics || {};
-    const origin = [basics?.originCity, basics?.originCountry].filter(Boolean).join(', ') || [row.origin_city, row.origin_country].filter(Boolean).join(', ') || undefined;
-    const dest = [basics?.destCity, basics?.destCountry].filter(Boolean).join(', ') || [row.dest_city, row.dest_country].filter(Boolean).join(', ') || undefined;
-    const targetDate = basics?.targetMoveDate || row.target_move_date;
+    const draft = parseDraft(row.draft_json);
+    const basics = draft.relocationBasics || {};
+    const origin = [basics.originCity, basics.originCountry].filter(Boolean).join(', ') || [row.origin_city, row.origin_country].filter(Boolean).join(', ') || undefined;
+    const dest = [basics.destCity, basics.destCountry].filter(Boolean).join(', ') || [row.dest_city, row.dest_country].filter(Boolean).join(', ') || undefined;
+    const targetDate = basics.targetMoveDate || row.target_move_date || undefined;
 
     return { data: { draft, origin, dest, targetDate }, error: null };
-  } catch (err: any) {
-    return { data: null, error: err?.message || 'Failed to load case' };
+  } catch (err) {
+    return { data: null, error: errMessage(err, 'Failed to load case') };
   }
 }
 
@@ -163,16 +196,15 @@ export async function getEmployeeAssignmentId(idOrCaseId: string): Promise<{ ass
   try {
     const token = await getAccessToken();
     if (!token) return { assignmentId: null, error: 'Not authenticated' };
-    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
-    const uid = decoded.sub;
+    const uid = decodeUid(token);
 
     const path = `/rest/v1/case_assignments?employee_user_id=eq.${encodeURIComponent(uid)}&or=(id.eq.${encodeURIComponent(idOrCaseId)},case_id.eq.${encodeURIComponent(idOrCaseId)})&select=id&limit=1`;
     const res = await fetchWithAuth(path);
     if (!res.ok) return { assignmentId: null, error: 'Not authorized' };
     const rows = (await res.json()) as { id: string }[];
     return { assignmentId: rows?.[0]?.id ?? null, error: null };
-  } catch (err: any) {
-    return { assignmentId: null, error: err?.message || 'Failed' };
+  } catch (err) {
+    return { assignmentId: null, error: errMessage(err, 'Failed') };
   }
 }
 
@@ -181,15 +213,14 @@ export async function getAssignmentIdForCase(caseId: string): Promise<{ assignme
   try {
     const token = await getAccessToken();
     if (!token) return { assignmentId: null, error: 'Not authenticated' };
-    const decoded = JSON.parse(atob(token.split('.')[1] ?? ''));
-    const uid = decoded.sub;
+    const uid = decodeUid(token);
 
     const path = `/rest/v1/case_assignments?case_id=eq.${encodeURIComponent(caseId)}&hr_user_id=eq.${encodeURIComponent(uid)}&select=id&limit=1`;
     const res = await fetchWithAuth(path);
     if (!res.ok) return { assignmentId: null, error: 'Not authorized' };
     const rows = (await res.json()) as { id: string }[];
     return { assignmentId: rows?.[0]?.id ?? null, error: null };
-  } catch (err: any) {
-    return { assignmentId: null, error: err?.message || 'Failed' };
+  } catch (err) {
+    return { assignmentId: null, error: errMessage(err, 'Failed') };
   }
 }
