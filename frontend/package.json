@@ -48,6 +48,7 @@
     "@axe-core/playwright": "^4.12.1",
     "@commitlint/cli": "^21.1.0",
     "@commitlint/config-conventional": "^21.1.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.61.1",
     "@size-limit/file": "^12.1.0",
     "@testing-library/jest-dom": "^6.6.3",
