@@ -13,9 +13,12 @@ import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyA
 import { PolicyAssistantDockedShell } from '../features/policy/PolicyAssistantDockedShell';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
+import { HrPolicyAssistantPanel } from '../features/policy/HrPolicyAssistantPanel';
+import { HrNoCompanyOnboarding, httpStatusOf } from '../features/policy/hrNoCompanyOnboarding';
 import { PolicyBenefitsSummary } from '../features/policy/PolicyBenefitsSummary';
 import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/HrPolicyBuilderV2Page';
 import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
+import { policyConfigMatrixAPI } from '../api/client';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -67,8 +70,8 @@ export const HrPolicy: React.FC = () => {
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
   // the /hr/settings/policy redirect lands on the correct tab.
-  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions';
-  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions') => {
+  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa';
+  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa') => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab);
     setSearchParams(next, { replace: true });
@@ -152,12 +155,15 @@ export const HrPolicy: React.FC = () => {
           <PolicyTabButton active={activeTab === 'exceptions'} onClick={() => setTab('exceptions')}>
             Exceptions
           </PolicyTabButton>
+          <PolicyTabButton active={activeTab === 'qa'} onClick={() => setTab('qa')}>
+            Policy Q&amp;A
+          </PolicyTabButton>
         </div>
       )}
 
       {/* Guided next-step CTA — points HR to the natural next action per tab.
           Does not alter the tab content below. (NAV-POL-1) */}
-      {!adminCompanyId && activeTab !== 'exceptions' && (
+      {!adminCompanyId && activeTab !== 'exceptions' && activeTab !== 'qa' && (
         <PolicyNextStepCta
           activeTab={activeTab}
           setTab={setTab}
@@ -178,6 +184,8 @@ export const HrPolicy: React.FC = () => {
           ? <PolicyBenefitsSummary />
           : (!adminCompanyId && activeTab === 'exceptions')
           ? <HrExceptionsPage embedded />
+          : (!adminCompanyId && activeTab === 'qa')
+          ? <HrPolicyQaTab />
           : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
         }
       </div>
@@ -211,6 +219,59 @@ function PolicyTabButton({
 }
 
 /**
+ * Policy Q&A tab (AIQ-1238). Surfaces the existing company-scoped Policy
+ * Assistant RAG as a first-class, full-width tab — "chat with your relocation
+ * policy". The assistant itself (HrPolicyAssistantPanel) and its backend
+ * (/api/policy-assistant/rag-query, grounded in policy_assistant_chunks) are
+ * reused as-is; this wrapper only resolves whether the company has a published
+ * policy to query (the panel's ask box gates on `hasQueryablePolicy`) and
+ * reuses the same no-company onboarding state as HrPolicyPageV2.
+ */
+function HrPolicyQaTab() {
+  const [state, setState] = useState<{
+    loading: boolean;
+    noCompany: boolean;
+    hasLivePolicy: boolean;
+  }>({ loading: true, noCompany: false, hasLivePolicy: false });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const payload = await policyConfigMatrixAPI.hrGet();
+        if (cancelled) return;
+        const status = String((payload as { status?: unknown })?.status ?? '').toLowerCase();
+        const hasLivePolicy = status === 'published' || Boolean((payload as { policy_version?: unknown })?.policy_version);
+        setState({ loading: false, noCompany: false, hasLivePolicy });
+      } catch (err) {
+        if (cancelled) return;
+        // 403 → HR account not linked to a company yet → onboarding state,
+        // matching HrPolicyPageV2's [T2.4] classification.
+        setState({ loading: false, noCompany: httpStatusOf(err) === 403, hasLivePolicy: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (state.loading) {
+    return (
+      <Card padding="lg">
+        <div className="text-sm text-slate-600">Loading your policy…</div>
+      </Card>
+    );
+  }
+  if (state.noCompany) {
+    return <HrNoCompanyOnboarding />;
+  }
+  // Company-scoped RAG: policyId is no longer sent (see client.ts), so the
+  // ask box opens off `hasQueryablePolicy` alone. The panel renders its own
+  // no-policy guidance when the company has nothing published yet.
+  return <HrPolicyAssistantPanel variant="card" hasQueryablePolicy={state.hasLivePolicy} policyId={null} />;
+}
+
+/**
  * Guided next-step CTA shown above each Policy tab (NAV-POL-1). Nudges HR toward
  * the natural next action without touching the tab content:
  *   • Published policy → Edit in Builder
@@ -222,8 +283,8 @@ function PolicyNextStepCta({
   setTab,
   onReviewPublish,
 }: {
-  activeTab: 'policy' | 'builder' | 'summary' | 'exceptions';
-  setTab: (tab: 'policy' | 'builder' | 'summary' | 'exceptions') => void;
+  activeTab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa';
+  setTab: (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa') => void;
   onReviewPublish: () => void;
 }) {
   const config: { hint: string; actions: React.ReactNode } = (() => {
