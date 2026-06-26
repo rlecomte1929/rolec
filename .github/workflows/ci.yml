@@ -248,9 +248,21 @@ jobs:
         # inclusions). pytest-asyncio (requirements.txt + asyncio_mode=auto in
         # pytest.ini) lets async tests collect.
         run: |
+          # Call 1 — full-suite discovery. Env-dependent / import-broken files are in
+          # collect_ignore (backend/tests/conftest.py). The 3 --ignore'd files below
+          # PASS in isolation but leak/collide when run with the whole suite (shared
+          # sqlite state); they keep gating via Call 2 (isolation fix is a follow-up).
           python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests scripts/tests \
-            -m "not integration and not policy_assistant_audit"
+            -m "not integration and not policy_assistant_audit" \
+            --ignore=backend/tests/test_llm_client_text.py \
+            --ignore=backend/tests/test_policy_propagation.py \
+            --ignore=backend/tests/test_supabase_password_sync.py
+          # Call 2 — the isolation-sensitive previously-gated files, on their own.
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
+            backend/tests/test_llm_client_text.py \
+            backend/tests/test_policy_propagation.py \
+            backend/tests/test_supabase_password_sync.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route

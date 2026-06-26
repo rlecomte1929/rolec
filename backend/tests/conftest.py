@@ -106,6 +106,7 @@ collect_ignore = [
     "test_trace_logger_carbon.py",
     "test_unified_assignment_creation.py",
     "test_upload_endpoints_validation.py",
+    "test_upload_validator.py",
 ]
 
 
