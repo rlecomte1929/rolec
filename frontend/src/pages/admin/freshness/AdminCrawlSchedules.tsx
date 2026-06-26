@@ -33,7 +33,7 @@ export const AdminCrawlSchedules: React.FC = () => {
         is_active: activeOnly ?? undefined,
         limit: 100,
       });
-      setItems(r.items ?? []);
+      setItems((r.items ?? []) as Schedule[]);
     } catch (e) {
       setError((e as Error)?.message || 'Failed');
     } finally {

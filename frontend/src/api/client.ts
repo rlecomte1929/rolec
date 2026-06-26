@@ -2174,30 +2174,30 @@ export const adminStagingAPI = {
 
 // Admin Freshness & Crawl API (admin-only)
 export const adminFreshnessAPI = {
-  getOverview: () => api.get('/api/admin/freshness/overview').then((r) => r.data),
-  getCountries: () => api.get('/api/admin/freshness/countries').then((r) => r.data),
+  getOverview: () => api.get<unknown>('/api/admin/freshness/overview').then((r) => r.data),
+  getCountries: () => api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/freshness/countries').then((r) => r.data),
   getCities: (params?: { country_code?: string }) =>
-    api.get('/api/admin/freshness/cities', { params }).then((r) => r.data),
-  getSources: () => api.get('/api/admin/freshness/sources').then((r) => r.data),
-  getSourcePages: () => api.get('/api/admin/freshness/source-pages').then((r) => r.data),
-  refreshFreshness: () => api.post('/api/admin/freshness/refresh').then((r) => r.data),
+    api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/freshness/cities', { params }).then((r) => r.data),
+  getSources: () => api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/freshness/sources').then((r) => r.data),
+  getSourcePages: () => api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/freshness/source-pages').then((r) => r.data),
+  refreshFreshness: () => api.post<unknown>('/api/admin/freshness/refresh').then((r) => r.data),
   listSchedules: (params?: { is_active?: boolean; limit?: number }) =>
-    api.get('/api/admin/crawl/schedules', { params }).then((r) => r.data),
-  getDueSchedules: () => api.get('/api/admin/crawl/schedules/due').then((r) => r.data),
-  getSchedule: (id: string) => api.get(`/api/admin/crawl/schedules/${id}`).then((r) => r.data),
+    api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/crawl/schedules', { params }).then((r) => r.data),
+  getDueSchedules: () => api.get<unknown>('/api/admin/crawl/schedules/due').then((r) => r.data),
+  getSchedule: (id: string) => api.get<unknown>(`/api/admin/crawl/schedules/${id}`).then((r) => r.data),
   createSchedule: (payload: Record<string, unknown>) =>
-    api.post('/api/admin/crawl/schedules', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/crawl/schedules', payload).then((r) => r.data),
   updateSchedule: (id: string, payload: Record<string, unknown>) =>
-    api.put(`/api/admin/crawl/schedules/${id}`, payload).then((r) => r.data),
-  pauseSchedule: (id: string) => api.post(`/api/admin/crawl/schedules/${id}/pause`).then((r) => r.data),
-  resumeSchedule: (id: string) => api.post(`/api/admin/crawl/schedules/${id}/resume`).then((r) => r.data),
-  triggerSchedule: (id: string) => api.post(`/api/admin/crawl/schedules/${id}/trigger`).then((r) => r.data),
-  processDueSchedules: () => api.post('/api/admin/crawl/process-due').then((r) => r.data),
+    api.put<unknown>(`/api/admin/crawl/schedules/${id}`, payload).then((r) => r.data),
+  pauseSchedule: (id: string) => api.post<unknown>(`/api/admin/crawl/schedules/${id}/pause`).then((r) => r.data),
+  resumeSchedule: (id: string) => api.post<unknown>(`/api/admin/crawl/schedules/${id}/resume`).then((r) => r.data),
+  triggerSchedule: (id: string) => api.post<unknown>(`/api/admin/crawl/schedules/${id}/trigger`).then((r) => r.data),
+  processDueSchedules: () => api.post<unknown>('/api/admin/crawl/process-due').then((r) => r.data),
   triggerCrawl: (payload: { source_name?: string; country_code?: string; city_name?: string; content_domain?: string }) =>
-    api.post('/api/admin/crawl/trigger', payload).then((r) => r.data),
+    api.post<unknown>('/api/admin/crawl/trigger', payload).then((r) => r.data),
   listJobRuns: (params?: { schedule_id?: string; status?: string; limit?: number; offset?: number }) =>
-    api.get('/api/admin/crawl/job-runs', { params }).then((r) => r.data),
-  getJobRun: (id: string) => api.get(`/api/admin/crawl/job-runs/${id}`).then((r) => r.data),
+    api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/crawl/job-runs', { params }).then((r) => r.data),
+  getJobRun: (id: string) => api.get<unknown>(`/api/admin/crawl/job-runs/${id}`).then((r) => r.data),
   listDocumentChanges: (params?: {
     job_run_id?: string;
     source_name?: string;
@@ -2205,12 +2205,12 @@ export const adminFreshnessAPI = {
     since?: string;
     limit?: number;
     offset?: number;
-  }) => api.get('/api/admin/changes/documents', { params }).then((r) => r.data),
-  getDocumentChange: (id: string) => api.get(`/api/admin/changes/documents/${id}`).then((r) => r.data),
+  }) => api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/changes/documents', { params }).then((r) => r.data),
+  getDocumentChange: (id: string) => api.get<unknown>(`/api/admin/changes/documents/${id}`).then((r) => r.data),
   getStaleResources: (params?: { country_code?: string; city_name?: string; limit?: number }) =>
-    api.get('/api/admin/changes/live-stale-resources', { params }).then((r) => r.data),
+    api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/changes/live-stale-resources', { params }).then((r) => r.data),
   getStaleEvents: (params?: { country_code?: string; city_name?: string; limit?: number }) =>
-    api.get('/api/admin/changes/live-stale-events', { params }).then((r) => r.data),
+    api.get<{ items: Record<string, unknown>[]; total?: number }>('/api/admin/changes/live-stale-events', { params }).then((r) => r.data),
 };
 
 // P2-02d — admin material-change review queue (approve before users are notified).

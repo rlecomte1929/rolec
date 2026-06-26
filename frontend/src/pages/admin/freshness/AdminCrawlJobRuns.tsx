@@ -34,7 +34,7 @@ export const AdminCrawlJobRuns: React.FC = () => {
         limit: 50,
       })
       .then((r) => {
-        setItems(r.items ?? []);
+        setItems((r.items ?? []) as JobRun[]);
         setTotal(r.total ?? 0);
       })
       .catch((e) => setError((e as Error)?.message || 'Failed'))
