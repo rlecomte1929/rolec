@@ -96,7 +96,6 @@ export const MarkdownTextarea: React.FC<Props> = ({
         <div
           className="prose prose-sm max-w-none rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           style={{ minHeight }}
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: html || '<em>(empty)</em>' }}
         />
       ) : (

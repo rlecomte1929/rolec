@@ -235,7 +235,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
       }
     };
     void fetch();
-  }, [hasTransit, center]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasTransit, center]);
 
   const schoolCount = schools.length;
   const transitCount = transit.length;

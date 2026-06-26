@@ -133,6 +133,11 @@ const cachedRequest = <T>(key: string, ttlMs: number, fetcher: () => Promise<T>)
   return promise;
 };
 
+// Perf metadata we stash on the axios config object (all props optional so the
+// cast from InternalAxiosRequestConfig is structurally valid — no `any` needed).
+type PerfMeta = { requestId: string; tStart: number };
+type PerfConfig = { url?: string; method?: string; _perfMeta?: PerfMeta };
+
 // Add auth token + request/perf metadata to requests
 api.interceptors.request.use((config) => {
   const token = getAuthItem('relopass_token');
@@ -142,26 +147,22 @@ api.interceptors.request.use((config) => {
     delete (config.headers as Record<string, unknown>)['Content-Type'];
   }
   if (token) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (config.headers as any).Authorization = `Bearer ${token}`;
+    (config.headers as Record<string, unknown>).Authorization = `Bearer ${token}`;
   }
 
   // Attach / propagate X-Request-ID for correlation with backend.
   const existingId =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((config.headers as any)['X-Request-ID'] as string | undefined) || getCurrentInteractionId();
+    ((config.headers as Record<string, unknown>)['X-Request-ID'] as string | undefined) || getCurrentInteractionId();
   const requestId =
     existingId ||
     (typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (config.headers as any)['X-Request-ID'] = requestId;
+  (config.headers as Record<string, unknown>)['X-Request-ID'] = requestId;
 
   // Stash perf metadata on the config (type-cast to avoid axios type extension).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (config as any)._perfMeta = {
+  (config as PerfConfig)._perfMeta = {
     requestId,
     tStart: typeof performance !== 'undefined' ? performance.now() : Date.now(),
   };
@@ -188,8 +189,7 @@ function parseServerTiming(header: string | null | undefined): number | undefine
 api.interceptors.response.use(
   (res) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const meta = (res.config as any)._perfMeta as { requestId: string; tStart: number } | undefined;
+      const meta = (res.config as PerfConfig)._perfMeta;
       if (meta) {
         const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
         const duration = tEnd - meta.tStart;
@@ -219,9 +219,8 @@ api.interceptors.response.use(
   },
   (err) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cfg = (err?.config || {}) as any;
-      const meta = cfg._perfMeta as { requestId: string; tStart: number } | undefined;
+      const cfg = (err?.config || {}) as PerfConfig;
+      const meta = cfg._perfMeta;
       const status = err?.response?.status ?? 0;
       if (meta) {
         const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();

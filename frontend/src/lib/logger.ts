@@ -16,7 +16,6 @@
 
 const isProd = typeof import.meta !== 'undefined' && (import.meta as { env?: { MODE?: string } }).env?.MODE === 'production';
 
-/* eslint-disable no-console */
 export const logger = {
   debug: isProd ? () => undefined : (...args: unknown[]) => console.debug(...args),
   info:  isProd ? () => undefined : (...args: unknown[]) => console.info(...args),
