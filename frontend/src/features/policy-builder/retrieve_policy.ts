@@ -21,10 +21,7 @@
 
 // Supabase client is imported lazily inside functions that need it so that
 // this module can be imported in test environments without Supabase env vars.
-type SupabaseClient = Awaited<ReturnType<typeof import('../../lib/supabase').supabase.auth.getSession>> extends never
-  ? never
-   
-  : any;
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function getSupabase(): Promise<SupabaseClient> {
   const { supabase } = await import('../../lib/supabase');
