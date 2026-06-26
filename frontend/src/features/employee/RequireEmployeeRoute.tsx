@@ -16,6 +16,12 @@ interface RequireEmployeeRouteProps {
  * portal instead of being redirected back to their own dashboard.
  *
  * Pass allowHR={true} to permit HR on specific cross-role pages (e.g. MVG-6B checklist).
+ *
+ * SECURITY (SEC-FE-4): this guard is a COSMETIC UX hint only. `relopass_role` is read
+ * from localStorage, which is user-editable in devtools, so it must NEVER be the access
+ * boundary. The real control is server-side: every privileged API independently enforces
+ * role + company-scope from the session token (see docs/security/SEC-FE-4_authz_coverage.md).
+ * The cached role is derived from the server login response (useAuth.ts → setSession).
  */
 export const RequireEmployeeRoute: React.FC<RequireEmployeeRouteProps> = ({ children, allowHR = false }) => {
   const role = (getAuthItem('relopass_role') || '').toUpperCase();

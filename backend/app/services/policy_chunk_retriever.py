@@ -153,7 +153,13 @@ def retrieve(
         return []
 
     embedder = embedder or get_default_embedder()
-    q_emb = embedder.embed(query)
+    # GDPR Art. 28/44 (SEC-03): the user's free-text query is embedded by a
+    # US LLM sub-processor (OpenAI embeddings), so mask any PII before egress —
+    # the chat-path masking in AnthropicClient does NOT cover this separate
+    # embeddings call. Single chokepoint for every retrieval caller.
+    from .pii_masker import mask_pii
+
+    q_emb = embedder.embed(mask_pii(query))
 
     dialect = db.engine.dialect.name
     if dialect == "sqlite":
