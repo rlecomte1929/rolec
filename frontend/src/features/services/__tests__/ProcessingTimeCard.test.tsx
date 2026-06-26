@@ -6,7 +6,6 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-
 import { ProcessingTimeCard } from '../ProcessingTimeCard';
 import { getProcessingTime } from '../../../api/processingTime';
 
@@ -30,7 +29,7 @@ describe('ProcessingTimeCard', () => {
       source_url: 'https://example.test/eu-blue-card',
     });
     render(<ProcessingTimeCard caseId="c1" />);
-    await waitFor(() => expect(screen.getByText('4–12 weeks')).toBeInTheDocument());
+    expect(await screen.findByText('4–12 weeks')).toBeInTheDocument();
     expect(screen.getByText('Processing time')).toBeInTheDocument();
     expect(mockedGet).toHaveBeenCalledWith('c1');
   });

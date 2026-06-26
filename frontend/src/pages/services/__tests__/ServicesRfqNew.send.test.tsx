@@ -59,6 +59,6 @@ describe('ServicesRfqNew send', () => {
     expect(payload.case_id).toBe('case-1');
     expect(payload.service_categories).toEqual(['living_areas', 'movers']);
 
-    await waitFor(() => expect(screen.getByTestId('rfq-sent')).toBeInTheDocument());
+    expect(await screen.findByTestId('rfq-sent')).toBeInTheDocument();
   });
 });

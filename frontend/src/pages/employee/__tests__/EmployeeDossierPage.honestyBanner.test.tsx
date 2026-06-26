@@ -76,9 +76,7 @@ describe('EmployeeDossierPage content-honesty banner', () => {
   it('hides the disclaimer when there are no forms', async () => {
     mockList.mockResolvedValue([]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/No forms yet/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/No forms yet/i)).toBeInTheDocument();
     expect(screen.queryByTestId('dossier-honesty-banner')).not.toBeInTheDocument();
   });
 });

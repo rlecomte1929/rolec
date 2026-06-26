@@ -69,7 +69,7 @@ beforeEach(() => {
     get length() {
       return Object.keys(lsStore).length;
     },
-  } as Storage);
+  });
 });
 
 afterEach(() => {
@@ -143,9 +143,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('asg-1', 'Is temporary housing included?'));
-    await waitFor(() => {
-      expect(screen.getByText(/included \(published policy\)/i)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/included \(published policy\)/i)).toBeInTheDocument();
     expect(screen.getByText(/where this comes from/i)).toBeInTheDocument();
     expect(screen.getAllByText(/published benefit rule/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/related policy questions/i)).toBeInTheDocument();
@@ -186,7 +184,7 @@ describe('EmployeePolicyAssistantPanel', () => {
       target: { value: 'Negotiate my salary' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
+    expect(await screen.findByText(/no policy answer/i)).toBeInTheDocument();
     expect(screen.getByText(/policy questions you can ask/i)).toBeInTheDocument();
     expect(screen.getByText('What is my housing cap?')).toBeInTheDocument();
   });
@@ -200,9 +198,7 @@ describe('EmployeePolicyAssistantPanel', () => {
       target: { value: 'Test question' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    await waitFor(() => {
-      expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE)).toBeInTheDocument();
   });
 
   it('restores saved Q&A from localStorage for this assignment', () => {

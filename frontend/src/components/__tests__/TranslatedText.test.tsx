@@ -11,7 +11,6 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-
 import { TranslatedText } from '../TranslatedText';
 import { translateText } from '../../api/translation';
 
@@ -41,7 +40,7 @@ it('shows the translation and a Translated badge on success', async () => {
     cache_hit: false,
   });
   render(<TranslatedText text="Welcome to Berlin" src="en" tgt="de" />);
-  await waitFor(() => expect(screen.getByText('Willkommen in Berlin')).toBeInTheDocument());
+  expect(await screen.findByText('Willkommen in Berlin')).toBeInTheDocument();
   expect(screen.getByText('Translated')).toBeInTheDocument();
 });
 

@@ -105,7 +105,7 @@ describe('EmployeeDossierPage stale-source banner', () => {
     mockList.mockResolvedValue([makeForm('a', FRESH_DATE), makeForm('b', null)]);
     renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('form-a')).toBeInTheDocument());
+    expect(await screen.findByTestId('form-a')).toBeInTheDocument();
     expect(screen.queryByTestId('stale-sources-banner')).not.toBeInTheDocument();
   });
 });

@@ -13,7 +13,6 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
 import { BudgetSummaryTable } from '../BudgetSummaryTable';
 
 vi.mock('../../../api/budget', () => ({
@@ -74,11 +73,7 @@ describe('BudgetSummaryTable', () => {
 
     render(<BudgetSummaryTable caseId="case-1" displayCurrency="USD" />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(/couldn[’']t load the policy caps/i),
-      ).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/couldn[’']t load the policy caps/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
@@ -88,7 +83,7 @@ describe('BudgetSummaryTable', () => {
     render(<BudgetSummaryTable caseId="case-1" displayCurrency="USD" />);
 
     // Headers
-    await waitFor(() => expect(screen.getByText('Category')).toBeInTheDocument());
+    expect(await screen.findByText('Category')).toBeInTheDocument();
     expect(screen.getByText('Your estimate')).toBeInTheDocument();
     expect(screen.getByText('Policy cap')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();

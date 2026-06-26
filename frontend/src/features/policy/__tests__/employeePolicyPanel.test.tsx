@@ -4,8 +4,8 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EmployeePolicyPanel } from '../EmployeePolicyPanel';
-import { mockEmployeePackage } from './hrPolicyTestUtils';
 import type { EffectiveServiceComparisonRow } from '../../../types';
+import { mockEmployeePackage } from './hrPolicyTestUtils';
 
 const employeeApiMocks = vi.hoisted(() => ({
   getMyAssignmentPackagePolicy: vi.fn(),
@@ -98,7 +98,7 @@ describe('EmployeePolicyPanel — lifecycle messaging', () => {
       comparison_readiness: { comparison_ready: true, comparison_blockers: [] },
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Your benefits and policy comparisons/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Your benefits and policy comparisons/i)).toBeInTheDocument();
   });
 
   it('read-only: no editable fields', () => {
@@ -141,7 +141,7 @@ describe('EmployeePolicyPanel — service comparison behavior', () => {
       ],
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Within policy limit/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Within policy limit/i)).toBeInTheDocument();
     expect(screen.getByText(/Within limit/i)).toBeInTheDocument();
   });
 
@@ -161,7 +161,7 @@ describe('EmployeePolicyPanel — service comparison behavior', () => {
       ],
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Above policy limit/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Above policy limit/i)).toBeInTheDocument();
     expect(screen.getByText(/Over by/i)).toBeInTheDocument();
   });
 
@@ -182,7 +182,7 @@ describe('EmployeePolicyPanel — service comparison behavior', () => {
       ],
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Excluded/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Excluded/i)).toBeInTheDocument();
     expect(screen.queryByText(/Difference vs limit/i)).not.toBeInTheDocument();
   });
 
@@ -202,7 +202,7 @@ describe('EmployeePolicyPanel — service comparison behavior', () => {
       ],
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Informational/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Informational/i)).toBeInTheDocument();
     expect(screen.queryByText(/Difference vs limit/i)).not.toBeInTheDocument();
   });
 
@@ -222,7 +222,7 @@ describe('EmployeePolicyPanel — service comparison behavior', () => {
       ],
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Needs more detail/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Needs more detail/i)).toBeInTheDocument();
     expect(screen.queryByText(/Difference vs limit/i)).not.toBeInTheDocument();
   });
 
@@ -242,7 +242,7 @@ describe('EmployeePolicyPanel — service comparison behavior', () => {
       ],
     });
     renderPanel(mockEmployeePackage('found_full'));
-    await waitFor(() => expect(screen.getByText(/Approval may be required/i)).toBeInTheDocument());
+    expect(await screen.findByText(/Approval may be required/i)).toBeInTheDocument();
   });
 
   it('benefit row shows approval when required', () => {
