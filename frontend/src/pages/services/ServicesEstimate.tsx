@@ -83,6 +83,19 @@ export const ServicesEstimate: React.FC = () => {
 
   return (
     <AppShell title="Estimate review" subtitle="Shortlist vs HR policy caps.">
+      <nav aria-label="Breadcrumb" className="mb-3 text-sm text-[#64748b]">
+        <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium text-[#0b2b43] hover:underline">
+          Services
+        </Link>
+        <span className="mx-2">/</span>
+        <span>Review &amp; budget</span>
+      </nav>
+      <Link
+        to={{ pathname: buildRoute('servicesRecommendations'), search: location.search }}
+        className="mb-4 inline-flex text-sm font-medium text-[#0b2b43] hover:underline"
+      >
+        ← Back to recommendations
+      </Link>
       <ServicesNavRibbon />
       {/* Stage 5 (audit) — replaced generic numbered list with outcome-described copy
           per audit/re-audit-stage-2-copy.md COPY-5 + docs/product-copy-rules.md

@@ -65,12 +65,13 @@ export function formatServicesMoney(amount: number, currencyCode: string): strin
   const cur = normalizeServicesCurrency(currencyCode);
   const maxFrac = cur === 'JPY' ? 0 : 2;
   try {
-    return new Intl.NumberFormat(undefined, {
+    const formatted = new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency: cur,
       maximumFractionDigits: maxFrac,
       minimumFractionDigits: 0,
     }).format(amount);
+    return formatted.toUpperCase().includes(cur) ? formatted : `${formatted} ${cur}`;
   } catch {
     return `${cur} ${amount.toLocaleString(undefined, { maximumFractionDigits: maxFrac })}`;
   }

@@ -113,7 +113,7 @@ function formatCap({ amount, capCurrency, displayCurrency, nativeCurrency }: For
   // For the placeholder/null-estimate world we live in today, displaying the
   // native amount with a code suffix is the safest behavior — promises no FX
   // accuracy we can't deliver.
-  return `${formatServicesMoney(amount, capCurrency)} (${capCurrency})`;
+  return formatServicesMoney(amount, capCurrency);
 }
 
 function formatEstimate(
