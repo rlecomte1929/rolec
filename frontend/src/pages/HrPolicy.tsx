@@ -238,10 +238,10 @@ function HrPolicyQaTab() {
     let cancelled = false;
     void (async () => {
       try {
-        const payload = await policyConfigMatrixAPI.hrGet();
+        const payload = (await policyConfigMatrixAPI.hrGet()) as { status?: string; policy_version?: unknown };
         if (cancelled) return;
-        const status = String((payload as { status?: unknown })?.status ?? '').toLowerCase();
-        const hasLivePolicy = status === 'published' || Boolean((payload as { policy_version?: unknown })?.policy_version);
+        const status = String(payload?.status ?? '').toLowerCase();
+        const hasLivePolicy = status === 'published' || Boolean(payload?.policy_version);
         setState({ loading: false, noCompany: false, hasLivePolicy });
       } catch (err) {
         if (cancelled) return;
@@ -382,6 +382,18 @@ const CLAUSE_TYPE_LABELS: Record<string, string> = {
 };
 
 /** Canonical metadata schema from backend - supports legacy shapes via normalization. */
+type NormalizeResult = {
+  summary?: { benefit_rules?: number; exclusions?: number; draft_rule_candidates?: number } & Record<string, unknown>;
+  rule_candidates_summary?: { draft_rule_candidates?: number };
+  normalization_result_code?: string;
+  outcome?: string;
+  publish_block_code?: string;
+  publish_block_detail?: string;
+  published?: boolean;
+  comparison_readiness_code?: string;
+  policy_id?: string;
+};
+
 interface PolicyDocumentMetadata {
   detected_title?: string | null;
   detected_version?: string | null;
@@ -517,7 +529,7 @@ function DocumentStructureTab({ docId }: { docId: string }) {
   const loadClauses = async () => {
     setLoading(true);
     try {
-      const res = await policyDocumentsAPI.listClauses(docId, clauseTypeFilter || undefined);
+      const res = (await policyDocumentsAPI.listClauses(docId, clauseTypeFilter || undefined)) as { clauses?: PolicyDocumentClause[] };
       setClauses(res.clauses || []);
     } catch {
       setClauses([]);
@@ -541,7 +553,7 @@ function DocumentStructureTab({ docId }: { docId: string }) {
     }
   };
 
-  const grouped = clauses.reduce<Record<string, any[]>>((acc, c) => {
+  const grouped = clauses.reduce<Record<string, PolicyDocumentClause[]>>((acc, c) => {
     const key = c.section_label || c.section_path || 'Unsectioned';
     if (!acc[key]) acc[key] = [];
     acc[key].push(c);
@@ -592,7 +604,7 @@ function DocumentStructureTab({ docId }: { docId: string }) {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 text-xs text-[#6b7280]">
                           <span className="px-2 py-0.5 rounded bg-[#e2e8f0] text-[#4b5563]">
-                            {CLAUSE_TYPE_LABELS[c.clause_type] || c.clause_type}
+                            {CLAUSE_TYPE_LABELS[c.clause_type ?? ''] || c.clause_type}
                           </span>
                           {c.source_page_start != null && (
                             <span>p.{c.source_page_start}{c.source_page_end != null && c.source_page_end !== c.source_page_start ? `–${c.source_page_end}` : ''}</span>
@@ -628,7 +640,7 @@ function DocumentStructureTab({ docId }: { docId: string }) {
                     {isEditing && (
                       <div className="mt-3 pt-3 border-t border-[#e2e8f0] flex flex-wrap items-center gap-2">
                         <select
-                          defaultValue={c.clause_type}
+                          defaultValue={c.clause_type ?? ''}
                           className="border border-[#e2e8f0] rounded px-2 py-1 text-sm"
                           onChange={(e) => handlePatch(c.id, { clause_type: e.target.value })}
                           disabled={patchingId === c.id}
@@ -875,7 +887,7 @@ export function PolicyDocumentIntakeSection({
     setMessage('');
     setNormalizingId(docId);
     try {
-      const res = await policyDocumentsAPI.normalize(docId);
+      const res = (await policyDocumentsAPI.normalize(docId)) as NormalizeResult;
       const br = res.summary?.benefit_rules ?? 0;
       const ex = res.summary?.exclusions ?? 0;
       const drc =

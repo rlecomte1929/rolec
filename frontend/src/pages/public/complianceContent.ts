@@ -43,6 +43,37 @@ export const complianceContent = {
     ],
   },
 
+  // AIQ-1240: explicit AI-systems inventory (EU AI Act transparency, Art. 13).
+  // Every claim here is scoped to what is verifiable in the codebase. The
+  // text-LLM paths (policy assistant, policy extraction) provably receive only
+  // policy text + the question — not passport/identity/DOB/family data
+  // (see docs/privacy/data-residency-and-gdpr.md "What we send to OpenAI").
+  // Document OCR is described honestly as processing uploaded document content.
+  aiSystems: {
+    sectionHeader: 'AI systems we use',
+    title: 'Every AI system, named — and what it works on.',
+    body:
+      'The EU AI Act expects transparency about which AI systems run and on what data. This is the full inventory. The policy AI receives your policy text and the question being asked — not passport numbers, dates of birth, or family data.',
+    cards: [
+      {
+        title: 'Policy assistant (Q&A)',
+        body: 'Answers HR and employee questions from your published policy only — grounded, cited, and declines when something is out of policy. Receives the question and the matching policy text.',
+      },
+      {
+        title: 'Policy document extraction',
+        body: 'Turns an uploaded corporate policy document into structured benefit rules for a human to review. Reads the policy document text — a corporate document, not employee identity data.',
+      },
+      {
+        title: 'Case guidance & roadmaps',
+        body: 'Proposes relocation steps and provider or corridor matches for a person to confirm. Operates on case structure and your policy rules; nothing is applied without human review.',
+      },
+      {
+        title: 'Document text recognition (OCR)',
+        body: 'Reads text from documents you upload to reduce manual data entry. Civil-status documents (e.g. birth or marriage certificates) use an EU-hosted provider (Mistral AI, France); identity documents such as passports use OpenAI vision (US) under standard contractual clauses.',
+      },
+    ],
+  },
+
   // The substance: the REAL oversight flow (Art. 14).
   oversight: {
     sectionHeader: 'Human oversight',
@@ -89,6 +120,34 @@ export const complianceContent = {
       {
         title: 'EU-hosted infrastructure',
         body: 'Case data is stored on EU-region infrastructure, with row-level tenant isolation enforced at the database.',
+      },
+    ],
+  },
+
+  // AIQ-1240: data governance + GDPR. Wording is deliberately conservative —
+  // every line maps to docs/security/PRIV-004_sub-processor_register.md and
+  // docs/privacy/data-residency-and-gdpr.md. "Available on request" is used
+  // rather than "in place" for the DPA, since sub-processor DPA signatures are
+  // still pending (see PRIV-004 §"Actions still requiring human sign-off").
+  dataGovernance: {
+    sectionHeader: 'Data governance & GDPR',
+    title: 'EU-resident by default. Disclosed where it isn’t.',
+    cards: [
+      {
+        title: 'EU data residency',
+        body: 'Your case data — cases, profiles, uploaded documents, and audit logs — is stored in the EU (Supabase, Ireland), with row-level tenant isolation enforced at the database.',
+      },
+      {
+        title: 'Named sub-processors',
+        body: 'We keep a current sub-processor register (Supabase, Anthropic, OpenAI, Mistral, Render, Resend). Where a provider processes data outside the EU, it is covered by standard contractual clauses. A DPA is available for enterprise customers on request.',
+      },
+      {
+        title: 'Minimised before AI',
+        body: 'Personal data is minimised before it reaches a language model: the policy assistant masks direct identifiers, and the policy AI receives policy text and questions — not identity-document or family data.',
+      },
+      {
+        title: 'Your rights (GDPR)',
+        body: 'Erasure requests (Article 17) are actioned per case — identifying fields are redacted and the case removed from every view. Data-residency details and our sub-processor list are available to your DPO on request.',
       },
     ],
   },
