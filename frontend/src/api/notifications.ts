@@ -99,6 +99,6 @@ export function subscribeToNotifications(
     }
   };
   void poll();
-  const id = setInterval(poll, intervalMs);
+  const id = setInterval(() => void poll(), intervalMs);
   return () => clearInterval(id);
 }

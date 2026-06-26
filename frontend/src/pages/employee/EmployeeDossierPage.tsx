@@ -99,7 +99,7 @@ export const EmployeeDossierPage: React.FC = () => {
   // [P1-5B] Realtime: when the Trigger Engine creates a new case_form (or any
   // row updates — completion_pct, status flipping to submitted, etc.), refetch
   // the joined list so the new row + its template/person/field-summary appear.
-  useCaseFormsRealtime(caseId, load);
+  useCaseFormsRealtime(caseId, () => void load());
 
   // [P1-6] Forms in scope for the current view: when a roadmap step is active,
   // only its triggered forms; otherwise the full list. The status tabs,

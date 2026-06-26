@@ -56,13 +56,14 @@ export const NotificationBell: React.FC = () => {
   }, [fetchCount]);
 
   useEffect(() => {
-    const id = setInterval(fetchCount, 60_000);
+    const id = setInterval(() => void fetchCount(), 60_000);
     return () => clearInterval(id);
   }, [fetchCount]);
 
   useEffect(() => {
-    window.addEventListener('focus', fetchCount);
-    return () => window.removeEventListener('focus', fetchCount);
+    const onFocus = () => void fetchCount();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [fetchCount]);
 
   useEffect(() => {

@@ -77,7 +77,7 @@ export const HrCaseDossierPage: React.FC = () => {
   useEffect(() => { void load(); }, [load]);
 
   // Realtime: re-fetch when any case_form row changes
-  useCaseFormsRealtime(caseId, load);
+  useCaseFormsRealtime(caseId, () => void load());
 
   // Per-tab counts
   const counts = useMemo(() => ({

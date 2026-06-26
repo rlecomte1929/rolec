@@ -102,7 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Subscribe to subsequent auth state changes
-    const unsubscribe = onAuthChange(async supabaseUser => {
+    const unsubscribe = onAuthChange(supabaseUser => {
+      void (async () => {
       if (cancelled) return;
 
       if (supabaseUser) {
@@ -116,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetRelopassAnalytics();
         setUser(null);
       }
+      })();
     });
 
     return () => {

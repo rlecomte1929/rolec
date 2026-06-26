@@ -86,7 +86,7 @@ export function subscribeToNotificationsRealtime(
     callbacks.onDisconnect?.();
     if (fallbackTimer) return;
     void refreshAndNotify();
-    fallbackTimer = setInterval(refreshAndNotify, FALLBACK_POLL_INTERVAL_MS);
+    fallbackTimer = setInterval(() => void refreshAndNotify(), FALLBACK_POLL_INTERVAL_MS);
   };
 
   const stopFallback = () => {
@@ -166,6 +166,6 @@ function startFallbackPolling(callbacks: SubscribeCallbacks): () => void {
     }
   };
   void refresh();
-  const id = setInterval(refresh, FALLBACK_POLL_INTERVAL_MS);
+  const id = setInterval(() => void refresh(), FALLBACK_POLL_INTERVAL_MS);
   return () => clearInterval(id);
 }
