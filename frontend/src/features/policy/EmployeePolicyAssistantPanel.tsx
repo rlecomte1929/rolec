@@ -665,9 +665,10 @@ export const EmployeePolicyAssistantPanel: React.FC<{
               setMessage(e.target.value);
               if (emptySubmitHint) setEmptySubmitHint(false);
             }}
-            onFocus={() => {
-              if (emptySubmitHint) setEmptySubmitHint(false);
-            }}
+            // The empty-submit hint clears on input (onChange) or chip-pick (handler).
+            // It intentionally does NOT clear on focus: empty-Ask auto-focuses this
+            // textarea, and an onFocus-clear wiped the hint ~instantly so the user
+            // never saw it (see employeePolicyAssistantPanel.test.tsx regression test).
             disabled={submitting}
             aria-describedby={questionDescribedBy}
           />
