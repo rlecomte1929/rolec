@@ -5,6 +5,8 @@ import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
+import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
@@ -44,6 +46,7 @@ export const ServicesEstimate: React.FC = () => {
   // returns the user to the estimate / shortlist instead of forcing a
   // restart of the services flow.
   useTrackLastVisited(assignmentId || null);
+  const moveBanner = useServicesMoveBanner(assignmentId || null);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations) {
@@ -83,6 +86,11 @@ export const ServicesEstimate: React.FC = () => {
 
   return (
     <AppShell title="Estimate review" subtitle="Shortlist vs HR policy caps.">
+      <ServicesContextBanner
+        originCity={moveBanner?.originCity}
+        destCity={moveBanner?.destCity}
+        date={moveBanner?.date}
+      />
       <ServicesNavRibbon />
       {/* Stage 5 (audit) — replaced generic numbered list with outcome-described copy
           per audit/re-audit-stage-2-copy.md COPY-5 + docs/product-copy-rules.md

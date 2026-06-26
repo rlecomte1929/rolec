@@ -8145,6 +8145,7 @@ def get_services_context(
 
     draft = {}
     dest_city = dest_country = origin_city = origin_country = None
+    target_move_date = None
     with SessionLocal() as session:
         case = app_crud.get_case(session, case_id)
         if case:
@@ -8156,6 +8157,7 @@ def get_services_context(
             dest_country = getattr(case, "dest_country", None)
             origin_city = getattr(case, "origin_city", None)
             origin_country = getattr(case, "origin_country", None)
+            target_move_date = getattr(case, "target_move_date", None)
     basics = draft.get("relocationBasics") or {}
     case_context = {
         "destCity": basics.get("destCity") or dest_city,
@@ -8163,6 +8165,12 @@ def get_services_context(
         "originCity": basics.get("originCity") or origin_city,
         "originCountry": origin_country or basics.get("originCountry"),
     }
+    # AIQ-1249d: canonical move date for the services context banner. Prefer the
+    # structured case column, fall back to the wizard draft (same precedence as
+    # the case-detail view at ~L5521).
+    target_start_date = (
+        str(target_move_date) if target_move_date else (basics.get("targetMoveDate") or None)
+    )
 
     saved_rows = db.list_case_service_answers(case_id)
     saved_flat: Dict[str, Any] = {}
@@ -8189,6 +8197,7 @@ def get_services_context(
         "assignment_id": assignment["id"],
         "case_id": case_id,
         "case_context": case_context,
+        "target_start_date": target_start_date,
         "services": services,
         "answers": saved_rows,
         "questions": questions,

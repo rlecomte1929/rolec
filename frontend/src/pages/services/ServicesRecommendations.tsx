@@ -5,6 +5,8 @@ import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
+import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
@@ -41,6 +43,7 @@ export const ServicesRecommendations: React.FC = () => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
   }, [assignmentId, setActiveCaseId]);
+  const moveBanner = useServicesMoveBanner(assignmentId || null);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
@@ -58,6 +61,11 @@ export const ServicesRecommendations: React.FC = () => {
 
   return (
     <AppShell title="Recommendations" subtitle="Shortlist by service.">
+      <ServicesContextBanner
+        originCity={moveBanner?.originCity}
+        destCity={moveBanner?.destCity}
+        date={moveBanner?.date}
+      />
       <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">

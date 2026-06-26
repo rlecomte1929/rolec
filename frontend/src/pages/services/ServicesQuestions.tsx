@@ -6,6 +6,7 @@ import { Alert, Button, Card } from '../../components/antigravity';
 import { DynamicServicesQuestionnaire, validateDynamicAnswers, type DynamicQuestion } from '../../features/services/DynamicServicesQuestionnaire';
 import { PetRelocationCard } from '../../features/services/PetRelocationCard';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
 import { logServicesWorkflow } from '../../features/services/servicesWorkflowInstrumentation';
 import { useServicesWorkflowState } from '../../features/services/useServicesWorkflowState';
 import { servicesAPI } from '../../api/client';
@@ -66,7 +67,7 @@ export const ServicesQuestions: React.FC = () => {
   const [questions, setQuestions] = useState<DynamicQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
-  const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string; originCountry?: string } | null>(null);
+  const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string; originCity?: string; originCountry?: string; targetStartDate?: string } | null>(null);
   const [caseDetailsLoaded, setCaseDetailsLoaded] = useState(false);
   const [isSavingAnswers, setIsSavingAnswers] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -132,7 +133,9 @@ export const ServicesQuestions: React.FC = () => {
         setCaseContext({
           destCity: destCity || undefined,
           destCountry: destCountry || undefined,
+          originCity: (ctx.originCity) || undefined,
           originCountry: (ctx.originCountry) || undefined,
+          targetStartDate: res.target_start_date || undefined,
         });
 
         const fromCase = caseToInitialAnswers(null, {
@@ -325,6 +328,11 @@ export const ServicesQuestions: React.FC = () => {
 
   return (
     <AppShell title="Service questions" subtitle="Refine your provider matches.">
+      <ServicesContextBanner
+        originCity={caseContext?.originCity ?? caseContext?.originCountry}
+        destCity={caseContext?.destCity ?? caseContext?.destCountry}
+        date={caseContext?.targetStartDate}
+      />
       <ServicesNavRibbon />
       {workflow.state === 'loading_recommendations' && (
         <div
