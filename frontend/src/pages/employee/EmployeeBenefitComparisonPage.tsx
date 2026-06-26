@@ -1,13 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Button, Card, Container, PhaseContextBar } from '../../components/antigravity';
+import { Button, Card, Container } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useIsOffline } from '../../hooks/useOnlineStatus';
-import { buildRoute } from '../../navigation/routes';
-import { resolveCaseStage, isIntakeComplete, type StageState } from '../../features/employee-journey/caseStage';
+import { isIntakeComplete } from '../../features/employee-journey/caseStage';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
@@ -36,14 +34,7 @@ interface ComparisonData {
 export const EmployeeBenefitComparisonPage: React.FC = () => {
   const { assignmentId, isLoading: assignmentLoading, linkedCount, linkedSummaries } =
     useEmployeeAssignment();
-  const navigate = useNavigate();
-  // B1: stepper state from the ONE shared resolver, driven by the active case's
-  // real status (not hardcoded 'done'), so this page can't disagree with the
-  // dashboard / roadmap steppers for the same case.
   const activeRow = linkedSummaries.find((r) => r.assignment_id === assignmentId);
-  const stage = resolveCaseStage({ status: activeRow?.status, servicesComplete: false });
-  const toBarStatus = (s: StageState): 'done' | 'current' | 'upcoming' =>
-    s === 'done' ? 'done' : s === 'active' ? 'current' : 'upcoming';
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   const comparisonQuery = useQuery({
@@ -179,26 +170,6 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
         )}
       >
         <Container maxWidth="xl" className="py-8">
-          {/* Phase-2 journey context: Intake done -> Services & policy (here) -> Roadmap. */}
-          <div className="mb-6">
-            <PhaseContextBar
-              phases={[
-                { key: 'intake', label: 'Intake', status: toBarStatus(stage.intake) },
-                { key: 'services', label: 'Services & policy', status: toBarStatus(stage.services) },
-                { key: 'roadmap', label: 'Roadmap', status: toBarStatus(stage.roadmap) },
-              ]}
-              onSelect={(key) => {
-                if (key === 'intake')
-                  navigate(
-                    activeRow?.case_id
-                      ? buildRoute('employeeCaseIntake', { caseId: activeRow.case_id })
-                      : buildRoute('employeeIntake'),
-                  );
-                if (key === 'roadmap' && stage.roadmap !== 'locked' && activeRow?.case_id)
-                  navigate(buildRoute('employeeCaseRoadmap', { caseId: activeRow.case_id }));
-              }}
-            />
-          </div>
           {body}
         </Container>
       </PolicyAssistantDockedShell>

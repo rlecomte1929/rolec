@@ -149,8 +149,9 @@ class _DossierFormTemplate(BaseModel):
     # dossier never implies unverified immigration content is authoritative.
     verification_status: Optional[str] = None
     # [P1-05 checklist] Required supporting documents, derived from the template
-    # fields that carry requires_original=true. Each item: {"key","label"}.
-    required_documents: List[Dict[str, str]] = []
+    # fields that carry requires_original=true. Each item: {"key","label","format"}
+    # where format (from the field's optional doc_format) may be None. [AIQ-1257a]
+    required_documents: List[Dict[str, Optional[str]]] = []
 
 
 class _DossierFormPerson(BaseModel):
@@ -309,8 +310,14 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
 
     # [P1-05 checklist] Required supporting documents = template fields that
     # must be backed by an original document (requires_original=true).
-    required_documents: List[Dict[str, str]] = [
-        {"key": str(f.get("id")), "label": str(f.get("label") or f.get("id"))}
+    # [AIQ-1257a] Each item also carries an optional `format` (from the field's
+    # `doc_format`, may be None) so the dossier can show acceptance guidance.
+    required_documents: List[Dict[str, Optional[str]]] = [
+        {
+            "key": str(f.get("id")),
+            "label": str(f.get("label") or f.get("id")),
+            "format": f.get("doc_format"),
+        }
         for f in fields
         if isinstance(f, dict) and f.get("requires_original") and f.get("id")
     ] if isinstance(fields, list) else []

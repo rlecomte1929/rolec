@@ -29,8 +29,9 @@ export interface DossierFormTemplate {
   source_url: string | null;
   /** [P1-05d] When the source URL was last fetched/verified (ISO), from source_pages. */
   source_last_verified: string | null;
-  /** [P1-05 checklist] Required supporting documents (derived from requires_original fields). */
-  required_documents: Array<{ key: string; label: string }>;
+  /** [P1-05 checklist] Required supporting documents (derived from requires_original fields).
+   *  [AIQ-1257b] `format` carries optional acceptance guidance (e.g. "Original + copy"). */
+  required_documents: Array<{ key: string; label: string; format?: string | null }>;
   /**
    * [WS1] Content-maturity flag. 'representative' (default scaffolding, not yet
    * human-verified), 'draft' (under review), or 'verified' (ops/legal confirmed

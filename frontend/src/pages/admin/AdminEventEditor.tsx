@@ -198,11 +198,18 @@ export const AdminEventEditor: React.FC = () => {
       </div>
 
       {approveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setApproveModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={(e) => { if (e.target === e.currentTarget) setApproveModalOpen(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setApproveModalOpen(false); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close approve dialog"
+        >
+          <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4">
             <h4 className="font-semibold mb-2">Approve event</h4>
-            <label className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
-            <textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4" />
+            <label htmlFor="evt-review-notes-optional" className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
+            <textarea id="evt-review-notes-optional" value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4" />
             <div className="flex gap-2">
               <Button onClick={() => { void workflow('approve', approveNotes || undefined); setApproveModalOpen(false); setApproveNotes(''); }} disabled={saving}>
                 {saving ? 'Approving…' : 'Approve'}
@@ -218,8 +225,9 @@ export const AdminEventEditor: React.FC = () => {
           <h3 className="font-semibold mb-3">Basic</h3>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Title *</label>
+              <label htmlFor="evt-title" className="block text-sm text-slate-600 mb-1">Title *</label>
               <Input unstyled
+                id="evt-title"
                 value={(form.title as string) || ''}
                 onChange={(v) => update('title', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -227,16 +235,18 @@ export const AdminEventEditor: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Country</label>
+                <label htmlFor="evt-country" className="block text-sm text-slate-600 mb-1">Country</label>
                 <Input unstyled
+                  id="evt-country"
                   value={(form.country_code as string) || ''}
                   onChange={(v) => update('country_code', v.toUpperCase())}
                   className="w-full rounded border border-slate-200 px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-600 mb-1">City</label>
+                <label htmlFor="evt-city" className="block text-sm text-slate-600 mb-1">City</label>
                 <Input unstyled
+                  id="evt-city"
                   value={(form.city_name as string) || ''}
                   onChange={(v) => update('city_name', v)}
                   className="w-full rounded border border-slate-200 px-3 py-2"
@@ -244,8 +254,9 @@ export const AdminEventEditor: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Event Type</label>
+              <label htmlFor="evt-event-type" className="block text-sm text-slate-600 mb-1">Event Type</label>
               <select
+                id="evt-event-type"
                 value={(form.event_type as string) || 'cinema'}
                 onChange={(e) => update('event_type', e.target.value)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -258,8 +269,9 @@ export const AdminEventEditor: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Description</label>
+              <label htmlFor="evt-description" className="block text-sm text-slate-600 mb-1">Description</label>
               <textarea
+                id="evt-description"
                 value={(form.description as string) || ''}
                 onChange={(e) => update('description', e.target.value)}
                 rows={3}
@@ -267,16 +279,18 @@ export const AdminEventEditor: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Venue</label>
+              <label htmlFor="evt-venue" className="block text-sm text-slate-600 mb-1">Venue</label>
               <Input unstyled
+                id="evt-venue"
                 value={(form.venue_name as string) || ''}
                 onChange={(v) => update('venue_name', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Address</label>
+              <label htmlFor="evt-address" className="block text-sm text-slate-600 mb-1">Address</label>
               <Input unstyled
+                id="evt-address"
                 value={(form.address as string) || ''}
                 onChange={(v) => update('address', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -284,8 +298,9 @@ export const AdminEventEditor: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Start (ISO)</label>
+                <label htmlFor="evt-start-iso" className="block text-sm text-slate-600 mb-1">Start (ISO)</label>
                 <Input unstyled
+                  id="evt-start-iso"
                   type="datetime-local"
                   value={
                     form.start_datetime
@@ -297,8 +312,9 @@ export const AdminEventEditor: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-600 mb-1">End (ISO)</label>
+                <label htmlFor="evt-end-iso" className="block text-sm text-slate-600 mb-1">End (ISO)</label>
                 <Input unstyled
+                  id="evt-end-iso"
                   type="datetime-local"
                   value={
                     form.end_datetime
@@ -311,10 +327,11 @@ export const AdminEventEditor: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Price / Free</label>
+              <span className="block text-sm text-slate-600 mb-1">Price / Free</span>
               <div className="flex gap-4 items-center">
-                <label className="flex items-center gap-2">
+                <label htmlFor="evt-free" className="flex items-center gap-2">
                   <Checkbox
+                    id="evt-free"
                     checked={!!form.is_free}
                     onChange={(e) => update('is_free', e.target.checked)}
                   />
@@ -328,24 +345,27 @@ export const AdminEventEditor: React.FC = () => {
                 />
               </div>
             </div>
-            <label className="flex items-center gap-2">
+            <label htmlFor="evt-family-friendly" className="flex items-center gap-2">
               <Checkbox
+                id="evt-family-friendly"
                 checked={!!form.is_family_friendly}
                 onChange={(e) => update('is_family_friendly', e.target.checked)}
               />
               <span className="text-sm">Family friendly</span>
             </label>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">External URL</label>
+              <label htmlFor="evt-external-url" className="block text-sm text-slate-600 mb-1">External URL</label>
               <Input unstyled
+                id="evt-external-url"
                 value={(form.external_url as string) || ''}
                 onChange={(v) => update('external_url', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Source</label>
+              <label htmlFor="evt-source" className="block text-sm text-slate-600 mb-1">Source</label>
               <select
+                id="evt-source"
                 value={(form.source_id as string) || ''}
                 onChange={(e) => update('source_id', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -364,8 +384,9 @@ export const AdminEventEditor: React.FC = () => {
         <Card padding="lg">
           <h3 className="font-semibold mb-3 text-amber-800">Admin Only</h3>
           <div>
-            <label className="block text-sm text-slate-600 mb-1">Internal Notes</label>
+            <label htmlFor="evt-internal-notes" className="block text-sm text-slate-600 mb-1">Internal Notes</label>
             <textarea
+              id="evt-internal-notes"
               value={(form.internal_notes as string) || ''}
               onChange={(e) => update('internal_notes', e.target.value)}
               rows={4}

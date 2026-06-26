@@ -4,6 +4,7 @@ import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { PlatformShellSidebar } from '../../../components/PlatformShellSidebar';
 import { CompanyBrand } from '../../../components/CompanyBrand';
 import { CompanyProfileForm } from './CompanyProfileForm';
+import { trackCompanyProfileSaved } from '../../../perf/hrOnboardingInstrumentation';
 
 /**
  * HR's own-company profile page. Data comes from useHrCompanyContext
@@ -20,6 +21,14 @@ export function CompanyProfileV2Page() {
 
   async function handleSave(payload: CompanyProfilePayload) {
     await hrAPI.saveCompanyProfile(payload);
+    // AIQ-1223b: HR onboarding signal — first save reveals company size_band.
+    // PII-free: presence flags + coarse size band enum only.
+    trackCompanyProfileSaved({
+      has_size_band: Boolean(payload.size_band),
+      has_default_destination_country: Boolean(payload.default_destination_country),
+      has_default_working_location: Boolean(payload.default_working_location),
+      size_band: payload.size_band || undefined,
+    });
     await refresh();
   }
 

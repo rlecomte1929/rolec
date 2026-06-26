@@ -145,9 +145,9 @@ export const ComplianceAlertsPanel: React.FC = () => {
           Sets the values the rule engine reads. Saving re-runs the evaluator.
         </p>
         <div className="grid gap-2 sm:grid-cols-3">
-          <label className="text-xs text-[#0b2b43]">
+          <label htmlFor="cap-case-id" className="text-xs text-[#0b2b43]">
             Case ID
-            <Input unstyled
+            <Input id="cap-case-id" unstyled
               type="text"
               value={fieldsCaseId}
               onChange={(v) => setFieldsCaseId(v)}
@@ -155,9 +155,9 @@ export const ComplianceAlertsPanel: React.FC = () => {
               className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
             />
           </label>
-          <label className="text-xs text-[#0b2b43]">
+          <label htmlFor="cap-employer-registration-number" className="text-xs text-[#0b2b43]">
             Employer registration number
-            <Input unstyled
+            <Input id="cap-employer-registration-number" unstyled
               type="text"
               value={fieldsEmployerReg}
               onChange={(v) => setFieldsEmployerReg(v)}
@@ -165,9 +165,9 @@ export const ComplianceAlertsPanel: React.FC = () => {
               className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
             />
           </label>
-          <label className="text-xs text-[#0b2b43]">
+          <label htmlFor="cap-expected-start-date" className="text-xs text-[#0b2b43]">
             Expected start date
-            <Input unstyled
+            <Input id="cap-expected-start-date" unstyled
               type="date"
               value={fieldsExpectedStart}
               onChange={(v) => setFieldsExpectedStart(v)}

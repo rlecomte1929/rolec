@@ -114,8 +114,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
     <div className="space-y-3 border border-[#e2e8f0] rounded-lg p-3 bg-[#fafbfc]">
       {label && <div className="text-xs font-medium text-[#64748b] uppercase tracking-wide">{label}</div>}
       <div>
-        <label className="block text-xs font-medium text-[#374151] mb-1">Address line 1</label>
-        <Input unstyled
+        <label htmlFor="im-address-line-1" className="block text-xs font-medium text-[#374151] mb-1">Address line 1</label>
+        <Input id="im-address-line-1" unstyled
           type="text"
           value={value.line1 || ''}
           onChange={(v) => upd('line1', v)}
@@ -124,8 +124,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-[#374151] mb-1">Address line 2</label>
-        <Input unstyled
+        <label htmlFor="im-address-line-2" className="block text-xs font-medium text-[#374151] mb-1">Address line 2</label>
+        <Input id="im-address-line-2" unstyled
           type="text"
           value={value.line2 || ''}
           onChange={(v) => upd('line2', v)}
@@ -135,8 +135,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-[#374151] mb-1">City</label>
-          <Input unstyled
+          <label htmlFor="im-city" className="block text-xs font-medium text-[#374151] mb-1">City</label>
+          <Input id="im-city" unstyled
             type="text"
             value={value.city || ''}
             onChange={(v) => upd('city', v)}
@@ -145,8 +145,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[#374151] mb-1">Postcode / ZIP</label>
-          <Input unstyled
+          <label htmlFor="im-postcode-zip" className="block text-xs font-medium text-[#374151] mb-1">Postcode / ZIP</label>
+          <Input id="im-postcode-zip" unstyled
             type="text"
             value={value.postcode || ''}
             onChange={(v) => upd('postcode', v)}
@@ -156,8 +156,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-[#374151] mb-1">Country</label>
-        <Input unstyled
+        <label htmlFor="im-country" className="block text-xs font-medium text-[#374151] mb-1">Country</label>
+        <Input id="im-country" unstyled
           type="text"
           value={value.country || ''}
           onChange={(v) => upd('country', v)}
@@ -168,8 +168,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       {showDates && (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-[#374151] mb-1">Lived here from</label>
-            <Input unstyled
+            <label htmlFor="im-lived-here-from" className="block text-xs font-medium text-[#374151] mb-1">Lived here from</label>
+            <Input id="im-lived-here-from" unstyled
               type="date"
               value={value.from_date || ''}
               onChange={(v) => upd('from_date', v)}
@@ -177,8 +177,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#374151] mb-1">To (leave blank if current)</label>
-            <Input unstyled
+            <label htmlFor="im-to-leave-blank-if-current" className="block text-xs font-medium text-[#374151] mb-1">To (leave blank if current)</label>
+            <Input id="im-to-leave-blank-if-current" unstyled
               type="date"
               value={value.to_date || ''}
               onChange={(v) => upd('to_date', v)}
@@ -286,8 +286,8 @@ const DependentListEditor: React.FC<DependentListEditorProps> = ({ value, onChan
           ))}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#374151] mb-1">Date of birth</label>
-              <Input unstyled
+              <label htmlFor="im-date-of-birth" className="block text-xs font-medium text-[#374151] mb-1">Date of birth</label>
+              <Input id="im-date-of-birth" unstyled
                 type="date"
                 value={dep.date_of_birth || ''}
                 onChange={(v) => upd(i, 'date_of_birth', v)}
@@ -295,8 +295,8 @@ const DependentListEditor: React.FC<DependentListEditorProps> = ({ value, onChan
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#374151] mb-1">Relationship</label>
-              <select
+              <label htmlFor="im-relationship" className="block text-xs font-medium text-[#374151] mb-1">Relationship</label>
+              <select id="im-relationship"
                 value={dep.relationship || ''}
                 onChange={(e) => upd(i, 'relationship', e.target.value)}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
