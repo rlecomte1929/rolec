@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/antigravity/Button';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
@@ -28,14 +29,29 @@ type CaseRow = {
 
 export const HrCommandCenter: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const role = getAuthItem('relopass_role');
   useEffect(() => {
     if (role && role !== 'HR' && role !== 'ADMIN') {
       safeNavigate(navigate, 'landing');
     }
   }, [role, navigate]);
-  const [kpis, setKpis] = useState<{
+  const [page, setPage] = useState(1);
+  const [riskFilter, setRiskFilter] = useState<string>('');
+
+  const kpisQuery = useQuery({
+    queryKey: ['hr', 'command-center', 'kpis'],
+    queryFn: () => hrAPI.getCommandCenterKPIs(),
+  });
+
+  const casesQuery = useQuery({
+    queryKey: ['hr', 'command-center', 'cases', { page, riskFilter: riskFilter || undefined }],
+    queryFn: () => hrAPI.listCommandCenterCases({ page, limit: 25, risk_filter: riskFilter || undefined }),
+    // Keep the prior page visible while the next one loads (the hand-rolled
+    // version left the old rows up and only swapped on resolve).
+    placeholderData: keepPreviousData,
+  });
+
+  const kpis: {
     activeCases: number;
     atRiskCount: number;
     attentionNeededCount: number;
@@ -44,51 +60,17 @@ export const HrCommandCenter: React.FC = () => {
     actionRequiredCount: number;
     departingSoonCount: number;
     completedCount: number;
-  } | null>(null);
-  const [cases, setCases] = useState<CaseRow[]>([]);
-  const [kpisLoading, setKpisLoading] = useState(true);
-  const [casesLoading, setCasesLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [riskFilter, setRiskFilter] = useState<string>('');
+  } | null = kpisQuery.data ?? null;
+  const cases: CaseRow[] = casesQuery.data ?? [];
+  const kpisLoading = kpisQuery.isLoading;
+  const casesLoading = casesQuery.isLoading;
 
+  // Preserve the 401 → landing redirect from both reads.
   useEffect(() => {
-    let cancelled = false;
-    async function loadKpis() {
-      setKpisLoading(true);
-      try {
-        const k = await hrAPI.getCommandCenterKPIs();
-        if (!cancelled) setKpis(k);
-      } catch (err: unknown) {
-        if (!cancelled && (err as { response?: { status?: number } })?.response?.status === 401) {
-          safeNavigate(navigate, 'landing');
-        }
-      } finally {
-        if (!cancelled) setKpisLoading(false);
-      }
-    }
-    void loadKpis();
-    return () => { cancelled = true; };
-  }, [navigate, location.key]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCases() {
-      setCasesLoading(true);
-      try {
-        const c = await hrAPI.listCommandCenterCases({ page, limit: 25, risk_filter: riskFilter || undefined });
-        if (!cancelled) setCases(c);
-      } catch (err: unknown) {
-        if (!cancelled && (err as { response?: { status?: number } })?.response?.status === 401) {
-          safeNavigate(navigate, 'landing');
-        }
-        if (!cancelled) setCases([]);
-      } finally {
-        if (!cancelled) setCasesLoading(false);
-      }
-    }
-    void loadCases();
-    return () => { cancelled = true; };
-  }, [navigate, location.key, page, riskFilter]);
+    const kStatus = (kpisQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    const cStatus = (casesQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    if (kStatus === 401 || cStatus === 401) safeNavigate(navigate, 'landing');
+  }, [kpisQuery.error, casesQuery.error, navigate]);
 
   const handleRowClick = (id: string) => {
     navigate(`/hr/command-center/cases/${id}`);

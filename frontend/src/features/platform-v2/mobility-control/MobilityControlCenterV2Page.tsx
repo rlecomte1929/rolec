@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
@@ -309,68 +310,76 @@ function ProgressBar({ value, risk }: { value: number; risk: string }) {
 
 export function MobilityControlCenterV2Page() {
   const navigate = useNavigate();
-  const [cases, setCases] = useState<CommandCenterCaseRow[]>([]);
   // MOBCC-FU1: header filters applied client-side over the already-scoped case
   // list — they never widen tenant visibility (no scope/endpoint change).
   const [corridorFilter, setCorridorFilter] = useState<string | null>(null);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
-  const [kpis, setKpis] = useState<{
+  const { companyId } = useHrCompanyContext();
+
+  // Single parallel read of KPIs + cases + pending approvals. Promise.allSettled
+  // never rejects, so the query always resolves; partial failures surface via the
+  // `degraded` flag exactly as the hand-rolled `backendDegraded` did (KPIs/cases
+  // failing degrades; an approvals failure just empties that sidebar).
+  const dashboardQuery = useQuery({
+    queryKey: ['hr', 'mobility-control'],
+    queryFn: async () => {
+      const [kpisRes, casesRes, approvalsRes] = await Promise.allSettled([
+        hrAPI.getCommandCenterKPIs(),
+        hrAPI.listCommandCenterCases({ page: 1, limit: 100 }),
+        // Reuse the HR exception requests endpoint — pending = awaiting HR sign-off
+        api.get('/api/exception-requests', { params: { status: 'pending' } }).then((r) => r.data as ApprovalRow[]),
+      ]);
+      let degraded = false;
+      let kpis: {
+        activeCases: number;
+        atRiskCount: number;
+        completedCount: number;
+        budgetOverrunsCount: number;
+      } | null = null;
+      if (kpisRes.status === 'fulfilled') {
+        kpis = {
+          activeCases: kpisRes.value.activeCases ?? 0,
+          atRiskCount: kpisRes.value.atRiskCount ?? 0,
+          completedCount: kpisRes.value.completedCount ?? 0,
+          budgetOverrunsCount: kpisRes.value.budgetOverrunsCount ?? 0,
+        };
+      } else {
+        degraded = true;
+      }
+      let cases: CommandCenterCaseRow[] = [];
+      if (casesRes.status === 'fulfilled') {
+        cases = casesRes.value;
+      } else {
+        degraded = true;
+      }
+      let approvals: ApprovalRow[] = [];
+      if (approvalsRes.status === 'fulfilled' && Array.isArray(approvalsRes.value)) {
+        approvals = approvalsRes.value;
+      }
+      return { kpis, cases, approvals, degraded };
+    },
+  });
+
+  const kpis: {
     activeCases: number;
     atRiskCount: number;
     completedCount: number;
     budgetOverrunsCount: number;
-  } | null>(null);
-  const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [backendDegraded, setBackendDegraded] = useState(false);
-  const { companyId } = useHrCompanyContext();
-  // Parker-J: data-to-text exec summary. Null = provider deferred to LLM (env flag) or unavailable.
-  const [execSummary, setExecSummary] = useState<string | null>(null);
+  } | null = dashboardQuery.data?.kpis ?? null;
+  const cases: CommandCenterCaseRow[] = dashboardQuery.data?.cases ?? [];
+  const approvals: ApprovalRow[] = dashboardQuery.data?.approvals ?? [];
+  const backendDegraded = dashboardQuery.data?.degraded ?? false;
+  const loading = dashboardQuery.isLoading;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setBackendDegraded(false);
-    const [kpisRes, casesRes, approvalsRes] = await Promise.allSettled([
-      hrAPI.getCommandCenterKPIs(),
-      hrAPI.listCommandCenterCases({ page: 1, limit: 100 }),
-      // Reuse the HR exception requests endpoint — pending = awaiting HR sign-off
-      api.get('/api/exception-requests', { params: { status: 'pending' } }).then((r) => r.data as ApprovalRow[]),
-    ]);
-    if (kpisRes.status === 'fulfilled') {
-      setKpis({
-        activeCases: kpisRes.value.activeCases ?? 0,
-        atRiskCount: kpisRes.value.atRiskCount ?? 0,
-        completedCount: kpisRes.value.completedCount ?? 0,
-        budgetOverrunsCount: kpisRes.value.budgetOverrunsCount ?? 0,
-      });
-    } else {
-      setBackendDegraded(true);
-    }
-    if (casesRes.status === 'fulfilled') {
-      setCases(casesRes.value);
-    } else {
-      setCases([]);
-      setBackendDegraded(true);
-    }
-    if (approvalsRes.status === 'fulfilled' && Array.isArray(approvalsRes.value)) {
-      setApprovals(approvalsRes.value);
-    } else {
-      setApprovals([]);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  // Parker-J: classical data-to-text exec summary (LLM-free, env-flag gated server-side).
-  useEffect(() => {
-    if (!companyId) { setExecSummary(null); return; }
-    const ctrl = new AbortController();
-    fetchExecSummary(companyId, ctrl.signal)
-      .then((res) => setExecSummary(res.summary))
-      .catch(() => setExecSummary(null));
-    return () => ctrl.abort();
-  }, [companyId]);
+  // Parker-J: classical data-to-text exec summary (LLM-free, env-flag gated
+  // server-side). Dependent on the resolved companyId. Null = provider deferred
+  // to LLM (env flag) or unavailable.
+  const execSummaryQuery = useQuery({
+    queryKey: ['hr', 'mobility-control', 'exec-summary', companyId],
+    enabled: !!companyId,
+    queryFn: ({ signal }) => fetchExecSummary(companyId as string, signal).then((res) => res.summary),
+  });
+  const execSummary: string | null = execSummaryQuery.data ?? null;
 
   // ── MOBCC-FU1: client-side header filters ─────────────────────────────────
   const filterActive = corridorFilter !== null || periodFilter !== 'all';
@@ -693,7 +702,7 @@ export function MobilityControlCenterV2Page() {
             <span>
               Some data couldn't load — showing partial results. Refresh to try again.
             </span>
-            <Button unstyled type="button" onClick={() => void load()} className="text-amber-700 hover:underline">Retry</Button>
+            <Button unstyled type="button" onClick={() => void dashboardQuery.refetch()} className="text-amber-700 hover:underline">Retry</Button>
           </div>
         )}
 

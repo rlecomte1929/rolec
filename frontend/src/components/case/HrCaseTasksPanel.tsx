@@ -9,7 +9,8 @@
  * Polls every 8 seconds so the HR user sees fresh status without refreshing
  * the whole page (reduced from original 60s to match demo UX requirements).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '../antigravity/Checkbox';
 import { Input } from '../antigravity/Input';
 import { hrAPI } from '../../api/client';
@@ -327,32 +328,20 @@ interface HrCaseTasksPanelProps {
 }
 
 export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId }) => {
-  const [data, setData] = useState<EmployeeTaskListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queryKey = ['hr', 'case-tasks', caseId] as const;
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      const result = await hrAPI.getCaseTasks(caseId);
-      setData(result);
-      setError(null);
-    } catch {
-      setError('Could not load tasks.');
-    } finally {
-      setLoading(false);
-    }
-  }, [caseId]);
+  // Poll every 8s — fast enough for demo UX, light enough not to hammer the API.
+  const tasksQuery = useQuery({
+    queryKey,
+    queryFn: () => hrAPI.getCaseTasks(caseId),
+    refetchInterval: 8_000,
+  });
 
-  useEffect(() => {
-    void fetchTasks();
-    // Poll every 8s — fast enough for demo UX, light enough not to hammer the API
-    pollRef.current = setInterval(() => void fetchTasks(), 8_000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [fetchTasks]);
+  const data: EmployeeTaskListResponse | null = tasksQuery.data ?? null;
+  const loading = tasksQuery.isLoading;
+  const error: string | null = tasksQuery.isError ? 'Could not load tasks.' : null;
 
   const recomputeStats = (tasks: EmployeeTask[]) => {
     const completed = tasks.filter(
@@ -362,16 +351,22 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId }) =>
     return { total, completed, pct: total ? Math.round((completed / total) * 100) : 0 };
   };
 
+  // Optimistic local patch into the query cache (matches the original in-place
+  // setData; the 8s poll reconciles with the server shortly after).
   const handleTaskUpdated = (updated: EmployeeTask) => {
-    if (!data) return;
-    const tasks = data.tasks.map((t) => (t.id === updated.id ? updated : t));
-    setData({ ...data, tasks, stats: recomputeStats(tasks) });
+    queryClient.setQueryData<EmployeeTaskListResponse>(queryKey, (old) => {
+      if (!old) return old;
+      const tasks = old.tasks.map((t) => (t.id === updated.id ? updated : t));
+      return { ...old, tasks, stats: recomputeStats(tasks) };
+    });
   };
 
   const handleTaskAdded = (newTask: EmployeeTask) => {
-    if (!data) return;
-    const tasks = [...data.tasks, newTask];
-    setData({ ...data, tasks, stats: recomputeStats(tasks) });
+    queryClient.setQueryData<EmployeeTaskListResponse>(queryKey, (old) => {
+      if (!old) return old;
+      const tasks = [...old.tasks, newTask];
+      return { ...old, tasks, stats: recomputeStats(tasks) };
+    });
     setShowAddForm(false);
   };
 
