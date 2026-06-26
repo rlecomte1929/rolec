@@ -74,6 +74,15 @@ export const ROUTE_DEFS = {
   servicesEstimate: { path: '/services/estimate', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   servicesRfqNew: { path: '/services/rfq/new', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   servicesConclusion: { path: '/services/conclusion', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  // [AIQ-1285/H-05] Case-scoped services flow — the canonical paths. The legacy
+  // /services/* paths above are kept as redirect routes (App.tsx) for back-compat
+  // with deep links + last-visited entries. caseId === the assignment id.
+  caseServices: { path: '/employee/case/:caseId/services/select', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  caseServicesQuestions: { path: '/employee/case/:caseId/services/questions', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  caseServicesRecommendations: { path: '/employee/case/:caseId/services/recommendations', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  caseServicesEstimate: { path: '/employee/case/:caseId/services/estimate', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  caseServicesRfqNew: { path: '/employee/case/:caseId/services/rfq/new', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  caseServicesConclusion: { path: '/employee/case/:caseId/services/conclusion', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   quotesInbox: { path: '/quotes', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   quoteRfqDetail: { path: '/quotes/rfq/:rfqId', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   vendorInbox: { path: '/vendor/inbox', roles: ['ADMIN', 'EMPLOYEE', 'HR'] as RouteRole[] },
