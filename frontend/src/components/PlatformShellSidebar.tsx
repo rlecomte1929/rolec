@@ -9,6 +9,9 @@ import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { Button } from './antigravity/Button';
 import { swallow } from '../lib/errorTracking';
+import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
+import { isIntakeComplete } from '../features/employee-journey/caseStage';
+import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -214,6 +217,62 @@ const SectionHeading: React.FC<{ label: string; count?: number; collapsed: boole
   );
 };
 
+// ── Employee journey-progress mini indicator (NAV-EMP-1) ─────────────────────────
+// A compact 3-step progress line shown under the "My cases" header for employees
+// with an active case. NOT the antigravity StepRail (that's a large page-card with
+// border/shadow/10×10 dots) — this is a tiny inline ●─●─○ + "Step N of 3" line in
+// the sidebar's type scale, so it reads as wayfinding rather than a content block.
+//
+// Model: a linear 3-stage pipeline (Intake → Services & policy → Roadmap). The
+// current stage is Intake until intake is submitted, then advances to Services &
+// policy. We have intake_step + status per linked case via EmployeeAssignmentContext,
+// so this is data-correct. (Roadmap stays "upcoming" until the services stage is
+// done — the sidebar has no services/roadmap completion signal to advance further.)
+
+type MiniStepStatus = 'done' | 'current' | 'upcoming';
+const JOURNEY_STEP_LABELS = ['Intake', 'Services & policy', 'Roadmap'] as const;
+
+function deriveJourneySteps(row: EmployeeLinkedOverviewRow): MiniStepStatus[] {
+  const step = row.intake_step ?? 0;
+  const submitted = isIntakeComplete(row.status) || (INTAKE_TOTAL_STEPS > 0 && step >= INTAKE_TOTAL_STEPS);
+  // Intake: done once submitted; otherwise it's the current focus (covers step 0
+  // and partial progress). Services becomes current once intake is submitted.
+  return submitted
+    ? ['done', 'current', 'upcoming']
+    : ['current', 'upcoming', 'upcoming'];
+}
+
+const JourneyProgressMini: React.FC<{ row: EmployeeLinkedOverviewRow }> = ({ row }) => {
+  const steps = deriveJourneySteps(row);
+  const currentIndex = steps.findIndex((s) => s === 'current');
+  const labelIndex = currentIndex === -1 ? steps.length - 1 : currentIndex;
+  return (
+    <div className="ml-7 mb-1 mt-0.5 flex flex-col gap-1">
+      <div className="flex items-center gap-1" aria-hidden="true">
+        {steps.map((status, i) => (
+          <React.Fragment key={JOURNEY_STEP_LABELS[i]}>
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full border ${
+                status === 'upcoming'
+                  ? 'border-slate-300 bg-white'
+                  : status === 'current'
+                    ? 'border-[#0b2b43] bg-[#0b2b43] ring-2 ring-[#0b2b43]/20'
+                    : 'border-[#0b2b43] bg-[#0b2b43]'
+              }`}
+            />
+            {i < steps.length - 1 && (
+              <span className={`h-px w-2.5 shrink-0 ${steps[i + 1] === 'upcoming' ? 'bg-slate-200' : 'bg-[#0b2b43]/40'}`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+      <span className="text-[11px] leading-tight text-slate-500">
+        Step {labelIndex + 1} of {JOURNEY_STEP_LABELS.length} · {JOURNEY_STEP_LABELS[labelIndex]}
+      </span>
+    </div>
+  );
+};
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface PlatformShellSidebarProps {
@@ -301,8 +360,16 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   // employee's primary linked case, so sidebar links resolve to the case-scoped roadmap/dossier
   // even from /employee/dashboard where there is no case in the URL and nothing was selected yet.
   const { selectedCaseId } = useSelectedCase();
-  const { linkedCount, primaryCaseId, isLoading: assignmentsLoading } = useEmployeeAssignment();
+  const { linkedCount, primaryCaseId, linkedSummaries, isLoading: assignmentsLoading } = useEmployeeAssignment();
   const effectiveCaseId = urlCaseId ?? selectedCaseId ?? primaryCaseId;
+
+  // Resolve the active linked case (by case_id or assignment_id) so the employee
+  // journey-progress mini indicator can read its intake_step/status. Falls back to
+  // the primary linked case. Null when the employee has no linked case yet.
+  const activeJourneyRow =
+    linkedSummaries.find((r) => r.case_id === effectiveCaseId || r.assignment_id === effectiveCaseId) ??
+    linkedSummaries[0] ??
+    null;
 
   // Resolve the effective `to` for an item, allowing case-scoped overrides
   const resolveItemTo = (item: SectionItem): string => {
@@ -493,6 +560,12 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                     </span>
                   )}
                 </Link>
+
+                {/* NAV-EMP-1: compact journey-progress indicator under "My cases"
+                    for employees with an active linked case. Hidden when collapsed. */}
+                {item.id === 'intake' && role === 'EMPLOYEE' && !collapsed && activeJourneyRow && (
+                  <JourneyProgressMini row={activeJourneyRow} />
+                )}
 
                 {/* NAV-POL-1: indented sub-items deep-linking to the parent's
                     ?tab= variants. Always visible when expanded so every step is
