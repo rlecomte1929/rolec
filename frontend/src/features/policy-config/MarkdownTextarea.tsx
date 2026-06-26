@@ -41,7 +41,10 @@ const renderInline = (s: string): string => {
   return bolded.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
 };
 
-const renderMarkdown = (raw: string): string => {
+// Exported for the XSS-safety regression test (SEC-FE-5). All user input is
+// HTML-escaped before the markdown regex runs, so only the controlled tag
+// template (<strong>/<em>/<ul>/<li>/<p>/<br>) can ever reach the DOM.
+export const renderMarkdown = (raw: string): string => {
   if (!raw.trim()) return '';
   const blocks = raw.split(/\n\s*\n/);
   const out: string[] = [];

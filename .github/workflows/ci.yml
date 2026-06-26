@@ -96,6 +96,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Dependency vulnerability audit (production deps)
+        # QG-3: gate on HIGH/CRITICAL vulnerabilities in the *shipped* bundle only
+        # (--omit=dev). Dev-only tooling vulns (vitest/vite majors) are tracked
+        # separately (DEP-5/6) and must not block PRs. Currently 0 prod vulns.
+        run: npm audit --omit=dev --audit-level=high
+
       - name: TypeScript type-check
         run: npx tsc --noEmit
 
