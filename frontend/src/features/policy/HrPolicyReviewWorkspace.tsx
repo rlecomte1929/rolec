@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../api/client';
+import { fetchPolicyTldr } from '../../api/nlg';
 import type { NormalizedPolicyResponse, NormalizedBenefitRule, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from './types';
 import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
 import { buildEmployeePreviewCompare } from './hrPolicyEmployeePreviewCompare';
@@ -19,7 +20,6 @@ import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPoli
 import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
 import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
 import { formatPolicySourceCitation, getSourceProvenance } from './policySourceProvenance';
-import { fetchPolicyTldr } from '../../api/nlg';
 
 const VERSION_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -33,14 +33,16 @@ const VERSION_STATUS_LABELS: Record<string, string> = {
 };
 
 type Meta = Record<string, unknown>;
-const meta = (r: any, key: string, def?: number | string | boolean) => {
-  const m = (r?.metadata_json || r?.metadata) as Meta | undefined;
+type ApiError = { response?: { status?: number; data?: Record<string, unknown> }; message?: string };
+
+const meta = (r: NormalizedBenefitRule, key: string, def?: number | string | boolean): string | number | boolean | undefined => {
+  const m = (r?.metadata_json || (r as { metadata?: Meta })?.metadata);
   if (!m || typeof m !== 'object') return def;
   const v = m[key];
-  return v !== undefined && v !== null ? v : def;
+  return (v !== undefined && v !== null ? v : def) as string | number | boolean | undefined;
 };
 
-function formatBenefitLabel(r: any): string {
+function formatBenefitLabel(r: NormalizedBenefitRule): string {
   return (meta(r, 'benefit_label') as string) || r?.benefit_key || '-';
 }
 
@@ -115,7 +117,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
   const downloadCacheRef = React.useRef<{ policyId: string; url: string | null; noFile: boolean } | null>(null);
 
-  const loadWorkspaceData = React.useCallback(async (policyId: string): Promise<{ normRes: any; dlRes: string | null; downloadUnavailable: boolean }> => {
+  const loadWorkspaceData = React.useCallback(async (policyId: string): Promise<{ normRes: NormalizedPolicyResponse | null; dlRes: string | null; downloadUnavailable: boolean }> => {
     const cached = downloadCacheRef.current?.policyId === policyId ? downloadCacheRef.current : null;
     const fetchDownload = cached
       ? Promise.resolve(cached.noFile ? { ok: false, url: null } : { ok: true, url: cached.url })
@@ -152,12 +154,12 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     void loadDocumentsAndPolicies().then((pols) => {
       if (cancelled) return;
       setSelectedPolicyId((current) => {
-        if (bindPolicyId && pols.some((p: any) => p.id === bindPolicyId)) {
+        if (bindPolicyId && pols.some((p) => p.id === bindPolicyId)) {
           onBindComplete?.();
           return bindPolicyId;
         }
         if (!current && pols.length) return pols[0]?.id ?? current;
-        if (current && !pols.some((p: any) => p.id === current) && pols.length) return pols[0]?.id ?? current;
+        if (current && !pols.some((p) => p.id === current) && pols.length) return pols[0]?.id ?? current;
         return current;
       });
     });
@@ -247,7 +249,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
   const getSourceLink = (objectType: string, objectId: string) => {
     const links = normalized?.source_links || [];
-    return links.find((l: any) => l.object_type === objectType && l.object_id === objectId);
+    return links.find((l) => l.object_type === objectType && l.object_id === objectId);
   };
 
   const openSourceClause = async (clauseId: string) => {
@@ -260,7 +262,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     }
   };
 
-  const handlePatchBenefit = async (ruleId: string, patch: Record<string, any>) => {
+  const handlePatchBenefit = async (ruleId: string, patch: Record<string, unknown>) => {
     if (!selectedPolicyId) return;
     setMessage('');
     setSavingRule(ruleId);
@@ -269,8 +271,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
       setEditingRule(null);
-    } catch (err: any) {
-      setMessage(err?.response?.data?.detail || 'Update failed');
+    } catch (err) {
+      setMessage(formatApiDetail((err as ApiError)?.response?.data?.detail) || 'Update failed');
       setMessageVariant('error');
     } finally {
       setSavingRule(null);
@@ -293,8 +295,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setNormalized(res);
       setMessage(STATUS_SUCCESS_LABELS[status] ?? 'Status updated.');
       setMessageVariant('success');
-    } catch (err: any) {
-      const statusCode = err?.response?.status;
+    } catch (err) {
+      const statusCode = (err as ApiError)?.response?.status;
       if (statusCode === 404) {
         const res = await companyPolicyAPI.getNormalized(selectedPolicyId).catch(() => null);
         if (res?.version) {
@@ -307,7 +309,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setMessage(
         statusCode === 404
           ? 'This version is no longer current. The page has been refreshed to the latest version.'
-          : formatApiDetail(err?.response?.data?.detail) || 'Status update failed'
+          : formatApiDetail((err as ApiError)?.response?.data?.detail) || 'Status update failed'
       );
       setMessageVariant('error');
     } finally {
@@ -329,8 +331,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setMessage('Published. Employees now see this version on their assignments (within eligibility).');
       setMessageVariant('success');
       void loadDocumentsAndPolicies();
-    } catch (err: any) {
-      const statusCode = err?.response?.status;
+    } catch (err) {
+      const statusCode = (err as ApiError)?.response?.status;
       if (statusCode === 404) {
         const res = await companyPolicyAPI
           .getNormalized(selectedPolicyId, { includeReadiness: true })
@@ -347,7 +349,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setMessage(
         statusCode === 404
           ? 'This version is no longer current. The page has been refreshed to the latest version.'
-          : formatApiDetail(err?.response?.data?.detail) || 'Publish failed'
+          : formatApiDetail((err as ApiError)?.response?.data?.detail) || 'Publish failed'
       );
       setMessageVariant('error');
     } finally {
@@ -385,9 +387,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       );
       setMessageVariant('success');
       void loadDocumentsAndPolicies();
-    } catch (err: any) {
+    } catch (err) {
       setMessage(
-        formatApiDetail(err?.response?.data?.detail) || 'Unpublish failed. Try again or contact support.'
+        formatApiDetail((err as ApiError)?.response?.data?.detail) || 'Unpublish failed. Try again or contact support.'
       );
       setMessageVariant('error');
     } finally {
@@ -406,8 +408,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setMessage('Policy rebuilt from your source file. Review the benefit table for changes.');
       setMessageVariant('success');
       void loadDocumentsAndPolicies();
-    } catch (err: any) {
-      const data = err?.response?.data;
+    } catch (err) {
+      const data = (err as ApiError)?.response?.data;
       let m =
         (data?.message && typeof data.message === 'string' ? data.message : null) ||
         formatApiDetail(data?.detail) ||
@@ -440,16 +442,16 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const groupedBenefits = useMemo(() => {
     const rules = normalized?.benefit_rules || [];
     const byCat = rules.reduce(
-      (acc: Record<string, any[]>, r: any) => {
+      (acc: Record<string, NormalizedBenefitRule[]>, r: NormalizedBenefitRule) => {
         const cat = r.benefit_category || 'misc';
         if (!acc[cat]) acc[cat] = [];
         acc[cat].push(r);
         return acc;
       },
-      {} as Record<string, any[]>
+      {} as Record<string, NormalizedBenefitRule[]>
     );
     // Return in display order, only topics that have rules
-    const ordered: [string, any[]][] = [];
+    const ordered: [string, NormalizedBenefitRule[]][] = [];
     for (const cat of POLICY_TOPIC_ORDER) {
       if (byCat[cat]?.length) ordered.push([cat, byCat[cat]]);
     }
@@ -588,14 +590,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     const m = tn.match(/^starter_(conservative|standard|premium)$/);
     const k = m?.[1];
     const templateKey =
-      k === 'conservative' || k === 'standard' || k === 'premium' ? (k as StarterTemplateKey) : null;
+      k === 'conservative' || k === 'standard' || k === 'premium' ? (k) : null;
     return { isStarter, templateKey };
   }, [normalized?.policy]);
 
   const starterGuidancePhase: HrPolicyWorkspacePhase = useMemo(() => {
     if (workspaceResolved.phase === 'published' && workspaceResolved.hasUnpublishedDraftAhead) {
       const st = String(
-        (normalized?.policy_readiness as { publish_readiness?: { status?: string } } | undefined)?.publish_readiness
+        (normalized?.policy_readiness)?.publish_readiness
           ?.status || ''
       )
         .trim()
@@ -847,11 +849,11 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             {groupedBenefits.map(([cat, rules]) => {
               const isExpanded = expandedTopics.has(cat);
               const label = POLICY_TOPIC_LABELS[cat] ?? cat;
-              const autoCount = (rules as any[]).filter((r: any) => r.auto_generated).length;
+              const autoCount = rules.filter((r) => r.auto_generated).length;
               const manualCount = rules.length - autoCount;
-              const ruleList = rules as any[];
-              const showApproval = ruleList.some((r: any) => meta(r, 'approval_required', false));
-              const showEvidence = ruleList.some((r: any) => meta(r, 'evidence_required', false));
+              const ruleList = rules;
+              const showApproval = ruleList.some((r) => meta(r, 'approval_required', false));
+              const showEvidence = ruleList.some((r) => meta(r, 'evidence_required', false));
               return (
                 <div key={cat} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
                   <Button unstyled type="button" onClick={() => toggleTopic(cat)} className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#f8fafc]">
@@ -878,10 +880,10 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                 </tr>
               </thead>
               <tbody>
-                {ruleList.map((r: any) => {
-                  const link = getSourceLink('benefit_rule', r.id);
+                {ruleList.map((r) => {
+                  const link = getSourceLink('benefit_rule', r.id ?? '');
                   const isEditing = editingRule?.id === r.id;
-                  const metaVal = (k: string, def?: any) => meta(r, k, def);
+                  const metaVal = (k: string, def?: number | string | boolean) => meta(r, k, def);
                   const primaryVal = r.amount_value ?? metaVal('standard_value') ?? metaVal('max_value') ?? metaVal('min_value');
                   const capVal = metaVal('max_value') ?? r.amount_value;
                   const approvalReq = metaVal('approval_required', false);
@@ -928,7 +930,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           <div className="space-y-1">
                             {hasNumericCap && (
                               <div className="h-2 w-24 bg-[#e2e8f0] rounded-full overflow-hidden">
-                                <div className="h-full bg-[#1f8e8b]" style={{ width: `${Math.min(100, ((editingRule?.amount_value ?? primaryVal ?? 0) / (typeof capVal === 'number' ? capVal : 1)) * 100)}%` }} />
+                                <div className="h-full bg-[#1f8e8b]" style={{ width: `${Math.min(100, ((Number(editingRule?.amount_value ?? primaryVal ?? 0)) / (typeof capVal === 'number' ? capVal : 1)) * 100)}%` }} />
                               </div>
                             )}
                             <Input type="number" value={String(editingRule?.amount_value ?? primaryVal ?? '')} onChange={(val) => setEditingRule({ ...editingRule, amount_value: val ? Number(val) : null })} placeholder="-" />
@@ -1000,7 +1002,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           <div className="flex gap-1">
                             <Button
                               size="sm"
-                              onClick={() => handlePatchBenefit(r.id, {
+                              onClick={() => handlePatchBenefit(r.id ?? '', {
                                 amount_value: editingRule?.amount_value,
                                 amount_unit: editingRule?.amount_unit,
                                 currency: editingRule?.currency,
@@ -1044,7 +1046,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               <div>
                 <div className="text-xs font-medium text-[#6b7280] mb-1">Exclusions</div>
                 <div className="flex flex-wrap gap-2">
-                  {normalized.exclusions.map((e: any) => (
+                  {normalized.exclusions.map((e) => (
                     <div key={e.id} className="px-2 py-1 rounded bg-amber-50 border border-amber-200 text-xs">
                       {e.benefit_key && <span className="font-medium">{e.benefit_key}</span>}
                       <span className="text-[#4b5563]"> · {(e.description || e.raw_text || '').slice(0, 60)}{(e.description || e.raw_text || '').length > 60 ? '…' : ''}</span>
@@ -1057,7 +1059,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               <div>
                 <div className="text-xs font-medium text-[#6b7280] mb-1">Required evidence</div>
                 <div className="flex flex-wrap gap-1">
-                  {normalized.evidence_requirements.map((ev: any) => (
+                  {normalized.evidence_requirements.map((ev) => (
                     <span key={ev.id} className="px-2 py-0.5 rounded bg-[#f0fdf4] text-[#166534] text-xs">
                       {(Array.isArray(ev.evidence_items_json) ? ev.evidence_items_json : []).join(', ')}
                     </span>
