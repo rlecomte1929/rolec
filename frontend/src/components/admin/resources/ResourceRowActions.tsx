@@ -119,11 +119,19 @@ export const ResourceRowActions: React.FC<ResourceRowActionsProps> = ({
       )}
 
       {showApproveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowApproveModal(false)}>
-          <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowApproveModal(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowApproveModal(false); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close approve dialog"
+        >
+          <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4">
             <h4 className="font-semibold mb-2">Approve resource</h4>
-            <label className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
+            <label htmlFor="approve-review-notes" className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
             <textarea
+              id="approve-review-notes"
               value={approveNotes}
               onChange={(e) => setApproveNotes(e.target.value)}
               rows={2}
