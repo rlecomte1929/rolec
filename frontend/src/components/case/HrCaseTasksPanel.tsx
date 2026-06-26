@@ -253,8 +253,8 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-[#6b7280] mb-1">Type</label>
-          <select
+          <label htmlFor="ct-type" className="block text-xs text-[#6b7280] mb-1">Type</label>
+          <select id="ct-type"
             className="w-full text-sm border border-[#e2e8f0] rounded p-2 bg-white focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
             value={taskType}
             onChange={(e) => setTaskType(e.target.value as TaskType)}
@@ -267,8 +267,8 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
           </select>
         </div>
         <div>
-          <label className="block text-xs text-[#6b7280] mb-1">Due date</label>
-          <Input unstyled
+          <label htmlFor="ct-due-date" className="block text-xs text-[#6b7280] mb-1">Due date</label>
+          <Input id="ct-due-date" unstyled
             type="date"
             className="w-full text-sm border border-[#e2e8f0] rounded p-2 focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
             value={dueDate}
@@ -278,8 +278,8 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
       </div>
 
       <div>
-        <label className="block text-xs text-[#6b7280] mb-1">Title *</label>
-        <Input unstyled
+        <label htmlFor="ct-title" className="block text-xs text-[#6b7280] mb-1">Title *</label>
+        <Input id="ct-title" unstyled
           type="text"
           className="w-full text-sm border border-[#e2e8f0] rounded p-2 focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
           placeholder="e.g. Upload proof of address"
@@ -289,8 +289,8 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
       </div>
 
       <div>
-        <label className="block text-xs text-[#6b7280] mb-1">Description / instructions</label>
-        <textarea
+        <label htmlFor="ct-description-instructions" className="block text-xs text-[#6b7280] mb-1">Description / instructions</label>
+        <textarea id="ct-description-instructions"
           className="w-full text-sm border border-[#e2e8f0] rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
           rows={2}
           value={description}
@@ -298,8 +298,8 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-        <Checkbox
+      <label htmlFor="ct-require-file-upload" className="flex items-center gap-2 text-sm cursor-pointer select-none">
+        <Checkbox id="ct-require-file-upload"
           checked={requireFile}
           onChange={(e) => setRequireFile(e.target.checked)}
           className="rounded border-[#e2e8f0]"

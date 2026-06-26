@@ -766,8 +766,8 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
         <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Add company</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Name *</label>
-            <Input unstyled
+            <label htmlFor="ac-name" className="block text-sm font-medium text-[#374151] mb-1">Name *</label>
+            <Input id="ac-name" unstyled
               value={name}
               onChange={(v) => setName(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
@@ -776,8 +776,8 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Country</label>
-            <Input unstyled
+            <label htmlFor="ac-country" className="block text-sm font-medium text-[#374151] mb-1">Country</label>
+            <Input id="ac-country" unstyled
               value={country}
               onChange={(v) => setCountry(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
@@ -785,8 +785,8 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Plan tier</label>
-            <select
+            <label htmlFor="ac-plan-tier" className="block text-sm font-medium text-[#374151] mb-1">Plan tier</label>
+            <select id="ac-plan-tier"
               value={plan_tier}
               onChange={(e) => setPlanTier(e.target.value as CompanyPlanTier)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
@@ -797,8 +797,8 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Status</label>
-            <select
+            <label htmlFor="ac-status" className="block text-sm font-medium text-[#374151] mb-1">Status</label>
+            <select id="ac-status"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
@@ -810,8 +810,8 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">HR seat limit</label>
-              <Input unstyled
+              <label htmlFor="ac-hr-seat-limit" className="block text-sm font-medium text-[#374151] mb-1">HR seat limit</label>
+              <Input id="ac-hr-seat-limit" unstyled
                 type="number"
                 min={0}
                 value={hr_seat_limit}
@@ -821,8 +821,8 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Employee seat limit</label>
-              <Input unstyled
+              <label htmlFor="ac-employee-seat-limit" className="block text-sm font-medium text-[#374151] mb-1">Employee seat limit</label>
+              <Input id="ac-employee-seat-limit" unstyled
                 type="number"
                 min={0}
                 value={employee_seat_limit}
