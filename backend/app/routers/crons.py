@@ -46,6 +46,7 @@ from ..services.monitoring_alerts import send_test_alert
 from ..services.rule_change_notifier import notify_superseded_rules
 from ..services.source_reliability_service import recompute_reliability_scores
 from ..services.vendor_metric_snapshot_service import snapshot_vendor_metrics
+from ..services.weekly_mobility_status import run_weekly_mobility_status_cron
 
 log = logging.getLogger(__name__)
 
@@ -90,6 +91,21 @@ def milestone_reminders(request: Request) -> Dict[str, Any]:
     _verify_cron_secret(request)
     log.info("milestone_reminders cron triggered")
     result = run_milestone_reminder_cron()
+    return {"ok": True, **result}
+
+
+@router.post("/weekly-mobility-status")
+def weekly_mobility_status(request: Request) -> Dict[str, Any]:
+    """
+    [AIQ-1237] Weekly mobility status check (scheduled Mondays 08:00 UTC via
+    GitHub Actions / pg_cron). Finds overdue case_milestones (target_date <
+    today, not done/skipped) on active cases, groups them by HR owner, and
+    emails each HR owner one digest of their overdue relocation steps. Reads
+    only; never raises; with no RESEND_API_KEY the digest is logged, not sent.
+    """
+    _verify_cron_secret(request)
+    log.info("weekly_mobility_status cron triggered")
+    result = run_weekly_mobility_status_cron()
     return {"ok": True, **result}
 
 
