@@ -53,11 +53,11 @@ export const InternalThreadPanel: React.FC<Props> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await adminCollaborationAPI.getThread(targetType, targetId);
+      const res = (await adminCollaborationAPI.getThread(targetType, targetId)) as { thread?: Thread };
       const t = res.thread;
       setThread(t || null);
       if (t?.id) {
-        const comRes = await adminCollaborationAPI.getComments(t.id);
+        const comRes = (await adminCollaborationAPI.getComments(t.id)) as { comments?: Comment[] };
         setComments(comRes.comments || []);
         await adminCollaborationAPI.markRead(t.id);
         onSummaryChange?.({
@@ -84,7 +84,7 @@ export const InternalThreadPanel: React.FC<Props> = ({
     if (!newBody.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const res = await adminCollaborationAPI.getOrCreateThread(targetType, targetId, title);
+      const res = (await adminCollaborationAPI.getOrCreateThread(targetType, targetId, title)) as { thread?: Thread };
       const t = res.thread;
       if (t?.id) {
         await adminCollaborationAPI.createComment(t.id, newBody.trim());
