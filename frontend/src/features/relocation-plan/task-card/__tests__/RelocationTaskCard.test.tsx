@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { RelocationTaskCard } from '../RelocationTaskCard';
 import type { RelocationPlanPhaseTaskDTO } from '../../../../types/relocationPlanView';
@@ -37,24 +38,26 @@ afterEach(() => {
 });
 
 describe('RelocationTaskCard', () => {
-  it('shows compact row with due date and expands for details + single CTA', () => {
+  it('shows compact row with due date and expands for details + single CTA', async () => {
+    const user = userEvent.setup();
     const onCta = vi.fn();
     render(<RelocationTaskCard task={task()} ctaContext={ctx} onCta={onCta} />);
 
     expect(screen.getByText('Upload passport copy')).toBeInTheDocument();
     expect(screen.getByText(/Due soon · 2026-04-01/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Upload passport copy/i }));
+    await user.click(screen.getByRole('button', { name: /Upload passport copy/i }));
     expect(screen.getByText(/Why this matters/i)).toBeInTheDocument();
     expect(screen.getByText(/HR needs this to start compliance review/i)).toBeInTheDocument();
     expect(screen.getByText(/Use a color scan/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Upload document/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Upload document/i }));
+    await user.click(screen.getByRole('button', { name: /Upload document/i }));
     expect(onCta).toHaveBeenCalledTimes(1);
   });
 
-  it('shows inline blocker copy when blocked_by is non-empty and hides primary CTA', () => {
+  it('shows inline blocker copy when blocked_by is non-empty and hides primary CTA', async () => {
+    const user = userEvent.setup();
     render(
       <RelocationTaskCard
         task={task({ status: 'in_progress', blocked_by: ['prior_task'] })}
@@ -63,12 +66,13 @@ describe('RelocationTaskCard', () => {
       />
     );
     expect(screen.getByText(/Waiting on prior steps: prior_task/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Upload passport copy/i }));
+    await user.click(screen.getByRole('button', { name: /Upload passport copy/i }));
     expect(screen.queryByRole('button', { name: /Upload document/i })).not.toBeInTheDocument();
     expect(screen.getByText(/can't be completed here until the blockers/i)).toBeInTheDocument();
   });
 
-  it('omits primary CTA when task is completed', () => {
+  it('omits primary CTA when task is completed', async () => {
+    const user = userEvent.setup();
     render(
       <RelocationTaskCard
         task={task({ status: 'completed' })}
@@ -76,11 +80,12 @@ describe('RelocationTaskCard', () => {
         onCta={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /Upload passport copy/i }));
+    await user.click(screen.getByRole('button', { name: /Upload passport copy/i }));
     expect(screen.queryByRole('button', { name: /Upload document/i })).not.toBeInTheDocument();
   });
 
-  it('renders notes textarea when notes_enabled and notes prop provided', () => {
+  it('renders notes textarea when notes_enabled and notes prop provided', async () => {
+    const user = userEvent.setup();
     render(
       <RelocationTaskCard
         task={task({ notes_enabled: true })}
@@ -89,7 +94,7 @@ describe('RelocationTaskCard', () => {
         notes={{ value: 'Hello', onChange: vi.fn() }}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /Upload passport copy/i }));
+    await user.click(screen.getByRole('button', { name: /Upload passport copy/i }));
     expect(screen.getByPlaceholderText(/Short context/i)).toHaveValue('Hello');
   });
 });

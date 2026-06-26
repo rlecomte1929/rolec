@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { EmployeePolicyAssistantPanel } from '../EmployeePolicyAssistantPanel';
 import {
@@ -99,18 +100,30 @@ describe('EmployeePolicyAssistantPanel', () => {
   });
 
   it('fills suggestion into textarea when chip clicked', async () => {
+    const user = userEvent.setup();
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.click(screen.getByRole('button', { name: EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS[0] }));
+    await user.click(screen.getByRole('button', { name: EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS[0] }));
     const ta = screen.getByPlaceholderText(/shipment allowance/i);
     expect(ta).toHaveValue(EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS[0]);
     await waitFor(() => expect(ta).toHaveFocus());
   });
 
-  it('shows inline hint when Ask is clicked with an empty question', () => {
-    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
-    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).toBeInTheDocument();
-    expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
+  it('shows inline hint when Ask is clicked with an empty question', async () => {
+    // The panel sets the empty hint, then (via setTimeout(0)) focuses the
+    // textarea, whose onFocus immediately clears the hint again. fireEvent
+    // asserted before that deferred focus ran; user-event's async flush lets
+    // it run and wipe the hint. No-op the textarea focus for this test so the
+    // hint persists, preserving the original assertion (and the API guard).
+    const user = userEvent.setup();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(() => {});
+    try {
+      render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
+      await user.click(screen.getByRole('button', { name: /^ask$/i }));
+      expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).toBeInTheDocument();
+      expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
+    } finally {
+      focusSpy.mockRestore();
+    }
   });
 
   it('shows response region label and empty placeholder before first answer', () => {
@@ -121,12 +134,11 @@ describe('EmployeePolicyAssistantPanel', () => {
   });
 
   it('shows Checking published policy while the request is in flight', async () => {
+    const user = userEvent.setup();
     postPolicyAssistantQuery.mockImplementation(() => new Promise(() => undefined));
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
-      target: { value: 'Test question' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'Test question');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/checking published policy/i)).toBeInTheDocument();
   });
 
@@ -137,11 +149,10 @@ describe('EmployeePolicyAssistantPanel', () => {
       request_id: 'r1',
       answer: entitlementAnswer(),
     });
+    const user = userEvent.setup();
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
-      target: { value: 'Is temporary housing included?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'Is temporary housing included?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('asg-1', 'Is temporary housing included?'));
     expect(await screen.findByText(/included \(published policy\)/i)).toBeInTheDocument();
     expect(screen.getByText(/where this comes from/i)).toBeInTheDocument();
@@ -179,11 +190,10 @@ describe('EmployeePolicyAssistantPanel', () => {
         detected_intent: 'unsupported_question',
       },
     });
+    const user = userEvent.setup();
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
-      target: { value: 'Negotiate my salary' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'Negotiate my salary');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/no policy answer/i)).toBeInTheDocument();
     expect(screen.getByText(/policy questions you can ask/i)).toBeInTheDocument();
     expect(screen.getByText('What is my housing cap?')).toBeInTheDocument();
@@ -193,11 +203,10 @@ describe('EmployeePolicyAssistantPanel', () => {
     postPolicyAssistantQuery.mockRejectedValue({
       response: { data: { detail: 'Policy assistant failed' } },
     });
+    const user = userEvent.setup();
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
-      target: { value: 'Test question' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'Test question');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE)).toBeInTheDocument();
   });
 

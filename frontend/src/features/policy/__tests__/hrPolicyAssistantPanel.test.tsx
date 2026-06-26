@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { HrPolicyAssistantPanel } from '../HrPolicyAssistantPanel';
 import {
@@ -88,11 +89,13 @@ describe('HrPolicyAssistantPanel', () => {
       document_id: null,
       answer: baseAnswer(),
     });
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId={null} hasQueryablePolicy={true} />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'What relocation benefits do we offer?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(
+      screen.getByPlaceholderText(/employees see for shipment/i),
+      'What relocation benefits do we offer?'
+    );
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() =>
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('', 'What relocation benefits do we offer?', undefined)
     );
@@ -103,9 +106,10 @@ describe('HrPolicyAssistantPanel', () => {
     expect(screen.getByText(/publish a policy/i)).toBeInTheDocument();
   });
 
-  it('applies a suggestion chip to the textarea', () => {
+  it('applies a suggestion chip to the textarea', async () => {
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
-    fireEvent.click(screen.getByRole('button', { name: HR_POLICY_ASSISTANT_SUGGESTIONS[0] }));
+    await user.click(screen.getByRole('button', { name: HR_POLICY_ASSISTANT_SUGGESTIONS[0] }));
     expect(screen.getByPlaceholderText(/employees see for shipment/i)).toHaveValue(HR_POLICY_ASSISTANT_SUGGESTIONS[0]);
   });
 
@@ -116,11 +120,13 @@ describe('HrPolicyAssistantPanel', () => {
       document_id: null,
       answer: baseAnswer(),
     });
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" documentId={null} />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'What changes if I publish?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(
+      screen.getByPlaceholderText(/employees see for shipment/i),
+      'What changes if I publish?'
+    );
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() =>
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'What changes if I publish?', undefined)
     );
@@ -138,11 +144,10 @@ describe('HrPolicyAssistantPanel', () => {
       document_id: 'doc-9',
       answer: baseAnswer(),
     });
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" documentId="doc-9" />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'Test' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/employees see for shipment/i), 'Test');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'Test', 'doc-9'));
   });
 
@@ -157,11 +162,10 @@ describe('HrPolicyAssistantPanel', () => {
         evidence: [],
       }),
     });
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'Why informational?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/employees see for shipment/i), 'Why informational?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     const region = await screen.findByRole('region', { name: /HR policy answer/i });
     expect(within(region).getByText('Comparison readiness:')).toBeInTheDocument();
     expect(within(region).getByText('informational only', { exact: false })).toBeInTheDocument();
@@ -189,11 +193,13 @@ describe('HrPolicyAssistantPanel', () => {
         role_scope: 'hr',
       },
     });
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'How should we beat competitors on benefits?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(
+      screen.getByPlaceholderText(/employees see for shipment/i),
+      'How should we beat competitors on benefits?'
+    );
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/no policy answer/i)).toBeInTheDocument();
     expect(screen.getByText(/within-policy examples/i)).toBeInTheDocument();
     expect(screen.getByText('What do employees see for temporary housing?')).toBeInTheDocument();
@@ -223,11 +229,13 @@ describe('HrPolicyAssistantPanel', () => {
         'pol-1'
       )
     );
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'What is the housing allowance?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(
+      screen.getByPlaceholderText(/employees see for shipment/i),
+      'What is the housing allowance?'
+    );
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     const region = await screen.findByRole('region', { name: /HR policy answer/i });
     expect(within(region).getByText(/housing allowance is 2000 eur\/month/i)).toBeInTheDocument();
     // Citation chip derived from the [chunk:c1] token + cited_chunks lookup.
@@ -249,11 +257,10 @@ describe('HrPolicyAssistantPanel', () => {
         'pol-1'
       )
     );
+    const user = userEvent.setup();
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
-    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
-      target: { value: 'give me legal advice' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.type(screen.getByPlaceholderText(/employees see for shipment/i), 'give me legal advice');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/i don't see this in your company's policy\. check with your hr team\./i)).toBeInTheDocument();
     expect(screen.getByText(/no policy answer/i)).toBeInTheDocument();
   });
