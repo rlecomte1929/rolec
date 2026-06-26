@@ -161,8 +161,10 @@ export const EmployeeJourney: React.FC = () => {
   /** No linked and no auto-detected pending → full assignment-ID / manual claim experience. */
   const showPrimaryManualClaimPage = !hasLinked && !hasPendingOnly;
   const showPendingSection = pendingCount > 0;
-  /** Secondary manual path: linked and/or pending hub: recovery & HR case code without a parallel API. */
-  const showSecondaryManualClaimCard = hasLinked || hasPendingOnly;
+  /** Secondary manual path: HR case-code recovery for users who have a pending
+   *  invite but no linked case yet. M-02 (AIQ-1263): no longer shown to already-
+   *  linked users — the manual claim form was clutter they don't need. */
+  const showSecondaryManualClaimCard = hasPendingOnly;
 
   const pendingIdsSignature = useMemo(
     () =>
