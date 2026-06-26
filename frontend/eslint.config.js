@@ -26,6 +26,7 @@ import tseslint from 'typescript-eslint';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import importPlugin from 'eslint-plugin-import';
 import noClickableDiv from './eslint-rules/no-clickable-div.js';
 
 export default tseslint.config(
@@ -44,8 +45,18 @@ export default tseslint.config(
       react.configs.flat['jsx-runtime'],
       jsxA11y.flatConfigs.recommended,
     ],
+    // LINT-4 (AIQ-1196): fail on eslint-disable comments that no longer suppress
+    // anything, so the dead-disable backlog can't silently grow back.
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
     settings: {
       react: { version: 'detect' },
+      // LINT-5 (AIQ-1197): resolve TS path imports via eslint-import-resolver-typescript.
+      'import/resolver': {
+        typescript: { alwaysTryTypes: true },
+        node: true,
+      },
     },
     languageOptions: {
       parserOptions: {
@@ -70,6 +81,8 @@ export default tseslint.config(
       // phantom disables target); the compiler rules can be turned on later as a
       // deliberate, scoped follow-up.
       'react-hooks': reactHooks,
+      // LINT-5: import-hygiene plugin (unresolved imports, cycles, ordering).
+      import: importPlugin,
     },
     rules: {
       // Classic Rules of Hooks — real bugs (conditional hooks, wrong call order).
@@ -88,6 +101,26 @@ export default tseslint.config(
        * (no-ops in production). logger.ts itself is exempt below.
        */
       'no-console': 'error',
+
+      // LINT-5 (AIQ-1197): import hygiene.
+      // Unresolved imports are real bugs (the dead-router / wrong-path class) — error.
+      'import/no-unresolved': 'error',
+      // Cycles surface architectural debt; warn so they're visible without blocking.
+      'import/no-cycle': 'warn',
+      // Consistent ordering — warn + autofixable; drained incrementally (not mass-fixed here).
+      'import/order': [
+        'warn',
+        {
+          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+          'newlines-between': 'never',
+        },
+      ],
+      // TS already validates named exports/imports; the import/* equivalents only
+      // duplicate that (and are slow), so leave them off.
+      'import/named': 'off',
+      'import/namespace': 'off',
+      'import/default': 'off',
+      'import/no-named-as-default-member': 'off',
     },
   },
 
