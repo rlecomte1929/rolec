@@ -295,11 +295,11 @@ const AUTH_ENTRYPOINT_TIMEOUT = 45_000;
 
 export const authAPI = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post('/api/auth/login', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
+    const response = await api.post<LoginResponse>('/api/auth/login', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
     return response.data;
   },
   register: async (data: RegisterRequest): Promise<LoginResponse> => {
-    const response = await api.post('/api/auth/register', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
+    const response = await api.post<LoginResponse>('/api/auth/register', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
     return response.data;
   },
   logout: async (): Promise<void> => {
@@ -321,12 +321,12 @@ export const authAPI = {
 // Profile API
 export const profileAPI = {
   getCurrent: async (): Promise<RelocationProfile> => {
-    const response = await api.get('/api/profile/current');
+    const response = await api.get<RelocationProfile>('/api/profile/current');
     return response.data;
   },
 
   getNextQuestion: async (): Promise<NextQuestionResponse> => {
-    const response = await api.get('/api/profile/next-question');
+    const response = await api.get<NextQuestionResponse>('/api/profile/next-question');
     return response.data;
   },
 
@@ -344,17 +344,17 @@ export const profileAPI = {
 // Recommendations API
 export const recommendationsAPI = {
   getHousing: async (): Promise<HousingRecommendation[]> => {
-    const response = await api.get('/api/recommendations/housing');
+    const response = await api.get<HousingRecommendation[]>('/api/recommendations/housing');
     return response.data;
   },
 
   getSchools: async (): Promise<SchoolRecommendation[]> => {
-    const response = await api.get('/api/recommendations/schools');
+    const response = await api.get<SchoolRecommendation[]>('/api/recommendations/schools');
     return response.data;
   },
 
   getMovers: async (): Promise<MoverRecommendation[]> => {
-    const response = await api.get('/api/recommendations/movers');
+    const response = await api.get<MoverRecommendation[]>('/api/recommendations/movers');
     return response.data;
   },
 };
@@ -362,7 +362,7 @@ export const recommendationsAPI = {
 // Dashboard API
 export const dashboardAPI = {
   get: async (): Promise<DashboardResponse> => {
-    const response = await api.get('/api/dashboard');
+    const response = await api.get<DashboardResponse>('/api/dashboard');
     return response.data;
   },
 };
@@ -463,11 +463,11 @@ export interface CaseHealthFlag {
 
 export const hrAPI = {
   getBacklog: async (): Promise<HrBacklogResponse> => {
-    const response = await api.get('/api/hr/backlog');
+    const response = await api.get<HrBacklogResponse>('/api/hr/backlog');
     return response.data;
   },
   createCase: async (): Promise<{ caseId: string }> => {
-    const response = await api.post('/api/hr/cases', undefined, { timeout: HR_CASE_TIMEOUT });
+    const response = await api.post<{ caseId: string }>('/api/hr/cases', undefined, { timeout: HR_CASE_TIMEOUT });
     return response.data;
   },
   assignCase: async (
@@ -522,19 +522,19 @@ export const hrAPI = {
   },
   /** AIQ-378d — behind-schedule ("case health") cases for the HR's company. */
   getCaseHealth: async (opts?: { signal?: AbortSignal }): Promise<{ cases: CaseHealthFlag[] }> => {
-    const response = await api.get('/api/hr/cases/behind-schedule', { signal: opts?.signal });
+    const response = await api.get<{ cases: CaseHealthFlag[] }>('/api/hr/cases/behind-schedule', { signal: opts?.signal });
     const cases = Array.isArray(response.data?.cases) ? (response.data.cases as CaseHealthFlag[]) : [];
     return { cases };
   },
   getAssignment: async (assignmentId: string, opts?: { signal?: AbortSignal }): Promise<AssignmentDetail> => {
-    const response = await api.get(`/api/hr/assignments/${assignmentId}`, { signal: opts?.signal });
+    const response = await api.get<AssignmentDetail>(`/api/hr/assignments/${assignmentId}`, { signal: opts?.signal });
     return response.data;
   },
   getReadinessSummary: async (
     assignmentId: string,
     opts?: { signal?: AbortSignal }
   ): Promise<Record<string, unknown>> => {
-    const response = await api.get(`/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/summary`, {
+    const response = await api.get<Record<string, unknown>>(`/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/summary`, {
       signal: opts?.signal,
     });
     return response.data;
@@ -543,7 +543,7 @@ export const hrAPI = {
     assignmentId: string,
     opts?: { signal?: AbortSignal }
   ): Promise<Record<string, unknown>> => {
-    const response = await api.get(`/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/detail`, {
+    const response = await api.get<Record<string, unknown>>(`/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/detail`, {
       signal: opts?.signal,
     });
     return response.data;
@@ -553,7 +553,7 @@ export const hrAPI = {
     itemId: string,
     payload: { status: string; notes?: string }
   ): Promise<{ success: boolean }> => {
-    const response = await api.patch(
+    const response = await api.patch<{ success: boolean }>(
       `/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/checklist-items/${encodeURIComponent(itemId)}`,
       payload
     );
@@ -564,7 +564,7 @@ export const hrAPI = {
     milestoneId: string,
     payload: { completed: boolean; notes?: string }
   ): Promise<{ success: boolean }> => {
-    const response = await api.patch(
+    const response = await api.patch<{ success: boolean }>(
       `/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/milestones/${encodeURIComponent(milestoneId)}`,
       payload
     );
@@ -595,7 +595,7 @@ export const hrAPI = {
   },
   /** Compare selected services vs resolved policy (with diagnostics) */
   getPolicyServiceComparison: async (assignmentId: string): Promise<PolicyServiceComparisonResponse> => {
-    const response = await api.get(`/api/hr/assignments/${assignmentId}/policy-service-comparison`);
+    const response = await api.get<PolicyServiceComparisonResponse>(`/api/hr/assignments/${assignmentId}/policy-service-comparison`);
     return response.data;
   },
   /** Same payload as employee route; allowed for HR via `require_hr_or_employee`. */
@@ -617,7 +617,7 @@ export const hrAPI = {
     return response.data;
   },
   getPolicy: async (caseId: string): Promise<PolicyResponse> => {
-    const response = await api.get('/api/hr/policy', { params: { caseId } });
+    const response = await api.get<PolicyResponse>('/api/hr/policy', { params: { caseId } });
     return response.data;
   },
   requestPolicyException: async (
@@ -629,7 +629,7 @@ export const hrAPI = {
   },
   getCompanyProfile: async (): Promise<{ company: any | null }> => {
     return cachedRequest('hr:company-profile', 60_000, async () => {
-      const response = await api.get('/api/hr/company-profile');
+      const response = await api.get<{ company: any | null }>('/api/hr/company-profile');
       return response.data;
     });
   },
@@ -642,14 +642,14 @@ export const hrAPI = {
     return response.data;
   },
   getEmployee: async (employeeId: string): Promise<{ employee: HrCompanyEmployee }> => {
-    const response = await api.get(`/api/hr/employees/${employeeId}`);
+    const response = await api.get<{ employee: HrCompanyEmployee }>(`/api/hr/employees/${employeeId}`);
     return response.data;
   },
   updateEmployee: async (
     employeeId: string,
     payload: { band?: string; assignment_type?: string; status?: string }
   ): Promise<{ employee: HrCompanyEmployee }> => {
-    const response = await api.patch(`/api/hr/employees/${employeeId}`, payload);
+    const response = await api.patch<{ employee: HrCompanyEmployee }>(`/api/hr/employees/${employeeId}`, payload);
     return response.data;
   },
   deleteEmployee: async (employeeId: string): Promise<void> => {
@@ -664,19 +664,19 @@ export const hrAPI = {
   uploadCompanyLogo: async (file: File): Promise<{ ok: boolean; logo_url: string }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/api/hr/company-profile/logo', formData, { timeout: 120_000 });
+    const response = await api.post<{ ok: boolean; logo_url: string }>('/api/hr/company-profile/logo', formData, { timeout: 120_000 });
     invalidateApiCache('hr:company-profile');
     invalidateApiCache('company:get');
     return response.data;
   },
   removeCompanyLogo: async (): Promise<{ ok: boolean }> => {
-    const response = await api.post('/api/hr/company-profile/remove-logo');
+    const response = await api.post<{ ok: boolean }>('/api/hr/company-profile/remove-logo');
     invalidateApiCache('hr:company-profile');
     invalidateApiCache('company:get');
     return response.data;
   },
   listMessages: async (): Promise<{ messages: any[] }> => {
-    const response = await api.get('/api/hr/messages');
+    const response = await api.get<{ messages: any[] }>('/api/hr/messages');
     return response.data;
   },
   /** One row per assignment (case thread); company-scoped. */
@@ -705,7 +705,7 @@ export const hrAPI = {
     assignmentId: string,
     opts?: { signal?: AbortSignal }
   ): Promise<{ assignment_id: string; messages: any[] }> => {
-    const response = await api.get(
+    const response = await api.get<{ assignment_id: string; messages: any[] }>(
       `/api/hr/messages/threads/${encodeURIComponent(assignmentId)}`,
       { signal: opts?.signal }
     );
@@ -715,21 +715,21 @@ export const hrAPI = {
     assignment_ids: string[];
     archived: boolean;
   }): Promise<{ ok: boolean; updated: number }> => {
-    const response = await api.post('/api/hr/messages/conversations/archive', payload);
+    const response = await api.post<{ ok: boolean; updated: number }>('/api/hr/messages/conversations/archive', payload);
     return response.data;
   },
   deleteHrMessage: async (messageId: string): Promise<{ ok: boolean }> => {
-    const response = await api.delete(
+    const response = await api.delete<{ ok: boolean }>(
       `/api/hr/messages/${encodeURIComponent(messageId)}`
     );
     return response.data;
   },
   getCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
-    const response = await api.get(`/api/hr/cases/${caseId}/compliance`);
+    const response = await api.get<ComplianceCaseReport>(`/api/hr/cases/${caseId}/compliance`);
     return response.data;
   },
   runCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/compliance/run`);
+    const response = await api.post<ComplianceCaseReport>(`/api/hr/cases/${caseId}/compliance/run`);
     return response.data;
   },
   recordComplianceAction: async (
@@ -764,11 +764,11 @@ export const hrAPI = {
     return response.data;
   },
   postFeedback: async (assignmentId: string, message: string): Promise<{ ok: boolean; id: string; created_at: string }> => {
-    const response = await api.post(`/api/hr/assignments/${assignmentId}/feedback`, { message });
+    const response = await api.post<{ ok: boolean; id: string; created_at: string }>(`/api/hr/assignments/${assignmentId}/feedback`, { message });
     return response.data;
   },
   getFeedback: async (assignmentId: string): Promise<Array<{ id: string; assignment_id: string; hr_user_id: string; employee_user_id: string | null; message: string; created_at: string }>> => {
-    const response = await api.get(`/api/hr/assignments/${assignmentId}/feedback`);
+    const response = await api.get<Array<{ id: string; assignment_id: string; hr_user_id: string; employee_user_id: string | null; message: string; created_at: string }>>(`/api/hr/assignments/${assignmentId}/feedback`);
     return response.data;
   },
   // Command Center
@@ -787,16 +787,16 @@ export const hrAPI = {
     return response.data;
   },
   listCommandCenterCases: async (params?: { page?: number; limit?: number; risk_filter?: string }): Promise<CommandCenterCaseRow[]> => {
-    const response = await api.get('/api/hr/command-center/cases', { params });
+    const response = await api.get<CommandCenterCaseRow[]>('/api/hr/command-center/cases', { params });
     return response.data;
   },
   getCommandCenterCaseDetail: async (assignmentId: string): Promise<{ id: string; employeeIdentifier: string; destCountry?: string; status: string; riskStatus: string; budgetLimit?: number; budgetEstimated?: number; expectedStartDate?: string; tasksTotal: number; tasksDone: number; tasksOverdue: number; phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>; events: Array<{ event_type: string; description?: string; created_at: string }> }> => {
-    const response = await api.get(`/api/hr/command-center/cases/${assignmentId}`);
+    const response = await api.get<{ id: string; employeeIdentifier: string; destCountry?: string; status: string; riskStatus: string; budgetLimit?: number; budgetEstimated?: number; expectedStartDate?: string; tasksTotal: number; tasksDone: number; tasksOverdue: number; phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>; events: Array<{ event_type: string; description?: string; created_at: string }> }>(`/api/hr/command-center/cases/${assignmentId}`);
     return response.data;
   },
   /** Provider × Case status matrix for the HR grid view (AIQ-14). */
   getProviderStatusGrid: async (): Promise<ProviderGridResponse> => {
-    const response = await api.get('/api/hr/provider-status-grid');
+    const response = await api.get<ProviderGridResponse>('/api/hr/provider-status-grid');
     return response.data;
   },
   /** Bounded policy Q&A for the HR policy workspace (draft + published context). */
@@ -819,7 +819,7 @@ export const hrAPI = {
   // ── Quote requests (AIQ-65) ──────────────────────────────────────────────
 
   getServiceCategories: async (): Promise<{ service_categories: string[] }> => {
-    const response = await api.get('/api/hr/service-categories');
+    const response = await api.get<{ service_categories: string[] }>('/api/hr/service-categories');
     return response.data;
   },
 
@@ -850,7 +850,7 @@ export const hrAPI = {
     requestId: string,
     status: 'acknowledged' | 'fulfilled'
   ): Promise<{ id: string; status: string }> => {
-    const response = await api.patch(`/api/hr/quote-requests/${requestId}`, { status });
+    const response = await api.patch<{ id: string; status: string }>(`/api/hr/quote-requests/${requestId}`, { status });
     return response.data;
   },
 
@@ -926,7 +926,7 @@ export const hrAPI = {
 
   /** GET /api/hr/vendors/corridors */
   getVendorCorridors: async (): Promise<{ corridors: string[] }> => {
-    const response = await api.get('/api/hr/vendors/corridors');
+    const response = await api.get<{ corridors: string[] }>('/api/hr/vendors/corridors');
     return response.data;
   },
 
@@ -1021,7 +1021,7 @@ export const hrAPI = {
       book_early_alert?: string | null;
     },
   ): Promise<{ id: string; milestone_type: string; status: string }> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/immigration/milestones`, payload);
+    const response = await api.post<{ id: string; milestone_type: string; status: string }>(`/api/hr/cases/${caseId}/immigration/milestones`, payload);
     return response.data;
   },
 
@@ -1037,7 +1037,7 @@ export const hrAPI = {
       evidence_url?: string | null;
     },
   ): Promise<{ id: string; status: string; updated_at: string }> => {
-    const response = await api.patch(
+    const response = await api.patch<{ id: string; status: string; updated_at: string }>(
       `/api/hr/cases/${caseId}/immigration/milestones/${milestoneId}`,
       patch,
     );
@@ -1107,7 +1107,7 @@ export const hrAPI = {
     has_dependents?: boolean;
     risk_flags?: string[];
   }): Promise<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }> => {
-    const response = await api.post('/api/hr/rfq-requests', payload);
+    const response = await api.post<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }>('/api/hr/rfq-requests', payload);
     return response.data;
   },
 
@@ -1145,7 +1145,7 @@ export const hrAPI = {
       quote_deliverable?: string;
     }
   ): Promise<{ ok: boolean; rfq_id: string; status: string }> => {
-    const response = await api.patch(`/api/hr/rfq-requests/${rfqId}`, { status, ...quoteDetails });
+    const response = await api.patch<{ ok: boolean; rfq_id: string; status: string }>(`/api/hr/rfq-requests/${rfqId}`, { status, ...quoteDetails });
     return response.data;
   },
 
@@ -1153,7 +1153,7 @@ export const hrAPI = {
 
   /** GET /api/hr/cases/{caseId}/tasks — full task list + completion stats */
   getCaseTasks: async (caseId: string): Promise<EmployeeTaskListResponse> => {
-    const response = await api.get(`/api/hr/cases/${caseId}/tasks`);
+    const response = await api.get<EmployeeTaskListResponse>(`/api/hr/cases/${caseId}/tasks`);
     return response.data;
   },
 
@@ -1163,7 +1163,7 @@ export const hrAPI = {
     taskId: string,
     body: { action: 'approved' | 'revision_requested'; review_note?: string }
   ): Promise<EmployeeTask> => {
-    const response = await api.patch(`/api/hr/cases/${caseId}/tasks/${taskId}`, body);
+    const response = await api.patch<EmployeeTask>(`/api/hr/cases/${caseId}/tasks/${taskId}`, body);
     return response.data;
   },
 
@@ -1179,7 +1179,7 @@ export const hrAPI = {
       required_file_upload?: boolean;
     }
   ): Promise<EmployeeTask> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/tasks`, body);
+    const response = await api.post<EmployeeTask>(`/api/hr/cases/${caseId}/tasks`, body);
     return response.data;
   },
 
@@ -1226,7 +1226,7 @@ export const hrAPI = {
 
   /** List undismissed policy calibration alerts for the caller's organisation. */
   listCalibrationAlerts: async (): Promise<CalibrationAlert[]> => {
-    const response = await api.get('/api/hr/calibration-alerts');
+    const response = await api.get<CalibrationAlert[]>('/api/hr/calibration-alerts');
     return response.data;
   },
 
@@ -1241,7 +1241,7 @@ export const hrAPI = {
 export const companyAPI = {
   get: async (): Promise<{ company: { id?: string; name: string; logo_url?: string | null; [key: string]: unknown } | null }> => {
     return cachedRequest('company:get', 60_000, async () => {
-      const response = await api.get('/api/company');
+      const response = await api.get<{ company: { id?: string; name: string; logo_url?: string | null; [key: string]: unknown } | null }>('/api/company');
       return response.data;
     });
   },
@@ -1294,7 +1294,7 @@ export type AdminMobilityOperationalInspect = {
 export const adminAPI = {
   getContext: async (): Promise<AdminContextResponse> => {
     return cachedRequest('admin:context', 20_000, async () => {
-      const response = await api.get('/api/admin/context');
+      const response = await api.get<AdminContextResponse>('/api/admin/context');
       return response.data;
     });
   },
@@ -1304,14 +1304,14 @@ export const adminAPI = {
     return response.data;
   },
   stopImpersonation: async (): Promise<{ ok: boolean }> => {
-    const response = await api.post('/api/admin/impersonate/stop');
+    const response = await api.post<{ ok: boolean }>('/api/admin/impersonate/stop');
     invalidateApiCache('admin:context');
     return response.data;
   },
   listCompanies: async (q?: string): Promise<{ companies: AdminCompany[] }> => {
     const key = `admin:companies:${q ?? ''}`;
     return cachedRequest(key, 60_000, async () => {
-      const response = await api.get('/api/admin/companies', { params: { q } });
+      const response = await api.get<{ companies: AdminCompany[] }>('/api/admin/companies', { params: { q } });
       return response.data;
     });
   },
@@ -1341,7 +1341,7 @@ export const adminAPI = {
     hr_contact?: string;
     support_email?: string;
   }): Promise<{ company: AdminCompany }> => {
-    const response = await api.post('/api/admin/companies', payload);
+    const response = await api.post<{ company: AdminCompany }>('/api/admin/companies', payload);
     invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
@@ -1361,29 +1361,29 @@ export const adminAPI = {
       support_email: string;
     }>
   ): Promise<{ company: AdminCompany }> => {
-    const response = await api.patch(`/api/admin/companies/${companyId}`, payload);
+    const response = await api.patch<{ company: AdminCompany }>(`/api/admin/companies/${companyId}`, payload);
     invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   deactivateCompany: async (companyId: string): Promise<{ company: AdminCompany; message?: string }> => {
-    const response = await api.post(`/api/admin/companies/${companyId}/deactivate`);
+    const response = await api.post<{ company: AdminCompany; message?: string }>(`/api/admin/companies/${companyId}/deactivate`);
     invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   /** Soft delete: sets status='archived' so the company is hidden from active lists. Reversible. */
   archiveCompany: async (companyId: string): Promise<{ company: AdminCompany; message?: string }> => {
-    const response = await api.post(`/api/admin/companies/${companyId}/archive`);
+    const response = await api.post<{ company: AdminCompany; message?: string }>(`/api/admin/companies/${companyId}/archive`);
     invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   /** Hard delete: removes the company row. Irreversible — orphans references in employees/hr_users/profiles/etc. */
   deleteCompany: async (companyId: string): Promise<{ deleted: string; message?: string }> => {
-    const response = await api.delete(`/api/admin/companies/${companyId}`);
+    const response = await api.delete<{ deleted: string; message?: string }>(`/api/admin/companies/${companyId}`);
     invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   runReconciliationBackfillTestCompany: async (): Promise<{ ok: boolean; summary?: { test_company_id: string; profiles_linked: number; hr_users_linked: number; relocation_cases_linked: number }; error?: string }> => {
-    const response = await api.post('/api/admin/reconciliation/backfill-test-company');
+    const response = await api.post<{ ok: boolean; summary?: { test_company_id: string; profiles_linked: number; hr_users_linked: number; relocation_cases_linked: number }; error?: string }>('/api/admin/reconciliation/backfill-test-company');
     return response.data;
   },
   rebuildTestCompanyGraph: async (): Promise<{
@@ -1404,43 +1404,43 @@ export const adminAPI = {
     return response.data;
   },
   listProfiles: async (params?: { q?: string; company_id?: string; role?: string }): Promise<{ profiles: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {
-    const response = await api.get('/api/admin/users', { params: params || {} });
+    const response = await api.get<{ profiles: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }>('/api/admin/users', { params: params || {} });
     return response.data;
   },
   listPeople: async (params?: { company_id?: string; role?: string; q?: string }): Promise<{ people: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {
-    const response = await api.get('/api/admin/people', { params: params || {} });
+    const response = await api.get<{ people: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }>('/api/admin/people', { params: params || {} });
     return response.data;
   },
   createPerson: async (payload: { email: string; full_name?: string; role?: string; company_id?: string; password?: string }): Promise<{ person: AdminProfile; invite_sent?: boolean; invite_error?: string; login_ready?: boolean }> => {
-    const response = await api.post('/api/admin/people', payload);
+    const response = await api.post<{ person: AdminProfile; invite_sent?: boolean; invite_error?: string; login_ready?: boolean }>('/api/admin/people', payload);
     return response.data;
   },
   updatePerson: async (personId: string, payload: Partial<{ full_name: string; role: string; company_id: string; status: string }>): Promise<{ person: AdminProfile }> => {
-    const response = await api.patch(`/api/admin/people/${personId}`, payload);
+    const response = await api.patch<{ person: AdminProfile }>(`/api/admin/people/${personId}`, payload);
     return response.data;
   },
   assignPersonCompany: async (personId: string, companyId: string): Promise<{ person: AdminProfile }> => {
-    const response = await api.post(`/api/admin/people/${personId}/assign-company`, { company_id: companyId });
+    const response = await api.post<{ person: AdminProfile }>(`/api/admin/people/${personId}/assign-company`, { company_id: companyId });
     return response.data;
   },
   setPersonRole: async (personId: string, role: string): Promise<{ person: AdminProfile }> => {
-    const response = await api.post(`/api/admin/people/${personId}/set-role`, { role });
+    const response = await api.post<{ person: AdminProfile }>(`/api/admin/people/${personId}/set-role`, { role });
     return response.data;
   },
   deactivatePerson: async (personId: string): Promise<{ person: AdminProfile }> => {
-    const response = await api.post(`/api/admin/people/${personId}/deactivate`);
+    const response = await api.post<{ person: AdminProfile }>(`/api/admin/people/${personId}/deactivate`);
     return response.data;
   },
   listEmployees: async (companyId?: string): Promise<{ employees: AdminEmployee[] }> => {
-    const response = await api.get('/api/admin/employees', { params: { company_id: companyId } });
+    const response = await api.get<{ employees: AdminEmployee[] }>('/api/admin/employees', { params: { company_id: companyId } });
     return response.data;
   },
   listHrUsers: async (companyId?: string): Promise<{ hr_users: AdminHrUser[] }> => {
-    const response = await api.get('/api/admin/hr-users', { params: { company_id: companyId } });
+    const response = await api.get<{ hr_users: AdminHrUser[] }>('/api/admin/hr-users', { params: { company_id: companyId } });
     return response.data;
   },
   listRelocations: async (params?: { company_id?: string; status?: string }): Promise<{ relocations: AdminRelocationCase[] }> => {
-    const response = await api.get('/api/admin/relocations', { params });
+    const response = await api.get<{ relocations: AdminRelocationCase[] }>('/api/admin/relocations', { params });
     return response.data;
   },
   listAssignments: async (params?: {
@@ -1450,11 +1450,11 @@ export const adminAPI = {
     status?: string;
     destination_country?: string;
   }): Promise<{ assignments: AdminAssignment[] }> => {
-    const response = await api.get('/api/admin/assignments', { params });
+    const response = await api.get<{ assignments: AdminAssignment[] }>('/api/admin/assignments', { params });
     return response.data;
   },
   getAssignmentDetail: async (assignmentId: string): Promise<{ assignment: AdminAssignmentDetail }> => {
-    const response = await api.get(`/api/admin/assignments/${assignmentId}`);
+    const response = await api.get<{ assignment: AdminAssignmentDetail }>(`/api/admin/assignments/${assignmentId}`);
     return response.data;
   },
   reassignEmployeeCompany: async (assignmentId: string, payload: { reason: string; company_id: string }) => {
@@ -1480,40 +1480,40 @@ export const adminAPI = {
     employee_identifier?: string;
     destination_country?: string;
   }): Promise<{ ok: boolean; assignment_id: string; case_id: string }> => {
-    const response = await api.post('/api/admin/assignments', payload);
+    const response = await api.post<{ ok: boolean; assignment_id: string; case_id: string }>('/api/admin/assignments', payload);
     return response.data;
   },
   listPolicyOverview: async (params?: { company_id?: string }): Promise<{ companies: AdminPolicyCompany[] }> => {
     try {
-      const response = await api.get('/api/admin/policies/overview', { params });
+      const response = await api.get<{ companies: AdminPolicyCompany[] }>('/api/admin/policies/overview', { params });
       return response.data;
     } catch {
       return { companies: [] };
     }
   },
   listAdminPolicies: async (companyId: string): Promise<AdminPoliciesByCompany> => {
-    const response = await api.get('/api/admin/policies', { params: { company_id: companyId } });
+    const response = await api.get<AdminPoliciesByCompany>('/api/admin/policies', { params: { company_id: companyId } });
     return response.data;
   },
   getAdminPolicyDetail: async (policyId: string): Promise<AdminPolicyDetail> => {
-    const response = await api.get(`/api/admin/policies/${policyId}`);
+    const response = await api.get<AdminPolicyDetail>(`/api/admin/policies/${policyId}`);
     return response.data;
   },
   getAdminPolicyVersions: async (policyId: string): Promise<{ policy_id: string; versions: AdminPolicyVersion[] }> => {
-    const response = await api.get(`/api/admin/policies/${policyId}/versions`);
+    const response = await api.get<{ policy_id: string; versions: AdminPolicyVersion[] }>(`/api/admin/policies/${policyId}/versions`);
     return response.data;
   },
   patchAdminPolicy: async (
     policyId: string,
     payload: { title?: string; version?: string; effective_date?: string; publish_version_id?: string; unpublish?: boolean }
   ): Promise<AdminPolicyDetail> => {
-    const response = await api.patch(`/api/admin/policies/${policyId}`, payload);
+    const response = await api.patch<AdminPolicyDetail>(`/api/admin/policies/${policyId}`, payload);
     return response.data;
   },
   /** Legacy / optional. Never throws — callers must not tie page load to this result. */
   listAdminPolicyTemplates: async (): Promise<AdminPolicyTemplatesResponse> => {
     try {
-      const response = await api.get('/api/admin/policies/templates');
+      const response = await api.get<AdminPolicyTemplatesResponse>('/api/admin/policies/templates');
       return response.data ?? { templates: [] };
     } catch (e) {
       logger.warn('[adminAPI] listAdminPolicyTemplates failed (non-blocking)', e);
@@ -1524,7 +1524,7 @@ export const adminAPI = {
     companyId: string,
     opts?: { template_id?: string; overwrite_existing?: boolean }
   ): Promise<{ ok: boolean; policy_id?: string; version_id?: string; error?: string }> => {
-    const response = await api.post('/api/admin/policies/apply-default-template', {
+    const response = await api.post<{ ok: boolean; policy_id?: string; version_id?: string; error?: string }>('/api/admin/policies/apply-default-template', {
       company_id: companyId,
       template_id: opts?.template_id,
       overwrite_existing: opts?.overwrite_existing ?? false,
@@ -1532,7 +1532,7 @@ export const adminAPI = {
     return response.data;
   },
   getPolicyAssistantCompanyHistory: async (companyId: string): Promise<Record<string, unknown>> => {
-    const response = await api.get(`/api/admin/policies/company/${companyId}/history`);
+    const response = await api.get<Record<string, unknown>>(`/api/admin/policies/company/${companyId}/history`);
     return response.data;
   },
   getPolicyAssistantSnapshotDiff: async (
@@ -1540,7 +1540,7 @@ export const adminAPI = {
     olderSnapshotId: string,
     newerSnapshotId: string
   ): Promise<Record<string, unknown>> => {
-    const response = await api.get(`/api/admin/policies/company/${companyId}/diff`, {
+    const response = await api.get<Record<string, unknown>>(`/api/admin/policies/company/${companyId}/diff`, {
       params: { older_snapshot_id: olderSnapshotId, newer_snapshot_id: newerSnapshotId },
     });
     return response.data;
@@ -1554,18 +1554,18 @@ export const adminAPI = {
     created_before?: string;
     limit?: number;
   }): Promise<{ audits: Record<string, unknown>[] }> => {
-    const response = await api.get('/api/admin/policies/answers/audits', { params });
+    const response = await api.get<{ audits: Record<string, unknown>[] }>('/api/admin/policies/answers/audits', { params });
     return response.data;
   },
   listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string; priority?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
-    const response = await api.get('/api/admin/support-cases', { params });
+    const response = await api.get<{ support_cases: AdminSupportCase[] }>('/api/admin/support-cases', { params });
     return response.data;
   },
   patchSupportCase: async (
     caseId: string,
     payload: { priority?: string; status?: string; assignee_id?: string | null; category?: string }
   ): Promise<AdminSupportCase> => {
-    const response = await api.patch(`/api/admin/support-cases/${caseId}`, payload);
+    const response = await api.patch<AdminSupportCase>(`/api/admin/support-cases/${caseId}`, payload);
     return response.data;
   },
   listMessageThreads: async (params?: {
@@ -1583,7 +1583,7 @@ export const adminAPI = {
     return response.data;
   },
   listSupportNotes: async (caseId: string): Promise<{ notes: AdminSupportNote[] }> => {
-    const response = await api.get(`/api/admin/support-cases/${caseId}/notes`);
+    const response = await api.get<{ notes: AdminSupportNote[] }>(`/api/admin/support-cases/${caseId}/notes`);
     return response.data;
   },
   addSupportNote: async (caseId: string, payload: { note: string; reason: string }) => {
@@ -1789,11 +1789,11 @@ export type PromptVersion = {
 
 export const promptsAPI = {
   list: async (): Promise<PromptVersion[]> => {
-    const response = await api.get('/api/admin/prompts');
+    const response = await api.get<PromptVersion[]>('/api/admin/prompts');
     return response.data;
   },
   listForTask: async (taskKey: string): Promise<PromptVersion[]> => {
-    const response = await api.get(`/api/admin/prompts/${encodeURIComponent(taskKey)}`);
+    const response = await api.get<PromptVersion[]>(`/api/admin/prompts/${encodeURIComponent(taskKey)}`);
     return response.data;
   },
   create: async (payload: {
@@ -1823,7 +1823,7 @@ export const promptsAPI = {
   },
   // Parker Step E — per-version win rates (approvals / verdicts) with Wilson CI.
   winRates: async (taskKey: string): Promise<Record<string, WinRate>> => {
-    const response = await api.get(`/api/admin/prompts/${encodeURIComponent(taskKey)}/win-rates`);
+    const response = await api.get<Record<string, WinRate>>(`/api/admin/prompts/${encodeURIComponent(taskKey)}/win-rates`);
     return response.data;
   },
 };
@@ -2379,14 +2379,14 @@ export const employeeAPI = {
     return response.data;
   },
   claimAssignment: async (assignmentId: string, email: string): Promise<{ success: boolean; assignmentId?: string }> => {
-    const response = await api.post(`/api/employee/assignments/${assignmentId}/claim`, { email });
+    const response = await api.post<{ success: boolean; assignmentId?: string }>(`/api/employee/assignments/${assignmentId}/claim`, { email });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
   /** Magic-link token claim: employee arrived via invite URL with ?token=<uuid>. */
   claimByToken: async (token: string): Promise<{ success: boolean; assignmentId?: string }> => {
-    const response = await api.post('/api/employee/assignments/claim-by-token', { token });
+    const response = await api.post<{ success: boolean; assignmentId?: string }>('/api/employee/assignments/claim-by-token', { token });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
     return response.data;
@@ -2402,7 +2402,7 @@ export const employeeAPI = {
     step: number,
     totalSteps: number,
   ): Promise<{ assignmentId: string; intakeStep: number; intakeTotalSteps: number; intakeUpdatedAt: string | null }> => {
-    const response = await api.post(
+    const response = await api.post<{ assignmentId: string; intakeStep: number; intakeTotalSteps: number; intakeUpdatedAt: string | null }>(
       `/api/employee/assignments/${assignmentId}/intake-progress`,
       { step, total_steps: totalSteps },
     );
@@ -2435,7 +2435,7 @@ export const employeeAPI = {
     assignmentId: string,
     data: IntakeData,
   ): Promise<{ assignmentId: string; intakeUpdatedAt: string | null }> => {
-    const response = await api.patch(
+    const response = await api.patch<{ assignmentId: string; intakeUpdatedAt: string | null }>(
       `/api/employee/assignments/${assignmentId}/intake-draft`,
       { data },
     );
@@ -2446,21 +2446,21 @@ export const employeeAPI = {
     assignmentId: string,
     email: string
   ): Promise<{ success: boolean; assignmentId?: string; alreadyLinked?: boolean }> => {
-    const response = await api.post(`/api/employee/assignments/${assignmentId}/link-pending`, { email });
+    const response = await api.post<{ success: boolean; assignmentId?: string; alreadyLinked?: boolean }>(`/api/employee/assignments/${assignmentId}/link-pending`, { email });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
   getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {
-    const response = await api.get('/api/employee/journey/next-question', { params: { assignmentId } });
+    const response = await api.get<EmployeeJourneyResponse>('/api/employee/journey/next-question', { params: { assignmentId } });
     return response.data;
   },
   getFeedback: async (assignmentId: string): Promise<Array<{ id: string; assignment_id: string; message: string; created_at: string }>> => {
-    const response = await api.get('/api/employee/assignment-feedback', { params: { assignment_id: assignmentId } });
+    const response = await api.get<Array<{ id: string; assignment_id: string; message: string; created_at: string }>>('/api/employee/assignment-feedback', { params: { assignment_id: assignmentId } });
     return response.data;
   },
   submitAnswer: async (assignmentId: string, questionId: string, answer: any): Promise<EmployeeJourneyResponse> => {
-    const response = await api.post('/api/employee/journey/answer', { assignmentId, questionId, answer });
+    const response = await api.post<EmployeeJourneyResponse>('/api/employee/journey/answer', { assignmentId, questionId, answer });
     return response.data;
   },
   submitAssignment: async (assignmentId: string): Promise<any> => {
@@ -2480,7 +2480,7 @@ export const employeeAPI = {
     return response.data;
   },
   getRecommendations: async (): Promise<{ housing: any[]; schools: any[]; movers: any[] }> => {
-    const response = await api.get('/api/employee/recommendations');
+    const response = await api.get<{ housing: any[]; schools: any[]; movers: any[] }>('/api/employee/recommendations');
     return response.data;
   },
   getPolicyCaps: async (): Promise<{
@@ -2523,7 +2523,7 @@ export const employeeAPI = {
       currency?: string | null;
     }>
   ): Promise<{ ok: boolean; services: any[] }> => {
-    const response = await api.post(`/api/employee/assignments/${assignmentId}/services`, { services });
+    const response = await api.post<{ ok: boolean; services: any[] }>(`/api/employee/assignments/${assignmentId}/services`, { services });
     return response.data;
   },
   /**
@@ -2680,7 +2680,7 @@ export const employeeAPI = {
   },
   /** Compare selected services vs resolved policy (read-only, explanatory) */
   getPolicyServiceComparison: async (assignmentId: string): Promise<PolicyServiceComparisonResponse> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-service-comparison`);
+    const response = await api.get<PolicyServiceComparisonResponse>(`/api/employee/assignments/${assignmentId}/policy-service-comparison`);
     return response.data;
   },
   /** Bounded policy Q&A from published policy data for this assignment. */
@@ -2736,7 +2736,7 @@ export const employeeAPI = {
       evidence: Array<{ label?: string; excerpt?: string }>;
     }>
   ): Promise<Blob> => {
-    const response = await api.post(
+    const response = await api.post<Blob>(
       '/api/employee/policy-assistant/export-pdf',
       { assignment_id: assignmentId, turns },
       { responseType: 'blob' }
@@ -2768,7 +2768,7 @@ export const servicesAPI = {
   },
   getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: any[] }> => {
     const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
-    const response = await api.get('/api/services/answers', { params: p });
+    const response = await api.get<{ case_id: string; answers: any[] }>('/api/services/answers', { params: p });
     return response.data;
   },
   getServiceQuestions: async (
@@ -2779,7 +2779,7 @@ export const servicesAPI = {
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get('/api/services/questions', { params });
+    const response = await api.get<{ questions: any[]; selected_services: string[] }>('/api/services/questions', { params });
     return response.data;
   },
   saveServiceAnswers: async (
@@ -2788,7 +2788,7 @@ export const servicesAPI = {
     options?: { signal?: AbortSignal }
   ): Promise<{ ok: boolean }> => {
     const config = options?.signal ? { signal: options.signal } : {};
-    const response = await api.post('/api/services/answers', { case_id: caseId, items }, config);
+    const response = await api.post<{ ok: boolean }>('/api/services/answers', { case_id: caseId, items }, config);
     return response.data;
   },
   createRfq: async (
@@ -2796,7 +2796,7 @@ export const servicesAPI = {
     items: Array<{ service_key: string; requirements: Record<string, any> }>,
     supplierIds: string[]
   ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
-    const response = await api.post('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
+    const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string } }>('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
     return response.data;
   },
 
@@ -2806,13 +2806,13 @@ export const servicesAPI = {
   getTasks: async (caseId?: string): Promise<EmployeeTaskListResponse> => {
     const params: Record<string, string> = {};
     if (caseId) params.case_id = caseId;
-    const response = await api.get('/api/employee/tasks', { params });
+    const response = await api.get<EmployeeTaskListResponse>('/api/employee/tasks', { params });
     return response.data;
   },
 
   /** Get a single task by ID. */
   getTask: async (taskId: string): Promise<EmployeeTask> => {
-    const response = await api.get(`/api/employee/tasks/${taskId}`);
+    const response = await api.get<EmployeeTask>(`/api/employee/tasks/${taskId}`);
     return response.data;
   },
 
@@ -2821,18 +2821,18 @@ export const servicesAPI = {
     taskId: string,
     payload: { submission_data?: Record<string, unknown>; file_url?: string }
   ): Promise<EmployeeTask> => {
-    const response = await api.patch(`/api/employee/tasks/${taskId}`, payload);
+    const response = await api.patch<EmployeeTask>(`/api/employee/tasks/${taskId}`, payload);
     return response.data;
   },
 };
 
 export const rfqAPI = {
   listByAssignment: async (assignmentId: string): Promise<{ rfqs: RfqSummary[] }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/rfqs`);
+    const response = await api.get<{ rfqs: RfqSummary[] }>(`/api/employee/assignments/${assignmentId}/rfqs`);
     return response.data;
   },
   get: async (rfqId: string): Promise<RfqDetail> => {
-    const response = await api.get(`/api/rfqs/${rfqId}`);
+    const response = await api.get<RfqDetail>(`/api/rfqs/${rfqId}`);
     return response.data;
   },
   listQuotes: async (
@@ -2840,29 +2840,29 @@ export const rfqAPI = {
     options?: { comparison?: boolean }
   ): Promise<{ rfq_id: string; quotes: QuoteDetail[] }> => {
     const params = options?.comparison ? { comparison: '1' } : {};
-    const response = await api.get(`/api/rfqs/${rfqId}/quotes`, { params });
+    const response = await api.get<{ rfq_id: string; quotes: QuoteDetail[] }>(`/api/rfqs/${rfqId}/quotes`, { params });
     return response.data;
   },
   acceptQuote: async (rfqId: string, quoteId: string): Promise<{ ok: boolean; quote: QuoteDetail }> => {
-    const response = await api.patch(`/api/rfqs/${rfqId}/quotes/${quoteId}/accept`);
+    const response = await api.patch<{ ok: boolean; quote: QuoteDetail }>(`/api/rfqs/${rfqId}/quotes/${quoteId}/accept`);
     return response.data;
   },
 };
 
 export const vendorAPI = {
   listRfqs: async (): Promise<{ rfqs: RfqSummary[] }> => {
-    const response = await api.get('/api/vendor/rfqs');
+    const response = await api.get<{ rfqs: RfqSummary[] }>('/api/vendor/rfqs');
     return response.data;
   },
   getRfq: async (rfqId: string): Promise<RfqDetail> => {
-    const response = await api.get(`/api/vendor/rfqs/${rfqId}`);
+    const response = await api.get<RfqDetail>(`/api/vendor/rfqs/${rfqId}`);
     return response.data;
   },
   submitQuote: async (
     rfqId: string,
     payload: QuoteCreatePayload
   ): Promise<{ ok: boolean; quote: QuoteDetail }> => {
-    const response = await api.post(`/api/vendor/rfqs/${rfqId}/quotes`, payload);
+    const response = await api.post<{ ok: boolean; quote: QuoteDetail }>(`/api/vendor/rfqs/${rfqId}/quotes`, payload);
     return response.data;
   },
 };
@@ -2926,7 +2926,7 @@ export const timelineAPI = {
     const params: Record<string, string> = {};
     if (options?.ensureDefaults) params.ensure_defaults = '1';
     if (options?.includeLinks === false) params.include_links = 'false';
-    const response = await api.get(`/api/assignments/${assignmentId}/timeline`, { params });
+    const response = await api.get<TimelineResponse>(`/api/assignments/${assignmentId}/timeline`, { params });
     return response.data;
   },
   getByCase: async (
@@ -2936,7 +2936,7 @@ export const timelineAPI = {
     const params: Record<string, string> = {};
     if (options?.ensureDefaults) params.ensure_defaults = '1';
     if (options?.includeLinks === false) params.include_links = 'false';
-    const response = await api.get(`/api/cases/${caseId}/timeline`, { params });
+    const response = await api.get<TimelineResponse>(`/api/cases/${caseId}/timeline`, { params });
     return response.data;
   },
   updateMilestone: async (
@@ -2954,7 +2954,7 @@ export const timelineAPI = {
       notes: string | null;
     }>
   ): Promise<TimelineMilestone> => {
-    const response = await api.patch(`/api/cases/${caseId}/timeline/milestones/${milestoneId}`, patch);
+    const response = await api.patch<TimelineMilestone>(`/api/cases/${caseId}/timeline/milestones/${milestoneId}`, patch);
     return response.data;
   },
 };
@@ -3040,7 +3040,7 @@ export interface TimelineMilestone {
 export const hrPreferredSuppliersAPI = {
   list: async (serviceCategory?: string): Promise<{ preferred: Array<Record<string, unknown>> }> => {
     const params = serviceCategory ? { service_category: serviceCategory } : {};
-    const response = await api.get('/api/hr/preferred-suppliers', { params });
+    const response = await api.get<{ preferred: Array<Record<string, unknown>> }>('/api/hr/preferred-suppliers', { params });
     return response.data;
   },
   add: async (payload: {
@@ -3061,7 +3061,7 @@ export const hrPreferredSuppliersAPI = {
 
 export const hrPolicyAPI = {
   list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: any[] }> => {
-    const response = await api.get('/api/hr/policies', { params: params || {} });
+    const response = await api.get<{ policies: any[] }>('/api/hr/policies', { params: params || {} });
     return response.data;
   },
   get: async (policyId: string): Promise<any> => {
@@ -3069,7 +3069,7 @@ export const hrPolicyAPI = {
     return response.data;
   },
   create: async (policy: Record<string, unknown>): Promise<{ policyId: string; policy: any }> => {
-    const response = await api.post('/api/hr/policies', policy);
+    const response = await api.post<{ policyId: string; policy: any }>('/api/hr/policies', policy);
     return response.data;
   },
   update: async (policyId: string, policy: Record<string, unknown>): Promise<any> => {
@@ -3079,7 +3079,7 @@ export const hrPolicyAPI = {
   upload: async (file: File): Promise<{ policyId: string; policy: any }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/api/hr/policies/upload', formData, { timeout: 120_000 });
+    const response = await api.post<{ policyId: string; policy: any }>('/api/hr/policies/upload', formData, { timeout: 120_000 });
     return response.data;
   },
   delete: async (policyId: string): Promise<void> => {
@@ -3090,13 +3090,13 @@ export const hrPolicyAPI = {
 /** Structured Compensation & Allowance matrix (policy_configs / versions / benefits). */
 export const policyConfigMatrixAPI = {
   hrGet: async (companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/hr/policy-config', {
+    const response = await api.get<Record<string, unknown>>('/api/hr/policy-config', {
       params: companyId ? { companyId } : {},
     });
     return response.data;
   },
   hrPostDraft: async (companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.post('/api/hr/policy-config/draft', {}, {
+    const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/draft', {}, {
       params: companyId ? { companyId } : {},
       // Seeding/cloning a draft writes the full benefit matrix (~90 rows for a
       // multi-tier policy) — override the 12s default per the B13 convention.
@@ -3105,7 +3105,7 @@ export const policyConfigMatrixAPI = {
     return response.data;
   },
   hrPutDraft: async (body: Record<string, unknown>, companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.put('/api/hr/policy-config/draft', body, {
+    const response = await api.put<Record<string, unknown>>('/api/hr/policy-config/draft', body, {
       params: companyId ? { companyId } : {},
       // Destructive replace of the whole matrix (~90 rows + audit rows) can
       // exceed the 12s default; override per the B13 convention.
@@ -3114,7 +3114,7 @@ export const policyConfigMatrixAPI = {
     return response.data;
   },
   hrPublish: async (body: Record<string, unknown> | undefined, companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.post('/api/hr/policy-config/publish', body ?? {}, {
+    const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/publish', body ?? {}, {
       params: companyId ? { companyId } : {},
       // Publish also rebuilds the RAG index (OpenAI embeddings over all chunks),
       // which can take well over 12s; override per the B13 convention.
@@ -3123,19 +3123,19 @@ export const policyConfigMatrixAPI = {
     return response.data;
   },
   hrHistory: async (companyId?: string): Promise<{ versions: unknown[] }> => {
-    const response = await api.get('/api/hr/policy-config/history', {
+    const response = await api.get<{ versions: unknown[] }>('/api/hr/policy-config/history', {
       params: companyId ? { companyId } : {},
     });
     return response.data;
   },
   hrPublished: async (companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/hr/policy-config/published', {
+    const response = await api.get<Record<string, unknown>>('/api/hr/policy-config/published', {
       params: companyId ? { companyId } : {},
     });
     return response.data;
   },
   hrGetVersion: async (versionId: string, companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.get(`/api/hr/policy-config/versions/${encodeURIComponent(versionId)}`, {
+    const response = await api.get<Record<string, unknown>>(`/api/hr/policy-config/versions/${encodeURIComponent(versionId)}`, {
       params: companyId ? { companyId } : {},
     });
     return response.data;
@@ -3145,7 +3145,7 @@ export const policyConfigMatrixAPI = {
    * — { templates: [{ key, label, description }] }.
    */
   hrListTemplates: async (): Promise<{ templates: Array<{ key: string; label: string; description: string }> }> => {
-    const response = await api.get('/api/hr/policy-config/templates');
+    const response = await api.get<{ templates: Array<{ key: string; label: string; description: string }> }>('/api/hr/policy-config/templates');
     return response.data;
   },
   /**
@@ -3159,7 +3159,7 @@ export const policyConfigMatrixAPI = {
     body: { template_key: string; replace_existing_draft?: boolean },
     companyId?: string
   ): Promise<Record<string, unknown>> => {
-    const response = await api.post('/api/hr/policy-config/draft/apply-template', body, {
+    const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/draft/apply-template', body, {
       params: companyId ? { companyId } : {},
     });
     return response.data;
@@ -3169,7 +3169,7 @@ export const policyConfigMatrixAPI = {
    * Returns {live, draft, diff: {added, removed, changed, unchanged_count, summary}}.
    */
   hrDiff: async (companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/hr/policy-config/diff', {
+    const response = await api.get<Record<string, unknown>>('/api/hr/policy-config/diff', {
       params: companyId ? { companyId } : {},
     });
     return response.data;
@@ -3182,14 +3182,14 @@ export const policyConfigMatrixAPI = {
     body: { benefit_key: string; targeting_signature: string },
     companyId?: string
   ): Promise<Record<string, unknown>> => {
-    const response = await api.post('/api/hr/policy-config/draft/revert-row', body, {
+    const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/draft/revert-row', body, {
       params: companyId ? { companyId } : {},
     });
     return response.data;
   },
 
   adminGet: async (companyId: string): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/admin/policy-config', { params: { companyId } });
+    const response = await api.get<Record<string, unknown>>('/api/admin/policy-config', { params: { companyId } });
     return response.data;
   },
   /**
@@ -3198,27 +3198,27 @@ export const policyConfigMatrixAPI = {
    * (Product names like “clone published” / “create empty” map to this single route today.)
    */
   adminPostDraft: async (companyId: string): Promise<Record<string, unknown>> => {
-    const response = await api.post('/api/admin/policy-config/draft', {}, { params: { companyId } });
+    const response = await api.post<Record<string, unknown>>('/api/admin/policy-config/draft', {}, { params: { companyId } });
     return response.data;
   },
   adminPutDraft: async (companyId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> => {
-    const response = await api.put('/api/admin/policy-config/draft', body, { params: { companyId } });
+    const response = await api.put<Record<string, unknown>>('/api/admin/policy-config/draft', body, { params: { companyId } });
     return response.data;
   },
   adminPublish: async (companyId: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> => {
-    const response = await api.post('/api/admin/policy-config/publish', body ?? {}, { params: { companyId } });
+    const response = await api.post<Record<string, unknown>>('/api/admin/policy-config/publish', body ?? {}, { params: { companyId } });
     return response.data;
   },
   adminHistory: async (companyId: string): Promise<{ versions: unknown[] }> => {
-    const response = await api.get('/api/admin/policy-config/history', { params: { companyId } });
+    const response = await api.get<{ versions: unknown[] }>('/api/admin/policy-config/history', { params: { companyId } });
     return response.data;
   },
   adminPublished: async (companyId: string): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/admin/policy-config/published', { params: { companyId } });
+    const response = await api.get<Record<string, unknown>>('/api/admin/policy-config/published', { params: { companyId } });
     return response.data;
   },
   adminGetVersion: async (companyId: string, versionId: string): Promise<Record<string, unknown>> => {
-    const response = await api.get(`/api/admin/policy-config/versions/${encodeURIComponent(versionId)}`, {
+    const response = await api.get<Record<string, unknown>>(`/api/admin/policy-config/versions/${encodeURIComponent(versionId)}`, {
       params: { companyId },
     });
     return response.data;
@@ -3250,7 +3250,7 @@ export const policyConfigMatrixAPI = {
     },
     companyId?: string
   ): Promise<{ metadata?: Record<string, unknown>; results: unknown[] }> => {
-    const response = await api.post('/api/hr/policy-config/caps/compare', body, {
+    const response = await api.post<{ metadata?: Record<string, unknown>; results: unknown[] }>('/api/hr/policy-config/caps/compare', body, {
       params: companyId ? { companyId } : {},
     });
     return response.data;
@@ -3259,19 +3259,19 @@ export const policyConfigMatrixAPI = {
 
 export const companyPolicyAPI = {
   list: async (params?: { company_id?: string }): Promise<{ policies: any[] }> => {
-    const response = await api.get('/api/company-policies', { params });
+    const response = await api.get<{ policies: any[] }>('/api/company-policies', { params });
     return response.data;
   },
   getLatest: async (): Promise<{ policy: any; benefits: any[]; company_name?: string }> => {
-    const response = await api.get('/api/company-policies/latest');
+    const response = await api.get<{ policy: any; benefits: any[]; company_name?: string }>('/api/company-policies/latest');
     return response.data;
   },
   getById: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.get(`/api/company-policies/${policyId}`);
+    const response = await api.get<{ policy: any; benefits: any[] }>(`/api/company-policies/${policyId}`);
     return response.data;
   },
   getDownloadUrl: async (policyId: string): Promise<{ ok?: boolean; url?: string }> => {
-    const response = await api.get(`/api/company-policies/${policyId}/download-url`);
+    const response = await api.get<{ ok?: boolean; url?: string }>(`/api/company-policies/${policyId}/download-url`);
     return response.data;
   },
   upload: async (file: File, meta: { title: string; version?: string; effective_date?: string }): Promise<{ policy: any }> => {
@@ -3280,15 +3280,15 @@ export const companyPolicyAPI = {
     form.append('title', meta.title);
     if (meta.version) form.append('version', meta.version);
     if (meta.effective_date) form.append('effective_date', meta.effective_date);
-    const response = await api.post('/api/company-policies/upload', form, { timeout: 120_000 });
+    const response = await api.post<{ policy: any }>('/api/company-policies/upload', form, { timeout: 120_000 });
     return response.data;
   },
   extract: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.post(`/api/policies/${policyId}/extract`, undefined, { timeout: 120_000 });
+    const response = await api.post<{ policy: any; benefits: any[] }>(`/api/policies/${policyId}/extract`, undefined, { timeout: 120_000 });
     return response.data;
   },
   saveBenefits: async (policyId: string, benefits: any[]): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.put(`/api/company-policies/${policyId}/benefits`, { benefits });
+    const response = await api.put<{ policy: any; benefits: any[] }>(`/api/company-policies/${policyId}/benefits`, { benefits });
     return response.data;
   },
   getNormalized: async (
@@ -3343,7 +3343,7 @@ export const companyPolicyAPI = {
       metadata_json?: Record<string, any>;
     }
   ): Promise<{ benefit_rule: any }> => {
-    const response = await api.patch(`/api/company-policies/${policyId}/benefits/${benefitRuleId}`, body);
+    const response = await api.patch<{ benefit_rule: any }>(`/api/company-policies/${policyId}/benefits/${benefitRuleId}`, body);
     return response.data;
   },
   /** HR override layer — does not change extracted Layer-2 rows; adjusts effective entitlements. */
@@ -3361,7 +3361,7 @@ export const companyPolicyAPI = {
       hr_notes?: string | null;
     }
   ): Promise<{ hr_override: any }> => {
-    const response = await api.patch(
+    const response = await api.patch<{ hr_override: any }>(
       `/api/company-policies/${policyId}/versions/${versionId}/benefits/${benefitRuleId}/hr-override`,
       body
     );
@@ -3372,7 +3372,7 @@ export const companyPolicyAPI = {
     versionId: string,
     benefitRuleId: string
   ): Promise<{ ok?: boolean }> => {
-    const response = await api.delete(
+    const response = await api.delete<{ ok?: boolean }>(
       `/api/company-policies/${policyId}/versions/${versionId}/benefits/${benefitRuleId}/hr-override`
     );
     return response.data;
@@ -3382,16 +3382,16 @@ export const companyPolicyAPI = {
     versionId: string,
     body: { status: string }
   ): Promise<{ version: any }> => {
-    const response = await api.patch(`/api/company-policies/${policyId}/versions/${versionId}/status`, body);
+    const response = await api.patch<{ version: any }>(`/api/company-policies/${policyId}/versions/${versionId}/status`, body);
     return response.data;
   },
   /** Update latest version status - avoids version_id mismatch 404s */
   patchLatestVersionStatus: async (policyId: string, body: { status: string }): Promise<{ version: any }> => {
-    const response = await api.patch(`/api/company-policies/${policyId}/versions/latest/status`, body);
+    const response = await api.patch<{ version: any }>(`/api/company-policies/${policyId}/versions/latest/status`, body);
     return response.data;
   },
   publishVersion: async (policyId: string, versionId: string): Promise<{ version: any }> => {
-    const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
+    const response = await api.post<{ version: any }>(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
     return response.data;
   },
   /**
@@ -3406,7 +3406,7 @@ export const companyPolicyAPI = {
     policyId: string,
     versionId: string
   ): Promise<{ version: any; already: string | null }> => {
-    const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/unpublish`);
+    const response = await api.post<{ version: any; already: string | null }>(`/api/company-policies/${policyId}/versions/${versionId}/unpublish`);
     return response.data;
   },
   /**
@@ -3419,14 +3419,14 @@ export const companyPolicyAPI = {
   hrCanonicalDiffForCompany: async (
     companyId?: string
   ): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/hr/canonical-policy/diff', {
+    const response = await api.get<Record<string, unknown>>('/api/hr/canonical-policy/diff', {
       params: companyId ? { companyId } : {},
     });
     return response.data;
   },
   /** Publish latest version - avoids version_id mismatch 404s */
   publishLatestVersion: async (policyId: string): Promise<{ version: any }> => {
-    const response = await api.post(`/api/company-policies/${policyId}/versions/latest/publish`);
+    const response = await api.post<{ version: any }>(`/api/company-policies/${policyId}/versions/latest/publish`);
     return response.data;
   },
   patchExclusion: async (
@@ -3434,7 +3434,7 @@ export const companyPolicyAPI = {
     exclId: string,
     body: { description?: string; review_status?: string }
   ): Promise<{ exclusion: any }> => {
-    const response = await api.patch(`/api/company-policies/${policyId}/exclusions/${exclId}`, body);
+    const response = await api.patch<{ exclusion: any }>(`/api/company-policies/${policyId}/exclusions/${exclId}`, body);
     return response.data;
   },
   patchCondition: async (
@@ -3442,7 +3442,7 @@ export const companyPolicyAPI = {
     condId: string,
     body: { condition_value_json?: Record<string, any>; review_status?: string }
   ): Promise<{ condition: any }> => {
-    const response = await api.patch(`/api/company-policies/${policyId}/conditions/${condId}`, body);
+    const response = await api.patch<{ condition: any }>(`/api/company-policies/${policyId}/conditions/${condId}`, body);
     return response.data;
   },
   /** Platform starter baseline (only when company has no policy yet). */
@@ -3465,7 +3465,7 @@ export const companyPolicyAPI = {
 /** HR aggregate review payload (document + policy + draft + readiness). */
 export const hrPolicyReviewAPI = {
   get: async (params: { document_id?: string; policy_id?: string }): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/hr/policy-review', { params });
+    const response = await api.get<Record<string, unknown>>('/api/hr/policy-review', { params });
     return response.data;
   },
 };
@@ -3486,11 +3486,11 @@ export const policyDocumentsAPI = {
     return response.data;
   },
   list: async (params?: { company_id?: string }): Promise<{ documents: any[] }> => {
-    const response = await api.get('/api/hr/policy-documents', { params });
+    const response = await api.get<{ documents: any[] }>('/api/hr/policy-documents', { params });
     return response.data;
   },
   get: async (docId: string): Promise<{ document: any }> => {
-    const response = await api.get(`/api/hr/policy-documents/${docId}`);
+    const response = await api.get<{ document: any }>(`/api/hr/policy-documents/${docId}`);
     return response.data;
   },
   upload: async (file: File, companyId?: string | null): Promise<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }> => {
@@ -3508,20 +3508,20 @@ export const policyDocumentsAPI = {
       });
       logger.info('policy upload form keys', [...form.keys()]);
     }
-    const response = await api.post('/api/hr/policy-documents/upload', form, { params, timeout: 120_000 });
+    const response = await api.post<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }>('/api/hr/policy-documents/upload', form, { params, timeout: 120_000 });
     return response.data;
   },
   reprocess: async (docId: string): Promise<{ document: any }> => {
-    const response = await api.post(`/api/hr/policy-documents/${docId}/reprocess`, undefined, { timeout: 120_000 });
+    const response = await api.post<{ document: any }>(`/api/hr/policy-documents/${docId}/reprocess`, undefined, { timeout: 120_000 });
     return response.data;
   },
   listClauses: async (docId: string, clauseType?: string): Promise<{ clauses: any[] }> => {
     const params = clauseType ? { clause_type: clauseType } : {};
-    const response = await api.get(`/api/hr/policy-documents/${docId}/clauses`, { params });
+    const response = await api.get<{ clauses: any[] }>(`/api/hr/policy-documents/${docId}/clauses`, { params });
     return response.data;
   },
   getClause: async (docId: string, clauseId: string): Promise<{ clause: any }> => {
-    const response = await api.get(`/api/hr/policy-documents/${docId}/clauses/${clauseId}`);
+    const response = await api.get<{ clause: any }>(`/api/hr/policy-documents/${docId}/clauses/${clauseId}`);
     return response.data;
   },
   patchClause: async (
@@ -3529,7 +3529,7 @@ export const policyDocumentsAPI = {
     clauseId: string,
     body: { clause_type?: string; title?: string; hr_override_notes?: string }
   ): Promise<{ clause: any }> => {
-    const response = await api.patch(
+    const response = await api.patch<{ clause: any }>(
       `/api/hr/policy-documents/${docId}/clauses/${clauseId}`,
       body
     );
@@ -3573,7 +3573,7 @@ export const policyDocumentsAPI = {
     return response.data;
   },
   bulkDelete: async (documentIds: string[]): Promise<{ ok: boolean; deleted: number; skipped?: Array<{ id: string; reason: string }> }> => {
-    const response = await api.post('/api/hr/policy-documents/bulk-delete', { document_ids: documentIds });
+    const response = await api.post<{ ok: boolean; deleted: number; skipped?: Array<{ id: string; reason: string }> }>('/api/hr/policy-documents/bulk-delete', { document_ids: documentIds });
     return response.data;
   },
 };
@@ -3609,12 +3609,12 @@ export const resourcesAPI = {
     if (filters && Object.keys(filters).length) {
       params.filters = JSON.stringify(filters);
     }
-    const response = await api.get('/api/resources/page', { params });
+    const response = await api.get<import('../types').ResourcesPagePayload>('/api/resources/page', { params });
     return response.data;
   },
 
   getContext: async (assignmentOrCaseId: string): Promise<import('../types').ResourceContext> => {
-    const response = await api.get('/api/resources/context', {
+    const response = await api.get<import('../types').ResourceContext>('/api/resources/context', {
       params: { assignment_id: assignmentOrCaseId },
     });
     return response.data;
@@ -3650,7 +3650,7 @@ export const resourcesAPI = {
     if (params.relocationType) q.relocation_type = params.relocationType;
     if (params.hasChildren != null) q.has_children = String(params.hasChildren);
     if (filters && Object.keys(filters).length) q.filters = JSON.stringify(filters);
-    const response = await api.get('/api/hr/resources/page', { params: q });
+    const response = await api.get<import('../types').ResourcesPagePayload>('/api/hr/resources/page', { params: q });
     return response.data;
   },
 
@@ -3668,7 +3668,7 @@ export const resourcesAPI = {
     if (filters && Object.keys(filters).length) {
       params.filters = JSON.stringify(filters);
     }
-    const response = await api.get('/api/resources', { params });
+    const response = await api.get<{ resources: Record<string, unknown>[] }>('/api/resources', { params });
     return response.data;
   },
 
@@ -3686,7 +3686,7 @@ export const resourcesAPI = {
     if (filters && Object.keys(filters).length) {
       params.filters = JSON.stringify(filters);
     }
-    const response = await api.get('/api/resources/events', { params });
+    const response = await api.get<{ events: import('../types').PublicEvent[] }>('/api/resources/events', { params });
     return response.data;
   },
 
@@ -3694,7 +3694,7 @@ export const resourcesAPI = {
     assignmentOrCaseId: string,
     limit = 10
   ): Promise<import('../types').RecommendationGroup> => {
-    const response = await api.get('/api/resources/recommended', {
+    const response = await api.get<import('../types').RecommendationGroup>('/api/resources/recommended', {
       params: { assignment_id: assignmentOrCaseId, limit },
     });
     return response.data;
@@ -3703,15 +3703,15 @@ export const resourcesAPI = {
 
 export const dossierAPI = {
   getQuestions: async (caseId: string): Promise<DossierQuestionsResponse> => {
-    const response = await api.get('/api/dossier/questions', { params: { case_id: caseId } });
+    const response = await api.get<DossierQuestionsResponse>('/api/dossier/questions', { params: { case_id: caseId } });
     return response.data;
   },
   saveAnswers: async (payload: { case_id: string; answers: Array<{ question_id?: string | null; case_question_id?: string | null; answer: any }> }): Promise<{ ok: boolean }> => {
-    const response = await api.post('/api/dossier/answers', payload);
+    const response = await api.post<{ ok: boolean }>('/api/dossier/answers', payload);
     return response.data;
   },
   searchSuggestions: async (caseId: string): Promise<DossierSearchSuggestionsResponse> => {
-    const response = await api.post('/api/dossier/search-suggestions', { case_id: caseId });
+    const response = await api.post<DossierSearchSuggestionsResponse>('/api/dossier/search-suggestions', { case_id: caseId });
     return response.data;
   },
   addCaseQuestion: async (payload: { case_id: string; question_text: string; answer_type: string; options?: string[] | null; is_mandatory?: boolean; sources?: DossierSource[] }): Promise<any> => {
@@ -4123,14 +4123,14 @@ export interface SpecialistReviewSubmitItem {
 
 export const specialistReviewAPI = {
   getRoadmap: async (caseId: string): Promise<{ case_id: string; steps: AiStep[] }> => {
-    const res = await api.get(`/api/internal/specialist-review/${caseId}`);
+    const res = await api.get<{ case_id: string; steps: AiStep[] }>(`/api/internal/specialist-review/${caseId}`);
     return res.data;
   },
   submit: async (
     caseId: string,
     body: { decision: 'approved' | 'rejected'; notes?: string; items: SpecialistReviewSubmitItem[] },
   ): Promise<{ released_to_user: boolean; regeneration_requested: boolean }> => {
-    const res = await api.post(`/api/internal/specialist-review/submit`, { case_id: caseId, ...body });
+    const res = await api.post<{ released_to_user: boolean; regeneration_requested: boolean }>(`/api/internal/specialist-review/submit`, { case_id: caseId, ...body });
     return res.data;
   },
 };
