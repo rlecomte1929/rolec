@@ -1,4 +1,5 @@
 import React from 'react';
+import { logger } from './lib/logger';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { initAnalytics } from './analytics';
@@ -31,6 +32,6 @@ if (!rootEl) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     rootEl.innerHTML = `<div style="padding:2rem;color:red;font-family:system-ui;">Failed to load: ${msg}</div>`;
-    console.error(err);
+    logger.error(err);
   }
 }

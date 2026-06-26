@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase';
+import { logger } from '../lib/logger';
 
 /**
  * Sign in to Supabase with email/password.
@@ -17,17 +18,17 @@ export async function signInSupabase(email: string, password: string): Promise<{
     const { data, error } = await supabase.auth.signInWithPassword({ email: e, password });
     if (error) {
       if (import.meta.env.DEV) {
-        console.warn('[Supabase sign-in]', error.message, '(Backend login succeeded; Supabase features may need VITE_SUPABASE_ACCESS_TOKEN fallback)');
+        logger.warn('[Supabase sign-in]', error.message, '(Backend login succeeded; Supabase features may need VITE_SUPABASE_ACCESS_TOKEN fallback)');
       }
       return { ok: false, error: error.message };
     }
     if (import.meta.env.DEV && data?.session) {
-      console.debug('[Supabase sign-in] Session established; tokens will auto-refresh');
+      logger.debug('[Supabase sign-in] Session established; tokens will auto-refresh');
     }
     return { ok: true };
   } catch (err: any) {
     if (import.meta.env.DEV) {
-      console.warn('[Supabase sign-in]', err?.message);
+      logger.warn('[Supabase sign-in]', err?.message);
     }
     return { ok: false, error: err?.message };
   }
@@ -41,7 +42,7 @@ export async function signOutSupabase(): Promise<void> {
     await supabase.auth.signOut();
   } catch (err) {
     if (import.meta.env.DEV) {
-      console.warn('[Supabase sign-out]', err);
+      logger.warn('[Supabase sign-out]', err);
     }
   }
 }

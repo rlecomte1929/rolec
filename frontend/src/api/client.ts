@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { signOutSupabase } from './supabaseAuth';
 import { parseResponse } from './schemas/parseResponse';
@@ -1516,7 +1517,7 @@ export const adminAPI = {
       const response = await api.get('/api/admin/policies/templates');
       return response.data ?? { templates: [] };
     } catch (e) {
-      console.warn('[adminAPI] listAdminPolicyTemplates failed (non-blocking)', e);
+      logger.warn('[adminAPI] listAdminPolicyTemplates failed (non-blocking)', e);
       return { templates: [] };
     }
   },
@@ -3499,14 +3500,14 @@ export const policyDocumentsAPI = {
     form.append('file', file);
     const params = companyId && companyId.trim() ? { company_id: companyId.trim() } : undefined;
     if (import.meta.env.DEV) {
-      console.info('policy upload selected file', {
+      logger.info('policy upload selected file', {
         name: file?.name,
         size: file?.size,
         type: file?.type,
         isFile: file instanceof File,
         companyId: companyId ?? undefined,
       });
-      console.info('policy upload form keys', [...form.keys()]);
+      logger.info('policy upload form keys', [...form.keys()]);
     }
     const response = await api.post('/api/hr/policy-documents/upload', form, { params, timeout: 120_000 });
     return response.data;

@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { logger } from '../../lib/logger';
 
 /**
  * Validate an API response at the boundary WITHOUT ever throwing.
@@ -16,7 +17,7 @@ export function parseResponse<T>(schema: z.ZodType<T>, data: unknown, label: str
   if (result.success) return result.data;
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.warn(`[api-boundary] ${label}: response failed validation`, result.error.issues);
+    logger.warn(`[api-boundary] ${label}: response failed validation`, result.error.issues);
   }
   return data as T;
 }

@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { logger } from '../lib/logger';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from './antigravity/Button';
@@ -100,7 +101,7 @@ class ResilientErrorBoundary extends React.Component<BoundaryProps, BoundaryStat
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ResilientRoute]', error, info.componentStack);
+    logger.error('[ResilientRoute]', error, info.componentStack);
     // EH-1: report render crashes to the capture-error service (was console-only).
     reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ResilientRoute' });
   }
