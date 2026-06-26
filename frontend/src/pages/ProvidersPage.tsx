@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
@@ -13,7 +13,6 @@ import {
   parseAssignmentSearchParam,
   resolveScopedAssignmentId,
   setPreferredEmployeeAssignmentId,
-  withAssignmentQuery,
 } from '../utils/employeeAssignmentScope';
 import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
@@ -88,7 +87,12 @@ export const ProvidersPage: React.FC = () => {
     isLoading: assignmentLoading,
     refetch,
   } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  // [AIQ-1285] caseId from the path is authoritative; fall back to legacy ?assignment=.
+  const { caseId: pathCaseId } = useParams<{ caseId?: string }>();
+  const queryAssignmentId = useMemo(
+    () => pathCaseId ?? parseAssignmentSearchParam(location.search),
+    [pathCaseId, location.search],
+  );
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
@@ -271,7 +275,7 @@ export const ProvidersPage: React.FC = () => {
         .map(([k]) => k as ServiceKey)
     );
     setSelectedServices(selected);
-    navigate(withAssignmentQuery(buildRoute('servicesQuestions'), assignmentId));
+    navigate(buildRoute('caseServicesQuestions', { caseId: assignmentId }));
   };
 
   if (assignmentLoading || isLoading) {

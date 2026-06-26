@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Button, Card, Input } from '../../components/antigravity';
@@ -8,8 +8,8 @@ import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { employeeAPI } from '../../api/client';
 import { RfqWorkflowDiagram } from '../../features/services/RfqWorkflowDiagram';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
-import { buildRoute } from '../../navigation/routes';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
+import { buildRoute, type RouteKey } from '../../navigation/routes';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 
 const SERVICE_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -32,7 +32,12 @@ export const ServicesRfqNew: React.FC = () => {
     linkedSummaries,
     isLoading: assignmentLoading,
   } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  // [AIQ-1285] caseId from the path is authoritative; fall back to legacy ?assignment=.
+  const { caseId: pathCaseId } = useParams<{ caseId?: string }>();
+  const queryAssignmentId = useMemo(
+    () => pathCaseId ?? parseAssignmentSearchParam(location.search),
+    [pathCaseId, location.search],
+  );
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
@@ -42,6 +47,8 @@ export const ServicesRfqNew: React.FC = () => {
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
+  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -136,7 +143,7 @@ export const ServicesRfqNew: React.FC = () => {
           </p>
           <Button
             onClick={() =>
-              navigate(withAssignmentQuery(buildRoute('servicesRecommendations'), assignmentId))
+              navigate(caseStep('caseServicesRecommendations'))
             }
           >
             Back to recommendations

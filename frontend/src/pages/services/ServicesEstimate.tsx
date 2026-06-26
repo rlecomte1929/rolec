@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
@@ -9,7 +9,7 @@ import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
-import { buildRoute } from '../../navigation/routes';
+import { buildRoute, type RouteKey } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
 import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
@@ -31,11 +31,18 @@ export const ServicesEstimate: React.FC = () => {
     assignmentId: primaryAssignmentId,
     linkedSummaries,
   } = useEmployeeAssignment();
-  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  // [AIQ-1285] caseId from the path is authoritative; fall back to legacy ?assignment=.
+  const { caseId: pathCaseId } = useParams<{ caseId?: string }>();
+  const queryAssignmentId = useMemo(
+    () => pathCaseId ?? parseAssignmentSearchParam(location.search),
+    [pathCaseId, location.search],
+  );
   const { effectiveId: assignmentId } = useMemo(
     () => resolveScopedAssignmentId({ linkedSummaries, primaryAssignmentId, queryAssignmentId }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId],
   );
+  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
   useEffect(() => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
@@ -69,8 +76,8 @@ export const ServicesEstimate: React.FC = () => {
             comes out of pocket. Your selections save automatically — you can come back any time.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => go(buildRoute('services'))}>Start picking services</Button>
-            <Button variant="outline" onClick={() => go(buildRoute('servicesRecommendations'))}>
+            <Button onClick={() => go(caseStep('caseServices'))}>Start picking services</Button>
+            <Button variant="outline" onClick={() => go(caseStep('caseServicesRecommendations'))}>
               See recommendations
             </Button>
           </div>
@@ -97,7 +104,7 @@ export const ServicesEstimate: React.FC = () => {
       <Alert variant="info" className="mb-4">
         <p className="text-sm">
           Estimates and policy comparison below use <strong>{displayCurrency}</strong>. To change currency, go back to{' '}
-          <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium underline">
+          <Link to={caseStep('caseServices')} className="font-medium underline">
             Select services
           </Link>
           .
@@ -119,12 +126,12 @@ export const ServicesEstimate: React.FC = () => {
         selectedPackage={shortlist}
         categoryLabels={CATEGORY_LABELS}
         displayCurrency={displayCurrency}
-        onBack={() => go(buildRoute('servicesRecommendations'))}
-        onStartOver={() => go(buildRoute('services'))}
+        onBack={() => go(caseStep('caseServicesRecommendations'))}
+        onStartOver={() => go(caseStep('caseServices'))}
       />
       {isRfqEnabled() && (
         <div className="mt-6 flex items-center justify-end">
-          <Button disabled={!hasShortlist} onClick={() => go(buildRoute('servicesRfqNew'))}>
+          <Button disabled={!hasShortlist} onClick={() => go(caseStep('caseServicesRfqNew'))}>
             Request quotations
           </Button>
         </div>
@@ -140,7 +147,7 @@ export const ServicesEstimate: React.FC = () => {
           primaryLabel="View my relocation plan →"
           primaryHref={buildRoute('employeeCasePlan', { caseId: assignmentId })}
           secondaryLabel="Back to recommendations"
-          secondaryHref={`${buildRoute('servicesRecommendations')}${location.search}`}
+          secondaryHref={caseStep('caseServicesRecommendations')}
         />
       )}
     </AppShell>

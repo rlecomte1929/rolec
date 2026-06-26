@@ -45,7 +45,12 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const { data, loading, error, refetch, ensureDefaultsAndReload } =
     useEmployeeRelocationPlanPageData(caseId);
   const runCta = useRelocationPlanCtaHandler(caseId ?? '', { resourceCaseId: data?.case_id });
-  const handleCta = (t: RelocationPlanPhaseTaskDTO) => runCta(t.cta ?? null);
+  const handleCta = (t: RelocationPlanPhaseTaskDTO) => {
+    // [AIQ-1252] For document-upload tasks, pass the document key so the dossier
+    // can deep-link to (auto-expand) the form whose required documents include it.
+    const docKey = t.required_inputs?.find((ri) => ri.type === 'document')?.key;
+    runCta(t.cta ?? null, docKey);
+  };
 
   // Header meta (cities / employee / role / move date) — separate endpoint.
   const [header, setHeader] = useState<RoadmapHeaderMeta | null>(null);

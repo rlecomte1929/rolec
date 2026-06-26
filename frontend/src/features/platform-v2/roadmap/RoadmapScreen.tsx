@@ -241,9 +241,20 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
           </div>
 
           {step.due_date && (
-            <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              Due: <DateFormatter date={step.due_date} format="absolute" />
-            </p>
+            step.due_date_is_suggested ? (
+              // [AIQ-1258d] Auto-estimated from the case move date — render muted
+              // and clearly distinct from a real deadline.
+              <p
+                style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}
+                title="Auto-estimated from your move date"
+              >
+                Suggested · <DateFormatter date={step.due_date} format="absolute" />
+              </p>
+            ) : (
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Due: <DateFormatter date={step.due_date} format="absolute" />
+              </p>
+            )
           )}
         </div>
 

@@ -102,6 +102,31 @@ export interface CompanyProfilePayload {
   default_working_location?: string;
 }
 
+/** AIQ-1223c — deterministic HR-onboarding inference response. */
+export interface InferredOnboardingConfig {
+  company_id: string | null;
+  signals: {
+    size_band: string | null;
+    size_bucket: 'small' | 'medium' | 'large' | 'unknown';
+    default_destination_country: string | null;
+    default_working_location: string | null;
+    published_tier_count: number;
+    has_published_policy: boolean;
+    case_count: number;
+    has_active_program: boolean;
+  };
+  proposed_config: {
+    policy_tiers: string[];
+    tier_source: 'published' | 'size_band_guess';
+    default_destination_country: string | null;
+    default_working_location: string | null;
+    dashboard_density: 'compact' | 'standard' | 'active_program';
+    bulk_assign_enabled: boolean;
+    show_volume_nudges: boolean;
+  };
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export interface DossierQuestion {
   id: string;
   question_text: string;

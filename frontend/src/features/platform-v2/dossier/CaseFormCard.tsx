@@ -7,7 +7,7 @@
  * Visual style uses antigravity primitives for consistency with the rest of
  * the new Phase 1 admin/employee surfaces.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { Badge, Card, StalenessBadge, isSourceStale } from '../../../components/antigravity';
@@ -209,10 +209,22 @@ function deadlineChip(deadline: string | null): { tone: string; text: string } |
 
 export interface CaseFormCardProps {
   form: CaseFormSummary;
+  /** [AIQ-1252] Start expanded (deep-link from a roadmap "Start now" target). */
+  initialExpanded?: boolean;
+  /** [AIQ-1252] Briefly flash a highlight ring so the user sees which card opened. */
+  highlight?: boolean;
 }
 
-export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
-  const [expanded, setExpanded] = useState(false);
+export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpanded = false, highlight = false }) => {
+  const [expanded, setExpanded] = useState(initialExpanded);
+  // [AIQ-1252] transient highlight: ring fades after a couple seconds.
+  const [highlighted, setHighlighted] = useState(highlight);
+  useEffect(() => {
+    if (!highlight) return;
+    setHighlighted(true);
+    const id = window.setTimeout(() => setHighlighted(false), 2200);
+    return () => window.clearTimeout(id);
+  }, [highlight]);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const navigate = useNavigate();
@@ -244,7 +256,12 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
   const badge = effectiveBadge(form);
 
   return (
-    <Card padding="lg" className="hover:shadow-sm transition-shadow">
+    <Card
+      padding="lg"
+      className={`hover:shadow-sm transition-shadow ${
+        highlighted ? 'ring-2 ring-[#1f8e8b] ring-offset-2' : ''
+      }`}
+    >
       <Button unstyled
         type="button"
         onClick={() => setExpanded((v) => !v)}

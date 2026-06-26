@@ -337,6 +337,9 @@ export interface RoadmapStep {
   owner: "employee" | "hr" | "vendor" | "system";
   vendor_id: string | null;
   due_date: string | null;
+  // [AIQ-1258c/d] True when due_date is auto-estimated from the case move date
+  // (move_date − track lead time) rather than a real deadline.
+  due_date_is_suggested?: boolean;
   completed_at: string | null;
   sort_order: number;
   dependency_ids: string[];           // IDs of steps that must complete first

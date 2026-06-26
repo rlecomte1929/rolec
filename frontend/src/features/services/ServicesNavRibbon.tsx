@@ -2,23 +2,28 @@
  * Navigation ribbon for Services flow - allows users to jump between sections.
  */
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { buildRoute } from '../../navigation/routes';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { buildRoute, type RouteKey } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
 
+// [AIQ-1285] case-scoped step routes; `match` is the path tail used for active state.
 const ALL_STEPS = [
-  { key: 'services', path: '/services', label: 'Select services' },
-  { key: 'questions', path: '/services/questions', label: 'Preferences' },
-  { key: 'recommendations', path: '/services/recommendations', label: 'Recommendations' },
-  { key: 'estimate', path: '/services/estimate', label: 'Review & budget' },
-  { key: 'rfq', path: '/services/rfq/new', label: 'Request quotes' },
+  { key: 'services', routeKey: 'caseServices' as RouteKey, match: '/services/select', label: 'Select services' },
+  { key: 'questions', routeKey: 'caseServicesQuestions' as RouteKey, match: '/services/questions', label: 'Preferences' },
+  { key: 'recommendations', routeKey: 'caseServicesRecommendations' as RouteKey, match: '/services/recommendations', label: 'Recommendations' },
+  { key: 'estimate', routeKey: 'caseServicesEstimate' as RouteKey, match: '/services/estimate', label: 'Review & budget' },
+  { key: 'rfq', routeKey: 'caseServicesRfqNew' as RouteKey, match: '/services/rfq/new', label: 'Request quotes' },
 ] as const;
 
 export const ServicesNavRibbon: React.FC = () => {
   const location = useLocation();
+  const { caseId } = useParams<{ caseId?: string }>();
   const currentPath = location.pathname;
-  const qs = location.search || '';
   const STEPS = isRfqEnabled() ? ALL_STEPS : ALL_STEPS.filter((s) => s.key !== 'rfq');
+
+  // Ribbon only navigates within the case-scoped flow; without a caseId there's
+  // nothing to link to (the legacy redirect handles entry from path-less URLs).
+  if (!caseId) return null;
 
   return (
     <nav
@@ -26,11 +31,8 @@ export const ServicesNavRibbon: React.FC = () => {
       aria-label="Services flow navigation"
     >
       {STEPS.map((step, idx) => {
-        const isActive =
-          step.path === currentPath ||
-          (step.path !== '/services' && currentPath.startsWith(step.path));
-        const isServices = step.key === 'services';
-        const path = (isServices ? buildRoute('services') : step.path) + qs;
+        const isActive = currentPath.endsWith(step.match);
+        const path = buildRoute(step.routeKey, { caseId });
 
         return (
           <React.Fragment key={step.key}>
