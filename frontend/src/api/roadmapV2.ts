@@ -11,6 +11,9 @@ export interface RoadmapV2Step {
   status: 'pending' | 'in_progress' | 'awaiting_employee' | 'awaiting_vendor' | 'awaiting_hr' | 'blocked' | 'completed' | 'skipped';
   owner: string;
   due_date: string | null;
+  // [AIQ-1258c/d] True when due_date is an auto-estimate from the case move date
+  // (move_date − track lead time) rather than a real form deadline.
+  due_date_is_suggested?: boolean;
   sort_order: number;
   ai_suggestion: string | null;
   dependency_ids: string[];
