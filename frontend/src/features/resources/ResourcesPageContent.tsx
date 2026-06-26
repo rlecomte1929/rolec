@@ -113,6 +113,20 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
   clearFilters,
 }) => {
   const [activeSection, setActiveSection] = useState('overview');
+  // M-07b (AIQ-1262): the 9 filter dropdowns are collapsed behind a "Filters" toggle
+  // by default so the page leads with content. Active (non-search) filters surface as
+  // dismissible chips + a count on the toggle.
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilterChips = useMemo(() => {
+    const labels: Partial<Record<keyof ResourcesFilters, string>> = {
+      city: 'City', family: 'Family', childAge: 'Child age', budget: 'Budget',
+      category: 'Category', free: 'Price', familyFriendly: 'Family-friendly',
+      eventType: 'Event type', weekendOnly: 'When',
+    };
+    return (Object.keys(labels) as (keyof ResourcesFilters)[])
+      .filter((k) => filters[k])
+      .map((k) => ({ key: k, label: labels[k]! }));
+  }, [filters]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const context = payload?.context ?? null;
@@ -244,16 +258,8 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         <Card padding="lg" className="mb-6">
           <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Suggested for you</h2>
           <div className="space-y-4">
-            {recommended.recommendedForYou?.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-[#64748b] mb-2">Top picks</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                  {recommended.recommendedForYou.slice(0, 5).map((r) => (
-                    <ResourceCard key={r.id} resource={r} />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* M-07a (AIQ-1265): the "Top picks" section duplicated the same items as
+                "First steps" below — removed it; First steps is the canonical list. */}
             {recommended.firstSteps?.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium text-[#64748b] mb-2">First steps</h3>
@@ -290,7 +296,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         </Card>
       )}
 
-      {/* Filters */}
+      {/* Filters — collapsed behind a toggle by default (M-07b / AIQ-1262). */}
       <Card padding="md" className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-40 sm:w-48">
@@ -300,100 +306,123 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
               onChange={(value) => updateFilters({ search: value })}
             />
           </div>
-          <select
-            value={filters.city}
-            onChange={(e) => updateFilters({ city: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+          <Button
+            variant="secondary"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
           >
-            <option value="">City</option>
-            {context?.cityName && <option value={context.cityName}>{context.cityName}</option>}
-          </select>
-          <select
-            value={filters.family}
-            onChange={(e) => updateFilters({ family: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Family type</option>
-            <option value="single">Single</option>
-            <option value="couple">Couple</option>
-            <option value="family">Family</option>
-          </select>
-          <select
-            value={filters.childAge}
-            onChange={(e) => updateFilters({ childAge: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Child age</option>
-            <option value="0-3">0–3</option>
-            <option value="4-6">4–6</option>
-            <option value="7-12">7–12</option>
-            <option value="13-18">13–18</option>
-          </select>
-          <select
-            value={filters.budget}
-            onChange={(e) => updateFilters({ budget: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Budget</option>
-            <option value="low">Low</option>
-            <option value="mid">Mid</option>
-            <option value="high">High</option>
-          </select>
-          <select
-            value={filters.category}
-            onChange={(e) => updateFilters({ category: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            {CATEGORY_FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.free}
-            onChange={(e) => updateFilters({ free: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Price</option>
-            <option value="true">Free only</option>
-          </select>
-          <select
-            value={filters.familyFriendly}
-            onChange={(e) => updateFilters({ familyFriendly: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Family-friendly</option>
-            <option value="true">Yes</option>
-          </select>
-          <select
-            value={filters.eventType}
-            onChange={(e) => updateFilters({ eventType: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Event type</option>
-            {Object.entries(EVENT_TYPE_LABELS)
-              .sort(([, a], [, b]) => a.localeCompare(b))
-              .map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
+            Filters{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ''} {showFilters ? '▴' : '▾'}
+          </Button>
+          {activeFilterChips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => updateFilters({ [chip.key]: '' } as Partial<ResourcesFilters>)}
+              className="inline-flex items-center gap-1 rounded-full bg-[#e2e8f0] px-3 py-1 text-xs text-[#334155] hover:bg-[#cbd5e1]"
+            >
+              {chip.label}
+              <span aria-hidden>×</span>
+              <span className="sr-only">Remove {chip.label} filter</span>
+            </button>
+          ))}
+        </div>
+        {showFilters && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[#e2e8f0] pt-3">
+            <select
+              value={filters.city}
+              onChange={(e) => updateFilters({ city: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">City</option>
+              {context?.cityName && <option value={context.cityName}>{context.cityName}</option>}
+            </select>
+            <select
+              value={filters.family}
+              onChange={(e) => updateFilters({ family: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Family type</option>
+              <option value="single">Single</option>
+              <option value="couple">Couple</option>
+              <option value="family">Family</option>
+            </select>
+            <select
+              value={filters.childAge}
+              onChange={(e) => updateFilters({ childAge: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Child age</option>
+              <option value="0-3">0–3</option>
+              <option value="4-6">4–6</option>
+              <option value="7-12">7–12</option>
+              <option value="13-18">13–18</option>
+            </select>
+            <select
+              value={filters.budget}
+              onChange={(e) => updateFilters({ budget: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Budget</option>
+              <option value="low">Low</option>
+              <option value="mid">Mid</option>
+              <option value="high">High</option>
+            </select>
+            <select
+              value={filters.category}
+              onChange={(e) => updateFilters({ category: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              {CATEGORY_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
-          </select>
-          <select
-            value={filters.weekendOnly}
-            onChange={(e) => updateFilters({ weekendOnly: e.target.value })}
-            className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">When</option>
-            <option value="true">Weekend only</option>
-          </select>
-          {(Object.values(filters).some(Boolean) && (
-            <Button variant="secondary" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          )) || null}
-        </div>
+            </select>
+            <select
+              value={filters.free}
+              onChange={(e) => updateFilters({ free: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Price</option>
+              <option value="true">Free only</option>
+            </select>
+            <select
+              value={filters.familyFriendly}
+              onChange={(e) => updateFilters({ familyFriendly: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Family-friendly</option>
+              <option value="true">Yes</option>
+            </select>
+            <select
+              value={filters.eventType}
+              onChange={(e) => updateFilters({ eventType: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Event type</option>
+              {Object.entries(EVENT_TYPE_LABELS)
+                .sort(([, a], [, b]) => a.localeCompare(b))
+                .map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+            </select>
+            <select
+              value={filters.weekendOnly}
+              onChange={(e) => updateFilters({ weekendOnly: e.target.value })}
+              className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">When</option>
+              <option value="true">Weekend only</option>
+            </select>
+            {(Object.values(filters).some(Boolean) && (
+              <Button variant="secondary" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )) || null}
+          </div>
+        )}
       </Card>
 
       {/* Section nav */}

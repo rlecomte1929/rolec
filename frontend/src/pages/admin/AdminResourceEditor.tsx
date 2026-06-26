@@ -221,11 +221,18 @@ export const AdminResourceEditor: React.FC = () => {
           </>
         )}
         {approveModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setApproveModalOpen(false)}>
-            <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            onClick={(e) => { if (e.target === e.currentTarget) setApproveModalOpen(false); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') setApproveModalOpen(false); }}
+            role="button"
+            tabIndex={-1}
+            aria-label="Close approve dialog"
+          >
+            <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4">
               <h4 className="font-semibold mb-2">Approve resource</h4>
-              <label className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
-              <textarea
+              <label htmlFor="res-review-notes-optional" className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
+              <textarea id="res-review-notes-optional"
                 value={approveNotes}
                 onChange={(e) => setApproveNotes(e.target.value)}
                 rows={2}
@@ -254,8 +261,8 @@ export const AdminResourceEditor: React.FC = () => {
           <h3 className="font-semibold mb-3">Basic</h3>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Title *</label>
-              <Input unstyled
+              <label htmlFor="res-title" className="block text-sm text-slate-600 mb-1">Title *</label>
+              <Input id="res-title" unstyled
                 value={(form.title as string) || ''}
                 onChange={(v) => update('title', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -263,8 +270,8 @@ export const AdminResourceEditor: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Country</label>
-                <Input unstyled
+                <label htmlFor="res-country" className="block text-sm text-slate-600 mb-1">Country</label>
+                <Input id="res-country" unstyled
                   value={(form.country_code as string) || ''}
                   onChange={(v) => update('country_code', v.toUpperCase())}
                   className="w-full rounded border border-slate-200 px-3 py-2"
@@ -272,8 +279,8 @@ export const AdminResourceEditor: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-600 mb-1">City</label>
-                <Input unstyled
+                <label htmlFor="res-city" className="block text-sm text-slate-600 mb-1">City</label>
+                <Input id="res-city" unstyled
                   value={(form.city_name as string) || ''}
                   onChange={(v) => update('city_name', v)}
                   className="w-full rounded border border-slate-200 px-3 py-2"
@@ -281,8 +288,8 @@ export const AdminResourceEditor: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Category</label>
-              <select
+              <label htmlFor="res-category" className="block text-sm text-slate-600 mb-1">Category</label>
+              <select id="res-category"
                 value={(form.category_id as string) || ''}
                 onChange={(e) => update('category_id', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -296,8 +303,8 @@ export const AdminResourceEditor: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Resource Type</label>
-              <select
+              <label htmlFor="res-resource-type" className="block text-sm text-slate-600 mb-1">Resource Type</label>
+              <select id="res-resource-type"
                 value={(form.resource_type as string) || 'guide'}
                 onChange={(e) => update('resource_type', e.target.value)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -310,8 +317,8 @@ export const AdminResourceEditor: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Audience</label>
-              <select
+              <label htmlFor="res-audience" className="block text-sm text-slate-600 mb-1">Audience</label>
+              <select id="res-audience"
                 value={(form.audience_type as string) || 'all'}
                 onChange={(e) => update('audience_type', e.target.value)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -324,8 +331,8 @@ export const AdminResourceEditor: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Budget Tier</label>
-              <select
+              <label htmlFor="res-budget-tier" className="block text-sm text-slate-600 mb-1">Budget Tier</label>
+              <select id="res-budget-tier"
                 value={(form.budget_tier as string) || ''}
                 onChange={(e) => update('budget_tier', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -339,15 +346,15 @@ export const AdminResourceEditor: React.FC = () => {
               </select>
             </div>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2">
-                <Checkbox
+              <label htmlFor="res-family-friendly" className="flex items-center gap-2">
+                <Checkbox id="res-family-friendly"
                   checked={!!form.is_family_friendly}
                   onChange={(e) => update('is_family_friendly', e.target.checked)}
                 />
                 <span className="text-sm">Family friendly</span>
               </label>
-              <label className="flex items-center gap-2">
-                <Checkbox
+              <label htmlFor="res-featured" className="flex items-center gap-2">
+                <Checkbox id="res-featured"
                   checked={!!form.is_featured}
                   onChange={(e) => update('is_featured', e.target.checked)}
                 />
@@ -361,8 +368,8 @@ export const AdminResourceEditor: React.FC = () => {
           <h3 className="font-semibold mb-3">Content</h3>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Summary</label>
-              <textarea
+              <label htmlFor="res-summary" className="block text-sm text-slate-600 mb-1">Summary</label>
+              <textarea id="res-summary"
                 value={(form.summary as string) || ''}
                 onChange={(e) => update('summary', e.target.value)}
                 rows={3}
@@ -370,8 +377,8 @@ export const AdminResourceEditor: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Body</label>
-              <textarea
+              <label htmlFor="res-body" className="block text-sm text-slate-600 mb-1">Body</label>
+              <textarea id="res-body"
                 value={(form.body as string) || ''}
                 onChange={(e) => update('body', e.target.value)}
                 rows={5}
@@ -379,8 +386,8 @@ export const AdminResourceEditor: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">External URL</label>
-              <Input unstyled
+              <label htmlFor="res-external-url" className="block text-sm text-slate-600 mb-1">External URL</label>
+              <Input id="res-external-url" unstyled
                 value={(form.external_url as string) || ''}
                 onChange={(v) => update('external_url', v)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -388,7 +395,7 @@ export const AdminResourceEditor: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Tags</label>
+              <span className="block text-sm text-slate-600 mb-1">Tags</span>
               <div className="flex flex-wrap gap-2">
                 {tags.map((t) => {
                   const ids = (form.tag_ids as string[]) || [];
@@ -412,8 +419,8 @@ export const AdminResourceEditor: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Source</label>
-              <select
+              <label htmlFor="res-source" className="block text-sm text-slate-600 mb-1">Source</label>
+              <select id="res-source"
                 value={(form.source_id as string) || ''}
                 onChange={(e) => update('source_id', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
@@ -433,8 +440,8 @@ export const AdminResourceEditor: React.FC = () => {
           <h3 className="font-semibold mb-3 text-amber-800">Admin Only (never shown to end users)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Internal Notes</label>
-              <textarea
+              <label htmlFor="res-internal-notes" className="block text-sm text-slate-600 mb-1">Internal Notes</label>
+              <textarea id="res-internal-notes"
                 value={(form.internal_notes as string) || ''}
                 onChange={(e) => update('internal_notes', e.target.value)}
                 rows={2}
@@ -442,8 +449,8 @@ export const AdminResourceEditor: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Review Notes</label>
-              <textarea
+              <label htmlFor="res-review-notes" className="block text-sm text-slate-600 mb-1">Review Notes</label>
+              <textarea id="res-review-notes"
                 value={(form.review_notes as string) || ''}
                 onChange={(e) => update('review_notes', e.target.value)}
                 rows={2}

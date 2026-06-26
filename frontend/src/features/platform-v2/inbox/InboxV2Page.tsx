@@ -35,6 +35,18 @@ interface MailboxDef {
   match: (c: Conversation) => boolean;
 }
 
+// M-08 (AIQ-1266): contextual empty states so a new employee knows WHEN messages
+// will arrive, instead of a bare "No threads in this mailbox."
+const MAILBOX_EMPTY_COPY: Record<MailboxKey, string> = {
+  inbox: 'Your HR team will message you here once your intake is reviewed. Your first message usually arrives within 2 business days.',
+  hr: 'Messages from your HR team appear here once your intake is reviewed.',
+  vendors: 'Vendor quotes appear here after you request services from the Services page.',
+  authorities: 'Messages from authorities appear here during the immigration process.',
+  family: 'Family-related messages appear here.',
+  sent: 'Messages you send appear here.',
+  archive: 'Archived conversations appear here.',
+};
+
 const MAILBOXES: MailboxDef[] = [
   { key: 'inbox', label: 'Inbox', icon: Inbox, match: () => true },
   { key: 'hr', label: 'From HR', icon: Briefcase, match: (c) => c.channel !== 'supplier' },
@@ -551,7 +563,7 @@ export function InboxV2Page() {
                   </Button>
                 </div>
               ) : filteredConversations.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-slate-400">No threads in this mailbox.</div>
+                <div className="px-4 py-6 text-sm text-slate-500">{MAILBOX_EMPTY_COPY[mailbox]}</div>
               ) : (
                 filteredConversations.map((c) => {
                   const isActive = activeId === c.id;

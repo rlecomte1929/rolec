@@ -89,8 +89,8 @@ export const AdminUsers: React.FC = () => {
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <label className="block text-xs font-medium text-[#6b7280] mb-0.5">Company</label>
-            <select
+            <label htmlFor="au-company" className="block text-xs font-medium text-[#6b7280] mb-0.5">Company</label>
+            <select id="au-company"
               value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
               className="rounded-lg border border-[#d1d5db] px-3 py-2 text-sm min-w-[180px]"
@@ -102,8 +102,8 @@ export const AdminUsers: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#6b7280] mb-0.5">Role</label>
-            <select
+            <label htmlFor="au-role" className="block text-xs font-medium text-[#6b7280] mb-0.5">Role</label>
+            <select id="au-role"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
@@ -114,8 +114,8 @@ export const AdminUsers: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#6b7280] mb-0.5">Search</label>
-            <Input unstyled
+            <label htmlFor="au-search" className="block text-xs font-medium text-[#6b7280] mb-0.5">Search</label>
+            <Input id="au-search" unstyled
               value={query}
               onChange={(v) => setQuery(v)}
               placeholder="Name or email"
@@ -349,12 +349,12 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
         <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Edit person</h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Email</label>
-            <Input unstyled value={person.email ?? ''} readOnly className="w-full rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm text-[#6b7280]" />
+            <label htmlFor="au-email" className="block text-sm font-medium text-[#374151] mb-1">Email</label>
+            <Input id="au-email" unstyled value={person.email ?? ''} readOnly className="w-full rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm text-[#6b7280]" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Name</label>
-            <Input unstyled
+            <label htmlFor="au-name" className="block text-sm font-medium text-[#374151] mb-1">Name</label>
+            <Input id="au-name" unstyled
               value={full_name}
               onChange={(v) => setFullName(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
@@ -362,8 +362,8 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
+            <label htmlFor="au-role" className="block text-sm font-medium text-[#374151] mb-1">Role</label>
+            <select id="au-role" value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
               <option value="ADMIN">Admin</option>
               <option value="HR">HR</option>
               <option value="EMPLOYEE">Employee</option>
@@ -371,8 +371,8 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Company</label>
-            <select value={company_id} onChange={(e) => setCompanyId(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
+            <label htmlFor="au-company" className="block text-sm font-medium text-[#374151] mb-1">Company</label>
+            <select id="au-company" value={company_id} onChange={(e) => setCompanyId(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
               <option value="">Unassigned</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -475,24 +475,24 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
         <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Add person</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Email *</label>
-            <Input unstyled type="email" value={email} onChange={(v) => setEmail(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="email@example.com" required />
+            <label htmlFor="au-email" className="block text-sm font-medium text-[#374151] mb-1">Email *</label>
+            <Input id="au-email" unstyled type="email" value={email} onChange={(v) => setEmail(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="email@example.com" required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Name</label>
-            <Input unstyled value={full_name} onChange={(v) => setFullName(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Full name" />
+            <label htmlFor="au-name" className="block text-sm font-medium text-[#374151] mb-1">Name</label>
+            <Input id="au-name" unstyled value={full_name} onChange={(v) => setFullName(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Full name" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
+            <label htmlFor="au-role" className="block text-sm font-medium text-[#374151] mb-1">Role</label>
+            <select id="au-role" value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
               <option value="ADMIN">Admin</option>
               <option value="HR">HR</option>
               <option value="EMPLOYEE">Employee</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Company</label>
-            <select value={company_id} onChange={(e) => setCompanyId(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
+            <label htmlFor="au-company" className="block text-sm font-medium text-[#374151] mb-1">Company</label>
+            <select id="au-company" value={company_id} onChange={(e) => setCompanyId(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
               <option value="">Unassigned</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -500,8 +500,8 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Initial password</label>
-            <Input unstyled type="password" value={password} onChange={(v) => setPassword(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Min 8 chars — leave blank to send an invite email" autoComplete="new-password" />
+            <label htmlFor="au-initial-password" className="block text-sm font-medium text-[#374151] mb-1">Initial password</label>
+            <Input id="au-initial-password" unstyled type="password" value={password} onChange={(v) => setPassword(v)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" placeholder="Min 8 chars — leave blank to send an invite email" autoComplete="new-password" />
             <p className="mt-1 text-xs text-[#6b7280]">Set a password so they can log in immediately, or leave blank to email them a set-password invite.</p>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}

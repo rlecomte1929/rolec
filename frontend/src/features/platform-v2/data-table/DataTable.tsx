@@ -1,3 +1,4 @@
+import type * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   flexRender,
@@ -322,13 +323,15 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
         )}
         <span
           className={canSort ? 'cursor-pointer' : ''}
-          onClick={(e) => {
-            // Allow click-to-sort without triggering drag (dnd-kit's
-            // activationConstraint distance=5 already handles this, but
-            // stopPropagation is belt-and-braces).
-            e.stopPropagation();
-            if (canSort) header.column.toggleSorting();
-          }}
+          {...(canSort
+            ? {
+                role: 'button' as const,
+                tabIndex: 0,
+                // stopPropagation lets click-to-sort coexist with dnd-kit drag.
+                onClick: (e: React.MouseEvent) => { e.stopPropagation(); header.column.toggleSorting(); },
+                onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.column.toggleSorting(); } },
+              }
+            : {})}
         >
           {flexRender(header.column.columnDef.header, header.getContext())}
         </span>
@@ -397,7 +400,14 @@ function DataRow<T>({ row, columns, onClick, isActive }: DataRowProps<T>) {
   const clickable = !!onClick;
   return (
     <tr
-      onClick={clickable ? () => onClick?.(row.original) : undefined}
+      {...(clickable
+        ? {
+            onClick: () => onClick?.(row.original),
+            onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(row.original); } },
+            role: 'button' as const,
+            tabIndex: 0,
+          }
+        : {})}
       className={`${clickable ? 'cursor-pointer hover:bg-slate-50' : ''} ${isActive ? 'bg-accent-50' : ''}`}
     >
       {row.getVisibleCells().map((cell) => {

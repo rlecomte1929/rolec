@@ -429,8 +429,8 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Verified</dt>
               <dd>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
+                <label htmlFor="sd-verified-partner" className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox id="sd-verified-partner"
                     checked={display.verified}
                     onChange={(e) => updateField('verified', e.target.checked)}
                   />
@@ -544,8 +544,8 @@ export const AdminSupplierDetail: React.FC = () => {
               <h3 className="text-sm font-medium text-[#374151] mb-2">New capability</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-xs text-[#6b7280] mb-0.5">Service</label>
-                  <select
+                  <label htmlFor="sd-service" className="block text-xs text-[#6b7280] mb-0.5">Service</label>
+                  <select id="sd-service"
                     value={newCap.service_category}
                     onChange={(e) => setNewCap((c) => ({ ...c, service_category: e.target.value }))}
                     className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
@@ -556,8 +556,8 @@ export const AdminSupplierDetail: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-[#6b7280] mb-0.5">Coverage</label>
-                  <select
+                  <label htmlFor="sd-coverage" className="block text-xs text-[#6b7280] mb-0.5">Coverage</label>
+                  <select id="sd-coverage"
                     value={newCap.coverage_scope_type}
                     onChange={(e) => setNewCap((c) => ({ ...c, coverage_scope_type: e.target.value }))}
                     className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
@@ -569,8 +569,8 @@ export const AdminSupplierDetail: React.FC = () => {
                 </div>
                 {newCap.coverage_scope_type !== 'global' && (
                   <div>
-                    <label className="block text-xs text-[#6b7280] mb-0.5">Country</label>
-                    <Input unstyled
+                    <label htmlFor="sd-country" className="block text-xs text-[#6b7280] mb-0.5">Country</label>
+                    <Input id="sd-country" unstyled
                       type="text"
                       value={newCap.country_code}
                       onChange={(v) => setNewCap((c) => ({ ...c, country_code: v.toUpperCase().slice(0, 2) }))}
@@ -581,8 +581,8 @@ export const AdminSupplierDetail: React.FC = () => {
                 )}
                 {newCap.coverage_scope_type === 'city' && (
                   <div>
-                    <label className="block text-xs text-[#6b7280] mb-0.5">City</label>
-                    <Input unstyled
+                    <label htmlFor="sd-city" className="block text-xs text-[#6b7280] mb-0.5">City</label>
+                    <Input id="sd-city" unstyled
                       type="text"
                       value={newCap.city_name}
                       onChange={(v) => setNewCap((c) => ({ ...c, city_name: v }))}
@@ -592,8 +592,8 @@ export const AdminSupplierDetail: React.FC = () => {
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs text-[#6b7280] mb-0.5">Min budget</label>
-                  <Input unstyled
+                  <label htmlFor="sd-min-budget" className="block text-xs text-[#6b7280] mb-0.5">Min budget</label>
+                  <Input id="sd-min-budget" unstyled
                     type="number"
                     value={newCap.min_budget ?? ''}
                     onChange={(v) => setNewCap((c) => ({ ...c, min_budget: v ? parseFloat(v) : undefined }))}
@@ -601,8 +601,8 @@ export const AdminSupplierDetail: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-[#6b7280] mb-0.5">Max budget</label>
-                  <Input unstyled
+                  <label htmlFor="sd-max-budget" className="block text-xs text-[#6b7280] mb-0.5">Max budget</label>
+                  <Input id="sd-max-budget" unstyled
                     type="number"
                     value={newCap.max_budget ?? ''}
                     onChange={(v) => setNewCap((c) => ({ ...c, max_budget: v ? parseFloat(v) : undefined }))}
@@ -611,22 +611,22 @@ export const AdminSupplierDetail: React.FC = () => {
                 </div>
               </div>
               <div className="flex gap-4 mt-2">
-                <label className="flex items-center gap-1 cursor-pointer text-sm">
-                  <Checkbox
+                <label htmlFor="sd-setnewcapc-family" className="flex items-center gap-1 cursor-pointer text-sm">
+                  <Checkbox id="sd-setnewcapc-family"
                     checked={newCap.family_support}
                     onChange={(e) => setNewCap((c) => ({ ...c, family_support: e.target.checked }))}
                   />
                   Family
                 </label>
-                <label className="flex items-center gap-1 cursor-pointer text-sm">
-                  <Checkbox
+                <label htmlFor="sd-setnewcapc-corporate" className="flex items-center gap-1 cursor-pointer text-sm">
+                  <Checkbox id="sd-setnewcapc-corporate"
                     checked={newCap.corporate_clients}
                     onChange={(e) => setNewCap((c) => ({ ...c, corporate_clients: e.target.checked }))}
                   />
                   Corporate
                 </label>
-                <label className="flex items-center gap-1 cursor-pointer text-sm">
-                  <Checkbox
+                <label htmlFor="sd-setnewcapc-remote" className="flex items-center gap-1 cursor-pointer text-sm">
+                  <Checkbox id="sd-setnewcapc-remote"
                     checked={newCap.remote_support}
                     onChange={(e) => setNewCap((c) => ({ ...c, remote_support: e.target.checked }))}
                   />
@@ -803,15 +803,15 @@ function ScoringEditor({
         <div>
           <dt className="text-[#6b7280]">Flags</dt>
           <dd className="flex gap-4">
-            <label className="flex items-center gap-1 cursor-pointer">
-              <Checkbox
+            <label htmlFor="sd-setlocall-preferred" className="flex items-center gap-1 cursor-pointer">
+              <Checkbox id="sd-setlocall-preferred"
                 checked={local.preferred_partner}
                 onChange={(e) => setLocal((l) => ({ ...l, preferred_partner: e.target.checked }))}
               />
               <span>Preferred</span>
             </label>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <Checkbox
+            <label htmlFor="sd-setlocall-premium" className="flex items-center gap-1 cursor-pointer">
+              <Checkbox id="sd-setlocall-premium"
                 checked={local.premium_partner}
                 onChange={(e) => setLocal((l) => ({ ...l, premium_partner: e.target.checked }))}
               />
@@ -883,8 +883,8 @@ function RankingDebugCard({
       </p>
       <div className="flex flex-wrap gap-3 items-end mb-4">
         <div>
-          <label className="block text-xs text-[#6b7280] mb-0.5">Service category</label>
-          <select
+          <label htmlFor="sd-service-category" className="block text-xs text-[#6b7280] mb-0.5">Service category</label>
+          <select id="sd-service-category"
             value={serviceCategory}
             onChange={(e) => setServiceCategory(e.target.value)}
             className="border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
@@ -898,8 +898,8 @@ function RankingDebugCard({
           </select>
         </div>
         <div>
-          <label className="block text-xs text-[#6b7280] mb-0.5">Destination country</label>
-          <Input unstyled
+          <label htmlFor="sd-destination-country" className="block text-xs text-[#6b7280] mb-0.5">Destination country</label>
+          <Input id="sd-destination-country" unstyled
             type="text"
             value={destinationCountry}
             onChange={(v) => setDestinationCountry(v.toUpperCase().slice(0, 2))}
@@ -908,8 +908,8 @@ function RankingDebugCard({
           />
         </div>
         <div>
-          <label className="block text-xs text-[#6b7280] mb-0.5">Destination city (optional)</label>
-          <Input unstyled
+          <label htmlFor="sd-destination-city-optional" className="block text-xs text-[#6b7280] mb-0.5">Destination city (optional)</label>
+          <Input id="sd-destination-city-optional" unstyled
             type="text"
             value={destinationCity}
             onChange={(v) => setDestinationCity(v)}

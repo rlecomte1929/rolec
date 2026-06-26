@@ -18,6 +18,8 @@ import { logger } from '../../../lib/logger';
 export interface RequiredDocument {
   key: string;
   label: string;
+  // [AIQ-1257b] Optional acceptance-format guidance (e.g. "Original + copy").
+  format?: string | null;
 }
 
 export interface FormDocumentsProps {
@@ -118,6 +120,13 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
     return m;
   }, [requiredDocuments]);
 
+  // [AIQ-1257b] Compact required-document guidance: show up to 3 "label (format)"
+  // entries, then a "+N more" affordance for the remainder.
+  const requiredGuidance = useMemo(() => {
+    const shown = requiredDocuments.slice(0, 3);
+    return { shown, remaining: requiredDocuments.length - shown.length };
+  }, [requiredDocuments]);
+
   return (
     <div className="rounded border border-slate-200 px-3 py-2">
       {/* Single hidden input, reused for every upload affordance. */}
@@ -128,6 +137,24 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
         disabled={busy}
         aria-label="Upload supporting document"
       />
+
+      {/* [AIQ-1257b] Compact required-document guidance (label + format), above
+          the upload affordance. */}
+      {requiredDocuments.length > 0 && (
+        <p className="mb-2 text-xs text-slate-500" data-testid="required-doc-guidance">
+          <span className="font-semibold text-slate-600">Required: </span>
+          {requiredGuidance.shown.map((req, i) => (
+            <span key={req.key}>
+              {req.label}
+              {req.format ? ` (${req.format})` : ''}
+              {i < requiredGuidance.shown.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+          {requiredGuidance.remaining > 0 && (
+            <span className="text-slate-400"> +{requiredGuidance.remaining} more</span>
+          )}
+        </p>
+      )}
 
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
