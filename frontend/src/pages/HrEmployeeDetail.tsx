@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Alert } from '../components/antigravity';
@@ -23,45 +24,60 @@ const STATUSES = ['active', 'inactive', 'on_assignment'];
 export const HrEmployeeDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [employee, setEmployee] = useState<HrCompanyEmployee | null>(null);
+  const queryClient = useQueryClient();
+  // `band`/`assignmentType`/`status` are form-local: seeded from the loaded
+  // employee, then edited freely until Save.
   const [band, setBand] = useState('');
   const [assignmentType, setAssignmentType] = useState('');
   const [status, setStatus] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // `error` is also written by handleSave, so keep it local and fold the read
+  // error into what we render below.
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  const loadEmployee = async () => {
-    if (!id) return;
-    setIsLoading(true);
-    setError('');
-    try {
-      const { employee: emp } = await hrAPI.getEmployee(id);
-      setEmployee(emp);
-      // Back-compat: absorb legacy Band1..Band4 (and L1..L4, job-title
-      // synonyms) into the canonical slug so the select shows the right
-      // option instead of an empty "Select…" for pre-existing rows.
-      const storedBand = emp.band || '';
-      setBand(normalizeEmployeeLevel(storedBand) ?? '');
-      setAssignmentType(emp.assignment_type || '');
-      setStatus(emp.status || '');
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else if (err?.response?.status === 404) {
-        setError('Employee not found.');
-      } else {
-        setError('Unable to load employee.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const employeeQuery = useQuery({
+    queryKey: ['hr', 'employee', id],
+    queryFn: async () => {
+      const { employee: emp } = await hrAPI.getEmployee(id!);
+      return emp;
+    },
+    enabled: !!id,
+  });
+  const employee: HrCompanyEmployee | null = employeeQuery.data ?? null;
+  // Original kept isLoading=true until a load resolved; with no id it never
+  // flips false.
+  const isLoading = id ? employeeQuery.isLoading : true;
 
+  const loadStatus =
+    (employeeQuery.error as { response?: { status?: number } } | null)?.response?.status;
+  const load401 = loadStatus === 401;
+  const readError = employeeQuery.isError
+    ? load401
+      ? '' // handled by the redirect below
+      : loadStatus === 404
+        ? 'Employee not found.'
+        : 'Unable to load employee.'
+    : '';
+  const displayedError = error || readError;
+
+  // Seed the form fields from the loaded employee. Back-compat: absorb legacy
+  // Band1..Band4 (and L1..L4, job-title synonyms) into the canonical slug so
+  // the select shows the right option instead of an empty "Select…".
   useEffect(() => {
-    void loadEmployee();
-  }, [id, navigate]);
+    const emp = employeeQuery.data;
+    if (!emp) return;
+    setBand(normalizeEmployeeLevel(emp.band || '') ?? '');
+    setAssignmentType(emp.assignment_type || '');
+    setStatus(emp.status || '');
+  }, [employeeQuery.data]);
+
+  // Preserve the 401 → landing redirect from the read.
+  useEffect(() => {
+    if (employeeQuery.isError && load401) {
+      safeNavigate(navigate, 'landing');
+    }
+  }, [employeeQuery.isError, load401, navigate]);
 
   const handleSave = async () => {
     if (!id) return;
@@ -75,7 +91,8 @@ export const HrEmployeeDetail: React.FC = () => {
         status: status || undefined,
       });
       setSaved(true);
-      void loadEmployee();
+      // Refetch re-seeds the form from the saved server state.
+      await queryClient.invalidateQueries({ queryKey: ['hr', 'employee', id] });
     } catch (err: any) {
       if (err?.response?.status === 404) {
         setError('Employee not found.');
@@ -105,9 +122,9 @@ export const HrEmployeeDetail: React.FC = () => {
           </Link>
         </div>
 
-        {error && (
+        {displayedError && (
           <Alert variant="error" className="mb-4">
-            {error}
+            {displayedError}
           </Alert>
         )}
         {saved && (

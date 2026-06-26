@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
@@ -96,48 +97,52 @@ function titleCase(s: string): string {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+const EXCEPTIONS_KEY = ['hr', 'policy-dashboard', 'exception-requests'] as const;
+
 export function HrPolicyDashboardPage() {
-  const [policy, setPolicy] = useState<Record<string, unknown> | null>(null);
-  const [companyName, setCompanyName] = useState<string | null>(null);
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const [employeeTotal, setEmployeeTotal] = useState(0);
-  const [exceptions, setExceptions] = useState<ExceptionRequest[]>([]);
-  const [caseHealth, setCaseHealth] = useState<CaseHealthFlag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [deciding, setDeciding] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      // Each source is independent — settle all so one failure (e.g. no
-      // published policy) doesn't blank the whole dashboard.
-      const [policyRes, assignRes, excRes, healthRes] = await Promise.allSettled([
-        companyPolicyAPI.getLatest(),
-        hrAPI.listAssignments({ limit: 100 }),
-        listExceptionRequestsForCompany(),
-        hrAPI.getCaseHealth(),
-      ]);
-      if (cancelled) return;
-      if (healthRes.status === 'fulfilled') {
-        setCaseHealth(healthRes.value.cases ?? []);
-      }
-      if (policyRes.status === 'fulfilled') {
-        setPolicy((policyRes.value.policy as Record<string, unknown>) ?? null);
-        setCompanyName(policyRes.value.company_name ?? null);
-      }
-      if (assignRes.status === 'fulfilled') {
-        setAssignments(assignRes.value.assignments ?? []);
-        setEmployeeTotal(assignRes.value.total ?? assignRes.value.assignments?.length ?? 0);
-      }
-      if (excRes.status === 'fulfilled') {
-        setExceptions(excRes.value ?? []);
-      }
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Each source is independent — kept as separate queries so one failure (e.g.
+  // no published policy) defaults gracefully instead of blanking the dashboard.
+  const policyQuery = useQuery({
+    queryKey: ['hr', 'policy-dashboard', 'company-policy-latest'],
+    queryFn: () => companyPolicyAPI.getLatest(),
+  });
+  const assignmentsQuery = useQuery({
+    queryKey: ['hr', 'policy-dashboard', 'assignments'],
+    queryFn: () => hrAPI.listAssignments({ limit: 100 }),
+  });
+  const exceptionsQuery = useQuery({
+    queryKey: EXCEPTIONS_KEY,
+    queryFn: () => listExceptionRequestsForCompany(),
+  });
+  const caseHealthQuery = useQuery({
+    queryKey: ['hr', 'policy-dashboard', 'case-health'],
+    queryFn: () => hrAPI.getCaseHealth(),
+  });
+
+  const policy: Record<string, unknown> | null =
+    (policyQuery.data?.policy as Record<string, unknown> | undefined) ?? null;
+  const companyName: string | null = policyQuery.data?.company_name ?? null;
+  const assignments: AssignmentSummary[] = useMemo(
+    () => assignmentsQuery.data?.assignments ?? [],
+    [assignmentsQuery.data],
+  );
+  const employeeTotal =
+    assignmentsQuery.data?.total ?? assignmentsQuery.data?.assignments?.length ?? 0;
+  const exceptions: ExceptionRequest[] = useMemo(
+    () => exceptionsQuery.data ?? [],
+    [exceptionsQuery.data],
+  );
+  const caseHealth: CaseHealthFlag[] = caseHealthQuery.data?.cases ?? [];
+  // Mirror the old allSettled: stay in the loading state until every source has
+  // settled (success or error).
+  const loading =
+    policyQuery.isLoading ||
+    assignmentsQuery.isLoading ||
+    exceptionsQuery.isLoading ||
+    caseHealthQuery.isLoading;
 
   // ── Derived: exceptions grouped by case ─────────────────────────────────────
   const exceptionsByCase = useMemo(() => {
@@ -220,7 +225,9 @@ export function HrPolicyDashboardPage() {
       setDeciding(id);
       try {
         const updated = await resolveExceptionRequest(id, { status });
-        setExceptions((rs) => rs.map((r) => (r.id === id ? { ...r, ...updated } : r)));
+        queryClient.setQueryData<ExceptionRequest[]>(EXCEPTIONS_KEY, (rs) =>
+          rs ? rs.map((r) => (r.id === id ? { ...r, ...updated } : r)) : rs,
+        );
       } catch {
         // Surface nothing destructive: leave the row pending so HR can retry.
         // The browser console carries the 4xx/5xx for debugging.
@@ -228,7 +235,7 @@ export function HrPolicyDashboardPage() {
         setDeciding(null);
       }
     },
-    []
+    [queryClient]
   );
 
   // ── Active policy tile fields ───────────────────────────────────────────────
