@@ -5,82 +5,69 @@
  *   cd frontend && npx eslint src --ext .ts,.tsx
  *
  * AUDIT-A6 (AIQ-359): initial config wires up the custom no-clickable-div rule.
- * AUDIT-A6-followup (AIQ-395): adds @typescript-eslint/parser so ESLint can
- * actually parse .ts/.tsx files (without this every file errored with
- * "Parsing error" because the default espree parser doesn't understand TS syntax).
+ * AUDIT-A6-followup (AIQ-395): adds @typescript-eslint/parser so ESLint can parse TS.
+ * LINT-1 (AIQ-1193): the config was "theater" — ~8 hand rules, extended no recommended
+ *   ruleset, and the parser was set but `projectService` was not, so type-aware rules
+ *   silently no-op'd. This enriches it with:
+ *     - @eslint/js                              `recommended`
+ *     - typescript-eslint                       `recommendedTypeChecked` (type-aware)
+ *     - eslint-plugin-jsx-a11y                  `flatConfigs.recommended`
+ *   and turns on `projectService` so no-floating-promises / no-misused-promises /
+ *   no-unsafe-* actually run. The project-specific rules (local/no-clickable-div,
+ *   no-console) are preserved.
+ *
+ *   NOTE: enabling these rulesets surfaces a large pre-existing backlog by design.
+ *   Draining it is LINT-3; making the lint step CI-blocking is QG-1. Do NOT gate on
+ *   zero violations here — `npx eslint src` is expected to report findings.
  */
 
-import tsParser from '@typescript-eslint/parser';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import noClickableDiv from './eslint-rules/no-clickable-div.js';
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import noClickableDiv from './eslint-rules/no-clickable-div.js';
 
-export default [
+export default tseslint.config(
   {
-    // Apply to all TypeScript/TSX source files
+    // Application source — full recommended + type-aware + a11y rulesets.
     files: ['src/**/*.{ts,tsx}'],
-
+    extends: [
+      js.configs.recommended,
+      ...tseslint.configs.recommendedTypeChecked,
+      jsxA11y.flatConfigs.recommended,
+    ],
     languageOptions: {
-      parser: tsParser,
       parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        ecmaFeatures: { jsx: true },
+        // Enables type-aware linting (no-floating-promises, no-unsafe-*, etc.).
+        // Without projectService the type-checked rules are parsed but never run.
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
-
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      /**
-       * "local" namespace for project-specific custom rules.
-       * Usage: 'local/no-clickable-div': 'error'
-       */
+      // "local" namespace for project-specific custom rules.
       local: {
         rules: {
           'no-clickable-div': noClickableDiv,
         },
       },
-
-      /**
-       * jsx-a11y: WCAG-aligned accessibility rules for JSX elements.
-       * MVP-9 / AUDIT-A6: enforces aria-label on interactive elements,
-       * proper label associations for inputs, alt text on images, etc.
-       */
-      'jsx-a11y': jsxA11y,
     },
-
     rules: {
       /**
-       * Prohibit <div onClick={...}> (and other non-interactive elements) without
-       * role + tabIndex + onKeyDown. WCAG 2.1 SC 2.1.1 (Keyboard).
-       *
-       * Error — this is a hard accessibility blocker. Clicking divs without
-       * keyboard support excludes all keyboard-only and switch-access users.
+       * Prohibit <div onClick={...}> without role + tabIndex + onKeyDown.
+       * WCAG 2.1 SC 2.1.1 (Keyboard). Hard accessibility blocker.
        */
       'local/no-clickable-div': 'error',
 
       /**
-       * AUDIT-A8: Ban direct console.* calls in application code.
-       * Use the logger wrapper (src/lib/logger.ts) instead — it no-ops in production.
-       * The logger module itself is exempt via the override block below.
+       * AUDIT-A8: ban direct console.* in app code — use src/lib/logger.ts
+       * (no-ops in production). logger.ts itself is exempt below.
        */
       'no-console': 'error',
-
-      // jsx-a11y: key WCAG 2.1 rules for interactive elements and form inputs
-      'jsx-a11y/alt-text': 'error',
-      'jsx-a11y/aria-props': 'error',
-      'jsx-a11y/aria-proptypes': 'error',
-      'jsx-a11y/aria-unsupported-elements': 'error',
-      'jsx-a11y/no-redundant-roles': 'warn',
-      // Warn (not error) on missing aria-label — many icon buttons are already fixed
-      // but some may remain in lower-priority screens. Escalate to error after a
-      // full sweep (see AUDIT-A6 known gaps).
-      'jsx-a11y/interactive-supports-focus': 'warn',
     },
   },
 
   {
-    // logger.ts is the one place allowed to call console directly
+    // logger.ts is the one place allowed to call console directly.
     files: ['src/lib/logger.ts'],
     rules: {
       'no-console': 'off',
@@ -88,10 +75,9 @@ export default [
   },
 
   {
-    // eval_*.ts and *_pipeline.ts are Node.js CLI scripts that intentionally
-    // write to stdout/stderr as their primary output. console.* is fine here.
+    // eval_*.ts and *_pipeline.ts are Node CLI scripts that write to stdout as
+    // their primary output; their tests likewise. console.* is fine here.
     files: [
-      'src/features/policy-builder/eval_*.ts',
       'src/features/policy-builder/eval_*.ts',
       'src/features/policy-builder/*_pipeline.ts',
       'src/features/policy-builder/__tests__/**',
@@ -102,9 +88,10 @@ export default [
   },
 
   {
-    // Synthetic test case for the rule — proves the rule fires on a bare <div onClick>
-    // Run: npx eslint eslint-rules/__tests__/no-clickable-div.test-fixture.jsx
+    // Synthetic test case for the custom rule — JS/JSX, not part of the TS program,
+    // so disable type-aware rules and just assert the custom rule fires.
     files: ['eslint-rules/__tests__/**'],
+    extends: [tseslint.configs.disableTypeChecked],
     plugins: {
       local: {
         rules: {
@@ -116,4 +103,4 @@ export default [
       'local/no-clickable-div': 'error',
     },
   },
-];
+);
