@@ -52,7 +52,7 @@ export const AdminSourceChangeReviewsPage: React.FC = () => {
     setLoading(true);
     sourceChangeReviewAPI
       .listPending({ limit: 100 })
-      .then((r) => setItems(r.items ?? []))
+      .then((r) => setItems((r.items ?? []) as Review[]))
       .catch((e) => setError((e as Error)?.message || 'Failed to load review queue'))
       .finally(() => setLoading(false));
   };
@@ -64,7 +64,7 @@ export const AdminSourceChangeReviewsPage: React.FC = () => {
     setBanner(null);
     try {
       const res = await sourceChangeReviewAPI.approve(review.id);
-      const count = (res?.notified_case_ids ?? []).length;
+      const count = (((res as { notified_case_ids?: unknown[] })?.notified_case_ids) ?? []).length;
       setItems((prev) => prev.filter((r) => r.id !== review.id));
       setBanner({
         kind: 'success',

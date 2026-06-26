@@ -15,7 +15,7 @@ export const AdminOpsNotificationsPage: React.FC = () => {
     setError(null);
     try {
       const res = await adminOpsAnalyticsAPI.getNotificationMetrics({ days });
-      setData(res);
+      setData(res as Record<string, unknown>);
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
     } finally {

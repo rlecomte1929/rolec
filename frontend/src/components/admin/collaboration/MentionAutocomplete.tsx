@@ -31,7 +31,7 @@ export const MentionAutocomplete: React.FC<Props> = ({
 
   useEffect(() => {
     adminReviewQueueAPI.getAssignees(50).then((r) => {
-      setUsers((r.items as User[]) || []);
+      setUsers((((r as { items?: unknown[] }).items ?? []) as User[]));
     }).catch(() => setUsers([]));
   }, []);
 

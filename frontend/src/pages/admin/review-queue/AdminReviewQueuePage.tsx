@@ -86,8 +86,8 @@ export const AdminReviewQueuePage: React.FC = () => {
           sort,
         }),
       ]);
-      setStats(st);
-      const listItems = list.items ?? [];
+      setStats(st as Record<string, unknown>);
+      const listItems = (list.items ?? []) as QueueItem[];
       setItems(listItems);
       setTotal(list.total ?? 0);
       if (listItems.length > 0) {

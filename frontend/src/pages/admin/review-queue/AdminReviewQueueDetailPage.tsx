@@ -84,10 +84,10 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
         adminReviewQueueAPI.getActivity(id),
         adminReviewQueueAPI.getAssignees(),
       ]);
-      setItem(it);
-      setActivity(act.items ?? []);
-      setAssignees(assigneesRes.items ?? []);
-      setNotesEdit(it?.notes ?? '');
+      setItem(it as QueueItem);
+      setActivity((((act as { items?: unknown[] }).items) ?? []) as ActivityItem[]);
+      setAssignees((((assigneesRes as { items?: unknown[] }).items) ?? []) as Array<{ id: string; email?: string; full_name?: string }>);
+      setNotesEdit(((it as { notes?: string })?.notes) ?? '');
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
     } finally {

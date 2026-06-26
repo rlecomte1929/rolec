@@ -39,9 +39,9 @@ export const AdminReviewQueueWorkloadPage: React.FC = () => {
         }),
         adminReviewQueueAPI.getAssignees(),
       ]);
-      setAssignees(assigneesRes.items ?? []);
+      setAssignees((((assigneesRes as { items?: unknown[] }).items) ?? []) as Array<{ id: string; email?: string; full_name?: string }>);
       const openStatuses = ['new', 'triaged', 'assigned', 'in_progress', 'blocked', 'waiting', 'reopened'];
-      const open = (list.items ?? []).filter((i: { status: string }) => openStatuses.includes(i.status));
+      const open = ((list.items ?? []) as Array<{ id: string; assigned_to_user_id?: string; status: string; priority_band: string; due_at?: string }>).filter((i) => openStatuses.includes(i.status));
       setItems(open);
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
