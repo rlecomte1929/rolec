@@ -13,8 +13,8 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Checkbox } from '../antigravity/Checkbox';
 import { useParams } from 'react-router-dom';
+import { Checkbox } from '../antigravity/Checkbox';
 import { AppShell } from '../AppShell';
 import { Alert, Badge, Button, Card } from '../antigravity';
 import api from '../../api/client';

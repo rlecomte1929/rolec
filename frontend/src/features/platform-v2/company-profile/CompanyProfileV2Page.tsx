@@ -1,9 +1,9 @@
 import { hrAPI } from '../../../api/client';
 import type { CompanyProfilePayload } from '../../../types';
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
-import { CompanyProfileForm } from './CompanyProfileForm';
 import { PlatformShellSidebar } from '../../../components/PlatformShellSidebar';
 import { CompanyBrand } from '../../../components/CompanyBrand';
+import { CompanyProfileForm } from './CompanyProfileForm';
 
 /**
  * HR's own-company profile page. Data comes from useHrCompanyContext

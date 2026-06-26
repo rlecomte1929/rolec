@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 import { adminFreshnessAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
+import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 
 export const AdminCrawlJobRunDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();

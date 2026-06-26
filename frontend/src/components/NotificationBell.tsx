@@ -5,7 +5,6 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from './antigravity/Button';
 import { useNavigate } from 'react-router-dom';
 import {
   getUnreadMessageCount,
@@ -14,6 +13,7 @@ import {
   dismissMessageNotification,
   type MessageNotificationItem,
 } from '../api/messageNotifications';
+import { Button } from './antigravity/Button';
 
 function formatRelative(time: string): string {
   const d = new Date(time);

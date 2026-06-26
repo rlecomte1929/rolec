@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from './antigravity/Button';
 import { Link, useLocation } from 'react-router-dom';
-import { Breadcrumb } from './Breadcrumb';
-import { ChangelogBell } from './ChangelogBell';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
@@ -13,6 +10,9 @@ import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
+import { ChangelogBell } from './ChangelogBell';
+import { Breadcrumb } from './Breadcrumb';
+import { Button } from './antigravity/Button';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
 import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';

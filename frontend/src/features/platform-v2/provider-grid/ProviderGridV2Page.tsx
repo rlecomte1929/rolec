@@ -7,8 +7,8 @@ import { ProviderStatusGrid } from '../../../components/providers/ProviderStatus
 import { hrAPI } from '../../../api/client';
 import type { ProviderGridRow } from '../../../api/client';
 import { useV2Flag } from '../useV2Flag';
-import { ProviderGridV2Table } from './ProviderGridV2Table';
 import { ROUTE_DEFS } from '../../../navigation/routes';
+import { ProviderGridV2Table } from './ProviderGridV2Table';
 
 /**
  * Provider Grid V2 — prototype-styled wrapper around the existing

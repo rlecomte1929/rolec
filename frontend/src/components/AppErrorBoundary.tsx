@@ -1,7 +1,7 @@
 import React from 'react';
-import { Button } from './antigravity/Button';
 import { ErrorBoundary } from 'react-error-boundary';
 import { reportError } from '../lib/errorTracking';
+import { Button } from './antigravity/Button';
 
 interface Props {
   children: React.ReactNode;

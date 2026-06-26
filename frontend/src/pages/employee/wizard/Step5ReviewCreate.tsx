@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { useNavigate } from 'react-router-dom';
+import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Button, Card, Alert, Input, Select } from '../../../components/antigravity';
 import { buildRoute } from '../../../navigation/routes';
 import type {

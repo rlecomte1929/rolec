@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card, Badge, Button } from './antigravity';
 import type { HousingRecommendation, SchoolRecommendation, MoverRecommendation } from '../types';
+import { Card, Badge, Button } from './antigravity';
 
 interface RecommendationPanelProps {
   housing?: HousingRecommendation[];

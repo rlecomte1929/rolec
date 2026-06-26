@@ -9,8 +9,8 @@
  * Audit logging records {session_id, trigger_type, timestamp} — NEVER raw query text.
  */
 
-import { classifyQuery, REJECTION_MSG } from './topic_classifier';
 import { logger } from '../../lib/logger';
+import { classifyQuery, REJECTION_MSG } from './topic_classifier';
 
 // ---------------------------------------------------------------------------
 // Public constants

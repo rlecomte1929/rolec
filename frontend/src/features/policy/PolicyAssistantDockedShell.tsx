@@ -23,8 +23,8 @@
  * responsive switch — pages stay simple.
  */
 import React, { useEffect, useRef } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { X } from 'lucide-react';
+import { Button } from '../../components/antigravity/Button';
 
 export type PolicyAssistantDockedShellProps = {
   open: boolean;

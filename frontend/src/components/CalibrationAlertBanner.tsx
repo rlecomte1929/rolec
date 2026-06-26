@@ -9,8 +9,8 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { logger } from '../lib/logger';
-import { Button } from './antigravity/Button';
 import { hrAPI, type CalibrationAlert } from '../api/client';
+import { Button } from './antigravity/Button';
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVG — no extra dep)

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from '../../../components/antigravity/Button';
 import { useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { Button } from '../../../components/antigravity/Button';
 import { adminFreshnessAPI } from '../../../api/client';
+import { AdminFreshnessLayout } from './AdminFreshnessLayout';
 
 type StaleResource = {
   id?: string;

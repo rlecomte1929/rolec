@@ -1,5 +1,5 @@
-import { apiGet } from './client';
 import type { RelocationPlanViewResponseDTO } from '../types/relocationPlanView';
+import { apiGet } from './client';
 
 export type FetchRelocationPlanViewOptions = {
   /** Optional lens; must match the authenticated user. */

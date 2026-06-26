@@ -6,7 +6,6 @@
  * evaluator for the company's open cases.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-
 import { Input } from '../../components/antigravity/Input';
 import { Badge, Button, Card } from '../../components/antigravity';
 import {

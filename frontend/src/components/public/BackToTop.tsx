@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-
 import { Button } from '../antigravity/Button';
 const SCROLL_THRESHOLD_RATIO = 0.3;
 

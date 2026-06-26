@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input, Select } from '../../components/antigravity';
+import { isSectionCOverridesEnabled } from '../../featureFlags';
 import type { PolicyConfigBenefitRow } from './types';
 import { POLICY_CURRENCY_OPTIONS, normalizeCurrencyCode } from './currencyOptions';
 import { getBenefitDefinition, getBenefitTitle } from './benefitRowRegistry';
@@ -11,7 +12,6 @@ import { validateBenefitRow } from './benefitRowValidation';
 import { patchAdditionalTerms, readAdditionalTerms } from './benefitProgramDetails';
 import { JurisdictionOverridesEditor } from './JurisdictionOverridesEditor';
 import type { PolicyJurisdictionOverride } from './types';
-import { isSectionCOverridesEnabled } from '../../featureFlags';
 import {
   normalizeAssignmentType,
   normalizeAssignmentTypeList,

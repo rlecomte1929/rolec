@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from '../antigravity/Button';
 import { Link } from 'react-router-dom';
+import { Button } from '../antigravity/Button';
 
 type CTAVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
 type CTASize = 'sm' | 'md' | 'lg';

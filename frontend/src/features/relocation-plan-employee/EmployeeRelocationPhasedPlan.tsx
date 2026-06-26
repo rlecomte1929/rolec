@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '../../components/antigravity';
+import { NextActionCard } from '../relocation-plan/next-action';
+import { RelocationPhaseTimeline } from '../relocation-plan/phase-timeline';
+import { RelocationTaskCard } from '../relocation-plan/task-card';
 import { useEmployeeRelocationPlanPageData } from './useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from './relocationPlanCtaNavigate';
-import { NextActionCard } from '../relocation-plan/next-action';
 import { RelocationPlanPageHeader } from './RelocationPlanPageHeader';
-import { RelocationPhaseTimeline } from '../relocation-plan/phase-timeline';
 import { RelocationPlanSummaryStrip } from './RelocationPlanSummaryStrip';
-import { RelocationTaskCard } from '../relocation-plan/task-card';
 
 export interface EmployeeRelocationPhasedPlanProps {
   routeCaseId: string;

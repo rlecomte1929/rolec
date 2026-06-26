@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Badge } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
 import type { AdminSupportCase } from '../../types';
+import { AdminLayout } from './AdminLayout';
 
 export const AdminSupport: React.FC = () => {
   const [cases, setCases] = useState<AdminSupportCase[]>([]);

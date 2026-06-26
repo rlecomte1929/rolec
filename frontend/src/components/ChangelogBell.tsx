@@ -16,7 +16,6 @@
 //   - Match the topbar's calm visual register (no emoji, no playful colors)
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { Button } from './antigravity/Button';
 const SEEN_KEY = 'relopass_changelog_seen';
 

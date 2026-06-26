@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AdminLayout } from './AdminLayout';
+import { Input } from '../../components/antigravity/Input';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Alert } from '../../components/antigravity';
 import { suppliersAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
+import { AdminLayout } from './AdminLayout';
 
 type Capability = {
   id: string;

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Input } from '../components/antigravity/Input';
 import { useSearchParams } from 'react-router-dom';
+import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { Card, Alert } from '../components/antigravity';
 import { resourcesAPI } from '../api/client';

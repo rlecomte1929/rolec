@@ -9,7 +9,6 @@
  * Mounted once inside AppShell so it appears on all authenticated pages.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-
 import { Button } from './antigravity/Button';
 /** How long before the banner auto-hides if not dismissed (ms). */
 const AUTO_HIDE_MS = 30_000;

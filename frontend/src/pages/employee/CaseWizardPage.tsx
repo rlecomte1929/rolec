@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
 import { logger } from '../../lib/logger';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
@@ -17,14 +17,14 @@ import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../utils/demo';
 import type { AssignmentStatus, CaseDTO, CaseDraftDTO, NextAction } from '../../types';
+import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
+import { useVariant } from '../../lib/feature-flags';
+import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
 import { Step1RelocationBasics } from './wizard/Step1RelocationBasics';
 import { Step2EmployeeProfile } from './wizard/Step2EmployeeProfile';
 import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
 import { Step4AssignmentContext } from './wizard/Step4AssignmentContext';
 import { Step5ReviewCreate } from './wizard/Step5ReviewCreate';
-import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
-import { useVariant } from '../../lib/feature-flags';
-import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
 
 function buildDefaultDraft(): CaseDraftDTO {
   const name = getAuthItem('relopass_name');

@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Input } from '../../components/antigravity/Input';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Input } from '../../components/antigravity/Input';
+import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { InternalThreadPanel } from '../../components/admin/collaboration/InternalThreadPanel';
+import { AdminLayout } from './AdminLayout';
 
 const AUDIENCE_OPTIONS = ['all', 'couple', 'family', 'single', 'spouse_job_seeker', 'with_children'];
 const RESOURCE_TYPES = ['checklist_item', 'event_source', 'guide', 'official_link', 'place', 'provider', 'tip'];

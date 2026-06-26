@@ -10,7 +10,6 @@ import { RequestExceptionModal } from '../exceptions/RequestExceptionModal';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
-import type { RecommendationResponse, RecommendationItem } from './types';
 import {
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
@@ -23,6 +22,7 @@ import {
   SERVICES_CURRENCY_FOOTNOTE,
 } from '../services/servicesCurrency';
 import { budgetAPI, type BudgetSummaryCategory } from '../../api/budget';
+import type { RecommendationResponse, RecommendationItem } from './types';
 
 // AIQ-280 follow-up #4 — replaced the hardcoded CATEGORY_TO_CAP map with
 // a runtime lookup driven by GET /api/cases/:caseId/budget-summary. The

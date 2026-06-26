@@ -20,8 +20,8 @@
  */
 
 import React, { useState, useCallback, useId } from 'react';
-import { Button } from '../../components/antigravity/Button';
 import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Button } from '../../components/antigravity/Button';
 
 // ---------------------------------------------------------------------------
 // Types

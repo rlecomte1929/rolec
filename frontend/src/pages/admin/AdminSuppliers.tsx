@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AdminLayout } from './AdminLayout';
 import { Card, Button, Alert } from '../../components/antigravity';
 import { suppliersAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
+import { AdminLayout } from './AdminLayout';
 
 /** Human-readable labels for service categories (API returns snake_case). */
 const CATEGORY_LABELS: Record<string, string> = {

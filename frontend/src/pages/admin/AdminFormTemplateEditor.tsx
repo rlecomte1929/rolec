@@ -15,10 +15,9 @@
  *                                 preserving the old; we redirect to its editor
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Input } from '../../components/antigravity/Input';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { Input } from '../../components/antigravity/Input';
 import { Button, Card } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import {
   adminFormTemplatesAPI,
   type FormTemplate,
@@ -36,6 +35,7 @@ import {
   PdfUploadField,
   signFormTemplatePdfUrl,
 } from '../../features/platform-v2/admin/form-templates/PdfUploadField';
+import { AdminLayout } from './AdminLayout';
 
 const COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: 'NO', label: 'Norway' },

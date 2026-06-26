@@ -10,9 +10,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Input } from '../components/antigravity/Input';
 import { Button } from '../components/antigravity/Button';
-import { useSearchParams } from 'react-router-dom';
 import { Card } from '../components/antigravity';
 import { getAssignmentById } from '../api/assignmentDebug';
 import { supabase } from '../api/supabase';

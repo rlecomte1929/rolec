@@ -4,19 +4,19 @@ import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { patchCase } from '../../../api/cases';
-import { intakeToCaseDraft } from './intakeToCaseDraft';
-import { resolveIntakeIds } from './resolveIntakeIds';
 import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidatedParams';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
+import { PrivacyNotice } from '../../privacy/PrivacyNotice';
+import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
 import { MultiChip } from './MultiChip';
 import { DossierSuggestionsPanel } from './DossierSuggestionsPanel';
 import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
-import { PrivacyNotice } from '../../privacy/PrivacyNotice';
-import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
+import { resolveIntakeIds } from './resolveIntakeIds';
+import { intakeToCaseDraft } from './intakeToCaseDraft';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

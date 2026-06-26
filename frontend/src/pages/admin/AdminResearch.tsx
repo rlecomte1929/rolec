@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Input } from '../../components/antigravity/Input';
-import { AdminLayout } from './AdminLayout';
 import { Card, Button } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
+import { AdminLayout } from './AdminLayout';
 
 type Candidate = {
   id: string;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import type { Question } from '../types';
 import { Checkbox } from './antigravity/Checkbox';
 import { Card, Button, Input } from './antigravity';
-import type { Question } from '../types';
 
 interface GuidedQuestionCardProps {
   question: Question;

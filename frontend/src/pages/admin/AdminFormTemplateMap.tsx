@@ -10,7 +10,6 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AdminLayout } from './AdminLayout';
 import { Button } from '../../components/antigravity';
 import {
   adminFormTemplatesAPI,
@@ -27,6 +26,7 @@ import {
   withComputedPositions,
   type FieldDefinition,
 } from '../../features/platform-v2/admin/form-templates/FieldDefinitionEditor';
+import { AdminLayout } from './AdminLayout';
 
 // ─────────────────────────────────────────────────────────────────────
 // Helpers

@@ -17,10 +17,10 @@ import { Button } from '../antigravity/Button';
 import { listCaseProviders, listProviderTasks } from '../../api/providers';
 import type { ProviderItem, ProviderTaskItem } from '../../api/providers';
 import { useProviderRealtime } from '../../hooks/useProviderRealtime';
+import { Card } from '../antigravity';
 import { ProviderRow } from './ProviderRow';
 import { AssignTaskModal } from './AssignTaskModal';
 import { InviteProviderModal } from './InviteProviderModal';
-import { Card } from '../antigravity';
 
 interface ProviderCoordinationPanelProps {
   caseId: string;

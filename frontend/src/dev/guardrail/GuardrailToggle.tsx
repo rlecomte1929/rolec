@@ -7,9 +7,9 @@
  * Example:
  *   <GuardrailToggle />
  */
+import { Button } from '../../components/antigravity/Button';
 import { useAiGuardrail } from './useAiGuardrail';
 
-import { Button } from '../../components/antigravity/Button';
 export function GuardrailToggle() {
   const { enabled, loading, saving, error, toggle } = useAiGuardrail();
 

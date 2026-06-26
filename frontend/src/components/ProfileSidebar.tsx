@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card } from './antigravity';
 import type { RelocationProfile } from '../types';
+import { Card } from './antigravity';
 
 interface ProfileSidebarProps {
   profile: RelocationProfile;

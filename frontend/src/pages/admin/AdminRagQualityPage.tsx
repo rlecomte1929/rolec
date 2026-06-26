@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { AdminLayout } from './AdminLayout';
 import { Card, Badge, Alert } from '../../components/antigravity';
-import { MetricTimeSeriesChart } from './MetricTimeSeriesChart';
 import { getRagEvalMetrics } from '../../api/ragEval';
 import type { RagEvalDashboard, RagEvalMetric } from '../../api/ragEval';
+import { MetricTimeSeriesChart } from './MetricTimeSeriesChart';
+import { AdminLayout } from './AdminLayout';
 
 // P3-01e — RAG-quality metrics dashboard. Time-series of context precision,
 // factual consistency, and outcome accuracy with threshold alert lines. Reads

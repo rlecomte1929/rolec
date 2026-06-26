@@ -17,7 +17,6 @@
  * react-markdown — the public API of this component stays the same.
  */
 import React, { useMemo, useState } from 'react';
-
 import { Button } from '../../components/antigravity/Button';
 type Props = {
   label: string;

@@ -18,7 +18,6 @@
  * Task 2.3 for the recommended pattern.
  */
 import React from 'react';
-
 import { Button } from '../../components/antigravity/Button';
 export type PolicyAssistantFabProps = {
   /** Click handler — should toggle the docked shell's open state on

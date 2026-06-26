@@ -1,8 +1,7 @@
 import React from 'react';
 import { logger } from '../lib/logger';
-
-import { Button } from './antigravity/Button';
 import { reportError } from '../lib/errorTracking';
+import { Button } from './antigravity/Button';
 interface Props {
   children: React.ReactNode;
 }

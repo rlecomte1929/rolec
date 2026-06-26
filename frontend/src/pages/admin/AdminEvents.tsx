@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Input } from '../../components/antigravity/Input';
 import { Link } from 'react-router-dom';
+import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
-import { AdminLayout } from './AdminLayout';
 import { StatusBadge } from '../../components/admin/resources/StatusBadge';
 import { EventRowActions } from '../../components/admin/resources/EventRowActions';
 import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
+import { AdminLayout } from './AdminLayout';
 
 const EVENT_TYPES = ['cinema', 'concert', 'family_activity', 'festival', 'museum', 'networking', 'sports', 'theater'];
 

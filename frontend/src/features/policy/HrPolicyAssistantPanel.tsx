@@ -7,12 +7,12 @@ import { Alert, Button, Card } from '../../components/antigravity';
 import { logger } from '../../lib/logger';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
+import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import {
   formatAnswerWithCitations,
   isCitationDeepLinkAvailable,
   scrollToPolicyReference,
 } from './policyAssistantCitations';
-import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import {
   deriveSupportStatus,
   supportStatusBadgeClass,

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Checkbox } from '../components/antigravity/Checkbox';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Checkbox } from '../components/antigravity/Checkbox';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { Alert, Badge, Button, Card } from '../components/antigravity';

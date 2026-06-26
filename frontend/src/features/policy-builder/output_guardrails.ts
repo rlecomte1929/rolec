@@ -35,9 +35,9 @@
  * No PII is stored in logs (log entries reference session_id only).
  */
 
+import { logger } from '../../lib/logger';
 import { checkFaithfulness } from './faithfulness_checker';
 import type { PolicyChunk } from './retrieve_policy';
-import { logger } from '../../lib/logger';
 
 // ---------------------------------------------------------------------------
 // Public types

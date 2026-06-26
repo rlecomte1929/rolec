@@ -3,8 +3,8 @@
  * Establishes Supabase session so tokens auto-refresh for feedback/review/RPC.
  */
 
-import { supabase } from './supabase';
 import { logger } from '../lib/logger';
+import { supabase } from './supabase';
 
 /**
  * Sign in to Supabase with email/password.

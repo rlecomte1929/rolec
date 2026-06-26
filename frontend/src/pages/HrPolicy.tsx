@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import type { PolicyDocument, PolicyDocumentClause } from '../features/policy/types';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { FileInput } from '../components/antigravity/FileInput';
-import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pagePerf';

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Input } from '../../../components/antigravity/Input';
 import { useSearchParams } from 'react-router-dom';
+import { Input } from '../../../components/antigravity/Input';
 import { Card, Button } from '../../../components/antigravity';
 import { AdminLayout } from '../../../pages/admin/AdminLayout';
 import { adminAPI, policyConfigMatrixAPI } from '../../../api/client';
@@ -8,6 +8,7 @@ import type { AdminCompany, AdminPoliciesByCompany } from '../../../types';
 import type { PolicyConfigWorkingPayload } from '../../policy-config/types';
 import { usePolicyConfigWorkspace } from '../../policy-config/usePolicyConfigWorkspace';
 import { validatePolicyConfigForPublish } from '../../policy-config/benefitRowValidation';
+import { buildRoute } from '../../../navigation/routes';
 import { PolicyWorkspaceIntroCard } from './PolicyWorkspaceIntroCard';
 import { POLICY_WORKSPACE_SUBTITLE, POLICY_WORKSPACE_TITLE } from './PolicyWorkspaceHeader';
 import { PolicyWorkspaceControls } from './PolicyWorkspaceControls';
@@ -19,7 +20,6 @@ import {
   deriveWorkspaceAggregate,
   unpublishedChangesLabel,
 } from './policyWorkspaceModel';
-import { buildRoute } from '../../../navigation/routes';
 
 function asWorkingPayload(raw: unknown): PolicyConfigWorkingPayload | null {
   if (!raw || typeof raw !== 'object') return null;

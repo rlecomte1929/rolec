@@ -22,8 +22,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { supabase } from './supabase';
 import { getAuthItem } from '../utils/demo';
+import { supabase } from './supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

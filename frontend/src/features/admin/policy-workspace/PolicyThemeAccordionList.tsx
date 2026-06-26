@@ -6,11 +6,11 @@ import {
   POLICY_ASSIGNMENT_TYPE_OPTIONS,
   POLICY_FAMILY_STATUS_OPTIONS,
 } from '../../policy-config/policyTargeting';
+import { Button, Select } from '../../../components/antigravity';
 import { themeDescriptionForCategoryKey } from './policyWorkspaceCanonical';
 import { mergeCanonicalBaselineBlocks, type WorkspaceDisplayRow } from './policyWorkspaceModel';
 import { PolicyThemeAccordion } from './PolicyThemeAccordion';
 import { PolicyWorkspaceBenefitEditDrawer } from './PolicyWorkspaceBenefitEditDrawer';
-import { Button, Select } from '../../../components/antigravity';
 
 function snapshotRow(r: WorkspaceDisplayRow): WorkspaceDisplayRow {
   return JSON.parse(JSON.stringify(r)) as WorkspaceDisplayRow;

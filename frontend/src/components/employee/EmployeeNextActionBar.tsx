@@ -13,8 +13,8 @@
  *     place instead of every page rolling their own
  */
 import React from 'react';
-import { Button } from '../antigravity/Button';
 import { Link } from 'react-router-dom';
+import { Button } from '../antigravity/Button';
 
 type Props = {
   /** Short label for what the user just finished or is on. e.g. "Step 4 of 6" */
