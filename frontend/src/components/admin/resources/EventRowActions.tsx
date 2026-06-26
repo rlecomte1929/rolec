@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '../../antigravity';
+import { Button, Modal } from '../../antigravity';
 import { buildRoute } from '../../../navigation/routes';
 
 type EventRowActionsProps = {
@@ -80,21 +80,29 @@ export const EventRowActions: React.FC<EventRowActionsProps> = ({
         </Button>
       )}
 
-      {showApproveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowApproveModal(false)}>
-          <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <h4 className="font-semibold mb-2">Approve event</h4>
-            <label className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
-            <textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} rows={2} className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4" />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => handle('approve', approveNotes || undefined)} disabled={working}>
-                {working ? 'Approving…' : 'Approve'}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setShowApproveModal(false)}>Cancel</Button>
-            </div>
-          </div>
+      <Modal
+        open={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        title="Approve event"
+        className="p-4 max-w-md w-full"
+      >
+        <label htmlFor="event-approve-notes" className="block text-sm text-slate-600 mb-2">
+          Review notes (optional)
+        </label>
+        <textarea
+          id="event-approve-notes"
+          value={approveNotes}
+          onChange={(e) => setApproveNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4"
+        />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => handle('approve', approveNotes || undefined)} disabled={working}>
+            {working ? 'Approving…' : 'Approve'}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowApproveModal(false)}>Cancel</Button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

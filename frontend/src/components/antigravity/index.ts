@@ -26,3 +26,5 @@ export type { SegmentedOption } from './SegmentedOptionCards';
 export { AutosaveChip } from './AutosaveChip';
 export { ConfirmFromIntake } from './ConfirmFromIntake';
 export type { ConfirmRow } from './ConfirmFromIntake';
+export { Modal } from './Modal';
+export type { ModalProps } from './Modal';
