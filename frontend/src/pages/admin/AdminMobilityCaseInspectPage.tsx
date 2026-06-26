@@ -3,7 +3,8 @@
  * and one action — run requirement evaluation for the linked assignment.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { Input } from '../../components/antigravity/Input';
@@ -51,55 +52,52 @@ function dash(v: unknown): string {
 export const AdminMobilityCaseInspectPage: React.FC = () => {
   const { caseId } = useParams<{ caseId?: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [manualId, setManualId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [payload, setPayload] = useState<{
-    context: Record<string, unknown>;
-    audit_logs: Array<Record<string, unknown>>;
-    operational?: AdminMobilityOperationalInspect;
-  } | null>(null);
   const [evalSubmitting, setEvalSubmitting] = useState(false);
   const [evalSuccess, setEvalSuccess] = useState<string | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
 
-  const load = useCallback(async (id: string) => {
-    const trimmed = id.trim();
-    if (!trimmed) return;
-    setLoading(true);
-    setError(null);
-    setEvalSuccess(null);
-    setEvalError(null);
-    try {
-      const data = await adminAPI.inspectMobilityCase(trimmed);
-      setPayload(data);
-    } catch (e: unknown) {
-      const ax = e as { response?: { status?: number; data?: { detail?: unknown } } };
-      const st = ax.response?.status;
-      const d = ax.response?.data?.detail;
-      const msg =
-        st === 404
+  const trimmedCaseId = caseId?.trim() ?? '';
+
+  const inspectQuery = useQuery({
+    queryKey: ['admin', 'mobility-inspect', trimmedCaseId],
+    queryFn: () => adminAPI.inspectMobilityCase(trimmedCaseId),
+    enabled: !!trimmedCaseId,
+  });
+  const payload: {
+    context: Record<string, unknown>;
+    audit_logs: Array<Record<string, unknown>>;
+    operational?: AdminMobilityOperationalInspect;
+  } | null = inspectQuery.data ?? null;
+  const loading = inspectQuery.isFetching;
+  const error: string | null = inspectQuery.isError
+    ? (() => {
+        const ax = inspectQuery.error as { response?: { status?: number; data?: { detail?: unknown } } };
+        const st = ax.response?.status;
+        const d = ax.response?.data?.detail;
+        return st === 404
           ? 'Mobility case not found.'
           : typeof d === 'string'
             ? d
             : st === 403
               ? 'Admin only.'
               : 'Failed to load case.';
-      setError(msg);
-      setPayload(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      })()
+    : null;
 
+  // The old load() cleared the evaluation banners on every (re)load, including
+  // navigation to a different case — preserve that for the case-change case.
   useEffect(() => {
-    if (caseId && caseId.trim()) {
-      void load(caseId);
-    } else {
-      setPayload(null);
-      setError(null);
-    }
-  }, [caseId, load]);
+    setEvalSuccess(null);
+    setEvalError(null);
+  }, [trimmedCaseId]);
+
+  const handleRefresh = () => {
+    setEvalSuccess(null);
+    setEvalError(null);
+    void inspectQuery.refetch();
+  };
 
   const context = payload?.context;
   const caseRow = context?.case as Record<string, unknown> | null | undefined;
@@ -115,7 +113,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
     try {
       await adminAPI.evaluateMobilityAssignmentRequirements(aid);
       setEvalSuccess('Evaluation finished. Data refreshed below.');
-      await load(caseId);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'mobility-inspect', trimmedCaseId] });
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { detail?: unknown } } };
       const d = ax.response?.data?.detail;
@@ -183,7 +181,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
           type="button"
           className="text-sm px-3 py-1 border border-[#cbd5e1] rounded-md hover:bg-[#f8fafc]"
           disabled={loading}
-          onClick={() => void load(caseId)}
+          onClick={handleRefresh}
         >
           Refresh
         </Button>

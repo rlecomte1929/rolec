@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
@@ -27,9 +28,10 @@ type SortKey =
   | null;
 
 export const AdminCompanies: React.FC = () => {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
-  const [companies, setCompanies] = useState<AdminCompany[]>([]);
-  const [loading, setLoading] = useState(false);
+  // `query` only hits the API on Search; appliedQuery drives the fetch/cache key.
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,19 +52,21 @@ export const AdminCompanies: React.FC = () => {
   const [bulkFeedback, setBulkFeedback] = useState<'idle' | 'archiving' | 'deleting' | 'done' | 'error'>('idle');
   const [bulkErrorMsg, setBulkErrorMsg] = useState<string>('');
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await adminAPI.listCompanies(query || undefined);
-      setCompanies(res.companies ?? []);
-    } finally {
-      setLoading(false);
+  const companiesQuery = useQuery({
+    queryKey: ['admin', 'companies', appliedQuery],
+    queryFn: async () => (await adminAPI.listCompanies(appliedQuery || undefined)).companies ?? [],
+  });
+  const companies: AdminCompany[] = companiesQuery.data ?? [];
+  const loading = companiesQuery.isFetching;
+  const reloadCompanies = () => queryClient.invalidateQueries({ queryKey: ['admin', 'companies'] });
+
+  const search = () => {
+    if (appliedQuery === query) {
+      void companiesQuery.refetch();
+    } else {
+      setAppliedQuery(query);
     }
   };
-
-  useEffect(() => {
-    load().catch(() => undefined);
-  }, []);
 
   const canEdit = (c: AdminCompany) => !c.missing_from_companies_table;
   const planTier = (c: AdminCompany) => (c.plan_tier as CompanyPlanTier) || 'low';
@@ -225,7 +229,7 @@ export const AdminCompanies: React.FC = () => {
       await adminAPI.updateCompany(companyId, payload);
       setEditingId(null);
       setEditDraft({});
-      await load();
+      await reloadCompanies();
     } catch (e) {
       logger.error(e);
     } finally {
@@ -238,7 +242,7 @@ export const AdminCompanies: React.FC = () => {
     if (!window.confirm('Are you sure? This action cannot be undone.')) return;
     try {
       await adminAPI.deactivateCompany(c.id);
-      await load();
+      await reloadCompanies();
     } catch (e) {
       logger.error(e);
     }
@@ -254,7 +258,7 @@ export const AdminCompanies: React.FC = () => {
             placeholder="Search by company name"
             className="w-64 rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
           />
-          <Button onClick={() => load()} disabled={loading}>
+          <Button onClick={search} disabled={loading}>
             {loading ? 'Loading…' : 'Search'}
           </Button>
           {!selectionMode ? (
@@ -290,7 +294,7 @@ export const AdminCompanies: React.FC = () => {
                   setBulkErrorMsg('');
                   const results = await Promise.allSettled(ids.map((id) => adminAPI.archiveCompany(id)));
                   const failed = results.filter((r) => r.status === 'rejected').length;
-                  await load();
+                  await reloadCompanies();
                   setSelectedIds(new Set());
                   if (failed > 0) {
                     setBulkFeedback('error');
@@ -317,7 +321,7 @@ export const AdminCompanies: React.FC = () => {
                   setBulkErrorMsg('');
                   const results = await Promise.allSettled(ids.map((id) => adminAPI.deleteCompany(id)));
                   const failed = results.filter((r) => r.status === 'rejected').length;
-                  await load();
+                  await reloadCompanies();
                   setSelectedIds(new Set());
                   if (failed > 0) {
                     setBulkFeedback('error');
@@ -707,7 +711,7 @@ export const AdminCompanies: React.FC = () => {
           onClose={() => setAddOpen(false)}
           onCreated={() => {
             setAddOpen(false);
-            void load();
+            void reloadCompanies();
           }}
         />
       )}

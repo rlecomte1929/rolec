@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { Card } from '../../../components/antigravity';
@@ -34,31 +35,20 @@ type HistoryPayload = {
 };
 
 export const AdminPolicyAssistantGroundingSection: React.FC<{ companyId: string }> = ({ companyId }) => {
-  const [history, setHistory] = useState<HistoryPayload | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   const [olderSnap, setOlderSnap] = useState('');
   const [newerSnap, setNewerSnap] = useState('');
   const [diff, setDiff] = useState<Record<string, unknown> | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
-    try {
-      const h = (await adminAPI.getPolicyAssistantCompanyHistory(companyId)) as HistoryPayload;
-      setHistory(h);
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to load history');
-      setHistory(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
-
-  useEffect(() => {
-    load().catch(() => undefined);
-  }, [load]);
+  const historyQuery = useQuery({
+    queryKey: ['admin', 'policy-assistant-history', companyId],
+    queryFn: async () => (await adminAPI.getPolicyAssistantCompanyHistory(companyId)) as HistoryPayload,
+  });
+  const history: HistoryPayload | null = historyQuery.data ?? null;
+  const loading = historyQuery.isFetching;
+  const err: string | null = historyQuery.isError
+    ? (historyQuery.error instanceof Error ? historyQuery.error.message : 'Failed to load history')
+    : null;
 
   const allSnapshots = useMemo(() => {
     const rows: SnapshotRow[] = [];
@@ -98,7 +88,7 @@ export const AdminPolicyAssistantGroundingSection: React.FC<{ companyId: string 
         <Button unstyled
           type="button"
           className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
-          onClick={() => load()}
+          onClick={() => void historyQuery.refetch()}
           disabled={loading}
         >
           {loading ? 'Refreshing…' : 'Refresh'}

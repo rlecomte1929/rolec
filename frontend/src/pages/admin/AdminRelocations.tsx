@@ -1,20 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
 import type { AdminRelocationCase } from '../../types';
 import { AdminLayout } from './AdminLayout';
 
 export const AdminRelocations: React.FC = () => {
-  const [cases, setCases] = useState<AdminRelocationCase[]>([]);
+  const queryClient = useQueryClient();
 
-  const load = async () => {
-    const res = await adminAPI.listRelocations();
-    setCases(res.relocations);
-  };
-
-  useEffect(() => {
-    load().catch(() => undefined);
-  }, []);
+  const casesQuery = useQuery({
+    queryKey: ['admin', 'relocations'],
+    queryFn: async () => (await adminAPI.listRelocations()).relocations,
+  });
+  const cases: AdminRelocationCase[] = casesQuery.data ?? [];
 
   const unlockCase = async (c: AdminRelocationCase) => {
     const reason = window.prompt('Reason for unlock (required):');
@@ -30,7 +28,7 @@ export const AdminRelocations: React.FC = () => {
         stage: c.stage,
       },
     });
-    void load();
+    await queryClient.invalidateQueries({ queryKey: ['admin', 'relocations'] });
   };
 
   return (

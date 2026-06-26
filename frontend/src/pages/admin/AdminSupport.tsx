@@ -1,20 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
 import type { AdminSupportCase } from '../../types';
 import { AdminLayout } from './AdminLayout';
 
 export const AdminSupport: React.FC = () => {
-  const [cases, setCases] = useState<AdminSupportCase[]>([]);
-
-  const load = async () => {
-    const res = await adminAPI.listSupportCases();
-    setCases(res.support_cases);
-  };
-
-  useEffect(() => {
-    load().catch(() => undefined);
-  }, []);
+  const casesQuery = useQuery({
+    queryKey: ['admin', 'support-cases'],
+    queryFn: async () => (await adminAPI.listSupportCases()).support_cases,
+  });
+  const cases: AdminSupportCase[] = casesQuery.data ?? [];
 
   const addNote = async (caseId: string) => {
     const note = window.prompt('Internal note:');

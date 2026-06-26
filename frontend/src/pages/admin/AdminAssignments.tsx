@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Card, Button, Badge, Input, Select } from '../../components/antigravity';
@@ -57,10 +58,9 @@ const formatCreated = (a: AdminAssignment) => {
 
 export const AdminAssignments: React.FC = () => {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const companyIdFromUrl = searchParams.get('company_id')?.trim() ?? '';
-  const [assignments, setAssignments] = useState<AdminAssignment[]>([]);
-  const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [filters, setFilters] = useState({
     company_id: '',
     employee_search: '',
@@ -68,10 +68,6 @@ export const AdminAssignments: React.FC = () => {
     destination_country: '',
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<AdminAssignmentDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({
     company_id: '',
@@ -90,44 +86,40 @@ export const AdminAssignments: React.FC = () => {
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
   const [deleteErrorDetail, setDeleteErrorDetail] = useState<string | null>(null);
 
-  const loadAssignments = useCallback(async () => {
-    setLoading(true);
-    try {
+  const assignmentsQuery = useQuery({
+    queryKey: ['admin', 'assignments', filters],
+    queryFn: async () => {
       const res = await adminAPI.listAssignments({
         company_id: filters.company_id || undefined,
         employee_search: filters.employee_search || undefined,
         status: filters.status || undefined,
         destination_country: filters.destination_country || undefined,
       });
-      setAssignments(res.assignments);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.company_id, filters.employee_search, filters.status, filters.destination_country]);
+      return res.assignments;
+    },
+    enabled: !!filters.company_id,
+  });
+  const assignments: AdminAssignment[] = assignmentsQuery.data ?? [];
+  const loading = assignmentsQuery.isFetching;
 
-  const loadCompanies = useCallback(async () => {
-    const res = await adminAPI.listCompanies();
-    setCompanies(res.companies);
-  }, []);
+  const companiesQuery = useQuery({
+    queryKey: ['admin', 'companies'],
+    queryFn: async () => (await adminAPI.listCompanies()).companies,
+  });
+  const companies: AdminCompany[] = companiesQuery.data ?? [];
 
-  const loadDetail = useCallback(async (id: string) => {
-    setDetailLoading(true);
-    setDetailError(false);
-    try {
-      const res = await adminAPI.getAssignmentDetail(id);
-      setDetail(res?.assignment ?? null);
-      if (!res?.assignment) setDetailError(true);
-    } catch {
-      setDetail(null);
-      setDetailError(true);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCompanies().catch(() => undefined);
-  }, [loadCompanies]);
+  const detailQuery = useQuery({
+    queryKey: ['admin', 'assignment-detail', selectedId],
+    queryFn: async () => {
+      const res = await adminAPI.getAssignmentDetail(selectedId!);
+      return res?.assignment ?? null;
+    },
+    enabled: !!selectedId,
+  });
+  const detail: AdminAssignmentDetail | null = detailQuery.data ?? null;
+  const detailLoading = !!selectedId && detailQuery.isLoading;
+  // The old loadDetail flagged an error both on throw and on a missing assignment.
+  const detailError = !!selectedId && (detailQuery.isError || (detailQuery.isSuccess && detailQuery.data === null));
 
   useEffect(() => {
     if (!companyIdFromUrl) return;
@@ -135,25 +127,8 @@ export const AdminAssignments: React.FC = () => {
     // location.key: honor ?company_id= on each navigation; avoid resetting user-cleared company on same visit.
   }, [location.key, companyIdFromUrl]);
 
-  useEffect(() => {
-    if (filters.company_id) {
-      loadAssignments().catch(() => undefined);
-    } else {
-      setAssignments([]);
-    }
-  }, [filters.company_id, loadAssignments]);
-
-  useEffect(() => {
-    if (selectedId) {
-      void loadDetail(selectedId);
-    } else {
-      setDetail(null);
-      setDetailError(false);
-    }
-  }, [selectedId, loadDetail]);
-
   const applyFilters = () => {
-    loadAssignments().catch(() => undefined);
+    void assignmentsQuery.refetch();
   };
 
   const isLinkageConsistent = (d: AdminAssignmentDetail | null): { ok: boolean; issues: string[] } => {
@@ -223,7 +198,7 @@ export const AdminAssignments: React.FC = () => {
       const assignmentId = (res as { assignment_id?: string }).assignment_id;
       setCreateSuccess(assignmentId ? { assignmentId } : null);
       setFilters((f) => ({ ...f, company_id: addForm.company_id }));
-      await loadAssignments();
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'assignments'] });
       if (assignmentId) {
         setTimeout(() => {
           setShowAddModal(false);
@@ -337,7 +312,7 @@ export const AdminAssignments: React.FC = () => {
                             (r): r is PromiseRejectedResult => r.status === 'rejected',
                           );
                           const failed = rejected.length;
-                          await loadAssignments();
+                          await queryClient.invalidateQueries({ queryKey: ['admin', 'assignments'] });
                           setDeleteFeedback(failed > 0 ? 'error' : 'done');
                           if (failed === 0) {
                             setDeleteErrorDetail(null);
@@ -355,7 +330,7 @@ export const AdminAssignments: React.FC = () => {
                           }
                         } catch (e: any) {
                           logger.error(e);
-                          await loadAssignments();
+                          await queryClient.invalidateQueries({ queryKey: ['admin', 'assignments'] });
                           setDeleteErrorDetail(
                             e?.response?.data?.detail || e?.message || 'unknown error',
                           );
@@ -564,8 +539,8 @@ export const AdminAssignments: React.FC = () => {
           linkage={linkage}
           onClose={() => setSelectedId(null)}
           onRefresh={() => {
-            void loadAssignments();
-            void loadDetail(selectedId);
+            void queryClient.invalidateQueries({ queryKey: ['admin', 'assignments'] });
+            void queryClient.invalidateQueries({ queryKey: ['admin', 'assignment-detail', selectedId] });
           }}
         />
       )}

@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../AdminLayout', () => ({
@@ -34,9 +35,11 @@ vi.stubGlobal('localStorage', {
 
 const renderPage = () =>
   render(
-    <MemoryRouter>
-      <AdminOverviewPage />
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <AdminOverviewPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 describe('AdminOverviewPage metrics', () => {

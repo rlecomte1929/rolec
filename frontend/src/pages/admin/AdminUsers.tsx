@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Checkbox } from '../../components/antigravity/Checkbox';
@@ -20,12 +21,13 @@ export const AdminUsers: React.FC = () => {
   const [searchParams] = useSearchParams();
   const companyIdFromUrl = searchParams.get('company_id')?.trim() ?? '';
   const roleFromUrl = (searchParams.get('role') || '').trim().toLowerCase();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
+  // `query` is only committed to the request on Apply (and was read live by the
+  // old loadPeople); appliedQuery is what actually drives the fetch/cache key.
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [people, setPeople] = useState<AdminProfile[]>([]);
-  const [companies, setCompanies] = useState<AdminCompany[]>([]);
-  const [loading, setLoading] = useState(false);
   const [editOpen, setEditOpen] = useState<AdminProfile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -40,24 +42,34 @@ export const AdminUsers: React.FC = () => {
     return () => clearTimeout(timer);
   }, [inviteToast]);
 
-  const loadPeople = async () => {
-    setLoading(true);
-    try {
+  const peopleQuery = useQuery({
+    queryKey: ['admin', 'people', companyId, roleFilter, appliedQuery],
+    queryFn: async () => {
       const res = await adminAPI.listPeople({
-        q: query || undefined,
+        q: appliedQuery || undefined,
         company_id: companyId || undefined,
         role: roleFilter || undefined,
       });
-      setPeople(res.people ?? []);
       return res.people ?? [];
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
+  const people: AdminProfile[] = peopleQuery.data ?? [];
+  const loading = peopleQuery.isFetching;
 
-  const loadCompanies = async () => {
-    const res = await adminAPI.listCompanies();
-    setCompanies(res.companies ?? []);
+  const companiesQuery = useQuery({
+    queryKey: ['admin', 'companies'],
+    queryFn: async () => (await adminAPI.listCompanies()).companies ?? [],
+  });
+  const companies: AdminCompany[] = companiesQuery.data ?? [];
+
+  const reloadPeople = () => queryClient.invalidateQueries({ queryKey: ['admin', 'people'] });
+
+  const applyQuery = () => {
+    if (appliedQuery === query) {
+      void peopleQuery.refetch();
+    } else {
+      setAppliedQuery(query);
+    }
   };
 
   useEffect(() => {
@@ -71,14 +83,6 @@ export const AdminUsers: React.FC = () => {
     }
     // location.key: apply deep links on each navigation; do not overwrite after user clears filters on same visit.
   }, [location.key, companyIdFromUrl, roleFromUrl]);
-
-  useEffect(() => {
-    loadCompanies().catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    loadPeople().catch(() => undefined);
-  }, [companyId, roleFilter]);
 
   return (
     <AdminLayout title="People" subtitle="HR and employee logins, filtered by company and role">
@@ -119,7 +123,7 @@ export const AdminUsers: React.FC = () => {
             />
           </div>
           <div className="self-end">
-            <Button onClick={() => loadPeople()} disabled={loading}>
+            <Button onClick={applyQuery} disabled={loading}>
               {loading ? 'Loading…' : 'Apply'}
             </Button>
           </div>
@@ -166,7 +170,7 @@ export const AdminUsers: React.FC = () => {
                         ids.map((id) => adminAPI.deactivatePerson(id)),
                       );
                       const failed = results.filter((r) => r.status === 'rejected').length;
-                      const nextPeople = await loadPeople();
+                      const { data: nextPeople } = await peopleQuery.refetch();
                       setDeleteFeedback(failed > 0 ? 'error' : 'done');
                       if (failed === 0 && nextPeople) {
                         setSelectionMode(false);
@@ -176,7 +180,7 @@ export const AdminUsers: React.FC = () => {
                       }
                     } catch (e) {
                       logger.error(e);
-                      await loadPeople();
+                      await peopleQuery.refetch();
                       setDeleteFeedback('error');
                       setTimeout(() => setDeleteFeedback('idle'), 5000);
                     }
@@ -265,7 +269,7 @@ export const AdminUsers: React.FC = () => {
           onClose={() => setEditOpen(null)}
           onSaved={() => {
             setEditOpen(null);
-            void loadPeople();
+            void reloadPeople();
           }}
         />
       )}
@@ -273,7 +277,7 @@ export const AdminUsers: React.FC = () => {
         <AddPersonModal
           companies={companies}
           onClose={() => setAddOpen(false)}
-          onRefresh={() => loadPeople()}
+          onRefresh={() => { void reloadPeople(); }}
           onInviteSuccess={(targetEmail) => {
             setAddOpen(false);
             setInviteToast(`Person created. Invite email sent to ${targetEmail}.`);
