@@ -19,6 +19,32 @@ for _p in (_HB, _LO, "/opt/homebrew/bin", "/usr/local/bin"):
 
 import pytest
 
+# QG-2 (AIQ-1176): full-suite discovery exposed test modules that have always been
+# broken at *import* time (they were never in the old hardcoded CI list, so this is
+# not a regression). A collection ImportError aborts the whole run, and a marker
+# can't skip a module that fails to import — so they're ignored here, by category,
+# until fixed. Skip-list (shrinks over time), NOT an inclusion list — every other
+# test now gates automatically.
+collect_ignore = [
+    # Pre-migration `from services...` imports — resolve only with backend/ on
+    # sys.path; canonical path is backend.app.services (AUDIT-A9.3 service-tree
+    # consolidation owns the fix; do not partially migrate per backend/CLAUDE.md).
+    "test_collaboration.py",
+    "test_dossier.py",
+    "test_employee_policy_matrix_bridge.py",
+    "test_guidance_pack.py",
+    # Relative imports with no parent package (need a package __init__ or
+    # importlib import-mode — out of scope for this CI-wiring change).
+    "test_collaboration_api.py",
+    "test_employee_policy_resolution.py",
+    "test_official_ingest.py",
+    "test_admin.py",
+    "test_admin_verification.py",
+    # scipy removed `trapz` (use scipy.integrate.trapezoid / numpy.trapezoid) —
+    # real code/dep fix tracked separately.
+    "test_case_duration_model.py",
+]
+
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     if "policy_assistant_audit" not in item.keywords:
