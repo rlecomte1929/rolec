@@ -8123,15 +8123,23 @@ def get_assignment_services(
 
 @app.get("/api/services/context")
 def get_services_context(
-    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    assignment_id: Optional[str] = Query(None, description="Assignment id (gate for access)"),
+    case_id: Optional[str] = Query(None, description="Case id (alternative gate; resolves to its assignment)"),
     fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none"),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """
     Combined endpoint: assignment, case context, services, answers, and questions in one round-trip.
     Reduces 4 requests to 1 for the services questions page.
+
+    AIQ-1249b: accepts case_id OR assignment_id (mirrors /api/services/answers).
+    Both resolve through _require_assignment_visibility, which rejects cross-case
+    access; the assignment_id path is unchanged.
     """
-    assignment = _require_assignment_visibility(assignment_id, user)
+    gate_id = assignment_id or case_id
+    if not gate_id:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id required")
+    assignment = _require_assignment_visibility(gate_id, user)
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")
@@ -8274,12 +8282,19 @@ def get_service_answers(
 
 @app.get("/api/services/questions")
 def get_service_questions(
-    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    assignment_id: Optional[str] = Query(None, description="Assignment id (gate for access)"),
+    case_id: Optional[str] = Query(None, description="Case id (alternative gate; resolves to its assignment)"),
     fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none (e.g. housing,schools)"),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """Return dynamic questions for selected services. Adapts to case context and saved answers."""
-    assignment = _require_assignment_visibility(assignment_id, user)
+    """Return dynamic questions for selected services. Adapts to case context and saved answers.
+
+    AIQ-1249b: accepts case_id OR assignment_id (mirrors /api/services/answers);
+    both resolve via _require_assignment_visibility (rejects cross-case access)."""
+    gate_id = assignment_id or case_id
+    if not gate_id:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id required")
+    assignment = _require_assignment_visibility(gate_id, user)
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")
