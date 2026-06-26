@@ -120,6 +120,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: License compliance check
+        # QG-12: fail on any production dependency carrying a non-permissive /
+        # unknown license. Allow-list + documented pinned exceptions live in
+        # frontend/scripts/check-licenses.mjs.
+        run: npm run licenses
+
       - name: Dependency vulnerability audit (production deps)
         # QG-3: gate on HIGH/CRITICAL vulnerabilities in the *shipped* bundle only
         # (--omit=dev). Dev-only tooling vulns (vitest/vite majors) are tracked
@@ -149,6 +155,11 @@ jobs:
             echo "::error::frontend/dist was not produced by the build"
             exit 1
           fi
+
+      - name: Bundle-size budget
+        # QG-10: fail if a built chunk exceeds its budget (.size-limit.json — set
+        # near the current gzipped sizes + small headroom; ratchet down later).
+        run: npm run size
 
       - name: Run Vitest unit tests + coverage gate
         # QG-6: run with coverage so the ratchet thresholds in vite.config.ts

@@ -1,0 +1,8 @@
+[
+  { "name": "index (app entry)", "path": "dist/assets/index-*.js", "limit": "175 kB", "gzip": true },
+  { "name": "AdminFormTemplateMap (PDF mapper)", "path": "dist/assets/AdminFormTemplateMap-*.js", "limit": "125 kB", "gzip": true },
+  { "name": "HrPolicy", "path": "dist/assets/HrPolicy-*.js", "limit": "70 kB", "gzip": true },
+  { "name": "react-vendor", "path": "dist/assets/react-vendor-*.js", "limit": "60 kB", "gzip": true },
+  { "name": "supabase-vendor", "path": "dist/assets/supabase-vendor-*.js", "limit": "55 kB", "gzip": true },
+  { "name": "html2canvas", "path": "dist/assets/html2canvas*.js", "limit": "55 kB", "gzip": true }
+]
