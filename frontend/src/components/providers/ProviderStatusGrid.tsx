@@ -68,6 +68,21 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
     });
   }, []);
 
+  // Sortable column headers: keyboard-operable + aria-sort (a11y). Replaces bare
+  // <th onClick> (no keyboard support — WCAG 2.1.1).
+  const sortableHeader = (key: SortKey) => ({
+    onClick: () => handleSort(key),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleSort(key);
+      }
+    },
+    tabIndex: 0,
+    role: 'button' as const,
+    'aria-sort': (sortKey === key ? (sortAsc ? 'ascending' : 'descending') : 'none') as React.AriaAttributes['aria-sort'],
+  });
+
   const sorted = [...rows].sort((a, b) => {
     let cmp = 0;
     if (sortKey === 'employee_name') {
@@ -179,16 +194,16 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff' }}>
             <thead>
               <tr>
-                <th style={{ ...thStyle, minWidth: 180 }} onClick={() => handleSort('employee_name')}>
+                <th style={{ ...thStyle, minWidth: 180 }} {...sortableHeader('employee_name')}>
                   Employee <SortIcon col="employee_name" />
                 </th>
-                <th style={{ ...thStyle, minWidth: 130 }} onClick={() => handleSort('dest_country')}>
+                <th style={{ ...thStyle, minWidth: 130 }} {...sortableHeader('dest_country')}>
                   Destination <SortIcon col="dest_country" />
                 </th>
-                <th style={{ ...thStyle, minWidth: 110 }} onClick={() => handleSort('move_date')}>
+                <th style={{ ...thStyle, minWidth: 110 }} {...sortableHeader('move_date')}>
                   Move date <SortIcon col="move_date" />
                 </th>
-                <th style={{ ...thStyle, minWidth: 130 }} onClick={() => handleSort('coordination_status')}>
+                <th style={{ ...thStyle, minWidth: 130 }} {...sortableHeader('coordination_status')}>
                   Overall <SortIcon col="coordination_status" />
                 </th>
                 {PROVIDER_COLUMNS.map(col => (
