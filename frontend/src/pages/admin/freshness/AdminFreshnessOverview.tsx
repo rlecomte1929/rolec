@@ -41,7 +41,7 @@ export const AdminFreshnessOverview: React.FC = () => {
         adminFreshnessAPI.listDocumentChanges({ limit: 10 }),
         adminFreshnessAPI.getStaleResources({ limit: 10 }),
       ]);
-      setOverview(ov);
+      setOverview(ov as Overview);
       setCountries(co);
       setJobRuns(jr);
       setChanges(ch);

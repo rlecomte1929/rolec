@@ -18,7 +18,7 @@ export const AdminCrawlJobRunDetail: React.FC = () => {
       adminFreshnessAPI.listDocumentChanges({ job_run_id: id, limit: 20 }),
     ])
       .then(([j, c]) => {
-        setJob(j);
+        setJob(j as Record<string, unknown>);
         setChanges(c);
       })
       .catch((e) => setError((e as Error)?.message || 'Failed'))
