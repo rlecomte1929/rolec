@@ -53,6 +53,11 @@ FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 _PRICING_USD_PER_1M = {
     "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
     "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
+    # Claude Fable 5 (AIQ-1219) — policy-document ingestion model. 1M context.
+    # $10 / $50 per 1M input/output tokens (provider pricing, 2026-06). Mirrors
+    # the costs.yaml entry so cost_usd_estimated is correct on whichever path
+    # prices a Fable-5 call.
+    "claude-fable-5": {"input": 10.00, "output": 50.00},
 }
 
 

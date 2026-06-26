@@ -36,11 +36,15 @@ Design notes:
 Configuration:
 
 * ``ANTHROPIC_API_KEY`` — required. Absence → returns None.
-* ``RELOPASS_LLM_POLICY_MODEL`` — optional. Defaults to ``claude-sonnet-4-6``
-  to match existing usage in ``support.py`` / ``analytics_query.py``.
-* ``RELOPASS_LLM_POLICY_MAX_INPUT_CHARS`` — optional. Defaults to 12000.
-  Truncates document text before sending so large policy PDFs don't blow
-  the context window.
+* ``RELOPASS_LLM_POLICY_MODEL`` — optional. Defaults to ``claude-fable-5``
+  (AIQ-1219): Fable 5's 1M-token context lets a full 100-200pg policy be
+  ingested in a single pass. The env var stays the operator escape hatch.
+* ``RELOPASS_LLM_POLICY_MAX_INPUT_CHARS`` — optional. The per-call truncation
+  cap. The *default* is model-aware (AIQ-1219): the Fable-5 path defaults to
+  1,500,000 chars (~430k tokens — a whole manual in one pass, well inside the
+  1M-token window) so the legacy 12k cap no longer throws away ~99% of a long
+  policy; non-Fable models keep the conservative 12,000-char default. An
+  explicit value always overrides either default.
 """
 from __future__ import annotations
 
@@ -191,6 +195,18 @@ SYSTEM_PROMPT = (
 )
 
 
+# Whole-document ingestion caps (AIQ-1219). Fable 5 has a 1M-token context
+# window, so the legacy 12k-char truncation — sized for small context windows —
+# would discard ~99% of a 100-200pg policy and defeat the whole-doc benefit.
+# 1,500,000 chars ≈ 430k tokens at ~3.5 chars/token: a full manual fits in one
+# pass while leaving comfortable headroom inside the 1M-token window for the
+# system prompt, tool schema, and up to 128k output tokens. Non-Fable models
+# keep the conservative legacy default. Both are overridable via
+# RELOPASS_LLM_POLICY_MAX_INPUT_CHARS.
+_FABLE5_MAX_INPUT_CHARS = 1_500_000
+_DEFAULT_MAX_INPUT_CHARS = 12_000
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
@@ -263,17 +279,31 @@ def extract_policy_with_llm(
     elif active is not None:
         model = active.model_name
     else:
-        model = "claude-sonnet-4-6"
+        # AIQ-1219: Fable 5 (1M-token context) is the policy-ingestion default so
+        # a full 100-200pg manual is parsed in one pass. RELOPASS_LLM_POLICY_MODEL
+        # remains the operator escape hatch. (Policy-assistant *chat* models are
+        # unchanged — Fable 5 is policy ingestion only.)
+        model = "claude-fable-5"
 
     system_prompt = active.system_prompt if active is not None else SYSTEM_PROMPT
     max_tokens = active.max_tokens if active is not None else 4096
     prompt_version_id = active.id if active is not None else None
     canary_arm = active.canary_arm if active is not None else None
 
+    # Model-aware default cap (AIQ-1219): lift the legacy 12k truncation for the
+    # Fable-5 whole-document path so a full policy reaches the model in one pass;
+    # other models keep the conservative default. The env var overrides either.
+    default_max_chars = (
+        _FABLE5_MAX_INPUT_CHARS
+        if str(model).startswith("claude-fable")
+        else _DEFAULT_MAX_INPUT_CHARS
+    )
     try:
-        max_chars = int(os.environ.get("RELOPASS_LLM_POLICY_MAX_INPUT_CHARS", "12000"))
+        max_chars = int(
+            os.environ.get("RELOPASS_LLM_POLICY_MAX_INPUT_CHARS", str(default_max_chars))
+        )
     except ValueError:
-        max_chars = 12000
+        max_chars = default_max_chars
 
     document_text = "\n".join(lines)
     if len(document_text) > max_chars:
