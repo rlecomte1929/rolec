@@ -170,8 +170,8 @@ export const AdminSupplierNew: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Name *</label>
-              <Input unstyled
+              <label htmlFor="sup-name" className="block text-sm font-medium text-[#374151] mb-1">Name *</label>
+              <Input id="sup-name" unstyled
                 type="text"
                 value={form.name}
                 onChange={(v) => updateForm({ name: v })}
@@ -181,8 +181,8 @@ export const AdminSupplierNew: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Legal name</label>
-              <Input unstyled
+              <label htmlFor="sup-legal-name" className="block text-sm font-medium text-[#374151] mb-1">Legal name</label>
+              <Input id="sup-legal-name" unstyled
                 type="text"
                 value={form.legal_name}
                 onChange={(v) => updateForm({ legal_name: v })}
@@ -190,8 +190,8 @@ export const AdminSupplierNew: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Status</label>
-              <select
+              <label htmlFor="sup-status" className="block text-sm font-medium text-[#374151] mb-1">Status</label>
+              <select id="sup-status"
                 value={form.status}
                 onChange={(e) => updateForm({ status: e.target.value })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
@@ -202,8 +202,8 @@ export const AdminSupplierNew: React.FC = () => {
               </select>
             </div>
             <div className="flex items-end gap-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
+              <label htmlFor="sup-updateform-verified" className="flex items-center gap-2 cursor-pointer">
+                <Checkbox id="sup-updateform-verified"
                   checked={form.verified}
                   onChange={(e) => updateForm({ verified: e.target.checked })}
                 />
@@ -211,8 +211,8 @@ export const AdminSupplierNew: React.FC = () => {
               </label>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-[#374151] mb-1">Description</label>
-              <textarea
+              <label htmlFor="sup-description" className="block text-sm font-medium text-[#374151] mb-1">Description</label>
+              <textarea id="sup-description"
                 value={form.description}
                 onChange={(e) => updateForm({ description: e.target.value })}
                 className="w-full border border-[#d1d5db] rounded px-3 py-2 text-sm"
@@ -220,8 +220,8 @@ export const AdminSupplierNew: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Website</label>
-              <Input unstyled
+              <label htmlFor="sup-website" className="block text-sm font-medium text-[#374151] mb-1">Website</label>
+              <Input id="sup-website" unstyled
                 type="url"
                 value={form.website}
                 onChange={(v) => updateForm({ website: v })}
@@ -229,8 +229,8 @@ export const AdminSupplierNew: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Contact email</label>
-              <Input unstyled
+              <label htmlFor="sup-contact-email" className="block text-sm font-medium text-[#374151] mb-1">Contact email</label>
+              <Input id="sup-contact-email" unstyled
                 type="email"
                 value={form.contact_email}
                 onChange={(v) => updateForm({ contact_email: v })}
@@ -238,8 +238,8 @@ export const AdminSupplierNew: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Contact phone</label>
-              <Input unstyled
+              <label htmlFor="sup-contact-phone" className="block text-sm font-medium text-[#374151] mb-1">Contact phone</label>
+              <Input id="sup-contact-phone" unstyled
                 type="text"
                 value={form.contact_phone}
                 onChange={(v) => updateForm({ contact_phone: v })}
@@ -247,8 +247,8 @@ export const AdminSupplierNew: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Languages (comma-separated)</label>
-              <Input unstyled
+              <label htmlFor="sup-languages-commaseparated" className="block text-sm font-medium text-[#374151] mb-1">Languages (comma-separated)</label>
+              <Input id="sup-languages-commaseparated" unstyled
                 type="text"
                 value={form.languages_supported}
                 onChange={(v) => updateForm({ languages_supported: v })}
@@ -262,8 +262,8 @@ export const AdminSupplierNew: React.FC = () => {
             <h3 className="text-base font-medium text-[#0b2b43] mb-2">Scoring / Verification</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm text-[#6b7280] mb-1">Rating</label>
-                <Input unstyled
+                <label htmlFor="sup-rating" className="block text-sm text-[#6b7280] mb-1">Rating</label>
+                <Input id="sup-rating" unstyled
                   type="number"
                   step="0.1"
                   min="0"
@@ -275,8 +275,8 @@ export const AdminSupplierNew: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm text-[#6b7280] mb-1">Review count</label>
-                <Input unstyled
+                <label htmlFor="sup-review-count" className="block text-sm text-[#6b7280] mb-1">Review count</label>
+                <Input id="sup-review-count" unstyled
                   type="number"
                   min="0"
                   value={form.scoring.review_count}
@@ -285,8 +285,8 @@ export const AdminSupplierNew: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm text-[#6b7280] mb-1">SLA (hours)</label>
-                <Input unstyled
+                <label htmlFor="sup-sla-hours" className="block text-sm text-[#6b7280] mb-1">SLA (hours)</label>
+                <Input id="sup-sla-hours" unstyled
                   type="number"
                   min="0"
                   value={form.scoring.response_sla_hours}
@@ -295,15 +295,15 @@ export const AdminSupplierNew: React.FC = () => {
                 />
               </div>
               <div className="flex items-end gap-4">
-                <label className="flex items-center gap-1 cursor-pointer">
-                  <Checkbox
+                <label htmlFor="sup-updateform-scoring-preferred" className="flex items-center gap-1 cursor-pointer">
+                  <Checkbox id="sup-updateform-scoring-preferred"
                     checked={form.scoring.preferred_partner}
                     onChange={(e) => updateForm({ scoring: { ...form.scoring, preferred_partner: e.target.checked } })}
                   />
                   <span className="text-sm">Preferred</span>
                 </label>
-                <label className="flex items-center gap-1 cursor-pointer">
-                  <Checkbox
+                <label htmlFor="sup-updateform-scoring-premium" className="flex items-center gap-1 cursor-pointer">
+                  <Checkbox id="sup-updateform-scoring-premium"
                     checked={form.scoring.premium_partner}
                     onChange={(e) => updateForm({ scoring: { ...form.scoring, premium_partner: e.target.checked } })}
                   />
@@ -334,8 +334,8 @@ export const AdminSupplierNew: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
-                        <label className="block text-xs text-[#6b7280] mb-0.5">Service</label>
-                        <select
+                        <label htmlFor="sup-service" className="block text-xs text-[#6b7280] mb-0.5">Service</label>
+                        <select id="sup-service"
                           value={cap.service_category}
                           onChange={(e) => updateCapability(idx, { service_category: e.target.value })}
                           className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
@@ -348,8 +348,8 @@ export const AdminSupplierNew: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-[#6b7280] mb-0.5">Coverage</label>
-                        <select
+                        <label htmlFor="sup-coverage" className="block text-xs text-[#6b7280] mb-0.5">Coverage</label>
+                        <select id="sup-coverage"
                           value={cap.coverage_scope_type}
                           onChange={(e) => updateCapability(idx, { coverage_scope_type: e.target.value })}
                           className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
@@ -363,8 +363,8 @@ export const AdminSupplierNew: React.FC = () => {
                       </div>
                       {cap.coverage_scope_type !== 'global' && (
                         <div>
-                          <label className="block text-xs text-[#6b7280] mb-0.5">Country (2-letter)</label>
-                          <Input unstyled
+                          <label htmlFor="sup-country-2letter" className="block text-xs text-[#6b7280] mb-0.5">Country (2-letter)</label>
+                          <Input id="sup-country-2letter" unstyled
                             type="text"
                             value={cap.country_code}
                             onChange={(v) => updateCapability(idx, { country_code: v.toUpperCase().slice(0, 2) })}
@@ -375,8 +375,8 @@ export const AdminSupplierNew: React.FC = () => {
                       )}
                       {cap.coverage_scope_type === 'city' && (
                         <div>
-                          <label className="block text-xs text-[#6b7280] mb-0.5">City</label>
-                          <Input unstyled
+                          <label htmlFor="sup-city" className="block text-xs text-[#6b7280] mb-0.5">City</label>
+                          <Input id="sup-city" unstyled
                             type="text"
                             value={cap.city_name}
                             onChange={(v) => updateCapability(idx, { city_name: v })}
@@ -386,8 +386,8 @@ export const AdminSupplierNew: React.FC = () => {
                         </div>
                       )}
                       <div>
-                        <label className="block text-xs text-[#6b7280] mb-0.5">Min budget</label>
-                        <Input unstyled
+                        <label htmlFor="sup-min-budget" className="block text-xs text-[#6b7280] mb-0.5">Min budget</label>
+                        <Input id="sup-min-budget" unstyled
                           type="number"
                           value={cap.min_budget}
                           onChange={(v) => updateCapability(idx, { min_budget: v })}
@@ -395,8 +395,8 @@ export const AdminSupplierNew: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-[#6b7280] mb-0.5">Max budget</label>
-                        <Input unstyled
+                        <label htmlFor="sup-max-budget" className="block text-xs text-[#6b7280] mb-0.5">Max budget</label>
+                        <Input id="sup-max-budget" unstyled
                           type="number"
                           value={cap.max_budget}
                           onChange={(v) => updateCapability(idx, { max_budget: v })}
@@ -404,8 +404,8 @@ export const AdminSupplierNew: React.FC = () => {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-xs text-[#6b7280] mb-0.5">Tags (comma-separated)</label>
-                        <Input unstyled
+                        <label htmlFor="sup-tags-commaseparated" className="block text-xs text-[#6b7280] mb-0.5">Tags (comma-separated)</label>
+                        <Input id="sup-tags-commaseparated" unstyled
                           type="text"
                           value={cap.specialization_tags}
                           onChange={(v) => updateCapability(idx, { specialization_tags: v })}
@@ -415,22 +415,22 @@ export const AdminSupplierNew: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex gap-4 mt-2">
-                      <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <Checkbox
+                      <label htmlFor="sup-updatecapabilityidx-family" className="flex items-center gap-1 cursor-pointer text-sm">
+                        <Checkbox id="sup-updatecapabilityidx-family"
                           checked={cap.family_support}
                           onChange={(e) => updateCapability(idx, { family_support: e.target.checked })}
                         />
                         Family
                       </label>
-                      <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <Checkbox
+                      <label htmlFor="sup-updatecapabilityidx-corporat" className="flex items-center gap-1 cursor-pointer text-sm">
+                        <Checkbox id="sup-updatecapabilityidx-corporat"
                           checked={cap.corporate_clients}
                           onChange={(e) => updateCapability(idx, { corporate_clients: e.target.checked })}
                         />
                         Corporate
                       </label>
-                      <label className="flex items-center gap-1 cursor-pointer text-sm">
-                        <Checkbox
+                      <label htmlFor="sup-updatecapabilityidx-remote" className="flex items-center gap-1 cursor-pointer text-sm">
+                        <Checkbox id="sup-updatecapabilityidx-remote"
                           checked={cap.remote_support}
                           onChange={(e) => updateCapability(idx, { remote_support: e.target.checked })}
                         />
