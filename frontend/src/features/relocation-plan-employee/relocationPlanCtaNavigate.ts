@@ -37,8 +37,9 @@ export function useRelocationPlanCtaHandler(
   const role = options?.role ?? 'employee';
 
   return useCallback(
-    (cta: RelocationPlanCtaDTO | null | undefined) => {
-      const t = resolveRelocationTaskCtaTarget({ routeCaseId, resourceCaseId, role }, cta);
+    // [AIQ-1252] optional per-call formHint → dossier ?form= deep-link.
+    (cta: RelocationPlanCtaDTO | null | undefined, formHint?: string | null) => {
+      const t = resolveRelocationTaskCtaTarget({ routeCaseId, resourceCaseId, role, formHint }, cta);
       if (t.kind === 'internal') navigate(t.to);
       else if (t.kind === 'external') window.open(t.href, '_blank', 'noopener,noreferrer');
     },

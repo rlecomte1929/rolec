@@ -4,6 +4,9 @@ export type RelocationPlanCtaNavigateContext = {
   routeCaseId: string;
   resourceCaseId?: string | null;
   role?: 'employee' | 'hr';
+  /** [AIQ-1252] Best-effort dossier deep-link key (a document-upload task's doc key);
+   *  appended as ?form= so the dossier can auto-expand the matching form. */
+  formHint?: string | null;
 };
 
 export type RelocationTaskCtaSemantic =
