@@ -37,6 +37,7 @@ Two brand scales (50→900) + neutrals + semantic. **Light is default; dark via 
 - **Neutrals:** slate/gray. Body text `#1f2937` (`--rp-text-primary` / `neutral-800`); secondary `neutral-600`; tertiary/muted `neutral-500`; surfaces `neutral-0/50/100`.
 - **Semantic** (Tailwind palette, as used across the app): success **emerald**, warning **amber**, error **rose/red**, info **blue**.
 - **Surfaces:** page `--rp-surface` (white), subtle (`neutral-50`, alt rows), muted (`neutral-100`, disabled/raised), inverse (`navy-800`).
+- **Muted-text contrast (WCAG AA) — A11Y-2 / AIQ-1211:** secondary/muted **text on light surfaces must be `text-slate-500` (≈4.6:1) or darker** — **never `text-slate-400` / `text-gray-400` / `*-300`** (≈2.6:1, fails AA's 4.5:1). On dark/navy/colored fills the lighter slate tokens are correct (light-on-dark). New code: `text-slate-500` for muted, `text-slate-600` for secondary body. (Migration of the ~490 existing light-surface usages is in progress, by feature area.)
 
 ## Spacing
 - **Base unit:** 8px grid.

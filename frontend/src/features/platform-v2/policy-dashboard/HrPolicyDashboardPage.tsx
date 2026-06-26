@@ -262,7 +262,7 @@ export function HrPolicyDashboardPage() {
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-5">
             <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Active policy</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Active policy</p>
                 <div className="flex items-center gap-2">
                   <span className="text-base font-semibold text-slate-900">{policyTitle}</span>
                   {policyVersion != null && (
@@ -273,15 +273,15 @@ export function HrPolicyDashboardPage() {
                 </div>
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Effective</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Effective</p>
                 <p className="text-sm font-medium text-slate-700">{effectiveDate ?? '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Employees</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Employees</p>
                 <p className="text-sm font-medium text-slate-700">{employeeTotal}</p>
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Next review</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Next review</p>
                 <p className="text-sm font-medium text-slate-700">{nextReview ?? '—'}</p>
               </div>
               <div className="flex-1" />
@@ -293,21 +293,21 @@ export function HrPolicyDashboardPage() {
         </section>
 
         {loading && (
-          <p className="text-sm text-slate-400">Loading live policy data…</p>
+          <p className="text-sm text-slate-500">Loading live policy data…</p>
         )}
 
         {/* Case health — proactively flagged behind-schedule cases (AIQ-378d) */}
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-sm font-semibold text-slate-800">Case health</h2>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-500">
               {caseHealth.length > 0 ? `${caseHealth.length} behind schedule` : 'all on track'}
             </span>
           </div>
           {caseHealth.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-center">
               <p className="text-sm text-slate-500">No cases are behind schedule.</p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-500">
                 Cases past an expected immigration milestone date show here with a suggested action.
               </p>
             </div>
@@ -317,7 +317,7 @@ export function HrPolicyDashboardPage() {
                 <div key={c.case_id} className="px-5 py-4 flex flex-wrap items-start gap-x-6 gap-y-2">
                   <div className="min-w-[140px]">
                     <p className="text-sm font-medium text-slate-800">{c.case_id}</p>
-                    <p className="text-xs text-slate-400">{c.stage ?? '—'}</p>
+                    <p className="text-xs text-slate-500">{c.stage ?? '—'}</p>
                   </div>
                   <div className="min-w-[120px]">
                     <span
@@ -330,7 +330,7 @@ export function HrPolicyDashboardPage() {
                       {c.days_behind != null ? `${c.days_behind} day(s) behind` : 'behind'}
                     </span>
                     {c.expected_date && (
-                      <p className="mt-1 text-xs text-slate-400">target {c.expected_date}</p>
+                      <p className="mt-1 text-xs text-slate-500">target {c.expected_date}</p>
                     )}
                   </div>
                   <p className="flex-1 min-w-[200px] text-sm text-slate-600">
@@ -346,21 +346,21 @@ export function HrPolicyDashboardPage() {
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-sm font-semibold text-slate-800">Employee compliance</h2>
-            <p className="text-xs text-slate-400">{employeeRows.length} employee{employeeRows.length === 1 ? '' : 's'} — sorted by status (pending first).</p>
+            <p className="text-xs text-slate-500">{employeeRows.length} employee{employeeRows.length === 1 ? '' : 's'} — sorted by status (pending first).</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-slate-100 text-left">
                   {['Employee', 'Destination', 'Tier', 'Over-cap delta', 'Exceptions pending', 'Status'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-medium text-slate-400">{h}</th>
+                    <th key={h} className="px-4 py-3 text-xs font-medium text-slate-500">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {employeeRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
                       No active employees found for your company.
                     </td>
                   </tr>
@@ -395,21 +395,21 @@ export function HrPolicyDashboardPage() {
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-sm font-semibold text-slate-800">Exception queue</h2>
-            <p className="text-xs text-slate-400">{pendingQueue.length} pending — most recent first. One-click decisions, no reload.</p>
+            <p className="text-xs text-slate-500">{pendingQueue.length} pending — most recent first. One-click decisions, no reload.</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
             <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="border-b border-slate-100 text-left">
                   {['Employee', 'Category', 'Policy cap', 'Requested', 'Justification', 'Decision'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-medium text-slate-400">{h}</th>
+                    <th key={h} className="px-4 py-3 text-xs font-medium text-slate-500">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {pendingQueue.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
                       No pending exception requests — the queue is clear.
                     </td>
                   </tr>
@@ -457,7 +457,7 @@ export function HrPolicyDashboardPage() {
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-sm font-semibold text-slate-800">Category utilisation</h2>
-            <p className="text-xs text-slate-400">Share of employees over-cap per category. Hover a cell for detail.</p>
+            <p className="text-xs text-slate-500">Share of employees over-cap per category. Hover a cell for detail.</p>
           </div>
 
           {/* Legend */}
@@ -471,13 +471,13 @@ export function HrPolicyDashboardPage() {
             ].map((b) => (
               <div key={b.label} className="flex items-center gap-1.5">
                 <span className={`w-5 h-5 rounded ${heatStyle(b.pct)}`} />
-                <span className="text-xs text-slate-400">{b.label}</span>
+                <span className="text-xs text-slate-500">{b.label}</span>
               </div>
             ))}
           </div>
 
           {heatCells.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-500">
               All employees are within their policy caps — no over-cap categories.
             </div>
           ) : (
