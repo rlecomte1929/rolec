@@ -125,7 +125,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: perf-budget-${{ github.run_id }}
           path: perf.json
