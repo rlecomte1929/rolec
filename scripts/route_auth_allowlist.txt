@@ -103,6 +103,9 @@ backend/app/routers/auth.py:register
 # PUBLIC: account registration is pre-auth by definition.
 backend/app/routers/auth.py:login
 # PUBLIC: login issues the session token; cannot require it.
+backend/app/routers/auth.py:exchange_supabase_token
+# PUBLIC (AIQ-1239): bridges a verified Supabase JWT (passkey/OAuth) to a ReloPass
+# session. The Supabase access token in the body IS the credential (verified HS256).
 backend/app/routers/auth.py:logout
 # PUBLIC: token-scoped / no-op; safe without an auth dep.
 backend/app/routers/providers.py:accept_provider_invite

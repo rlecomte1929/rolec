@@ -550,6 +550,123 @@ def login(body: LoginRequest, request: Request):
     )
 
 
+def _verify_supabase_access_token(token: str) -> Dict[str, Any]:
+    """Verify a Supabase Auth access token and return its claims.
+
+    Supabase signs auth tokens HS256 with the project JWT secret (the same
+    secret provider_jwt.py uses), with audience 'authenticated'. Raises
+    HTTPException(401) on any validation failure, 503 if unconfigured.
+    """
+    secret = os.getenv("SUPABASE_JWT_SECRET", "")
+    if not secret:
+        log.error("exchange-supabase-token rejected: SUPABASE_JWT_SECRET not set")
+        raise HTTPException(status_code=503, detail="Supabase token exchange not configured")
+    try:
+        import jwt  # PyJWT
+    except ImportError:  # pragma: no cover - dependency always present in prod
+        raise HTTPException(status_code=503, detail="Token exchange unavailable")
+    try:
+        return jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
+    except Exception as exc:  # noqa: BLE001 — any decode failure is an auth failure
+        log.warning("exchange-supabase-token: invalid token (%s)", type(exc).__name__)
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+@router.post("/api/auth/exchange-supabase-token")
+def exchange_supabase_token(
+    request: Request,
+    access_token: str = Body(..., embed=True),
+) -> LoginResponse:
+    """
+    [AIQ-1239] Exchange a verified Supabase Auth JWT for a ReloPass session.
+
+    Every authenticated request to this backend carries a ReloPass session token
+    (sessions table), but Supabase-native logins — passkeys / WebAuthn and Google
+    OAuth — only produce a Supabase JWT. This endpoint bridges the two: it verifies
+    the Supabase access token, resolves the matching ReloPass user by email, and
+    issues a ReloPass session, so a passkey/OAuth sign-in lands the user in the app
+    exactly like password login. It never auto-provisions accounts.
+
+    401 if the token is missing/invalid/expired or has no matching ReloPass user.
+    """
+    t0 = time.perf_counter()
+    request_id = request.headers.get("X-Request-ID")
+    token_str = (access_token or "").strip()
+    if not token_str:
+        raise HTTPException(status_code=401, detail="Missing access token")
+
+    claims = _verify_supabase_access_token(token_str)
+    email = (claims.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Token has no email claim")
+
+    user = db.get_user_by_email(email)
+    if not user:
+        # No ReloPass account for this Supabase identity — do not auto-create one.
+        identity_event(
+            "identity.auth.exchange.failed",
+            reason="NO_RELOPASS_USER",
+            request_id=request_id or None,
+        )
+        raise HTTPException(status_code=401, detail="No ReloPass account for this identity")
+
+    session_token = str(uuid.uuid4())
+    db.create_session(session_token, user["id"])
+    db.ensure_profile_record(
+        user_id=user["id"],
+        email=user.get("email"),
+        role=user.get("role", UserRole.EMPLOYEE.value),
+        full_name=user.get("name"),
+        company_id=user.get("company"),
+    )
+    profile = db.get_profile_record(user["id"])
+
+    effective_role = UserRole(user["role"])
+    if _is_admin_user(user):
+        effective_role = UserRole.ADMIN
+
+    # Employees: best-effort link of any pending assignment claims (parity with
+    # password login). Fire-and-forget — a passkey/OAuth sign-in must not block on
+    # reconcile, and the next login retries it.
+    if effective_role == UserRole.EMPLOYEE:
+        try:
+            _reconcile_executor.submit(
+                reconcile_pending_assignment_claims,
+                db,
+                user_id=user["id"],
+                email=user.get("email"),
+                username=user.get("username"),
+                role=user.get("role") or UserRole.EMPLOYEE.value,
+                request_id=request_id or None,
+                emit_side_effects=True,
+            )
+        except Exception:  # noqa: BLE001 — reconcile dispatch must not fail the exchange
+            log.warning("exchange-supabase-token: reconcile dispatch failed user_id=%s", user["id"][:8])
+
+    identity_event(
+        "identity.auth.exchange.ok",
+        request_id=request_id or None,
+        auth_user_id=user["id"],
+        role=effective_role.value,
+        principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
+    )
+    _audit_auth(entity_type="session", entity_id=user["id"], action_type=ACTION_INSERT, actor_id=user["id"])
+    log.info("auth_exchange success user_id=%s", user["id"][:8])
+    _log_auth_perf("/api/auth/exchange-supabase-token", request_id, user["id"], (time.perf_counter() - t0) * 1000, 200)
+    return LoginResponse(
+        token=session_token,
+        user=UserResponse(
+            id=user["id"],
+            username=user.get("username"),
+            email=user.get("email"),
+            role=effective_role,
+            name=user.get("name"),
+            company=profile.get("company_id") if profile else user.get("company"),
+        ),
+        reconciliation=None,
+    )
+
+
 @router.post("/api/auth/logout")
 def logout(
     payload: Optional[Dict[str, Any]] = Body(None),
