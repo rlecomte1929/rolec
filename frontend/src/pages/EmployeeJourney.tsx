@@ -5,10 +5,8 @@ import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/
 import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { JourneySpine, isIntakeComplete } from '../features/employee-journey/JourneySpine';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
-import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
@@ -36,6 +34,31 @@ function openCaseHref(assignmentId: string, status?: string | null): string {
   return isIntakeComplete(status)
     ? `/employee/case/${assignmentId}/roadmap`
     : `/employee/case/${assignmentId}/intake`;
+}
+
+/**
+ * First-time welcome-card dismissal, per assignment (AIQ-1269b). Mirrors the
+ * localStorage helper pattern in utils/employeeCaseProgress.ts — try/catch wrapped,
+ * failures swallowed (the fallback, showing the card again, is acceptable).
+ */
+const WELCOME_DISMISS_PREFIX = 'rp_welcome_dismissed:';
+
+function isWelcomeDismissed(assignmentId: string): boolean {
+  if (!assignmentId) return false;
+  try {
+    return window.localStorage.getItem(`${WELCOME_DISMISS_PREFIX}${assignmentId}`) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function dismissWelcomeCard(assignmentId: string): void {
+  if (!assignmentId) return;
+  try {
+    window.localStorage.setItem(`${WELCOME_DISMISS_PREFIX}${assignmentId}`, '1');
+  } catch {
+    // ignore — see employeeCaseProgress.ts
+  }
 }
 
 /** Pattern to detect a case code pasted into the wrong field. */
@@ -124,23 +147,6 @@ export const EmployeeJourney: React.FC = () => {
     pendingSummaries,
     overviewError,
   } = useEmployeeAssignment();
-  // "Pick up where you left off": the most-recently-updated assignment whose intake
-  // is still INCOMPLETE; if none are incomplete, the most-recently-updated overall
-  // (so a submitted-only employee sees its real completed state, not list[0]).
-  const journeyPick = useMemo(() => {
-    const recency = (r: { updated_at?: string | null; intake_updated_at?: string | null }) =>
-      r.updated_at ?? r.intake_updated_at ?? '';
-    const byRecencyDesc = (
-      a: { updated_at?: string | null; intake_updated_at?: string | null },
-      b: { updated_at?: string | null; intake_updated_at?: string | null },
-    ) => recency(b).localeCompare(recency(a));
-    const incomplete = linkedSummaries.filter((r) => !isIntakeComplete(r.status));
-    return (
-      [...incomplete].sort(byRecencyDesc)[0] ??
-      [...linkedSummaries].sort(byRecencyDesc)[0] ??
-      linkedSummaries[0]
-    );
-  }, [linkedSummaries]);
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
   const [claimEmail, setClaimEmail] = useState(
@@ -155,6 +161,28 @@ export const EmployeeJourney: React.FC = () => {
   /** Hub: collapsed manual claim form unless user opens it (always expanded for primary fallback). */
   const [manualClaimExpanded, setManualClaimExpanded] = useState(false);
   const [bannerDismissNonce, setBannerDismissNonce] = useState(0);
+
+  // AIQ-1269b: first-time welcome card for the primary linked case, shown only
+  // before intake has begun (status assigned/awaiting_intake & intake_step 0) and
+  // until the employee dismisses it. Dismissal is persisted per assignment.
+  const primaryRow = linkedSummaries[0] ?? null;
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  useEffect(() => {
+    setWelcomeDismissed(primaryRow?.assignment_id ? isWelcomeDismissed(primaryRow.assignment_id) : false);
+  }, [primaryRow?.assignment_id]);
+  const showWelcomeCard =
+    !assignmentLoading &&
+    !!primaryRow &&
+    (primaryRow.status === 'assigned' || primaryRow.status === 'awaiting_intake') &&
+    (primaryRow.intake_step ?? 0) === 0 &&
+    !welcomeDismissed;
+  const handleDismissWelcomeCard = () => {
+    if (primaryRow?.assignment_id) dismissWelcomeCard(primaryRow.assignment_id);
+    setWelcomeDismissed(true);
+  };
+  // Name isn't on the assignment-overview row (EmployeeLinkedOverviewRow has no
+  // name field); use the signed-in display name when available.
+  const welcomeName = (getAuthItem('relopass_name') || '').trim();
 
   const hasLinked = linkedCount > 0;
   const hasPendingOnly = !hasLinked && pendingCount > 0;
@@ -560,6 +588,26 @@ export const EmployeeJourney: React.FC = () => {
 
       {(!assignmentLoading || tokenClaimInProgress) && error ? <Alert variant="error" className="mb-6">{error}</Alert> : null}
 
+      {showWelcomeCard && primaryRow ? (
+        <Card padding="lg" className="mb-6 border border-[#1f8e8b]/40 bg-[#f0faf9]">
+          <h2 className="text-lg font-semibold text-[#0b2b43]">
+            Welcome{welcomeName ? ` ${welcomeName}` : ''}.
+          </h2>
+          <p className="text-sm text-[#334155] mt-2">
+            Your HR team at {primaryRow.company?.name || 'your company'} has started your relocation to{' '}
+            {formatDestinationLabel(primaryRow.destination)}. Here&rsquo;s what to do first:
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={() => navigate(`/employee/case/${primaryRow.assignment_id}/intake`)}>
+              Start intake →
+            </Button>
+            <Button variant="outline" onClick={handleDismissWelcomeCard}>
+              Skip for now
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
       {!assignmentLoading && showNewAssignmentBanner ? (
         <div className="mb-6 border border-[#93c5fd] bg-[#eff6ff] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0">
@@ -592,23 +640,6 @@ export const EmployeeJourney: React.FC = () => {
                 ? 'HR has set up a case for you. Accept it below to get started.'
                 : 'Sign in with the email HR used for your move, or enter the case code HR sent you.'}
           </p>
-          {linkedSummaries.length > 0 && journeyPick ? (
-            <JourneySpine
-              intakeStep={journeyPick.intake_step ?? 0}
-              intakeTotalSteps={INTAKE_TOTAL_STEPS}
-              status={journeyPick.status}
-              onContinueIntake={() => navigate(`/employee/case/${journeyPick.assignment_id}/intake`)}
-              onPreviewBenefits={() => navigate(buildRoute('employeeBenefitsComparison'))}
-              onViewRoadmap={
-                isIntakeComplete(journeyPick.status)
-                  ? () =>
-                      navigate(
-                        buildRoute('employeeCaseRoadmap', { caseId: journeyPick.assignment_id }),
-                      )
-                  : undefined
-              }
-            />
-          ) : null}
         </Card>
       ) : null}
 
