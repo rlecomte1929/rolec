@@ -73,6 +73,16 @@ def load_allowlist(path: Path) -> set[str]:
     return allowed
 
 
+def missing_from_allowlist(
+    policy_less: Iterable[str], allowlist: "set[str]"
+) -> "list[str]":
+    """Policy-less tables that are NOT on the allowlist — i.e. the ones that must
+    FAIL the gate. Pure function (no DB) so the fail path is unit-testable: a new
+    public table with no RLS policy and no allowlist entry lands here → exit 1.
+    """
+    return [t for t in policy_less if t not in allowlist]
+
+
 def find_unjustified_allowlist_entries(path: Path) -> "list[tuple[int, str]]":
     """Return ``(line_no, tablename)`` for every allowlist entry lacking a
     justification comment (SEC-RLSf / AIQ-663).
@@ -201,7 +211,7 @@ def main() -> int:
         print(f"[rls-coverage] wrote {len(policy_less)} entries to {ALLOWLIST_FILE.relative_to(REPO_ROOT)}")
         return 0
 
-    missing = [t for t in policy_less if t not in allowlist]
+    missing = missing_from_allowlist(policy_less, allowlist)
     extra = sorted(allowlist - set(policy_less))  # in allowlist but now has a policy
 
     if args.json:

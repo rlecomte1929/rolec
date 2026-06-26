@@ -67,6 +67,30 @@ jobs:
         with:
           files: ".github/workflows/*.yml"
 
+  # SEC-FE-7: scan every PR for secret-shaped strings and FAIL on a hit. Not
+  # gated on `changes` — a leaked credential can appear in any diff. Uses the
+  # root .gitleaks.toml allowlist (public Supabase anon key + known false-
+  # positive paths); a service_role key or any other real secret still fails.
+  secrets-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    # gitleaks-action lists the PR's commits via the PR API; the default token is
+    # contents-read only ("Resource not accessible by integration" 403), so grant
+    # pull-requests: read — same reason the `changes` job does.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs the PR commit range (base..head) to scan the diff.
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
+
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).
   # The three separate jobs each did their own checkout + setup-node + `npm ci`,
@@ -324,9 +348,22 @@ jobs:
         run: python scripts/check_route_auth.py --root .
 
   rls-coverage:
-    # AUDIT-A3: lists `public.*` tables with zero RLS policies and asserts each
-    # one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
+    # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
+    # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
     # Requires DATABASE_URL secret pointing at the live/staging Supabase (read-only).
+    #
+    # SEC-01 (AIQ-1164) — ACTIVATION (founder, one-time). Until both are set this
+    # live-DB audit is SKIPPED, and since the repo has no required status checks a
+    # skipped job does NOT block merge. The diff logic itself is still unit-tested
+    # on every PR via scripts/tests/test_check_rls_coverage.py (proves an RLS-less
+    # table fails), but to make the live gate genuinely block, do:
+    #   1. Create a READ-ONLY Postgres role on the Supabase project (SELECT on
+    #      pg_tables/pg_policies is enough; no app-data access needed).
+    #   2. Repo → Settings → Secrets and variables → Actions:
+    #        - New repository SECRET  RLS_COVERAGE_DATABASE_URL = postgresql://<readonly-role>...
+    #        - New repository VARIABLE RLS_COVERAGE_DATABASE_URL_SET = true
+    #   3. Open a PR touching supabase/migrations/ — this job now runs and fails on
+    #      any policy-less public/rce table not on the allowlist.
     name: RLS coverage check
     needs: changes
     runs-on: ubuntu-latest
