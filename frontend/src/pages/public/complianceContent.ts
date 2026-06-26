@@ -69,7 +69,7 @@ export const complianceContent = {
       },
       {
         title: 'Document text recognition (OCR)',
-        body: 'Reads text from documents you upload to reduce manual data entry. Civil-status documents are processed by an EU-hosted OCR provider (Mistral AI, France).',
+        body: 'Reads text from documents you upload to reduce manual data entry. Civil-status documents (e.g. birth or marriage certificates) use an EU-hosted provider (Mistral AI, France); identity documents such as passports use OpenAI vision (US) under standard contractual clauses.',
       },
     ],
   },
