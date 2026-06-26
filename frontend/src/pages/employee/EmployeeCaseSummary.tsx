@@ -82,6 +82,7 @@ export const EmployeeCaseSummary: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [wizardNavLoading, setWizardNavLoading] = useState(false);
   const [error, setError] = useState('');
+  const [caseStatus, setCaseStatus] = useState<string>('');
 
   const load = useCallback(async () => {
     if (!assignmentId) return;
@@ -98,6 +99,7 @@ export const EmployeeCaseSummary: React.FC = () => {
         );
       } else if (data?.case) {
         setDraft(caseToWizardDraft(data.case));
+        setCaseStatus(data.case.status ?? '');
       } else {
         setDraft(buildDefaultDraft());
         setError('Assignment not found or not visible under RLS.');
@@ -157,48 +159,13 @@ export const EmployeeCaseSummary: React.FC = () => {
         )}
       </div>
 
-      {assignmentId && !isLoading && (
-        <Card padding="md" className="mb-6 border-[#bfdbfe] bg-[#eff6ff]">
-          <h2 className="text-sm font-semibold text-[#0b2b43] mb-2">What to do next</h2>
-          <ul className="text-sm text-[#1e3a5f] space-y-2 list-disc pl-5 leading-relaxed">
-            <li>
-              <strong>Already in the intake wizard?</strong> Use <strong>Continue editing</strong> above to pick up where
-              you left off.
-            </li>
-            <li>
-              <strong>Not started yet?</strong> Use <strong>Continue editing</strong> to begin — you’ll go through
-              relocation basics, your profile, family, and assignment details step by step. You can also start from your{' '}
-              <Link to={buildRoute('employeeDashboard')} className="font-medium text-[#0b2b43] underline">
-                Dashboard
-              </Link>
-              .
-            </li>
-            <li>
-              <strong>Policy &amp; benefits</strong> from your employer (read-only) are on{' '}
-              <Link to={buildRoute('hrPolicy')} className="font-medium text-[#0b2b43] underline">
-                HR Policy
-              </Link>
-              . Use <strong>Policy Assistant</strong> on that page for questions tied to your published policy.
-            </li>
-            <li>
-              <strong>Tasks with HR</strong> (checklist, due dates) are on the{' '}
-              <Link to={planHref} className="font-medium text-[#0b2b43] underline">
-                Relocation plan
-              </Link>{' '}
-              tab.
-            </li>
-            {immigrationHref && (
-              <li>
-                <strong>Immigration intake</strong> — complete your visa profile (passport scan,
-                personal details, address history) on the{' '}
-                <Link to={immigrationHref} className="font-medium text-[#0b2b43] underline">
-                  Immigration intake
-                </Link>{' '}
-                page.
-              </li>
-            )}
-          </ul>
-        </Card>
+      {/* M-09 (AIQ-1267): confirm the intake actually reached HR. */}
+      {caseStatus === 'submitted' && (
+        <div className="mb-6">
+          <Alert variant="success">
+            ✓ Intake submitted — your HR team is reviewing your details. You’ll hear from them in your Inbox.
+          </Alert>
+        </div>
       )}
 
       {/* Immigration intake card */}
@@ -280,6 +247,52 @@ export const EmployeeCaseSummary: React.FC = () => {
 
       {!isLoading && draft && !hasAnyData && (
         <p className="text-sm text-[#6b7280] mt-4">No intake saved yet. Use Continue editing to complete it.</p>
+      )}
+
+      {/* M-11 (AIQ-1268): "What to do next" moved BELOW the data so the employee
+          sees their own case details first, not guidance before content. */}
+      {assignmentId && !isLoading && (
+        <Card padding="md" className="mt-6 mb-6 border-[#bfdbfe] bg-[#eff6ff]">
+          <h2 className="text-sm font-semibold text-[#0b2b43] mb-2">What to do next</h2>
+          <ul className="text-sm text-[#1e3a5f] space-y-2 list-disc pl-5 leading-relaxed">
+            <li>
+              <strong>Already in the intake wizard?</strong> Use <strong>Continue editing</strong> above to pick up where
+              you left off.
+            </li>
+            <li>
+              <strong>Not started yet?</strong> Use <strong>Continue editing</strong> to begin — you’ll go through
+              relocation basics, your profile, family, and assignment details step by step. You can also start from your{' '}
+              <Link to={buildRoute('employeeDashboard')} className="font-medium text-[#0b2b43] underline">
+                Dashboard
+              </Link>
+              .
+            </li>
+            <li>
+              <strong>Policy &amp; benefits</strong> from your employer (read-only) are on{' '}
+              <Link to={buildRoute('hrPolicy')} className="font-medium text-[#0b2b43] underline">
+                HR Policy
+              </Link>
+              . Use <strong>Policy Assistant</strong> on that page for questions tied to your published policy.
+            </li>
+            <li>
+              <strong>Tasks with HR</strong> (checklist, due dates) are on the{' '}
+              <Link to={planHref} className="font-medium text-[#0b2b43] underline">
+                Relocation plan
+              </Link>{' '}
+              tab.
+            </li>
+            {immigrationHref && (
+              <li>
+                <strong>Immigration intake</strong> — complete your visa profile (passport scan,
+                personal details, address history) on the{' '}
+                <Link to={immigrationHref} className="font-medium text-[#0b2b43] underline">
+                  Immigration intake
+                </Link>{' '}
+                page.
+              </li>
+            )}
+          </ul>
+        </Card>
       )}
 
       {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && assignmentId && (
