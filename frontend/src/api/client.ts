@@ -46,6 +46,7 @@ import type {
   AdminSupportCase,
   AdminSupportNote,
   CompanyProfilePayload,
+  InferredOnboardingConfig,
   DossierQuestionsResponse,
   DossierSearchSuggestionsResponse,
   DossierSource,
@@ -634,6 +635,11 @@ export const hrAPI = {
       const response = await api.get<{ company: any | null }>('/api/hr/company-profile');
       return response.data;
     });
+  },
+  /** AIQ-1223c — deterministic proposed workspace config for the first-run UI. */
+  getInferredOnboardingConfig: async (): Promise<InferredOnboardingConfig> => {
+    const response = await api.get<InferredOnboardingConfig>('/api/hr/onboarding/inferred-config');
+    return response.data;
   },
   /** Company-scoped employees for HR */
   listCompanyEmployees: async (): Promise<{
