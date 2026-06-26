@@ -599,6 +599,10 @@ export const EmployeeJourney: React.FC = () => {
               status={journeyPick.status}
               onContinueIntake={() => navigate(`/employee/case/${journeyPick.assignment_id}/intake`)}
               onPreviewBenefits={() => navigate(buildRoute('employeeBenefitsComparison'))}
+              // [AIQ-1251] Step-2 primary → services selection flow. Legacy path +
+              // ?assignment= so it works today and is upgraded to the case-scoped
+              // route by the H-05 (AIQ-1285) redirect once that lands.
+              onSelectServices={() => navigate(`/services?assignment=${journeyPick.assignment_id}`)}
               onViewRoadmap={
                 isIntakeComplete(journeyPick.status)
                   ? () =>

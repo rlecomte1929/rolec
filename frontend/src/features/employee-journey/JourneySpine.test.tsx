@@ -10,6 +10,7 @@ const baseProps = {
   intakeTotalSteps: 5,
   onContinueIntake: () => {},
   onPreviewBenefits: () => {},
+  onSelectServices: () => {},
 };
 
 describe('JourneySpine', () => {
@@ -40,10 +41,10 @@ describe('JourneySpine', () => {
     expect(screen.getByRole('button', { name: 'Start intake' })).toBeInTheDocument();
   });
 
-  it('Preview benefits fires onPreviewBenefits', () => {
+  it('View policy fires onPreviewBenefits', () => {
     const onPreviewBenefits = vi.fn();
     render(<JourneySpine {...baseProps} onPreviewBenefits={onPreviewBenefits} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Preview benefits' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View policy' }));
     expect(onPreviewBenefits).toHaveBeenCalledTimes(1);
   });
 
@@ -65,9 +66,20 @@ describe('JourneySpine', () => {
 
   it('marks intake done and surfaces Services as the active phase once intake completes', () => {
     render(<JourneySpine {...baseProps} intakeStep={5} intakeTotalSteps={5} />);
-    // Services is the next actionable phase: its Preview benefits is primary.
-    expect(screen.getByRole('button', { name: 'Preview benefits' })).toBeInTheDocument();
+    // [AIQ-1251] Services is the next actionable phase: "Select your services" is
+    // the primary CTA, with "View policy" as a secondary link.
+    expect(screen.getByRole('button', { name: 'Select your services →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View policy' })).toBeInTheDocument();
     expect(screen.getByText('Ready')).toBeInTheDocument();
+  });
+
+  it('Select your services fires onSelectServices (active step)', () => {
+    const onSelectServices = vi.fn();
+    render(
+      <JourneySpine {...baseProps} intakeStep={5} intakeTotalSteps={5} onSelectServices={onSelectServices} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select your services →' }));
+    expect(onSelectServices).toHaveBeenCalledTimes(1);
   });
 });
 

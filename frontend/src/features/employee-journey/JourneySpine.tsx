@@ -34,6 +34,8 @@ interface JourneySpineProps {
   servicesComplete?: boolean;
   onContinueIntake: () => void;
   onPreviewBenefits: () => void;
+  /** [AIQ-1251] Step-2 primary action — go to the services selection flow. */
+  onSelectServices: () => void;
   /** When omitted, the Roadmap phase stays locked until intake is done. */
   onViewRoadmap?: () => void;
 }
@@ -92,6 +94,7 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
   servicesComplete,
   onContinueIntake,
   onPreviewBenefits,
+  onSelectServices,
   onViewRoadmap,
 }) => {
   // Status is authoritative (shared isIntakeComplete predicate — same one the
@@ -174,17 +177,25 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
         {servicesActive ? (
           <div className="mt-2 rounded-xl border-2 border-[#1f8e8b] bg-white p-4">
             <p className="text-sm text-[#4b5563]">
-              See the services and budget your policy covers for this move.
+              Choose the services your policy covers for this move and start setting them up.
             </p>
-            <Button variant="primary" size="sm" className="mt-4" onClick={onPreviewBenefits}>
-              Preview benefits
-            </Button>
+            {/* [AIQ-1251] Primary CTA goes to the services selection flow (was a
+                dead-end "Preview benefits" → empty comparison page). "View policy"
+                stays as a secondary link to the benefits page. */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button variant="primary" size="sm" onClick={onSelectServices}>
+                Select your services →
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onPreviewBenefits}>
+                View policy
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="mt-1">
             <div className="text-xs text-[#94a3b8]">Opens after intake</div>
             <Button variant="ghost" size="sm" className="mt-1" onClick={onPreviewBenefits}>
-              Preview benefits
+              View policy
             </Button>
           </div>
         )}
