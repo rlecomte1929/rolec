@@ -153,12 +153,8 @@ export const ProvidersPage: React.FC = () => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
   }, [assignmentId, setActiveCaseId]);
-  const [pendingCurrency, setPendingCurrency] = useState<string>(displayCurrency);
-  // Keep the picker in sync if the committed currency changes from elsewhere
-  // (e.g. when policy resolution forces a default on first load).
-  useEffect(() => {
-    setPendingCurrency(displayCurrency);
-  }, [displayCurrency]);
+  // AIQ-1276: the estimate currency auto-applies on change — no pending state /
+  // Apply button (the select writes straight to displayCurrency).
 
   useEffect(() => {
     if (!svcPolicy?.currency) return;
@@ -339,8 +335,8 @@ export const ProvidersPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <select
                 className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm text-[#0b2b43] w-full max-w-xs"
-                value={pendingCurrency}
-                onChange={(e) => setPendingCurrency(e.target.value)}
+                value={displayCurrency}
+                onChange={(e) => setDisplayCurrency(e.target.value)}
                 aria-label="Currency for service estimates"
               >
                 {SERVICES_DISPLAY_CURRENCIES.map((o) => (
@@ -349,22 +345,6 @@ export const ProvidersPage: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <Button
-                onClick={() => setDisplayCurrency(pendingCurrency)}
-                disabled={pendingCurrency === displayCurrency}
-                aria-label={
-                  pendingCurrency === displayCurrency
-                    ? 'No change to apply — currency already set'
-                    : `Apply ${pendingCurrency} as the estimate currency`
-                }
-              >
-                Apply
-              </Button>
-              {pendingCurrency !== displayCurrency && (
-                <span className="text-xs text-[#94a3b8]">
-                  Currently using {displayCurrency} — click Apply to switch.
-                </span>
-              )}
             </div>
           </label>
         </div>
