@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Card, Button, Input } from '../../components/antigravity';
+import { getCountryName } from '../../utils/countries';
 import type {
   ResourcesPagePayload,
   PublicResource,
@@ -130,8 +131,11 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const context = payload?.context ?? null;
+  // AIQ-1272: fall back to the resolved full country name when the API didn't
+  // send countryName, so the hero never shows a bare ISO code.
+  const destCountryName = context ? (context.countryName || getCountryName(context.countryCode)) : null;
   const destination = context
-    ? [context.cityName, context.countryName].filter(Boolean).join(', ') || context.countryName || 'Your destination'
+    ? [context.cityName, destCountryName].filter(Boolean).join(', ') || destCountryName || 'Your destination'
     : null;
 
   const categoryKeyById = useMemo(() => {
