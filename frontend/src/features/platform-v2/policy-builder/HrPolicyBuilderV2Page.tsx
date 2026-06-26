@@ -19,6 +19,7 @@ import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
 import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
 import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
+import { trackPolicyPublished } from '../../../perf/hrOnboardingInstrumentation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';
@@ -367,6 +368,9 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       if (rowCount === 0) { setBanner({ kind: 'info', msg: 'Add at least one covered benefit before publishing.' }); return; }
       await policyConfigMatrixAPI.hrPutDraft(body);
       await policyConfigMatrixAPI.hrPublish({ policy_version: pv });
+      // AIQ-1223b: HR onboarding signal — publish reveals policy tier count.
+      // PII-free: counts only.
+      trackPolicyPublished({ tier_count: tiers.length, benefit_row_count: rowCount });
       setVersion('published');
       setSavedAt(Date.now());
       setDraftVersionId(null); // next edit starts a fresh draft

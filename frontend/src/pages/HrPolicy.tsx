@@ -22,6 +22,7 @@ import { policyConfigMatrixAPI } from '../api/client';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
+import { trackPolicyBuilderOpened } from '../perf/hrOnboardingInstrumentation';
 
 function EmployeePolicyContent() {
   // The /hr/policy route is reused for employees so the nav tab they
@@ -87,6 +88,12 @@ export const HrPolicy: React.FC = () => {
   useEffect(() => {
     trackPolicyStage('upload_ui_shown');
   }, []);
+
+  // AIQ-1223b: HR onboarding signal — fire once whenever the Policy Builder tab
+  // becomes active (covers both tab clicks and direct ?tab=builder deep links).
+  useEffect(() => {
+    if (activeTab === 'builder') trackPolicyBuilderOpened();
+  }, [activeTab]);
 
   const handleNormalized = useCallback((policyId: string) => {
     setPostNormalizePolicyId(policyId);
