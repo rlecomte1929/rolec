@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
@@ -32,28 +33,19 @@ export function ProviderGridV2Page({ embedded = false }: { embedded?: boolean } 
   // localStorage.platform_v2_provider_grid_resizable='on' to opt in.
   const { on: resizableOn } = useV2Flag('provider_grid_resizable');
 
-  const [rows, setRows] = useState<ProviderGridRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchGrid = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await hrAPI.getProviderStatusGrid();
-      setRows(data.rows);
-      setLastRefreshed(new Date());
-    } catch {
-      setError('Failed to load provider grid. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchGrid();
-  }, [fetchGrid]);
+  const gridQuery = useQuery({
+    queryKey: ['hr', 'provider-status-grid'],
+    queryFn: () => hrAPI.getProviderStatusGrid(),
+  });
+  const rows: ProviderGridRow[] = gridQuery.data?.rows ?? [];
+  const loading = gridQuery.isLoading;
+  const lastRefreshed: Date | null = gridQuery.dataUpdatedAt
+    ? new Date(gridQuery.dataUpdatedAt)
+    : null;
+  const error = gridQuery.isError ? 'Failed to load provider grid. Please try again.' : null;
+  const fetchGrid = () => {
+    void gridQuery.refetch();
+  };
 
   // KPIs computed from the same row list — keeps everything in one render path.
   const kpis = useMemo(() => {
