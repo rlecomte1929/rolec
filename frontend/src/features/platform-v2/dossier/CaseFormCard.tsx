@@ -268,11 +268,8 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
         aria-expanded={expanded}
         className="w-full text-left grid grid-cols-12 items-center gap-3"
       >
-        {/* Left: code badge + name + person */}
+        {/* Left: name + person — AIQ-1273: internal form code hidden from employees. */}
         <div className="col-span-5 flex items-start gap-2 min-w-0">
-          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            {form.template.code}
-          </span>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-slate-900 truncate">{form.template.name}</div>
             <div className="text-xs text-slate-500 truncate">
@@ -459,10 +456,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
             >
               View original PDF
             </Button>
-            <span className="text-xs text-slate-400 ml-auto">
-              v{form.template.version} · updated{' '}
-              {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}
-            </span>
+            {/* AIQ-1274: form version metadata hidden from employees. */}
           </div>
 
           {/* [P1-05c] Supporting documents upload + list (not for ad-hoc forms,
