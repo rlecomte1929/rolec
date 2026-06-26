@@ -122,7 +122,7 @@ export const AdminSupplierDetail: React.FC = () => {
     setError(null);
     try {
       const s = await suppliersAPI.get(id);
-      setSupplier(s);
+      setSupplier(s as SupplierDetail);
       setEditForm({});
     } catch (err: unknown) {
       const ex = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
@@ -137,7 +137,7 @@ export const AdminSupplierDetail: React.FC = () => {
 
   useEffect(() => {
     void load();
-    suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories)).catch(() => {});
+    suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories as string[])).catch(() => {});
   }, [load]);
 
   const updateField = useCallback((field: keyof SupplierDetail, value: unknown) => {
@@ -160,7 +160,7 @@ export const AdminSupplierDetail: React.FC = () => {
       if (editForm.languages_supported !== undefined) payload.languages_supported = editForm.languages_supported;
       if (editForm.verified !== undefined) payload.verified = editForm.verified;
       const updated = await suppliersAPI.update(id, payload);
-      setSupplier(updated);
+      setSupplier(updated as SupplierDetail);
       setEditForm({});
     } catch (err: unknown) {
       const msg =
@@ -180,7 +180,7 @@ export const AdminSupplierDetail: React.FC = () => {
       setError(null);
       try {
         const updated = await suppliersAPI.setStatus(id, status);
-        setSupplier(updated);
+        setSupplier(updated as SupplierDetail);
         setEditForm((prev) => ({ ...prev, status }));
       } catch (err: unknown) {
         const msg =
@@ -214,7 +214,7 @@ export const AdminSupplierDetail: React.FC = () => {
         notes: newCap.notes?.trim() || undefined,
       };
       const updated = await suppliersAPI.addCapability(id, payload);
-      setSupplier(updated);
+      setSupplier(updated as SupplierDetail);
       setAddingCapability(false);
       setNewCap({
         service_category: 'movers',
@@ -247,7 +247,7 @@ export const AdminSupplierDetail: React.FC = () => {
       setError(null);
       try {
         const updated = await suppliersAPI.removeCapability(id, capId);
-        setSupplier(updated);
+        setSupplier(updated as SupplierDetail);
       } catch (err: unknown) {
         const msg =
           err && typeof err === 'object' && 'response' in err
@@ -268,7 +268,7 @@ export const AdminSupplierDetail: React.FC = () => {
       setError(null);
       try {
         const updated = await suppliersAPI.updateScoring(id, payload);
-        setSupplier(updated);
+        setSupplier(updated as SupplierDetail);
       } catch (err: unknown) {
         const msg =
           err && typeof err === 'object' && 'response' in err
@@ -850,11 +850,17 @@ function RankingDebugCard({
     setLoading(true);
     setResult(null);
     try {
-      const data = await suppliersAPI.getRankingDebug(supplierId, {
+      const data = (await suppliersAPI.getRankingDebug(supplierId, {
         service_category: serviceCategory || undefined,
         destination_country: destinationCountry || undefined,
         destination_city: destinationCity || undefined,
-      });
+      })) as {
+        would_match_search: boolean;
+        match_reason: string;
+        status?: string;
+        coverage_summary?: string;
+        scoring?: Record<string, unknown>;
+      };
       setResult({
         would_match_search: data.would_match_search,
         match_reason: data.match_reason,

@@ -55,7 +55,7 @@ export const AdminSupplierNew: React.FC = () => {
   });
 
   useEffect(() => {
-    suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories)).catch(() => {});
+    suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories as string[])).catch(() => {});
   }, []);
 
   const updateForm = useCallback((patch: Record<string, unknown>) => {
@@ -145,7 +145,7 @@ export const AdminSupplierNew: React.FC = () => {
           },
         };
         const created = await suppliersAPI.create(payload);
-        navigate(ROUTE_DEFS.adminSuppliersDetail.path.replace(':id', created.id));
+        navigate(ROUTE_DEFS.adminSuppliersDetail.path.replace(':id', (created as { id: string }).id));
       } catch (err: unknown) {
         const msg =
           err && typeof err === 'object' && 'response' in err
