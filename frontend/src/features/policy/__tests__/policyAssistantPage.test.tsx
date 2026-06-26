@@ -17,8 +17,9 @@
  *  - Helper functions: buildEscalationHref, answerToPlainText
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import {
   PolicyAssistantPage,
@@ -104,6 +105,13 @@ function mockApiSuccess(answer?: PolicyAssistantAnswer) {
 function mockApiError(message = 'Server error') {
   postPolicyAssistantQuery.mockRejectedValue(new Error(message));
 }
+
+// jsdom does not implement scrollIntoView; with user-event the component's
+// auto-scroll-to-latest-response actually fires, so stub it to avoid an
+// unhandled "scrollIntoView is not a function" error in the coverage run.
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 afterEach(() => {
   cleanup();
@@ -199,12 +207,13 @@ describe('QuestionTileGrid', () => {
     expect(screen.getByText('Second tile')).toBeInTheDocument();
   });
 
-  it('calls onTileClick with the correct question when clicked', () => {
+  it('calls onTileClick with the correct question when clicked', async () => {
+    const user = userEvent.setup();
     const onTileClick = vi.fn();
     render(
       <QuestionTileGrid tiles={QUESTION_TILES} disabled={false} onTileClick={onTileClick} />,
     );
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    await user.click(screen.getAllByRole('button')[0]);
     expect(onTileClick).toHaveBeenCalledWith(QUESTION_TILES[0]);
   });
 
@@ -332,10 +341,11 @@ describe('PolicyAssistantPage — render', () => {
 
 describe('PolicyAssistantPage — tile click', () => {
   it('clicking a tile calls postPolicyAssistantQuery with that tile text', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
 
     await waitFor(() => {
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('assign-1', QUESTION_TILES[0]);
@@ -343,10 +353,11 @@ describe('PolicyAssistantPage — tile click', () => {
   });
 
   it('hides tiles after tile click submit', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
 
     await waitFor(() => {
       expect(screen.queryByRole('group', { name: /suggested policy questions/i })).not.toBeInTheDocument();
@@ -354,20 +365,22 @@ describe('PolicyAssistantPage — tile click', () => {
   });
 
   it('shows response card after tile click', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(tileButtons()[2]);
+    await user.click(tileButtons()[2]);
 
     expect(await screen.findByRole('article')).toBeInTheDocument();
     expect(screen.getByText(QUESTION_TILES[2])).toBeInTheDocument();
   });
 
   it('shows "New question" button after first tile submit', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
 
     expect(await screen.findByRole('button', { name: 'New question' })).toBeInTheDocument();
   });
@@ -378,21 +391,19 @@ describe('PolicyAssistantPage — tile click', () => {
 // ---------------------------------------------------------------------------
 
 describe('PolicyAssistantPage — text input', () => {
-  it('typing enables the submit button', () => {
+  it('typing enables the submit button', async () => {
+    const user = userEvent.setup();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    fireEvent.change(screen.getByLabelText('Policy question'), {
-      target: { value: 'What is my housing allowance?' },
-    });
+    await user.type(screen.getByLabelText('Policy question'), 'What is my housing allowance?');
     expect(screen.getByRole('button', { name: 'Ask' })).not.toBeDisabled();
   });
 
   it('clicking submit calls postPolicyAssistantQuery with typed text', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    fireEvent.change(screen.getByLabelText('Policy question'), {
-      target: { value: 'My custom question?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(screen.getByLabelText('Policy question'), 'My custom question?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => {
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('assign-1', 'My custom question?');
@@ -400,11 +411,11 @@ describe('PolicyAssistantPage — text input', () => {
   });
 
   it('Enter key submits the query', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const input = screen.getByLabelText('Policy question');
-    fireEvent.change(input, { target: { value: 'Enter key test?' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+    await user.type(input, 'Enter key test?{Enter}');
 
     await waitFor(() => {
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('assign-1', 'Enter key test?');
@@ -412,22 +423,24 @@ describe('PolicyAssistantPage — text input', () => {
   });
 
   it('Shift+Enter does NOT submit', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const input = screen.getByLabelText('Policy question');
-    fireEvent.change(input, { target: { value: 'Shift enter test?' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    await user.type(input, 'Shift enter test?');
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
 
     // Not submitted
     expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
   });
 
   it('clears input after successful submit', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const input = screen.getByLabelText('Policy question');
-    fireEvent.change(input, { target: { value: 'My question?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(input, 'My question?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => {
       expect(input).toHaveValue('');
@@ -441,10 +454,11 @@ describe('PolicyAssistantPage — text input', () => {
 
 describe('PolicyAssistantPage — HR escalation', () => {
   it('escalation button href contains the submitted question', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const question = QUESTION_TILES[0];
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
 
     const link = await screen.findByRole('link', { name: 'Discuss this with HR' });
 
@@ -453,10 +467,11 @@ describe('PolicyAssistantPage — HR escalation', () => {
   });
 
   it('escalation button href contains answer text from API response', async () => {
+    const user = userEvent.setup();
     const answer = makeAnswer({ answer_text: 'USD 5000 per month.' });
     mockApiSuccess(answer);
     render(<PolicyAssistantPage assignmentId="assign-1" />);
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
 
     const link = await screen.findByRole('link', { name: 'Discuss this with HR' });
 
@@ -471,52 +486,56 @@ describe('PolicyAssistantPage — HR escalation', () => {
 
 describe('PolicyAssistantPage — New question', () => {
   it('clicking "New question" restores the question tile grid', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
     // Submit to hide tiles
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: /suggested policy questions/i })).not.toBeInTheDocument(),
     );
 
     // Restore tiles
-    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    await user.click(screen.getByRole('button', { name: 'New question' }));
     expect(screen.getByRole('group', { name: /suggested policy questions/i })).toBeInTheDocument();
   });
 
   it('"New question" hides the "New question" button itself', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
     await screen.findByRole('button', { name: 'New question' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    await user.click(screen.getByRole('button', { name: 'New question' }));
     expect(screen.queryByRole('button', { name: 'New question' })).not.toBeInTheDocument();
   });
 
   it('"New question" clears the text input', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const input = screen.getByLabelText('Policy question');
-    fireEvent.change(input, { target: { value: 'Some text' } });
+    await user.type(input, 'Some text');
 
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
     await screen.findByRole('button', { name: 'New question' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    await user.click(screen.getByRole('button', { name: 'New question' }));
     expect(input).toHaveValue('');
   });
 
   it('prior response cards are still visible after "New question"', async () => {
+    const user = userEvent.setup();
     mockApiSuccess();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
     await screen.findByRole('article');
 
-    fireEvent.click(screen.getByRole('button', { name: 'New question' }));
+    await user.click(screen.getByRole('button', { name: 'New question' }));
     expect(screen.getByRole('article')).toBeInTheDocument();
   });
 });
@@ -527,18 +546,18 @@ describe('PolicyAssistantPage — New question', () => {
 
 describe('PolicyAssistantPage — errors', () => {
   it('shows error banner on API failure', async () => {
+    const user = userEvent.setup();
     mockApiError("Couldn't reach the server.");
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.change(screen.getByLabelText('Policy question'), {
-      target: { value: 'My question?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(screen.getByLabelText('Policy question'), 'My question?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('shows API detail string in error banner', async () => {
+    const user = userEvent.setup();
     const axiosError = {
       response: { data: { detail: 'Policy engine unavailable.' } },
       message: 'Request failed',
@@ -546,15 +565,14 @@ describe('PolicyAssistantPage — errors', () => {
     postPolicyAssistantQuery.mockRejectedValue(axiosError);
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.change(screen.getByLabelText('Policy question'), {
-      target: { value: 'My question?' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(screen.getByLabelText('Policy question'), 'My question?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Policy engine unavailable.');
   });
 
   it('clears error on successful next submission', async () => {
+    const user = userEvent.setup();
     // First call fails
     postPolicyAssistantQuery.mockRejectedValueOnce(new Error('oops'));
     // Second call succeeds
@@ -567,21 +585,23 @@ describe('PolicyAssistantPage — errors', () => {
     render(<PolicyAssistantPage assignmentId="assign-1" />);
     const input = screen.getByLabelText('Policy question');
 
-    fireEvent.change(input, { target: { value: 'First?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(input, 'First?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
 
-    fireEvent.change(input, { target: { value: 'Second?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.clear(input);
+    await user.type(input, 'Second?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('does not add a turn on API failure', async () => {
+    const user = userEvent.setup();
     mockApiError('oops');
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
-    fireEvent.change(screen.getByLabelText('Policy question'), { target: { value: 'Q?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(screen.getByLabelText('Policy question'), 'Q?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
@@ -598,16 +618,17 @@ describe('PolicyAssistantPage — multiple turns', () => {
       .mockResolvedValueOnce({ ok: true, assignment_id: 'a', answer: makeAnswer({ answer_text: 'Answer 1' }) })
       .mockResolvedValueOnce({ ok: true, assignment_id: 'a', answer: makeAnswer({ answer_text: 'Answer 2' }) });
 
+    const user = userEvent.setup();
     render(<PolicyAssistantPage assignmentId="assign-1" />);
 
     // First question via tile
-    fireEvent.click(tileButtons()[0]);
+    await user.click(tileButtons()[0]);
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1));
 
     // Second question via text input (tiles hidden; use text + submit)
     const input = screen.getByLabelText('Policy question');
-    fireEvent.change(input, { target: { value: 'Second question?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    await user.type(input, 'Second question?');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2));
   });
