@@ -28,6 +28,7 @@ from .routers import (
     hr_vendor_performance,
     exception_requests,
     hr_analytics,
+    hr_onboarding,
     hr_export,
     hr_case_audit,
     hr_case_notes,
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(hr_vendor_widgets.router)  # [B16/AIQ-422] bare-path vendor widget aliases
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    app.include_router(hr_onboarding.router)  # AIQ-1223c — deterministic onboarding inference
     app.include_router(hr_export.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
     app.include_router(hr_case_detail.router)

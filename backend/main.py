@@ -216,6 +216,7 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
 from .app.routers import branding as branding_router
@@ -14486,6 +14487,7 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic onboarding inference
 app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
