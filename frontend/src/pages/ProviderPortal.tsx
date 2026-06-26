@@ -178,7 +178,7 @@ export const ProviderPortal: React.FC = () => {
   useEffect(() => {
     if (phase !== 'ready' || !token) return;
     setLoadingTasks(true);
-    Promise.all([
+    void Promise.all([
       getPortalTasks(token),
       getPortalCaseSummary(token).catch(() => null),
     ]).then(([tasksRes, summaryRes]) => {

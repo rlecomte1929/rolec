@@ -161,7 +161,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
                 return;
               }
               setError('');
-              onNext(nextDraft);
+              void onNext(nextDraft);
             }}
           >
             {isSaving ? 'Saving…' : 'Next'}

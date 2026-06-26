@@ -145,7 +145,7 @@ export const AdminAssignments: React.FC = () => {
 
   useEffect(() => {
     if (selectedId) {
-      loadDetail(selectedId);
+      void loadDetail(selectedId);
     } else {
       setDetail(null);
       setDetailError(false);
@@ -564,8 +564,8 @@ export const AdminAssignments: React.FC = () => {
           linkage={linkage}
           onClose={() => setSelectedId(null)}
           onRefresh={() => {
-            loadAssignments();
-            loadDetail(selectedId);
+            void loadAssignments();
+            void loadDetail(selectedId);
           }}
         />
       )}

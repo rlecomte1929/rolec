@@ -21,7 +21,7 @@ export const AdminOpsReviewersPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const byAssignee = (data?.by_assignee as Record<string, Record<string, number>>) ?? {};

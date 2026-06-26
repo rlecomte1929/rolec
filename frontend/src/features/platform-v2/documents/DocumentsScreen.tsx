@@ -233,7 +233,7 @@ function UploadZone({ category, onUpload }: UploadZoneProps) {
         onClick={() => inputRef.current?.click()}
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
-        onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files); }}
+        onDrop={e => { e.preventDefault(); setDragging(false); void handleFiles(e.dataTransfer.files); }}
         style={{
           border: `2px dashed ${dragging ? C.accent : C.border}`,
           borderRadius: C.radLg,

@@ -48,7 +48,7 @@ export const QuoteRfqDetail: React.FC = () => {
   }, [rfqId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [rfqId]);
 
   useEffect(() => {

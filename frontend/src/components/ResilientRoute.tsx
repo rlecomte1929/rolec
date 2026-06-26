@@ -102,7 +102,7 @@ class ResilientErrorBoundary extends React.Component<BoundaryProps, BoundaryStat
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logger.error('[ResilientRoute]', error, info.componentStack);
     // EH-1: report render crashes to the capture-error service (was console-only).
-    reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ResilientRoute' });
+    void reportError({ message: error.message, stack: error.stack ?? null, componentName: 'ResilientRoute' });
   }
 
   private reset = () => this.setState({ hasError: false, error: null });

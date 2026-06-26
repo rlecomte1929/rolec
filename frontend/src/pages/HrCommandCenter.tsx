@@ -66,7 +66,7 @@ export const HrCommandCenter: React.FC = () => {
         if (!cancelled) setKpisLoading(false);
       }
     }
-    loadKpis();
+    void loadKpis();
     return () => { cancelled = true; };
   }, [navigate, location.key]);
 
@@ -86,7 +86,7 @@ export const HrCommandCenter: React.FC = () => {
         if (!cancelled) setCasesLoading(false);
       }
     }
-    loadCases();
+    void loadCases();
     return () => { cancelled = true; };
   }, [navigate, location.key, page, riskFilter]);
 

@@ -28,7 +28,7 @@ export const useAdminContext = () => {
   };
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
   return { context, loading, refresh };

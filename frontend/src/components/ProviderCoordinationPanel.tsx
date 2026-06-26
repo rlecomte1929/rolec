@@ -510,7 +510,7 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
   // Initial fetch
   useEffect(() => {
     setLoading(true)
-    fetchProviders()
+    void fetchProviders()
   }, [fetchProviders])
 
   // Supabase Realtime subscription
@@ -526,13 +526,13 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
           filter: `case_id=eq.${caseId}`,
         },
         () => {
-          fetchProviders()
+          void fetchProviders()
         }
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      void supabase.removeChannel(channel)
     }
   }, [caseId, fetchProviders])
 

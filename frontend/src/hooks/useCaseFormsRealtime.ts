@@ -51,7 +51,7 @@ export function subscribeToCaseFormsRealtime(
   let reconnectAttempts = 0;
 
   const cleanup = () => {
-    if (channel) { supabase.removeChannel(channel); channel = null; }
+    if (channel) { void supabase.removeChannel(channel); channel = null; }
     if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
   };
 

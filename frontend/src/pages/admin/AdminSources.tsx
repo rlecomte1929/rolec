@@ -34,7 +34,7 @@ export const AdminSources: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const role = getAuthItem('relopass_role');
@@ -57,7 +57,7 @@ export const AdminSources: React.FC = () => {
       });
       setNewName('');
       setNewPublisher('');
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Create failed');
     }
@@ -67,7 +67,7 @@ export const AdminSources: React.FC = () => {
     try {
       await adminResourcesAPI.updateSource(id, payload);
       setEditing(null);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Update failed');
     }
@@ -192,7 +192,7 @@ export const AdminSources: React.FC = () => {
                           const typeInp = document.getElementById(`edit-type-${s.id}`) as HTMLSelectElement;
                           const trustInp = document.getElementById(`edit-trust-${s.id}`) as HTMLSelectElement;
                           const urlInp = document.getElementById(`edit-url-${s.id}`) as HTMLInputElement;
-                          if (nameInp?.value) update(s.id, {
+                          if (nameInp?.value) void update(s.id, {
                             source_name: nameInp.value,
                             publisher: pubInp?.value || undefined,
                             source_type: typeInp?.value || undefined,

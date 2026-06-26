@@ -317,7 +317,7 @@ export const CaseWizardPage: React.FC = () => {
   useEffect(() => {
     if (!assignmentId) return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const data = await employeeAPI.getFeedback(assignmentId);
         if (!cancelled && data) {

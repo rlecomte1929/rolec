@@ -116,7 +116,7 @@ export const HrCompanyProfile: React.FC = () => {
       e.preventDefault();
       setDragOver(false);
       const file = e.dataTransfer?.files?.[0];
-      if (file) handleLogoFile(file);
+      if (file) void handleLogoFile(file);
     },
     [handleLogoFile]
   );
@@ -258,7 +258,7 @@ export const HrCompanyProfile: React.FC = () => {
                   id="logo-upload"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleLogoFile(f);
+                    if (f) void handleLogoFile(f);
                     e.target.value = '';
                   }}
                 />

@@ -29,7 +29,7 @@ export class PolicyConfigRouteErrorBoundary extends React.Component<Props, State
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logger.error('[PolicyConfigRouteErrorBoundary]', error.message, info.componentStack);
     // EH-1: logger.error is a no-op in prod — also report to the capture-error service.
-    reportError({ message: error.message, stack: error.stack ?? null, componentName: 'PolicyConfigRouteErrorBoundary' });
+    void reportError({ message: error.message, stack: error.stack ?? null, componentName: 'PolicyConfigRouteErrorBoundary' });
   }
 
   render() {

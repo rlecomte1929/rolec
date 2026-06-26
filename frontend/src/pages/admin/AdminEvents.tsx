@@ -81,7 +81,7 @@ export const AdminEvents: React.FC = () => {
         default:
           return;
       }
-      load();
+      void load();
     } catch (e) {
       alert((e as Error)?.message || 'Action failed');
       throw e;
@@ -89,7 +89,7 @@ export const AdminEvents: React.FC = () => {
   }, [load]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const role = getAuthItem('relopass_role');

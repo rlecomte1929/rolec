@@ -160,16 +160,16 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
     // every page and floods the console. getSession() returns the session (with
     // its user) when one exists and null otherwise — falling back to the
     // ReloPass identity exactly as before, but without the network probe.
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getSession().then(({ data: { session } }) => {
       const userId = session?.user?.id ?? getAuthItem('relopass_email') ?? null;
-      loadVariants(userId);
+      void loadVariants(userId);
     });
 
     // Re-resolve whenever the user signs in or out
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const userId = session?.user?.id ?? getAuthItem('relopass_email') ?? null;
-                loadVariants(userId);
+                void loadVariants(userId);
       },
     );
 

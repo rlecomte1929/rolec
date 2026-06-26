@@ -466,7 +466,7 @@ function DocumentStructureTab({ docId }: { docId: string }) {
   };
 
   useEffect(() => {
-    loadClauses();
+    void loadClauses();
   }, [docId, clauseTypeFilter]);
 
   const handlePatch = async (clauseId: string, patch: { clause_type?: string; title?: string; hr_override_notes?: string }) => {
@@ -744,8 +744,8 @@ export function PolicyDocumentIntakeSection({
     (isDevOrLocalhost && configOnlyInvalid);
 
   useEffect(() => {
-    loadDocs();
-    loadHealth();
+    void loadDocs();
+    void loadHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDocs uses adminCompanyId from closure
   }, [adminCompanyId]);
 

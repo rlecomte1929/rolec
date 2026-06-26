@@ -102,7 +102,7 @@ export const HrPolicyManagement: React.FC = () => {
   }, [navigate]);
 
   useEffect(() => {
-    loadPolicies();
+    void loadPolicies();
   }, [loadPolicies]);
 
   const handleCreate = () => {
@@ -141,7 +141,7 @@ export const HrPolicyManagement: React.FC = () => {
         await hrPolicyAPI.create(payload);
       }
       setView('list');
-      loadPolicies();
+      void loadPolicies();
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Could not save policy.');
     }
@@ -157,7 +157,7 @@ export const HrPolicyManagement: React.FC = () => {
         await hrPolicyAPI.create(payload);
       }
       setView('list');
-      loadPolicies();
+      void loadPolicies();
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Could not publish policy.');
     }
@@ -171,7 +171,7 @@ export const HrPolicyManagement: React.FC = () => {
       await hrPolicyAPI.upload(uploadFile);
       setUploadFile(null);
       setView('list');
-      loadPolicies();
+      void loadPolicies();
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Upload failed.');
     } finally {

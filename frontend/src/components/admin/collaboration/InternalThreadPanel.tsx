@@ -77,7 +77,7 @@ export const InternalThreadPanel: React.FC<Props> = ({
   }, [targetType, targetId, onSummaryChange]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const handleStartDiscussion = async () => {

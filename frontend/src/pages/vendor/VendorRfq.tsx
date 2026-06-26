@@ -48,7 +48,7 @@ export const VendorRfq: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const handleSubmit = async () => {

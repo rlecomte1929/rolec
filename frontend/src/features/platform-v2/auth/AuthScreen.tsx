@@ -535,7 +535,7 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
             {/* ── Sign In ── */}
             {tab === 'sign_in' && (
               <form
-                onSubmit={e => { e.preventDefault(); handleSignIn(siEmail, siPassword); }}
+                onSubmit={e => { e.preventDefault(); void handleSignIn(siEmail, siPassword); }}
                 noValidate
               >
                 <div style={fieldStyle}>
@@ -651,7 +651,7 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
 
             {/* ── Sign Up ── */}
             {tab === 'sign_up' && (
-              <form onSubmit={e => { e.preventDefault(); handleSignUp(); }} noValidate>
+              <form onSubmit={e => { e.preventDefault(); void handleSignUp(); }} noValidate>
                 <div style={fieldStyle}>
                   <label htmlFor="su-name" style={labelStyle}>Full name</label>
                   <Input unstyled id="su-name" type="text" autoComplete="name" value={suName} onChange={v => setSuName(v)} placeholder="Jane Smith" disabled={suLoading} style={inputStyle(false)} />
@@ -787,7 +787,7 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
                     Check your email — a reset link is on its way.
                   </div>
                 ) : (
-                  <form onSubmit={e => { e.preventDefault(); handleResetPassword(); }} noValidate>
+                  <form onSubmit={e => { e.preventDefault(); void handleResetPassword(); }} noValidate>
                     <div style={fieldStyle}>
                       <label htmlFor="rp-email" style={labelStyle}>Email</label>
                       <Input unstyled

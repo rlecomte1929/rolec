@@ -46,7 +46,7 @@ export const AdminStagingEventDetail: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const status = (candidate?.status as string) ?? 'new';
@@ -59,7 +59,7 @@ export const AdminStagingEventDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.approveEventAsNew(id, reviewReason || undefined);
-      load();
+      void load();
       setReviewReason('');
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
@@ -77,7 +77,7 @@ export const AdminStagingEventDetail: React.FC = () => {
         fields_to_merge: ['description', 'venue_name', 'address', 'external_url'],
         reason: reviewReason || undefined,
       });
-      load();
+      void load();
       setMergeTargetId('');
       setReviewReason('');
     } catch (e) {
@@ -93,7 +93,7 @@ export const AdminStagingEventDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.rejectEvent(id, reviewReason || undefined);
-      load();
+      void load();
       setReviewReason('');
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
@@ -110,7 +110,7 @@ export const AdminStagingEventDetail: React.FC = () => {
         duplicate_of_live_event_id: mergeTargetId,
         reason: reviewReason || undefined,
       });
-      load();
+      void load();
       setMergeTargetId('');
       setReviewReason('');
     } catch (e) {
@@ -125,7 +125,7 @@ export const AdminStagingEventDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.ignoreEvent(id, reviewReason || undefined);
-      load();
+      void load();
       setReviewReason('');
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
@@ -139,7 +139,7 @@ export const AdminStagingEventDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.restoreEventToReview(id);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
     } finally {

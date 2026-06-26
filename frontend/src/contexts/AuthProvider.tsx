@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     // Resolve initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    void supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return;
 
       if (session?.user) {

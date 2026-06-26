@@ -102,7 +102,7 @@ export const AdminAbTestsPage: React.FC = () => {
       }
     }
 
-    load();
+    void load();
   }, [isAdmin]);
 
   // ── 403 guard ────────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ export const Journey: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const loadData = async () => {

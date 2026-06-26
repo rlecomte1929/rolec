@@ -88,8 +88,8 @@ export const AdminResources: React.FC = () => {
         case 'restore': await adminResourcesAPI.restoreResource(id); break;
         default: return;
       }
-      load();
-      loadResources();
+      void load();
+      void loadResources();
     } catch (e) {
       alert((e as Error)?.message || 'Action failed');
       throw e;
@@ -97,11 +97,11 @@ export const AdminResources: React.FC = () => {
   }, [load, loadResources]);
 
   useEffect(() => {
-    if (view === 'list') loadResources();
+    if (view === 'list') void loadResources();
   }, [view, loadResources]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   if (role !== 'ADMIN') {

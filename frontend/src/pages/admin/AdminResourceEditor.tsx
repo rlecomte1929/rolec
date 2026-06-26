@@ -71,11 +71,11 @@ export const AdminResourceEditor: React.FC = () => {
   };
 
   useEffect(() => {
-    loadTaxonomy();
+    void loadTaxonomy();
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [id]);
 
   const loadAudit = async () => {
@@ -89,7 +89,7 @@ export const AdminResourceEditor: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isNew && id) loadAudit();
+    if (!isNew && id) void loadAudit();
   }, [id, isNew]);
 
   const update = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
@@ -114,7 +114,7 @@ export const AdminResourceEditor: React.FC = () => {
         navigate(buildRoute('adminResourcesEdit', { id: created.id }), { replace: true });
       } else {
         await adminResourcesAPI.updateResource(id, payload);
-        load();
+        void load();
       }
     } catch (e) {
       alert((e as Error).message || 'Save failed');
@@ -149,8 +149,8 @@ export const AdminResourceEditor: React.FC = () => {
         default:
           return;
       }
-      load();
-      loadAudit();
+      void load();
+      void loadAudit();
     } catch (e) {
       alert((e as Error).message || 'Action failed');
     } finally {
@@ -232,7 +232,7 @@ export const AdminResourceEditor: React.FC = () => {
                 className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4"
               />
               <div className="flex gap-2">
-                <Button onClick={() => { workflow('approve', approveNotes || undefined); setApproveModalOpen(false); setApproveNotes(''); }} disabled={saving}>
+                <Button onClick={() => { void workflow('approve', approveNotes || undefined); setApproveModalOpen(false); setApproveNotes(''); }} disabled={saving}>
                   {saving ? 'Approving…' : 'Approve'}
                 </Button>
                 <Button variant="secondary" onClick={() => { setApproveModalOpen(false); setApproveNotes(''); }}>

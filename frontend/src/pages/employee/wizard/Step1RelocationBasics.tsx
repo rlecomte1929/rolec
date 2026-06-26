@@ -244,7 +244,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               return;
             }
             setError('');
-            onNext(nextDraft);
+            void onNext(nextDraft);
           }}
         >
           {isSaving ? 'Saving…' : 'Next'}

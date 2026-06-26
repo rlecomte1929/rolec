@@ -61,7 +61,7 @@ export function subscribeToNotificationsRealtime(
 
   const cleanup = () => {
     if (channel) {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
       channel = null;
     }
     if (fallbackTimer) {
@@ -85,7 +85,7 @@ export function subscribeToNotificationsRealtime(
   const startFallback = () => {
     callbacks.onDisconnect?.();
     if (fallbackTimer) return;
-    refreshAndNotify();
+    void refreshAndNotify();
     fallbackTimer = setInterval(refreshAndNotify, FALLBACK_POLL_INTERVAL_MS);
   };
 
@@ -165,7 +165,7 @@ function startFallbackPolling(callbacks: SubscribeCallbacks): () => void {
       // ignore
     }
   };
-  refresh();
+  void refresh();
   const id = setInterval(refresh, FALLBACK_POLL_INTERVAL_MS);
   return () => clearInterval(id);
 }

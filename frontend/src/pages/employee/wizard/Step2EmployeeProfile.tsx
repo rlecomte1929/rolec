@@ -219,7 +219,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
                 return;
               }
               setError('');
-              onNext(nextDraft);
+              void onNext(nextDraft);
             }}
           >
             {isSaving ? 'Saving…' : 'Next'}

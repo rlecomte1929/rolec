@@ -97,7 +97,7 @@ export const HrCompanyContextProvider: React.FC<{ children: React.ReactNode }> =
   }, [role, pathname, navigate]);
 
   useEffect(() => {
-    fetchCompany();
+    void fetchCompany();
   }, [fetchCompany]);
 
   const refresh = useCallback(async () => {

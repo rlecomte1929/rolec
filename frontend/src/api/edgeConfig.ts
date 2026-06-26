@@ -131,7 +131,7 @@ export function useFeatureFlag(flagKey: string): boolean {
 
   useEffect(() => {
     let cancelled = false;
-    isFlagEnabled(flagKey).then((val) => {
+    void isFlagEnabled(flagKey).then((val) => {
       if (!cancelled) setEnabled(val);
     });
     return () => { cancelled = true; };

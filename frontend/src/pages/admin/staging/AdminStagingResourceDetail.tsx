@@ -48,7 +48,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const status = (candidate?.status as string) ?? 'new';
@@ -61,7 +61,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.approveResourceAsNew(id, reviewReason || undefined);
-      load();
+      void load();
       setReviewReason('');
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
@@ -79,7 +79,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
         fields_to_merge: mergeFields,
         reason: reviewReason || undefined,
       });
-      load();
+      void load();
       setMergeTargetId('');
       setReviewReason('');
     } catch (e) {
@@ -95,7 +95,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.rejectResource(id, reviewReason || undefined);
-      load();
+      void load();
       setReviewReason('');
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
@@ -117,7 +117,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
         duplicate_of_live_resource_id: liveId,
         reason: reviewReason || undefined,
       });
-      load();
+      void load();
       setMergeTargetId('');
       setReviewReason('');
     } catch (e) {
@@ -132,7 +132,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.ignoreResource(id, reviewReason || undefined);
-      load();
+      void load();
       setReviewReason('');
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
@@ -146,7 +146,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await adminStagingAPI.restoreResourceToReview(id);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error)?.message || 'Failed');
     } finally {

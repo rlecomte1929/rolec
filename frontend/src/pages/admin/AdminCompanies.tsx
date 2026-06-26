@@ -707,7 +707,7 @@ export const AdminCompanies: React.FC = () => {
           onClose={() => setAddOpen(false)}
           onCreated={() => {
             setAddOpen(false);
-            load();
+            void load();
           }}
         />
       )}

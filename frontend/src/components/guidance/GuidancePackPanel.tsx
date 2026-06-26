@@ -159,7 +159,7 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
               variant="outline"
               onClick={() => {
                 if (window.confirm('Regenerate the guidance pack? This will overwrite the latest guidance.')) {
-                  generate();
+                  void generate();
                 }
               }}
               disabled={!isStep5Complete || loading}

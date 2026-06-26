@@ -220,7 +220,7 @@ export const ExceptionFlagsPanel: React.FC<ExceptionFlagsPanelProps> = ({ caseId
 
   const load = useCallback(() => {
     if (!caseId) { setLoading(false); return; }
-    fetchCaseExceptions(caseId)
+    void fetchCaseExceptions(caseId)
       .then(setData)
       .finally(() => setLoading(false));
   }, [caseId]);

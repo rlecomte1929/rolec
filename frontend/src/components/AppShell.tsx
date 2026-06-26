@@ -256,7 +256,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
             <Button unstyled
               onClick={async () => {
                 await adminAPI.stopImpersonation();
-                refreshAdminContext();
+                void refreshAdminContext();
               }}
               className="text-xs px-3 py-1 rounded-full bg-amber-100 hover:bg-amber-200"
             >

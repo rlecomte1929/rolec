@@ -96,7 +96,7 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const runAction = async (fn: () => Promise<unknown>) => {
@@ -298,7 +298,7 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
                 className="rounded border border-slate-300 px-2 py-1 text-sm"
                 onChange={(e) => {
                   const v = e.target.value;
-                  if (v) handleAssign(v);
+                  if (v) void handleAssign(v);
                 }}
               >
                 <option value="">Assign to...</option>

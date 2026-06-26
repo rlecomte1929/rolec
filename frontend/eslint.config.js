@@ -200,7 +200,8 @@ export default tseslint.config(
 
       // — Async-safety epic —
       '@typescript-eslint/no-misused-promises': 'warn',
-      '@typescript-eslint/no-floating-promises': 'warn',
+      // no-floating-promises: DRAINED to 0 + re-promoted to 'error' (reverts to the
+      // recommendedTypeChecked default) — Epic A1. New floating promises now fail CI.
 
       // — Accessibility epic (clickable-div + jsx-a11y) —
       'local/no-clickable-div': 'warn',

@@ -149,7 +149,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   useEffect(() => {
     let cancelled = false;
     const bindPolicyId = postNormalizePolicyId;
-    loadDocumentsAndPolicies().then((pols) => {
+    void loadDocumentsAndPolicies().then((pols) => {
       if (cancelled) return;
       setSelectedPolicyId((current) => {
         if (bindPolicyId && pols.some((p: any) => p.id === bindPolicyId)) {
@@ -176,7 +176,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     setLoading(true);
     setDownloadUrl(null);
     setDownloadUnavailable(false);
-    loadWorkspaceData(selectedPolicyId)
+    void loadWorkspaceData(selectedPolicyId)
       .then(({ normRes, dlRes, downloadUnavailable: unav }) => {
         if (cancelled) return;
         setNormalized(normRes);
@@ -405,7 +405,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setNormalized(res);
       setMessage('Policy rebuilt from your source file. Review the benefit table for changes.');
       setMessageVariant('success');
-      loadDocumentsAndPolicies();
+      void loadDocumentsAndPolicies();
     } catch (err: any) {
       const data = err?.response?.data;
       let m =

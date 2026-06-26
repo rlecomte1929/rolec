@@ -66,7 +66,7 @@ export const AdminStagingEvents: React.FC = () => {
   }, [filters]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const statusColor = (s: string) => {

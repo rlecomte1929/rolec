@@ -190,7 +190,7 @@ export const ProvidersPage: React.FC = () => {
         setIsLoading(false);
       }
     };
-    load();
+    void load();
   }, [assignmentId, assignmentLoading, needsPicker, navigate]);
 
   const selectedKeys = useMemo(

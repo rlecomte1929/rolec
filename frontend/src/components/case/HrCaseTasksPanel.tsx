@@ -346,7 +346,7 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId }) =>
   }, [caseId]);
 
   useEffect(() => {
-    fetchTasks();
+    void fetchTasks();
     // Poll every 8s — fast enough for demo UX, light enough not to hammer the API
     pollRef.current = setInterval(fetchTasks, 8_000);
     return () => {

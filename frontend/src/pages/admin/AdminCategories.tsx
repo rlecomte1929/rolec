@@ -31,7 +31,7 @@ export const AdminCategories: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const role = getAuthItem('relopass_role');
@@ -56,7 +56,7 @@ export const AdminCategories: React.FC = () => {
       setNewLabel('');
       setNewIcon('');
       setNewSortOrder(0);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Create failed');
     }
@@ -66,7 +66,7 @@ export const AdminCategories: React.FC = () => {
     try {
       await adminResourcesAPI.updateCategory(id, payload);
       setEditing(null);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Update failed');
     }
@@ -76,7 +76,7 @@ export const AdminCategories: React.FC = () => {
     if (!confirm('Deactivate this category? It will no longer appear in dropdowns.')) return;
     try {
       await adminResourcesAPI.deactivateCategory(id);
-      load();
+      void load();
     } catch (e) {
       alert((e as Error).message || 'Deactivate failed');
     }
@@ -180,7 +180,7 @@ export const AdminCategories: React.FC = () => {
                             const labelInp = document.getElementById(`edit-label-${c.id}`) as HTMLInputElement;
                             const iconInp = document.getElementById(`edit-icon-${c.id}`) as HTMLInputElement;
                             const sortInp = document.getElementById(`edit-sort-${c.id}`) as HTMLInputElement;
-                            update(c.id, {
+                            void update(c.id, {
                               label: labelInp?.value,
                               icon_name: iconInp?.value || undefined,
                               sort_order: sortInp?.value ? parseInt(sortInp.value, 10) : undefined,

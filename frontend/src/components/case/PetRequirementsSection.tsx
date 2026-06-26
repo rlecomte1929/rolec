@@ -199,7 +199,7 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
   }, [caseId, destCountry]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   // Hide entirely when no pets
