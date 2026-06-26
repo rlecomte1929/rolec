@@ -17,6 +17,7 @@ import { buildRoute } from '../../../navigation/routes';
 import { formEditorAPI } from '../../../api/formEditor';
 import { OriginalPdfDrawer } from './OriginalPdfDrawer';
 import { FormDocuments } from './FormDocuments';
+import { allFieldsFilled, requiresDocuments } from './dossierStatus';
 
 // ---------------------------------------------------------------------------
 // Status → label + colour + banner copy
@@ -65,6 +66,25 @@ const STATUS_BADGE_VARIANT: Record<DisplayStatus, 'success' | 'warning' | 'error
   rejected: 'error',
 };
 
+type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
+
+// [AIQ-1250] A 100%-filled form must never read "Action needed". When an
+// `auto_filled` form has all fields filled, refine the badge: no required
+// supporting docs → "Ready to submit" (green); docs required → "Upload documents
+// to complete" (yellow). Every other status / partially-filled form is unchanged.
+// Note: the card sees which docs are *required* (template.required_documents) but
+// not which are *uploaded* (lazy-fetched in FormDocuments), so "docs required" is
+// the proxy for the upload-docs state.
+function effectiveBadge(form: CaseFormSummary): { label: string; variant: BadgeVariant } {
+  const dStatus = displayStatus(form);
+  if (dStatus === 'auto_filled' && allFieldsFilled(form)) {
+    return requiresDocuments(form)
+      ? { label: 'Upload documents to complete', variant: 'warning' }
+      : { label: 'Ready to submit', variant: 'success' };
+  }
+  return { label: STATUS_LABEL[dStatus], variant: STATUS_BADGE_VARIANT[dStatus] };
+}
+
 function statusBannerCopy(form: CaseFormSummary): { tone: string; text: string } {
   const { fields_summary, blocker_form_code, deadline_trigger } = form;
   const status = displayStatus(form);
@@ -72,7 +92,20 @@ function statusBannerCopy(form: CaseFormSummary): { tone: string; text: string }
   const missing = fields_summary.missing_required;
 
   switch (status) {
-    case 'auto_filled':
+    case 'auto_filled': {
+      // [AIQ-1250] Keep the expanded banner consistent with the refined badge:
+      // when every field is filled, this form isn't "action needed" anymore.
+      if (allFieldsFilled(form)) {
+        return requiresDocuments(form)
+          ? {
+              tone: 'bg-amber-50 border-amber-200 text-amber-900',
+              text: 'All fields complete · upload the required supporting documents to finish.',
+            }
+          : {
+              tone: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+              text: 'All fields complete · ready to submit.',
+            };
+      }
       return {
         tone: 'bg-amber-50 border-amber-200 text-amber-900',
         text:
@@ -80,6 +113,7 @@ function statusBannerCopy(form: CaseFormSummary): { tone: string; text: string }
             ? `Ready for your review — ${aiFilled} field${aiFilled === 1 ? '' : 's'} pre-filled, ${missing} need${missing === 1 ? 's' : ''} your input.`
             : 'Action needed — review and complete the remaining fields.',
       };
+    }
     case 'pending_doc':
       return {
         tone: 'bg-orange-50 border-orange-200 text-orange-900',
@@ -206,6 +240,8 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
     form.fields_summary.filled_by_ai + form.fields_summary.filled_by_human;
   const progressPct =
     totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : form.completion_pct;
+  // [AIQ-1250] Refined badge — never "Action needed" at 100% filled.
+  const badge = effectiveBadge(form);
 
   return (
     <Card padding="lg" className="hover:shadow-sm transition-shadow">
@@ -263,7 +299,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
               {chip.text}
             </span>
           )}
-          <Badge variant={STATUS_BADGE_VARIANT[dStatus]}>{STATUS_LABEL[dStatus]}</Badge>
+          <Badge variant={badge.variant}>{badge.label}</Badge>
           <svg
             className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
