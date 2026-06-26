@@ -256,6 +256,54 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
+  lighthouse:
+    # QG-13 (AIQ-1186): Lighthouse Core-Web-Vitals budget against the BUILT app
+    # served by `vite preview` (:4173) — the same QG-5 preview the e2e job uses, but
+    # in its OWN job so Lighthouse gets a clean server (Playwright's webServer is
+    # torn down with it, and sharing would pollute perf timings). Fails on CWV/perf
+    # regression per frontend/lighthouserc.json and uploads the Lighthouse JSON for
+    # AP-12's performance-audit (--with-lighthouse-results). Public, backend-free
+    # pages only (/ and /auth — Lighthouse can't mock /api).
+    name: Lighthouse (CWV budget)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (throwaway VITE_ vars — no backend; mirrors playwright.config webServer.env)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://e2e.placeholder.supabase.co
+          # Spaces are intentional: never a real key, and they keep the value below
+          # gitleaks' generic-api-key heuristic (matches contiguous tokens only).
+          VITE_SUPABASE_ANON_KEY: not a secret e2e placeholder
+          VITE_API_URL: ""
+
+      - name: Run Lighthouse CI (previews the built app + asserts the CWV budget)
+        run: npx lhci autorun
+
+      - name: Upload Lighthouse reports (for AP-12 performance-audit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: frontend/.lighthouseci/
+          retention-days: 7
+
   backend-tests:
     name: Backend tests (deterministic P1 suite)
     needs: changes

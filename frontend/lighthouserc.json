@@ -1,0 +1,26 @@
+{
+  "//": "QG-13 (AIQ-1186): Lighthouse CI Core-Web-Vitals budget. Runs against the built `vite preview` (:4173) — the same QG-5 preview the Playwright e2e job uses. Public, backend-free pages only (Lighthouse can't mock /api). Thresholds: ERROR gate sits at standard 'good' CWV boundaries (robust to CI runner variance; local desktop baseline is perf 0.99 / LCP ~0.8s / CLS ~0.01, so there's wide headroom); WARN sits nearer the baseline for early-drift signal. Ratchet the error thresholds down as scores stabilise (per the ticket).",
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run preview",
+      "startServerReadyPattern": "Local:",
+      "startServerReadyTimeout": 30000,
+      "url": ["http://localhost:4173/", "http://localhost:4173/auth"],
+      "numberOfRuns": 3,
+      "settings": { "preset": "desktop" }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.85 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "first-contentful-paint": ["warn", { "maxNumericValue": 1800 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": "./.lighthouseci"
+    }
+  }
+}
