@@ -81,7 +81,7 @@ function OwnerPill({ owner }: { owner: RelocationPlanPhaseTaskDTO['owner'] }) {
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
-function Hero({ data, header }: { data: RelocationPlanViewResponseDTO; header: RoadmapHeaderMeta | null }) {
+function Hero({ data, header, validated, validatedAt }: { data: RelocationPlanViewResponseDTO; header: RoadmapHeaderMeta | null; validated: boolean; validatedAt: string | null }) {
   // One canonical progress definition (shared with the dashboard / Tasks page).
   const { completed, total, pct, blocked, readyNow } = deriveCanonicalProgress(data.summary);
   const cities = header?.originCity && header?.destCity ? `${header.originCity} to ${header.destCity}` : 'Your relocation';
@@ -102,6 +102,12 @@ function Hero({ data, header }: { data: RelocationPlanViewResponseDTO; header: R
             {header?.destCountry && <CountryFlag country={getCountryName(header.destCountry)} className="text-base opacity-90" />}
           </h1>
           {sub && <div className="mt-1 text-[13px] text-white/70">{sub}</div>}
+          {/* AIQ-1278: validated status surfaced in the hero (moved up from the footer). */}
+          {validated && (
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-teal-400/20 px-2.5 py-0.5 text-[11.5px] font-medium text-teal-100 ring-1 ring-teal-300/40">
+              <Check size={12} /> Roadmap validated{validatedAt ? ` · ${new Date(validatedAt).toLocaleDateString()}` : ''}
+            </div>
+          )}
         </div>
         <div className="text-right">
           <div className="text-[11px] uppercase tracking-wide text-white/60">Overall progress</div>
@@ -279,7 +285,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
 
   return (
     <div className="space-y-4">
-      <Hero data={data} header={header} />
+      <Hero data={data} header={header} validated={validated} validatedAt={validatedAt} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[13px] font-semibold">
@@ -334,8 +340,8 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
         ))}
       </div>
 
-      {/* Validate footer */}
-      {!validated ? (
+      {/* Validate footer — validated status now shown in the hero (AIQ-1278). */}
+      {!validated && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
           <div>
             <div className="text-[14px] font-semibold text-[#0b2b43]">Ready to begin?</div>
@@ -349,13 +355,6 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
           >
             <Check size={16} /> {validating ? 'Validating…' : 'Validate & start tasks'}
           </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 px-1 text-[12.5px] text-teal-700">
-          <Check size={15} />
-          <span>
-            Roadmap validated{validatedAt ? ` on ${new Date(validatedAt).toLocaleDateString()}` : ''}. Your tasks are unlocked.
-          </span>
         </div>
       )}
     </div>
