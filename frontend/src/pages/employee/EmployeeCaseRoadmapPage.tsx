@@ -34,6 +34,16 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const selectionRef = useRef<HTMLDivElement>(null);
   const { selection, clear } = useTextSelection(selectionRef);
 
+  // H-08 (AIQ-1255): the page had no title — the browser tab + bookmarks were
+  // unlabelled. Set a document title for the duration the page is mounted.
+  useEffect(() => {
+    const prev = document.title;
+    document.title = 'Roadmap — ReloPass';
+    return () => {
+      document.title = prev;
+    };
+  }, []);
+
   const { data, loading, error, refetch, ensureDefaultsAndReload } =
     useEmployeeRelocationPlanPageData(caseId);
   const runCta = useRelocationPlanCtaHandler(caseId ?? '', { resourceCaseId: data?.case_id });
@@ -182,6 +192,8 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     <AppShell>
       {phaseBar}
       <div ref={selectionRef} className="mx-auto max-w-5xl px-6 py-6">
+        {/* H-08 (AIQ-1255): page heading so the employee has orientation above the hero. */}
+        <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
         <RoadmapTemplate
           data={data}
           header={header}
