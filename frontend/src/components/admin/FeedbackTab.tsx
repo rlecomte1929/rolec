@@ -81,10 +81,13 @@ function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void
   return (
     <div
       className="fixed inset-0 z-[200] bg-black/75 flex items-center justify-center p-6"
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close screenshot preview"
     >
-      <div className="relative max-w-4xl max-h-[85vh] rounded-xl overflow-hidden shadow-2xl"
-           onClick={(e) => e.stopPropagation()}>
+      <div className="relative max-w-4xl max-h-[85vh] rounded-xl overflow-hidden shadow-2xl">
         <img src={src} alt="Feedback screenshot" className="max-w-full max-h-[85vh] object-contain" />
         <button
           onClick={onClose}
@@ -247,6 +250,10 @@ export function FeedbackTab() {
                     <div
                       className="grid grid-cols-[120px_80px_160px_1fr_80px_120px_160px] gap-0 items-center hover:bg-gray-50 transition-colors cursor-pointer"
                       onClick={() => setExpanded(isExpanded ? null : row.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(isExpanded ? null : row.id); } }}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
                     >
                       {/* Report ID */}
                       <div className="px-3 py-2.5">
@@ -297,8 +304,9 @@ export function FeedbackTab() {
                       </div>
 
                       {/* Status inline editor */}
-                      <div className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="px-3 py-2.5">
                         <select
+                          onClick={(e) => e.stopPropagation()}
                           value={row.status}
                           disabled={savingId === row.id}
                           onChange={(e) => updateStatus(row, e.target.value as FeedbackStatus)}
