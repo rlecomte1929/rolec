@@ -5,6 +5,7 @@ import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { env } from '../config/env';
 import type { IntakeData } from '../features/platform-v2/intake/EmployeeIntakePage';
 import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
+import { swallow } from '../lib/errorTracking';
 import type {
   LoginRequest,
   LoginResponse,
@@ -245,8 +246,8 @@ api.interceptors.response.use(
           startedAt: meta.tStart,
         });
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      swallow(e, 'client: request-perf emit');
     }
     const status = err?.response?.status;
     const url = err?.config?.url ?? '';
@@ -261,8 +262,8 @@ api.interceptors.response.use(
     if (!isAbort && (!err?.response || err?.code === 'ECONNABORTED')) {
       try {
         window.dispatchEvent(new CustomEvent('api_unavailable'));
-      } catch {
-        // ignore in SSR / test environments that lack a window
+      } catch (e) {
+        swallow(e, 'client: dispatch api_unavailable (SSR/test lacks window)');
       }
     }
 

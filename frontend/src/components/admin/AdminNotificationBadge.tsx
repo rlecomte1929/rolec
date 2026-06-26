@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { adminNotificationsAPI } from '../../api/client';
+import { swallow } from '../../lib/errorTracking';
 
 export const AdminNotificationBadge: React.FC = () => {
   const [count, setCount] = useState<number>(0);
@@ -11,7 +12,7 @@ export const AdminNotificationBadge: React.FC = () => {
       .then((s) => {
         if (!cancelled) setCount((s as { open_count?: number }).open_count ?? 0);
       })
-      .catch(() => {});
+      .catch((e) => swallow(e, 'AdminNotificationBadge: stats poll'));
     return () => {
       cancelled = true;
     };

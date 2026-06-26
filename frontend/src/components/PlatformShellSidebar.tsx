@@ -8,6 +8,7 @@ import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { Button } from './antigravity/Button';
+import { swallow } from '../lib/errorTracking';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -270,7 +271,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     const fetchHr = () => {
       void getHrNotificationCounts()
         .then((c) => { if (!cancelled) setHrNotif(c); })
-        .catch(() => {});
+        .catch((e) => swallow(e, 'PlatformShellSidebar: HR notification poll'));
     };
     fetchHr();
     const id = window.setInterval(fetchHr, 60_000);
@@ -283,7 +284,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     const fetchAdmin = () => {
       void getAdminNotificationCounts()
         .then((c) => { if (!cancelled) setAdminNotif(c); })
-        .catch(() => {});
+        .catch((e) => swallow(e, 'PlatformShellSidebar: admin notification poll'));
     };
     fetchAdmin();
     const id = window.setInterval(fetchAdmin, 60_000);
