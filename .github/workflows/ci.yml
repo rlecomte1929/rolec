@@ -146,8 +146,10 @@ jobs:
             exit 1
           fi
 
-      - name: Run Vitest unit tests
-        run: npm test
+      - name: Run Vitest unit tests + coverage gate
+        # QG-6: run with coverage so the ratchet thresholds in vite.config.ts
+        # (statements/lines 15%, branches 60%, functions 28%) gate the PR.
+        run: npm run test:coverage
         env:
           CI: true
 
