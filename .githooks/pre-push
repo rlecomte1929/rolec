@@ -79,6 +79,15 @@ if [ ! -d frontend ]; then
   exit 0
 fi
 
+# QG-7: a fresh clone / worktree has no node_modules, so `npm run build` would
+# hard-error with "tsc: command not found" and abort the push. Degrade
+# gracefully with a clear instruction instead of blocking.
+if [ ! -x frontend/node_modules/.bin/tsc ]; then
+  echo "pre-push: ⚠️  frontend/node_modules is missing — run 'npm ci' in frontend/ to"
+  echo "pre-push:     enable the pre-push build check. Skipping the build for this push."
+  exit 0
+fi
+
 echo "pre-push: running frontend production build (npm run build)…"
 if ( cd frontend && npm run build ); then
   echo "pre-push: ✅ build passed."
