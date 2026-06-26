@@ -43,7 +43,7 @@ jobs:
       # argparse type=int rejects any non-integer value, so this is doubly safe.
       MIN_SAMPLE: ${{ github.event.inputs.min_sample || '50' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:

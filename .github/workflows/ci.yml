@@ -34,7 +34,7 @@ jobs:
       migrations: ${{ steps.filter.outputs.migrations }}
       workflows: ${{ steps.filter.outputs.workflows }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -61,7 +61,7 @@ jobs:
     if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
         with:
@@ -81,7 +81,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # gitleaks needs the PR commit range (base..head) to scan the diff.
           fetch-depth: 0
@@ -108,7 +108,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -163,7 +163,7 @@ jobs:
       run:
         working-directory: apps/hr-dashboard
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -201,7 +201,7 @@ jobs:
       RELOPASS_DISABLE_RATE_LIMITS: "1"
       PYTHONPATH: .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -339,7 +339,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -374,7 +374,7 @@ jobs:
     # Only relevant when migrations change.
     if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -398,7 +398,7 @@ jobs:
     # Only relevant when migrations change.
     if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -425,7 +425,7 @@ jobs:
     # Only relevant when migrations change.
     if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -450,7 +450,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -474,7 +474,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
