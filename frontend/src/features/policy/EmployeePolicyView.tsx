@@ -135,20 +135,6 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
     contextAssignmentId ??
     undefined;
 
-  // Show a friendly holding state while the assignment context is still loading,
-  // or if the employee isn't yet linked to a company/assignment.
-  if (!assignmentLoading && !assignmentId && linkedCount === 0) {
-    return (
-      <Card padding="lg" className="border-[#e2e8f0]">
-        <p className="text-sm font-medium text-[#0b2b43] mb-1">No company linked yet</p>
-        <p className="text-sm text-[#64748b]">
-          Your company's relocation policy will appear here automatically once HR links your account to an assignment.
-          No action is needed on your part — you'll be able to view your full benefit entitlements as soon as they've set it up.
-        </p>
-      </Card>
-    );
-  }
-
   const caseId = searchParams.get('caseId') || undefined;
   const assignmentTypeRaw = searchParams.get('assignmentType');
   const familyStatusRaw = searchParams.get('familyStatus');
@@ -234,6 +220,21 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
         ? `Reference ${String(data.policy_version).slice(0, 8)}…`
         : '—';
   const effectiveLabel = data?.effective_date ? String(data.effective_date).slice(0, 10) : '—';
+
+  // Friendly holding state while the assignment context is still loading, or if the
+  // employee isn't yet linked to a company/assignment. (Must come AFTER all hooks —
+  // an early return above them would call the hooks conditionally; LINT-3 rules-of-hooks.)
+  if (!assignmentLoading && !assignmentId && linkedCount === 0) {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="text-sm font-medium text-[#0b2b43] mb-1">No company linked yet</p>
+        <p className="text-sm text-[#64748b]">
+          Your company's relocation policy will appear here automatically once HR links your account to an assignment.
+          No action is needed on your part — you'll be able to view your full benefit entitlements as soon as they've set it up.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6" data-employee-policy-view="v1">
