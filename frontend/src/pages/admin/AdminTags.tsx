@@ -25,7 +25,7 @@ export const AdminTags: React.FC = () => {
     setLoading(true);
     try {
       const res = await adminResourcesAPI.listTags(filterGroup || undefined);
-      setItems(res.tags || []);
+      setItems((res.tags || []) as Tag[]);
     } catch {
       setItems([]);
     } finally {

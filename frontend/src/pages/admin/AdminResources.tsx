@@ -49,7 +49,7 @@ export const AdminResources: React.FC = () => {
       ]);
       setCounts(c || {});
       setStagingCounts(s || null);
-      setCategories(cat?.categories || []);
+      setCategories((cat?.categories || []) as { id: string; key: string; label: string }[]);
     } catch {
       setCounts({});
       setStagingCounts(null);
@@ -67,7 +67,7 @@ export const AdminResources: React.FC = () => {
         search: filters.search || undefined,
         limit: 50,
       });
-      setResources(res.items || []);
+      setResources((res.items || []) as ResourceItem[]);
       setListTotal(res.total ?? 0);
     } catch {
       setResources([]);

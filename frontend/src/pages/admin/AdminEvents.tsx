@@ -47,7 +47,7 @@ export const AdminEvents: React.FC = () => {
         family_friendly: filters.family_friendly === 'true' ? true : filters.family_friendly === 'false' ? false : undefined,
         limit: 50,
       });
-      setEvents(res.items || []);
+      setEvents((res.items || []) as EventItem[]);
       setTotal(res.total ?? 0);
     } catch {
       setEvents([]);

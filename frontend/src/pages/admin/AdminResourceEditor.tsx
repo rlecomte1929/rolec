@@ -46,9 +46,9 @@ export const AdminResourceEditor: React.FC = () => {
         adminResourcesAPI.listTags(),
         adminResourcesAPI.listSources(),
       ]);
-      setCategories(catRes.categories || []);
-      setTags(tagRes.tags || []);
-      setSources(srcRes.sources || []);
+      setCategories((catRes.categories || []) as { id: string; key: string; label: string }[]);
+      setTags((tagRes.tags || []) as { id: string; key: string; label: string; tag_group?: string }[]);
+      setSources((srcRes.sources || []) as { id: string; source_name: string }[]);
     } catch {
       //
     }

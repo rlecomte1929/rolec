@@ -22,7 +22,7 @@ export const AdminCategories: React.FC = () => {
     setLoading(true);
     try {
       const res = await adminResourcesAPI.listCategories();
-      setItems(res.categories || []);
+      setItems((res.categories || []) as Category[]);
     } catch {
       setItems([]);
     } finally {
