@@ -19,6 +19,7 @@ import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { fetchRelocationPlanView } from '../../api/relocationPlanView';
 import { Alert, isSourceStale } from '../../components/antigravity';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
+import { isUiBlocked, isEffectivelyReady } from '../../features/platform-v2/dossier/dossierStatus';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
 
 type FilterTabKey = 'all' | 'action_needed' | 'blocked' | 'ready' | 'submitted';
@@ -31,16 +32,14 @@ const FILTER_TABS: Array<{ key: FilterTabKey; label: string }> = [
   { key: 'submitted', label: 'Submitted' },
 ];
 
-function isUiBlocked(f: CaseFormSummary): boolean {
-  return !!f.blocker_form_id && f.status !== 'submitted' && f.status !== 'approved' && f.status !== 'rejected';
-}
-
 function matchesFilter(f: CaseFormSummary, key: FilterTabKey): boolean {
   switch (key) {
     case 'all':           return true;
-    case 'action_needed': return !isUiBlocked(f) && (f.status === 'auto_filled' || f.status === 'in_progress' || f.status === 'pending_doc');
+    // [AIQ-1250] a 100%-filled auto_filled form with no required docs is "ready",
+    // not "action needed" — keep these chips consistent with the card badge.
+    case 'action_needed': return !isUiBlocked(f) && !isEffectivelyReady(f) && (f.status === 'auto_filled' || f.status === 'in_progress' || f.status === 'pending_doc');
     case 'blocked':       return isUiBlocked(f);
-    case 'ready':         return !isUiBlocked(f) && f.status === 'ready';
+    case 'ready':         return !isUiBlocked(f) && (f.status === 'ready' || isEffectivelyReady(f));
     case 'submitted':     return f.status === 'submitted' || f.status === 'approved';
     default:              return true;
   }
@@ -124,7 +123,11 @@ export const EmployeeDossierPage: React.FC = () => {
     const sum = scopedForms.reduce((acc, f) => acc + (f.completion_pct || 0), 0);
     const pct = Math.round(sum / total);
     const ready = scopedForms.filter(
-      (f) => f.status === 'ready' || f.status === 'submitted' || f.status === 'approved',
+      (f) =>
+        f.status === 'ready' ||
+        f.status === 'submitted' ||
+        f.status === 'approved' ||
+        isEffectivelyReady(f), // [AIQ-1250] count 100%-filled no-docs forms as ready
     ).length;
     return { pct, ready, total };
   }, [scopedForms]);

@@ -17,6 +17,7 @@ import { buildRoute } from '../../../navigation/routes';
 import { formEditorAPI } from '../../../api/formEditor';
 import { OriginalPdfDrawer } from './OriginalPdfDrawer';
 import { FormDocuments } from './FormDocuments';
+import { allFieldsFilled, requiresDocuments } from './dossierStatus';
 
 // ---------------------------------------------------------------------------
 // Status → label + colour + banner copy
@@ -74,16 +75,10 @@ type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 // Note: the card sees which docs are *required* (template.required_documents) but
 // not which are *uploaded* (lazy-fetched in FormDocuments), so "docs required" is
 // the proxy for the upload-docs state.
-function effectiveBadge(
-  form: CaseFormSummary,
-  filledFields: number,
-  totalFields: number,
-): { label: string; variant: BadgeVariant } {
+function effectiveBadge(form: CaseFormSummary): { label: string; variant: BadgeVariant } {
   const dStatus = displayStatus(form);
-  const allFieldsFilled = totalFields > 0 && filledFields >= totalFields;
-  if (dStatus === 'auto_filled' && allFieldsFilled) {
-    const requiresDocs = (form.template.required_documents?.length ?? 0) > 0;
-    return requiresDocs
+  if (dStatus === 'auto_filled' && allFieldsFilled(form)) {
+    return requiresDocuments(form)
       ? { label: 'Upload documents to complete', variant: 'warning' }
       : { label: 'Ready to submit', variant: 'success' };
   }
@@ -100,10 +95,8 @@ function statusBannerCopy(form: CaseFormSummary): { tone: string; text: string }
     case 'auto_filled': {
       // [AIQ-1250] Keep the expanded banner consistent with the refined badge:
       // when every field is filled, this form isn't "action needed" anymore.
-      const total = fields_summary.total;
-      const filled = fields_summary.filled_by_ai + fields_summary.filled_by_human;
-      if (total > 0 && filled >= total) {
-        return (form.template.required_documents?.length ?? 0) > 0
+      if (allFieldsFilled(form)) {
+        return requiresDocuments(form)
           ? {
               tone: 'bg-amber-50 border-amber-200 text-amber-900',
               text: 'All fields complete · upload the required supporting documents to finish.',
@@ -248,7 +241,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
   const progressPct =
     totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : form.completion_pct;
   // [AIQ-1250] Refined badge — never "Action needed" at 100% filled.
-  const badge = effectiveBadge(form, filledFields, totalFields);
+  const badge = effectiveBadge(form);
 
   return (
     <Card padding="lg" className="hover:shadow-sm transition-shadow">
