@@ -4,7 +4,7 @@ import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { patchCase } from '../../../api/cases';
-import { apiGet, apiPost, employeeAPI } from '../../../api/client';
+import { employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidatedParams';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
@@ -503,116 +503,6 @@ function StepHd({ title, sub, required }: { title: string; sub: string; required
     </div>
   );
 }
-
-// ─── Case messages thread (WZ5) ───────────────────────────────────────────────
-
-interface CaseMessage {
-  id: string;
-  case_id: string;
-  sender_id: string;
-  sender_role: string;
-  content: string;
-  created_at: string;
-}
-
-function CaseMessagesPanel({ caseId }: { caseId: string }) {
-  const [messages, setMessages] = useState<CaseMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  const loadMessages = useCallback(async () => {
-    try {
-      const res = await apiGet<CaseMessage[]>(`/api/cases/${caseId}/messages`);
-      setMessages(res);
-    } catch {
-      // silently fail — thread may be empty or case not yet persisted
-    } finally {
-      setLoading(false);
-    }
-  }, [caseId]);
-
-  useEffect(() => { void loadMessages(); }, [loadMessages]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-    setSending(true);
-    setError(null);
-    try {
-      const msg = await apiPost<CaseMessage>(`/api/cases/${caseId}/messages`, { content: text });
-      setMessages((prev) => [...prev, msg]);
-      setInput('');
-    } catch (e) {
-      setError((e as Error).message ?? 'Failed to send message');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const roleLabel = (role: string) =>
-    role === 'hr' ? 'HR' : role === 'admin' ? 'Admin' : 'You';
-
-  const roleColor = (role: string) =>
-    role === 'employee' ? 'bg-accent-100 text-accent-800' : 'bg-blue-100 text-blue-800';
-
-  return (
-    <div className="mt-4 border border-gray-100 rounded-xl bg-white overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-        <span className="text-xs font-bold text-gray-700">💬 Messages</span>
-        <span className="text-xs text-gray-400">between you and your HR team</span>
-      </div>
-      <div className="px-4 py-3 max-h-48 overflow-y-auto flex flex-col gap-2">
-        {loading && <p className="text-xs text-gray-400">Loading messages…</p>}
-        {!loading && messages.length === 0 && (
-          <p className="text-xs text-gray-400">No messages yet — send one below to start the conversation.</p>
-        )}
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col gap-0.5 ${msg.sender_role === 'employee' ? 'items-end' : 'items-start'}`}>
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${roleColor(msg.sender_role)}`}>
-              {roleLabel(msg.sender_role)}
-            </span>
-            <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
-              msg.sender_role === 'employee'
-                ? 'bg-accent-600 text-white rounded-br-none'
-                : 'bg-gray-100 text-gray-800 rounded-bl-none'
-            }`}>
-              {msg.content}
-            </div>
-            <span className="text-[9px] text-gray-400">
-              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-      <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
-        <Input unstyled
-          type="text"
-          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent-300"
-          placeholder="Write a message…"
-          value={input}
-          onChange={(v) => setInput(v)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend(); } }}
-          disabled={sending}
-        />
-        <Button unstyled type="button" onClick={handleSend} disabled={!input.trim() || sending}
-          className="px-3 py-2 text-xs font-semibold rounded-lg bg-navy-800 text-white hover:bg-navy-900 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
-          {sending ? '…' : 'Send'}
-        </Button>
-      </div>
-      {error && <p className="px-4 pb-3 text-xs text-red-500">{error}</p>}
-    </div>
-  );
-}
-
-// ─── Review summary ───────────────────────────────────────────────────────────
 
 function ReviewSummary({ data, goTo, loading = false }: { data: IntakeData; goTo: (s: number) => void; loading?: boolean }) {
   const partner = data.members.find((m) => m.kind === 'partner');
@@ -1325,7 +1215,12 @@ export function EmployeeIntakePage() {
                 {/* P3-RAG-04: surface the RAG dossier suggestions (corpus-grounded,
                     cited) in the active v2 flow — previously only in the legacy wizard. */}
                 <DossierSuggestionsPanel caseId={caseIdRef.current} />
-                <CaseMessagesPanel caseId={assignmentId ?? ''} />
+                {/* H-07 (AIQ-1254): the messaging panel was removed from the Review
+                    step — a chat UI at the moment of submission was cognitive overload.
+                    Point the employee to the Inbox instead. */}
+                <p className="mt-4 text-sm text-slate-600">
+                  Questions? Message your HR team from your Inbox after submitting.
+                </p>
                 {/* PRIV-005 / AIQ-473 — Art. 13 notice at the point of collection.
                     Acknowledging records a privacy_consents row and unblocks submit. */}
                 <div className="mt-5">
