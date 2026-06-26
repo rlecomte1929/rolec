@@ -180,7 +180,6 @@ export const ProvidersPage: React.FC = () => {
         setLoadError('Couldn’t load services data. Try again.');
         if (import.meta.env.DEV) {
           setLoadErrorDetails(`status=${status || 'n/a'} url=${err?.config?.url || ''} detail=${detail || ''}`);
-          // eslint-disable-next-line no-console
           logger.error('[services] load error', err);
         }
         if (!API_BASE_URL && !import.meta.env.DEV) {
@@ -239,7 +238,6 @@ export const ProvidersPage: React.FC = () => {
       const friendly = detail === 'Network Error' ? 'Couldn’t save. Try again.' : detail;
       setMessage(friendly || "Couldn't save. Try again.");
       if (import.meta.env.DEV && detail) {
-        // eslint-disable-next-line no-console
         logger.error('[services] save error', err);
       }
       return false;

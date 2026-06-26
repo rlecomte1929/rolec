@@ -44,7 +44,6 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
     if (immigrationContext.move_date) setMoveDate(immigrationContext.move_date);
     if (immigrationContext.visa_type) setServiceCategory('Immigration/visa');
     // Re-seed each time a new vendor is selected (i.e. each open).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor, immigrationContext]);
 
   if (!vendor) return null;

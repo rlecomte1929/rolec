@@ -16,7 +16,6 @@ export function parseResponse<T>(schema: z.ZodType<T>, data: unknown, label: str
   const result = schema.safeParse(data);
   if (result.success) return result.data;
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     logger.warn(`[api-boundary] ${label}: response failed validation`, result.error.issues);
   }
   return data as T;
