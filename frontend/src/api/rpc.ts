@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { logger } from '../lib/logger';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -50,7 +51,7 @@ const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<
               ? 'JWT verification failed. Token may be expired or project keys changed. Get a fresh access token from Supabase Auth.'
               : message;
         if (import.meta.env.DEV) {
-          console.debug('RPC error', fn, friendly);
+          logger.debug('RPC error', fn, friendly);
         }
         return { data: null, error: friendly };
       }
@@ -59,7 +60,7 @@ const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<
     } catch (err: any) {
       const message = err?.message || 'Unable to reach Supabase';
       if (import.meta.env.DEV) {
-        console.debug('RPC error', fn, message);
+        logger.debug('RPC error', fn, message);
       }
       return { data: null, error: message };
     }
@@ -69,7 +70,7 @@ const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<
   const { data, error } = await supabase.rpc(fn, params);
   if (error) {
     if (import.meta.env.DEV) {
-      console.debug('RPC error', fn, error.message);
+      logger.debug('RPC error', fn, error.message);
     }
     return { data: null, error: error.message };
   }

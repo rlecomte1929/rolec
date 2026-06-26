@@ -8,6 +8,7 @@
  * disappears.
  */
 import React, { useEffect, useState, useCallback } from 'react';
+import { logger } from '../lib/logger';
 import { Button } from './antigravity/Button';
 import { hrAPI, type CalibrationAlert } from '../api/client';
 
@@ -95,7 +96,7 @@ export const CalibrationAlertBanner: React.FC = () => {
       setAlerts(data ?? []);
     } catch (err) {
       // Silently swallow — the banner is non-critical and shouldn't break the page
-      console.warn('CalibrationAlertBanner: failed to fetch alerts', err);
+      logger.warn('CalibrationAlertBanner: failed to fetch alerts', err);
     } finally {
       setLoading(false);
     }
@@ -111,7 +112,7 @@ export const CalibrationAlertBanner: React.FC = () => {
       await hrAPI.dismissCalibrationAlert(alertId);
       setAlerts((prev) => prev.filter((a) => a.id !== alertId));
     } catch (err) {
-      console.error('CalibrationAlertBanner: dismiss failed', err);
+      logger.error('CalibrationAlertBanner: dismiss failed', err);
     } finally {
       setDismissingId(null);
     }

@@ -19,6 +19,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from './logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ export async function rankSuppliers(
     .order('total_assignments', { ascending: false });
 
   if (error) {
-    console.error('supplier-scorer: failed to fetch supplier_stats:', error.message);
+    logger.error('supplier-scorer: failed to fetch supplier_stats:', error.message);
     return [];
   }
 

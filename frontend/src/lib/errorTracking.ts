@@ -10,6 +10,7 @@
  */
 
 import { getAuthItem } from '../utils/demo';
+import { logger } from './logger';
 
 // ---------------------------------------------------------------------------
 // Breadcrumb buffer — last 10 navigation events, module-level (no re-renders)
@@ -102,7 +103,7 @@ export async function reportError(ctx: ErrorContext): Promise<void> {
     (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1')
   ) {
-    console.warn('[ErrorTracking] Skipped (dev):', ctx.message);
+    logger.warn('[ErrorTracking] Skipped (dev):', ctx.message);
     return;
   }
 

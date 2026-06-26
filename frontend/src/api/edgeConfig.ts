@@ -28,6 +28,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { logger } from '../lib/logger';
 import { supabase } from './supabase';
 
 export interface FeatureFlag {
@@ -64,7 +65,7 @@ export async function getFeatureFlags(): Promise<FlagsMap> {
   _fetchPromise = (async (): Promise<FlagsMap> => {
     if (!SUPABASE_URL) {
       if (import.meta.env.DEV) {
-        console.warn('[EdgeConfig] VITE_SUPABASE_URL not set; using flag defaults.');
+        logger.warn('[EdgeConfig] VITE_SUPABASE_URL not set; using flag defaults.');
       }
       _cachedFlags = { ...FLAG_DEFAULTS };
       return _cachedFlags;
@@ -88,7 +89,7 @@ export async function getFeatureFlags(): Promise<FlagsMap> {
 
       if (!res.ok) {
         if (import.meta.env.DEV) {
-          console.warn(`[EdgeConfig] Function returned ${res.status}; using defaults.`);
+          logger.warn(`[EdgeConfig] Function returned ${res.status}; using defaults.`);
         }
         _cachedFlags = { ...FLAG_DEFAULTS };
         return _cachedFlags;
@@ -99,7 +100,7 @@ export async function getFeatureFlags(): Promise<FlagsMap> {
       return _cachedFlags;
     } catch (err) {
       if (import.meta.env.DEV) {
-        console.warn('[EdgeConfig] Failed to fetch flags:', err);
+        logger.warn('[EdgeConfig] Failed to fetch flags:', err);
       }
       _cachedFlags = { ...FLAG_DEFAULTS };
       return _cachedFlags;
