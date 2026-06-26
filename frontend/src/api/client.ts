@@ -2069,13 +2069,13 @@ export const adminFormTemplatesAPI = {
     limit?: number;
     offset?: number;
   }): Promise<FormTemplate[]> =>
-    api.get('/api/admin/form-templates', { params }).then((r) => r.data),
+    api.get<FormTemplate[]>('/api/admin/form-templates', { params }).then((r) => r.data),
 
   get: async (id: string): Promise<FormTemplate> =>
-    api.get(`/api/admin/form-templates/${id}`).then((r) => r.data),
+    api.get<FormTemplate>(`/api/admin/form-templates/${id}`).then((r) => r.data),
 
   create: async (payload: FormTemplateCreate): Promise<FormTemplate> =>
-    api.post('/api/admin/form-templates', payload).then((r) => r.data),
+    api.post<FormTemplate>('/api/admin/form-templates', payload).then((r) => r.data),
 
   /**
    * PATCH — two modes:
@@ -2085,7 +2085,7 @@ export const adminFormTemplatesAPI = {
    *    pointing at it. The returned row is the new one.
    */
   update: async (id: string, payload: FormTemplateUpdate): Promise<FormTemplate> =>
-    api.patch(`/api/admin/form-templates/${id}`, payload).then((r) => r.data),
+    api.patch<FormTemplate>(`/api/admin/form-templates/${id}`, payload).then((r) => r.data),
 };
 
 // Admin Staging Review API (admin-only)
