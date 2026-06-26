@@ -90,6 +90,14 @@ export const ServicesEstimate: React.FC = () => {
 
   return (
     <AppShell title="Estimate review" subtitle="Shortlist vs HR policy caps.">
+      {/* AIQ-1277: explicit back link to the previous step. */}
+      <button
+        type="button"
+        onClick={() => go(caseStep('caseServicesRecommendations'))}
+        className="mb-3 inline-flex items-center gap-1 text-sm text-[#1f8e8b] hover:underline"
+      >
+        ← Back to recommendations
+      </button>
       <ServicesNavRibbon />
       {/* Stage 5 (audit) — replaced generic numbered list with outcome-described copy
           per audit/re-audit-stage-2-copy.md COPY-5 + docs/product-copy-rules.md
