@@ -399,6 +399,9 @@ export const AdminProspects: React.FC = () => {
                   key={r.id}
                   className="border-b border-[#f3f4f6] hover:bg-[#f8fafc] cursor-pointer"
                   onClick={() => openDetail(r)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r); } }}
+                  role="button"
+                  tabIndex={0}
                 >
                   <td className="py-2 pr-3">
                     <div className="font-medium text-[#0b2b43]">{r.company_name}</div>
@@ -434,11 +437,14 @@ export const AdminProspects: React.FC = () => {
       {selected && (
         <div
           className="fixed inset-0 bg-black/30 flex justify-end z-50"
-          onClick={() => setSelected(null)}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setSelected(null); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close detail"
         >
           <div
             className="bg-white w-full max-w-xl h-full overflow-y-auto p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-4">
               <div>

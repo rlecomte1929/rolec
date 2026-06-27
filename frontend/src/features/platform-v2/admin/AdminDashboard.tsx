@@ -5,6 +5,7 @@
  * Stat cards · companies table · new-company slide-over · event feed
  */
 
+import type * as React from 'react';
 import { useState } from 'react';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
@@ -116,6 +117,7 @@ function NewCompanySlideOver({
 
   return (
     <>
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); panel is keyboard-dismissible via its own controls */}
       <div
         aria-hidden="true"
         onClick={onClose}
@@ -264,7 +266,12 @@ export function AdminDashboard({
                   {companies.map(row => (
                     <tr
                       key={row.id}
-                      onClick={() => onCompanyClick?.(row.id)}
+                      {...(onCompanyClick ? {
+                        onClick: () => onCompanyClick(row.id),
+                        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCompanyClick(row.id); } },
+                        role: 'button' as const,
+                        tabIndex: 0,
+                      } : {})}
                       style={{ cursor: onCompanyClick ? 'pointer' : 'default', borderBottom: '1px solid var(--border)', transition: 'background var(--transition-fast)' }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}
