@@ -56,6 +56,7 @@ import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryRespon
 import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
 import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
 import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
+import type { RagQueryResponse } from './policyAssistantRagAdapter';
 import {
   intakeEnvelopeSchema,
   assignmentsOverviewSchema,
@@ -465,6 +466,253 @@ export interface CaseHealthFlag {
   draft_reminder: string | null;
 }
 
+// ── hrAPI response shapes (extracted from inline literals for type-safety) ──
+
+export interface ResolvedPolicyResponse {
+  resolved: {
+    id: string;
+    assignment_id: string;
+    benefits: unknown[];
+    exclusions: unknown[];
+    resolution_context?: Record<string, unknown>;
+  } | null;
+  policy_version?: Record<string, unknown>;
+  resolution_context?: Record<string, unknown>;
+  message?: string;
+}
+
+export interface RecomputedPolicyResponse {
+  resolved: unknown;
+  policy_version?: Record<string, unknown>;
+  message?: string;
+}
+
+export interface AssignmentServicesResponse {
+  assignment_id: string;
+  case_id: string;
+  services: Array<{
+    id: string;
+    assignment_id: string;
+    case_id: string;
+    service_key: string;
+    category: string;
+    selected: number | boolean;
+    estimated_cost: number | null;
+    currency: string | null;
+  }>;
+}
+
+export interface CommandCenterKPIs {
+  activeCases: number;
+  atRiskCount: number;
+  attentionNeededCount: number;
+  overdueTasksCount: number;
+  avgVisaDurationDays?: number;
+  budgetOverrunsCount: number;
+  actionRequiredCount: number;
+  departingSoonCount: number;
+  completedCount: number;
+}
+
+export interface HrQuoteRequest {
+  id: string;
+  case_id: string;
+  employee_id: string;
+  company_id: string;
+  service_categories: string[];
+  notes: string | null;
+  budget_range: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VendorPerformanceResponse {
+  summary: {
+    avg_rating: number | null;
+    avg_cost_eur: number | null;
+    active_vendors: number;
+    avg_response_sla_hours: number | null;
+  };
+  monthly_trend: Array<{
+    month: string;
+    supplier_id: string;
+    category: string;
+    case_count: number;
+  }>;
+  categories: Array<{
+    category: string;
+    vendor_count: number;
+    avg_rating: number | null;
+    avg_cost_eur: number | null;
+    status: 'healthy' | 'low_coverage' | 'review' | 'critical';
+    vendors: Array<{
+      id: string;
+      name: string;
+      location: string;
+      rating: number | null;
+      review_count: number;
+      response_sla_hours: number | null;
+      cost_eur: number | null;
+      cost_min_eur: number | null;
+      cost_max_eur: number | null;
+      recent_reviews: Array<{ score: number; comment: string; date: string }>;
+    }>;
+  }>;
+  coverage: Array<{
+    category: string;
+    country: string;
+    vendor_count: number;
+    status: 'healthy' | 'thin' | 'gap';
+  }>;
+  cost_trend: Array<{ date: string; avg_cost_eur: number }>;
+  rating_trend: Array<{ date: string; avg_rating: number }>;
+}
+
+export interface HrVendor {
+  id: string;
+  name: string;
+  service_categories: string[];
+  corridors: string[];
+  contact_email: string;
+  description?: string;
+  is_approved: boolean;
+}
+
+export interface ImmigrationRequirementsResponse {
+  covered: boolean;
+  coverage_reason: string | null;
+  corridor: string | null;
+  corridor_from: string;
+  corridor_to: string;
+  visa_type: string;
+  document_count: number;
+  estimated_timeline_days: number | null;
+  requirements: Array<{
+    document_type: string;
+    document_name: string;
+    is_required: boolean;
+    freshness_days: number | null;
+    requires_apostille: boolean;
+    apostille_countries: string[];
+    requires_translation: boolean;
+    translation_languages: string[];
+    typical_processing_days: number | null;
+    book_early_flag: boolean;
+    book_early_reason: string | null;
+    form_url: string | null;
+  }>;
+  risk_flags: Array<{
+    flag_type: string;
+    severity: 'critical' | 'warning' | 'info';
+    title: string;
+    description: string;
+    recommended_action: string;
+    deadline: string | null;
+  }>;
+  employee_nationality?: string | null;
+  has_dependents?: boolean;
+  dependents_count?: number;
+}
+
+export interface ImmigrationInterviewStatus {
+  has_session: boolean;
+  completion_pct: number;
+  is_complete: boolean;
+  started_at: string | null;
+  last_active_at: string | null;
+  completed_at: string | null;
+}
+
+export interface ImmigrationMilestonesResponse {
+  milestones: Array<{
+    id: string;
+    milestone_type: string;
+    status: string;
+    sort_order: number;
+    target_date: string | null;
+    completed_date: string | null;
+    notes: string | null;
+    evidence_url: string | null;
+    book_early_alert: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+  }>;
+}
+
+export interface ErasureRequestsResponse {
+  requests: Array<{
+    id: string;
+    case_id: string;
+    employee_id: string;
+    status: string;
+    reason: string | null;
+    requested_at: string | null;
+    statutory_due_at: string | null;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    review_notes: string | null;
+    completed_at: string | null;
+  }>;
+  pending_count: number;
+}
+
+export interface ProcessErasureResponse {
+  request_id: string;
+  status: string;
+  profiles_anonymised: number;
+  reviewed_by: string;
+  reviewed_at: string;
+}
+
+export interface HrRfqRequestsResponse {
+  rfqs: Array<{
+    id: string;
+    case_id: string;
+    vendor_id: string;
+    vendor_name: string;
+    vendor_email: string;
+    service_category: string;
+    move_date: string | null;
+    budget_range: string | null;
+    special_requirements: string | null;
+    hr_email: string;
+    hr_name: string;
+    status: string;
+    created_at: string;
+  }>;
+  total: number;
+}
+
+export interface HrAnalyticsResponse {
+  workspace: {
+    avg_completion_days: number | null;
+    compliance_incident_rate: number | null;
+    total_cases_in_window: number;
+    closed_cases_in_window: number;
+    top_delay_causes: Array<{ cause: string; count: number }>;
+    corridor_breakdown: Array<{ corridor: string; avg_days: number; case_count: number }>;
+    computed_at: string | null;
+  };
+  industry: {
+    median_completion_days: number | null;
+    median_compliance_rate: number | null;
+    case_count: number;
+    workspace_count: number;
+    is_valid: boolean;
+    computed_at: string | null;
+  } | null;
+  trend: Array<{ month: string; avg_completion_days: number | null }>;
+}
+
+export interface HrDraftCase {
+  id: string;
+  status: 'draft';
+  company_id: string | null;
+  created_at: string | null;
+  hr_user_id: string | null;
+}
+
 export const hrAPI = {
   getBacklog: async (): Promise<HrBacklogResponse> => {
     const response = await api.get<HrBacklogResponse>('/api/hr/backlog');
@@ -479,7 +727,7 @@ export const hrAPI = {
     employeeIdentifier: string,
     options?: { firstName?: string; lastName?: string; level?: string }
   ): Promise<AssignCaseResponse> => {
-    const response = await api.post(
+    const response = await api.post<AssignCaseResponse>(
       `/api/hr/cases/${caseId}/assign`,
       {
         employeeIdentifier,
@@ -501,7 +749,7 @@ export const hrAPI = {
     destination?: string;
   }): Promise<AssignmentsListResponse> => {
     const { signal, ...query } = params ?? {};
-    const response = await api.get('/api/hr/assignments', {
+    const response = await api.get<unknown>('/api/hr/assignments', {
       signal,
       params: {
         limit: query.limit ?? 25,
@@ -574,27 +822,12 @@ export const hrAPI = {
     );
     return response.data;
   },
-  getResolvedPolicy: async (assignmentId: string): Promise<{
-    resolved: {
-      id: string;
-      assignment_id: string;
-      benefits: unknown[];
-      exclusions: unknown[];
-      resolution_context?: Record<string, unknown>;
-    } | null;
-    policy_version?: Record<string, unknown>;
-    resolution_context?: Record<string, unknown>;
-    message?: string;
-  }> => {
-    const response = await api.get(`/api/hr/assignments/${assignmentId}/resolved-policy`);
+  getResolvedPolicy: async (assignmentId: string): Promise<ResolvedPolicyResponse> => {
+    const response = await api.get<ResolvedPolicyResponse>(`/api/hr/assignments/${assignmentId}/resolved-policy`);
     return response.data;
   },
-  recomputeResolvedPolicy: async (assignmentId: string): Promise<{
-    resolved: unknown | null;
-    policy_version?: Record<string, unknown>;
-    message?: string;
-  }> => {
-    const response = await api.post(`/api/hr/assignments/${assignmentId}/resolved-policy/recompute`);
+  recomputeResolvedPolicy: async (assignmentId: string): Promise<RecomputedPolicyResponse> => {
+    const response = await api.post<RecomputedPolicyResponse>(`/api/hr/assignments/${assignmentId}/resolved-policy/recompute`);
     return response.data;
   },
   /** Compare selected services vs resolved policy (with diagnostics) */
@@ -603,21 +836,8 @@ export const hrAPI = {
     return response.data;
   },
   /** Same payload as employee route; allowed for HR via `require_hr_or_employee`. */
-  getAssignmentServices: async (assignmentId: string): Promise<{
-    assignment_id: string;
-    case_id: string;
-    services: Array<{
-      id: string;
-      assignment_id: string;
-      case_id: string;
-      service_key: string;
-      category: string;
-      selected: number | boolean;
-      estimated_cost: number | null;
-      currency: string | null;
-    }>;
-  }> => {
-    const response = await api.get(`/api/employee/assignments/${encodeURIComponent(assignmentId)}/services`);
+  getAssignmentServices: async (assignmentId: string): Promise<AssignmentServicesResponse> => {
+    const response = await api.get<AssignmentServicesResponse>(`/api/employee/assignments/${encodeURIComponent(assignmentId)}/services`);
     return response.data;
   },
   getPolicy: async (caseId: string): Promise<PolicyResponse> => {
@@ -631,9 +851,9 @@ export const hrAPI = {
     const response = await api.post<unknown>(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
     return response.data;
   },
-  getCompanyProfile: async (): Promise<{ company: any | null }> => {
+  getCompanyProfile: async (): Promise<{ company: Record<string, unknown> | null }> => {
     return cachedRequest('hr:company-profile', 60_000, async () => {
-      const response = await api.get<{ company: any | null }>('/api/hr/company-profile');
+      const response = await api.get<{ company: Record<string, unknown> | null }>('/api/hr/company-profile');
       return response.data;
     });
   },
@@ -647,7 +867,7 @@ export const hrAPI = {
     employees: HrCompanyEmployee[];
     has_company?: boolean;
   }> => {
-    const response = await api.get('/api/hr/employees');
+    const response = await api.get<{ employees: HrCompanyEmployee[]; has_company?: boolean }>('/api/hr/employees');
     return response.data;
   },
   getEmployee: async (employeeId: string): Promise<{ employee: HrCompanyEmployee }> => {
@@ -684,13 +904,13 @@ export const hrAPI = {
     invalidateApiCache('company:get');
     return response.data;
   },
-  listMessages: async (): Promise<{ messages: any[] }> => {
-    const response = await api.get<{ messages: any[] }>('/api/hr/messages');
+  listMessages: async (): Promise<{ messages: Record<string, unknown>[] }> => {
+    const response = await api.get<{ messages: Record<string, unknown>[] }>('/api/hr/messages');
     return response.data;
   },
   /** Send a message to the assigned employee on a case thread (tenant-scoped server-side). */
-  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: any }> => {
-    const response = await api.post<{ ok: boolean; message: any }>('/api/hr/messages', {
+  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: Record<string, unknown> }> => {
+    const response = await api.post<{ ok: boolean; message: Record<string, unknown> }>('/api/hr/messages', {
       assignment_id: assignmentId,
       body,
     });
@@ -704,9 +924,9 @@ export const hrAPI = {
     limit?: number;
     offset?: number;
     signal?: AbortSignal;
-  }): Promise<{ conversations: any[]; has_more?: boolean }> => {
+  }): Promise<{ conversations: Record<string, unknown>[]; has_more?: boolean }> => {
     const { signal, ...query } = params ?? {};
-    const response = await api.get('/api/hr/messages/conversations', {
+    const response = await api.get<{ conversations: Record<string, unknown>[]; has_more?: boolean }>('/api/hr/messages/conversations', {
       signal,
       params: {
         ...(query.q && { q: query.q }),
@@ -721,8 +941,8 @@ export const hrAPI = {
   getMessageThread: async (
     assignmentId: string,
     opts?: { signal?: AbortSignal }
-  ): Promise<{ assignment_id: string; messages: any[] }> => {
-    const response = await api.get<{ assignment_id: string; messages: any[] }>(
+  ): Promise<{ assignment_id: string; messages: Record<string, unknown>[] }> => {
+    const response = await api.get<{ assignment_id: string; messages: Record<string, unknown>[] }>(
       `/api/hr/messages/threads/${encodeURIComponent(assignmentId)}`,
       { signal: opts?.signal }
     );
@@ -751,7 +971,7 @@ export const hrAPI = {
   },
   recordComplianceAction: async (
     caseId: string,
-    payload: { actionType: string; checkId: string; notes?: string; payload?: any }
+    payload: { actionType: string; checkId: string; notes?: string; payload?: unknown }
   ): Promise<unknown> => {
     const response = await api.post<unknown>(`/api/hr/cases/${caseId}/compliance/actions`, payload);
     return response.data;
@@ -789,18 +1009,8 @@ export const hrAPI = {
     return response.data;
   },
   // Command Center
-  getCommandCenterKPIs: async (): Promise<{
-    activeCases: number;
-    atRiskCount: number;
-    attentionNeededCount: number;
-    overdueTasksCount: number;
-    avgVisaDurationDays?: number;
-    budgetOverrunsCount: number;
-    actionRequiredCount: number;
-    departingSoonCount: number;
-    completedCount: number;
-  }> => {
-    const response = await api.get('/api/hr/command-center/kpis');
+  getCommandCenterKPIs: async (): Promise<CommandCenterKPIs> => {
+    const response = await api.get<CommandCenterKPIs>('/api/hr/command-center/kpis');
     return response.data;
   },
   listCommandCenterCases: async (params?: { page?: number; limit?: number; risk_filter?: string }): Promise<CommandCenterCaseRow[]> => {
@@ -825,7 +1035,7 @@ export const hrAPI = {
     // AIQ-833 / F2: cut over to the constrained RAG engine. Company scoping is
     // server-derived from the authenticated user — policy_id/document_id are no
     // longer sent (kept on the signature + response for shape compatibility).
-    const response = await api.post(
+    const response = await api.post<RagQueryResponse>(
       '/api/policy-assistant/rag-query',
       { question: message },
       { timeout: 120_000 }
@@ -843,21 +1053,8 @@ export const hrAPI = {
   getQuoteRequests: async (params?: {
     status?: string;
     case_id?: string;
-  }): Promise<{
-    quote_requests: Array<{
-      id: string;
-      case_id: string;
-      employee_id: string;
-      company_id: string;
-      service_categories: string[];
-      notes: string | null;
-      budget_range: string | null;
-      status: string;
-      created_at: string;
-      updated_at: string;
-    }>;
-  }> => {
-    const response = await api.get('/api/hr/quote-requests', { params });
+  }): Promise<{ quote_requests: HrQuoteRequest[] }> => {
+    const response = await api.get<{ quote_requests: HrQuoteRequest[] } | HrQuoteRequest[]>('/api/hr/quote-requests', { params });
     // backend returns a list directly; normalise to named key
     const data = response.data;
     return { quote_requests: Array.isArray(data) ? data : (data.quote_requests ?? []) };
@@ -874,48 +1071,8 @@ export const hrAPI = {
   // ── NAV-SP-2: Vendor performance dashboard ───────────────────────────────
 
   /** GET /api/hr/vendor-performance?range=30d|90d|12mo — NAV-SP-2 Vendor Performance tab. */
-  getVendorPerformance: async (range: '30d' | '90d' | '12mo' = '90d'): Promise<{
-    summary: {
-      avg_rating: number | null;
-      avg_cost_eur: number | null;
-      active_vendors: number;
-      avg_response_sla_hours: number | null;
-    };
-    monthly_trend: Array<{
-      month: string;
-      supplier_id: string;
-      category: string;
-      case_count: number;
-    }>;
-    categories: Array<{
-      category: string;
-      vendor_count: number;
-      avg_rating: number | null;
-      avg_cost_eur: number | null;
-      status: 'healthy' | 'low_coverage' | 'review' | 'critical';
-      vendors: Array<{
-        id: string;
-        name: string;
-        location: string;
-        rating: number | null;
-        review_count: number;
-        response_sla_hours: number | null;
-        cost_eur: number | null;
-        cost_min_eur: number | null;
-        cost_max_eur: number | null;
-        recent_reviews: Array<{ score: number; comment: string; date: string }>;
-      }>;
-    }>;
-    coverage: Array<{
-      category: string;
-      country: string;
-      vendor_count: number;
-      status: 'healthy' | 'thin' | 'gap';
-    }>;
-    cost_trend: Array<{ date: string; avg_cost_eur: number }>;
-    rating_trend: Array<{ date: string; avg_rating: number }>;
-  }> => {
-    const response = await api.get('/api/hr/vendor-performance', { params: { range } });
+  getVendorPerformance: async (range: '30d' | '90d' | '12mo' = '90d'): Promise<VendorPerformanceResponse> => {
+    const response = await api.get<VendorPerformanceResponse>('/api/hr/vendor-performance', { params: { range } });
     return response.data;
   },
 
@@ -925,18 +1082,8 @@ export const hrAPI = {
   getVendors: async (params?: {
     corridor?: string;
     category?: string;
-  }): Promise<{
-    vendors: Array<{
-      id: string;
-      name: string;
-      service_categories: string[];
-      corridors: string[];
-      contact_email: string;
-      description?: string;
-      is_approved: boolean;
-    }>;
-  }> => {
-    const response = await api.get('/api/hr/vendors', { params });
+  }): Promise<{ vendors: HrVendor[] }> => {
+    const response = await api.get<{ vendors: HrVendor[] } | HrVendor[]>('/api/hr/vendors', { params });
     const data = response.data;
     return { vendors: Array.isArray(data) ? data : (data.vendors ?? []) };
   },
@@ -950,81 +1097,25 @@ export const hrAPI = {
   // ── IMM-13: Immigration status panel ─────────────────────────────────────
 
   /** GET /api/hr/cases/{caseId}/immigration-requirements */
-  getImmigrationRequirements: async (caseId: string): Promise<{
-    // AIQ-847 / F1: backend fails closed on uncovered corridors (AIQ-832, PR #399).
-    // covered=false ⇒ no seeded checklist for this corridor × visa_type; the
-    // timeline is then null and requirements/risk_flags are empty.
-    covered: boolean;
-    coverage_reason: string | null;
-    corridor: string | null;
-    corridor_from: string;
-    corridor_to: string;
-    visa_type: string;
-    document_count: number;
-    estimated_timeline_days: number | null;
-    requirements: Array<{
-      document_type: string;
-      document_name: string;
-      is_required: boolean;
-      freshness_days: number | null;
-      requires_apostille: boolean;
-      apostille_countries: string[];
-      requires_translation: boolean;
-      translation_languages: string[];
-      typical_processing_days: number | null;
-      book_early_flag: boolean;
-      book_early_reason: string | null;
-      form_url: string | null;
-    }>;
-    risk_flags: Array<{
-      flag_type: string;
-      severity: 'critical' | 'warning' | 'info';
-      title: string;
-      description: string;
-      recommended_action: string;
-      deadline: string | null;
-    }>;
-    // IMM-15: case context for vendor RFQ pre-fill
-    employee_nationality?: string | null;
-    has_dependents?: boolean;
-    dependents_count?: number;
-  }> => {
-    const response = await api.get(`/api/hr/cases/${caseId}/immigration-requirements`);
+  // AIQ-847 / F1: backend fails closed on uncovered corridors (AIQ-832, PR #399).
+  // covered=false ⇒ no seeded checklist for this corridor × visa_type; the
+  // timeline is then null and requirements/risk_flags are empty.
+  getImmigrationRequirements: async (caseId: string): Promise<ImmigrationRequirementsResponse> => {
+    const response = await api.get<ImmigrationRequirementsResponse>(`/api/hr/cases/${caseId}/immigration-requirements`);
     return response.data;
   },
 
   /** GET /api/hr/cases/{caseId}/immigration/interview-status (IMM-13) */
-  getImmigrationInterviewStatus: async (caseId: string): Promise<{
-    has_session: boolean;
-    completion_pct: number;
-    is_complete: boolean;
-    started_at: string | null;
-    last_active_at: string | null;
-    completed_at: string | null;
-  }> => {
-    const response = await api.get(`/api/hr/cases/${caseId}/immigration/interview-status`);
+  getImmigrationInterviewStatus: async (caseId: string): Promise<ImmigrationInterviewStatus> => {
+    const response = await api.get<ImmigrationInterviewStatus>(`/api/hr/cases/${caseId}/immigration/interview-status`);
     return response.data;
   },
 
   // ── IMM-14: immigration milestones ────────────────────────────────────────
 
   /** GET /api/hr/cases/{caseId}/immigration/milestones */
-  listImmigrationMilestones: async (caseId: string): Promise<{
-    milestones: Array<{
-      id: string;
-      milestone_type: string;
-      status: string;
-      sort_order: number;
-      target_date: string | null;
-      completed_date: string | null;
-      notes: string | null;
-      evidence_url: string | null;
-      book_early_alert: string | null;
-      created_at: string | null;
-      updated_at: string | null;
-    }>;
-  }> => {
-    const response = await api.get(`/api/hr/cases/${caseId}/immigration/milestones`);
+  listImmigrationMilestones: async (caseId: string): Promise<ImmigrationMilestonesResponse> => {
+    const response = await api.get<ImmigrationMilestonesResponse>(`/api/hr/cases/${caseId}/immigration/milestones`);
     return response.data;
   },
 
@@ -1066,23 +1157,8 @@ export const hrAPI = {
   /** GET /api/hr/immigration/erasure-requests */
   listErasureRequests: async (
     statusFilter: 'pending' | 'completed' | 'rejected' | 'all' = 'pending',
-  ): Promise<{
-    requests: Array<{
-      id: string;
-      case_id: string;
-      employee_id: string;
-      status: string;
-      reason: string | null;
-      requested_at: string | null;
-      statutory_due_at: string | null;
-      reviewed_by: string | null;
-      reviewed_at: string | null;
-      review_notes: string | null;
-      completed_at: string | null;
-    }>;
-    pending_count: number;
-  }> => {
-    const response = await api.get('/api/hr/immigration/erasure-requests', {
+  ): Promise<ErasureRequestsResponse> => {
+    const response = await api.get<ErasureRequestsResponse>('/api/hr/immigration/erasure-requests', {
       params: { status_filter: statusFilter },
     });
     return response.data;
@@ -1092,14 +1168,8 @@ export const hrAPI = {
   processErasureRequest: async (
     caseId: string,
     payload: { request_id: string; decision: 'approve' | 'reject'; review_notes?: string },
-  ): Promise<{
-    request_id: string;
-    status: string;
-    profiles_anonymised: number;
-    reviewed_by: string;
-    reviewed_at: string;
-  }> => {
-    const response = await api.post(
+  ): Promise<ProcessErasureResponse> => {
+    const response = await api.post<ProcessErasureResponse>(
       `/api/hr/cases/${caseId}/immigration/process-erasure-request`,
       payload,
     );
@@ -1129,25 +1199,8 @@ export const hrAPI = {
   },
 
   /** GET /api/hr/rfq-requests?case_id=X */
-  getRfqRequests: async (params?: { case_id?: string }): Promise<{
-    rfqs: Array<{
-      id: string;
-      case_id: string;
-      vendor_id: string;
-      vendor_name: string;
-      vendor_email: string;
-      service_category: string;
-      move_date: string | null;
-      budget_range: string | null;
-      special_requirements: string | null;
-      hr_email: string;
-      hr_name: string;
-      status: string;
-      created_at: string;
-    }>;
-    total: number;
-  }> => {
-    const response = await api.get('/api/hr/rfq-requests', { params });
+  getRfqRequests: async (params?: { case_id?: string }): Promise<HrRfqRequestsResponse> => {
+    const response = await api.get<HrRfqRequestsResponse>('/api/hr/rfq-requests', { params });
     return response.data;
   },
 
@@ -1201,41 +1254,16 @@ export const hrAPI = {
   },
 
   /** AIQ-39-B: Workspace benchmarking stats + industry comparison. */
-  getAnalytics: async (): Promise<{
-    workspace: {
-      avg_completion_days: number | null;
-      compliance_incident_rate: number | null;
-      total_cases_in_window: number;
-      closed_cases_in_window: number;
-      top_delay_causes: Array<{ cause: string; count: number }>;
-      corridor_breakdown: Array<{ corridor: string; avg_days: number; case_count: number }>;
-      computed_at: string | null;
-    };
-    industry: {
-      median_completion_days: number | null;
-      median_compliance_rate: number | null;
-      case_count: number;
-      workspace_count: number;
-      is_valid: boolean;
-      computed_at: string | null;
-    } | null;
-    trend: Array<{ month: string; avg_completion_days: number | null }>;
-  }> => {
-    const response = await api.get('/api/hr/analytics');
+  getAnalytics: async (): Promise<HrAnalyticsResponse> => {
+    const response = await api.get<HrAnalyticsResponse>('/api/hr/analytics');
     return response.data;
   },
 
   // ── B10: Draft case info (no assignment yet) ─────────────────────────────
 
   /** Fetch minimal info for a draft relocation case that has no assignment row yet. */
-  getDraftCase: async (caseId: string): Promise<{
-    id: string;
-    status: 'draft';
-    company_id: string | null;
-    created_at: string | null;
-    hr_user_id: string | null;
-  }> => {
-    const response = await api.get(`/api/hr/cases/${caseId}`);
+  getDraftCase: async (caseId: string): Promise<HrDraftCase> => {
+    const response = await api.get<HrDraftCase>(`/api/hr/cases/${caseId}`);
     return response.data;
   },
 
