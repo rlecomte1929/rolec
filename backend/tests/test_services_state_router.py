@@ -152,10 +152,16 @@ class ServicesStateRouterTests(unittest.TestCase):
                 ).mappings()
             )
 
-    def test_get_404_when_no_state_for_case(self) -> None:
-        with self.assertRaises(HTTPException) as ctx:
-            get_services_state(case_id=str(uuid.uuid4()), user=_user())
-        self.assertEqual(ctx.exception.status_code, 404)
+    def test_get_returns_empty_state_when_none_saved(self) -> None:
+        # AIQ-1320: an authorized case with no saved state yet returns 200 + an
+        # empty state (not 404), so the browser doesn't log a console error on
+        # the first services visit. Access is still enforced above (see
+        # test_case_access_denied_blocks_read).
+        case_id = str(uuid.uuid4())
+        result = get_services_state(case_id=case_id, user=_user())
+        self.assertEqual(result["state"], {})
+        self.assertEqual(result["case_id"], case_id)
+        self.assertEqual(result["updated_at"], "")
 
     def test_put_then_get_round_trip(self) -> None:
         emp = _user()
