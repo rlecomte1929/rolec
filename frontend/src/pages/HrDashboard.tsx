@@ -692,6 +692,8 @@ export const HrDashboard: React.FC = () => {
                 return (
                   <div
                     key={assignment.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       if (isManageMode) {
                         toggleSelection(assignment.id);
@@ -700,17 +702,17 @@ export const HrDashboard: React.FC = () => {
                       setSelectedCaseId(assignment.id);
                       navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                     }}
-                    {...(!isManageMode && {
-                      role: 'button',
-                      tabIndex: 0,
-                      onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
+                    onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        if (isManageMode) {
+                          toggleSelection(assignment.id);
+                        } else {
                           setSelectedCaseId(assignment.id);
                           navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                         }
-                      },
-                    })}
+                      }
+                    }}
                     className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${gridCols} ${
                       isManageMode
                         ? (isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]')
