@@ -385,9 +385,11 @@ function DocRow({ doc, onUpload, onPreview, onDownload, onDelete, isDeepLinkTarg
             <Button unstyled onClick={onDownload} title="Download" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
             </Button>
-            <Button unstyled onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.danger, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
-            </Button>
+            {onDelete && (
+              <Button unstyled onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.danger, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+              </Button>
+            )}
           </div>
         )}
         <RowUpload doc={doc} onUpload={onUpload} btnRef={uploadBtnRef} />
