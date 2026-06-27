@@ -424,8 +424,15 @@ export const AdminMessages: React.FC = () => {
 
       {/* Update ticket modal */}
       {editingTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingTicket(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingTicket(null); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditingTicket(null); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close update ticket modal"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Update ticket</h3>
             <div className="space-y-4">
               <div>

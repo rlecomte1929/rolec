@@ -220,6 +220,9 @@ export const AdminSuppliers: React.FC = () => {
                       key={s.id}
                       className="border-b border-[#e5e7eb] hover:bg-[#f9fafb] cursor-pointer"
                       onClick={() => goToDetail(s.id)}
+                      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToDetail(s.id); } }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <td className="py-3 px-4">
                         <span className="font-medium text-[#0b2b43]">{s.name}</span>
@@ -251,12 +254,12 @@ export const AdminSuppliers: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4">{s.verified ? '✓' : '-'}</td>
-                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3 px-4">
                         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Row actions">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => goToDetail(s.id)}
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); goToDetail(s.id); }}
                             aria-label={`Edit ${s.name}`}
                           >
                             Edit
@@ -266,7 +269,7 @@ export const AdminSuppliers: React.FC = () => {
                               variant="outline"
                               size="sm"
                               className="text-amber-700 border-amber-300"
-                              onClick={() => handleSetStatus(s.id, s.name, 'inactive')}
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSetStatus(s.id, s.name, 'inactive'); }}
                               aria-label={`Deactivate ${s.name}`}
                             >
                               Deactivate
@@ -276,7 +279,7 @@ export const AdminSuppliers: React.FC = () => {
                               variant="outline"
                               size="sm"
                               className="text-green-700 border-green-300"
-                              onClick={() => handleSetStatus(s.id, s.name, 'active')}
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSetStatus(s.id, s.name, 'active'); }}
                               aria-label={`Activate ${s.name}`}
                             >
                               Activate
@@ -286,7 +289,7 @@ export const AdminSuppliers: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             className="text-[#4b5563]"
-                            onClick={() => goToDetail(s.id, '#coverage')}
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); goToDetail(s.id, '#coverage'); }}
                             aria-label={`View coverage for ${s.name}`}
                           >
                             View coverage
