@@ -39,11 +39,16 @@ class _StubResolver:
 
     def resolve(self):
         raw = extract_destination_from_profile(self.employee_profile)
-        if not raw and self.case:
-            if self.case.get("host_country"):
-                raw = str(self.case["host_country"]).strip() or None
-            if not raw:
-                raw = extract_destination_from_case_profile(self.case.get("profile_json"))
+        # Fall back when the profile destination is missing OR doesn't normalise
+        # (e.g. city-only "Amsterdam") — mirrors the real resolver (AIQ-1321).
+        if not normalize_destination_key(raw) and self.case:
+            host = str(self.case.get("host_country") or "").strip() or None
+            if normalize_destination_key(host):
+                raw = host
+            else:
+                blob = extract_destination_from_case_profile(self.case.get("profile_json"))
+                if normalize_destination_key(blob):
+                    raw = blob
         return raw, normalize_destination_key(raw)
 
 
@@ -94,6 +99,41 @@ class DestinationResolutionPriorityTests(unittest.TestCase):
         raw, key = r.resolve()
         self.assertEqual(raw, "Spain")
         self.assertEqual(key, "ES")
+
+
+class DestinationFallbackOnUnnormalizableTests(unittest.TestCase):
+    """AIQ-1321: the resolver must fall back to the canonical host_country when the
+    profile destination is truthy but doesn't normalise (e.g. a city-only value), not
+    only when it's empty — otherwise readiness degrades to no_destination."""
+
+    def test_city_only_profile_falls_back_to_host_country(self):
+        # "Amsterdam" alone has no country → normalises to None → use host_country.
+        r = _StubResolver(
+            employee_profile={"movePlan": {"destination": "Amsterdam"}},
+            case={"host_country": "NL", "profile_json": None},
+        )
+        raw, key = r.resolve()
+        self.assertEqual(raw, "NL")
+        self.assertEqual(key, "NL")
+
+    def test_reported_aiq1321_case_resolves(self):
+        # The actual case 120d6fd0: movePlan "Amsterdam, NL" normalises (via #1058) → used as-is.
+        r = _StubResolver(
+            employee_profile={"movePlan": {"destination": "Amsterdam, NL"}},
+            case={"host_country": "NL", "profile_json": None},
+        )
+        raw, key = r.resolve()
+        self.assertEqual(raw, "Amsterdam, NL")
+        self.assertEqual(key, "NL")
+
+    def test_unnormalizable_everywhere_stays_no_destination(self):
+        # Nothing resolves → key None (no_destination), correctly.
+        r = _StubResolver(
+            employee_profile={"movePlan": {"destination": "Atlantis"}},
+            case={"host_country": None, "profile_json": None},
+        )
+        _, key = r.resolve()
+        self.assertIsNone(key)
 
 
 class CombinedCityCountryNormalizationTests(unittest.TestCase):
