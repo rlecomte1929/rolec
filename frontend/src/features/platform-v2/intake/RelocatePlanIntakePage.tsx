@@ -16,6 +16,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import type * as React from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Radio } from '../../../components/antigravity/Radio';
 import { Input } from '../../../components/antigravity/Input';
@@ -364,11 +365,14 @@ function RequestCountryModal({
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', background: 'rgba(12,25,41,.65)', backdropFilter: 'blur(3px)' }}
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
       <div
         style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 520, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,.28)' }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -510,7 +514,12 @@ function ProgressStepper({
             </Button>
             {/* Label */}
             <span
-              onClick={() => isNavigable && onStepClick(stepNum)}
+              {...(isNavigable ? {
+                onClick: () => onStepClick(stepNum),
+                onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStepClick(stepNum); } },
+                role: 'button' as const,
+                tabIndex: 0,
+              } : {})}
               className={`mt-1.5 text-[10px] font-medium text-center leading-tight transition-colors ${
                 isActive
                   ? 'text-gray-800'

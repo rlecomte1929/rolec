@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import type * as React from 'react';
 import { Button } from '../../../components/antigravity/Button';
 import type { DocStatus, StepStatus, FormStatus } from '../../../types/relopass-api-contracts';
 
@@ -113,9 +114,12 @@ export function StatCard({ title, value, delta, icon, iconColor = 'var(--accent)
 
   return (
     <div
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
+      {...(onClick ? {
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
+        role: 'button' as const,
+        tabIndex: 0,
+      } : {})}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border-subtle)',
@@ -436,6 +440,7 @@ export function ConfirmDialog({
       }}
     >
       {/* Backdrop */}
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the dialog's own controls */}
       <div
         aria-hidden="true"
         onClick={onCancel}

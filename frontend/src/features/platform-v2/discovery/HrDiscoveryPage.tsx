@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type * as React from 'react';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
 
@@ -183,6 +184,10 @@ function RequirementsTab({
             <div
               key={r.id}
               onClick={() => setActiveId(isActive ? null : r.id)}
+              onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveId(isActive ? null : r.id); } }}
+              role="button"
+              tabIndex={0}
+              aria-expanded={isActive}
               className={`flex items-start gap-4 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
                 isActive
                   ? 'border-accent-400 bg-accent-50'

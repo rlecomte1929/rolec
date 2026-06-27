@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import type * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
@@ -767,10 +768,11 @@ export function MobilityControlCenterV2Page() {
                   {riskFeed.map((row) => {
                     const age = daysAgo(row.updatedAt);
                     return (
-                      <li
-                        key={row.id}
+                      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- <li> as interactive list item; button role enables keyboard activation
+                      <li key={row.id} role="button" tabIndex={0}
                         className="cursor-pointer text-[12.5px] hover:opacity-90"
                         onClick={() => goToCase(row)}
+                        onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToCase(row); } }}
                       >
                         <div className="flex items-center gap-1.5">
                           <span className={`inline-block h-1.5 w-1.5 rounded-full ${row.riskStatus === 'red' ? 'bg-rose-500' : 'bg-amber-500'}`} />

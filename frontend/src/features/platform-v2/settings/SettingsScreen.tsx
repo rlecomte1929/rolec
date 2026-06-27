@@ -4,6 +4,7 @@
  */
 
 import { useRef, useState } from 'react';
+import type * as React from 'react';
 import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
@@ -175,8 +176,12 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
         <div
           onClick={() => fileRef.current?.click()}
+          onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click(); } }}
+          role="button"
+          tabIndex={0}
           style={{ cursor: 'pointer', position: 'relative' }}
           title="Click to upload avatar"
+          aria-label="Upload avatar"
         >
           <Avatar name={form.full_name} src={form.avatar_url ?? undefined} size={72} />
           <div style={{

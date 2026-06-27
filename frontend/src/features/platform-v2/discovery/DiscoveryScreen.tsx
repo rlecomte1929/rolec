@@ -93,6 +93,7 @@ function UploadPanel({ requirement, onClose, onUpload }: UploadPanelProps) {
         justifyContent: 'flex-end',
       }}
     >
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
       <div
         aria-hidden="true"
         onClick={onClose}

@@ -251,6 +251,7 @@ function VendorSlideOver({ vendor, onClose, onAssign }: VendorSlideOverProps) {
   if (!vendor) return null;
   return (
     <>
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
       <div
         aria-hidden="true"
         onClick={onClose}
