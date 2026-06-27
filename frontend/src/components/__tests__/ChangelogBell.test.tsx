@@ -35,7 +35,6 @@ function mockChangelogFetch(payload: unknown = SAMPLE_ENTRIES) {
     ok: true,
     json: () => Promise.resolve(payload),
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).fetch = fetchMock;
   return fetchMock;
 }
