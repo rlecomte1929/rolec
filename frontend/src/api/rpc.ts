@@ -1,5 +1,6 @@
 import { logger } from '../lib/logger';
 import { supabase } from './supabase';
+import type { ApiErrorBody } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -39,7 +40,7 @@ const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<
       if (!res.ok) {
         let message = bodyText;
         try {
-          const parsed = JSON.parse(bodyText);
+          const parsed = JSON.parse(bodyText) as ApiErrorBody;
           message = parsed?.message || parsed?.error || bodyText;
         } catch {
           // keep raw bodyText
@@ -57,8 +58,8 @@ const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<
       }
       const data = bodyText ? (JSON.parse(bodyText) as T) : null;
       return { data: data as T, error: null };
-    } catch (err: any) {
-      const message = err?.message || 'Unable to reach Supabase';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to reach Supabase';
       if (import.meta.env.DEV) {
         logger.debug('RPC error', fn, message);
       }
@@ -67,14 +68,14 @@ const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<
   }
 
   // Fallback to supabase-js rpc if env vars are missing.
-  const { data, error } = await supabase.rpc(fn, params);
-  if (error) {
+  const result = await supabase.rpc(fn, params);
+  if (result.error) {
     if (import.meta.env.DEV) {
-      logger.debug('RPC error', fn, error.message);
+      logger.debug('RPC error', fn, result.error.message);
     }
-    return { data: null, error: error.message };
+    return { data: null, error: result.error.message };
   }
-  return { data: data as T, error: null };
+  return { data: (result.data ?? null) as T | null, error: null };
 };
 
 export const transitionAssignment = async (
