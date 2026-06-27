@@ -55,7 +55,7 @@ import type {
 import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryResponse } from '../types/policyAssistant';
 import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
 import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
-import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
+import { ragResponseToEmployeeResponse, ragResponseToHrResponse, type RagQueryResponse } from './policyAssistantRagAdapter';
 import {
   intakeEnvelopeSchema,
   assignmentsOverviewSchema,
@@ -2409,11 +2409,176 @@ export const requirementsAPI = {
   },
 };
 
+interface EmployeePolicyCaps {
+  // AIQ-999 — caps now come from the caller's resolved per-assignment policy,
+  // not a global default. When the company has not published a matching
+  // policy, has_policy is false and every cap is null (no fake defaults).
+  has_policy?: boolean;
+  housing_monthly_usd: number | null;
+  movers_usd: number | null;
+  schools_usd: number | null;
+  immigration_usd: number | null;
+}
+
+interface AssignmentServiceRow {
+  id: string;
+  assignment_id: string;
+  case_id: string;
+  service_key: string;
+  category: string;
+  selected: number | boolean;
+  estimated_cost: number | null;
+  currency: string | null;
+}
+
+interface EmployeeAssignmentServicesResponse {
+  assignment_id: string;
+  case_id: string;
+  services: AssignmentServiceRow[];
+}
+
+interface ComparisonReadiness {
+  comparison_ready: boolean;
+  comparison_blockers: string[];
+  partial_numeric_coverage?: boolean;
+}
+
+interface ServicesPolicyContextResponse {
+  ok?: boolean;
+  has_policy?: boolean;
+  comparison_available?: boolean;
+  comparison_readiness?: ComparisonReadiness;
+  currency: string;
+  categories: Record<
+    string,
+    {
+      wizard_key: string;
+      benefit_key: string | null;
+      determination: string;
+      show_policy_comparison: boolean;
+      primary_label: string;
+      detail?: string | null;
+      approval_required?: boolean;
+      cap_summary?: string | null;
+    }
+  >;
+  source?: string;
+  policy_surface?: {
+    id?: string;
+    title?: string;
+    version?: number;
+    effective_date?: string | null;
+    company_name?: string | null;
+  };
+  resolution_context?: {
+    assignment_type?: string | null;
+    family_status?: string | null;
+    tier?: string | null;
+    source?: string | null;
+  };
+}
+
+interface EmployeePolicyBudgetResponse {
+  ok?: boolean;
+  has_policy?: boolean;
+  comparison_available?: boolean;
+  comparison_readiness?: ComparisonReadiness;
+  currency: string;
+  caps: Record<string, number>;
+  total_cap?: number | null;
+  budget?: unknown;
+}
+
+interface ApplicablePolicyResponse {
+  policy: Record<string, unknown> | null;
+  allowedBenefits: Array<Record<string, unknown>>;
+  wizardCriteria: Record<string, unknown>;
+  employeeBand?: string;
+  assignmentType?: string;
+}
+
+interface ResolvedPolicyResponse {
+  policy: { id: string; title: string; version: number; effective_date: string } | null;
+  benefits: Array<{
+    benefit_key: string;
+    included: boolean;
+    min_value?: number;
+    standard_value?: number;
+    max_value?: number;
+    currency?: string;
+    approval_required: boolean;
+    evidence_required_json?: string[];
+    condition_summary?: string;
+    exclusions_json?: Array<{ domain?: string; description?: string }>;
+  }>;
+  exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
+  resolved_at?: string;
+  resolution_context?: { assignment_type?: string; family_status?: string; tier?: string };
+  message?: string;
+  has_policy?: boolean;
+  message_secondary?: string;
+  comparison_available?: boolean;
+  comparison_readiness?: ComparisonReadiness;
+}
+
+interface MyAssignmentPackagePolicyResponse {
+  status: 'found' | 'no_policy_found' | 'no_assignment' | 'error';
+  ok?: boolean;
+  assignment_id: string | null;
+  has_policy?: boolean;
+  policy: Record<string, unknown> | null;
+  benefits: unknown[];
+  exclusions: unknown[];
+  resolved_at?: string | null;
+  resolution_context?: Record<string, unknown> | null;
+  message?: string | null;
+  message_secondary?: string | null;
+  company_id_used?: string;
+  comparison_available?: boolean;
+  comparison_readiness?: ComparisonReadiness;
+}
+
+interface PolicyEnvelopeResponse {
+  policy: Record<string, unknown> | null;
+  benefits: unknown[];
+  exclusions: unknown[];
+  envelopes: Array<{
+    key: string;
+    label: string;
+    included: boolean;
+    capped: boolean;
+    min_value?: number;
+    standard_value?: number;
+    max_value?: number;
+    currency: string;
+    approval_required: boolean;
+    evidence_required: string[];
+  }>;
+  message?: string;
+}
+
+interface CreateQuoteRequestResponse {
+  id: string;
+  case_id: string;
+  status: string;
+  created_at: string;
+}
+
+interface QuoteRequestListItem {
+  id: string;
+  case_id: string;
+  service_categories: string[];
+  notes: string | null;
+  budget_range: string | null;
+  status: string;
+  created_at: string;
+}
+
 export const employeeAPI = {
   getCurrentAssignment: async (): Promise<{
-    assignment: any;
-    linked_assignments?: any[];
-    pending_claim_assignments?: any[];
+    assignment: unknown;
+    linked_assignments?: unknown[];
+    pending_claim_assignments?: unknown[];
   }> => {
     return cachedRequest('employee:current-assignment', 30_000, async () => {
       const response = await api.get('/api/employee/assignments/current');
@@ -2421,22 +2586,22 @@ export const employeeAPI = {
     });
   },
   /** Compact linked + pending summaries (no case draft hydration). */
-  getAssignmentsOverview: async (): Promise<{ linked: any[]; pending: any[] }> => {
+  getAssignmentsOverview: async (): Promise<{ linked: unknown[]; pending: unknown[] }> => {
     return cachedRequest('employee:assignments-overview', 60_000, async () => {
       const response = await api.get('/api/employee/assignments/overview');
       return parseResponse(assignmentsOverviewSchema, response.data, 'getAssignmentsOverview');
     });
   },
   listMessages: async (): Promise<{
-    messages: any[];
-    quote_threads?: any[];
+    messages: unknown[];
+    quote_threads?: unknown[];
   }> => {
-    const response = await api.get('/api/employee/messages');
+    const response = await api.get<{ messages: unknown[]; quote_threads?: unknown[] }>('/api/employee/messages');
     return response.data;
   },
   /** Send a message to HR on your own assignment thread (ownership enforced server-side). */
-  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: any }> => {
-    const response = await api.post<{ ok: boolean; message: any }>('/api/employee/messages', {
+  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: unknown }> => {
+    const response = await api.post<{ ok: boolean; message: unknown }>('/api/employee/messages', {
       assignment_id: assignmentId,
       body,
     });
@@ -2527,7 +2692,7 @@ export const employeeAPI = {
     const response = await api.get<Array<{ id: string; assignment_id: string; message: string; created_at: string }>>('/api/employee/assignment-feedback', { params: { assignment_id: assignmentId } });
     return response.data;
   },
-  submitAnswer: async (assignmentId: string, questionId: string, answer: any): Promise<EmployeeJourneyResponse> => {
+  submitAnswer: async (assignmentId: string, questionId: string, answer: unknown): Promise<EmployeeJourneyResponse> => {
     const response = await api.post<EmployeeJourneyResponse>('/api/employee/journey/answer', { assignmentId, questionId, answer });
     return response.data;
   },
@@ -2545,38 +2710,16 @@ export const employeeAPI = {
     });
     return response.data;
   },
-  getRecommendations: async (): Promise<{ housing: any[]; schools: any[]; movers: any[] }> => {
-    const response = await api.get<{ housing: any[]; schools: any[]; movers: any[] }>('/api/employee/recommendations');
+  getRecommendations: async (): Promise<{ housing: unknown[]; schools: unknown[]; movers: unknown[] }> => {
+    const response = await api.get<{ housing: unknown[]; schools: unknown[]; movers: unknown[] }>('/api/employee/recommendations');
     return response.data;
   },
-  getPolicyCaps: async (): Promise<{
-    // AIQ-999 — caps now come from the caller's resolved per-assignment policy,
-    // not a global default. When the company has not published a matching
-    // policy, has_policy is false and every cap is null (no fake defaults).
-    has_policy?: boolean;
-    housing_monthly_usd: number | null;
-    movers_usd: number | null;
-    schools_usd: number | null;
-    immigration_usd: number | null;
-  }> => {
-    const response = await api.get('/api/employee/policy/caps');
+  getPolicyCaps: async (): Promise<EmployeePolicyCaps> => {
+    const response = await api.get<EmployeePolicyCaps>('/api/employee/policy/caps');
     return response.data;
   },
-  getAssignmentServices: async (assignmentId: string): Promise<{
-    assignment_id: string;
-    case_id: string;
-    services: Array<{
-      id: string;
-      assignment_id: string;
-      case_id: string;
-      service_key: string;
-      category: string;
-      selected: number | boolean;
-      estimated_cost: number | null;
-      currency: string | null;
-    }>;
-  }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/services`);
+  getAssignmentServices: async (assignmentId: string): Promise<EmployeeAssignmentServicesResponse> => {
+    const response = await api.get<EmployeeAssignmentServicesResponse>(`/api/employee/assignments/${assignmentId}/services`);
     return response.data;
   },
   saveAssignmentServices: async (
@@ -2588,160 +2731,42 @@ export const employeeAPI = {
       estimated_cost: number | null;
       currency?: string | null;
     }>
-  ): Promise<{ ok: boolean; services: any[] }> => {
-    const response = await api.post<{ ok: boolean; services: any[] }>(`/api/employee/assignments/${assignmentId}/services`, { services });
+  ): Promise<{ ok: boolean; services: unknown[] }> => {
+    const response = await api.post<{ ok: boolean; services: unknown[] }>(`/api/employee/assignments/${assignmentId}/services`, { services });
     return response.data;
   },
   /**
    * Services page: per-category policy view from resolved published policy (Layer 2) only.
    */
-  getServicesPolicyContext: async (assignmentId: string): Promise<{
-    ok?: boolean;
-    has_policy?: boolean;
-    comparison_available?: boolean;
-    comparison_readiness?: {
-      comparison_ready: boolean;
-      comparison_blockers: string[];
-      partial_numeric_coverage?: boolean;
-    };
-    currency: string;
-    categories: Record<
-      string,
-      {
-        wizard_key: string;
-        benefit_key: string | null;
-        determination: string;
-        show_policy_comparison: boolean;
-        primary_label: string;
-        detail?: string | null;
-        approval_required?: boolean;
-        cap_summary?: string | null;
-      }
-    >;
-    source?: string;
-    policy_surface?: {
-      id?: string;
-      title?: string;
-      version?: number;
-      effective_date?: string | null;
-      company_name?: string | null;
-    };
-    resolution_context?: {
-      assignment_type?: string | null;
-      family_status?: string | null;
-      tier?: string | null;
-      source?: string | null;
-    };
-  }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/services-policy-context`);
+  getServicesPolicyContext: async (assignmentId: string): Promise<ServicesPolicyContextResponse> => {
+    const response = await api.get<ServicesPolicyContextResponse>(`/api/employee/assignments/${assignmentId}/services-policy-context`);
     return response.data;
   },
-  getPolicyBudget: async (assignmentId: string): Promise<{
-    ok?: boolean;
-    has_policy?: boolean;
-    comparison_available?: boolean;
-    comparison_readiness?: {
-      comparison_ready: boolean;
-      comparison_blockers: string[];
-      partial_numeric_coverage?: boolean;
-    };
-    currency: string;
-    caps: Record<string, number>;
-    total_cap?: number | null;
-    budget?: unknown;
-  }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-budget`);
+  getPolicyBudget: async (assignmentId: string): Promise<EmployeePolicyBudgetResponse> => {
+    const response = await api.get<EmployeePolicyBudgetResponse>(`/api/employee/assignments/${assignmentId}/policy-budget`);
     return response.data;
   },
-  getApplicablePolicy: async (assignmentId?: string): Promise<{
-    policy: Record<string, unknown> | null;
-    allowedBenefits: Array<Record<string, unknown>>;
-    wizardCriteria: Record<string, unknown>;
-    employeeBand?: string;
-    assignmentType?: string;
-  }> => {
+  getApplicablePolicy: async (assignmentId?: string): Promise<ApplicablePolicyResponse> => {
     const params = assignmentId ? { assignmentId } : {};
-    const response = await api.get('/api/employee/policy/applicable', { params });
+    const response = await api.get<ApplicablePolicyResponse>('/api/employee/policy/applicable', { params });
     return response.data;
   },
   /** Resolved policy from published company policy (preferred when assignmentId available) */
-  getResolvedPolicy: async (assignmentId: string): Promise<{
-    policy: { id: string; title: string; version: number; effective_date: string } | null;
-    benefits: Array<{
-      benefit_key: string;
-      included: boolean;
-      min_value?: number;
-      standard_value?: number;
-      max_value?: number;
-      currency?: string;
-      approval_required: boolean;
-      evidence_required_json?: string[];
-      condition_summary?: string;
-      exclusions_json?: Array<{ domain?: string; description?: string }>;
-    }>;
-    exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
-    resolved_at?: string;
-    resolution_context?: { assignment_type?: string; family_status?: string; tier?: string };
-    message?: string;
-    has_policy?: boolean;
-    message_secondary?: string;
-    comparison_available?: boolean;
-    comparison_readiness?: {
-      comparison_ready: boolean;
-      comparison_blockers: string[];
-      partial_numeric_coverage?: boolean;
-    };
-  }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy`);
+  getResolvedPolicy: async (assignmentId: string): Promise<ResolvedPolicyResponse> => {
+    const response = await api.get<ResolvedPolicyResponse>(`/api/employee/assignments/${assignmentId}/policy`);
     return response.data;
   },
   /**
    * Single round-trip for Assignment Package & Limits (employee HR Policy page).
    * Avoids chaining current-assignment + policy calls on the critical path.
    */
-  getMyAssignmentPackagePolicy: async (): Promise<{
-    status: 'found' | 'no_policy_found' | 'no_assignment' | 'error';
-    ok?: boolean;
-    assignment_id: string | null;
-    has_policy?: boolean;
-    policy: Record<string, unknown> | null;
-    benefits: unknown[];
-    exclusions: unknown[];
-    resolved_at?: string | null;
-    resolution_context?: Record<string, unknown> | null;
-    message?: string | null;
-    message_secondary?: string | null;
-    company_id_used?: string;
-    comparison_available?: boolean;
-    comparison_readiness?: {
-      comparison_ready: boolean;
-      comparison_blockers: string[];
-      partial_numeric_coverage?: boolean;
-    };
-  }> => {
-    const response = await api.get('/api/employee/me/assignment-package-policy');
+  getMyAssignmentPackagePolicy: async (): Promise<MyAssignmentPackagePolicyResponse> => {
+    const response = await api.get<MyAssignmentPackagePolicyResponse>('/api/employee/me/assignment-package-policy');
     return response.data;
   },
   /** Policy envelope (envelope cards ready) for comparison/budget logic */
-  getPolicyEnvelope: async (assignmentId: string): Promise<{
-    policy: Record<string, unknown> | null;
-    benefits: unknown[];
-    exclusions: unknown[];
-    envelopes: Array<{
-      key: string;
-      label: string;
-      included: boolean;
-      capped: boolean;
-      min_value?: number;
-      standard_value?: number;
-      max_value?: number;
-      currency: string;
-      approval_required: boolean;
-      evidence_required: string[];
-    }>;
-    message?: string;
-  }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-envelope`);
+  getPolicyEnvelope: async (assignmentId: string): Promise<PolicyEnvelopeResponse> => {
+    const response = await api.get<PolicyEnvelopeResponse>(`/api/employee/assignments/${assignmentId}/policy-envelope`);
     return response.data;
   },
   /** Compare selected services vs resolved policy (read-only, explanatory) */
@@ -2756,7 +2781,7 @@ export const employeeAPI = {
   ): Promise<EmployeePolicyAssistantQueryResponse> => {
     // AIQ-833 / F2: cut over to the constrained RAG engine (company scoping is
     // server-derived). assignment_id is kept on the signature + response shape.
-    const response = await api.post(
+    const response = await api.post<RagQueryResponse>(
       '/api/policy-assistant/rag-query',
       { question: message },
       { timeout: 120_000 }
@@ -2771,26 +2796,13 @@ export const employeeAPI = {
     service_categories: string[];
     notes?: string;
     budget_range?: string;
-  }): Promise<{
-    id: string;
-    case_id: string;
-    status: string;
-    created_at: string;
-  }> => {
-    const response = await api.post('/api/employee/quote-requests', payload);
+  }): Promise<CreateQuoteRequestResponse> => {
+    const response = await api.post<CreateQuoteRequestResponse>('/api/employee/quote-requests', payload);
     return response.data;
   },
 
-  listMyQuoteRequests: async (): Promise<Array<{
-    id: string;
-    case_id: string;
-    service_categories: string[];
-    notes: string | null;
-    budget_range: string | null;
-    status: string;
-    created_at: string;
-  }>> => {
-    const response = await api.get('/api/employee/quote-requests');
+  listMyQuoteRequests: async (): Promise<QuoteRequestListItem[]> => {
+    const response = await api.get<QuoteRequestListItem[]>('/api/employee/quote-requests');
     return Array.isArray(response.data) ? response.data : [];
   },
 
