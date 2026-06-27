@@ -21,6 +21,7 @@ from .routers import (
     case_integrations,
     cases_read,
     cases_write,
+    case_documents,
     conjoint,
     employee_quotes,
     employee_steps,
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(cases_read.router)
     app.include_router(case_integrations.router)  # I-4 — email plan + calendar .ics
     app.include_router(cases_write.router)
+    app.include_router(case_documents.router)  # [DOCFLOW P1] case-scoped document upload/status
     app.include_router(cases_admin.router)
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
     app.include_router(admin.router)

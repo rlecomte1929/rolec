@@ -42,6 +42,7 @@ from ...relocation_plan_task_library import estimated_effort_for
 from ...relocation_plan_status_derivation import (
     DerivationThresholds,
     RelocationPlanDerivationContext,
+    _MET_DOC_STATUSES,
     apply_derived_statuses_to_enriched_tasks,
     employment_letter_satisfied,
     is_due_soon,
@@ -211,6 +212,18 @@ def _wire_cta(internal: str) -> Tuple[RelocationPlanCtaType, str]:
 
 def _required_input_present(key: str, ctx: RelocationPlanDerivationContext) -> bool:
     k = (key or "").strip().lower()
+    # Generic satisfaction: any uploaded case_documents row whose document_key matches
+    # this required-input key (exact) in a MET status satisfies the task. This makes the
+    # upload→satisfy loop work for the whole document vocabulary, not just passport /
+    # employment.
+    if k:
+        for row in (ctx.case_documents or []):
+            if str(row.get("document_key") or "").strip().lower() != k:
+                continue
+            if str(row.get("document_status") or "").strip().lower() in _MET_DOC_STATUSES:
+                return True
+    # Legacy fallbacks (profile flags / requirement eval / substring doc match) so
+    # pre-existing paths still satisfy passport & employment even without a case_documents row.
     if "passport" in k:
         return passport_copy_satisfied(ctx)
     if "employment" in k or "contract" in k or "assignment" in k:
