@@ -12,6 +12,7 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import React from 'react';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { EmployeeDossierPage } from '../EmployeeDossierPage';
 
 expect.extend(matchers);
 
@@ -40,7 +41,6 @@ vi.mock('../../../features/platform-v2/dossier/CaseFormCard', () => ({
   CaseFormCard: ({ form }: { form: { id: string } }) => <div data-testid={`form-${form.id}`} />,
 }));
 
-import { EmployeeDossierPage } from '../EmployeeDossierPage';
 
 // --- helpers ---------------------------------------------------------------
 

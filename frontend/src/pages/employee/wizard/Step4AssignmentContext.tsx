@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '../../../components/antigravity/Input';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
-import type { CaseDraftDTO } from '../../../types';
+import type { CaseDraftDTO, AssignmentContextDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
+import { getApiErrorMessage } from '../../../utils/apiDetail';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -15,9 +16,7 @@ interface StepProps {
   isSaving?: boolean;
 }
 
-const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
-
-export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack, isSaving }) => {
+export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack, isSaving }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.assignmentContext);
   const [error, setError] = useState('');
@@ -27,7 +26,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
     setLocal(draft.assignmentContext || {});
   }, [draft.assignmentContext]);
 
-  const update = (key: keyof typeof local, value: any) => {
+  const update = (key: keyof AssignmentContextDTO, value: AssignmentContextDTO[keyof AssignmentContextDTO]) => {
     setLocal({ ...local, [key]: value });
   };
 
@@ -70,7 +69,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Job title
-          {(isRequired(requiredFields, 'assignmentContext.jobTitle') || true) && jobTitleMissing && (
+          {jobTitleMissing && (
             <span className="text-red-600"> *</span>
           )}
           <Input unstyled
@@ -81,7 +80,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Contract start date
-          {(isRequired(requiredFields, 'assignmentContext.contractStartDate') || true) && contractStartMissing && (
+          {contractStartMissing && (
             <span className="text-red-600"> *</span>
           )}
           <Input unstyled
@@ -93,7 +92,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Contract type
-          {(isRequired(requiredFields, 'assignmentContext.contractType') || true) && contractTypeMissing && (
+          {contractTypeMissing && (
             <span className="text-red-600"> *</span>
           )}
           <select
@@ -109,7 +108,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Salary band
-          {(isRequired(requiredFields, 'assignmentContext.salaryBand') || true) && salaryBandMissing && (
+          {salaryBandMissing && (
             <span className="text-red-600"> *</span>
           )}
           <select
@@ -144,8 +143,8 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
                   logger.debug('Save & Exit -> /employee/dashboard');
                 }
                 navigate(ROUTES.EMP_DASH);
-              } catch (err: any) {
-                setError(err?.message || "Couldn't save draft. Try again.");
+              } catch (err) {
+                setError(getApiErrorMessage(err, "Couldn't save draft. Try again."));
               } finally {
                 setDraftExitSaving(false);
               }

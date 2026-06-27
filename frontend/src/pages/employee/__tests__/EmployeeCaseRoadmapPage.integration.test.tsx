@@ -15,6 +15,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { RelocationPlanViewResponseDTO } from '../../../types/relocationPlanView';
+import { EmployeeCaseRoadmapPage } from '../EmployeeCaseRoadmapPage';
 
 // ── Stub AppShell ────────────────────────────────────────────────────────────
 vi.mock('../../../components/AppShell', () => ({
@@ -42,8 +43,6 @@ vi.mock('../../../api/caseDetails', () => ({
 vi.mock('../../../api/cases', () => ({
   validateRoadmap: vi.fn().mockResolvedValue({ roadmap_validated_at: null }),
 }));
-
-import { EmployeeCaseRoadmapPage } from '../EmployeeCaseRoadmapPage';
 
 const READY_PLAN: RelocationPlanViewResponseDTO = {
   case_id: 'c1',

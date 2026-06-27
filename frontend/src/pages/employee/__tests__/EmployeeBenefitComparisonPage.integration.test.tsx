@@ -19,6 +19,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { createTestQueryClient } from '../../../hooks/__tests__/queryTestUtils';
 import type { PolicyServiceComparisonResponse } from '../../../types';
+import { EmployeeBenefitComparisonPage } from '../EmployeeBenefitComparisonPage';
 
 // ── Stub AppShell ────────────────────────────────────────────────────────────
 vi.mock('../../../components/AppShell', () => ({
@@ -57,8 +58,6 @@ vi.mock('../../../api/client', () => ({
     getServicesPolicyContext: (...a: unknown[]) => getServicesPolicyContext(...a),
   },
 }));
-
-import { EmployeeBenefitComparisonPage } from '../EmployeeBenefitComparisonPage';
 
 function linkedCtx(): AssignmentCtx {
   return {
