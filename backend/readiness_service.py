@@ -55,10 +55,17 @@ def normalize_destination_key(raw: Optional[str]) -> Optional[str]:
     key = _COUNTRY_ALIASES.get(s.lower())
     if key:
         return key
-    # Title Case country name e.g. "Singapore"
-    key2 = _COUNTRY_ALIASES.get(s.lower().strip())
-    if key2:
-        return key2
+    # Combined "City, CC" / "City, Country" — the wizard stores movePlan.destination as
+    # "<city>, <country>" (e.g. "Amsterdam, NL"), which previously failed to normalize and
+    # left HR's readiness stuck on reason="no_destination" (AIQ-1311 follow-up). Try each
+    # comma-separated token, country-last (the country is usually the trailing token).
+    if "," in s:
+        for token in reversed([t.strip() for t in s.split(",") if t.strip()]):
+            if re.fullmatch(r"[A-Za-z]{2}", token):
+                return token.upper()
+            alias = _COUNTRY_ALIASES.get(token.lower())
+            if alias:
+                return alias
     return None
 
 

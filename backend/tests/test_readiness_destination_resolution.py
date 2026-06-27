@@ -96,5 +96,33 @@ class DestinationResolutionPriorityTests(unittest.TestCase):
         self.assertEqual(key, "ES")
 
 
+class CombinedCityCountryNormalizationTests(unittest.TestCase):
+    """AIQ-1311 follow-up: the wizard stores movePlan.destination as "<city>, <country>"
+    (e.g. "Amsterdam, NL"). That must normalize to the country key so HR readiness
+    resolves (NL has a template) instead of degrading to reason="no_destination"."""
+
+    def test_city_plus_iso2_code(self):
+        self.assertEqual(normalize_destination_key("Amsterdam, NL"), "NL")
+        self.assertEqual(normalize_destination_key("Oslo, NO"), "NO")
+
+    def test_city_plus_country_name(self):
+        self.assertEqual(normalize_destination_key("Paris, France"), "FR")
+        self.assertEqual(normalize_destination_key("Munich, Germany"), "DE")
+
+    def test_city_state_country_three_parts(self):
+        self.assertEqual(normalize_destination_key("New York, NY, US"), "US")
+
+    def test_plain_inputs_unaffected(self):
+        # No comma → unchanged behavior.
+        self.assertEqual(normalize_destination_key("NL"), "NL")
+        self.assertEqual(normalize_destination_key("Singapore"), "SG")
+        self.assertIsNone(normalize_destination_key("Atlantis"))
+        self.assertIsNone(normalize_destination_key(None))
+
+    def test_unresolvable_tokens_return_none(self):
+        # A comma string with no recognizable country token still yields None.
+        self.assertIsNone(normalize_destination_key("Somewhere, Nowhere"))
+
+
 if __name__ == "__main__":
     unittest.main()
