@@ -5,6 +5,7 @@ import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/
 import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
@@ -166,7 +167,16 @@ export const EmployeeJourney: React.FC = () => {
   // AIQ-1269b: first-time welcome card for the primary linked case, shown only
   // before intake has begun (status assigned/awaiting_intake & intake_step 0) and
   // until the employee dismisses it. Dismissal is persisted per assignment.
-  const primaryRow = linkedSummaries[0] ?? null;
+  // AIQ-1318: resolve the primary card to the SAME case the sidebar treats as active
+  // (the last-selected case), so the highlighted card + its 'Open case' CTA match the
+  // sidebar. Mirrors PlatformShellSidebar's effectiveCaseId fallback (minus the URL case,
+  // which doesn't exist on the dashboard). Falls back to linkedSummaries[0] (single-case
+  // employees are unaffected).
+  const { selectedCaseId } = useSelectedCase();
+  const primaryRow =
+    linkedSummaries.find((r) => r.case_id === selectedCaseId || r.assignment_id === selectedCaseId)
+    ?? linkedSummaries[0]
+    ?? null;
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   useEffect(() => {
     setWelcomeDismissed(primaryRow?.assignment_id ? isWelcomeDismissed(primaryRow.assignment_id) : false);
