@@ -53,6 +53,7 @@ export const EscalateCaseModal: React.FC<Props> = ({ open, onClose, onSuccess, c
   };
 
   return (
+    // eslint-disable-next-line local/no-clickable-div, jsx-a11y/no-noninteractive-element-interactions -- role="dialog" is the correct ARIA role for the modal container; backdrop-click + Escape are the standard dismiss interactions
     <div
       role="dialog"
       aria-modal="true"
@@ -60,6 +61,9 @@ export const EscalateCaseModal: React.FC<Props> = ({ open, onClose, onSuccess, c
       className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0b2b43]/40 px-4"
       onClick={(e) => {
         if (e.target === e.currentTarget && !submitting) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && !submitting) onClose();
       }}
     >
       <Card padding="lg" className="w-full max-w-lg bg-white">

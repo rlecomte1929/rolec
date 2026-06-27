@@ -65,11 +65,14 @@ export function DeleteCompanyDialog({ company, onClose, onDeleted }: DeleteCompa
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-      onClick={() => !submitting && onClose()}
+      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape' && !submitting) onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
       <div
         className="w-full max-w-md rounded-xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={`Delete ${company.name}`}
       >
