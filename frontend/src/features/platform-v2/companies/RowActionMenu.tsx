@@ -120,6 +120,7 @@ export function RowActionMenu({
       </Button>
 
       {open && panelStyle && portalRoot && createPortal(
+        // eslint-disable-next-line local/no-clickable-div -- role="menu" is the correct ARIA role (the custom rule only allowlists button/link/tab); keyboard handled by the menu items + onKeyDown guard
         <div
           ref={panelRef}
           role="menu"

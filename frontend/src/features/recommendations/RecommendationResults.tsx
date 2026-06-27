@@ -396,7 +396,7 @@ function RecCard({
                 </div>
                 <p className="mt-1.5 text-xs text-[#6b7280]">
                   Each dimension is 0–100. The overall score weighs them
-                  per the {category} plugin's formula. HR-configurable
+                  per the {category} plugin&apos;s formula. HR-configurable
                   weights ship in a follow-up sprint.
                 </p>
               </div>
@@ -593,7 +593,7 @@ export const RecommendationResults: React.FC<Props> = ({
             (res.criteria_echo as Record<string, unknown> | undefined)?.hr_curation_status === 'hr_pending' ? (
               <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
                 <strong className="block text-[#0b2b43] mb-1">Your HR is finalizing providers for this category.</strong>
-                Once HR has approved the vendors for your destination, they'll show up here automatically.
+                Once HR has approved the vendors for your destination, they&apos;ll show up here automatically.
                 Until then, hold off on this category — you can build the rest of your package and come back.
               </div>
             ) : (

@@ -471,13 +471,13 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                             {ev.from_status} → {ev.to_status}
                           </span>
                           {ev.actor_name && <span className="text-slate-400"> by {ev.actor_name}</span>}
-                          {ev.note && <span className="ml-1 italic text-slate-500">"{ev.note}"</span>}
+                          {ev.note && <span className="ml-1 italic text-slate-500">&quot;{ev.note}&quot;</span>}
                         </>
                       ) : ev.event_type === 'flagged' ? (
                         <>
                           <span className="font-medium text-amber-600">Flagged</span>
                           {ev.actor_name && <span className="text-slate-400"> by {ev.actor_name}</span>}
-                          {ev.note && <span className="ml-1 italic text-slate-500">"{ev.note}"</span>}
+                          {ev.note && <span className="ml-1 italic text-slate-500">&quot;{ev.note}&quot;</span>}
                         </>
                       ) : ev.event_type === 'unflagged' ? (
                         <>

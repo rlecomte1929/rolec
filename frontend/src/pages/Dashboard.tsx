@@ -62,7 +62,7 @@ export const Dashboard: React.FC = () => {
           <Alert variant="info">
             <p className="font-medium text-[#0b2b43] mb-1">No relocation plan yet</p>
             <p className="mb-4">
-              Tell us your origin, destination, and target move date — we'll build a tailored
+              Tell us your origin, destination, and target move date — we&apos;ll build a tailored
               plan with documents, milestones, and provider recommendations.
             </p>
             <Button onClick={() => navigate('/journey')}>Start your profile</Button>

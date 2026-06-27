@@ -145,7 +145,7 @@ const CitationRow: React.FC<{ citation: Citation; id: string }> = ({ citation, i
       {/* Excerpt */}
       {citation.text && (
         <p className="text-xs text-[#6b7280] italic leading-relaxed pl-7 line-clamp-2">
-          "{citation.text.slice(0, 180).trim()}{citation.text.length > 180 ? '…' : ''}"
+          &quot;{citation.text.slice(0, 180).trim()}{citation.text.length > 180 ? '…' : ''}&quot;
         </p>
       )}
 
