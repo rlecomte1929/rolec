@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from '../features/policy/types';
+import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary, PolicyVersionSummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { env } from '../config/env';
@@ -3364,38 +3364,75 @@ export const policyConfigMatrixAPI = {
   },
 };
 
+/**
+ * A document-normalized HR policy ("company_policies") row as returned by the
+ * /api/company-policies endpoints. The backend selects whole DB rows, so this
+ * stays open-ended (index signature): consumers read a handful of typed fields
+ * (title/version/effective_date) and treat the remainder as opaque.
+ */
+export interface CompanyPolicyRecord {
+  id?: string;
+  company_id?: string | null;
+  title?: string | null;
+  version?: string | number | null;
+  effective_date?: string | null;
+  next_review_date?: string | null;
+  file_url?: string | null;
+  storage_path?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+}
+
+/** A single extracted benefit ("benefit_rule") row attached to a company policy. */
+export interface CompanyPolicyBenefit {
+  id?: string;
+  policy_id?: string | null;
+  benefit_category?: string | null;
+  benefit_key?: string | null;
+  amount_value?: number | string | null;
+  amount_unit?: string | null;
+  currency?: string | null;
+  frequency?: string | null;
+  description?: string | null;
+  review_status?: string | null;
+  metadata_json?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
 export const companyPolicyAPI = {
   list: async (params?: { company_id?: string }): Promise<{ policies: CompanyPolicySummary[] }> => {
     const response = await api.get<{ policies: CompanyPolicySummary[] }>('/api/company-policies', { params });
     return response.data;
   },
-  getLatest: async (): Promise<{ policy: any; benefits: any[]; company_name?: string }> => {
-    const response = await api.get<{ policy: any; benefits: any[]; company_name?: string }>('/api/company-policies/latest');
+  getLatest: async (): Promise<{ policy: CompanyPolicyRecord | null; benefits: CompanyPolicyBenefit[]; company_name?: string | null }> => {
+    const response = await api.get<{ policy: CompanyPolicyRecord | null; benefits: CompanyPolicyBenefit[]; company_name?: string | null }>('/api/company-policies/latest');
     return response.data;
   },
-  getById: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.get<{ policy: any; benefits: any[] }>(`/api/company-policies/${policyId}`);
+  getById: async (policyId: string): Promise<{ policy: CompanyPolicyRecord; benefits: CompanyPolicyBenefit[] }> => {
+    const response = await api.get<{ policy: CompanyPolicyRecord; benefits: CompanyPolicyBenefit[] }>(`/api/company-policies/${policyId}`);
     return response.data;
   },
   getDownloadUrl: async (policyId: string): Promise<{ ok?: boolean; url?: string }> => {
     const response = await api.get<{ ok?: boolean; url?: string }>(`/api/company-policies/${policyId}/download-url`);
     return response.data;
   },
-  upload: async (file: File, meta: { title: string; version?: string; effective_date?: string }): Promise<{ policy: any }> => {
+  upload: async (file: File, meta: { title: string; version?: string; effective_date?: string }): Promise<{ policy: CompanyPolicyRecord }> => {
     const form = new FormData();
     form.append('file', file);
     form.append('title', meta.title);
     if (meta.version) form.append('version', meta.version);
     if (meta.effective_date) form.append('effective_date', meta.effective_date);
-    const response = await api.post<{ policy: any }>('/api/company-policies/upload', form, { timeout: 120_000 });
+    const response = await api.post<{ policy: CompanyPolicyRecord }>('/api/company-policies/upload', form, { timeout: 120_000 });
     return response.data;
   },
-  extract: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.post<{ policy: any; benefits: any[] }>(`/api/policies/${policyId}/extract`, undefined, { timeout: 120_000 });
+  extract: async (policyId: string): Promise<{ policy: CompanyPolicyRecord; benefits: CompanyPolicyBenefit[] }> => {
+    const response = await api.post<{ policy: CompanyPolicyRecord; benefits: CompanyPolicyBenefit[] }>(`/api/policies/${policyId}/extract`, undefined, { timeout: 120_000 });
     return response.data;
   },
-  saveBenefits: async (policyId: string, benefits: any[]): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.put<{ policy: any; benefits: any[] }>(`/api/company-policies/${policyId}/benefits`, { benefits });
+  saveBenefits: async (policyId: string, benefits: CompanyPolicyBenefit[]): Promise<{ policy: CompanyPolicyRecord; benefits: CompanyPolicyBenefit[] }> => {
+    const response = await api.put<{ policy: CompanyPolicyRecord; benefits: CompanyPolicyBenefit[] }>(`/api/company-policies/${policyId}/benefits`, { benefits });
     return response.data;
   },
   getNormalized: async (
@@ -3421,10 +3458,10 @@ export const companyPolicyAPI = {
       description?: string;
       review_status?: string;
       benefit_key?: string;
-      metadata_json?: Record<string, any>;
+      metadata_json?: Record<string, unknown>;
     }
-  ): Promise<{ benefit_rule: any }> => {
-    const response = await api.patch<{ benefit_rule: any }>(`/api/company-policies/${policyId}/benefits/${benefitRuleId}`, body);
+  ): Promise<{ benefit_rule: CompanyPolicyBenefit }> => {
+    const response = await api.patch<{ benefit_rule: CompanyPolicyBenefit }>(`/api/company-policies/${policyId}/benefits/${benefitRuleId}`, body);
     return response.data;
   },
   /** HR override layer — does not change extracted Layer-2 rows; adjusts effective entitlements. */
@@ -3441,8 +3478,8 @@ export const companyPolicyAPI = {
       approval_required_override?: boolean | null;
       hr_notes?: string | null;
     }
-  ): Promise<{ hr_override: any }> => {
-    const response = await api.patch<{ hr_override: any }>(
+  ): Promise<{ hr_override: Record<string, unknown> }> => {
+    const response = await api.patch<{ hr_override: Record<string, unknown> }>(
       `/api/company-policies/${policyId}/versions/${versionId}/benefits/${benefitRuleId}/hr-override`,
       body
     );
@@ -3462,17 +3499,17 @@ export const companyPolicyAPI = {
     policyId: string,
     versionId: string,
     body: { status: string }
-  ): Promise<{ version: any }> => {
-    const response = await api.patch<{ version: any }>(`/api/company-policies/${policyId}/versions/${versionId}/status`, body);
+  ): Promise<{ version: PolicyVersionSummary }> => {
+    const response = await api.patch<{ version: PolicyVersionSummary }>(`/api/company-policies/${policyId}/versions/${versionId}/status`, body);
     return response.data;
   },
   /** Update latest version status - avoids version_id mismatch 404s */
-  patchLatestVersionStatus: async (policyId: string, body: { status: string }): Promise<{ version: any }> => {
-    const response = await api.patch<{ version: any }>(`/api/company-policies/${policyId}/versions/latest/status`, body);
+  patchLatestVersionStatus: async (policyId: string, body: { status: string }): Promise<{ version: PolicyVersionSummary }> => {
+    const response = await api.patch<{ version: PolicyVersionSummary }>(`/api/company-policies/${policyId}/versions/latest/status`, body);
     return response.data;
   },
-  publishVersion: async (policyId: string, versionId: string): Promise<{ version: any }> => {
-    const response = await api.post<{ version: any }>(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
+  publishVersion: async (policyId: string, versionId: string): Promise<{ version: PolicyVersionSummary }> => {
+    const response = await api.post<{ version: PolicyVersionSummary }>(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
     return response.data;
   },
   /**
@@ -3486,8 +3523,8 @@ export const companyPolicyAPI = {
   unpublishVersion: async (
     policyId: string,
     versionId: string
-  ): Promise<{ version: any; already: string | null }> => {
-    const response = await api.post<{ version: any; already: string | null }>(`/api/company-policies/${policyId}/versions/${versionId}/unpublish`);
+  ): Promise<{ version: PolicyVersionSummary; already: string | null }> => {
+    const response = await api.post<{ version: PolicyVersionSummary; already: string | null }>(`/api/company-policies/${policyId}/versions/${versionId}/unpublish`);
     return response.data;
   },
   /**
@@ -3506,24 +3543,24 @@ export const companyPolicyAPI = {
     return response.data;
   },
   /** Publish latest version - avoids version_id mismatch 404s */
-  publishLatestVersion: async (policyId: string): Promise<{ version: any }> => {
-    const response = await api.post<{ version: any }>(`/api/company-policies/${policyId}/versions/latest/publish`);
+  publishLatestVersion: async (policyId: string): Promise<{ version: PolicyVersionSummary }> => {
+    const response = await api.post<{ version: PolicyVersionSummary }>(`/api/company-policies/${policyId}/versions/latest/publish`);
     return response.data;
   },
   patchExclusion: async (
     policyId: string,
     exclId: string,
     body: { description?: string; review_status?: string }
-  ): Promise<{ exclusion: any }> => {
-    const response = await api.patch<{ exclusion: any }>(`/api/company-policies/${policyId}/exclusions/${exclId}`, body);
+  ): Promise<{ exclusion: Record<string, unknown> }> => {
+    const response = await api.patch<{ exclusion: Record<string, unknown> }>(`/api/company-policies/${policyId}/exclusions/${exclId}`, body);
     return response.data;
   },
   patchCondition: async (
     policyId: string,
     condId: string,
-    body: { condition_value_json?: Record<string, any>; review_status?: string }
-  ): Promise<{ condition: any }> => {
-    const response = await api.patch<{ condition: any }>(`/api/company-policies/${policyId}/conditions/${condId}`, body);
+    body: { condition_value_json?: Record<string, unknown>; review_status?: string }
+  ): Promise<{ condition: Record<string, unknown> }> => {
+    const response = await api.patch<{ condition: Record<string, unknown> }>(`/api/company-policies/${policyId}/conditions/${condId}`, body);
     return response.data;
   },
   /** Platform starter baseline (only when company has no policy yet). */
@@ -3538,7 +3575,14 @@ export const companyPolicyAPI = {
     benefit_rules_created?: number;
     message?: string;
   }> => {
-    const response = await api.post('/api/hr/company-policy/initialize-from-template', body);
+    const response = await api.post<{
+      ok?: boolean;
+      policy_id?: string;
+      policy_version_id?: string;
+      version_status?: string;
+      benefit_rules_created?: number;
+      message?: string;
+    }>('/api/hr/company-policy/initialize-from-template', body);
     return response.data;
   },
 };
