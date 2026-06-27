@@ -1115,7 +1115,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
           {conflict && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-[12px] text-amber-800">
               <AlertTriangle size={14} className="flex-shrink-0 mt-0.5 text-amber-600"/>
-              <span><strong>Overlap detected with "{conflict.name}".</strong> The first matching tier (left-to-right) wins. Drag to reorder or refine rules to remove the overlap.</span>
+              <span><strong>Overlap detected with &quot;{conflict.name}&quot;.</strong> The first matching tier (left-to-right) wins. Drag to reorder or refine rules to remove the overlap.</span>
             </div>
           )}
         </div>
@@ -1432,7 +1432,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                         ))}
                       </div>
                       {r.assign_to.length === 0 && (
-                        <div className="mt-2 text-[11px] text-red-500">⚠ No tier selected — this rule won't be applied.</div>
+                        <div className="mt-2 text-[11px] text-red-500">⚠ No tier selected — this rule won&apos;t be applied.</div>
                       )}
                     </div>
                   ))}

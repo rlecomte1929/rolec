@@ -328,7 +328,7 @@ export function HrBacklogPage() {
 
         {!hasCompany && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Your HR profile isn't linked to a company yet — there's nothing to show. Ask your admin
+            Your HR profile isn&apos;t linked to a company yet — there&apos;s nothing to show. Ask your admin
             to link your account, then refresh.
           </div>
         )}

@@ -702,7 +702,7 @@ export const HrAssignmentReview: React.FC = () => {
                     Draft urgent reminder for Profile
                   </Button>
                   <Button variant="outline" fullWidth>
-                    What’s blocking {fullName.split(' ')[0]}'s profile completion?
+                    What’s blocking {fullName.split(' ')[0]}&apos;s profile completion?
                   </Button>
                   <Button variant="outline" fullWidth>
                     What documents are needed for {origin && destination ? `${origin} → ${destination}` : 'this route'}?

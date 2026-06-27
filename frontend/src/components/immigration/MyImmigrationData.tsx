@@ -295,7 +295,7 @@ export const MyImmigrationData: React.FC = () => {
           {!profile && (
             <Card padding="lg">
               <p className="text-sm text-[#475569]">
-                We don't hold any immigration data for you yet. Once you complete your
+                We don&apos;t hold any immigration data for you yet. Once you complete your
                 immigration profile, it will appear here.
               </p>
             </Card>

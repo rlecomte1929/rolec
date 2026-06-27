@@ -912,7 +912,7 @@ export function EmployeeRichProfilePage() {
                               <option value="">Select…</option>
                               <option value="have">Has one</option>
                               <option value="need">Need to get one</option>
-                              <option value="unknown">Don't know</option>
+                              <option value="unknown">Don&apos;t know</option>
                             </select>
                           </FieldWrap>
                         </Grid>

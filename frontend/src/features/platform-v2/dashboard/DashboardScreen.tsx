@@ -504,7 +504,7 @@ export function DashboardScreen({
                         fontWeight: 500,
                       }}
                     >
-                      {item.case_employee}'s case
+                      {item.case_employee}&apos;s case
                     </Button>
                   </p>
                 </div>

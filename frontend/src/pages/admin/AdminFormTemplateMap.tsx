@@ -265,7 +265,7 @@ export const AdminFormTemplateMap: React.FC = () => {
 
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   Coordinates are stored as raw PDF points (1 pt ≈ 1/72 in). The
-                  Y-axis origin is at the page's bottom-left, matching the PDF
+                  Y-axis origin is at the page&apos;s bottom-left, matching the PDF
                   spec. The overlay engine writes values directly at these
                   coordinates on top of the original PDF.
                 </p>

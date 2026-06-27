@@ -82,13 +82,13 @@ export function DeleteCompanyDialog({ company, onClose, onDeleted }: DeleteCompa
 
         <div className="space-y-4 px-6 py-5 text-sm">
           <p className="text-slate-700">
-            You're about to <strong>hard-delete</strong>{' '}
+            You&apos;re about to <strong>hard-delete</strong>{' '}
             <span className="font-mono text-slate-900">{company.name}</span>. This action is
             irreversible and may orphan references in employees / HR users / cases.
           </p>
 
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Consider <strong>Archive</strong> instead — same outcome from the user's perspective,
+            Consider <strong>Archive</strong> instead — same outcome from the user&apos;s perspective,
             but reversible.
           </div>
 

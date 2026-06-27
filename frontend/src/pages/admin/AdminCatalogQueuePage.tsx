@@ -280,7 +280,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
           <div>
             <h2 className="text-lg font-semibold text-[#0b2b43]">HR scrape requests</h2>
             <p className="text-sm text-[#6b7280] mt-1">
-              Tickets opened by HR when they ask the AI to populate a destination that isn't yet
+              Tickets opened by HR when they ask the AI to populate a destination that isn&apos;t yet
               on our supported list. Approving auto-adds (city, country) to the allowlist for
               every company.
             </p>

@@ -196,7 +196,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
               variant="outline"
               disabled={isSubmitting}
             >
-              I don't know yet
+              I don&apos;t know yet
             </Button>
           )}
         </div>

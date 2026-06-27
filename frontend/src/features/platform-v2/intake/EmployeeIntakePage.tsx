@@ -922,7 +922,7 @@ export function EmployeeIntakePage() {
         {Object.values(locks).some(Boolean) && (
           <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
             <span className="flex-shrink-0">ℹ</span>
-            <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click "Edit" on any pre-filled field if anything looks wrong.</div>
+            <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click &quot;Edit&quot; on any pre-filled field if anything looks wrong.</div>
           </div>
         )}
 
@@ -932,8 +932,8 @@ export function EmployeeIntakePage() {
         {hydrateError && (
           <div className="flex items-start justify-between gap-3 p-3 mb-5 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700">
             <div>
-              <strong>Couldn't load your saved answers.</strong> To avoid overwriting what
-              you've already saved, editing is paused until this loads.
+              <strong>Couldn&apos;t load your saved answers.</strong> To avoid overwriting what
+              you&apos;ve already saved, editing is paused until this loads.
             </div>
             <button
               type="button"
@@ -960,7 +960,7 @@ export function EmployeeIntakePage() {
                   onClick={retryIntakeSave}
                   className="font-medium text-red-600 hover:underline"
                 >
-                  Couldn't save — retry
+                  Couldn&apos;t save — retry
                 </button>
               ) : (
                 <span>Auto-saved {savedLabel}</span>
@@ -1050,7 +1050,7 @@ export function EmployeeIntakePage() {
                 </Grid>
                 {international && (
                   <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                    🌍 <span><strong>International move detected.</strong> We'll automatically include visa, customs, international movers, and pet import (if relevant) in your roadmap.</span>
+                    🌍 <span><strong>International move detected.</strong> We&apos;ll automatically include visa, customs, international movers, and pet import (if relevant) in your roadmap.</span>
                   </div>
                 )}
               </>
@@ -1120,7 +1120,7 @@ export function EmployeeIntakePage() {
                 </div>
                 {data.members.length === 1 && (
                   <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                    ℹ <span><strong>Moving solo?</strong> That's fine — just continue. You can add household members later from your profile.</span>
+                    ℹ <span><strong>Moving solo?</strong> That&apos;s fine — just continue. You can add household members later from your profile.</span>
                   </div>
                 )}
               </>
@@ -1200,7 +1200,7 @@ export function EmployeeIntakePage() {
                 )}
                 {data.work_pattern === 'Fully remote' && (
                   <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                    ℹ <span><strong>Working fully remote.</strong> We'll skip commute filtering and lead housing search with neighborhood quality and lifestyle priorities instead.</span>
+                    ℹ <span><strong>Working fully remote.</strong> We&apos;ll skip commute filtering and lead housing search with neighborhood quality and lifestyle priorities instead.</span>
                   </div>
                 )}
               </>

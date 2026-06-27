@@ -176,7 +176,7 @@ export const ChangelogBell: React.FC = () => {
           className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white shadow-lg z-40"
         >
           <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-900">What's new</span>
+            <span className="text-sm font-semibold text-slate-900">What&apos;s new</span>
             <Button unstyled
               type="button"
               onClick={() => setOpen(false)}

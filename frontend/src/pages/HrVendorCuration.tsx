@@ -563,7 +563,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           <p className="mt-3 text-xs text-[#64748b]">
             AI catalog quota today: <strong className="text-[#0b2b43]">{quota.used}/{quota.limit}</strong> used
             ({quota.remaining} remaining; resets at midnight UTC). Each service category that
-            actually calls the AI counts as 1 — already-populated categories don't.
+            actually calls the AI counts as 1 — already-populated categories don&apos;t.
           </p>
         )}
         {populateResult && populateResult.status === 'completed' && (

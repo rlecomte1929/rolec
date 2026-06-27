@@ -132,7 +132,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
   if (rfqs.length === 0) {
     return (
       <p className="text-sm text-[#94a3b8]">
-        No quote requests sent yet. Use "Find a vendor" to request quotes from vendors.
+        No quote requests sent yet. Use &quot;Find a vendor&quot; to request quotes from vendors.
       </p>
     );
   }

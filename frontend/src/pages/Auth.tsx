@@ -362,7 +362,7 @@ export const Auth: React.FC = () => {
           {inviteDone ? (
             <div className="text-center space-y-3">
               <p className="text-3xl">✓</p>
-              <p className="font-semibold text-[#0b2b43]">Password set — you're in!</p>
+              <p className="font-semibold text-[#0b2b43]">Password set — you&apos;re in!</p>
               <p className="text-sm text-slate-500">Redirecting you to your dashboard…</p>
             </div>
           ) : (

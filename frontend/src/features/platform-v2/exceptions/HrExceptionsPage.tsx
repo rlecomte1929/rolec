@@ -411,7 +411,7 @@ function ExcDetail({
                   </div>
                   <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{event.what}</p>
                   {event.quote && (
-                    <p className="text-xs text-slate-500 italic mt-1 leading-relaxed">"{event.quote}"</p>
+                    <p className="text-xs text-slate-500 italic mt-1 leading-relaxed">&quot;{event.quote}&quot;</p>
                   )}
                 </div>
               </div>
@@ -745,7 +745,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
                 <svg className="w-8 h-8 text-amber-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-sm text-slate-500">Couldn't load exception requests.</p>
+                <p className="text-sm text-slate-500">Couldn&apos;t load exception requests.</p>
                 <p className="text-xs text-slate-400 mt-0.5">Refresh to try again.</p>
               </div>
             ) : filtered.length === 0 ? (

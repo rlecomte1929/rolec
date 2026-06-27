@@ -763,7 +763,7 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
                   Reset your password
                 </h2>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
-                  Enter your email and we'll send you a reset link.
+                  Enter your email and we&apos;ll send you a reset link.
                 </p>
 
                 {rpSent ? (
