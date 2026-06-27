@@ -36,7 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
 function fmtVal(v: unknown): string {
   if (v == null) return '—';
   if (typeof v === 'object') return JSON.stringify(v, null, 0);
-  return String(v);
+  return String(v as string | number | boolean | bigint);
 }
 
 function fmtTs(iso: string): string {
