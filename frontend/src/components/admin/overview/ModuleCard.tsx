@@ -11,7 +11,7 @@ export interface ModuleRow {
 interface ModuleCardProps {
   testId: string;
   to: string;
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   subtitle: string;
   metric: string | number | null;
@@ -23,7 +23,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title,
   <Link data-testid={testId} to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
     <div className="flex items-start justify-between mb-4">
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
           {icon}
         </div>
         <div>

@@ -7,6 +7,7 @@ import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
 import { StatCard } from '../../components/admin/overview/StatCard';
 import { ModuleCard } from '../../components/admin/overview/ModuleCard';
+import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2 } from 'lucide-react';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-review-queue"
           to={buildRoute('adminReviewQueue')}
-          icon="🔁"
+          icon={<ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Review queue"
           subtitle={metricSummary(stats.reviewOpen, 'open items')}
           metric={stats.reviewOpen}
@@ -150,7 +151,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-ops-analytics"
           to={buildRoute('adminOpsSla')}
-          icon="📈"
+          icon={<LineChart className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Ops analytics"
           subtitle="SLA, bottlenecks, reviewer load"
           metric={null}
@@ -160,7 +161,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-workflow-analytics"
           to={buildRoute('adminOpsQueue')}
-          icon="🔀"
+          icon={<Shuffle className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Workflow analytics"
           subtitle="Recommendations, RFQ conversion"
           metric={null}
@@ -170,7 +171,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-resources"
           to={buildRoute('adminResources')}
-          icon="📋"
+          icon={<FileText className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Resources CMS"
           subtitle="Guides, requirements, taxonomy"
           metric={null}
@@ -180,7 +181,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-prospects"
           to={buildRoute('adminProspects')}
-          icon="🎯"
+          icon={<Target className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Prospects"
           subtitle="HR pipeline · ICP-scored"
           metric={null}
@@ -190,7 +191,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-rag-quality"
           to={buildRoute('adminRagQuality')}
-          icon="📈"
+          icon={<Activity className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="RAG quality"
           subtitle="Retrieval & generation health over time"
           metric={null}
@@ -204,7 +205,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-suppliers"
           to={buildRoute('adminSuppliers')}
-          icon="🔗"
+          icon={<Link2 className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Suppliers"
           subtitle="Active supplier records"
           metric={stats.activeSuppliers}
@@ -216,7 +217,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-companies"
           to={buildRoute('adminCompanies')}
-          icon="🏢"
+          icon={<Building2 className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Companies & users"
           subtitle="Tenants, allowlists, roles"
           metric={stats.companies}
