@@ -44,9 +44,18 @@ def analyze_policy_document(
             detail=f"Unsupported file type: {content_type}. Use PDF or DOCX.",
         )
 
-    file_bytes = file.file.read()
-    if len(file_bytes) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=422, detail="File too large (50 MB max).")
+    # Read with bounded size to prevent memory exhaustion from oversized uploads.
+    chunks = []
+    total = 0
+    while True:
+        chunk = file.file.read(1024 * 1024)  # 1 MB chunks
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_FILE_SIZE:
+            raise HTTPException(status_code=422, detail="File too large (50 MB max).")
+        chunks.append(chunk)
+    file_bytes = b"".join(chunks)
     if not file_bytes:
         raise HTTPException(status_code=422, detail="Empty file.")
 
