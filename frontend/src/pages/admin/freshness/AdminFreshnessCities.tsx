@@ -56,8 +56,9 @@ export const AdminFreshnessCities: React.FC = () => {
   return (
     <AdminFreshnessLayout title="Freshness by city" subtitle="City-level freshness">
       <div className="mb-4 flex items-center gap-2">
-        <label className="text-sm text-slate-600">Country:</label>
+        <label htmlFor="afc-country" className="text-sm text-slate-600">Country:</label>
         <Input unstyled
+          id="afc-country"
           type="text"
           placeholder="e.g. NO"
           value={filter}

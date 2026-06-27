@@ -343,6 +343,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
                       onChange={(v) => update('code', v)}
                       className="w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
                       placeholder="UTL-2011"
+                      // eslint-disable-next-line jsx-a11y/no-autofocus -- new form: focus Code field so keyboard users can start typing immediately
                       autoFocus={isNew}
                     />
                   </Field>

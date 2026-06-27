@@ -348,7 +348,6 @@ function RecCard({
             rows={2}
             placeholder="Explain why this option fits this case better."
             className="mt-2 w-full rounded-md border border-accent-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-200 resize-none bg-white"
-            autoFocus
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <p className="text-[11px] text-accent-500">Logged for human oversight audit · EU AI Act Art. 14</p>
@@ -397,7 +396,7 @@ function RecCard({
                 </div>
                 <p className="mt-1.5 text-xs text-[#6b7280]">
                   Each dimension is 0–100. The overall score weighs them
-                  per the {category} plugin's formula. HR-configurable
+                  per the {category} plugin&apos;s formula. HR-configurable
                   weights ship in a follow-up sprint.
                 </p>
               </div>
@@ -594,7 +593,7 @@ export const RecommendationResults: React.FC<Props> = ({
             (res.criteria_echo as Record<string, unknown> | undefined)?.hr_curation_status === 'hr_pending' ? (
               <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
                 <strong className="block text-[#0b2b43] mb-1">Your HR is finalizing providers for this category.</strong>
-                Once HR has approved the vendors for your destination, they'll show up here automatically.
+                Once HR has approved the vendors for your destination, they&apos;ll show up here automatically.
                 Until then, hold off on this category — you can build the rest of your package and come back.
               </div>
             ) : (

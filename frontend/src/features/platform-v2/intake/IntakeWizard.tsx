@@ -255,6 +255,8 @@ function CountryDropdown({
           overflow: 'hidden',
         }}>
           <div style={{ padding: '8px' }}>
+            {/* eslint-disable jsx-a11y/no-autofocus */}
+            {/* dropdown search: focus input when popover opens for keyboard users */}
             <Input unstyled
               autoFocus
               value={search}
@@ -272,6 +274,7 @@ function CountryDropdown({
                 boxSizing: 'border-box',
               }}
             />
+            {/* eslint-enable jsx-a11y/no-autofocus */}
           </div>
           <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
             {filtered.length === 0 ? (

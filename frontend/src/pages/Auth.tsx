@@ -376,7 +376,7 @@ export const Auth: React.FC = () => {
               {error && <Alert variant="error">{error}</Alert>}
               {inviteEmail && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Your email</label>
+                  <span className="block text-sm font-medium text-slate-700 mb-1.5">Your email</span>
                   <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
                     <span className="text-sm text-slate-700 truncate">{inviteEmail}</span>
                     <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">

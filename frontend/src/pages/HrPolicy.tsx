@@ -582,8 +582,9 @@ function DocumentStructureTab({ docId }: { docId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <label className="text-sm text-[#6b7280]">Filter by type:</label>
+        <label htmlFor="hp-filter-type" className="text-sm text-[#6b7280]">Filter by type:</label>
         <select
+          id="hp-filter-type"
           value={clauseTypeFilter}
           onChange={(e) => setClauseTypeFilter(e.target.value)}
           className="border border-[#e2e8f0] rounded px-2 py-1 text-sm"

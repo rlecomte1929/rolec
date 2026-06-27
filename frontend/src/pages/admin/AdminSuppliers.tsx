@@ -146,8 +146,9 @@ export const AdminSuppliers: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div className="flex flex-wrap items-center gap-4">
               <div>
-                <label className="block text-xs font-medium text-[#6b7280] mb-1">Country</label>
+                <label htmlFor="as-country" className="block text-xs font-medium text-[#6b7280] mb-1">Country</label>
                 <select
+                  id="as-country"
                   value={countryFilter}
                   onChange={(e) => setCountryFilter(e.target.value)}
                   className="border border-[#d1d5db] rounded px-3 py-2 text-sm min-w-[120px]"
@@ -161,8 +162,9 @@ export const AdminSuppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#6b7280] mb-1">Status</label>
+                <label htmlFor="as-status" className="block text-xs font-medium text-[#6b7280] mb-1">Status</label>
                 <select
+                  id="as-status"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="border border-[#d1d5db] rounded px-3 py-2 text-sm"

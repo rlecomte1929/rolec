@@ -751,8 +751,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       <Card padding="lg">
         <div className="text-sm font-semibold text-[#0b2b43] mb-2">Policy & version</div>
         <div className="flex flex-wrap gap-3 items-center">
-          <label className="text-sm text-[#6b7280]">Policy:</label>
+          <label htmlFor="hprw-policy" className="text-sm text-[#6b7280]">Policy:</label>
           <select
+            id="hprw-policy"
             value={selectedPolicyId || ''}
             onChange={(e) => setSelectedPolicyId(e.target.value || null)}
             disabled={Boolean(loading && policies.length > 0)}

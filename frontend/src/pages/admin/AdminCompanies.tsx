@@ -761,8 +761,15 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Add company</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -772,6 +779,7 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
               onChange={(v) => setName(v)}
               className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
               placeholder="Company name"
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- modal dialog: focus first field for keyboard users
               autoFocus
             />
           </div>

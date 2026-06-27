@@ -211,7 +211,13 @@ export default tseslint.config(
 
       // — Accessibility epic (clickable-div + jsx-a11y) —
       'local/no-clickable-div': 'warn',
-      'jsx-a11y/label-has-associated-control': 'warn',
+      // label-has-associated-control: DRAINED to 0 + re-promoted to 'error' (Epic C / R1).
+      // controlComponents recognises the antigravity wrappers that render native form controls.
+      // Select (antigravity) is NOT listed — it doesn't expose id, so pairs use native <select> with id instead.
+      'jsx-a11y/label-has-associated-control': ['error', {
+        controlComponents: ['Checkbox', 'Input', 'FileInput', 'Radio'],
+        depth: 3,
+      }],
       'jsx-a11y/click-events-have-key-events': 'warn',
       'jsx-a11y/no-static-element-interactions': 'warn',
       'jsx-a11y/no-noninteractive-element-interactions': 'warn',

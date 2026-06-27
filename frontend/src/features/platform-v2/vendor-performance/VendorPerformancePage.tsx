@@ -654,7 +654,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-[12px] font-medium text-slate-500">Range</label>
+          <span className="text-[12px] font-medium text-slate-500">Range</span>
           <div className="inline-flex overflow-hidden rounded-md border border-slate-200">
             {RANGE_OPTIONS.map((o) => (
               <button

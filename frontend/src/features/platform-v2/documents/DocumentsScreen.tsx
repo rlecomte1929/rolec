@@ -230,7 +230,10 @@ function UploadZone({ category, onUpload }: UploadZoneProps) {
   return (
     <div style={{ marginBottom: '4px' }}>
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); } }}
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); void handleFiles(e.dataTransfer.files); }}
@@ -514,7 +517,9 @@ function ReminderSettingsPanel() {
               </span>
               <div
                 onClick={() => setSettings(s => ({ ...s, notifyHr: !s.notifyHr }))}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSettings(s => ({ ...s, notifyHr: !s.notifyHr })); } }}
                 role="switch"
+                tabIndex={0}
                 aria-checked={settings.notifyHr}
                 style={{
                   width: '36px', height: '20px', borderRadius: '10px', cursor: 'pointer',

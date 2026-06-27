@@ -168,8 +168,9 @@ export const AdminResearch: React.FC = () => {
     <AdminLayout title="Official Source Ingest" subtitle="Approve official sources for guidance packs">
       <Card padding="lg">
         <div className="flex items-center gap-3">
-          <label className="text-sm text-[#6b7280]">Destination</label>
+          <label htmlFor="ar-destination" className="text-sm text-[#6b7280]">Destination</label>
           <select
+            id="ar-destination"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
             className="border border-[#e2e8f0] rounded-md px-2 py-1 text-sm"

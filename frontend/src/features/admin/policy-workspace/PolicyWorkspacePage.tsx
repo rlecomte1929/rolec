@@ -158,8 +158,9 @@ export const PolicyWorkspacePage: React.FC = () => {
               <span className="font-mono text-xs">{matrixPayload?.policy_version?.slice(0, 10) ?? '—'}…</span>
             </p>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#374151] mb-1">Effective date (required)</label>
+              <label htmlFor="pw-effective-date" className="block text-sm font-medium text-[#374151] mb-1">Effective date (required)</label>
               <Input unstyled
+                id="pw-effective-date"
                 type="date"
                 className="w-full border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm"
                 value={publishEffectiveDate}
