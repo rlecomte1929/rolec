@@ -454,7 +454,7 @@ class HrMixin:
 
     def get_hr_readiness_summary(self, assignment_id: str) -> Dict[str, Any]:
         """Compact payload for first paint; no full checklist rows."""
-        from . import provenance_catalog
+        from .. import provenance_catalog  # backend.provenance_catalog (NOT backend.db)
 
         raw_dest, dest_key = self.resolve_readiness_destination_for_assignment(assignment_id)
         prof = self.get_employee_profile(assignment_id)
@@ -575,7 +575,7 @@ class HrMixin:
 
     def get_hr_readiness_detail(self, assignment_id: str) -> Dict[str, Any]:
         """Full checklist + milestones merged with case state (two queries)."""
-        from . import provenance_catalog
+        from .. import provenance_catalog  # backend.provenance_catalog (NOT backend.db)
 
         summary = self.get_hr_readiness_summary(assignment_id)
         if not summary.get("resolved"):
