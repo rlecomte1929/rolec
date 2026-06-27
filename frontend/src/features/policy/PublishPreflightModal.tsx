@@ -49,8 +49,10 @@ export const PublishPreflightModal: React.FC<PublishPreflightModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
-      role="presentation"
-      onClick={onClose}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
       }}
@@ -61,7 +63,6 @@ export const PublishPreflightModal: React.FC<PublishPreflightModalProps> = ({
         aria-labelledby="publish-preflight-title"
         className="w-full max-w-lg"
         data-testid="publish-preflight-modal"
-        onClick={(e) => e.stopPropagation()}
       >
         <Card padding="lg" className="shadow-lg">
           <h2 id="publish-preflight-title" className="text-lg font-semibold text-[#0b2b43]">
