@@ -17,6 +17,7 @@ import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
 import { resolveIntakeIds } from './resolveIntakeIds';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
+import { parseSubmitError } from './parseSubmitError';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1303,8 +1304,13 @@ export function EmployeeIntakePage() {
                           : ROUTE_DEFS.employeeDashboard.path,
                       );
                     } catch (e) {
-                      setSubmitError((e as Error).message ?? 'Submission failed. Please try again.');
+                      // AIQ-1311: surface the server's human message + route the
+                      // user back to the step it pinpoints, instead of the raw
+                      // "Request failed with status code 400".
+                      const { message, suggestedStep } = parseSubmitError(e);
+                      setSubmitError(message);
                       setSubmitting(false);
+                      if (suggestedStep != null) setStep(suggestedStep);
                     }
                   }}
                   className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
