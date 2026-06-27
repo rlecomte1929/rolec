@@ -2474,17 +2474,24 @@ class CasesMixin:
         """
         prof = self.get_employee_profile(assignment_id)
         raw = extract_destination_from_profile(prof)
-        if not raw:
+        # Fall back when the profile destination is MISSING *or* doesn't normalise to a
+        # country key — e.g. a city-only value like "Amsterdam" with no country (AIQ-1321).
+        # The old `if not raw` only caught the empty case, so a truthy-but-unnormalisable
+        # value short-circuited to no_destination instead of using the canonical host_country.
+        if not normalize_destination_key(raw):
             asn = self.get_assignment_by_id(assignment_id)
             if asn:
                 cid = (asn.get("case_id") or "").strip()
                 case = self.get_case_by_id(cid) if cid else None
                 if case:
-                    if case.get("host_country"):
-                        raw = str(case.get("host_country")).strip() or None
-                    if not raw:
+                    host = str(case.get("host_country") or "").strip() or None
+                    if normalize_destination_key(host):
+                        raw = host
+                    else:
                         # Last-resort fallback to the historical blob.
-                        raw = extract_destination_from_case_profile(case.get("profile_json"))
+                        blob = extract_destination_from_case_profile(case.get("profile_json"))
+                        if normalize_destination_key(blob):
+                            raw = blob
         key = normalize_destination_key(raw)
         return raw, key
 
