@@ -148,6 +148,7 @@ export const HrCommandCenter: React.FC = () => {
                   {cases.map((row) => (
                     <tr
                       key={row.id}
+                      role="button"
                       onClick={() => handleRowClick(row.id)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(row.id); } }}
                       tabIndex={0}

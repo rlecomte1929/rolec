@@ -304,10 +304,14 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded, onSkip }) =
   return (
     <div className="space-y-4">
       <div
+        role="button"
+        tabIndex={0}
+        aria-label="Upload passport image"
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         onClick={() => fileRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click(); } }}
         className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
           dragOver ? 'border-[#0b2b43] bg-[#f0f4f8]' : 'border-[#cbd5e1] bg-[#f8fafc] hover:border-[#94a3b8]'
         }`}

@@ -89,6 +89,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   return (
     <>
       {/* Backdrop */}
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
       <div
         className="fixed inset-0 bg-black/30 z-40"
         onClick={onClose}
