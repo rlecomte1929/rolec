@@ -2762,6 +2762,8 @@ export const servicesAPI = {
     assignment_id: string;
     case_id: string;
     case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
+    /** AIQ-1249d: canonical move date for the services context banner. */
+    target_start_date?: string | null;
     services: Array<{ service_key: string; selected: boolean | number; [k: string]: any }>;
     answers: Array<{ service_key: string; answers: Record<string, any> }>;
     questions: any[];
