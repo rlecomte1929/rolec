@@ -973,7 +973,7 @@ export function DocumentsScreen({
           {[
             { label: 'Total',        value: totalDocs,                         accent: C.accent,   bg: C.surface },
             { label: 'Approved',     value: approvedCount,                     accent: C.success,  bg: C.surface },
-            { label: 'Missing',      value: missingCount + pendingCount,        accent: missingCount + pendingCount > 0 ? C.warning : C.border, bg: C.surface },
+            { label: 'Outstanding',  value: missingCount + pendingCount,        accent: missingCount + pendingCount > 0 ? C.warning : C.border, bg: C.surface },
             { label: 'Expiring soon',value: expiringCount,                     accent: expiringCount > 0 ? C.danger : C.border,  bg: C.surface },
           ].map(({ label, value, accent, bg }, i, arr) => (
             <div key={label} style={{
