@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import type { CompanyProfilePayload } from '../../../types';
 import { Breadcrumb } from '../../../components/Breadcrumb';
+import { useCompanyProfileForm } from './useCompanyProfileForm';
+import type { SectionKey } from './useCompanyProfileForm';
 
 // ── Option lists (mirror the prototype's static lists) ──────────────────────
 
@@ -59,82 +62,6 @@ const WORKING_LOCATIONS: ReadonlyArray<{ value: string; icon: string }> = [
 
 const LOGO_ACCEPT = 'image/png,image/jpeg,image/jpg,image/svg+xml';
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
-
-const AUTOSAVE_DEBOUNCE_MS = 1500;
-
-// ── Form state shape (matches CompanyProfilePayload) ────────────────────────
-
-type FormState = {
-  name: string;
-  legal_name: string;
-  industry: string;
-  size_band: string;
-  website: string;
-  country: string;
-  hq_city: string;
-  address: string;
-  phone: string;
-  hr_contact: string;
-  support_email: string;
-  default_destination_country: string;
-  default_working_location: string;
-};
-
-type SectionKey = 'identity' | 'location' | 'hr' | 'branding';
-
-function emptyForm(): FormState {
-  return {
-    name: '', legal_name: '', industry: '', size_band: '', website: '',
-    country: '', hq_city: '', address: '', phone: '',
-    hr_contact: '', support_email: '',
-    default_destination_country: '', default_working_location: '',
-  };
-}
-
-/** Adapter: nested record (snake or camel) → flat form state. */
-export function formFromCompany(company: Record<string, unknown> | null): FormState {
-  if (!company) return emptyForm();
-  const pick = (snake: string, camel: string) =>
-    String((company[snake] ?? company[camel] ?? '') || '').trim();
-  return {
-    name:                        pick('name', 'name'),
-    legal_name:                  pick('legal_name', 'legalName'),
-    industry:                    pick('industry', 'industry'),
-    size_band:                   pick('size_band', 'sizeBand'),
-    website:                     pick('website', 'website'),
-    country:                     pick('country', 'country'),
-    hq_city:                     pick('hq_city', 'hqCity'),
-    address:                     pick('address', 'address'),
-    phone:                       pick('phone', 'phone'),
-    hr_contact:                  pick('hr_contact', 'hrContact'),
-    support_email:               pick('support_email', 'supportEmail'),
-    default_destination_country: pick('default_destination_country', 'defaultDestinationCountry'),
-    default_working_location:    pick('default_working_location', 'defaultWorkingLocation'),
-  };
-}
-
-/** Adapter: flat form state → CompanyProfilePayload (drops empty strings). */
-export function formToPayload(f: FormState): CompanyProfilePayload {
-  const trimOrUndef = (v: string): string | undefined => {
-    const t = v.trim();
-    return t === '' ? undefined : t;
-  };
-  return {
-    name: f.name.trim(),
-    country: trimOrUndef(f.country),
-    size_band: trimOrUndef(f.size_band),
-    address: trimOrUndef(f.address),
-    phone: trimOrUndef(f.phone),
-    hr_contact: trimOrUndef(f.hr_contact),
-    legal_name: trimOrUndef(f.legal_name),
-    website: trimOrUndef(f.website),
-    hq_city: trimOrUndef(f.hq_city),
-    industry: trimOrUndef(f.industry),
-    default_destination_country: trimOrUndef(f.default_destination_country),
-    support_email: trimOrUndef(f.support_email),
-    default_working_location: trimOrUndef(f.default_working_location),
-  };
-}
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -192,120 +119,55 @@ export function CompanyProfileForm({
   backLabel = 'Back to Dashboard',
 }: CompanyProfileFormProps) {
   const navigate = useNavigate();
-  const [form, setForm] = useState<FormState>(() => formFromCompany(company));
-  const [pristine, setPristine] = useState<FormState>(() => formFromCompany(company));
-  const [savedSnapshot, setSavedSnapshot] = useState<FormState>(() => formFromCompany(company));
-  const [saving, setSaving] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // ── Section flash (UI animation) ───────────────────────────────────────
   const [sectionFlash, setSectionFlash] = useState<Record<SectionKey, boolean>>({
     identity: false, location: false, hr: false, branding: false,
   });
-  const [logoUploading, setLogoUploading] = useState(false);
-  const [logoError, setLogoError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimers = useRef<Record<SectionKey, ReturnType<typeof setTimeout> | null>>({
     identity: null, location: null, hr: null, branding: null,
   });
 
-  // Re-seed when source company changes
-  useEffect(() => {
-    const next = formFromCompany(company);
-    setForm(next);
-    setPristine(next);
-    setSavedSnapshot(next);
-  }, [company]);
-
-  // Cleanup timers on unmount
   useEffect(() => () => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     Object.values(flashTimers.current).forEach((t) => t && clearTimeout(t));
   }, []);
 
-  const logoUrl = useMemo(() => {
-    if (!company) return null;
-    const v = (company['logo_url'] ?? (company)['logoUrl']) as string | undefined;
-    return v ? String(v) : null;
-  }, [company]);
-
-  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(pristine), [form, pristine]);
-
-  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  // Which sections changed since the last successful save
-  const sectionDirty = useMemo<Record<SectionKey, boolean>>(() => {
-    const diff = (k: keyof FormState) => form[k] !== savedSnapshot[k];
-    return {
-      identity: diff('name') || diff('legal_name') || diff('industry') || diff('size_band') || diff('website'),
-      location: diff('country') || diff('hq_city') || diff('address') || diff('phone'),
-      hr: diff('hr_contact') || diff('support_email') || diff('default_destination_country') || diff('default_working_location'),
-      branding: false,
-    };
-  }, [form, savedSnapshot]);
-
-  function flashSection(key: SectionKey) {
+  const flashSection = useCallback((key: SectionKey) => {
     setSectionFlash((s) => ({ ...s, [key]: true }));
     if (flashTimers.current[key]) clearTimeout(flashTimers.current[key]);
     flashTimers.current[key] = setTimeout(() => {
       setSectionFlash((s) => ({ ...s, [key]: false }));
     }, 2200);
-  }
+  }, []);
 
-  const persist = useCallback(
-    async (snapshot: FormState, sourceSections: SectionKey[]) => {
-      if (!snapshot.name.trim()) {
-        setSaveError('Company name is required.');
-        return false;
-      }
-      setSaveError(null);
-      setSaving(true);
-      try {
-        await onSave(formToPayload(snapshot));
-        setSavedSnapshot(snapshot);
-        setPristine(snapshot);
-        setLastSavedAt(Date.now());
-        sourceSections.forEach((k) => flashSection(k));
-        return true;
-      } catch (e) {
-        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
-        const status = err?.response?.status;
-        const detail = err?.response?.data?.detail;
-        if (detail) setSaveError(detail);
-        else if (status === 500) setSaveError('Server error — check the uvicorn terminal for the Python traceback.');
-        else if (status === 403) setSaveError('Permission denied — your session may have expired.');
-        else if (status === 422) setSaveError('The form data was rejected by the server (validation error).');
-        else setSaveError(err?.message ?? 'Failed to save profile.');
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [onSave],
-  );
+  // ── RHF hook ───────────────────────────────────────────────────────────
+  const {
+    control,
+    register,
+    watch,
+    saving,
+    saveError,
+    lastSavedAt,
+    isDirty,
+    sectionDirty,
+    saveNow,
+    markSaved,
+  } = useCompanyProfileForm(company, onSave, {
+    onSaveComplete: (sections) => sections.forEach(flashSection),
+  });
 
-  // Debounced auto-save: schedule a save 1.5s after the last edit (when dirty)
-  useEffect(() => {
-    if (!isDirty) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    const snapshot = form;
-    const sections = (Object.keys(sectionDirty) as SectionKey[]).filter((k) => sectionDirty[k]);
-    autosaveTimer.current = setTimeout(() => {
-      void persist(snapshot, sections);
-    }, AUTOSAVE_DEBOUNCE_MS);
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, isDirty]);
+  const watchedName = watch('name');
 
-  async function handleManualSave() {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    const sections = (Object.keys(sectionDirty) as SectionKey[]).filter((k) => sectionDirty[k]);
-    await persist(form, sections.length ? sections : ['identity', 'location', 'hr']);
-  }
+  // ── Logo upload (independent from form save) ───────────────────────────
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const logoUrl = (() => {
+    if (!company) return null;
+    const v = (company['logo_url'] ?? (company)['logoUrl']) as string | undefined;
+    return v ? String(v) : null;
+  })();
 
   const handleLogoFile = useCallback(
     async (file: File) => {
@@ -323,7 +185,7 @@ export function CompanyProfileForm({
       try {
         await onUploadLogo(file);
         flashSection('branding');
-        setLastSavedAt(Date.now());
+        markSaved();
       } catch (e) {
         const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
         setLogoError(detail ?? 'Upload failed.');
@@ -331,7 +193,7 @@ export function CompanyProfileForm({
         setLogoUploading(false);
       }
     },
-    [onUploadLogo],
+    [onUploadLogo, flashSection, markSaved],
   );
 
   async function handleRemoveLogo() {
@@ -342,7 +204,7 @@ export function CompanyProfileForm({
     try {
       await onRemoveLogo();
       flashSection('branding');
-      setLastSavedAt(Date.now());
+      markSaved();
     } catch (e) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setLogoError(detail ?? 'Remove failed.');
@@ -399,28 +261,41 @@ export function CompanyProfileForm({
               required
               helper="Used as the employer name on new relocation cases."
             >
-              <Input unstyled
-                value={form.name}
-                onChange={(v) => setField('name', v)}
-                className={inputCx}
-                placeholder="e.g. Aurora Energy"
+              <Controller
+                name="name"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="e.g. Aurora Energy"
+                  />
+                )}
               />
             </Field>
             <Field
               label="Legal name"
               helper="Used on official case documents and contracts."
             >
-              <Input unstyled
-                value={form.legal_name}
-                onChange={(v) => setField('legal_name', v)}
-                className={inputCx}
-                placeholder="e.g. Aurora Energy AS"
+              <Controller
+                name="legal_name"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="e.g. Aurora Energy AS"
+                  />
+                )}
               />
             </Field>
             <Field label="Industry">
               <select
-                value={form.industry}
-                onChange={(e) => setField('industry', e.target.value)}
+                {...register('industry')}
                 className={selectCx}
               >
                 <option value="">—</option>
@@ -432,8 +307,7 @@ export function CompanyProfileForm({
               helper="Used for filtering & may affect policy tier eligibility."
             >
               <select
-                value={form.size_band}
-                onChange={(e) => setField('size_band', e.target.value)}
+                {...register('size_band')}
                 className={selectCx}
               >
                 <option value="">—</option>
@@ -445,11 +319,18 @@ export function CompanyProfileForm({
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12.5px] text-slate-400">
                   https://
                 </span>
-                <Input unstyled
-                  value={form.website}
-                  onChange={(v) => setField('website', v.replace(/^https?:\/\//, ''))}
-                  className={`${inputCx} pl-[60px]`}
-                  placeholder="aurora-energy.com"
+                <Controller
+                  name="website"
+                  control={control}
+                  render={({ field }) => (
+                    <Input unstyled
+                      value={field.value}
+                      onChange={(v) => field.onChange(v.replace(/^https?:\/\//, ''))}
+                      onBlur={field.onBlur}
+                      className={`${inputCx} pl-[60px]`}
+                      placeholder="aurora-energy.com"
+                    />
+                  )}
                 />
               </div>
             </Field>
@@ -468,25 +349,45 @@ export function CompanyProfileForm({
               label="Country of incorporation"
               helper="Pre-filled as employer country in every new relocation case."
             >
-              <CountrySelect
-                value={form.country}
-                onChange={(v) => setField('country', v)}
+              <Controller
+                name="country"
+                control={control}
+                render={({ field }) => (
+                  <CountrySelect
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </Field>
             <Field label="HQ city">
-              <Input unstyled
-                value={form.hq_city}
-                onChange={(v) => setField('hq_city', v)}
-                className={inputCx}
-                placeholder="Paris"
+              <Controller
+                name="hq_city"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="Paris"
+                  />
+                )}
               />
             </Field>
             <Field label="Address" full>
-              <Input unstyled
-                value={form.address}
-                onChange={(v) => setField('address', v)}
-                className={inputCx}
-                placeholder="12 Avenue de Friedland, 75008 Paris, France"
+              <Controller
+                name="address"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="12 Avenue de Friedland, 75008 Paris, France"
+                  />
+                )}
               />
             </Field>
             <Field
@@ -494,11 +395,18 @@ export function CompanyProfileForm({
               full
               helper="International format with country code."
             >
-              <Input unstyled
-                value={form.phone}
-                onChange={(v) => setField('phone', v)}
-                className={inputCx}
-                placeholder="+33 1 4502 8821"
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="+33 1 4502 8821"
+                  />
+                )}
               />
             </Field>
           </div>
@@ -516,28 +424,48 @@ export function CompanyProfileForm({
               label="HR contact"
               helper="Internal — used in audit logs and admin views."
             >
-              <Input unstyled
-                value={form.hr_contact}
-                onChange={(v) => setField('hr_contact', v)}
-                className={inputCx}
-                placeholder="helena.muller@aurora-energy.com"
+              <Controller
+                name="hr_contact"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="helena.muller@aurora-energy.com"
+                  />
+                )}
               />
             </Field>
             <Field label="Support email">
-              <Input unstyled
-                value={form.support_email}
-                onChange={(v) => setField('support_email', v)}
-                className={inputCx}
-                placeholder="mobility@aurora-energy.com"
+              <Controller
+                name="support_email"
+                control={control}
+                render={({ field }) => (
+                  <Input unstyled
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    className={inputCx}
+                    placeholder="mobility@aurora-energy.com"
+                  />
+                )}
               />
               <InfoBanner>
                 <span className="font-medium">Employees see this</span> as their HR contact in the relocation portal.
               </InfoBanner>
             </Field>
             <Field label="Default destination country">
-              <CountrySelect
-                value={form.default_destination_country}
-                onChange={(v) => setField('default_destination_country', v)}
+              <Controller
+                name="default_destination_country"
+                control={control}
+                render={({ field }) => (
+                  <CountrySelect
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
               <InfoBanner>
                 Seeds the destination picker in <span className="font-medium">every new case</span> and drives supplier &amp; resource recommendations.
@@ -545,8 +473,7 @@ export function CompanyProfileForm({
             </Field>
             <Field label="Default working location">
               <select
-                value={form.default_working_location}
-                onChange={(e) => setField('default_working_location', e.target.value)}
+                {...register('default_working_location')}
                 className={selectCx}
               >
                 <option value="">—</option>
@@ -629,10 +556,7 @@ export function CompanyProfileForm({
         </SectionCard>
       </div>
 
-      {/* Sticky bottom bar — sits within the main scroll column so the
-          PlatformSidebar isn't covered when it's expanded. Uses brand
-          navy (#0b2b43) + teal (#1f8e8b) to match the antigravity Button
-          primary/secondary variants used across the rest of the platform. */}
+      {/* Sticky bottom bar */}
       <div className="sticky bottom-0 left-0 right-0 z-20 -mx-6 mt-6 border-t border-[#e2e8f0] bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-3 text-[13px]">
@@ -667,8 +591,8 @@ export function CompanyProfileForm({
             </Button>
             <Button unstyled
               type="button"
-              onClick={() => void handleManualSave()}
-              disabled={saving || !form.name.trim()}
+              onClick={() => void saveNow()}
+              disabled={saving || !watchedName.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2b43] px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckIcon className="h-3.5 w-3.5" /> Save profile
@@ -701,7 +625,6 @@ function SectionCard({
   dirty: boolean;
   children: React.ReactNode;
 }) {
-  // Show pill: green "Saved" by default; emerald flash when section just saved; amber "Editing" if dirty.
   let pill: React.ReactNode;
   if (savedFlash) {
     pill = (
