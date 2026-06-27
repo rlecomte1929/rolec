@@ -3343,6 +3343,74 @@ class CasesMixin:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def insert_message(
+        self,
+        *,
+        assignment_id: str,
+        body: str,
+        sender_user_id: str,
+        recipient_user_id: Optional[str] = None,
+        hr_user_id: Optional[str] = None,
+        employee_identifier: Optional[str] = None,
+        status: str = "sent",
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Insert one HR<->employee message on an assignment thread via the legacy
+        assignment-based columns the inbox read path uses
+        (list_messages_by_assignment / list_messages_for_{hr,employee}). The
+        thread-model columns (thread_id/sender_id/sender_name/sender_initials) are
+        left NULL — see migration 20260727000000. Tenant scoping is the caller's
+        responsibility (the handler verifies assignment access first). The id is
+        generated here so the insert is identical on Postgres and SQLite. Returns
+        the created row, or None when assignment_id / body / sender are blank."""
+        import uuid as _uuid
+
+        aid = (assignment_id or "").strip()
+        text_body = (body or "").strip()
+        suid = (sender_user_id or "").strip()
+        if not aid or not text_body or not suid:
+            return None
+        mid = str(_uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        params = {
+            "id": mid,
+            "aid": aid,
+            "body": text_body,
+            "suid": suid,
+            "ruid": (recipient_user_id or None),
+            "hruid": (hr_user_id or None),
+            "emp": (employee_identifier or None),
+            "status": status,
+            "now": now,
+        }
+        cols = (
+            "id, assignment_id, body, sender_user_id, recipient_user_id, "
+            "hr_user_id, employee_identifier, status, created_at, sent_at"
+        )
+        if _is_sqlite:
+            sql = (
+                f"INSERT INTO messages ({cols}) "
+                "VALUES (:id, :aid, :body, :suid, :ruid, :hruid, :emp, :status, :now, :now)"
+            )
+        else:
+            sql = (
+                f"INSERT INTO messages ({cols}) "
+                "VALUES (:id, :aid, :body, :suid, :ruid, :hruid, :emp, :status, "
+                "CAST(:now AS timestamptz), CAST(:now AS timestamptz))"
+            )
+        with self.engine.begin() as conn:
+            self._exec(conn, sql, params, op_name="insert_message", request_id=request_id)
+        return {
+            "id": mid,
+            "assignment_id": aid,
+            "body": text_body,
+            "sender_user_id": suid,
+            "recipient_user_id": recipient_user_id,
+            "hr_user_id": hr_user_id,
+            "status": status,
+            "created_at": now,
+        }
+
     def get_admin_assignments_index(
         self,
         company_id: Optional[str] = None,
