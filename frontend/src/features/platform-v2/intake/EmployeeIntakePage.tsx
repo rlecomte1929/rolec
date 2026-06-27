@@ -282,7 +282,18 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
           value={open ? query : selected ? selected.name : ''}
           placeholder={placeholder}
           disabled={disabled}
-          onChange={(v) => { setQuery(v); setOpen(true); }}
+          onChange={(v) => {
+            setQuery(v);
+            setOpen(true);
+            // Auto-commit when the typed text exactly matches a country so the
+            // user isn't left with an empty value (and a disabled Continue) after
+            // typing the full name without clicking the dropdown.
+            const norm = v.trim().toLowerCase();
+            const exact = COUNTRIES.find(
+              (c) => c.name.toLowerCase() === norm || c.code.toLowerCase() === norm,
+            );
+            if (exact) { onChange(exact.code); setOpen(false); setQuery(''); }
+          }}
           onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
           autoComplete="off"
         />
@@ -290,6 +301,9 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
       </div>
       {open && !disabled && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+          {query && filtered.length > 0 && (
+            <div className="px-4 pt-2 pb-1 text-[11px] text-gray-400">Select your country from the list</div>
+          )}
           {filtered.length === 0
             ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
             : filtered.map((c) => (
