@@ -4,7 +4,7 @@
  * Falls back to polling when Supabase is unavailable or subscription drops.
  */
 
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { listNotifications, getUnreadCount } from './notifications';
 import type { NotificationListItem } from './notifications';
@@ -132,12 +132,12 @@ export function subscribeToNotificationsRealtime(
         }
       )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
           stopFallback();
           reconnectAttempts = 0;
           return;
         }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR || status === REALTIME_SUBSCRIBE_STATES.TIMED_OUT) {
           reconnectAttempts += 1;
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             startFallback();

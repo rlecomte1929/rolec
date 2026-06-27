@@ -193,7 +193,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-unsafe-call': 'error',
-      '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-base-to-string': 'error',
       '@typescript-eslint/restrict-template-expressions': 'error',
