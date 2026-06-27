@@ -6,7 +6,25 @@ import { adminStagingAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { InternalThreadPanel } from '../../../components/admin/collaboration/InternalThreadPanel';
 
-type Candidate = Record<string, unknown>;
+type Candidate = {
+  id?: string;
+  status?: string;
+  title?: string;
+  summary?: string;
+  body?: string;
+  country_code?: string;
+  city_name?: string;
+  category_key?: string;
+  resource_type?: string;
+  source_url?: string;
+  source_name?: string;
+  trust_tier?: string;
+  confidence_score?: number;
+  extraction_method?: string;
+  created_at?: string;
+  review_reason?: string;
+  provenance_json?: Record<string, unknown>;
+};
 type Match = {
   id: string;
   title?: string;
@@ -51,7 +69,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
     void load();
   }, [load]);
 
-  const status = (candidate?.status as string) ?? 'new';
+  const status = candidate?.status ?? 'new';
   const isApproved = status === 'approved_new' || status === 'approved_merged';
   const canRestore =
     ['rejected', 'duplicate', 'ignored'].includes(status) && !isApproved;
@@ -178,12 +196,12 @@ export const AdminStagingResourceDetail: React.FC = () => {
     );
   }
 
-  const prov = (candidate.provenance_json as Record<string, unknown>) || {};
+  const prov = candidate.provenance_json ?? {};
 
   return (
     <AdminLayout
       title="Staged Resource"
-      subtitle={(candidate.title as string) || 'Detail'}
+      subtitle={candidate.title || 'Detail'}
     >
       <div className="mb-4">
         <Link
@@ -201,31 +219,31 @@ export const AdminStagingResourceDetail: React.FC = () => {
             <dl className="space-y-2 text-sm">
               <div>
                 <dt className="text-slate-500">Title</dt>
-                <dd className="font-medium">{String(candidate.title ?? '-')}</dd>
+                <dd className="font-medium">{candidate.title ?? '-'}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Summary</dt>
                 <dd className="whitespace-pre-wrap">
-                  {(candidate.summary as string) || '-'}
+                  {candidate.summary || '-'}
                 </dd>
               </div>
               <div>
                 <dt className="text-slate-500">Body</dt>
                 <dd className="whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  {(candidate.body as string) || '-'}
+                  {candidate.body || '-'}
                 </dd>
               </div>
               <div className="flex gap-4">
                 <div>
                   <dt className="text-slate-500">Country / City</dt>
                   <dd>
-                    {String(candidate.country_code ?? '')} / {String(candidate.city_name ?? '-')}
+                    {candidate.country_code ?? ''} / {candidate.city_name ?? '-'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Category / Type</dt>
                   <dd>
-                    {String(candidate.category_key ?? '-')} / {String(candidate.resource_type ?? '-')}
+                    {candidate.category_key ?? '-'} / {candidate.resource_type ?? '-'}
                   </dd>
                 </div>
               </div>
@@ -233,12 +251,12 @@ export const AdminStagingResourceDetail: React.FC = () => {
                 <dt className="text-slate-500">Source URL</dt>
                 <dd>
                   <a
-                    href={(candidate.source_url as string) || '#'}
+                    href={candidate.source_url || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[#0b2b43] hover:underline"
                   >
-                    {String(candidate.source_url ?? '-')}
+                    {candidate.source_url ?? '-'}
                   </a>
                 </dd>
               </div>
@@ -250,11 +268,11 @@ export const AdminStagingResourceDetail: React.FC = () => {
             <dl className="space-y-1 text-sm text-slate-600">
               <div>
                 <dt className="inline font-medium">Source:</dt>{' '}
-                <dd className="inline">{String(candidate.source_name ?? '-')}</dd>
+                <dd className="inline">{candidate.source_name ?? '-'}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Trust tier:</dt>{' '}
-                <dd className="inline">{String(candidate.trust_tier ?? '-')}</dd>
+                <dd className="inline">{candidate.trust_tier ?? '-'}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Confidence:</dt>{' '}
@@ -266,21 +284,21 @@ export const AdminStagingResourceDetail: React.FC = () => {
               </div>
               <div>
                 <dt className="inline font-medium">Extraction method:</dt>{' '}
-                <dd className="inline">{String(candidate.extraction_method ?? '-')}</dd>
+                <dd className="inline">{candidate.extraction_method ?? '-'}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Fetched:</dt>{' '}
                 <dd className="inline">
                   {candidate.created_at
-                    ? new Date(candidate.created_at as string).toLocaleString()
+                    ? new Date(candidate.created_at).toLocaleString()
                     : '-'}
                 </dd>
               </div>
-              {Boolean((prov)?.snippet) && (
+              {Boolean(prov.snippet) && (
                 <div>
                   <dt className="block font-medium">Snippet</dt>
                   <dd className="mt-1 rounded bg-white p-2 text-xs">
-                    {String((prov)?.snippet ?? '').slice(0, 300)}...
+                    {String((prov.snippet as string | undefined) ?? '').slice(0, 300)}...
                   </dd>
                 </div>
               )}
@@ -304,9 +322,9 @@ export const AdminStagingResourceDetail: React.FC = () => {
                 {String(status)}
               </span>
             </p>
-            {Boolean((candidate as Record<string, unknown>).review_reason) && (
+            {Boolean(candidate.review_reason) && (
               <p className="mt-2 text-sm text-slate-600">
-                <strong>Review note:</strong> {String((candidate as Record<string, unknown>).review_reason ?? '')}
+                <strong>Review note:</strong> {candidate.review_reason ?? ''}
               </p>
             )}
           </div>

@@ -3,6 +3,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// eslint-disable-next-line import/order
 import { AdminSourceChangeReviewsPage } from '../AdminSourceChangeReviewsPage';
 
 vi.mock('../../../../api/client', () => ({

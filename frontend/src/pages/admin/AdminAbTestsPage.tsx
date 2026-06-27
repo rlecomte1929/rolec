@@ -74,7 +74,11 @@ export const AdminAbTestsPage: React.FC = () => {
 
       try {
         // 1. Fetch feature flags from edge function
-        const { data: flagData, error: flagErr } = await supabase.functions.invoke('get-feature-flags');
+        const invokeResult = await supabase.functions.invoke('get-feature-flags') as {
+          data: { flags?: Record<string, FeatureFlag> } | null;
+          error: { message: string } | null;
+        };
+        const { data: flagData, error: flagErr } = invokeResult;
         if (flagErr) throw new Error(`Failed to load flags: ${flagErr.message}`);
         setFlags(flagData?.flags ?? {});
 
@@ -92,7 +96,7 @@ export const AdminAbTestsPage: React.FC = () => {
         }
 
         if (summary?.raw_counts) {
-          setAnalysis(summary.raw_counts);
+          setAnalysis(summary.raw_counts as AnalysisPayload);
           setLastUpdated(summary.date as string);
         }
       } catch (err) {

@@ -129,8 +129,8 @@ export const AdminMessages: React.FC = () => {
         company_id: companyFilter,
         limit: 100,
         offset: 0,
-      });
-      return res.threads || [];
+      }) as { threads?: Thread[] };
+      return res.threads ?? [];
     },
     enabled: activeTab === 'conversations' && !!companyFilter,
   });
@@ -165,21 +165,22 @@ export const AdminMessages: React.FC = () => {
     }> => {
       const t = selectedThread!;
       if (t.thread_type === 'hr_employee' && t.assignment_id) {
-        const res = await adminAPI.getHrThreadDetail(t.assignment_id);
-        return { threadDetail: res as HrThreadDetail, collabComments: [] };
+        const res = await adminAPI.getHrThreadDetail(t.assignment_id) as HrThreadDetail;
+        return { threadDetail: res, collabComments: [] };
       }
       if (t.thread_type === 'collaboration') {
-        const [, commentsRes] = await Promise.all([
+        type RawComment = { id: string; body: string; created_at: string; author_display_name?: string; author_user_id?: string };
+        const [, rawComments] = await Promise.all([
           adminCollaborationAPI.getThreadById(t.thread_id),
           adminCollaborationAPI.getComments(t.thread_id),
-        ]);
+        ]) as [unknown, { comments?: RawComment[] }];
         return {
           threadDetail: null,
-          collabComments: (commentsRes?.comments || []).map((c: any) => ({
+          collabComments: (rawComments?.comments ?? []).map((c) => ({
             id: c.id,
             body: c.body,
             created_at: c.created_at,
-            author_display_name: c.author_display_name || c.author_user_id?.slice(0, 8) + '…',
+            author_display_name: c.author_display_name ?? (c.author_user_id?.slice(0, 8) + '…'),
           })),
         };
       }
@@ -230,8 +231,9 @@ export const AdminMessages: React.FC = () => {
 
   // Group threads: map groupKey -> { label, threads }. Keys for person/role are stable for expand/collapse.
   const groups = React.useMemo(() => {
+    const threadList: Thread[] = threadsQuery.data ?? [];
     const map = new Map<string, { label: string; threads: Thread[] }>();
-    for (const t of threads) {
+    for (const t of threadList) {
       let key: string;
       let label: string;
       if (groupBy === 'thread') {
@@ -253,7 +255,7 @@ export const AdminMessages: React.FC = () => {
       }
     }
     return map;
-  }, [threads, groupBy]);
+  }, [threadsQuery.data, groupBy]);
 
   const groupKeys = [...groups.keys()];
 
