@@ -28,3 +28,45 @@ export type CompanyPolicyResult = {
   benefits: unknown[];
   company_name?: string;
 };
+
+/** /api/services/context — services-flow context banner payload. */
+export type ServiceContextResult = {
+  assignment_id: string;
+  case_id: string;
+  case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
+  target_start_date?: string | null;
+  services: Array<{ service_key: string; selected: boolean | number; [k: string]: unknown }>;
+  answers: Array<{ service_key: string; answers: Record<string, unknown> }>;
+  questions: unknown[];
+  selected_services: string[];
+};
+
+/** /api/resources/country — legacy country-resources payload (rkg_resources). */
+export type CountryResourcesResult = {
+  profile: Record<string, unknown>;
+  context?: Record<string, unknown>;
+  hints: { priorities: string[]; recommendations: string[] };
+  sections: Array<{ key: string; title: string; content: unknown }>;
+  events?: unknown[];
+  recommended?: unknown[];
+  filters_applied: Record<string, unknown>;
+};
+
+/** /api/guidance/generate — generated guidance pack. */
+export type GuidanceGenerateResult = {
+  guidance_pack_id: string;
+  guidance_mode?: 'demo' | 'strict';
+  pack_hash?: string;
+  rule_set?: unknown[];
+  plan: unknown;
+  checklist: unknown;
+  markdown: string;
+  sources: Array<{ doc_id: string; title?: string; url: string; publisher?: string }>;
+  not_covered: string[];
+  coverage?: unknown;
+};
+
+/** /api/admin/collaboration/threads/summary|summaries — per-target comment summaries. */
+export type ThreadSummariesResult = {
+  summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }>;
+};

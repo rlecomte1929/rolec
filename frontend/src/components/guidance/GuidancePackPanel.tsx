@@ -127,7 +127,9 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
     setLoading(true);
     try {
       const res = await guidanceAPI.generate(caseId, adminContext?.isAdmin ? mode : undefined);
-      setPack(res);
+      // Boundary cast: the API returns the guidance pack with opaque plan/checklist; this panel's
+      // GuidancePack view type narrows them. Shapes are otherwise identical.
+      setPack(res as GuidancePack);
       setGeneratedAt(new Date().toLocaleString());
       setTab('plan');
     } catch (e) {
