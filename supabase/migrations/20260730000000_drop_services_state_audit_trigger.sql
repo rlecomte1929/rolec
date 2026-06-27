@@ -1,0 +1,21 @@
+-- AIQ-1324: dedupe the services_state audit trail — drop the redundant DB trigger.
+--
+-- services_state was audited TWICE per save:
+--   1. The app handler (backend/app/routers/services_state.py _audit()) writes a
+--      LEAN audit_logs row: actor_type='human' (the real user), new_value={byte_size}.
+--      This is the intended design ("Don't echo the whole blob into audit_logs").
+--   2. The shared trigger trg_audit_services_state -> relopass_audit_row() writes a
+--      DUPLICATE row: actor_type='system', new_value = to_jsonb(NEW) — i.e. the ENTIRE
+--      state_json blob (up to 256 KB/save). Bloats audit_logs and mis-attributes the actor.
+--
+-- Keep the lean, correctly-attributed app audit; drop the duplicate+bloating trigger.
+-- The shared relopass_audit_row() function is UNCHANGED — it still serves the other
+-- ~11 tables that carry this trigger and DO have an `id` column. Only services_state
+-- (keyed by case_id, no id) loses its trigger.
+--
+-- History: AIQ-1320 dropped this trigger as a 500-hotfix, then restored it to match
+-- #1077 (which fixed relopass_audit_row for id-less tables) pending this dedupe
+-- decision. This migration finalizes it: trigger dropped, app audit kept.
+--
+-- Idempotent.
+DROP TRIGGER IF EXISTS trg_audit_services_state ON public.services_state;
