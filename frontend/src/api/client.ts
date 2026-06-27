@@ -851,9 +851,9 @@ export const hrAPI = {
     const response = await api.post<unknown>(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
     return response.data;
   },
-  getCompanyProfile: async (): Promise<{ company: Record<string, unknown> | null }> => {
+  getCompanyProfile: async (): Promise<{ company: CompanyProfilePayload | null }> => {
     return cachedRequest('hr:company-profile', 60_000, async () => {
-      const response = await api.get<{ company: Record<string, unknown> | null }>('/api/hr/company-profile');
+      const response = await api.get<{ company: CompanyProfilePayload | null }>('/api/hr/company-profile');
       return response.data;
     });
   },
@@ -2397,37 +2397,70 @@ export const adminOpsAnalyticsAPI = {
 };
 
 // Admin Collaboration API (admin-only, internal threads)
+
+/** An internal collaboration thread row (backend select(*) + is_unread). */
+export interface CollabThread {
+  id: string;
+  thread_target_type?: string;
+  thread_target_id?: string;
+  status?: string;
+  last_comment_at?: string | null;
+  created_at?: string;
+  is_unread?: boolean;
+  [k: string]: unknown;
+}
+
+/** A single comment on a collaboration thread. */
+export interface CollabComment {
+  id: string;
+  thread_id: string;
+  parent_comment_id?: string | null;
+  body: string;
+  author_user_id?: string | null;
+  created_at?: string;
+  mentions?: string[];
+  [k: string]: unknown;
+}
+
+/** Compact per-target thread summary for the inline collaboration badge. */
+export interface CollabThreadSummary {
+  comment_count: number;
+  last_comment_at?: string | null;
+  status?: string | null;
+  is_unread?: boolean;
+}
+
 export const adminCollaborationAPI = {
   getThread: (targetType: string, targetId: string) =>
-    api.get('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+    api.get<CollabThread>('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
   getOrCreateThread: (targetType: string, targetId: string, title?: string) =>
-    api.post('/api/admin/collaboration/threads/by-target', null, {
+    api.post<CollabThread>('/api/admin/collaboration/threads/by-target', null, {
       params: { target_type: targetType, target_id: targetId, title: title || undefined },
     }).then((r) => r.data),
   getSummary: (targetType: string, targetId: string) =>
-    api.get('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+    api.get<CollabThreadSummary>('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
   getSummariesBatch: (targets: { target_type: string; target_id: string }[]) =>
-    api.post('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
+    api.post<{ summaries?: Record<string, CollabThreadSummary> }>('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
   getThreadById: (threadId: string) =>
-    api.get(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
+    api.get<CollabThread>(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
   getComments: (threadId: string) =>
-    api.get(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
+    api.get<CollabComment[]>(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
   createComment: (threadId: string, body: string, parentCommentId?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
+    api.post<CollabComment>(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
   editComment: (commentId: string, body: string) =>
-    api.patch(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
+    api.patch<CollabComment>(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
   deleteComment: (commentId: string) =>
-    api.delete(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data),
+    api.delete<unknown>(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data), // opaque: action result not consumed by callers
   resolveThread: (threadId: string, note?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
+    api.post<CollabThread>(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
   reopenThread: (threadId: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
+    api.post<CollabThread>(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
   closeThread: (threadId: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
+    api.post<CollabThread>(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
   markRead: (threadId: string, lastCommentId?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data), // opaque: action result not consumed by callers
   getUnreadCount: () =>
-    api.get('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
+    api.get<{ unread_count?: number }>('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
 };
 
 export const requirementsAPI = {
@@ -2851,48 +2884,51 @@ export const employeeAPI = {
   },
 };
 
+/** Combined services context payload (assignment + case + services + answers + questions). */
+export interface ServicesContextResponse {
+  assignment_id: string;
+  case_id: string;
+  case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
+  /** AIQ-1249d: canonical move date for the services context banner. */
+  target_start_date?: string | null;
+  services: Array<{ service_key: string; selected: boolean | number; [k: string]: unknown }>;
+  answers: Array<{ service_key: string; answers: Record<string, unknown> }>;
+  questions: unknown[];
+  selected_services: string[];
+}
+
 export const servicesAPI = {
   /** Combined load: assignment, case context, services, answers, questions in one request. Use instead of 4 separate calls. */
   getServicesContext: async (
     assignmentId: string,
     fallbackServices?: string[]
-  ): Promise<{
-    assignment_id: string;
-    case_id: string;
-    case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
-    /** AIQ-1249d: canonical move date for the services context banner. */
-    target_start_date?: string | null;
-    services: Array<{ service_key: string; selected: boolean | number; [k: string]: any }>;
-    answers: Array<{ service_key: string; answers: Record<string, any> }>;
-    questions: any[];
-    selected_services: string[];
-  }> => {
+  ): Promise<ServicesContextResponse> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get('/api/services/context', { params });
+    const response = await api.get<ServicesContextResponse>('/api/services/context', { params });
     return response.data;
   },
-  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: any[] }> => {
+  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: unknown[] }> => {
     const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
-    const response = await api.get<{ case_id: string; answers: any[] }>('/api/services/answers', { params: p });
+    const response = await api.get<{ case_id: string; answers: unknown[] }>('/api/services/answers', { params: p });
     return response.data;
   },
   getServiceQuestions: async (
     assignmentId: string,
     fallbackServices?: string[]
-  ): Promise<{ questions: any[]; selected_services: string[] }> => {
+  ): Promise<{ questions: unknown[]; selected_services: string[] }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get<{ questions: any[]; selected_services: string[] }>('/api/services/questions', { params });
+    const response = await api.get<{ questions: unknown[]; selected_services: string[] }>('/api/services/questions', { params });
     return response.data;
   },
   saveServiceAnswers: async (
     caseId: string,
-    items: Array<{ service_key: string; answers: Record<string, any> }>,
+    items: Array<{ service_key: string; answers: Record<string, unknown> }>,
     options?: { signal?: AbortSignal }
   ): Promise<{ ok: boolean }> => {
     const config = options?.signal ? { signal: options.signal } : {};
@@ -2901,7 +2937,7 @@ export const servicesAPI = {
   },
   createRfq: async (
     caseId: string,
-    items: Array<{ service_key: string; requirements: Record<string, any> }>,
+    items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
     supplierIds: string[]
   ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
     const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string } }>('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
@@ -3877,23 +3913,34 @@ function handle401Redirect(response: Response): void {
   }
 }
 
-function buildApiError(response: Response, bodyText: string) {
-  let detail: any = bodyText;
+/** Error thrown by the native-fetch API helpers; carries the HTTP status + parsed body. */
+export interface ApiError extends Error {
+  status: number;
+  /** Parsed `detail` from the error body — legitimately dynamic. */
+  detail: unknown;
+}
+
+function buildApiError(response: Response, bodyText: string): ApiError {
+  let detail: unknown = bodyText;
   let message = bodyText || `${response.status} ${response.statusText}`;
 
   try {
-    const parsed = JSON.parse(bodyText);
-    detail = parsed?.detail ?? parsed;
+    const parsed: unknown = JSON.parse(bodyText);
+    detail =
+      parsed && typeof parsed === 'object' && 'detail' in parsed
+        ? parsed.detail
+        : parsed;
     if (typeof detail === 'string') {
       message = detail;
     } else if (detail && typeof detail === 'object') {
-      message = detail.message || JSON.stringify(detail);
+      const maybeMessage = (detail as { message?: unknown }).message;
+      message = typeof maybeMessage === 'string' ? maybeMessage : JSON.stringify(detail);
     }
   } catch {
     // bodyText wasn't JSON
   }
 
-  const err: any = new Error(message);
+  const err = new Error(message) as ApiError;
   err.status = response.status;
   err.detail = detail;
   return err;
@@ -3961,7 +4008,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
 
 export async function apiPost<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
@@ -4020,7 +4067,7 @@ export async function apiPost<T>(
 
 export async function apiPatch<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
@@ -4079,7 +4126,7 @@ export async function apiPatch<T>(
 
 export async function apiPut<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;

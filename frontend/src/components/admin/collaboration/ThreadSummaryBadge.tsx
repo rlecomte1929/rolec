@@ -1,13 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { buildRoute, type RouteKey } from '../../../navigation/routes';
+import type { CollabThreadSummary } from '../../../api/client';
 
-type Summary = {
-  comment_count: number;
-  last_comment_at?: string;
-  status?: string;
-  is_unread?: boolean;
-};
+type Summary = CollabThreadSummary;
 
 interface Props {
   targetType: 'review_queue_item' | 'ops_notification' | 'staged_resource_candidate' | 'staged_event_candidate' | 'live_resource' | 'live_event';

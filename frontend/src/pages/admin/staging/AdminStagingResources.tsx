@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Input } from '../../../components/antigravity/Input';
 import { AdminLayout } from '../AdminLayout';
-import { adminStagingAPI, adminCollaborationAPI } from '../../../api/client';
+import { adminStagingAPI, adminCollaborationAPI, type CollabThreadSummary } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { ThreadSummaryBadge } from '../../../components/admin/collaboration/ThreadSummaryBadge';
 
@@ -26,7 +26,7 @@ export const AdminStagingResources: React.FC = () => {
   const [items, setItems] = useState<ResourceCandidate[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [threadSummaries, setThreadSummaries] = useState<Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }>>({});
+  const [threadSummaries, setThreadSummaries] = useState<Record<string, CollabThreadSummary>>({});
   const [filters, setFilters] = useState({
     status: '',
     country_code: '',
@@ -56,7 +56,7 @@ export const AdminStagingResources: React.FC = () => {
       if (listItems.length > 0) {
         adminCollaborationAPI.getSummariesBatch(
           listItems.map((i: { id: string }) => ({ target_type: 'staged_resource_candidate', target_id: i.id }))
-        ).then((r: { summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }> }) => setThreadSummaries(r.summaries ?? {})).catch(() => {});
+        ).then((r) => setThreadSummaries(r.summaries ?? {})).catch(() => {});
       } else {
         setThreadSummaries({});
       }

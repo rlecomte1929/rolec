@@ -5,7 +5,7 @@ import { Input } from '../../../components/antigravity/Input';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { ReviewQueuePriorityBadge } from '../../../components/admin/review-queue/ReviewQueuePriorityBadge';
 import { ReviewQueueStatusBadge } from '../../../components/admin/review-queue/ReviewQueueStatusBadge';
-import { adminReviewQueueAPI, adminCollaborationAPI } from '../../../api/client';
+import { adminReviewQueueAPI, adminCollaborationAPI, type CollabThreadSummary } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { ThreadSummaryBadge } from '../../../components/admin/collaboration/ThreadSummaryBadge';
 import { AdminReviewQueueLayout } from './AdminReviewQueueLayout';
@@ -59,7 +59,7 @@ export const AdminReviewQueuePage: React.FC = () => {
   const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [items, setItems] = useState<QueueItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [threadSummaries, setThreadSummaries] = useState<Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }>>({});
+  const [threadSummaries, setThreadSummaries] = useState<Record<string, CollabThreadSummary>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export const AdminReviewQueuePage: React.FC = () => {
       if (listItems.length > 0) {
         adminCollaborationAPI.getSummariesBatch(
           listItems.map((i: { id: string }) => ({ target_type: 'review_queue_item', target_id: i.id }))
-        ).then((r: { summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }> }) => setThreadSummaries(r.summaries ?? {})).catch(() => {});
+        ).then((r) => setThreadSummaries(r.summaries ?? {})).catch(() => {});
       } else {
         setThreadSummaries({});
       }
