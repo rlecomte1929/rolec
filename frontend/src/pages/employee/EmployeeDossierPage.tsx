@@ -185,6 +185,18 @@ export const EmployeeDossierPage: React.FC = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [matchedFormId, visible]);
 
+  // [AIQ-1319] A roadmap "Start now" can deep-link ?form=<docKey> for a document
+  // (e.g. a passport upload) that has no corresponding form in this corridor's
+  // dossier. Once forms have loaded and nothing matched, strip the stale param so
+  // the employee lands cleanly on the dossier with no phantom highlight target,
+  // instead of a URL that promises a form that isn't here.
+  useEffect(() => {
+    if (loading || !formParam || matchedFormId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('form');
+    setSearchParams(next, { replace: true });
+  }, [loading, formParam, matchedFormId, searchParams, setSearchParams]);
+
   // [P2-08d] Count forms whose official source hasn't been verified within its
   // staleness threshold, so the user is warned at the dossier level before they
   // hit a per-form badge. Derived from the same scoped set as the other counts.
