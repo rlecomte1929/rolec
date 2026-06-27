@@ -30,13 +30,13 @@ function mockFetch(category: string, confidence: number, detected_topic = 'reloc
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
-    json: async () => ({
+    json: () => Promise.resolve({
       content: [{
         type: 'text',
         text: JSON.stringify({ category, confidence, detected_topic }),
       }],
     }),
-    text: async () => '',
+    text: () => Promise.resolve(''),
   }));
 }
 
@@ -136,8 +136,8 @@ describe('classify — structural correctness', () => {
   it('defaults to borderline on JSON parse failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ content: [{ type: 'text', text: 'not valid json {{' }] }),
-      text: async () => '',
+      json: () => Promise.resolve({ content: [{ type: 'text', text: 'not valid json {{' }] }),
+      text: () => Promise.resolve(''),
     }));
     const result = await classify('some query', 'test-key');
     expect(result.category).toBe('borderline');
@@ -147,7 +147,7 @@ describe('classify — structural correctness', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
-      text: async () => 'Unauthorized',
+      text: () => Promise.resolve('Unauthorized'),
     }));
     await expect(classify('test', 'bad-key')).rejects.toThrow('API error 401');
   });

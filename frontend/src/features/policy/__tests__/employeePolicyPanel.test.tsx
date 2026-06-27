@@ -116,7 +116,7 @@ describe('EmployeePolicyPanel — lifecycle messaging', () => {
 
 describe('EmployeePolicyPanel — service comparison behavior', () => {
   beforeEach(() => {
-    employeeApiMocks.getPolicyServiceComparison.mockImplementation(async () => ({
+    employeeApiMocks.getPolicyServiceComparison.mockImplementation(() => Promise.resolve({
       assignment_id: 'asg-1',
       comparisons: [],
       comparison_readiness: { comparison_ready: true, comparison_blockers: [] },

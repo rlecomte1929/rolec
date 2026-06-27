@@ -35,10 +35,10 @@ function mockNliFetch(results: boolean[]) {
     vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({
+      json: () => Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(results) }],
       }),
-      text: async () => '',
+      text: () => Promise.resolve(''),
     }),
   );
 }
@@ -335,8 +335,8 @@ describe('checkFaithfulness — edge cases', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ content: [{ type: 'text', text: 'not valid JSON {{[' }] }),
-        text: async () => '',
+        json: () => Promise.resolve({ content: [{ type: 'text', text: 'not valid JSON {{[' }] }),
+        text: () => Promise.resolve(''),
       }),
     );
     const chunks = ['The policy covers housing allowances for all employees.'];
@@ -352,7 +352,7 @@ describe('checkFaithfulness — edge cases', () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
-        text: async () => 'Internal Server Error',
+        text: () => Promise.resolve('Internal Server Error'),
       }),
     );
     const chunks = ['The policy text goes here with important information content.'];

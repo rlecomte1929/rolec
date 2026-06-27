@@ -414,7 +414,7 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
     }
   }, [caseId, orderedForms, coverPage, packageName]);
 
-  const handleDownloadZip = useCallback(async () => {
+  const handleDownloadZip = useCallback(() => {
     if (!result) return;
     const zipUrl = dossierPackageAPI.getZipUrl(caseId, result.id);
     // Trigger download by creating a temporary anchor
@@ -516,7 +516,7 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
 
             <Button unstyled
               type="button"
-              onClick={() => void handleDownloadZip()}
+              onClick={() => handleDownloadZip()}
               data-testid="download-zip-btn"
               className="inline-flex items-center gap-2 rounded-lg border border-[#0b2b43] px-5 py-2.5 text-sm font-semibold text-[#0b2b43] bg-white shadow-sm hover:bg-[#0b2b43]/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/50"
             >

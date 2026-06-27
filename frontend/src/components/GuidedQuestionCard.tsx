@@ -24,9 +24,9 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
+
     let finalAnswer = answer;
-    
+
     if (question.type === 'multi_select') {
       finalAnswer = selectedOptions;
     } else if (question.type === 'boolean') {
@@ -34,14 +34,14 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
     } else if (question.type === 'single_select' && question.options && !answer) {
       return; // Require selection
     }
-    
-    await onAnswer(finalAnswer, false);
+
+    await Promise.resolve(onAnswer(finalAnswer, false));
     setIsSubmitting(false);
   };
 
   const handleUnknown = async () => {
     setIsSubmitting(true);
-    await onAnswer(null, true);
+    await Promise.resolve(onAnswer(null, true));
     setIsSubmitting(false);
   };
 

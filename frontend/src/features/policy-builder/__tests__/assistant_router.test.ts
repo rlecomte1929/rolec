@@ -111,7 +111,7 @@ function makeProfileChain(profile: { company_id: string; employee_tier: string }
   return {
     select: () => ({
       eq: () => ({
-        single: async () => ({ data: profile, error: profile ? null : { message: 'not found' } }),
+        single: () => Promise.resolve({ data: profile, error: profile ? null : { message: 'not found' } }),
       }),
     }),
   };
@@ -125,7 +125,7 @@ function makePolicyDocChain(data: { effective_date: string | null; processing_st
         eq: () => ({
           order: () => ({
             limit: () => ({
-              maybeSingle: async () => ({ data, error: data ? null : { message: 'no rows' } }),
+              maybeSingle: () => Promise.resolve({ data, error: data ? null : { message: 'no rows' } }),
             }),
           }),
         }),
@@ -157,8 +157,8 @@ function mockGenerateFetch(text: string) {
     vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ content: [{ type: 'text', text }] }),
-      text: async () => '',
+      json: () => Promise.resolve({ content: [{ type: 'text', text }] }),
+      text: () => Promise.resolve(''),
     }),
   );
 }
@@ -269,7 +269,7 @@ describe('generateResponse', () => {
 
   it('throws on non-2xx API response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false, status: 503, text: async () => 'Service Unavailable',
+      ok: false, status: 503, text: () => Promise.resolve('Service Unavailable'),
     }));
     await expect(generateResponse('q', MOCK_CHUNKS, 'key')).rejects.toThrow('503');
   });
@@ -277,8 +277,8 @@ describe('generateResponse', () => {
   it('throws when response body has no text content', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ content: [] }),
-      text: async () => '',
+      json: () => Promise.resolve({ content: [] }),
+      text: () => Promise.resolve(''),
     }));
     await expect(generateResponse('q', MOCK_CHUNKS, 'key')).rejects.toThrow('empty response');
   });

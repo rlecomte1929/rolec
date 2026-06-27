@@ -244,9 +244,13 @@ export const HrDashboard: React.FC = () => {
       const results = await Promise.allSettled(
         Array.from(selectedForRemoval, (id) => hrAPI.deleteAssignment(id))
       );
-      const failed = results.filter((result) => result.status === 'rejected');
-      if (failed.length > 0) {
-        throw failed[0];
+      const firstFailed = results.find(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
+      if (firstFailed) {
+        throw firstFailed.reason instanceof Error
+          ? firstFailed.reason
+          : new Error(String(firstFailed.reason));
       }
       setSelectedForRemoval(new Set());
       setIsConfirmingRemoval(false);

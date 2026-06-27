@@ -519,7 +519,7 @@ export const RecommendationResults: React.FC<Props> = ({
     setPendingPick({ category, item, rank });
   };
 
-  const confirmPendingPick = async (reason: string) => {
+  const confirmPendingPick = (reason: string) => {
     if (!pendingPick || !reason) return;
     setPendingSubmitting(true);
     try {

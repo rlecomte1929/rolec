@@ -241,7 +241,7 @@ describe('classifyChunk', () => {
       category_code: 'CAT-01',
       extracted_values: [{ value: 3500, unit: 'EUR/month', currency: 'EUR', condition: null }],
     });
-    globalThis.fetch = async () => makeApiResponse(expected);
+    globalThis.fetch = () => Promise.resolve(makeApiResponse(expected));
 
     const result = await classifyChunk('Housing allowance EUR 3,500/month for Manager.', {
       apiKey: 'test-key',
@@ -253,11 +253,11 @@ describe('classifyChunk', () => {
   });
 
   it('throws on non-2xx API response', async () => {
-    globalThis.fetch = async () =>
-      new Response('{"error":"invalid_api_key"}', {
+    globalThis.fetch = () =>
+      Promise.resolve(new Response('{"error":"invalid_api_key"}', {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
-      });
+      }));
 
     await expect(
       classifyChunk('Any text', { apiKey: 'bad-key' }),
@@ -274,22 +274,22 @@ describe('classifyChunk', () => {
   it('handles markdown-fenced JSON response from API', async () => {
     const expected = makeOutput({ category_code: 'CAT-05', category_name: 'Travel & Airfare' });
     const fencedText = '```json\n' + JSON.stringify(expected) + '\n```';
-    globalThis.fetch = async () =>
-      new Response(
+    globalThis.fetch = () =>
+      Promise.resolve(new Response(
         JSON.stringify({ content: [{ type: 'text', text: fencedText }] }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      );
+      ));
 
     const result = await classifyChunk('Business class flights to Paris', { apiKey: 'test-key' });
     expect(result.category_code).toBe('CAT-05');
   });
 
   it('throws when API response contains no text block', async () => {
-    globalThis.fetch = async () =>
-      new Response(
+    globalThis.fetch = () =>
+      Promise.resolve(new Response(
         JSON.stringify({ content: [{ type: 'tool_use', id: 'x' }] }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      );
+      ));
 
     await expect(classifyChunk('Some text', { apiKey: 'test-key' })).rejects.toThrow(
       'No text block',
@@ -298,9 +298,9 @@ describe('classifyChunk', () => {
 
   it('sends temperature=0 in the request body', async () => {
     let capturedBody: Record<string, unknown> = {};
-    globalThis.fetch = async (_url: unknown, init: RequestInit) => {
+    globalThis.fetch = (_url: unknown, init: RequestInit) => {
       capturedBody = JSON.parse(init.body as string);
-      return makeApiResponse(makeOutput());
+      return Promise.resolve(makeApiResponse(makeOutput()));
     };
 
     await classifyChunk('Test', { apiKey: 'test-key' });
@@ -309,9 +309,9 @@ describe('classifyChunk', () => {
 
   it('uses the specified model override', async () => {
     let capturedBody: Record<string, unknown> = {};
-    globalThis.fetch = async (_url: unknown, init: RequestInit) => {
+    globalThis.fetch = (_url: unknown, init: RequestInit) => {
       capturedBody = JSON.parse(init.body as string);
-      return makeApiResponse(makeOutput());
+      return Promise.resolve(makeApiResponse(makeOutput()));
     };
 
     await classifyChunk('Test', { apiKey: 'test-key', model: 'claude-3-opus-20240229' });
@@ -338,7 +338,7 @@ describe('batchClassifyChunks', () => {
       makeOutput({ category_code: 'CAT-09', category_name: 'Tax Assistance' }),
     ];
 
-    globalThis.fetch = async () => makeApiResponse(outputs[callCount++]);
+    globalThis.fetch = () => Promise.resolve(makeApiResponse(outputs[callCount++]));
 
     const results = await batchClassifyChunks(
       ['Housing chunk', 'Travel chunk', 'Tax chunk'],
@@ -354,15 +354,15 @@ describe('batchClassifyChunks', () => {
 
   it('captures errors on individual chunks without aborting', async () => {
     let callCount = 0;
-    globalThis.fetch = async () => {
+    globalThis.fetch = () => {
       callCount++;
       if (callCount === 2) {
-        return new Response('Internal error', {
+        return Promise.resolve(new Response('Internal error', {
           status: 500,
           headers: { 'Content-Type': 'text/plain' },
-        });
+        }));
       }
-      return makeApiResponse(makeOutput({ category_code: `CAT-0${callCount}` as 'CAT-01' }));
+      return Promise.resolve(makeApiResponse(makeOutput({ category_code: `CAT-0${callCount}` as 'CAT-01' })));
     };
 
     const results = await batchClassifyChunks(
@@ -378,7 +378,7 @@ describe('batchClassifyChunks', () => {
   });
 
   it('preserves chunkText and index on each result', async () => {
-    globalThis.fetch = async () => makeApiResponse(makeOutput());
+    globalThis.fetch = () => Promise.resolve(makeApiResponse(makeOutput()));
 
     const chunks = ['Alpha text', 'Beta text'];
     const results = await batchClassifyChunks(chunks, { apiKey: 'test-key' });

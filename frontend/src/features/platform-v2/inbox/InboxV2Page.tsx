@@ -395,7 +395,7 @@ export function InboxV2Page() {
     });
   }, [activeConversation]);
 
-  const handleSend = useCallback(async () => {
+  const handleSend = useCallback(() => {
     const text = draft.trim();
     if (!text || !activeConversation) return;
     setSending(true);

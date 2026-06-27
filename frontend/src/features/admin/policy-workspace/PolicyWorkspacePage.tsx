@@ -278,8 +278,8 @@ export const PolicyWorkspacePage: React.FC = () => {
                     assignmentTypesSupported={publishedPayload.assignment_types_supported}
                     familyStatusesSupported={publishedPayload.family_statuses_supported}
                     basePayload={publishedPayload}
-                    saveDraft={async () => null}
-                    onRequestCreateDraft={async () => {}}
+                    saveDraft={() => Promise.resolve(null)}
+                    onRequestCreateDraft={() => Promise.resolve()}
                     setWorkspaceError={() => {}}
                     serverErrorsByBenefitKey={{}}
                     matrixInspectOnly

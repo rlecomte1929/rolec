@@ -137,10 +137,10 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
     const normReady = mockPolicyState('ready_to_publish').normalized!;
     const normPublished = mockPolicyState('published').normalized!;
     let live = false;
-    policyClientMocks.getNormalized.mockImplementation(async () => (live ? normPublished : normReady));
-    policyClientMocks.publishLatestVersion.mockImplementation(async () => {
+    policyClientMocks.getNormalized.mockImplementation(() => Promise.resolve(live ? normPublished : normReady));
+    policyClientMocks.publishLatestVersion.mockImplementation(() => {
       live = true;
-      return {};
+      return Promise.resolve({});
     });
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
@@ -163,10 +163,10 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
     const beforeNorm = mockPolicyState('published_replacement_draft').normalized!;
     const afterNorm = mockPolicyState('published').normalized!;
     let live = false;
-    policyClientMocks.getNormalized.mockImplementation(async () => (live ? afterNorm : beforeNorm));
-    policyClientMocks.publishLatestVersion.mockImplementation(async () => {
+    policyClientMocks.getNormalized.mockImplementation(() => Promise.resolve(live ? afterNorm : beforeNorm));
+    policyClientMocks.publishLatestVersion.mockImplementation(() => {
       live = true;
-      return {};
+      return Promise.resolve({});
     });
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);

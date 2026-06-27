@@ -285,7 +285,7 @@ api.interceptors.response.use(
         window.location.href = '/auth?mode=login&reason=session_expired';
       }
     }
-    return Promise.reject(err);
+    return Promise.reject(err instanceof Error ? err : new Error(String(err)));
   }
 );
 
