@@ -1,88 +1,13 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
-
-// ── Loading skeleton ───────────────────────────────────────────────────────────
-// A muted pulse instead of a bare '…', which read as a broken/WIP value (UI9).
-
-const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
-  <span
-    aria-hidden="true"
-    className={`inline-block animate-pulse rounded bg-slate-200 align-middle ${className ?? ''}`}
-  />
-);
-
-// ── Stat card ─────────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  testId: string;
-  label: string;
-  value: number | null;
-  sub?: string;
-  loading?: boolean;
-}
-
-const MetricValue: React.FC<{ value: string | number | null }> = ({ value }) =>
-  value === null ? <span className="text-base font-medium text-amber-700">Unavailable</span> : <>{value}</>;
-
-const StatCard: React.FC<StatCardProps> = ({ testId, label, value, sub, loading }) => (
-  <div data-testid={testId} className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
-    <p className="text-3xl font-semibold text-slate-900">
-      {loading ? <Skeleton className="h-7 w-16" /> : <MetricValue value={value} />}
-    </p>
-    {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
-  </div>
-);
-
-// ── Module card ───────────────────────────────────────────────────────────────
-
-interface ModuleRow { label: string; value: string | number | null }
-
-interface ModuleCardProps {
-  testId: string;
-  to: string;
-  icon: string;
-  title: string;
-  subtitle: string;
-  metric: string | number | null;
-  rows: ModuleRow[];
-  loading?: boolean;
-}
-
-const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtitle, metric, rows, loading }) => (
-  <Link data-testid={testId} to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
-    <div className="flex items-start justify-between mb-4">
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base shrink-0">
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="text-xs text-slate-400">{subtitle}</p>
-        </div>
-      </div>
-      <span className="text-2xl font-semibold text-slate-900">
-        {loading ? <Skeleton className="h-6 w-10" /> : <MetricValue value={metric} />}
-      </span>
-    </div>
-    <div className="space-y-1.5">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">{row.label}</span>
-          <span className="text-xs font-medium text-slate-700">
-            {loading ? <Skeleton className="h-3 w-8" /> : <MetricValue value={row.value} />}
-          </span>
-        </div>
-      ))}
-    </div>
-  </Link>
-);
+import { StatCard } from '../../components/admin/overview/StatCard';
+import { ModuleCard } from '../../components/admin/overview/ModuleCard';
+import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2 } from 'lucide-react';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -213,7 +138,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-review-queue"
           to={buildRoute('adminReviewQueue')}
-          icon="🔁"
+          icon={<ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Review queue"
           subtitle={metricSummary(stats.reviewOpen, 'open items')}
           metric={stats.reviewOpen}
@@ -226,7 +151,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-ops-analytics"
           to={buildRoute('adminOpsSla')}
-          icon="📈"
+          icon={<LineChart className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Ops analytics"
           subtitle="SLA, bottlenecks, reviewer load"
           metric={null}
@@ -236,7 +161,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-workflow-analytics"
           to={buildRoute('adminOpsQueue')}
-          icon="🔀"
+          icon={<Shuffle className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Workflow analytics"
           subtitle="Recommendations, RFQ conversion"
           metric={null}
@@ -246,7 +171,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-resources"
           to={buildRoute('adminResources')}
-          icon="📋"
+          icon={<FileText className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Resources CMS"
           subtitle="Guides, requirements, taxonomy"
           metric={null}
@@ -256,7 +181,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-prospects"
           to={buildRoute('adminProspects')}
-          icon="🎯"
+          icon={<Target className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Prospects"
           subtitle="HR pipeline · ICP-scored"
           metric={null}
@@ -266,7 +191,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-rag-quality"
           to={buildRoute('adminRagQuality')}
-          icon="📈"
+          icon={<Activity className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="RAG quality"
           subtitle="Retrieval & generation health over time"
           metric={null}
@@ -276,11 +201,13 @@ export const AdminOverviewPage: React.FC = () => {
       </div>
 
       {/* ── Module grid — row 2 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 mb-6">
+      {/* Only 2 cards here, so cap at md:grid-cols-2 — the row-1 breakpoints (…2xl:grid-cols-5)
+          would strand these two as wide orphans in a 5-column ghost grid at large viewports. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <ModuleCard
           testId="module-suppliers"
           to={buildRoute('adminSuppliers')}
-          icon="🔗"
+          icon={<Link2 className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Suppliers"
           subtitle="Active supplier records"
           metric={stats.activeSuppliers}
@@ -292,7 +219,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-companies"
           to={buildRoute('adminCompanies')}
-          icon="🏢"
+          icon={<Building2 className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Companies & users"
           subtitle="Tenants, allowlists, roles"
           metric={stats.companies}
