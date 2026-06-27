@@ -101,6 +101,22 @@ def _audit(*, case_id: str, action: str, actor_id: str, byte_size: int) -> None:
         logger.exception("audit_log write failed services_state case_id=%s", case_id)
 
 
+def _parse_state_json(raw: Any) -> Dict[str, Any]:
+    """Normalise a stored services-state blob to a dict.
+
+    state_json is a JSONB column: psycopg2 returns it ALREADY PARSED (a dict) on
+    Postgres, while SQLite (tests) stores it as TEXT and returns a str. The old
+    code called json.loads() unconditionally, so on Postgres json.loads(<dict>)
+    raised TypeError → every GET 404'd "could not be parsed" once a row existed
+    (AIQ-1320 — only surfaced after the save path was unblocked). Handle both.
+    """
+    if raw is None or raw == "":
+        return {}
+    if isinstance(raw, (dict, list)):
+        return raw  # already parsed from JSONB (Postgres)
+    return json.loads(raw)  # TEXT column on SQLite — may raise, caught by caller
+
+
 @router.get(
     "/api/cases/{case_id}/services-state",
     response_model=ServicesStateRead,
@@ -136,9 +152,9 @@ def get_services_state(
             "updated_by_user_id": None,
         }
     try:
-        parsed = json.loads(row["state_json"]) if row["state_json"] else {}
+        parsed = _parse_state_json(row["state_json"])
     except (TypeError, ValueError):
-        # Stored blob is corrupt — surface as 404 rather than 500 so the
+        # Stored blob is genuinely corrupt — surface as 404 rather than 500 so the
         # client can fall back to its own local state.
         raise HTTPException(status_code=404, detail="Stored state could not be parsed.")
     updated_at = row["updated_at"]

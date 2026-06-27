@@ -27,6 +27,7 @@ from backend.app.routers import services_state as router_module  # noqa: E402
 from backend.app.routers.services_state import (  # noqa: E402
     MAX_STATE_BYTES,
     ServicesStatePut,
+    _parse_state_json,
     get_services_state,
     put_services_state,
 )
@@ -296,6 +297,30 @@ class ServicesStateRouterTests(unittest.TestCase):
                 case_id=case_id, body=ServicesStatePut(state=oversized), user=emp
             )
         self.assertEqual(ctx.exception.status_code, 413)
+
+
+class ParseStateJsonTests(unittest.TestCase):
+    """AIQ-1320: state_json is JSONB — psycopg2 returns it as a dict on Postgres,
+    while SQLite returns TEXT. The GET must handle both (the old json.loads() 404'd
+    every Postgres read once a row existed)."""
+
+    def test_dict_from_jsonb_postgres(self):
+        self.assertEqual(_parse_state_json({"selectedServices": ["banks"]}),
+                         {"selectedServices": ["banks"]})
+
+    def test_list_from_jsonb(self):
+        self.assertEqual(_parse_state_json([1, 2]), [1, 2])
+
+    def test_text_from_sqlite(self):
+        self.assertEqual(_parse_state_json('{"a": 1}'), {"a": 1})
+
+    def test_none_and_empty(self):
+        self.assertEqual(_parse_state_json(None), {})
+        self.assertEqual(_parse_state_json(""), {})
+
+    def test_corrupt_text_raises(self):
+        with self.assertRaises(ValueError):
+            _parse_state_json("{not json")
 
 
 if __name__ == "__main__":
