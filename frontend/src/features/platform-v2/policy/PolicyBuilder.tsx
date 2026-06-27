@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type * as React from 'react';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import type { PolicyTier, PolicyBenefit, BenefitValueType } from '../../../types/relopass-api-contracts';
@@ -264,7 +265,9 @@ export function PolicyBuilder({ tiers, benefits, onSaveTier: _onSaveTier, onCrea
                       key={tier.id}
                       role="option"
                       aria-selected={isSelected}
+                      tabIndex={0}
                       onClick={() => setSelectedTierId(tier.id)}
+                      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTierId(tier.id); } }}
                       style={{
                         padding: '12px 16px',
                         cursor: 'pointer',

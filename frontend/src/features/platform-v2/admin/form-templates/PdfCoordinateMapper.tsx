@@ -367,7 +367,12 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
         ) : (
           <div
             ref={canvasRef}
-            onClick={handleCanvasClick}
+            {...(activeFieldId && !disabled && !previewMode ? {
+              onClick: handleCanvasClick,
+              onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Escape') onActiveFieldIdChange(null); },
+              role: 'button' as const,
+              tabIndex: 0,
+            } : {})}
             className={`relative ${
               activeFieldId && !disabled && !previewMode ? 'cursor-crosshair' : 'cursor-default'
             }`}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
@@ -293,6 +294,10 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
             ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
             : filtered.map((c) => (
               <div key={c.code} onClick={() => { onChange(c.code); setOpen(false); setQuery(''); }}
+                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(c.code); setOpen(false); setQuery(''); } }}
+                role="option"
+                aria-selected={value === c.code}
+                tabIndex={0}
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-accent-50 text-accent-700' : ''}`}>
                 <span className="text-base">{c.flag}</span>
                 <span className="flex-1">{c.name}</span>
@@ -329,6 +334,10 @@ function CityCombo({ country, value, onChange, testId }: { country: string; valu
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
           {opts.map((c) => (
             <div key={c} onClick={() => { onChange(c); setOpen(false); }}
+              onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(c); setOpen(false); } }}
+              role="option"
+              aria-selected={value === c}
+              tabIndex={0}
               className="px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50">{c}</div>
           ))}
         </div>

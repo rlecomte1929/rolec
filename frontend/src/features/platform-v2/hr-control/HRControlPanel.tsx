@@ -146,6 +146,7 @@ function NewCaseModal({ open, onClose, onSubmit }: NewCaseModalProps) {
 
   return (
     <>
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
       <div aria-hidden="true" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'var(--overlay)', zIndex: 40 }} />
       <div
         role="dialog"

@@ -252,6 +252,7 @@ export function AdminExceptions({
           aria-label={dialog.kind === 'approve' ? 'Approve exception' : 'Deny exception'}
           style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-modal)' as never, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
+          {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the dialog's own controls */}
           <div aria-hidden="true" onClick={() => setDialog(d => ({ ...d, open: false }))} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} />
           <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-4)', padding: '24px', maxWidth: '440px', width: '90vw', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>
