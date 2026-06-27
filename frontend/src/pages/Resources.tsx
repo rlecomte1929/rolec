@@ -7,6 +7,7 @@ import { Card, Button } from '../components/antigravity';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { resourcesAPI } from '../api/client';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../utils/employeeAssignmentScope';
+import { getAuthItem } from '../utils/demo';
 import {
   ResourcesPageContent,
   EMPTY_RESOURCES_FILTERS,
@@ -135,9 +136,14 @@ export const Resources: React.FC = () => {
 
   const hasDestination = Boolean(payload?.context?.countryCode);
 
+  // Role-aware breadcrumb section so employees see 'Employee' (not 'HR Operations').
+  // Mirrors AIQ-548 (InboxV2Page). ADMIN keeps 'HR Operations'.
+  const role = (getAuthItem('relopass_role') || '').toUpperCase();
+  const sectionLabel = role === 'EMPLOYEE' ? 'Employee' : 'HR Operations';
+
   if (contextLoading || (loading && !payload && !(needsPicker && !isCaseRoute))) {
     return (
-      <AppShell section="HR Operations" title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
+      <AppShell section={sectionLabel} title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
         <div className="flex flex-col items-center justify-center py-16 text-[#6b7280]">
           <div className="animate-pulse h-8 w-48 bg-[#e2e8f0] rounded mb-4" />
           <div className="animate-pulse h-4 w-64 bg-[#e2e8f0] rounded" />
@@ -148,7 +154,7 @@ export const Resources: React.FC = () => {
 
   if (!isCaseRoute && needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell section="HR Operations" title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
+      <AppShell section={sectionLabel} title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
         <EmployeeScopedAssignmentPicker
           title="Which assignment?"
           subtitle="Resources load per assignment."
@@ -161,7 +167,7 @@ export const Resources: React.FC = () => {
 
   if (!effectiveId) {
     return (
-      <AppShell section="HR Operations" title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
+      <AppShell section={sectionLabel} title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
         <Card padding="lg">
           <p className="text-[#4b5563]">
             Open a case and set a destination to see local resources here.
@@ -182,7 +188,7 @@ export const Resources: React.FC = () => {
 
   if (error) {
     return (
-      <AppShell section="HR Operations" title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
+      <AppShell section={sectionLabel} title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
         <Card padding="lg" className="border-red-200 bg-red-50">
           <p className="text-red-700">{error}</p>
           <Button variant="secondary" className="mt-4" onClick={() => window.location.reload()}>
@@ -195,7 +201,7 @@ export const Resources: React.FC = () => {
 
   if (!hasDestination || !payload) {
     return (
-      <AppShell section="HR Operations" title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
+      <AppShell section={sectionLabel} title="Resources" subtitle="Destination guides, events and local resources for your relocation.">
         <Card padding="lg">
           <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">Set a destination first</h2>
           <p className="text-[#4b5563] mb-4">
@@ -208,7 +214,7 @@ export const Resources: React.FC = () => {
   }
 
   return (
-    <AppShell title="Resources" subtitle="Guides and events for your destination.">
+    <AppShell section={sectionLabel} title="Resources" subtitle="Guides and events for your destination.">
       <ResourcesPageContent
         payload={payload}
         filters={filters}
