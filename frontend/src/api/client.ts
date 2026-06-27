@@ -1,5 +1,12 @@
 import axios, { type AxiosError } from 'axios';
-import type { ApiErrorBody, CompanyPolicyResult } from './types';
+import type {
+  ApiErrorBody,
+  CompanyPolicyResult,
+  ServiceContextResult,
+  CountryResourcesResult,
+  GuidanceGenerateResult,
+  ThreadSummariesResult,
+} from './types';
 import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
@@ -2399,35 +2406,35 @@ export const adminOpsAnalyticsAPI = {
 // Admin Collaboration API (admin-only, internal threads)
 export const adminCollaborationAPI = {
   getThread: (targetType: string, targetId: string) =>
-    api.get('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+    api.get<unknown>('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
   getOrCreateThread: (targetType: string, targetId: string, title?: string) =>
-    api.post('/api/admin/collaboration/threads/by-target', null, {
+    api.post<unknown>('/api/admin/collaboration/threads/by-target', null, {
       params: { target_type: targetType, target_id: targetId, title: title || undefined },
     }).then((r) => r.data),
   getSummary: (targetType: string, targetId: string) =>
-    api.get('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+    api.get<ThreadSummariesResult>('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
   getSummariesBatch: (targets: { target_type: string; target_id: string }[]) =>
-    api.post('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
+    api.post<ThreadSummariesResult>('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
   getThreadById: (threadId: string) =>
-    api.get(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
   getComments: (threadId: string) =>
-    api.get(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
   createComment: (threadId: string, body: string, parentCommentId?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
   editComment: (commentId: string, body: string) =>
-    api.patch(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
+    api.patch<unknown>(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
   deleteComment: (commentId: string) =>
-    api.delete(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data),
+    api.delete<unknown>(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data),
   resolveThread: (threadId: string, note?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
   reopenThread: (threadId: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
   closeThread: (threadId: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
   markRead: (threadId: string, lastCommentId?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data),
   getUnreadCount: () =>
-    api.get('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
+    api.get<unknown>('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
 };
 
 export const requirementsAPI = {
@@ -2862,37 +2869,37 @@ export const servicesAPI = {
     case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
     /** AIQ-1249d: canonical move date for the services context banner. */
     target_start_date?: string | null;
-    services: Array<{ service_key: string; selected: boolean | number; [k: string]: any }>;
-    answers: Array<{ service_key: string; answers: Record<string, any> }>;
-    questions: any[];
+    services: Array<{ service_key: string; selected: boolean | number; [k: string]: unknown }>;
+    answers: Array<{ service_key: string; answers: Record<string, unknown> }>;
+    questions: unknown[];
     selected_services: string[];
   }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get('/api/services/context', { params });
+    const response = await api.get<ServiceContextResult>('/api/services/context', { params });
     return response.data;
   },
-  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: any[] }> => {
+  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: unknown[] }> => {
     const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
-    const response = await api.get<{ case_id: string; answers: any[] }>('/api/services/answers', { params: p });
+    const response = await api.get<{ case_id: string; answers: unknown[] }>('/api/services/answers', { params: p });
     return response.data;
   },
   getServiceQuestions: async (
     assignmentId: string,
     fallbackServices?: string[]
-  ): Promise<{ questions: any[]; selected_services: string[] }> => {
+  ): Promise<{ questions: unknown[]; selected_services: string[] }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get<{ questions: any[]; selected_services: string[] }>('/api/services/questions', { params });
+    const response = await api.get<{ questions: unknown[]; selected_services: string[] }>('/api/services/questions', { params });
     return response.data;
   },
   saveServiceAnswers: async (
     caseId: string,
-    items: Array<{ service_key: string; answers: Record<string, any> }>,
+    items: Array<{ service_key: string; answers: Record<string, unknown> }>,
     options?: { signal?: AbortSignal }
   ): Promise<{ ok: boolean }> => {
     const config = options?.signal ? { signal: options.signal } : {};
@@ -2901,7 +2908,7 @@ export const servicesAPI = {
   },
   createRfq: async (
     caseId: string,
-    items: Array<{ service_key: string; requirements: Record<string, any> }>,
+    items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
     supplierIds: string[]
   ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
     const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string } }>('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
@@ -3666,19 +3673,19 @@ export const resourcesAPI = {
     assignmentId: string,
     filters?: Record<string, string | number | boolean | null>
   ): Promise<{
-    profile: Record<string, any>;
-    context?: Record<string, any>;
+    profile: Record<string, unknown>;
+    context?: Record<string, unknown>;
     hints: { priorities: string[]; recommendations: string[] };
-    sections: Array<{ key: string; title: string; content: any }>;
-    events?: any[];
-    recommended?: any[];
-    filters_applied: Record<string, any>;
+    sections: Array<{ key: string; title: string; content: unknown }>;
+    events?: unknown[];
+    recommended?: unknown[];
+    filters_applied: Record<string, unknown>;
   }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (filters && Object.keys(filters).length) {
       params.filters = JSON.stringify(filters);
     }
-    const response = await api.get('/api/resources/country', { params });
+    const response = await api.get<CountryResourcesResult>('/api/resources/country', { params });
     return response.data;
   },
 
@@ -3708,7 +3715,7 @@ export const resourcesAPI = {
    * live dropdown instead of a hardcoded 12-country list (B14 fix).
    */
   getDestinations: async (): Promise<Array<{ city: string; country: string }>> => {
-    const response = await api.get('/api/hr/resources/destinations');
+    const response = await api.get<Array<{ city: string; country: string }>>('/api/hr/resources/destinations');
     return Array.isArray(response.data) ? response.data : [];
   },
 
@@ -3807,23 +3814,23 @@ export const guidanceAPI = {
     guidance_pack_id: string;
     guidance_mode?: 'demo' | 'strict';
     pack_hash?: string;
-    rule_set?: any[];
-    plan: any;
-    checklist: any;
+    rule_set?: unknown[];
+    plan: unknown;
+    checklist: unknown;
     markdown: string;
     sources: Array<{ doc_id: string; title?: string; url: string; publisher?: string }>;
     not_covered: string[];
-    coverage?: any;
+    coverage?: unknown;
   }> => {
-    const response = await api.post('/api/guidance/generate', { case_id: caseId, mode });
+    const response = await api.post<GuidanceGenerateResult>('/api/guidance/generate', { case_id: caseId, mode });
     return response.data;
   },
-  getLatest: async (caseId: string): Promise<any> => {
-    const response = await api.get('/api/guidance/latest', { params: { case_id: caseId } });
+  getLatest: async (caseId: string): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/guidance/latest', { params: { case_id: caseId } });
     return response.data;
   },
-  explain: async (caseId: string): Promise<any> => {
-    const response = await api.get('/api/guidance/explain', { params: { case_id: caseId } });
+  explain: async (caseId: string): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/guidance/explain', { params: { case_id: caseId } });
     return response.data;
   },
 };
@@ -3852,7 +3859,7 @@ export interface PolicyTemplatesResponse {
 
 export const policyBuilderAPI = {
   getTemplates: (): Promise<PolicyTemplatesResponse> =>
-    api.get('/api/policy/templates').then((r) => r.data),
+    api.get<PolicyTemplatesResponse>('/api/policy/templates').then((r) => r.data),
 };
 
 export default api;
@@ -3878,22 +3885,26 @@ function handle401Redirect(response: Response): void {
 }
 
 function buildApiError(response: Response, bodyText: string) {
-  let detail: any = bodyText;
+  let detail: unknown = bodyText;
   let message = bodyText || `${response.status} ${response.statusText}`;
 
   try {
-    const parsed = JSON.parse(bodyText);
-    detail = parsed?.detail ?? parsed;
+    const parsed: unknown = JSON.parse(bodyText);
+    const parsedDetail =
+      parsed && typeof parsed === 'object' && 'detail' in parsed
+        ? (parsed as Record<string, unknown>).detail
+        : undefined;
+    detail = parsedDetail ?? parsed;
     if (typeof detail === 'string') {
       message = detail;
     } else if (detail && typeof detail === 'object') {
-      message = detail.message || JSON.stringify(detail);
+      message = (detail as { message?: string }).message || JSON.stringify(detail);
     }
   } catch {
     // bodyText wasn't JSON
   }
 
-  const err: any = new Error(message);
+  const err = new Error(message) as Error & { status?: number; detail?: unknown };
   err.status = response.status;
   err.detail = detail;
   return err;
@@ -3961,7 +3972,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
 
 export async function apiPost<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
@@ -4020,7 +4031,7 @@ export async function apiPost<T>(
 
 export async function apiPatch<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
@@ -4079,7 +4090,7 @@ export async function apiPatch<T>(
 
 export async function apiPut<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
