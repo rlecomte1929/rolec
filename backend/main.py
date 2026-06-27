@@ -63,6 +63,7 @@ from .app.services.policy_extractor import (
 from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
 from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
 from .intake_completeness import incomplete_intake_detail, missing_intake_basics
+from .intake_draft_to_case_draft import intake_draft_to_case_draft
 from .app.services.country_resources import (
     build_profile_context,
     get_personalization_hints,
@@ -5665,21 +5666,49 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
     wizard_complete = False
     # Which step-1 basics are missing → drives a field-level 400 below.
     missing_basics: List[str] = []
-    # If profile missing/incomplete, try syncing from wizard Case draft (wizard may use assignment_id or case_id as URL param)
+
+    # AIQ-1311: the reliable intake answers live in case_assignments.intake_draft
+    # (flat snake_case, written by every autosave, keyed by assignment_id). The
+    # legacy wizard_cases.draft_json is the camelCase shape the validator expects,
+    # but the frontend often wrote it to the WRONG wizard_cases id, so submit read
+    # an empty draft → spurious 400 and HR never saw the data. Make the assignment
+    # draft authoritative: convert it snake→camel here and prefer it everywhere
+    # below; fall back to wizard_cases.draft_json only when it's empty (back-compat).
+    authoritative_draft: Optional[Dict[str, Any]] = None
+    try:
+        _intake = db.get_assignment_intake(
+            assignment_id=assignment_id, employee_user_id=effective["id"]
+        )
+        _snake = (_intake or {}).get("intake_draft") or {}
+        if isinstance(_snake, dict) and _snake:
+            authoritative_draft = intake_draft_to_case_draft(_snake)
+    except Exception as exc:
+        log.warning(
+            "submit_assignment: assignment intake_draft read/convert failed assignment_id=%s error=%s",
+            assignment_id,
+            str(exc),
+            exc_info=True,
+        )
+
+    # If profile missing/incomplete, sync from the wizard draft (assignment draft
+    # preferred; wizard_cases.draft_json keyed by assignment_id or case_id as fallback).
     if not profile or (orchestrator.compute_completion_state(profile).get("profileCompleteness", 0) < 90):
-        with SessionLocal() as session:
-            case = app_crud.get_case(session, assignment_id) or (
-                app_crud.get_case(session, assignment.get("case_id", "")) if assignment.get("case_id") else None
-            )
-            if case:
-                draft = json.loads(case.draft_json)
-                missing_basics = missing_intake_basics(draft)
-                # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
-                if not missing_basics:
-                    wizard_profile = _draft_to_relocation_profile(draft, assignment_id)
-                    profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
-                    db.save_employee_profile(assignment_id, profile)
-                    wizard_complete = True
+        draft = authoritative_draft
+        if draft is None:
+            with SessionLocal() as session:
+                case = app_crud.get_case(session, assignment_id) or (
+                    app_crud.get_case(session, assignment.get("case_id", "")) if assignment.get("case_id") else None
+                )
+                if case:
+                    draft = json.loads(case.draft_json)
+        if draft is not None:
+            missing_basics = missing_intake_basics(draft)
+            # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
+            if not missing_basics:
+                wizard_profile = _draft_to_relocation_profile(draft, assignment_id)
+                profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
+                db.save_employee_profile(assignment_id, profile)
+                wizard_complete = True
 
     # These raise BEFORE set_assignment_submitted → no status transition on incomplete data.
     if not profile:
@@ -5699,13 +5728,19 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
                     if (assignment.get("case_id") or "").strip()
                     else None
                 )
-                if wc:
+                # Prefer the authoritative assignment draft (AIQ-1311); fall back to
+                # the wizard_cases draft only when the assignment draft was empty.
+                if authoritative_draft is not None:
+                    draft = authoritative_draft
+                elif wc:
                     try:
                         draft = json.loads(wc.draft_json or "{}")
                     except (json.JSONDecodeError, TypeError, ValueError):
                         draft = {}
-                    if isinstance(draft, dict):
-                        db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
+                else:
+                    draft = None
+                if isinstance(draft, dict):
+                    db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
         except Exception as exc:
             log.warning(
                 "submit_assignment: relocation_cases draft sync failed assignment_id=%s case_id=%s error=%s",
