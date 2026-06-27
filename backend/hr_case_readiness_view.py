@@ -205,7 +205,7 @@ def build_hr_case_readiness_ui(
                     "title": it.get("label") or it.get("key"),
                     "detail": "Missing or not confirmed in employee profile.",
                     "human_review_required": False,
-                    "provenance_note": "Derived from assignment profile JSON (same fields as internal compliance checks).",
+                    "provenance_note": "Based on the details captured in this employee's intake.",
                     "linked_tracker_task_type": it.get("linked_tracker_task_type"),
                 }
             )
@@ -243,10 +243,10 @@ def build_hr_case_readiness_ui(
                     "title": "Route / template readiness",
                     "detail": msg,
                     "human_review_required": True,
-                    "provenance_note": "From case readiness resolution (destination, template store, migrations).",
+                    "provenance_note": "Based on the destination and your configured case templates.",
                 }
             )
-            next_actions.append({"title": "Resolve destination and readiness template, or apply DB migrations.", "category": "readiness"})
+            next_actions.append({"title": "Set the destination and confirm the case template to resolve readiness.", "category": "readiness"})
         elif chk_pending and chk_pending > 0:
             blocking.append(
                 {
@@ -273,7 +273,7 @@ def build_hr_case_readiness_ui(
                     "detail": c.get("rationale"),
                     "human_review_required": bool(c.get("human_review_required")),
                     "provenance_note": c.get("rationale_legal_safety")
-                    or "Internal policy rules (mobility_rules.json) — not immigration law.",
+                    or "Based on your company's configured policy rules — not immigration law.",
                 }
             )
         for a in compliance_report.get("actions") or []:
