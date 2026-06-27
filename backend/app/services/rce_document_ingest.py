@@ -61,6 +61,16 @@ def classify_rce_document_type(file_name: Optional[str]) -> Optional[str]:
         return "DIPLOMA"
     if "tax" in name or "avis" in name or "lohnsteuer" in name or "skatte" in name:
         return "TAX_CERT"
+    if (
+        "visa" in name
+        or "permit" in name
+        or "titre_de_sejour" in name
+        or "titre-de-sejour" in name
+        or "aufenthalt" in name
+        or "oppholdstillatelse" in name
+        or "brp" in name
+    ):
+        return "VISA_PERMIT"
     return None
 
 
