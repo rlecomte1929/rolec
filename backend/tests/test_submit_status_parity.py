@@ -64,3 +64,34 @@ def test_submit_advances_intake_step_to_total():
     assert src.index("set_assignment_submitted") < progress_idx
     assert "step=_total" in src and "total_steps=_total" in src
     assert "try:" in src[:progress_idx]  # best-effort, never fails the submit
+
+
+def test_submit_reads_assignment_intake_draft_authoritatively():
+    """AIQ-1311: submit must validate from the reliable assignment autosave draft
+    (case_assignments.intake_draft, snake_case), converted to the canonical
+    camelCase shape — not solely the frontend-patched wizard_cases row, which used
+    a divergent case-id and left submit reading an empty draft (400 on a
+    fully-filled wizard)."""
+    src = _submit_assignment_source()
+    assert "get_assignment_intake" in src
+    assert "intake_draft_to_case_draft" in src
+    # The conversion must happen BEFORE the completeness check that drives the 400.
+    assert src.index("intake_draft_to_case_draft") < src.index("missing_intake_basics(submit_draft)")
+
+
+def test_submit_prefers_assignment_draft_over_wizard_cases_fallback():
+    """The wizard_cases draft is only a back-compat fallback; the assignment draft
+    is read first."""
+    src = _submit_assignment_source()
+    # Assignment draft is read before the wizard_cases fallback lookup.
+    assert src.index("get_assignment_intake") < src.index("app_crud.get_case(session, assignment_id)")
+
+
+def test_submit_syncs_relocation_case_from_authoritative_draft():
+    """HR reads relocation_cases; the route sync must use the authoritative
+    assignment-derived draft so HR sees origin/destination after submit (A-12)."""
+    src = _submit_assignment_source()
+    assert "sync_relocation_case_route_from_wizard_draft" in src
+    sync_idx = src.index("sync_relocation_case_route_from_wizard_draft")
+    # The authoritative draft is substituted before the sync call.
+    assert "draft = submit_draft" in src[:sync_idx]
