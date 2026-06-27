@@ -50,12 +50,14 @@ function keyToCategory(key: string): RequirementCategory {
 
 // ── Status mapping ───────────────────────────────────────────────────────────
 //
-// The endpoint returns lowercase required|submitted|under_review|approved|rejected,
-// all valid DocStatus values. Guard the cast so an unexpected value degrades to
-// 'required' instead of poisoning the union.
+// The endpoint returns the case_documents status: required|uploaded|under_review|
+// approved|rejected (an upload lands as 'uploaded'). Map to the DocStatus union —
+// 'uploaded' shows as 'submitted' (provided, pending review). Guard the cast so an
+// unexpected value degrades to 'required' instead of poisoning the union.
 
 function toDocStatus(status: string): DocStatus {
   switch (status) {
+    case 'uploaded':     return 'submitted';
     case 'submitted':    return 'submitted';
     case 'under_review': return 'under_review';
     case 'approved':     return 'approved';
