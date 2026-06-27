@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
@@ -111,13 +111,21 @@ interface InlineSelectProps {
 const InlineSelect: React.FC<InlineSelectProps> = ({ value, options, onSave, placeholder }) => {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const selectRef = useRef<HTMLSelectElement>(null);
   const label = options.find((o) => o.value.toLowerCase() === value?.toLowerCase())?.label ?? value;
+
+  useEffect(() => {
+    if (editing) selectRef.current?.focus();
+  }, [editing]);
 
   if (!editing) {
     return (
       <span
         className="group flex items-center gap-1 cursor-pointer"
-        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        role="button"
+        tabIndex={0}
+        onClick={() => setEditing(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
         <span className={value ? 'text-[#374151]' : 'text-[#9ca3af]'}>
           {value ? label : (placeholder ?? '—')}
@@ -129,7 +137,7 @@ const InlineSelect: React.FC<InlineSelectProps> = ({ value, options, onSave, pla
 
   return (
     <select
-      autoFocus
+      ref={selectRef}
       className="text-xs border border-[#1D9E75] rounded px-1 py-0.5 bg-white text-[#0b2b43] outline-none"
       defaultValue={value || ''}
       disabled={saving}
@@ -200,11 +208,14 @@ const ConfirmModal: React.FC<{
 }> = ({ count, onConfirm, onCancel }) => (
   <div
     className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-    onClick={onCancel}
+    onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }}
+    role="button"
+    tabIndex={-1}
+    aria-label="Close dialog"
   >
     <div
       className="bg-white rounded-xl border border-[#e5e7eb] p-6 w-80 shadow-sm"
-      onClick={(e) => e.stopPropagation()}
     >
       <p className="font-medium text-[#0b2b43] mb-2">Remove {count === 1 ? 'employee' : `${count} employees`}?</p>
       <p className="text-sm text-[#6b7280] mb-5">
@@ -473,9 +484,11 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                     {i < COLS.length - 1 && (
                       <div
                         onMouseDown={onMouseDown(i)}
+                        role="button"
+                        tabIndex={-1}
+                        aria-label="Resize column"
                         className="absolute right-0 top-0 h-full w-3 cursor-col-resize flex items-center justify-center group"
                         style={{ zIndex: 1 }}
-                        onClick={(e) => e.stopPropagation()}
                       >
                         <div className="w-px h-3/5 bg-[#d1d5db] group-hover:bg-[#1D9E75] transition-colors" />
                       </div>
@@ -503,10 +516,22 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                     <React.Fragment key={emp.id}>
                       <tr
                         className={`border-b border-[#e5e7eb] cursor-pointer transition-colors ${isSelected ? 'bg-[#E1F5EE]' : 'hover:bg-[#f9fafb]'}`}
-                        onClick={() => setExpanded((p) => (p === emp.id ? null : emp.id))}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest('button,a,input,select,label,[role="button"]')) return;
+                          setExpanded((p) => (p === emp.id ? null : emp.id));
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setExpanded((p) => (p === emp.id ? null : emp.id));
+                          }
+                        }}
                       >
                         {/* checkbox */}
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5">
                           <Checkbox
                             checked={isSelected}
                             onChange={() => toggleRow(emp.id)}
@@ -543,7 +568,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* assignment type — inline editable */}
-                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-sm">
                           <InlineSelect
                             value={emp.assignment_type || ''}
                             options={ASSIGNMENT_TYPE_OPTIONS}
@@ -553,7 +578,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* band — inline editable */}
-                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-sm">
                           <InlineSelect
                             value={normalizeEmployeeLevel(emp.band || '') ?? ''}
                             options={POLICY_EMPLOYEE_LEVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
@@ -563,7 +588,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* status — inline editable */}
-                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-sm">
                           <InlineSelect
                             value={emp.status || ''}
                             options={STATUS_OPTIONS}
@@ -589,7 +614,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* actions */}
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1 justify-end">
                             <Link
                               to={buildRoute('hrEmployeeDetail', { id: emp.id })}
