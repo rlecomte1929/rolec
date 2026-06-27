@@ -70,3 +70,48 @@ export type GuidanceGenerateResult = {
 export type ThreadSummariesResult = {
   summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }>;
 };
+
+/** /api/hr/policy-documents/health — storage + table health probe. */
+export type PolicyDocumentsHealth = {
+  supabase_url_present: boolean;
+  service_role_present: boolean;
+  bucket_name: string;
+  bucket_access_ok: boolean;
+  policy_documents_table_ok: boolean;
+  policy_document_clauses_table_ok: boolean;
+  policy_versions_table_ok: boolean;
+  resolved_assignment_policies_table_ok: boolean;
+};
+
+/** /api/hr/policy-documents/{id}/normalize — normalization outcome + readiness. */
+export type PolicyNormalizeResult = {
+  ok?: boolean;
+  normalized?: boolean;
+  publishable?: boolean;
+  published?: boolean;
+  outcome?: string;
+  normalization_result_code?: string;
+  readiness_status?: string;
+  readiness_issues?: Array<Record<string, unknown>>;
+  publish_block_code?: string;
+  publish_block_detail?: string;
+  comparison_readiness_code?: string;
+  rule_candidates_summary?: {
+    benefit_rules?: number;
+    exclusions?: number;
+    evidence_requirements?: number;
+    conditions?: number;
+    draft_rule_candidates?: number;
+  };
+  policy_id: string;
+  policy_version_id: string;
+  summary: unknown;
+  version?: Record<string, unknown>;
+  input_repairs?: Array<Record<string, string>>;
+  policy_readiness?: {
+    normalization_readiness?: { status?: string; issues?: Array<Record<string, unknown>> };
+    publish_readiness?: { status?: string; issues?: Array<Record<string, unknown>> };
+    comparison_readiness?: { status?: string; issues?: Array<Record<string, unknown>> };
+  };
+  normalization_draft?: Record<string, unknown> | null;
+};

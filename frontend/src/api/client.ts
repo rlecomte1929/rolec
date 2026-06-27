@@ -6,6 +6,8 @@ import type {
   CountryResourcesResult,
   GuidanceGenerateResult,
   ThreadSummariesResult,
+  PolicyDocumentsHealth,
+  PolicyNormalizeResult,
 } from './types';
 import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
@@ -342,8 +344,8 @@ export const profileAPI = {
     return response.data;
   },
 
-  submitAnswer: async (data: AnswerRequest): Promise<any> => {
-    const response = await api.post('/api/profile/answer', data);
+  submitAnswer: async (data: AnswerRequest): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/profile/answer', data);
     return response.data;
   },
 
@@ -1897,17 +1899,17 @@ export const promptsAPI = {
     status?: string;
     notes?: string | null;
   }) => {
-    const response = await api.post('/api/admin/prompts', payload);
+    const response = await api.post<unknown>('/api/admin/prompts', payload);
     return response.data;
   },
   promote: async (versionId: string, targetStatus: string) => {
-    const response = await api.post(`/api/admin/prompts/${encodeURIComponent(versionId)}/promote`, {
+    const response = await api.post<unknown>(`/api/admin/prompts/${encodeURIComponent(versionId)}/promote`, {
       target_status: targetStatus,
     });
     return response.data;
   },
   setCanaryShare: async (taskKey: string, canaryShare: number) => {
-    const response = await api.post(`/api/admin/prompts/${encodeURIComponent(taskKey)}/canary-share`, {
+    const response = await api.post<unknown>(`/api/admin/prompts/${encodeURIComponent(taskKey)}/canary-share`, {
       canary_share: canaryShare,
     });
     return response.data;
@@ -2027,7 +2029,7 @@ export const adminProspectsAPI = {
 // Admin recommendations debug (admin only)
 export const adminRecommendationsAPI = {
   getDebug: async (assignmentId: string, serviceCategory: string) => {
-    const response = await api.get('/api/admin/recommendations/debug', {
+    const response = await api.get<unknown>('/api/admin/recommendations/debug', {
       params: { assignment_id: assignmentId, service_category: serviceCategory },
     });
     return response.data;
@@ -3164,41 +3166,41 @@ export const hrPreferredSuppliersAPI = {
     priority_rank?: number;
     notes?: string;
   }) => {
-    const response = await api.post('/api/hr/preferred-suppliers', payload);
+    const response = await api.post<unknown>('/api/hr/preferred-suppliers', payload);
     return response.data;
   },
   remove: async (supplierId: string, serviceCategory?: string) => {
     const params = serviceCategory ? { service_category: serviceCategory } : {};
-    const response = await api.delete(`/api/hr/preferred-suppliers/${supplierId}`, { params });
+    const response = await api.delete<unknown>(`/api/hr/preferred-suppliers/${supplierId}`, { params });
     return response.data;
   },
 };
 
 export const hrPolicyAPI = {
-  list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: any[] }> => {
-    const response = await api.get<{ policies: any[] }>('/api/hr/policies', { params: params || {} });
+  list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: unknown[] }> => {
+    const response = await api.get<{ policies: unknown[] }>('/api/hr/policies', { params: params || {} });
     return response.data;
   },
   get: async (policyId: string): Promise<unknown> => {
     const response = await api.get<unknown>(`/api/hr/policies/${policyId}`);
     return response.data;
   },
-  create: async (policy: Record<string, unknown>): Promise<{ policyId: string; policy: any }> => {
-    const response = await api.post<{ policyId: string; policy: any }>('/api/hr/policies', policy);
+  create: async (policy: Record<string, unknown>): Promise<{ policyId: string; policy: unknown }> => {
+    const response = await api.post<{ policyId: string; policy: unknown }>('/api/hr/policies', policy);
     return response.data;
   },
   update: async (policyId: string, policy: Record<string, unknown>): Promise<unknown> => {
     const response = await api.put<unknown>(`/api/hr/policies/${policyId}`, policy);
     return response.data;
   },
-  upload: async (file: File): Promise<{ policyId: string; policy: any }> => {
+  upload: async (file: File): Promise<{ policyId: string; policy: unknown }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post<{ policyId: string; policy: any }>('/api/hr/policies/upload', formData, { timeout: 120_000 });
+    const response = await api.post<{ policyId: string; policy: unknown }>('/api/hr/policies/upload', formData, { timeout: 120_000 });
     return response.data;
   },
   delete: async (policyId: string): Promise<void> => {
-    await api.delete(`/api/hr/policies/${policyId}`);
+    await api.delete<unknown>(`/api/hr/policies/${policyId}`);
   },
 };
 
@@ -3345,7 +3347,7 @@ export const policyConfigMatrixAPI = {
     assignmentType?: string;
     familyStatus?: string;
   }): Promise<Record<string, unknown>> => {
-    const response = await api.get('/api/employee/policy-config', {
+    const response = await api.get<Record<string, unknown>>('/api/employee/policy-config', {
       params: {
         assignmentId: params?.assignmentId,
         caseId: params?.caseId,
@@ -3571,7 +3573,7 @@ export const policyDocumentsAPI = {
     policy_versions_table_ok: boolean;
     resolved_assignment_policies_table_ok: boolean;
   }> => {
-    const response = await api.get('/api/hr/policy-documents/health');
+    const response = await api.get<PolicyDocumentsHealth>('/api/hr/policy-documents/health');
     return response.data;
   },
   list: async (params?: { company_id?: string }): Promise<{ documents: PolicyDocument[] }> => {
@@ -3648,7 +3650,7 @@ export const policyDocumentsAPI = {
     };
     policy_id: string;
     policy_version_id: string;
-    summary: any;
+    summary: unknown;
     version?: Record<string, unknown>;
     input_repairs?: Array<Record<string, string>>;
     policy_readiness?: {
@@ -3658,7 +3660,7 @@ export const policyDocumentsAPI = {
     };
     normalization_draft?: Record<string, unknown> | null;
   }> => {
-    const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`, undefined, { timeout: 120_000 });
+    const response = await api.post<PolicyNormalizeResult>(`/api/hr/policy-documents/${docId}/normalize`, undefined, { timeout: 120_000 });
     return response.data;
   },
   bulkDelete: async (documentIds: string[]): Promise<{ ok: boolean; deleted: number; skipped?: Array<{ id: string; reason: string }> }> => {
@@ -3795,7 +3797,7 @@ export const dossierAPI = {
     const response = await api.get<DossierQuestionsResponse>('/api/dossier/questions', { params: { case_id: caseId } });
     return response.data;
   },
-  saveAnswers: async (payload: { case_id: string; answers: Array<{ question_id?: string | null; case_question_id?: string | null; answer: any }> }): Promise<{ ok: boolean }> => {
+  saveAnswers: async (payload: { case_id: string; answers: Array<{ question_id?: string | null; case_question_id?: string | null; answer: unknown }> }): Promise<{ ok: boolean }> => {
     const response = await api.post<{ ok: boolean }>('/api/dossier/answers', payload);
     return response.data;
   },
