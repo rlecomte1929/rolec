@@ -15,9 +15,7 @@ interface StepProps {
   isSaving?: boolean;
 }
 
-const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
-
-export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack, isSaving }) => {
+export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack, isSaving }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.assignmentContext);
   const [error, setError] = useState('');
@@ -70,7 +68,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Job title
-          {(isRequired(requiredFields, 'assignmentContext.jobTitle') || true) && jobTitleMissing && (
+          {jobTitleMissing && (
             <span className="text-red-600"> *</span>
           )}
           <Input unstyled
@@ -81,7 +79,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Contract start date
-          {(isRequired(requiredFields, 'assignmentContext.contractStartDate') || true) && contractStartMissing && (
+          {contractStartMissing && (
             <span className="text-red-600"> *</span>
           )}
           <Input unstyled
@@ -93,7 +91,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Contract type
-          {(isRequired(requiredFields, 'assignmentContext.contractType') || true) && contractTypeMissing && (
+          {contractTypeMissing && (
             <span className="text-red-600"> *</span>
           )}
           <select
@@ -109,7 +107,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
         </label>
         <label className="text-sm text-[#0b2b43]">
           Salary band
-          {(isRequired(requiredFields, 'assignmentContext.salaryBand') || true) && salaryBandMissing && (
+          {salaryBandMissing && (
             <span className="text-red-600"> *</span>
           )}
           <select

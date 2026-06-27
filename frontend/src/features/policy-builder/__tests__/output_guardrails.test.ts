@@ -340,7 +340,7 @@ describe('Stress test — 50 responses with cross-tier chunk injection', () => {
       const amount = managerAmounts[i % managerAmounts.length];
       const response = `Your entitlement is ${amount} per month.`;
       const result = checkCrossTierLeak(response, chunks, 'Manager');
-      result.pass ? passCt++ : failCt++;
+      if (result.pass) { passCt++; } else { failCt++; }
     }
 
     expect(failCt).toBe(0);

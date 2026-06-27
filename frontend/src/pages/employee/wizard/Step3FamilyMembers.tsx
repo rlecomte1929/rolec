@@ -65,7 +65,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
       <div className="mt-6 space-y-4">
         <label className="text-sm text-[#0b2b43]">
           Marital status
-          {(isRequired(requiredFields, 'familyMembers.maritalStatus') || true) && maritalMissing && (
+          {maritalMissing && (
             <span className="text-red-600"> *</span>
           )}
           <select

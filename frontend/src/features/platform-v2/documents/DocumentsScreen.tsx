@@ -923,7 +923,7 @@ export function DocumentsScreen({
   const [activeFilter, setActiveFilter] = useState<DocFilter>('all');
 
   const toggleCat = (cat: RequirementCategory) =>
-    setOpenCats(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n; });
+    setOpenCats(prev => { const n = new Set(prev); if (n.has(cat)) { n.delete(cat); } else { n.add(cat); } return n; });
 
   // ── Alert docs ──
   const expiringDocs = documents.filter(d => isExpiringSoon(d.expiry_date));

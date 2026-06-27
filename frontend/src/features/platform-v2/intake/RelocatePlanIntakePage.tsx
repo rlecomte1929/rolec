@@ -195,7 +195,7 @@ function getInfoTip(step: number, state: IntakeState): string | null {
   if (step === 2)
     return 'ReloPass currently has corridor-grade requirements for 47 destinations.';
   if (step === 3 && state.fromCode && state.toCode)
-    return `We\'ll tailor your document checklist to the exact ${getCountry(state.fromCode)?.name} → ${getCountry(state.toCode)?.name} corridor.`;
+    return `We'll tailor your document checklist to the exact ${getCountry(state.fromCode)?.name} → ${getCountry(state.toCode)?.name} corridor.`;
   return null;
 }
 
@@ -884,7 +884,7 @@ export function RelocatePlanIntakePage() {
   }, [caseId]);
 
   const handleSelect = useCallback((value: string) => {
-    let nextState = { ...state };
+    const nextState = { ...state };
     let patch: object = {};
 
     if (step === 1) {
