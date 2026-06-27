@@ -213,7 +213,7 @@ export async function classify(
   try {
     // Strip any accidental markdown fencing
     const cleaned = rawText.replace(/```json|```/g, '').trim();
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(cleaned) as { category: TopicCategory; confidence: number; detected_topic?: string };
   } catch {
     // If parsing fails, default to borderline (safe fallback — triggers clarification)
     logger.warn(`[topic_classifier] JSON parse failed for hash=${query_hash}, raw="${rawText.slice(0, 100)}"`);
