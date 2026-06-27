@@ -1,0 +1,23 @@
+-- AIQ-1320: drop the redundant + broken audit trigger on services_state.
+--
+-- public.relopass_audit_row() (the shared row-audit trigger function) hardcodes
+-- new.id / old.id as audit_logs.entity_id. services_state is keyed by case_id
+-- and has NO id column, so every INSERT/UPDATE/DELETE threw
+--   (psycopg2.errors.UndefinedColumn) record "new" has no field "id"
+-- which aborted the transaction: POST /api/cases/{id}/services-state returned
+-- 500 and nothing was ever saved server-side (the page silently fell back to
+-- localStorage). This surfaced as a console error on the employee services flow.
+--
+-- The put_services_state handler already audits services_state explicitly via
+-- _audit() -> insert_audit_log(entity_type='services_state', entity_id=case_id),
+-- so this DB trigger was redundant as well as broken — dropping it loses no
+-- audit coverage (it never successfully wrote a row).
+--
+-- NOTE (separate follow-up, not addressed here): relopass_audit_row() still
+-- assumes every audited table has an `id` column, so any other id-less table
+-- carrying this trigger would 500 on write the same way. The robust fix is to
+-- make the function tolerate id-less rows ((to_jsonb(new))->>'id'); that touches
+-- a shared SECURITY DEFINER function across ~12 tables and deserves its own PR.
+--
+-- Idempotent.
+DROP TRIGGER IF EXISTS trg_audit_services_state ON public.services_state;
