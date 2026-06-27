@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -181,6 +182,17 @@ def _retrieve_postgres(
     [0, 2]; we convert to similarity = 1 - (distance / 2) clipped to
     [0, 1] for a comparable shape with the SQLite path.
     """
+    # F3: policy_assistant_chunks.company_id is a uuid column, and the request
+    # path may run as the non-superuser relopass_api role. A non-UUID company id
+    # (e.g. a legacy seed slug like "seed-emp-testingapril") can never match a
+    # uuid; binding it as :co makes psycopg2 raise InvalidTextRepresentation ->
+    # 500. Such a company has no chunks by definition, so return empty instead.
+    # (The RLS policy's safe_uuid() guard handles the same case at the policy
+    # layer; this guards the query's own WHERE company_id = :co predicate.)
+    try:
+        uuid.UUID(str(company_id))
+    except (ValueError, AttributeError, TypeError):
+        return []
     where_extra = ""
     params: Dict[str, Any] = {"co": company_id, "k": int(max(1, min(top_k, 50)))}
     if source_types:
