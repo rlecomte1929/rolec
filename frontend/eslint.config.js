@@ -221,11 +221,13 @@ export default tseslint.config(
       'jsx-a11y/click-events-have-key-events': 'warn',
       'jsx-a11y/no-static-element-interactions': 'warn',
       'jsx-a11y/no-noninteractive-element-interactions': 'warn',
-      'jsx-a11y/no-redundant-roles': 'warn',
+      // Epic C / R3: DRAINED to 0 + re-promoted to 'error'. These now fail CI on any new violation.
+      'jsx-a11y/no-redundant-roles': 'error',
+      // no-autofocus stays 'warn': 1 remaining in features/hr/HrTeamList.tsx (deferred file — needs browser-verified fix).
       'jsx-a11y/no-autofocus': 'warn',
-      'jsx-a11y/interactive-supports-focus': 'warn',
-      'jsx-a11y/aria-role': 'warn',
-      'jsx-a11y/no-noninteractive-element-to-interactive-role': 'warn',
+      'jsx-a11y/interactive-supports-focus': 'error',
+      'jsx-a11y/aria-role': 'error',
+      'jsx-a11y/no-noninteractive-element-to-interactive-role': 'error',
 
       // — Cosmetic / low-count, demoted for now (tracked for follow-up; several are
       //   trivially fixable and should be drained + re-promoted in the epics) —
