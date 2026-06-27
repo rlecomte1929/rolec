@@ -3,8 +3,8 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-// eslint-disable-next-line import/order
 import { AdminSourceChangeReviewsPage } from '../AdminSourceChangeReviewsPage';
+import { sourceChangeReviewAPI } from '../../../../api/client';
 
 vi.mock('../../../../api/client', () => ({
   sourceChangeReviewAPI: {
@@ -35,8 +35,6 @@ vi.mock('../../../../api/client', () => ({
     reject: vi.fn().mockResolvedValue({ status: 'rejected' }),
   },
 }));
-
-import { sourceChangeReviewAPI } from '../../../../api/client';
 
 const renderPage = () =>
   render(
