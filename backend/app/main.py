@@ -53,6 +53,7 @@ from .routers import (
     mobility_context,
     nlg,
     pets,
+    policy_analysis,
     policy_canonical,
     policy_gaps,
     policy_publish,
@@ -176,6 +177,9 @@ def create_app() -> FastAPI:
     app.include_router(specialist_review.router)
     app.include_router(rag_roadmap.router)  # [P1-01d] /api/internal/rag/generate-roadmap
     app.include_router(compliance.router)  # [BL-Compliance.4] /api/compliance
+
+    # ── AIQ-1219 PR2: policy analysis (PDF → workflow summary) ─────────────────
+    app.include_router(policy_analysis.router)
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)

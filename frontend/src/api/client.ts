@@ -1706,7 +1706,40 @@ export const adminAPI = {
     );
     return response.data;
   },
+  /** AIQ-1219: Upload a policy PDF/DOCX and get a workflow summary. */
+  analyzePolicy: async (file: File): Promise<PolicyAnalysisResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<PolicyAnalysisResult>('/api/admin/policy-analysis', form, { timeout: 120_000 });
+    return response.data;
+  },
 };
+
+export interface PolicyWorkflowSummary {
+  policy_title: string | null;
+  effective_date: string | null;
+  tiers: Array<{ name: string; bands: string[]; benefits_count: number }>;
+  tasks: Array<{ category: string; task: string; owner: string; benefit_key: string; confidence: number }>;
+  timeline: Array<{ phase: string; duration: string; tasks: string[] }>;
+  cost_summary: {
+    total_range: { min: number; max: number; currency: string } | null;
+    by_category: Array<{ category: string; estimated_range: { min: number; max: number; currency: string } }>;
+    note: string;
+  };
+  benefits_count: number;
+}
+
+export interface PolicyAnalysisResult {
+  workflow_summary: PolicyWorkflowSummary;
+  extraction: {
+    llm_used: boolean;
+    llm_unavailable_reason: string | null;
+    model: string | null;
+    truncated: boolean;
+    benefits_count: number;
+  };
+  elapsed_ms: number;
+}
 
 // Supplier Registry API (admin)
 export const suppliersAPI = {
