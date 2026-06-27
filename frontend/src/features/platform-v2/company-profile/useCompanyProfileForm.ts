@@ -41,8 +41,10 @@ export function emptyValues(): CompanyProfileFormValues {
 /** Adapt a raw company record (snake or camel keys) → form values. */
 export function valuesFromCompany(company: Record<string, unknown> | null): CompanyProfileFormValues {
   if (!company) return emptyValues();
-  const pick = (snake: string, camel: string) =>
-    String((company[snake] ?? company[camel] ?? '') || '').trim();
+  const pick = (snake: string, camel: string) => {
+    const v = company[snake] ?? company[camel];
+    return typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
+  };
   return {
     name:                        pick('name', 'name'),
     legal_name:                  pick('legal_name', 'legalName'),

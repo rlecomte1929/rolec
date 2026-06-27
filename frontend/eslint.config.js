@@ -195,8 +195,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'warn',
       '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-base-to-string': 'warn',
-      '@typescript-eslint/restrict-template-expressions': 'warn',
+      '@typescript-eslint/no-base-to-string': 'error',
+      '@typescript-eslint/restrict-template-expressions': 'error',
 
       // — Async-safety epic —
       // no-misused-promises: DRAINED + re-promoted to 'error' (Epic A2). The
