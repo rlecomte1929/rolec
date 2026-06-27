@@ -86,7 +86,12 @@ export const CountryMultiSelect: React.FC<Props> = ({
             ? 'border-[#e5e7eb] opacity-60 cursor-not-allowed'
             : 'border-[#d1d5db] focus-within:ring-2 focus-within:ring-[#0b2b43] cursor-text'
         }`}
-        onClick={() => !disabled && setOpen(true)}
+        {...(!disabled ? {
+          onClick: () => setOpen(true),
+          onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); }
+          },
+        } : {})}
       >
         {value.length === 0 && !open && (
           <span className="text-sm text-[#9ca3af]">

@@ -1139,6 +1139,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           tabIndex={0}
           aria-label="Close"
         >
+          {/* eslint-disable-next-line local/no-clickable-div -- role="presentation" is the correct ARIA role for the modal content wrapper; backdrop-click + Escape are the standard dismiss interactions */}
           <div role="presentation" onClick={(e): void => e.stopPropagation()}>
             <Card padding="lg" className="max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-3">

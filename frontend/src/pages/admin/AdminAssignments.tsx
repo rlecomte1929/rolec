@@ -452,8 +452,15 @@ export const AdminAssignments: React.FC = () => {
       </Card>
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowAddModal(false); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close add assignment modal"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4">
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
             {createError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900 whitespace-pre-wrap">
@@ -665,6 +672,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch">
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
       <div className="flex-1 bg-black/30" onClick={onClose} aria-hidden="true" />
       <div className="w-full max-w-xl bg-white shadow-xl overflow-y-auto flex flex-col">
         <div className="p-4 border-b border-[#e2e8f0] flex items-center justify-between">
