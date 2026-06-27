@@ -22,7 +22,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // ── Fix Leaflet default icon for Vite (no webpack loader) ─────────────────────
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+// Leaflet's internal property is not in the TS declarations — cast through Record.
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)['_getIconUrl'];
 L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -71,9 +72,10 @@ async function geocodeAddress(address: string): Promise<LatLng | null> {
     const res = await fetch(url, {
       headers: { 'Accept-Language': 'en', 'User-Agent': 'ReloPass/1.0 (intake-map)' },
     });
-    const data = await res.json();
-    if (!data?.length) return null;
-    const point: LatLng = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+    const first = data[0];
+    if (!first) return null;
+    const point: LatLng = { lat: parseFloat(first.lat), lng: parseFloat(first.lon) };
     GEO_CACHE.set(address, point);
     return point;
   } catch {
@@ -89,6 +91,14 @@ interface OverpassNode {
   tags: Record<string, string>;
 }
 
+type OverpassRawElement = {
+  type: string;
+  id: number;
+  lat?: number;
+  lon?: number;
+  tags?: Record<string, string>;
+};
+
 const OVERPASS_CACHE = new Map<string, OverpassNode[]>();
 
 async function overpassQuery(query: string): Promise<OverpassNode[]> {
@@ -100,10 +110,12 @@ async function overpassQuery(query: string): Promise<OverpassNode[]> {
       body: query,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    const json = await res.json();
-    const nodes: OverpassNode[] = (json.elements ?? []).filter(
-      (e: any) => e.type === 'node' && e.lat && e.lon,
-    );
+    const json = (await res.json()) as { elements?: OverpassRawElement[] };
+    const nodes: OverpassNode[] = (json.elements ?? [])
+      .filter((e): e is OverpassRawElement & { lat: number; lon: number } =>
+        e.type === 'node' && e.lat != null && e.lon != null,
+      )
+      .map(({ id, lat, lon, tags }) => ({ id, lat, lon, tags: tags ?? {} }));
     OVERPASS_CACHE.set(key, nodes);
     return nodes;
   } catch {

@@ -162,13 +162,14 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
 
     try {
       // 1. Fetch all pets for this case
-      const { data: pets, error: petsError } = await supabase
+      const { data: petsRaw, error: petsError } = await supabase
         .from('pets')
         .select('id, name, species, breed')
         .eq('case_id', caseId);
 
       if (petsError) throw petsError;
-      if (!pets || pets.length === 0) {
+      const pets = (petsRaw ?? []) as Pet[];
+      if (pets.length === 0) {
         setPetsWithRules([]);
         setLoading(false);
         return;
@@ -179,14 +180,14 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
         pets.map(async (pet) => {
           if (!destCountry) return { pet, rule: null };
 
-          const { data: rule } = await supabase
+          const ruleResult = (await supabase
             .from('pet_import_rules')
             .select('*')
             .eq('destination_country_code', destCountry.toUpperCase())
             .eq('species', pet.species.toLowerCase())
-            .maybeSingle();
+            .maybeSingle()) as unknown as { data: PetImportRule | null };
 
-          return { pet, rule: rule ?? null };
+          return { pet, rule: ruleResult.data ?? null };
         })
       );
 
