@@ -46,13 +46,21 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes upload_document to the case-scoped dossier (D1 — uploads live there)', () => {
-    // Upload tasks land on the dossier (the upload surface); data tasks land on
-    // intake. No task dead-ends or lands on an unrelated step.
+  it('routes upload_document to the case-scoped documents surface (doc-flow P3)', () => {
+    // Upload tasks land on the dedicated documents page (the surface that hosts
+    // case-document uploads); data tasks land on intake.
     const cta: RelocationPlanCtaDTO = { type: 'upload_document', label: 'Upload' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/documents`,
+    });
+  });
+
+  it('upload_document with a formHint deep-links ?doc=<key> on the documents page', () => {
+    const cta: RelocationPlanCtaDTO = { type: 'upload_document', label: 'Upload' };
+    expect(resolveRelocationTaskCtaTarget({ ...employeeCtx, formHint: 'passport_copy' }, cta)).toEqual({
+      kind: 'internal',
+      to: `/employee/case/${encodeURIComponent('assign-1')}/documents?doc=passport_copy`,
     });
   });
 

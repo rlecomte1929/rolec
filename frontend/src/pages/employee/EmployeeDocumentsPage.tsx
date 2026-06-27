@@ -28,7 +28,6 @@ export function EmployeeDocumentsPage() {
     isLoading,
     error,
     handleUpload,
-    handleDelete,
     handleRemind,
     caseId,
   } = useDocuments(routeCaseId);
@@ -68,8 +67,6 @@ export function EmployeeDocumentsPage() {
       <DocumentsScreen
         documents={documents}
         onUpload={handleUpload}
-        onDelete={handleDelete}
-        onReupload={handleDelete} // re-upload = delete old; the row's upload control handles the new file
         onRemind={handleRemind}
         deepLinkKey={deepLinkKey}
         onPreview={(doc) => {
