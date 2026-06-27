@@ -349,10 +349,11 @@ export const AdminStagingEventDetail: React.FC = () => {
                 {matches.length > 0 && (
                   <>
                     <div className="border-t border-slate-100 pt-2">
-                      <label className="block text-xs text-slate-500">
+                      <label htmlFor="asede-merge-target" className="block text-xs text-slate-500">
                         Merge into live event
                       </label>
                       <select
+                        id="asede-merge-target"
                         value={mergeTargetId}
                         onChange={(e) => setMergeTargetId(e.target.value)}
                         className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"

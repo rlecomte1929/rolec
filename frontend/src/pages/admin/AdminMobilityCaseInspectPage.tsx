@@ -142,8 +142,9 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
               navigate(`/admin/mobility/cases/${encodeURIComponent(id)}`);
             }}
           >
-            <label className="block text-sm font-medium text-[#0b2b43]">Mobility case UUID</label>
+            <label htmlFor="amci-case-id" className="block text-sm font-medium text-[#0b2b43]">Mobility case UUID</label>
             <Input unstyled
+              id="amci-case-id"
               className="w-full border border-[#cbd5e1] rounded-md px-3 py-2 text-sm font-mono"
               placeholder="33333333-3333-4333-8333-333333333301"
               value={manualId}

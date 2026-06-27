@@ -93,10 +93,11 @@ export const PolicyBuilderWizard: React.FC = () => {
 
       {/* Optional policy label */}
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-slate-600 whitespace-nowrap">
+        <label htmlFor="pbw-policy-label" className="text-sm font-medium text-slate-600 whitespace-nowrap">
           Policy label:
         </label>
         <Input unstyled
+          id="pbw-policy-label"
           type="text"
           value={draft.label}
           onChange={(v) => draft.setLabel(v)}

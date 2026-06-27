@@ -66,8 +66,9 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({
           />
 
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Description</label>
+            <label htmlFor="atm-description" className="block text-sm font-medium text-[#374151] mb-1">Description</label>
             <textarea
+              id="atm-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}

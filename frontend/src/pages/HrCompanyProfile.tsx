@@ -236,7 +236,7 @@ export const HrCompanyProfile: React.FC = () => {
           </div>
 
           <div className="pt-2">
-            <label className="block text-sm font-medium text-[#374151] mb-2">Company logo</label>
+            <span className="block text-sm font-medium text-[#374151] mb-2">Company logo</span>
             <p className="text-xs text-[#6b7280] mb-2">PNG, JPG or SVG, max 2MB. Recommended: square 512×512.</p>
             {logoUrl ? (
               <div className="flex items-center gap-4">
