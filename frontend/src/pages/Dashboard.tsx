@@ -172,7 +172,7 @@ export const Dashboard: React.FC = () => {
                 role="tab"
                 aria-selected={activeTab === tab.id}
                 aria-controls={`dashboard-panel-${tab.id}`}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'timeline' | 'housing' | 'schools' | 'movers' | 'documents')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? 'border-[#0b2b43] text-[#0b2b43]'

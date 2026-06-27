@@ -90,8 +90,9 @@ export const HrPolicyManagement: React.FC = () => {
       const { policies: list } = await hrPolicyAPI.list();
       setPolicies(list);
       setError('');
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
+    } catch (err) {
+      const e = err as { response?: { status?: number } };
+      if (e.response?.status === 401) {
         safeNavigate(navigate, 'landing');
         return;
       }
@@ -142,8 +143,9 @@ export const HrPolicyManagement: React.FC = () => {
       }
       setView('list');
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Could not save policy.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Could not save policy.');
     }
   };
 
@@ -158,8 +160,9 @@ export const HrPolicyManagement: React.FC = () => {
       }
       setView('list');
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Could not publish policy.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Could not publish policy.');
     }
   };
 
@@ -172,14 +175,15 @@ export const HrPolicyManagement: React.FC = () => {
       setUploadFile(null);
       setView('list');
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Upload failed.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Upload failed.');
     } finally {
       setUploading(false);
     }
   };
 
-  const setBenefit = (key: string, field: string, value: any) => {
+  const setBenefit = (key: string, field: string, value: unknown) => {
     setForm((prev) => {
       const cats = { ...(prev.benefitCategories || {}) };
       if (!cats[key]) cats[key] = { ...DEFAULT_BENEFIT };

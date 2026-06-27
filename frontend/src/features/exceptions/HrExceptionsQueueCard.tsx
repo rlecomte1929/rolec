@@ -112,7 +112,7 @@ export const HrExceptionsQueueCard: React.FC = () => {
 
       {loading && rows.length === 0 ? (
         <div className="space-y-2 py-4">
-          {[...Array(2)].map((_, i) => (
+          {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="h-16 rounded-lg bg-[#f1f5f9] animate-pulse" />
           ))}
         </div>

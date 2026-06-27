@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const FALLBACK_ACCESS_TOKEN = import.meta.env.VITE_SUPABASE_ACCESS_TOKEN;
+const FALLBACK_ACCESS_TOKEN = import.meta.env.VITE_SUPABASE_ACCESS_TOKEN as string | undefined;
 
 const isJwt = (v?: string | null) => typeof v === 'string' && v.split('.').length === 3;
 
@@ -53,7 +53,7 @@ export async function getHrFeedback(
       const text = await res.text();
       let msg = text;
       try {
-        const j = JSON.parse(text);
+        const j = JSON.parse(text) as { message?: string; error?: string; details?: string };
         msg = j.message || j.error || j.details || text;
       } catch {
         // keep text

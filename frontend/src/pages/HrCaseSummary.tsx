@@ -85,20 +85,21 @@ export const HrCaseSummary: React.FC = () => {
           .finally(() => clearTimeout(timer));
         localStorage.setItem('relopass_last_assignment_id', data.id);
         return { assignment: data, draftCase: null };
-      } catch (err: any) {
-        if (err.response?.status === 401) throw err; // handled by the 401 effect
+      } catch (err) {
+        const e = err as { response?: { status?: number; data?: { detail?: string } } };
+        if (e.response?.status === 401) throw err; // handled by the 401 effect
         // B10 fix: try the draft-case fallback for ANY non-auth error, not just
         // 404. A 5xx or network timeout on the assignment lookup should still
         // reveal the draft card when the underlying case exists.
         const isAuthError =
-          err.response?.status === 401 || err.response?.status === 403;
+          e.response?.status === 401 || e.response?.status === 403;
         if (!isAuthError) {
           try {
             const draft = await hrAPI.getDraftCase(caseId as string);
             return { assignment: null, draftCase: draft };
           } catch {
             throw new Error(
-              err.response?.status === 404
+              e.response?.status === 404
                 ? 'Case not found or not visible.'
                 : 'Unable to load case. Please try again.',
             );
@@ -137,8 +138,9 @@ export const HrCaseSummary: React.FC = () => {
     try {
       await hrAPI.runCompliance(assignment.id);
       await caseQuery.refetch();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to run compliance checks.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Unable to run compliance checks.');
     } finally {
       setIsRunning(false);
     }
@@ -154,8 +156,9 @@ export const HrCaseSummary: React.FC = () => {
       setDecisionNotes('');
       setRequestedSections([]);
       await caseQuery.refetch();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to approve case.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Unable to approve case.');
     } finally {
       setIsDeciding(false);
     }
@@ -178,8 +181,9 @@ export const HrCaseSummary: React.FC = () => {
       setDecisionNotes('');
       setRequestedSections([]);
       await caseQuery.refetch();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to request changes.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Unable to request changes.');
     } finally {
       setIsDeciding(false);
     }

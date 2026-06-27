@@ -27,15 +27,15 @@ export interface SubscribeCallbacks {
 
 function rowToNotificationListItem(row: Record<string, unknown>): NotificationListItem {
   return {
-    id: String(row.id ?? ''),
-    created_at: String(row.created_at ?? ''),
-    assignment_id: row.assignment_id != null ? String(row.assignment_id) : null,
-    case_id: row.case_id != null ? String(row.case_id) : null,
-    type: String(row.type ?? ''),
-    title: String(row.title ?? ''),
-    body: row.body != null ? String(row.body) : null,
+    id: (row.id as string | null | undefined) ?? '',
+    created_at: (row.created_at as string | null | undefined) ?? '',
+    assignment_id: (row.assignment_id as string | null | undefined) ?? null,
+    case_id: (row.case_id as string | null | undefined) ?? null,
+    type: (row.type as string | null | undefined) ?? '',
+    title: (row.title as string | null | undefined) ?? '',
+    body: (row.body as string | null | undefined) ?? null,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
-    read_at: row.read_at != null ? String(row.read_at) : null,
+    read_at: (row.read_at as string | null | undefined) ?? null,
   };
 }
 

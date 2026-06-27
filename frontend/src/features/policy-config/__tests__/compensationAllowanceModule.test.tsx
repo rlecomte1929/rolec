@@ -26,14 +26,14 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('../../../api/client', () => ({
   policyConfigMatrixAPI: {
-    hrGet: (...args: unknown[]) => apiMocks.hrGet(...args),
-    hrPutDraft: (...args: unknown[]) => apiMocks.hrPutDraft(...args),
-    hrPublish: (...args: unknown[]) => apiMocks.hrPublish(...args),
-    adminGet: (...args: unknown[]) => apiMocks.adminGet(...args),
-    employeeGet: (...args: unknown[]) => apiMocks.employeeGet(...args),
+    hrGet: (...args: unknown[]): unknown => apiMocks.hrGet(...args),
+    hrPutDraft: (...args: unknown[]): unknown => apiMocks.hrPutDraft(...args),
+    hrPublish: (...args: unknown[]): unknown => apiMocks.hrPublish(...args),
+    adminGet: (...args: unknown[]): unknown => apiMocks.adminGet(...args),
+    employeeGet: (...args: unknown[]): unknown => apiMocks.employeeGet(...args),
   },
   adminAPI: {
-    listCompanies: (...args: unknown[]) => apiMocks.adminListCompanies(...args),
+    listCompanies: (...args: unknown[]): unknown => apiMocks.adminListCompanies(...args),
   },
   // EmployeePolicyView also calls employeeAPI.getServicesPolicyContext — must be present in mock
   employeeAPI: {

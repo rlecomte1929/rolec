@@ -7,19 +7,19 @@ import type { Message, Conversation } from './types';
 
 /** Map API conversation summary row to a lightweight Conversation (messages loaded later). */
 export function conversationFromSummary(row: Record<string, unknown>): Conversation {
-  const assignmentId = String(row.assignment_id ?? '');
+  const assignmentId = (row.assignment_id as string | null | undefined) ?? '';
   return {
     id: `conv-${assignmentId}`,
     assignment_id: assignmentId,
-    other_participant_name: String(row.employee_name ?? 'Employee'),
-    last_message_preview: String(row.last_message_preview ?? ''),
-    last_message_at: String(row.last_message_at ?? new Date().toISOString()),
+    other_participant_name: (row.employee_name as string | null | undefined) ?? 'Employee',
+    last_message_preview: (row.last_message_preview as string | null | undefined) ?? '',
+    last_message_at: (row.last_message_at as string | null | undefined) ?? new Date().toISOString(),
     unread_count: typeof row.unread_count === 'number' ? row.unread_count : Number(row.unread_count) || 0,
     messages: [],
     thread_loaded: false,
-    case_id: (row.case_id as string) ?? null,
-    participant_email: (row.employee_email as string) ?? null,
-    archived_at: (row.archived_at as string) ?? null,
+    case_id: (row.case_id as string | null | undefined) ?? null,
+    participant_email: (row.employee_email as string | null | undefined) ?? null,
+    archived_at: (row.archived_at as string | null | undefined) ?? null,
   };
 }
 
@@ -123,18 +123,18 @@ export function buildConversationsFromQuoteThreads(
 ): Conversation[] {
   const out: Conversation[] = [];
   for (const t of rawThreads) {
-    const conversationId = String(t.conversation_id ?? '');
-    const assignmentId = String(t.assignment_id ?? '');
+    const conversationId = (t.conversation_id as string | null | undefined) ?? '';
+    const assignmentId = (t.assignment_id as string | null | undefined) ?? '';
     if (!conversationId || !assignmentId) continue;
-    const label = String(t.counterparty_label ?? 'Service provider');
+    const label = (t.counterparty_label as string | null | undefined) ?? 'Service provider';
     const rawMsgs = (t.messages as Record<string, unknown>[]) || [];
     const messages: Message[] = rawMsgs.map((raw) => {
-      const sid = String(raw.sender_user_id ?? '');
+      const sid = (raw.sender_user_id as string | null | undefined) ?? '';
       const isFromMe = Boolean(currentUserId) && sid === currentUserId;
       return {
         id: String(raw.id),
-        body: String(raw.body ?? ''),
-        created_at: String(raw.created_at ?? ''),
+        body: (raw.body as string | null | undefined) ?? '',
+        created_at: (raw.created_at as string | null | undefined) ?? '',
         sender_user_id: sid || undefined,
         sender_role: isFromMe ? 'EMPLOYEE' : 'SUPPLIER',
         sender_name: isFromMe ? currentUserName : label,
@@ -142,7 +142,7 @@ export function buildConversationsFromQuoteThreads(
       };
     });
     const last = messages[messages.length - 1];
-    const rfqRef = t.rfq_ref != null ? String(t.rfq_ref) : '';
+    const rfqRef = t.rfq_ref != null ? (t.rfq_ref as string | null | undefined) ?? '' : '';
     out.push({
       id: `qconv-${conversationId}`,
       assignment_id: assignmentId,
@@ -152,7 +152,7 @@ export function buildConversationsFromQuoteThreads(
       other_participant_name: label,
       other_participant_avatar: label.slice(0, 2).toUpperCase(),
       last_message_preview: truncate(last?.body ?? '', 60),
-      last_message_at: last?.created_at || String(t.created_at ?? new Date().toISOString()),
+      last_message_at: last?.created_at || ((t.created_at as string | null | undefined) ?? new Date().toISOString()),
       unread_count: 0,
       messages,
       thread_loaded: true,

@@ -52,7 +52,7 @@ describe('AdminSpecialistReviewPage', () => {
     await screen.findByText('Step one');
     fireEvent.click(screen.getByRole('button', { name: /approve roadmap/i }));
     await waitFor(() => expect(specialistReviewAPI.submit).toHaveBeenCalledTimes(1));
-    const [caseId, body] = (specialistReviewAPI.submit as ReturnType<typeof vi.fn>).mock.calls[0];
+    const [caseId, body] = (specialistReviewAPI.submit as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { decision: string; items: unknown[] }];
     expect(caseId).toBe('case-1');
     expect(body.decision).toBe('approved');
     expect(body.items).toHaveLength(2);
