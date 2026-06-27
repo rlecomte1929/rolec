@@ -9,6 +9,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import {
+  ReviewRow,
+  isLowConfidence,
+  LOW_CONFIDENCE_THRESHOLD,
+} from '../PolicyReviewQueuePage';
+import type { ReviewQueueItem } from '../../../../api/policyBuilderPipeline';
 
 // The page module constructs the Supabase client at import time, which needs
 // env vars absent in the test runner. Mock it (hoisted before the import below).
@@ -21,13 +27,6 @@ vi.mock('../../../../api/supabase', () => ({
     from: () => ({ select: () => ({}) }),
   },
 }));
-
-import {
-  ReviewRow,
-  isLowConfidence,
-  LOW_CONFIDENCE_THRESHOLD,
-} from '../PolicyReviewQueuePage';
-import type { ReviewQueueItem } from '../../../../api/policyBuilderPipeline';
 
 afterEach(cleanup);
 

@@ -367,7 +367,7 @@ export function MobilityControlCenterV2Page() {
     completedCount: number;
     budgetOverrunsCount: number;
   } | null = dashboardQuery.data?.kpis ?? null;
-  const cases: CommandCenterCaseRow[] = dashboardQuery.data?.cases ?? [];
+  const cases: CommandCenterCaseRow[] = useMemo(() => dashboardQuery.data?.cases ?? [], [dashboardQuery.data]);
   const approvals: ApprovalRow[] = dashboardQuery.data?.approvals ?? [];
   const backendDegraded = dashboardQuery.data?.degraded ?? false;
   const loading = dashboardQuery.isLoading;

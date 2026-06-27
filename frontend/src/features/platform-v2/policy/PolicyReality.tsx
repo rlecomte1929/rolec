@@ -26,7 +26,7 @@ export interface PolicyRealityProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function parseNumeric(value: string): number | null {
-  const n = parseFloat(value.replace(/[^0-9.\-]/g, ''));
+  const n = parseFloat(value.replace(/[^0-9.-]/g, ''));
   return isNaN(n) ? null : n;
 }
 

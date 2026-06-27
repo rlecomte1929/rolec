@@ -62,7 +62,7 @@ function loadOrder(tableId: string, columns: ColumnDef[]): string[] {
   try {
     const raw = localStorage.getItem(storageKey(tableId));
     if (!raw) return columns.map(c => c.id);
-    const saved: string[] = JSON.parse(raw);
+    const saved = JSON.parse(raw) as string[];
     // Filter out any columns that no longer exist, then append new ones
     const valid = saved.filter(id => columns.some(c => c.id === id));
     const newIds = columns.filter(c => !valid.includes(c.id)).map(c => c.id);

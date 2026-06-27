@@ -131,7 +131,7 @@ export function HrBacklogPage() {
     queryKey: ['hr', 'backlog'],
     queryFn: () => hrAPI.getBacklog(),
   });
-  const items: HrBacklogTask[] = backlogQuery.data?.items ?? [];
+  const items: HrBacklogTask[] = useMemo(() => backlogQuery.data?.items ?? [], [backlogQuery.data]);
   const hasCompany = backlogQuery.data?.has_company ?? true;
   const loading = backlogQuery.isLoading;
   const error = backlogQuery.isError

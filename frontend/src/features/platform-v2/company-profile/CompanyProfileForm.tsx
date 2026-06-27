@@ -94,8 +94,10 @@ function emptyForm(): FormState {
 /** Adapter: nested record (snake or camel) → flat form state. */
 export function formFromCompany(company: Record<string, unknown> | null): FormState {
   if (!company) return emptyForm();
-  const pick = (snake: string, camel: string) =>
-    String((company[snake] ?? company[camel] ?? '') || '').trim();
+  const pick = (snake: string, camel: string) => {
+    const val = company[snake] ?? company[camel];
+    return (typeof val === 'string' ? val : '').trim();
+  };
   return {
     name:                        pick('name', 'name'),
     legal_name:                  pick('legal_name', 'legalName'),

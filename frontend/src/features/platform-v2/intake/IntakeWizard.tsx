@@ -444,8 +444,8 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as Record<string, string>).message ?? `HTTP ${res.status}`);
+        const err = await res.json().catch(() => ({})) as { message?: string };
+        throw new Error(err.message ?? `HTTP ${res.status}`);
       }
 
       const { data } = await res.json() as { data: { id: string } };

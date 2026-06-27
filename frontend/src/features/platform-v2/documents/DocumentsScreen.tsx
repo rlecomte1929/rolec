@@ -193,6 +193,9 @@ const CATEGORY_ICON: Record<RequirementCategory, string> = {
 
 // ─── Upload Zone ──────────────────────────────────────────────────────────────
 
+const ACCEPTED = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+const MAX_BYTES = 25 * 1024 * 1024;
+
 interface UploadZoneProps {
   category: RequirementCategory;
   onUpload: (file: File, category: RequirementCategory) => Promise<void>;
@@ -203,9 +206,6 @@ function UploadZone({ category, onUpload }: UploadZoneProps) {
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const ACCEPTED = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  const MAX_BYTES = 25 * 1024 * 1024;
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -927,7 +927,7 @@ export function DocumentsScreen({
   const [activeFilter, setActiveFilter] = useState<DocFilter>('all');
 
   const toggleCat = (cat: RequirementCategory) =>
-    setOpenCats(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n; });
+    setOpenCats(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; });
 
   // ── Alert docs ──
   const expiringDocs = documents.filter(d => isExpiringSoon(d.expiry_date));

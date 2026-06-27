@@ -67,7 +67,7 @@ export function InferredOnboardingPanel({
   const applyAndCreate = async () => {
     setApplying(true);
     try {
-      const { company } = await hrAPI.getCompanyProfile();
+      const { company } = await hrAPI.getCompanyProfile() as { company?: { name?: string } };
       const name = (company?.name ?? '').trim();
       if (name) {
         await hrAPI.saveCompanyProfile({
