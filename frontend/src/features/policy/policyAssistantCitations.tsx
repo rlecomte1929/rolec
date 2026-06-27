@@ -21,7 +21,7 @@ import { Button } from '../../components/antigravity/Button';
 import { formatRichMessage } from '../../utils/richMessage';
 import type { PolicyAssistantCitedChunk } from '../../types/policyAssistant';
 
-const CITATION_RE = /\[chunk:([a-zA-Z0-9_\-]+)\]/g;
+const CITATION_RE = /\[chunk:([a-zA-Z0-9_-]+)\]/g;
 const HIGHLIGHT_CLASS = 'policy-source-highlight';
 const HIGHLIGHT_DURATION_MS = 1800;
 
