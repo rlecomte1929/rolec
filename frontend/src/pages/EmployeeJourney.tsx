@@ -12,7 +12,7 @@ import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
-import { formatDestinationLabel, formatCaseReference } from '../types/employeeAssignmentOverview';
+import { formatDestinationLabel, formatCaseReference, caseNavId } from '../types/employeeAssignmentOverview';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { formatRichMessage } from '../utils/richMessage';
 import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
@@ -32,10 +32,10 @@ import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '
  * wizard (/employee/case/{id}/intake — AIQ-976, so a multi-case employee opens
  * the clicked case, not the primary one).
  */
-function openCaseHref(assignmentId: string, status?: string | null): string {
+function openCaseHref(navId: string, status?: string | null): string {
   return isIntakeComplete(status)
-    ? `/employee/case/${assignmentId}/roadmap`
-    : `/employee/case/${assignmentId}/intake`;
+    ? `/employee/case/${navId}/roadmap`
+    : `/employee/case/${navId}/intake`;
 }
 
 /**
@@ -609,7 +609,7 @@ export const EmployeeJourney: React.FC = () => {
             {formatDestinationLabel(primaryRow.destination)}. Here&rsquo;s what to do first:
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => navigate(`/employee/case/${primaryRow.assignment_id}/intake`)}>
+            <Button onClick={() => navigate(`/employee/case/${caseNavId(primaryRow)}/intake`)}>
               Start intake →
             </Button>
             <Button variant="outline" onClick={handleDismissWelcomeCard}>
@@ -712,7 +712,7 @@ export const EmployeeJourney: React.FC = () => {
                               {currentStep} / {totalSteps} steps
                             </Badge>
                             <Link
-                              to={`/employee/case/${row.assignment_id}/intake`}
+                              to={`/employee/case/${caseNavId(row)}/intake`}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Continue
@@ -722,7 +722,7 @@ export const EmployeeJourney: React.FC = () => {
                           <>
                             <Badge variant="warning" size="sm">Not started</Badge>
                             <Link
-                              to={`/employee/case/${row.assignment_id}/intake`}
+                              to={`/employee/case/${caseNavId(row)}/intake`}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Start
@@ -738,7 +738,7 @@ export const EmployeeJourney: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex sm:flex-col sm:justify-center shrink-0">
-                      <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
+                      <Button onClick={() => navigate(openCaseHref(caseNavId(row), row.status))}>Open case</Button>
                     </div>
                   </li>
                 );
