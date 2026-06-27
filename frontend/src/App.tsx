@@ -260,7 +260,7 @@ function App() {
         <Route path="/design-preview" element={<DesignPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}
         <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
-        <Route path="/journey" element={<Journey />} />
+        <Route path="/journey" element={<RequireEmployeeRoute><Journey /></RequireEmployeeRoute>} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         {/* Bare /employee/roadmap has no caseId — keep logged-in employees in-app

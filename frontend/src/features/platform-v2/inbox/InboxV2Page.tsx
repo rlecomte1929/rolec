@@ -156,6 +156,7 @@ export function InboxV2Page() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -397,13 +398,15 @@ export function InboxV2Page() {
   const handleSend = useCallback(async () => {
     const text = draft.trim();
     if (!text || !activeConversation) return;
+    const aid = activeConversation.assignment_id;
+    const convId = activeConversation.id;
+    const localId = `local-${Date.now()}`;
     setSending(true);
-    // No public send endpoint exists yet for either HR or employee inboxes.
-    // Optimistically append the draft so the user gets immediate feedback;
-    // a follow-up commit will wire this to POST /api/{hr|employee}/messages.
+    setSendError(null);
+    // Optimistically append so the user gets immediate feedback, then POST.
     const optimistic: Message = {
-      id: `local-${Date.now()}`,
-      assignment_id: activeConversation.assignment_id,
+      id: localId,
+      assignment_id: aid,
       body: text,
       created_at: new Date().toISOString(),
       sender_user_id: userId,
@@ -414,7 +417,7 @@ export function InboxV2Page() {
     };
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === activeConversation.id
+        c.id === convId
           ? {
               ...c,
               messages: [...c.messages, optimistic],
@@ -425,7 +428,29 @@ export function InboxV2Page() {
       )
     );
     setDraft('');
-    setSending(false);
+    try {
+      const send = isHrLike ? hrAPI.sendMessage : employeeAPI.sendMessage;
+      await send(aid, text);
+      // Confirm delivery on the optimistic row.
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => (m.id === localId ? { ...m, status_delivery: 'sent' } : m)) }
+            : c
+        )
+      );
+    } catch {
+      // Roll the optimistic message back and restore the draft so the user can retry.
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId ? { ...c, messages: c.messages.filter((m) => m.id !== localId) } : c
+        )
+      );
+      setDraft(text);
+      setSendError("Couldn't send your message. Please try again.");
+    } finally {
+      setSending(false);
+    }
   }, [draft, activeConversation, userId, userName, isHrLike]);
 
   const handleDraftWithAi = useCallback(() => {
@@ -529,6 +554,15 @@ export function InboxV2Page() {
               </div>
               <Button unstyled
                 type="button"
+                title="Start a new message"
+                onClick={() => {
+                  // Conversations are one-per-assignment and always exist, so a
+                  // "new message" is: open a thread (the active one, or the first)
+                  // and focus the composer to start writing.
+                  const target = activeId ?? filteredConversations[0]?.id ?? null;
+                  if (target && target !== activeId) setActiveId(target);
+                  setTimeout(() => document.getElementById('inbox-v2-composer')?.focus(), 50);
+                }}
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -563,7 +597,11 @@ export function InboxV2Page() {
                   </Button>
                 </div>
               ) : filteredConversations.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-slate-500">{MAILBOX_EMPTY_COPY[mailbox]}</div>
+                <div className="px-4 py-6 text-sm text-slate-500">
+                {isHrLike && mailbox === 'inbox'
+                  ? 'No conversations yet. Open a case and message the employee to start a thread.'
+                  : MAILBOX_EMPTY_COPY[mailbox]}
+              </div>
               ) : (
                 filteredConversations.map((c) => {
                   const isActive = activeId === c.id;
@@ -712,6 +750,9 @@ export function InboxV2Page() {
                       Draft with AI
                     </Button>
                   </div>
+                  {sendError && (
+                    <p className="mb-1 text-xs text-red-500" role="alert">{sendError}</p>
+                  )}
                   <textarea
                     id="inbox-v2-composer"
                     value={draft}

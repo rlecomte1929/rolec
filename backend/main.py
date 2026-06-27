@@ -4981,6 +4981,45 @@ def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.
     return {"messages": items, "quote_threads": quote_threads}
 
 
+class _SendMessageRequest(BaseModel):
+    assignment_id: str
+    body: str
+
+
+@app.post("/api/employee/messages")
+def send_employee_message(
+    payload: _SendMessageRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """Employee sends a message to HR on their own assignment thread (Wave1 P1).
+
+    Tenant isolation: the assignment must belong to this employee. Persists via
+    the legacy assignment-based ``messages`` columns the inbox read path uses
+    (db.list_messages_by_assignment / list_messages_for_employee)."""
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    body_txt = (payload.body or "").strip()
+    if not body_txt:
+        raise HTTPException(status_code=400, detail="Message body is required.")
+    assignment = db.get_assignment_by_id(payload.assignment_id) or db.get_assignment_by_case_id(
+        payload.assignment_id
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if assignment.get("employee_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Assignment not assigned to user")
+    msg = db.insert_message(
+        assignment_id=assignment["id"],
+        body=body_txt,
+        sender_user_id=effective["id"],
+        recipient_user_id=assignment.get("hr_user_id"),
+        employee_identifier=effective.get("email") or effective["id"],
+        status="sent",
+    )
+    if not msg:
+        raise HTTPException(status_code=400, detail="Message could not be sent.")
+    return {"ok": True, "message": msg}
+
+
 def _validated_employee_claim_identifiers(
     effective: Dict[str, Any],
     claim: ClaimAssignmentRequest,
@@ -6355,6 +6394,38 @@ def list_hr_messages(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     effective = _effective_user(user, UserRole.HR)
     items = db.list_messages_for_hr(effective["id"])
     return {"messages": items}
+
+
+@app.post("/api/hr/messages")
+def send_hr_message(
+    payload: _SendMessageRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR sends a message to the assigned employee on an assignment thread (Wave1
+    P1). Tenant isolation: HR must be able to access the assignment (admin, owner,
+    or same company) — the same check the thread read endpoint uses."""
+    effective = _effective_user(user, UserRole.HR)
+    body_txt = (payload.body or "").strip()
+    if not body_txt:
+        raise HTTPException(status_code=400, detail="Message body is required.")
+    assignment = db.get_assignment_by_id(payload.assignment_id) or db.get_assignment_by_case_id(
+        payload.assignment_id
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    msg = db.insert_message(
+        assignment_id=assignment["id"],
+        body=body_txt,
+        sender_user_id=effective["id"],
+        recipient_user_id=assignment.get("employee_user_id"),
+        hr_user_id=effective["id"],
+        status="sent",
+    )
+    if not msg:
+        raise HTTPException(status_code=400, detail="Message could not be sent.")
+    return {"ok": True, "message": msg}
 
 
 class HrConversationsArchiveRequest(BaseModel):

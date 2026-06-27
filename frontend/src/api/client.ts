@@ -687,6 +687,14 @@ export const hrAPI = {
     const response = await api.get<{ messages: any[] }>('/api/hr/messages');
     return response.data;
   },
+  /** Send a message to the assigned employee on a case thread (tenant-scoped server-side). */
+  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: any }> => {
+    const response = await api.post<{ ok: boolean; message: any }>('/api/hr/messages', {
+      assignment_id: assignmentId,
+      body,
+    });
+    return response.data;
+  },
   /** One row per assignment (case thread); company-scoped. */
   listMessageConversations: async (params?: {
     q?: string;
@@ -2384,6 +2392,14 @@ export const employeeAPI = {
     quote_threads?: any[];
   }> => {
     const response = await api.get('/api/employee/messages');
+    return response.data;
+  },
+  /** Send a message to HR on your own assignment thread (ownership enforced server-side). */
+  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: any }> => {
+    const response = await api.post<{ ok: boolean; message: any }>('/api/employee/messages', {
+      assignment_id: assignmentId,
+      body,
+    });
     return response.data;
   },
   claimAssignment: async (assignmentId: string, email: string): Promise<{ success: boolean; assignmentId?: string }> => {
