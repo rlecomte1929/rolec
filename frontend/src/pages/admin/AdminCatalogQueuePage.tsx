@@ -303,7 +303,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
         </div>
         {loading && tickets.length === 0 ? (
           <div className="space-y-2 py-3">
-            {[...Array(3)].map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-14 rounded-lg bg-[#f1f5f9] animate-pulse" />
             ))}
           </div>

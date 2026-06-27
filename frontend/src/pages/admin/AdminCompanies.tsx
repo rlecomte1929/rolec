@@ -56,7 +56,7 @@ export const AdminCompanies: React.FC = () => {
     queryKey: ['admin', 'companies', appliedQuery],
     queryFn: async () => (await adminAPI.listCompanies(appliedQuery || undefined)).companies ?? [],
   });
-  const companies: AdminCompany[] = companiesQuery.data ?? [];
+  const companies: AdminCompany[] = useMemo(() => companiesQuery.data ?? [], [companiesQuery.data]);
   const loading = companiesQuery.isFetching;
   const reloadCompanies = () => queryClient.invalidateQueries({ queryKey: ['admin', 'companies'] });
 
@@ -753,8 +753,10 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
         employee_seat_limit: employee_seat_limit === '' ? undefined : Number(employee_seat_limit),
       });
       onCreated();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Failed to create company');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const detail = e?.response?.data?.detail;
+      setError((typeof detail === 'string' ? detail : null) ?? e?.message ?? 'Failed to create company');
     } finally {
       setSubmitting(false);
     }

@@ -1,13 +1,13 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from '../../components/antigravity/Button';
+import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2 } from 'lucide-react';
 import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
+import { StatCard } from '../../components/admin/overview/StatCard';
+import { ModuleCard } from '../../components/admin/overview/ModuleCard';
+import { Button } from '../../components/antigravity/Button';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
-import { StatCard } from '../../components/admin/overview/StatCard';
-import { ModuleCard } from '../../components/admin/overview/ModuleCard';
-import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2 } from 'lucide-react';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 

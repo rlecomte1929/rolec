@@ -17,7 +17,7 @@ export const CountryDetailPage: React.FC = () => {
 
   useEffect(() => {
     void loadProfile();
-  }, [countryCode]);
+  }, [countryCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AppShell title="Country Requirements" subtitle="Review source evidence and requirements.">
