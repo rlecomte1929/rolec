@@ -5771,19 +5771,23 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
                     if (assignment.get("case_id") or "").strip()
                     else None
                 )
-                if wc:
+                # Promote the route onto relocation_cases. Prefer the authoritative
+                # assignment-derived draft (AIQ-1311); fall back to the wizard_cases
+                # draft. CRITICAL: run the sync even when there is NO wizard_cases row
+                # (wc is None) — a freshly-created case has only a relocation_cases row,
+                # and gating this on `if wc:` skipped the promotion entirely, leaving
+                # HR's origin/destination NULL ("Not provided") after submit (AIQ-1311
+                # criterion 3; caught live by scripts/verify_intake_submit_spine.py).
+                promote_draft: Optional[Dict[str, Any]] = None
+                if submit_draft and not missing_intake_basics(submit_draft):
+                    promote_draft = submit_draft
+                elif wc:
                     try:
-                        draft = json.loads(wc.draft_json or "{}")
+                        promote_draft = json.loads(wc.draft_json or "{}")
                     except (json.JSONDecodeError, TypeError, ValueError):
-                        draft = {}
-                    # Prefer the authoritative assignment-derived draft (AIQ-1311):
-                    # the wizard_cases draft can be empty when the frontend patched
-                    # a divergent case-id, which is exactly what left HR's case
-                    # showing "Not provided" after the employee submitted.
-                    if submit_draft and not missing_intake_basics(submit_draft):
-                        draft = submit_draft
-                    if isinstance(draft, dict):
-                        db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
+                        promote_draft = {}
+                if isinstance(promote_draft, dict) and promote_draft:
+                    db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, promote_draft)
         except Exception as exc:
             log.warning(
                 "submit_assignment: relocation_cases draft sync failed assignment_id=%s case_id=%s error=%s",
