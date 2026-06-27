@@ -3,10 +3,10 @@
  * Employee-facing document management with sidebar, upload zone, and rejection banner.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
-import { ProgressBar, StatusBadge, DateFormatter, EmptyState } from '../shared';
+import { StatusBadge, DateFormatter, EmptyState } from '../shared';
 import type { DocStatus } from '../../../types/relopass-api-contracts';
 
 // ─── Brand colour constants ───────────────────────────────────────────────────
@@ -71,10 +71,14 @@ export type RequirementCategory =
 
 export interface DocumentItem {
   id: string;
+  /** The backend document_key (e.g. passport_copy) this row represents. */
+  key: string;
   filename: string;
   category: RequirementCategory;
   status: DocStatus;
   uploaded_at: string | null;
+  /** Signed URL of the uploaded file, when one exists. */
+  file_url: string | null;
   /** Hard deadline by which the employee must upload this document (ISO date). */
   submission_deadline: string | null;
   expiry_date: string | null;
@@ -84,44 +88,18 @@ export interface DocumentItem {
 
 export interface DocumentsScreenProps {
   documents?: DocumentItem[];
-  onUpload?: (file: File, category: RequirementCategory) => Promise<void>;
+  /** Upload a file against a specific required document (carries its document_key). */
+  onUpload?: (file: File, documentKey: string) => Promise<void>;
   onPreview?: (doc: DocumentItem) => void;
   onDownload?: (doc: DocumentItem) => void;
   onDelete?: (doc: DocumentItem) => void;
   onReupload?: (doc: DocumentItem) => void;
   /** Called when the user clicks "Remind HR" in an expiry or deadline alert. */
   onRemind?: (doc: DocumentItem) => Promise<void>;
+  /** Deep-link target: scroll to, highlight, and focus the upload control of the
+   *  row whose `key` matches (from `?doc=<key>`). No-op when unset / unmatched. */
+  deepLinkKey?: string | null;
 }
-
-// ─── Mock ─────────────────────────────────────────────────────────────────────
-
-const MOCK_DOCS: DocumentItem[] = [
-  // Identity & travel
-  { id: 'd1', filename: 'passport.pdf',              category: 'Identity & travel',     status: 'approved',      uploaded_at: '2026-05-02', submission_deadline: null,         expiry_date: '2026-06-14', rejection_reason: null, size_kb: 340 },
-  { id: 'd2', filename: 'national_id.pdf',           category: 'Identity & travel',     status: 'approved',      uploaded_at: '2026-04-28', submission_deadline: null,         expiry_date: '2031-03-15', rejection_reason: null, size_kb: 210 },
-  { id: 'd3', filename: 'birth_certificate.pdf',     category: 'Identity & travel',     status: 'approved',      uploaded_at: '2026-05-05', submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 185 },
-
-  // Immigration & permits
-  { id: 'd4', filename: 'work_permit_germany.pdf',   category: 'Immigration & permits', status: 'approved',      uploaded_at: '2026-05-10', submission_deadline: null,         expiry_date: '2026-08-01', rejection_reason: null, size_kb: 520 },
-  { id: 'd5', filename: 'visa_copy.pdf',             category: 'Immigration & permits', status: 'required',      uploaded_at: null,         submission_deadline: '2026-06-01', expiry_date: null,         rejection_reason: null, size_kb: 0 },
-  { id: 'd6', filename: 'residence_registration.pdf',category: 'Immigration & permits', status: 'under_review',  uploaded_at: '2026-05-15', submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 310 },
-
-  // Employment
-  { id: 'd7', filename: 'employment_contract.pdf',   category: 'Employment',            status: 'approved',      uploaded_at: '2026-03-20', submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 445 },
-  { id: 'd8', filename: 'offer_letter.pdf',          category: 'Employment',            status: 'approved',      uploaded_at: '2026-03-18', submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 230 },
-  { id: 'd9', filename: 'payslips_last3.pdf',        category: 'Employment',            status: 'submitted',     uploaded_at: '2026-05-12', submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 580 },
-
-  // Housing & relocation
-  { id: 'd10', filename: 'lease_agreement.pdf',      category: 'Housing & relocation',  status: 'approved',      uploaded_at: '2026-05-01', submission_deadline: null,         expiry_date: '2027-05-01', rejection_reason: null, size_kb: 670 },
-  { id: 'd11', filename: 'proof_of_address.pdf',     category: 'Housing & relocation',  status: 'rejected',      uploaded_at: '2026-05-08', submission_deadline: '2026-06-15', expiry_date: null,         rejection_reason: 'Document must be dated within the last 3 months. Please re-upload a recent utility bill or bank statement.', size_kb: 195 },
-  { id: 'd12', filename: 'moving_quote.pdf',         category: 'Housing & relocation',  status: 'submitted',     uploaded_at: '2026-05-14', submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 420 },
-
-  // Financial & tax
-  { id: 'd13', filename: 'tax_declaration_fr.pdf',   category: 'Financial & tax',       status: 'required',      uploaded_at: null,         submission_deadline: '2026-06-30', expiry_date: null,         rejection_reason: null, size_kb: 0 },
-  { id: 'd14', filename: 'bank_statement_3mo.pdf',   category: 'Financial & tax',       status: 'required',      uploaded_at: null,         submission_deadline: null,         expiry_date: null,         rejection_reason: null, size_kb: 0 },
-
-  // Family & dependents (optional — empty by default)
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -191,19 +169,22 @@ const CATEGORY_ICON: Record<RequirementCategory, string> = {
   'Family & dependents':   'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
 };
 
-// ─── Upload Zone ──────────────────────────────────────────────────────────────
+// ─── Row Upload ───────────────────────────────────────────────────────────────
+// Compact per-row upload control. Each row is a specific required document, so the
+// upload carries that row's document_key (doc.key) — the backend uses it to know
+// which requirement the file satisfies.
 
 const ACCEPTED = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 const MAX_BYTES = 25 * 1024 * 1024;
 
-interface UploadZoneProps {
-  category: RequirementCategory;
-  onUpload: (file: File, category: RequirementCategory) => Promise<void>;
+interface RowUploadProps {
+  doc: DocumentItem;
+  onUpload: (file: File, documentKey: string) => Promise<void>;
+  btnRef: React.Ref<HTMLButtonElement>;
 }
 
-function UploadZone({ category, onUpload }: UploadZoneProps) {
-  const [dragging, setDragging] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
+function RowUpload({ doc, onUpload, btnRef }: RowUploadProps) {
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -213,52 +194,41 @@ function UploadZone({ category, onUpload }: UploadZoneProps) {
     if (!ACCEPTED.includes(file.type)) { setError('Unsupported file type. Use PDF, JPEG, PNG or DOCX.'); return; }
     if (file.size > MAX_BYTES) { setError('File exceeds 25 MB limit.'); return; }
     setError(null);
-    setProgress(0);
-    const interval = setInterval(() => setProgress(p => (p !== null && p < 90 ? p + 15 : p)), 200);
+    setBusy(true);
     try {
-      await onUpload(file, category);
-      clearInterval(interval);
-      setProgress(100);
-      setTimeout(() => setProgress(null), 1000);
+      await onUpload(file, doc.key);
     } catch {
-      clearInterval(interval);
       setError('Upload failed. Please try again.');
-      setProgress(null);
+    } finally {
+      setBusy(false);
     }
-  }, [category, onUpload]);
+  }, [doc.key, onUpload]);
+
+  const label = doc.uploaded_at ? 'Replace' : 'Upload';
 
   return (
-    <div style={{ marginBottom: '4px' }}>
-      <div
-        role="button"
-        tabIndex={0}
+    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+      <Button unstyled
+        ref={btnRef}
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); } }}
-        onDragOver={e => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={e => { e.preventDefault(); setDragging(false); void handleFiles(e.dataTransfer.files); }}
+        disabled={busy}
+        title={`${label} document`}
         style={{
-          border: `2px dashed ${dragging ? C.accent : C.border}`,
-          borderRadius: C.radLg,
-          padding: '20px 24px',
-          textAlign: 'center',
-          background: dragging ? C.accentSoft : C.surface2,
-          cursor: 'pointer',
-          transition: 'all 0.15s',
+          display: 'inline-flex', alignItems: 'center', gap: '5px',
+          padding: '5px 11px', borderRadius: C.radMd,
+          border: `1px solid ${C.accent}`, background: doc.uploaded_at ? C.surface : C.accent,
+          color: doc.uploaded_at ? C.accent : '#fff',
+          fontSize: '12px', fontWeight: 600, cursor: busy ? 'wait' : 'pointer',
+          whiteSpace: 'nowrap', opacity: busy ? 0.7 : 1,
         }}
       >
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="1.5" style={{ margin: '0 auto 8px', display: 'block' }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
         </svg>
-        <p style={{ margin: '0 0 3px', fontSize: '13px', fontWeight: 600, color: C.text }}>
-          Drop file here or{' '}
-          <span style={{ color: C.accent, textDecoration: 'underline' }}>browse</span>
-        </p>
-        <p style={{ margin: 0, fontSize: '11px', color: C.textMuted }}>PDF, JPEG, PNG or DOCX · max 25 MB</p>
-      </div>
+        {busy ? 'Uploading…' : label}
+      </Button>
       <FileInput ref={inputRef} accept=".pdf,.jpg,.jpeg,.png,.docx" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
-      {progress !== null && <div style={{ marginTop: '8px' }}><ProgressBar value={progress} label="Uploading…" height={6} /></div>}
-      {error && <p style={{ margin: '6px 0 0', fontSize: '12px', color: C.danger }}>{error}</p>}
+      {error && <span style={{ fontSize: '11px', color: C.danger }}>{error}</span>}
     </div>
   );
 }
@@ -308,12 +278,26 @@ function RejectionBanner({ doc, onReupload }: RejectionBannerProps) {
 
 interface DocRowProps {
   doc: DocumentItem;
+  onUpload: (file: File, documentKey: string) => Promise<void>;
   onPreview: () => void;
   onDownload: () => void;
   onDelete: () => void;
+  /** True when this row is the `?doc=<key>` deep-link target. */
+  isDeepLinkTarget: boolean;
 }
 
-function DocRow({ doc, onPreview, onDownload, onDelete }: DocRowProps) {
+function DocRow({ doc, onUpload, onPreview, onDownload, onDelete, isDeepLinkTarget }: DocRowProps) {
+  const rowRef       = useRef<HTMLDivElement>(null);
+  const uploadBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Deep-link: once mounted, scroll the matched row into view and focus its
+  // upload control so the employee lands ready to act.
+  useEffect(() => {
+    if (!isDeepLinkTarget) return;
+    rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    uploadBtnRef.current?.focus();
+  }, [isDeepLinkTarget]);
+
   const urgency      = expiryUrgency(doc.expiry_date);
   const deadlineSoon = isDeadlineSoon(doc.submission_deadline);
   const expiryDays   = daysUntil(doc.expiry_date);
@@ -358,7 +342,7 @@ function DocRow({ doc, onPreview, onDownload, onDelete }: DocRowProps) {
   }
 
   return (
-    <div style={{
+    <div ref={rowRef} style={{
       display: 'grid',
       gridTemplateColumns: '1fr 110px 140px 130px auto',
       alignItems: 'center',
@@ -366,7 +350,8 @@ function DocRow({ doc, onPreview, onDownload, onDelete }: DocRowProps) {
       padding: '11px 16px',
       borderBottom: `1px solid ${C.border}`,
       fontSize: '13px',
-      background: rowBg,
+      background: isDeepLinkTarget ? C.accentSoft : rowBg,
+      boxShadow: isDeepLinkTarget ? `inset 3px 0 0 ${C.accent}` : 'none',
       transition: 'background 0.1s',
     }}>
       {/* Name */}
@@ -391,16 +376,21 @@ function DocRow({ doc, onPreview, onDownload, onDelete }: DocRowProps) {
       {/* Status */}
       <StatusBadge type="doc" status={doc.status} />
       {/* Actions */}
-      <div style={{ display: 'flex', gap: '2px' }}>
-        <Button unstyled onClick={onPreview} title="Preview" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-        </Button>
-        <Button unstyled onClick={onDownload} title="Download" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-        </Button>
-        <Button unstyled onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.danger, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
-        </Button>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
+        {doc.uploaded_at && (
+          <div style={{ display: 'flex', gap: '2px' }}>
+            <Button unstyled onClick={onPreview} title="Preview" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+            </Button>
+            <Button unstyled onClick={onDownload} title="Download" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+            </Button>
+            <Button unstyled onClick={onDelete} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.danger, padding: '5px', borderRadius: C.radSm, lineHeight: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+            </Button>
+          </div>
+        )}
+        <RowUpload doc={doc} onUpload={onUpload} btnRef={uploadBtnRef} />
       </div>
     </div>
   );
@@ -694,55 +684,6 @@ function DeadlineAlertBanner({ docs, onRemind }: DeadlineAlertBannerProps) {
   );
 }
 
-// ─── Collapsible Upload ───────────────────────────────────────────────────────
-
-interface CollapsibleUploadProps {
-  category: RequirementCategory;
-  onUpload: (file: File, category: RequirementCategory) => Promise<void>;
-}
-
-function CollapsibleUpload({ category, onUpload }: CollapsibleUploadProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div style={{ borderTop: `1px solid ${C.border}` }}>
-      {!open ? (
-        <Button unstyled
-          onClick={() => setOpen(true)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '8px 16px', background: 'none', border: 'none',
-            cursor: 'pointer', color: C.textMuted, fontSize: '12px',
-            textAlign: 'left', transition: 'color 0.1s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.color = C.accent)}
-          onMouseLeave={e => (e.currentTarget.style.color = C.textMuted)}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Add document
-        </Button>
-      ) : (
-        <div style={{ padding: '12px 16px 14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: C.textSec }}>Upload to {category}</span>
-            <Button unstyled
-              onClick={() => setOpen(false)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted, padding: '2px', lineHeight: 0 }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </Button>
-          </div>
-          <UploadZone category={category} onUpload={async (file, cat) => { await onUpload(file, cat); setOpen(false); }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Category Section ─────────────────────────────────────────────────────────
 
 interface CategorySectionProps {
@@ -750,16 +691,17 @@ interface CategorySectionProps {
   docs: DocumentItem[];
   isOpen: boolean;
   onToggle: () => void;
-  onUpload: (file: File, category: RequirementCategory) => Promise<void>;
+  onUpload: (file: File, documentKey: string) => Promise<void>;
   onPreview: (doc: DocumentItem) => void;
   onDownload: (doc: DocumentItem) => void;
   onDelete: (doc: DocumentItem) => void;
   onReupload: (doc: DocumentItem) => void;
+  deepLinkKey?: string | null;
   isOptional?: boolean;
 }
 
 function CategorySection({
-  cat, docs, isOpen, onToggle, onUpload, onPreview, onDownload, onDelete, onReupload, isOptional,
+  cat, docs, isOpen, onToggle, onUpload, onPreview, onDownload, onDelete, onReupload, deepLinkKey, isOptional,
 }: CategorySectionProps) {
   const approved = docs.filter(d => d.status === 'approved').length;
   const rejected = docs.filter(d => d.status === 'rejected');
@@ -833,7 +775,7 @@ function CategorySection({
 
           {/* Document table */}
           {docs.length === 0 ? (
-            <EmptyState icon="M14 2H6a2 2 0 0 0-2 2v16" title="No documents yet" description="Upload a document below to get started." />
+            <EmptyState icon="M14 2H6a2 2 0 0 0-2 2v16" title="No documents in this category" description="Nothing required here for your case." />
           ) : (
             <>
               {/* Column headers */}
@@ -848,16 +790,15 @@ function CategorySection({
               </div>
               {docs.map(doc => (
                 <DocRow key={doc.id} doc={doc}
+                  onUpload={onUpload}
                   onPreview={() => onPreview(doc)}
                   onDownload={() => onDownload(doc)}
                   onDelete={() => onDelete(doc)}
+                  isDeepLinkTarget={!!deepLinkKey && doc.key === deepLinkKey}
                 />
               ))}
             </>
           )}
-
-          {/* Upload zone — collapsed by default */}
-          <CollapsibleUpload category={cat} onUpload={onUpload} />
         </div>
       )}
     </div>
@@ -913,13 +854,14 @@ function FilterChips({ active, onChange, counts }: FilterChipsProps) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function DocumentsScreen({
-  documents = MOCK_DOCS,
+  documents = [],
   onUpload = async () => {},
   onPreview,
   onDownload,
   onDelete,
   onReupload,
   onRemind,
+  deepLinkKey,
 }: DocumentsScreenProps) {
   const [openCats, setOpenCats] = useState<Set<RequirementCategory>>(
     new Set<RequirementCategory>(['Identity & travel', 'Immigration & permits'])
@@ -928,6 +870,16 @@ export function DocumentsScreen({
 
   const toggleCat = (cat: RequirementCategory) =>
     setOpenCats(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; });
+
+  // Deep-link: ensure the matched row's category is expanded so DocRow can mount,
+  // scroll into view, and focus its upload control.
+  const deepLinkCategory = deepLinkKey
+    ? documents.find(d => d.key === deepLinkKey)?.category ?? null
+    : null;
+  useEffect(() => {
+    if (!deepLinkCategory) return;
+    setOpenCats(prev => (prev.has(deepLinkCategory) ? prev : new Set(prev).add(deepLinkCategory)));
+  }, [deepLinkCategory]);
 
   // ── Alert docs ──
   const expiringDocs = documents.filter(d => isExpiringSoon(d.expiry_date));
@@ -1043,28 +995,41 @@ export function DocumentsScreen({
       {/* ── Filter chips ── */}
       <FilterChips active={activeFilter} onChange={setActiveFilter} counts={filterCounts} />
 
-      {/* ── Category accordions ── */}
-      {CATEGORIES.map(cat => {
-        const catDocs   = filteredDocs.filter(d => d.category === cat);
-        const isOptional = cat === 'Family & dependents';
-        // If filtering and no docs match in this category, hide the section entirely
-        if (activeFilter !== 'all' && catDocs.length === 0) return null;
-        return (
-          <CategorySection
-            key={cat}
-            cat={cat}
-            docs={catDocs}
-            isOpen={openCats.has(cat)}
-            onToggle={() => toggleCat(cat)}
-            onUpload={onUpload}
-            onPreview={doc => onPreview?.(doc)}
-            onDownload={doc => onDownload?.(doc)}
-            onDelete={doc => onDelete?.(doc)}
-            onReupload={doc => onReupload?.(doc)}
-            isOptional={isOptional}
-          />
-        );
-      })}
+      {/* ── Empty state: no required documents for this case ── */}
+      {totalDocs === 0 ? (
+        <EmptyState
+          icon="M14 2H6a2 2 0 0 0-2 2v16"
+          title="No documents required yet"
+          description="Required documents will appear here as your relocation case progresses."
+        />
+      ) : (
+        /* ── Category accordions ── */
+        CATEGORIES.map(cat => {
+          const catDocs   = filteredDocs.filter(d => d.category === cat);
+          const isOptional = cat === 'Family & dependents';
+          // If filtering and no docs match in this category, hide the section entirely
+          if (activeFilter !== 'all' && catDocs.length === 0) return null;
+          // Don't render empty categories at all — the full required set may not
+          // touch every bucket.
+          if (catDocs.length === 0) return null;
+          return (
+            <CategorySection
+              key={cat}
+              cat={cat}
+              docs={catDocs}
+              isOpen={openCats.has(cat)}
+              onToggle={() => toggleCat(cat)}
+              onUpload={onUpload}
+              onPreview={doc => onPreview?.(doc)}
+              onDownload={doc => onDownload?.(doc)}
+              onDelete={doc => onDelete?.(doc)}
+              onReupload={doc => onReupload?.(doc)}
+              deepLinkKey={deepLinkKey}
+              isOptional={isOptional}
+            />
+          );
+        })
+      )}
 
       {/* ── Reminder settings ── */}
       <ReminderSettingsPanel />
