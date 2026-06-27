@@ -201,7 +201,9 @@ export const AdminOverviewPage: React.FC = () => {
       </div>
 
       {/* ── Module grid — row 2 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 mb-6">
+      {/* Only 2 cards here, so cap at md:grid-cols-2 — the row-1 breakpoints (…2xl:grid-cols-5)
+          would strand these two as wide orphans in a 5-column ghost grid at large viewports. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <ModuleCard
           testId="module-suppliers"
           to={buildRoute('adminSuppliers')}
