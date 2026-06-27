@@ -10,6 +10,7 @@ import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import {
+  caseIdForAssignment,
   parseAssignmentSearchParam,
   resolveScopedAssignmentId,
   setPreferredEmployeeAssignmentId,
@@ -150,9 +151,11 @@ export const ProvidersPage: React.FC = () => {
   }, [servicesQuery.isError, servicesQuery.error, load401]);
 
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped (/api/cases/{caseId}/...); map the resolved
+    // assignment_id to its case_id so the GET/PUT don't 404 (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
   // AIQ-1276: the estimate currency auto-applies on change — no pending state /
   // Apply button (the select writes straight to displayCurrency).
 

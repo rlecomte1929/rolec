@@ -9,7 +9,7 @@ import { ServicesContextBanner } from '../../features/services/ServicesContextBa
 import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -45,9 +45,10 @@ export const ServicesRecommendations: React.FC = () => {
     [linkedSummaries, primaryAssignmentId, queryAssignmentId],
   );
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
   // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
   const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });

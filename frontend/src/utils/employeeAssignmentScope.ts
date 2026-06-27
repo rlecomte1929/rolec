@@ -21,6 +21,23 @@ export function parseAssignmentSearchParam(search: string): string | null {
   return v || null;
 }
 
+/**
+ * Map a resolved assignment id back to its canonical case_id for **case-scoped**
+ * endpoints — e.g. `GET/PUT /api/cases/{caseId}/services-state`. The services
+ * pages resolve an `assignment_id` (via resolveScopedAssignmentId) but the
+ * services-state route is keyed by case_id; passing the assignment_id 404s
+ * ("Case not found"). Resolve via linkedSummaries; fall back to the id itself
+ * when no linked row matches (HR/legacy). (AIQ-1320)
+ */
+export function caseIdForAssignment(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  id: string | null,
+): string | null {
+  if (!id) return null;
+  const row = linkedSummaries.find((r) => r.assignment_id === id || r.case_id === id);
+  return row?.case_id ?? id;
+}
+
 /** Collapse duplicate overview rows (same assignment_id) so UI / picker logic stay consistent. */
 export function dedupeLinkedSummariesByAssignmentId(
   rows: EmployeeLinkedOverviewRow[]

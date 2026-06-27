@@ -15,7 +15,7 @@ import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { ROUTE_DEFS, buildRoute, type RouteKey } from '../../navigation/routes';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
@@ -88,9 +88,10 @@ export const ServicesQuestions: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
 
   useEffect(() => {
     mountedRef.current = true;

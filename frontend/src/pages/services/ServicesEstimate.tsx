@@ -10,7 +10,7 @@ import { useServicesMoveBanner } from '../../features/services/useServicesMoveBa
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
 import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
@@ -46,9 +46,10 @@ export const ServicesEstimate: React.FC = () => {
   // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
   const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
   // Records this as the resume target so re-entering from dashboard
   // returns the user to the estimate / shortlist instead of forcing a
   // restart of the services flow.

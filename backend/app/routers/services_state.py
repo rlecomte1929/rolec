@@ -123,7 +123,18 @@ def get_services_state(
             {"id": case_id, "org": organization_id},
         ).mappings().first()
     if not row:
-        raise HTTPException(status_code=404, detail="No saved state for this case.")
+        # No saved state yet is the normal fresh-visit case — return an empty
+        # state with 200 (not 404). A 404 here is swallowed by the client but
+        # the browser still logs a console error on every first services visit
+        # (AIQ-1320). The authorize-first guard above still 403/404s real access
+        # problems; this only changes the "authorized but nothing saved" path.
+        return {
+            "case_id": case_id,
+            "organization_id": organization_id,
+            "state": {},
+            "updated_at": "",
+            "updated_by_user_id": None,
+        }
     try:
         parsed = json.loads(row["state_json"]) if row["state_json"] else {}
     except (TypeError, ValueError):
