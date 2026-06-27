@@ -26,6 +26,7 @@ os.environ.setdefault("POLICY_ASSISTANT_LLM", "mock")
 from backend.app.services.policy_chunk_retriever import (  # noqa: E402
     _apply_quality_gates,
     _parse_tier,
+    _retrieve_postgres,
 )
 
 _NOW = datetime(2026, 6, 6, tzinfo=timezone.utc)
@@ -92,6 +93,22 @@ class TestQualityGates(unittest.TestCase):
         self.assertIsNone(_parse_tier(None))
         self.assertIsNone(_parse_tier(""))
         self.assertIsNone(_parse_tier("not-a-number"))
+
+
+class TestNonUuidCompanyGuard(unittest.TestCase):
+    """F3: policy_assistant_chunks.company_id is a uuid column. A non-UUID
+    company id (legacy seed slug) must yield no chunks rather than raise
+    InvalidTextRepresentation (which 500'd the assistant once F3 ran the query
+    as the relopass_api role)."""
+
+    def test_non_uuid_company_returns_empty(self):
+        # Returns early before any DB / embedder access.
+        out = _retrieve_postgres("seed-emp-testingapril", [0.1] * 8, 8, None)
+        self.assertEqual(out, [])
+
+    def test_empty_company_returns_empty(self):
+        out = _retrieve_postgres("", [0.1] * 8, 8, None)
+        self.assertEqual(out, [])
 
 
 if __name__ == "__main__":
