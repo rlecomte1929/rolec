@@ -170,6 +170,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
       {/* AIQ-1017: mobile backdrop — only rendered when the drawer is open, below md. */}
       {mobileNavOpen && (
+        // eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           aria-hidden="true"
@@ -184,7 +185,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         className={`fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none ${
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
-        onClick={() => setMobileNavOpen(false)}
       >
         <PlatformShellSidebar
           role={sbRole}
