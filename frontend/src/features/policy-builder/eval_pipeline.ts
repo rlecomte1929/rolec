@@ -564,7 +564,7 @@ async function main(): Promise<void> {
   // Lazy-import ground truth (avoids bundler issues in test environments)
   const { createRequire } = await import('module');
   const require = createRequire(import.meta.url);
-  const groundTruth: GroundTruth = require('./__tests__/eval_ground_truth.json');
+  const groundTruth = require('./__tests__/eval_ground_truth.json') as GroundTruth;
 
   console.log(`\n🔍 ReloPass Ingestion Pipeline Evaluation`);
   console.log(`   Mode:       ${isMock ? 'mock (keyword classifier)' : 'live (LLM)'}`);
