@@ -88,7 +88,8 @@ export const HrPolicyManagement: React.FC = () => {
   const loadPolicies = useCallback(async () => {
     try {
       const { policies: list } = await hrPolicyAPI.list();
-      setPolicies(list);
+      // Boundary cast: the legacy list endpoint returns opaque rows; this page's view type narrows them.
+      setPolicies(list as HrLegacyPolicySummary[]);
       setError('');
     } catch (err) {
       const e = err as { response?: { status?: number } };
