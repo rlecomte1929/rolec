@@ -11,6 +11,7 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import React from 'react';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { EmployeeDossierPage } from '../EmployeeDossierPage';
 
 expect.extend(matchers);
 
@@ -36,8 +37,6 @@ vi.mock('../../../components/AppShell', () => ({
 vi.mock('../../../features/platform-v2/dossier/CaseFormCard', () => ({
   CaseFormCard: ({ form }: { form: { id: string } }) => <div data-testid={`form-${form.id}`} />,
 }));
-
-import { EmployeeDossierPage } from '../EmployeeDossierPage';
 
 const CASE_ID = 'case-1';
 const FRESH_DATE = new Date().toISOString();

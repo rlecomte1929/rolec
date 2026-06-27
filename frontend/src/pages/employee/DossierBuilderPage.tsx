@@ -414,7 +414,7 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
     }
   }, [caseId, orderedForms, coverPage, packageName]);
 
-  const handleDownloadZip = useCallback(async () => {
+  const handleDownloadZip = useCallback(() => {
     if (!result) return;
     const zipUrl = dossierPackageAPI.getZipUrl(caseId, result.id);
     // Trigger download by creating a temporary anchor

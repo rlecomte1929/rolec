@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '../../../components/antigravity/Input';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
-import type { CaseDraftDTO, FamilyMemberDTO } from '../../../types';
+import type { CaseDraftDTO, FamilyMemberDTO, FamilyMembersDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
+import { getApiErrorMessage } from '../../../utils/apiDetail';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -26,11 +27,11 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
   const [children, setChildren] = useState<FamilyMemberDTO[]>(local.children || []);
   const [draftExitSaving, setDraftExitSaving] = useState(false);
 
-  const update = (key: keyof typeof local, value: any) => {
+  const update = (key: keyof FamilyMembersDTO, value: FamilyMembersDTO[keyof FamilyMembersDTO]) => {
     setLocal({ ...local, [key]: value });
   };
 
-  const updateChild = (index: number, key: keyof FamilyMemberDTO, value: any) => {
+  const updateChild = (index: number, key: keyof FamilyMemberDTO, value: FamilyMemberDTO[keyof FamilyMemberDTO]) => {
     const next = [...children];
     next[index] = { ...next[index], [key]: value };
     setChildren(next);
@@ -65,7 +66,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
       <div className="mt-6 space-y-4">
         <label className="text-sm text-[#0b2b43]">
           Marital status
-          {(isRequired(requiredFields, 'familyMembers.maritalStatus') || true) && maritalMissing && (
+          {maritalMissing && (
             <span className="text-red-600"> *</span>
           )}
           <select
@@ -166,8 +167,8 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
                   logger.debug('Save & Exit -> /employee/dashboard');
                 }
                 navigate(ROUTES.EMP_DASH);
-              } catch (err: any) {
-                setError(err?.message || "Couldn't save draft. Try again.");
+              } catch (err) {
+                setError(getApiErrorMessage(err, "Couldn't save draft. Try again."));
               } finally {
                 setDraftExitSaving(false);
               }

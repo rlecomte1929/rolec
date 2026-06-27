@@ -14,6 +14,7 @@ import { patchCase, startResearch } from '../../api/cases';
 import { notifyHrEmployeeSaved } from '../../api/notifications';
 import { buildNextActionsFromMissingFields, classifyRelocationCase, getRelocationCase } from '../../api/relocation';
 import { employeeAPI } from '../../api/client';
+import { getApiErrorMessage } from '../../utils/apiDetail';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../utils/demo';
 import type { AssignmentStatus, CaseDTO, CaseDraftDTO, NextAction } from '../../types';
@@ -254,6 +255,7 @@ export const CaseWizardPage: React.FC = () => {
     if (!import.meta.env.DEV) return;
     if (!caseData) return;
     logger.debug('Wizard defaults (relocationBasics):', caseToWizardDraft(caseData).relocationBasics);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseData?.id, caseData?.updatedAt]);
 
   const overviewRowForAssignment = useMemo(
@@ -286,10 +288,10 @@ export const CaseWizardPage: React.FC = () => {
       const hydrateFeedback = (raw: string) => {
         if (!raw) return;
         try {
-          const parsed = JSON.parse(raw);
+          const parsed = JSON.parse(raw) as { notes?: unknown; requestedSections?: unknown[] };
           const notes = typeof parsed?.notes === 'string' ? parsed.notes : '';
-          const sections = Array.isArray(parsed?.requestedSections)
-            ? parsed.requestedSections.filter((s: any) => typeof s === 'string')
+          const sections: string[] = Array.isArray(parsed?.requestedSections)
+            ? parsed.requestedSections.filter((s): s is string => typeof s === 'string')
             : [];
           setHrFeedback(notes || raw);
           setHrRequestedSections(sections);
@@ -330,6 +332,7 @@ export const CaseWizardPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [assignmentId]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSave = async (nextDraft: CaseDraftDTO): Promise<string> => {
     let caseIdToSave = resolvedCaseId;
     if (!caseIdToSave && assignmentIdFromRoute) {
@@ -378,8 +381,8 @@ export const CaseWizardPage: React.FC = () => {
         notifyHrEmployeeSaved(assignmentId).catch(() => {});
       }
       navigate(`/employee/case/${assignmentId}/wizard/${currentStep + 1}`);
-    } catch (err: any) {
-      setError(err?.message || "Couldn't save. Try again.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Couldn't save. Try again."));
       // Do not navigate on save failure: user stays on current step
     } finally {
       setIsSaving(false);
@@ -397,8 +400,8 @@ export const CaseWizardPage: React.FC = () => {
     try {
       const res = await classifyRelocationCase(resolvedCaseId);
       setNextActions(res.classification.next_actions || []);
-    } catch (err: any) {
-      setError(err?.message || 'Unable to generate next steps.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Unable to generate next steps.'));
     } finally {
       setIsClassifying(false);
     }
@@ -427,6 +430,7 @@ export const CaseWizardPage: React.FC = () => {
     if (currentStep === 3) return <Step3FamilyMembers {...stepProps} />;
     if (currentStep === 4) return <Step4AssignmentContext {...stepProps} />;
     return <Step5ReviewCreate {...stepProps} />;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, draft, requiredFields, banner, isSaving]);
 
   const completedSteps = stepCompletion.completed;

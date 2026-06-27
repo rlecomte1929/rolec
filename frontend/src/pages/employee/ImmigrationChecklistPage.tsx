@@ -238,14 +238,14 @@ export const ImmigrationChecklistPage: React.FC = () => {
         {/* BL-OCR.4 / AIQ-750 — upload documents + AI extraction status */}
         <section className="mt-8">
           <h2 className="text-sm font-semibold text-navy-800 mb-3">Upload documents</h2>
-          <CaseDocumentsPanel caseId={caseId!} canUpload />
+          <CaseDocumentsPanel caseId={caseId} canUpload />
         </section>
 
         <div className="mt-6">
           <Button
             variant="ghost"
             onClick={() =>
-              navigate(buildRoute('employeeCaseRoadmap', { caseId: caseId! }))
+              navigate(buildRoute('employeeCaseRoadmap', { caseId: caseId }))
             }
           >
             ← Back to roadmap
