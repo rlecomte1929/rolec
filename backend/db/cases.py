@@ -37,6 +37,7 @@ from ..readiness_service import (
     resolve_readiness_route_key,
 )
 from ..sla_rules import compute_sla_status
+from ..intake_route_fields import wizard_basics_to_route
 
 log = logging.getLogger(__name__)
 
@@ -2689,22 +2690,47 @@ class CasesMixin:
         *,
         home_country: Optional[str] = None,
         host_country: Optional[str] = None,
+        origin_city: Optional[str] = None,
+        dest_city: Optional[str] = None,
+        target_start_date: Optional[str] = None,
     ) -> None:
-        """Denormalize wizard origin/destination onto relocation_cases for HR lists and filters."""
+        """Denormalize wizard origin/destination onto relocation_cases for HR lists and filters.
+
+        AIQ-1311 PR2: also writes origin_country_code/dest_country_code/origin_city/
+        dest_city/target_start_date — the columns hr_case_detail.get_case_overview
+        reads (corridor is a generated column derived from the codes). The legacy
+        home_country/host_country are still written (case-list surfaces read those).
+        """
         rid = (relocation_case_id or "").strip()
-        if not rid or (not home_country and not host_country):
+        if not rid:
+            return
+        # origin/dest *_country_code mirror home/host — the overview reads the former.
+        col_vals = {
+            "home_country": home_country,
+            "host_country": host_country,
+            "origin_country_code": home_country,
+            "dest_country_code": host_country,
+            "origin_city": origin_city,
+            "dest_city": dest_city,
+        }
+        if not any(col_vals.values()) and not target_start_date:
             return
         if not self.get_case_by_id(rid):
             return
         now = datetime.utcnow().isoformat()
         parts = ["updated_at = :ua"]
         params: Dict[str, Any] = {"cid": rid, "ua": now}
-        if home_country:
-            parts.append("home_country = :home")
-            params["home"] = home_country
-        if host_country:
-            parts.append("host_country = :host")
-            params["host"] = host_country
+        for col, val in col_vals.items():
+            if val:
+                parts.append(f"{col} = :{col}")
+                params[col] = val
+        if target_start_date:
+            # DATE column: bind plain on SQLite, CAST on Postgres (mirrors the
+            # _is_sqlite branch the other date/jsonb writes here use).
+            parts.append(
+                "target_start_date = :tsd" if _is_sqlite else "target_start_date = CAST(:tsd AS date)"
+            )
+            params["tsd"] = target_start_date
         sql = f"UPDATE relocation_cases SET {', '.join(parts)} WHERE id::text = :cid"
         with self.engine.begin() as conn:
             conn.execute(text(sql), params)
@@ -2712,23 +2738,19 @@ class CasesMixin:
     def sync_relocation_case_route_from_wizard_draft(self, relocation_case_id: str, draft: Dict[str, Any]) -> None:
         """
         Denormalize relocationBasics onto relocation_cases (same fields as PATCH /api/cases).
-        Used on employee submit so HR lists stay current without an extra wizard save.
+        Used on employee submit so HR lists + the case overview stay current without an
+        extra wizard save. AIQ-1311 PR2: now also carries city + target move date.
         """
-        basics = draft.get("relocationBasics") or {}
-        home = (basics.get("originCountry") or basics.get("origin_country") or "").strip() or None
-        host = (
-            basics.get("destCountry")
-            or basics.get("destination_country")
-            or basics.get("hostCountry")
-            or basics.get("host_country")
-            or ""
-        )
-        host = (host or "").strip() or None
-        if home or host:
+        basics = (draft or {}).get("relocationBasics") or {}
+        route = wizard_basics_to_route(basics)
+        if any(route.values()):
             self.touch_relocation_case_route_from_wizard(
                 relocation_case_id,
-                home_country=home,
-                host_country=host,
+                home_country=route["origin_country"],
+                host_country=route["dest_country"],
+                origin_city=route["origin_city"],
+                dest_city=route["dest_city"],
+                target_start_date=route["target_start_date"],
             )
 
     def _sync_case_dependents_from_draft(self, canonical_case_id: str, draft: Dict[str, Any]) -> None:
