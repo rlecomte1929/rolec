@@ -29,6 +29,11 @@ collect_ignore = [
     # Pre-migration `from services...` imports — resolve only with backend/ on
     # sys.path; canonical path is backend.app.services (AUDIT-A9.3 service-tree
     # consolidation owns the fix; do not partially migrate per backend/CLAUDE.md).
+    # Swaps the global backend.database engine (StaticPool in-memory) to exercise
+    # the case_documents upload→sync→satisfaction flow; that mutation pollutes
+    # full-suite ordering, so run it standalone (8 tests pass on its own). Same
+    # rationale as test_passport_case_document_sync_service.py below.
+    "test_case_documents_flow.py",
     "test_collaboration.py",
     "test_dossier.py",
     "test_employee_policy_matrix_bridge.py",
