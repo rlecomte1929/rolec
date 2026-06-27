@@ -1,16 +1,4 @@
-/**
- * RHF wrapper for the company profile form (AIQ-1201).
- *
- * Migration target for CompanyProfileForm.tsx — this hook encapsulates the
- * react-hook-form setup so the component can be migrated field by field.
- * The existing component continues to use useState-based form state until the
- * migration PR lands; this file establishes the schema and autosave pattern.
- *
- * Usage (future):
- *   const { register, handleSubmit, watch, formState, reset } = useCompanyProfileForm(company);
- *   <Input {...register('name')} />
- */
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { CompanyProfilePayload } from '../../../types';
 
@@ -30,6 +18,15 @@ export type CompanyProfileFormValues = {
   support_email: string;
   default_destination_country: string;
   default_working_location: string;
+};
+
+export type SectionKey = 'identity' | 'location' | 'hr' | 'branding';
+
+const SECTION_FIELDS: Record<SectionKey, (keyof CompanyProfileFormValues)[]> = {
+  identity: ['name', 'legal_name', 'industry', 'size_band', 'website'],
+  location: ['country', 'hq_city', 'address', 'phone'],
+  hr: ['hr_contact', 'support_email', 'default_destination_country', 'default_working_location'],
+  branding: [],
 };
 
 export function emptyValues(): CompanyProfileFormValues {
@@ -87,40 +84,122 @@ export function valuesToPayload(values: CompanyProfileFormValues): CompanyProfil
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
+export interface UseCompanyProfileFormOptions {
+  onSaveComplete?: (sections: SectionKey[]) => void;
+}
+
 export function useCompanyProfileForm(
   company: Record<string, unknown> | null,
   onSave: (payload: CompanyProfilePayload) => Promise<void>,
+  options?: UseCompanyProfileFormOptions,
 ) {
   const methods = useForm<CompanyProfileFormValues>({
     defaultValues: valuesFromCompany(company),
     mode: 'onChange',
   });
 
-  const { reset, watch, handleSubmit } = methods;
+  const { reset, watch, formState, getValues } = methods;
 
-  // Re-seed the form whenever the source data changes (e.g. after a fresh fetch).
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   useEffect(() => {
     reset(valuesFromCompany(company));
   }, [company, reset]);
 
-  // Debounced autosave: watch all fields and trigger onSave after AUTOSAVE_DEBOUNCE_MS
-  // of silence. Mirrors the existing autosave pattern in CompanyProfileForm.tsx.
-  const submitValues = useCallback(
-    async (values: CompanyProfileFormValues) => {
-      await onSave(valuesToPayload(values));
+  const sectionDirty = useMemo<Record<SectionKey, boolean>>(() => {
+    const df = formState.dirtyFields;
+    return {
+      identity: !!(df.name || df.legal_name || df.industry || df.size_band || df.website),
+      location: !!(df.country || df.hq_city || df.address || df.phone),
+      hr: !!(df.hr_contact || df.support_email || df.default_destination_country || df.default_working_location),
+      branding: false,
+    };
+  }, [formState.dirtyFields]);
+
+  const persist = useCallback(
+    async (values: CompanyProfileFormValues, sections: SectionKey[]) => {
+      if (!values.name.trim()) {
+        setSaveError('Company name is required.');
+        return;
+      }
+      setSaveError(null);
+      setSaving(true);
+      try {
+        await onSaveRef.current(valuesToPayload(values));
+        reset(values, { keepValues: true });
+        setLastSavedAt(Date.now());
+        optionsRef.current?.onSaveComplete?.(sections);
+      } catch (e) {
+        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail;
+        if (detail) setSaveError(detail);
+        else if (status === 500) setSaveError('Server error — check the uvicorn terminal for the Python traceback.');
+        else if (status === 403) setSaveError('Permission denied — your session may have expired.');
+        else if (status === 422) setSaveError('The form data was rejected by the server (validation error).');
+        else setSaveError(err?.message ?? 'Failed to save profile.');
+      } finally {
+        setSaving(false);
+      }
     },
-    [onSave],
+    [reset],
   );
 
+  // Debounced autosave
   useEffect(() => {
     const sub = watch(() => {
-      const tid = window.setTimeout(() => {
-        void handleSubmit(submitValues)();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        const currentValues = getValues();
+        const df = formState.dirtyFields;
+        const dirty = Object.keys(df).length > 0;
+        if (!dirty) return;
+        const sections = (Object.keys(SECTION_FIELDS) as SectionKey[]).filter((s) =>
+          SECTION_FIELDS[s].some((f) => df[f]),
+        );
+        void persist(currentValues, sections);
       }, AUTOSAVE_DEBOUNCE_MS);
-      return () => window.clearTimeout(tid);
     });
-    return () => sub.unsubscribe();
-  }, [watch, handleSubmit, submitValues]);
+    return () => {
+      sub.unsubscribe();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [watch, getValues, formState.dirtyFields, persist]);
 
-  return methods;
+  const saveNow = useCallback(async () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const currentValues = getValues();
+    const df = formState.dirtyFields;
+    const sections = (Object.keys(SECTION_FIELDS) as SectionKey[]).filter((s) =>
+      SECTION_FIELDS[s].some((f) => df[f]),
+    );
+    await persist(currentValues, sections.length > 0 ? sections : ['identity', 'location', 'hr']);
+  }, [getValues, formState.dirtyFields, persist]);
+
+  const markSaved = useCallback(() => {
+    setLastSavedAt(Date.now());
+  }, []);
+
+  const clearError = useCallback(() => {
+    setSaveError(null);
+  }, []);
+
+  return {
+    ...methods,
+    saving,
+    saveError,
+    lastSavedAt,
+    isDirty: formState.isDirty,
+    sectionDirty,
+    saveNow,
+    markSaved,
+    clearError,
+  };
 }
