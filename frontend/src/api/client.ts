@@ -1308,6 +1308,38 @@ export type AdminMobilityOperationalInspect = {
 };
 
 // Admin API
+export interface AdminCompanyDetailResponse {
+  company: AdminCompany | null;
+  summary?: { hr_users_count: number; employee_count: number; assignments_count: number; policies_count: number };
+  counts_summary?: AdminCompanyDetailCounts;
+  hr_users: AdminHrUser[];
+  employees: AdminEmployee[];
+  assignments: AdminCompanyDetailAssignment[];
+  policies: AdminCompanyDetailPolicy[];
+  orphan_diagnostics?: AdminCompanyDetailOrphanDiagnostics;
+}
+
+export interface AdminRebuildTestCompanyGraphResponse {
+  ok: boolean;
+  summary: {
+    test_company_id: string;
+    profiles_linked: number;
+    hr_users_linked: number;
+    employees_linked: number;
+    relocation_cases_linked: number;
+    case_assignments_repaired: number;
+    policies_linked: number;
+  };
+  before: Record<string, number>;
+  after: Record<string, number>;
+}
+
+export interface AdminMobilityCaseInspectResponse {
+  context: Record<string, unknown>;
+  audit_logs: Array<Record<string, unknown>>;
+  operational?: AdminMobilityOperationalInspect;
+}
+
 export const adminAPI = {
   getContext: async (): Promise<AdminContextResponse> => {
     return cachedRequest('admin:context', 20_000, async () => {
@@ -1315,8 +1347,8 @@ export const adminAPI = {
       return response.data;
     });
   },
-  startImpersonation: async (payload: { targetUserId: string; mode: 'hr' | 'employee'; reason?: string }) => {
-    const response = await api.post('/api/admin/impersonate/start', payload);
+  startImpersonation: async (payload: { targetUserId: string; mode: 'hr' | 'employee'; reason?: string }): Promise<{ ok: boolean; impersonation: { targetUserId: string; mode: 'hr' | 'employee' } }> => {
+    const response = await api.post<{ ok: boolean; impersonation: { targetUserId: string; mode: 'hr' | 'employee' } }>('/api/admin/impersonate/start', payload);
     invalidateApiCache('admin:context');
     return response.data;
   },
@@ -1332,17 +1364,8 @@ export const adminAPI = {
       return response.data;
     });
   },
-  getCompanyDetail: async (companyId: string): Promise<{
-    company: AdminCompany | null;
-    summary?: { hr_users_count: number; employee_count: number; assignments_count: number; policies_count: number };
-    counts_summary?: AdminCompanyDetailCounts;
-    hr_users: AdminHrUser[];
-    employees: AdminEmployee[];
-    assignments: AdminCompanyDetailAssignment[];
-    policies: AdminCompanyDetailPolicy[];
-    orphan_diagnostics?: AdminCompanyDetailOrphanDiagnostics;
-  }> => {
-    const response = await api.get(`/api/admin/companies/${companyId}`);
+  getCompanyDetail: async (companyId: string): Promise<AdminCompanyDetailResponse> => {
+    const response = await api.get<AdminCompanyDetailResponse>(`/api/admin/companies/${companyId}`);
     return response.data;
   },
   createCompany: async (payload: {
@@ -1403,21 +1426,8 @@ export const adminAPI = {
     const response = await api.post<{ ok: boolean; summary?: { test_company_id: string; profiles_linked: number; hr_users_linked: number; relocation_cases_linked: number }; error?: string }>('/api/admin/reconciliation/backfill-test-company');
     return response.data;
   },
-  rebuildTestCompanyGraph: async (): Promise<{
-    ok: boolean;
-    summary: {
-      test_company_id: string;
-      profiles_linked: number;
-      hr_users_linked: number;
-      employees_linked: number;
-      relocation_cases_linked: number;
-      case_assignments_repaired: number;
-      policies_linked: number;
-    };
-    before: Record<string, number>;
-    after: Record<string, number>;
-  }> => {
-    const response = await api.post('/api/admin/reconciliation/rebuild-test-company-graph');
+  rebuildTestCompanyGraph: async (): Promise<AdminRebuildTestCompanyGraphResponse> => {
+    const response = await api.post<AdminRebuildTestCompanyGraphResponse>('/api/admin/reconciliation/rebuild-test-company-graph');
     return response.data;
   },
   listProfiles: async (params?: { q?: string; company_id?: string; role?: string }): Promise<{ profiles: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {
@@ -1474,20 +1484,20 @@ export const adminAPI = {
     const response = await api.get<{ assignment: AdminAssignmentDetail }>(`/api/admin/assignments/${assignmentId}`);
     return response.data;
   },
-  reassignEmployeeCompany: async (assignmentId: string, payload: { reason: string; company_id: string }) => {
-    const response = await api.patch(`/api/admin/assignments/${assignmentId}/reassign-employee-company`, payload);
+  reassignEmployeeCompany: async (assignmentId: string, payload: { reason: string; company_id: string }): Promise<{ ok: boolean }> => {
+    const response = await api.patch<{ ok: boolean }>(`/api/admin/assignments/${assignmentId}/reassign-employee-company`, payload);
     return response.data;
   },
-  reassignHrOwner: async (assignmentId: string, payload: { reason: string; hr_user_id: string }) => {
-    const response = await api.patch(`/api/admin/assignments/${assignmentId}/reassign-hr-owner`, payload);
+  reassignHrOwner: async (assignmentId: string, payload: { reason: string; hr_user_id: string }): Promise<{ ok: boolean }> => {
+    const response = await api.patch<{ ok: boolean }>(`/api/admin/assignments/${assignmentId}/reassign-hr-owner`, payload);
     return response.data;
   },
-  fixAssignmentCompanyLinkage: async (assignmentId: string, payload: { reason: string; company_id: string }) => {
-    const response = await api.patch(`/api/admin/assignments/${assignmentId}/fix-company-linkage`, payload);
+  fixAssignmentCompanyLinkage: async (assignmentId: string, payload: { reason: string; company_id: string }): Promise<{ ok: boolean }> => {
+    const response = await api.patch<{ ok: boolean }>(`/api/admin/assignments/${assignmentId}/fix-company-linkage`, payload);
     return response.data;
   },
-  updateAssignmentStatus: async (assignmentId: string, payload: { status: string }) => {
-    const response = await api.patch(`/api/admin/assignments/${assignmentId}/status`, payload);
+  updateAssignmentStatus: async (assignmentId: string, payload: { status: string }): Promise<{ ok: boolean; status: string }> => {
+    const response = await api.patch<{ ok: boolean; status: string }>(`/api/admin/assignments/${assignmentId}/status`, payload);
     return response.data;
   },
   createAssignment: async (payload: {
@@ -1591,118 +1601,114 @@ export const adminAPI = {
     thread_type?: 'hr_employee' | 'collaboration';
     limit?: number;
     offset?: number;
-  }) => {
-    const response = await api.get('/api/admin/messages/threads', { params });
+  }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/messages/threads', { params });
     return response.data;
   },
-  getHrThreadDetail: async (assignmentId: string) => {
-    const response = await api.get(`/api/admin/messages/threads/hr-employee/${assignmentId}`);
+  getHrThreadDetail: async (assignmentId: string): Promise<unknown> => {
+    const response = await api.get<unknown>(`/api/admin/messages/threads/hr-employee/${assignmentId}`);
     return response.data;
   },
   listSupportNotes: async (caseId: string): Promise<{ notes: AdminSupportNote[] }> => {
     const response = await api.get<{ notes: AdminSupportNote[] }>(`/api/admin/support-cases/${caseId}/notes`);
     return response.data;
   },
-  addSupportNote: async (caseId: string, payload: { note: string; reason: string }) => {
-    const response = await api.post(`/api/admin/support-cases/${caseId}/notes`, payload);
+  addSupportNote: async (caseId: string, payload: { note: string; reason: string }): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/admin/support-cases/${caseId}/notes`, payload);
     return response.data;
   },
-  adminAction: async (action: string, payload: { reason: string; breakGlass?: boolean; payload?: any }) => {
-    const response = await api.post(`/api/admin/actions/${action}`, payload);
+  adminAction: async (action: string, payload: { reason: string; breakGlass?: boolean; payload?: unknown }): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/admin/actions/${action}`, payload);
     return response.data;
   },
-  getReconciliationReport: async () => {
-    const response = await api.get('/api/admin/reconciliation/report');
+  getReconciliationReport: async (): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/reconciliation/report');
     return response.data;
   },
-  reconciliationLinkPersonCompany: async (profileId: string, companyId: string) => {
-    const response = await api.post('/api/admin/reconciliation/link-person-company', { profile_id: profileId, company_id: companyId });
+  reconciliationLinkPersonCompany: async (profileId: string, companyId: string): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/reconciliation/link-person-company', { profile_id: profileId, company_id: companyId });
     return response.data;
   },
-  reconciliationLinkAssignmentCompany: async (assignmentId: string, companyId: string, reason: string) => {
-    const response = await api.post('/api/admin/reconciliation/link-assignment-company', {
+  reconciliationLinkAssignmentCompany: async (assignmentId: string, companyId: string, reason: string): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/reconciliation/link-assignment-company', {
       assignment_id: assignmentId,
       company_id: companyId,
       reason,
     });
     return response.data;
   },
-  reconciliationLinkAssignmentPerson: async (assignmentId: string, profileId: string) => {
-    const response = await api.post('/api/admin/reconciliation/link-assignment-person', {
+  reconciliationLinkAssignmentPerson: async (assignmentId: string, profileId: string): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/reconciliation/link-assignment-person', {
       assignment_id: assignmentId,
       profile_id: profileId,
     });
     return response.data;
   },
-  reconciliationLinkPolicyCompany: async (policyId: string, companyId: string) => {
-    const response = await api.post('/api/admin/reconciliation/link-policy-company', {
+  reconciliationLinkPolicyCompany: async (policyId: string, companyId: string): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/reconciliation/link-policy-company', {
       policy_id: policyId,
       company_id: companyId,
     });
     return response.data;
   },
-  listResearchCandidates: async (params?: { destination_country?: string; status?: string }) => {
-    const response = await api.get('/api/admin/research/candidates', { params });
+  listResearchCandidates: async (params?: { destination_country?: string; status?: string }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/research/candidates', { params });
     return response.data;
   },
-  researchHealth: async (params: { destination: string }) => {
-    const response = await api.get('/api/admin/research/health', { params });
+  researchHealth: async (params: { destination: string }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/research/health', { params });
     return response.data;
   },
-  approveResearchCandidate: async (candidateId: string, payload: { domain_area: string }) => {
-    const response = await api.post(`/api/admin/research/candidates/${candidateId}/approve`, payload);
+  approveResearchCandidate: async (candidateId: string, payload: { domain_area: string }): Promise<unknown> => {
+    const response = await api.post<unknown>(`/api/admin/research/candidates/${candidateId}/approve`, payload);
     return response.data;
   },
-  ingestUrl: async (payload: { url: string; destination_country: string; domain_area: string }) => {
-    const response = await api.post('/api/admin/ingest/url', payload);
+  ingestUrl: async (payload: { url: string; destination_country: string; domain_area: string }): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/ingest/url', payload);
     return response.data;
   },
-  ingestBatch: async (payload: { urls: Array<string | { url: string; domain_area?: string }>; destination_country: string; domain_area?: string }) => {
-    const response = await api.post('/api/admin/ingest/batch', payload);
+  ingestBatch: async (payload: { urls: Array<string | { url: string; domain_area?: string }>; destination_country: string; domain_area?: string }): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/ingest/batch', payload);
     return response.data;
   },
-  listIngestJobs: async (params?: { status?: string }) => {
-    const response = await api.get('/api/admin/ingest/jobs', { params });
+  listIngestJobs: async (params?: { status?: string }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/ingest/jobs', { params });
     return response.data;
   },
-  listKnowledgeDocs: async (params: { destination_country: string }) => {
-    const response = await api.get('/api/admin/knowledge/docs', { params });
+  listKnowledgeDocs: async (params: { destination_country: string }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/knowledge/docs', { params });
     return response.data;
   },
-  listRequirementEntities: async (params: { destination: string; status?: string }) => {
-    const response = await api.get('/api/admin/requirements/entities', { params });
+  listRequirementEntities: async (params: { destination: string; status?: string }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/requirements/entities', { params });
     return response.data;
   },
-  listRequirementFacts: async (entityId: string, params?: { status?: string }) => {
-    const response = await api.get(`/api/admin/requirements/entities/${entityId}/facts`, { params });
+  listRequirementFacts: async (entityId: string, params?: { status?: string }): Promise<unknown> => {
+    const response = await api.get<unknown>(`/api/admin/requirements/entities/${entityId}/facts`, { params });
     return response.data;
   },
-  listRequirementCriteria: async (params: { destination: string; status?: string }) => {
-    const response = await api.get('/api/admin/requirements/criteria', { params });
+  listRequirementCriteria: async (params: { destination: string; status?: string }): Promise<unknown> => {
+    const response = await api.get<unknown>('/api/admin/requirements/criteria', { params });
     return response.data;
   },
-  approveRequirementFacts: async (payload: { fact_ids: string[] }) => {
-    const response = await api.post('/api/admin/requirements/facts/approve', payload);
+  approveRequirementFacts: async (payload: { fact_ids: string[] }): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/requirements/facts/approve', payload);
     return response.data;
   },
-  rejectRequirementFacts: async (payload: { fact_ids: string[] }) => {
-    const response = await api.post('/api/admin/requirements/facts/reject', payload);
+  rejectRequirementFacts: async (payload: { fact_ids: string[] }): Promise<unknown> => {
+    const response = await api.post<unknown>('/api/admin/requirements/facts/reject', payload);
     return response.data;
   },
   /** Mobility graph: case context + audit logs (admin JWT). */
   inspectMobilityCase: async (
     caseId: string
-  ): Promise<{
-    context: Record<string, unknown>;
-    audit_logs: Array<Record<string, unknown>>;
-    operational?: AdminMobilityOperationalInspect;
-  }> => {
-    const response = await api.get(`/api/admin/mobility/cases/${encodeURIComponent(caseId)}/inspect`);
+  ): Promise<AdminMobilityCaseInspectResponse> => {
+    const response = await api.get<AdminMobilityCaseInspectResponse>(`/api/admin/mobility/cases/${encodeURIComponent(caseId)}/inspect`);
     return response.data;
   },
   /** Run requirement evaluation for the assignment linked to a mobility case (admin JWT). */
-  evaluateMobilityAssignmentRequirements: async (assignmentId: string) => {
-    const response = await api.post(
+  evaluateMobilityAssignmentRequirements: async (assignmentId: string): Promise<unknown> => {
+    const response = await api.post<unknown>(
       `/api/admin/mobility/assignments/${encodeURIComponent(assignmentId)}/evaluate-requirements`
     );
     return response.data;
