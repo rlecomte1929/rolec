@@ -27,6 +27,7 @@ from backend.app.routers import services_state as router_module  # noqa: E402
 from backend.app.routers.services_state import (  # noqa: E402
     MAX_STATE_BYTES,
     ServicesStatePut,
+    _parse_state,
     get_services_state,
     put_services_state,
 )
@@ -296,6 +297,29 @@ class ServicesStateRouterTests(unittest.TestCase):
                 case_id=case_id, body=ServicesStatePut(state=oversized), user=emp
             )
         self.assertEqual(ctx.exception.status_code, 413)
+
+
+class ParseStateTests(unittest.TestCase):
+    """AIQ-1320: state_json is jsonb — Postgres returns a dict, SQLite returns
+    text. _parse_state must handle both and never raise (the old code did
+    json.loads() on the dict → TypeError → a 404 on read)."""
+
+    def test_dict_passthrough_jsonb(self) -> None:
+        d = {"selectedServices": ["housing"], "displayCurrency": "EUR"}
+        self.assertEqual(_parse_state(d), d)
+
+    def test_json_string_parsed_text(self) -> None:
+        self.assertEqual(_parse_state('{"a": 1}'), {"a": 1})
+
+    def test_none_and_empty_return_empty(self) -> None:
+        self.assertEqual(_parse_state(None), {})
+        self.assertEqual(_parse_state(""), {})
+
+    def test_garbage_returns_empty_not_raise(self) -> None:
+        self.assertEqual(_parse_state("not json"), {})
+
+    def test_non_dict_json_returns_empty(self) -> None:
+        self.assertEqual(_parse_state("42"), {})
 
 
 if __name__ == "__main__":

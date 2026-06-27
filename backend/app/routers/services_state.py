@@ -101,6 +101,28 @@ def _audit(*, case_id: str, action: str, actor_id: str, byte_size: int) -> None:
         logger.exception("audit_log write failed services_state case_id=%s", case_id)
 
 
+def _parse_state(raw: Any) -> Dict[str, Any]:
+    """Normalise a stored services-state blob to a dict.
+
+    ``state_json`` is a jsonb column, so psycopg2 returns it already-parsed
+    (dict/list) on Postgres, while SQLite (tests) returns the raw text. Handle
+    both, and never raise on a read — an unreadable blob falls back to an empty
+    state so the client uses its local copy and the browser logs no console
+    error (AIQ-1320; the old code json.loads()'d the dict → TypeError → 404).
+    """
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, list):
+        return {"_": raw}  # defensive: a top-level array isn't a valid state map
+    if raw:
+        try:
+            loaded = json.loads(raw)
+            return loaded if isinstance(loaded, dict) else {}
+        except (TypeError, ValueError):
+            return {}
+    return {}
+
+
 @router.get(
     "/api/cases/{case_id}/services-state",
     response_model=ServicesStateRead,
@@ -135,12 +157,7 @@ def get_services_state(
             "updated_at": "",
             "updated_by_user_id": None,
         }
-    try:
-        parsed = json.loads(row["state_json"]) if row["state_json"] else {}
-    except (TypeError, ValueError):
-        # Stored blob is corrupt — surface as 404 rather than 500 so the
-        # client can fall back to its own local state.
-        raise HTTPException(status_code=404, detail="Stored state could not be parsed.")
+    parsed = _parse_state(row["state_json"])
     updated_at = row["updated_at"]
     if hasattr(updated_at, "isoformat"):
         updated_at = updated_at.isoformat()
