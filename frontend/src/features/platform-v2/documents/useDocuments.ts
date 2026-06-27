@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { documentsAPI } from '../../../api/documents';
 import { notifyHrEmployeeSaved } from '../../../api/notifications';
-import type { DocumentItem, RequirementCategory } from './DocumentsScreen';
+import type { DocumentItem } from './DocumentsScreen';
 
 // ── Public interface ───────────────────────────────────────────────────────────
 
@@ -24,10 +24,10 @@ export interface UseDocumentsResult {
   /** Trigger a manual refresh (e.g. after navigating back to the page). */
   refetch: () => Promise<void>;
   /**
-   * Upload a file into the given category.
-   * Refreshes the document list on success so the UI reflects the new item.
+   * Upload a file against a specific required document (by document_key).
+   * Refreshes the document list on success so the row's status flips.
    */
-  handleUpload: (file: File, category: RequirementCategory) => Promise<void>;
+  handleUpload: (file: File, documentKey: string) => Promise<void>;
   /**
    * Delete / retract a document.
    * Optimistically removes the item from local state; re-fetches on error.
@@ -47,12 +47,13 @@ export interface UseDocumentsResult {
 
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
-export function useDocuments(): UseDocumentsResult {
+export function useDocuments(caseIdOverride?: string): UseDocumentsResult {
   const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
 
-  // In the current architecture assignmentId === caseId.
-  // When these diverge, derive caseId from assignment data instead.
-  const caseId = assignmentId;
+  // Case-scoped routes (/employee/case/:caseId/documents) pass the caseId in via
+  // the route param. The bare /employee/documents route has none, so fall back to
+  // the employee's primary assignment (which equals the case id today).
+  const caseId = caseIdOverride ?? assignmentId;
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,18 +80,19 @@ export function useDocuments(): UseDocumentsResult {
   }, [caseId]);
 
   useEffect(() => {
-    // Wait until the assignment context has resolved before fetching.
-    if (assignmentLoading) return;
+    // With an explicit caseId we can fetch immediately; otherwise wait until the
+    // assignment context has resolved the fallback case id.
+    if (!caseIdOverride && assignmentLoading) return;
     void fetchDocuments();
-  }, [assignmentLoading, fetchDocuments]);
+  }, [caseIdOverride, assignmentLoading, fetchDocuments]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
   const handleUpload = useCallback(
-    async (file: File, category: RequirementCategory): Promise<void> => {
+    async (file: File, documentKey: string): Promise<void> => {
       if (!caseId) throw new Error('No active relocation case.');
-      await documentsAPI.upload(caseId, file, category);
-      // Refresh so the new document appears immediately.
+      await documentsAPI.upload(caseId, file, documentKey);
+      // Refresh so the row's status flips from "required" to "submitted".
       await fetchDocuments();
     },
     [caseId, fetchDocuments],
@@ -124,7 +126,7 @@ export function useDocuments(): UseDocumentsResult {
 
   return {
     documents,
-    isLoading: assignmentLoading || isLoading,
+    isLoading: (!caseIdOverride && assignmentLoading) || isLoading,
     error,
     refetch: fetchDocuments,
     handleUpload,

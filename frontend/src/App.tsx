@@ -60,6 +60,8 @@ const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSumm
 const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
 // [P1-5] Dossier & Forms list view
 const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierPage').then((module) => ({ default: module.EmployeeDossierPage })));
+// Employee document vault (case-scoped + assignment fallback)
+const EmployeeDocumentsPage = lazy(() => import('./pages/employee/EmployeeDocumentsPage').then((module) => ({ default: module.EmployeeDocumentsPage })));
 // [P1-6] Case roadmap page
 const EmployeeCaseRoadmapPage = lazy(() => import('./pages/employee/EmployeeCaseRoadmapPage').then((module) => ({ default: module.EmployeeCaseRoadmapPage })));
 const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
@@ -370,6 +372,9 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
+        {/* Employee document vault — case-scoped + bare /employee/documents (assignment fallback) */}
+        <Route path={ROUTE_DEFS.employeeCaseDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
         {/* [P1-6] Case roadmap */}
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
         {/* [MVG-6B] Employee — immigration document checklist; allowHR so HR can view via timeline link */}
