@@ -115,7 +115,8 @@ const InlineSelect: React.FC<InlineSelectProps> = ({ value, options, onSave, pla
 
   if (!editing) {
     return (
-      <span
+      <button
+        type="button"
         className="group flex items-center gap-1 cursor-pointer"
         onClick={(e) => { e.stopPropagation(); setEditing(true); }}
       >
@@ -123,7 +124,7 @@ const InlineSelect: React.FC<InlineSelectProps> = ({ value, options, onSave, pla
           {value ? label : (placeholder ?? '—')}
         </span>
         <svg className="opacity-0 group-hover:opacity-100 text-[#9ca3af] flex-shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-      </span>
+      </button>
     );
   }
 
@@ -198,11 +199,15 @@ const ConfirmModal: React.FC<{
   onConfirm: () => void;
   onCancel: () => void;
 }> = ({ count, onConfirm, onCancel }) => (
+  // eslint-disable-next-line local/no-clickable-div -- modal backdrop, not an interactive control
   <div
+    role="presentation"
     className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
     onClick={onCancel}
   >
+    {/* eslint-disable-next-line local/no-clickable-div -- stops propagation to backdrop, not interactive */}
     <div
+      role="presentation"
       className="bg-white rounded-xl border border-[#e5e7eb] p-6 w-80 shadow-sm"
       onClick={(e) => e.stopPropagation()}
     >
@@ -471,14 +476,16 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                     ) : col}
                     {/* resize handle — not on last col */}
                     {i < COLS.length - 1 && (
-                      <div
+                      <button
+                        type="button"
                         onMouseDown={onMouseDown(i)}
-                        className="absolute right-0 top-0 h-full w-3 cursor-col-resize flex items-center justify-center group"
+                        className="absolute right-0 top-0 h-full w-3 cursor-col-resize flex items-center justify-center group border-0 bg-transparent p-0"
                         style={{ zIndex: 1 }}
                         onClick={(e) => e.stopPropagation()}
+                        aria-label={`Resize column ${COLS[i] || i}`}
                       >
                         <div className="w-px h-3/5 bg-[#d1d5db] group-hover:bg-[#1D9E75] transition-colors" />
-                      </div>
+                      </button>
                     )}
                   </th>
                 ))}
@@ -503,10 +510,13 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                     <React.Fragment key={emp.id}>
                       <tr
                         className={`border-b border-[#e5e7eb] cursor-pointer transition-colors ${isSelected ? 'bg-[#E1F5EE]' : 'hover:bg-[#f9fafb]'}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setExpanded((p) => (p === emp.id ? null : emp.id))}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => (p === emp.id ? null : emp.id)); } }}
                       >
                         {/* checkbox */}
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5" role="gridcell" tabIndex={-1} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={isSelected}
                             onChange={() => toggleRow(emp.id)}
@@ -543,7 +553,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* assignment type — inline editable */}
-                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-sm" role="gridcell" tabIndex={-1} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                           <InlineSelect
                             value={emp.assignment_type || ''}
                             options={ASSIGNMENT_TYPE_OPTIONS}
@@ -553,7 +563,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* band — inline editable */}
-                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-sm" role="gridcell" tabIndex={-1} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                           <InlineSelect
                             value={normalizeEmployeeLevel(emp.band || '') ?? ''}
                             options={POLICY_EMPLOYEE_LEVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
@@ -563,7 +573,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* status — inline editable */}
-                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-sm" role="gridcell" tabIndex={-1} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                           <InlineSelect
                             value={emp.status || ''}
                             options={STATUS_OPTIONS}
@@ -589,7 +599,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         </td>
 
                         {/* actions */}
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2.5" role="gridcell" tabIndex={-1} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-1 justify-end">
                             <Link
                               to={buildRoute('hrEmployeeDetail', { id: emp.id })}
