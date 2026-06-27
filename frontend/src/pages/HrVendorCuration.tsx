@@ -603,7 +603,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       </Card>
 
       {requestModalOpen && (
-        // eslint-disable-next-line local/no-clickable-div -- role="dialog" is the correct ARIA role; backdrop-click + Escape are the standard dismiss interactions
+        // eslint-disable-next-line local/no-clickable-div, jsx-a11y/no-noninteractive-element-interactions -- role="dialog" is the correct ARIA role; backdrop-click + Escape are the standard dismiss interactions
         <div
           role="dialog"
           aria-modal="true"

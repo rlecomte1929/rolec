@@ -158,6 +158,10 @@ export const BookDemoModal: React.FC = () => {
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) requestClose();
       }}
+      onKeyDown={(e) => { if (e.key === 'Escape') requestClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
       <div
         ref={dialogRef}
