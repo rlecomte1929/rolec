@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { employeeAPI, invalidateApiCache } from '../api/client';
 import { getAuthItem } from '../utils/demo';
@@ -12,6 +13,8 @@ import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentL
 
 const CURRENT_ASSIGNMENT_CACHE_KEY = 'employee:current-assignment';
 const ASSIGNMENTS_OVERVIEW_CACHE_KEY = 'employee:assignments-overview';
+
+const OVERVIEW_QUERY_KEY = ['employee', 'assignments-overview'] as const;
 
 export type EmployeePrimaryCompany = { id: string | null; name: string | null };
 
@@ -47,12 +50,11 @@ const defaultValue: EmployeeAssignmentContextValue = {
 
 const EmployeeAssignmentContext = createContext<EmployeeAssignmentContextValue>(defaultValue);
 
+const EMPTY_LINKED: EmployeeLinkedOverviewRow[] = [];
+const EMPTY_PENDING: EmployeePendingOverviewRow[] = [];
+
 export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [assignmentId, setAssignmentId] = useState<string | null>(null);
-  const [primaryAssignmentCompany, setPrimaryAssignmentCompany] = useState<EmployeePrimaryCompany | null>(null);
-  const [linkedSummaries, setLinkedSummaries] = useState<EmployeeLinkedOverviewRow[]>([]);
-  const [pendingSummaries, setPendingSummaries] = useState<EmployeePendingOverviewRow[]>([]);
-  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const location = useLocation();
   const pathname = location.pathname;
   const pathnameRef = useRef(pathname);
@@ -64,89 +66,28 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
   const routeNeedsOverview = useMemo(() => shouldLoadEmployeeAssignmentOverview(pathname), [pathname]);
   const shouldFetch = isEmployee && token && routeNeedsOverview;
 
-  const [isLoading, setIsLoading] = useState(shouldFetch);
-  const fetchGenRef = useRef(0);
-
-  const linkedCount = linkedSummaries.length;
-  const pendingCount = pendingSummaries.length;
-  const primaryCaseId = linkedSummaries[0]?.case_id ?? null;
-
-  useLayoutEffect(() => {
-    if (!shouldFetch) {
-      setIsLoading(false);
-      if (!isEmployee || !token) {
-        setAssignmentId(null);
-        setPrimaryAssignmentCompany(null);
-        setLinkedSummaries([]);
-        setPendingSummaries([]);
-        setOverviewError(null);
-      }
-      return;
-    }
-    setIsLoading(true);
-  }, [shouldFetch, isEmployee, token]);
-
-  const loadAssignment = useCallback(
-    async (clearCache: boolean): Promise<void> => {
+  const query = useQuery({
+    queryKey: [...OVERVIEW_QUERY_KEY],
+    queryFn: async () => {
       const path = pathnameRef.current;
-      if (!isEmployee || !getAuthItem('relopass_token') || !shouldLoadEmployeeAssignmentOverview(path)) {
-        fetchGenRef.current += 1;
-        setIsLoading(false);
-        if (!isEmployee || !getAuthItem('relopass_token')) {
-          setAssignmentId(null);
-          setPrimaryAssignmentCompany(null);
-          setLinkedSummaries([]);
-          setPendingSummaries([]);
-          setOverviewError(null);
-        }
-        return;
-      }
-      const gen = ++fetchGenRef.current;
-      if (clearCache) {
-        invalidateApiCache(CURRENT_ASSIGNMENT_CACHE_KEY);
-        invalidateApiCache(ASSIGNMENTS_OVERVIEW_CACHE_KEY);
-      }
-      setIsLoading(true);
-      setOverviewError(null);
       const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.overviewLookupStart, {
         pathname: path,
-        clearCache,
+        clearCache: false,
       });
       try {
-        const overview = await employeeAPI.getAssignmentsOverview();
+        const result = await employeeAPI.getAssignmentsOverview();
         const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        if (gen !== fetchGenRef.current) return;
-        const linked = dedupeLinkedSummariesByAssignmentId(
-          (overview?.linked || []) as EmployeeLinkedOverviewRow[]
-        );
-        const pending = (overview?.pending || []) as EmployeePendingOverviewRow[];
-        setLinkedSummaries(linked);
-        setPendingSummaries(pending);
-        const primary = linked[0]?.assignment_id ?? null;
-        setAssignmentId(primary);
-        if (linked.length === 1 && primary) {
-          setPreferredEmployeeAssignmentId(primary);
-        }
-        const c0 = linked[0]?.company;
-        const cn = (c0?.name && String(c0.name).trim()) || null;
-        const cid = (c0?.id && String(c0.id).trim()) || null;
-        setPrimaryAssignmentCompany(cn || cid ? { id: cid, name: cn } : null);
         trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.overviewLookupComplete, {
           pathname: path,
           ok: true,
           durationMs: Math.round(t1 - t0),
-          linkedCount: linked.length,
-          pendingCount: pending.length,
+          linkedCount: (result?.linked || []).length,
+          pendingCount: (result?.pending || []).length,
         });
-      } catch {
+        return result;
+      } catch (e) {
         const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        if (gen !== fetchGenRef.current) return;
-        setAssignmentId(null);
-        setPrimaryAssignmentCompany(null);
-        setLinkedSummaries([]);
-        setPendingSummaries([]);
-        setOverviewError('Overview did not load. Check your connection and refresh.');
         trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.overviewLookupComplete, {
           pathname: path,
           ok: false,
@@ -154,32 +95,65 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
           linkedCount: 0,
           pendingCount: 0,
         });
-      } finally {
-        if (gen === fetchGenRef.current) setIsLoading(false);
+        throw e;
       }
     },
-    [isEmployee]
+    enabled: shouldFetch,
+    staleTime: 0,
+  });
+
+  const overview = query.data;
+
+  const linked = useMemo(
+    () => overview ? dedupeLinkedSummariesByAssignmentId((overview.linked || []) as EmployeeLinkedOverviewRow[]) : EMPTY_LINKED,
+    [overview],
+  );
+  const pending = useMemo(
+    () => overview ? (overview.pending || []) as EmployeePendingOverviewRow[] : EMPTY_PENDING,
+    [overview],
   );
 
-  useEffect(() => {
-    if (!shouldFetch) return;
-    void loadAssignment(false);
-  }, [shouldFetch, loadAssignment]);
+  const assignmentId = linked[0]?.assignment_id ?? null;
+  const primaryCaseId = linked[0]?.case_id ?? null;
 
-  const refetch = useCallback(() => loadAssignment(true), [loadAssignment]);
+  const primaryAssignmentCompany = useMemo<EmployeePrimaryCompany | null>(() => {
+    const c0 = linked[0]?.company;
+    if (!c0) return null;
+    const cn = (c0?.name && String(c0.name).trim()) || null;
+    const cid = (c0?.id && String(c0.id).trim()) || null;
+    return cn || cid ? { id: cid, name: cn } : null;
+  }, [linked]);
+
+  useEffect(() => {
+    if (linked.length === 1 && assignmentId) {
+      setPreferredEmployeeAssignmentId(assignmentId);
+    }
+  }, [linked.length, assignmentId]);
+
+  const refetch = useCallback(async () => {
+    invalidateApiCache(CURRENT_ASSIGNMENT_CACHE_KEY);
+    invalidateApiCache(ASSIGNMENTS_OVERVIEW_CACHE_KEY);
+    await queryClient.invalidateQueries({ queryKey: [...OVERVIEW_QUERY_KEY] });
+  }, [queryClient]);
+
+  const authed = isEmployee && token;
+  const isLoading = shouldFetch && query.isLoading;
+  const overviewError = query.isError
+    ? 'Overview did not load. Check your connection and refresh.'
+    : null;
 
   return (
     <EmployeeAssignmentContext.Provider
       value={{
-        assignmentId,
-        primaryCaseId,
-        primaryAssignmentCompany,
+        assignmentId: authed ? assignmentId : null,
+        primaryCaseId: authed ? primaryCaseId : null,
+        primaryAssignmentCompany: authed ? primaryAssignmentCompany : null,
         isLoading,
-        linkedCount,
-        pendingCount,
-        linkedSummaries,
-        pendingSummaries,
-        overviewError,
+        linkedCount: authed ? linked.length : 0,
+        pendingCount: authed ? pending.length : 0,
+        linkedSummaries: authed ? linked : EMPTY_LINKED,
+        pendingSummaries: authed ? pending : EMPTY_PENDING,
+        overviewError: authed ? overviewError : null,
         refetch,
       }}
     >
