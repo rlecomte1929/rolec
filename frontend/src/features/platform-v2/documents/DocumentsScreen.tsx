@@ -515,6 +515,7 @@ function ReminderSettingsPanel() {
               <div
                 onClick={() => setSettings(s => ({ ...s, notifyHr: !s.notifyHr }))}
                 role="switch"
+                tabIndex={0}
                 aria-checked={settings.notifyHr}
                 style={{
                   width: '36px', height: '20px', borderRadius: '10px', cursor: 'pointer',

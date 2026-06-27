@@ -123,6 +123,7 @@ export function RowActionMenu({
         <div
           ref={panelRef}
           role="menu"
+          tabIndex={-1}
           style={{
             position: 'fixed',
             top: panelStyle.top,

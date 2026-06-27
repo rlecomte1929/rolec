@@ -175,11 +175,11 @@ export const AdminMessages: React.FC = () => {
         ]);
         return {
           threadDetail: null,
-          collabComments: (commentsRes?.comments || []).map((c: any) => ({
+          collabComments: ((commentsRes?.comments ?? []) as Array<{id: string; body: string; created_at: string; author_display_name?: string; author_user_id?: string}>).map((c) => ({
             id: c.id,
             body: c.body,
             created_at: c.created_at,
-            author_display_name: c.author_display_name || c.author_user_id?.slice(0, 8) + '…',
+            author_display_name: c.author_display_name ?? ((c.author_user_id?.slice(0, 8) ?? '') + '…'),
           })),
         };
       }

@@ -294,7 +294,6 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
               <ul
                 id={`${uid}-sources`}
                 className="px-4 pb-4"
-                role="list"
                 aria-label="Policy source citations"
               >
                 {displayedCitations.map((citation) => (

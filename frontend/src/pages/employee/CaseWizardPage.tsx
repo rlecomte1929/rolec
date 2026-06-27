@@ -289,7 +289,7 @@ export const CaseWizardPage: React.FC = () => {
           const parsed = JSON.parse(raw);
           const notes = typeof parsed?.notes === 'string' ? parsed.notes : '';
           const sections = Array.isArray(parsed?.requestedSections)
-            ? parsed.requestedSections.filter((s: any) => typeof s === 'string')
+            ? (parsed as { requestedSections: unknown[] }).requestedSections.filter((s: unknown) => typeof s === 'string')
             : [];
           setHrFeedback(notes || raw);
           setHrRequestedSections(sections);

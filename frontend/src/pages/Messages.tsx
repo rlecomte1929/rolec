@@ -77,8 +77,9 @@ export const Messages: React.FC = () => {
         const quoteRaw = (res.quote_threads || []) as Record<string, unknown>[];
         const labels = new Map<string, string>();
         for (const row of overview.linked || []) {
-          const aid = row.assignment_id;
-          const nm = row.company?.name?.trim();
+          const r = row as { assignment_id?: string; company?: { name?: string } };
+          const aid = r.assignment_id;
+          const nm = r.company?.name?.trim();
           if (aid && nm) labels.set(aid, nm);
         }
         let hrBuilt = buildConversationsFromMessages(raw, userId, role || 'EMPLOYEE', userName);

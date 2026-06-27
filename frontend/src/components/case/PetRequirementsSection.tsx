@@ -183,7 +183,7 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
             .from('pet_import_rules')
             .select('*')
             .eq('destination_country_code', destCountry.toUpperCase())
-            .eq('species', pet.species.toLowerCase())
+            .eq('species', String(pet.species).toLowerCase())
             .maybeSingle();
 
           return { pet, rule: rule ?? null };

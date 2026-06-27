@@ -35,7 +35,7 @@ export function CompanyProfileV2Page() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      <PlatformShellSidebar role="HR" companySlot={<CompanyBrand />} />
+      <PlatformShellSidebar persona="HR" companySlot={<CompanyBrand />} />
       <main className="flex-1 overflow-y-auto">
         <CompanyProfileForm
           company={company}

@@ -101,8 +101,8 @@ async function overpassQuery(query: string): Promise<OverpassNode[]> {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     const json = await res.json();
-    const nodes: OverpassNode[] = (json.elements ?? []).filter(
-      (e: any) => e.type === 'node' && e.lat && e.lon,
+    const nodes: OverpassNode[] = ((json as { elements?: unknown[] }).elements ?? []).filter(
+      (e: unknown): e is OverpassNode => { const el = e as { type?: string; lat?: number; lon?: number }; return el.type === 'node' && Boolean(el.lat) && Boolean(el.lon); },
     );
     OVERPASS_CACHE.set(key, nodes);
     return nodes;

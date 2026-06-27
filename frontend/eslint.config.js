@@ -192,8 +192,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'warn',
       '@typescript-eslint/no-unsafe-return': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      '@typescript-eslint/no-unsafe-call': 'warn',
-      '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
+      // DRAINED to 0 + promoted to error (TS-1):
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-base-to-string': 'warn',
       '@typescript-eslint/restrict-template-expressions': 'warn',
@@ -215,11 +216,12 @@ export default tseslint.config(
       'jsx-a11y/click-events-have-key-events': 'warn',
       'jsx-a11y/no-static-element-interactions': 'warn',
       'jsx-a11y/no-noninteractive-element-interactions': 'warn',
-      'jsx-a11y/no-redundant-roles': 'warn',
       'jsx-a11y/no-autofocus': 'warn',
-      'jsx-a11y/interactive-supports-focus': 'warn',
-      'jsx-a11y/aria-role': 'warn',
-      'jsx-a11y/no-noninteractive-element-to-interactive-role': 'warn',
+      // DRAINED to 0 + promoted to error (A11Y-1):
+      'jsx-a11y/no-redundant-roles': 'error',
+      'jsx-a11y/interactive-supports-focus': 'error',
+      'jsx-a11y/aria-role': 'error',
+      'jsx-a11y/no-noninteractive-element-to-interactive-role': 'error',
 
       // — Cosmetic / low-count, demoted for now (tracked for follow-up; several are
       //   trivially fixable and should be drained + re-promoted in the epics) —

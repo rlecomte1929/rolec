@@ -231,8 +231,9 @@ export function InboxV2Page() {
         if (cancelled) return;
         const labels = new Map<string, string>();
         for (const row of overview.linked || []) {
-          const aid = row.assignment_id;
-          const nm = row.company?.name?.trim();
+          const r = row as { assignment_id?: string; company?: { name?: string } };
+          const aid = r.assignment_id;
+          const nm = r.company?.name?.trim();
           if (aid && nm) labels.set(aid, nm);
         }
         const raw = (res.messages || []) as Record<string, unknown>[];

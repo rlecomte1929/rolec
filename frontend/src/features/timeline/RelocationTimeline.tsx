@@ -1125,7 +1125,6 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
             {/* LEFT: timeline list */}
             <div className="overflow-y-auto max-h-[70vh] pr-1">
               <ul
-                role="list"
                 aria-label="Relocation milestones"
                 className="relative space-y-1 pl-3"
               >

@@ -132,12 +132,12 @@ export function subscribeToNotificationsRealtime(
         }
       )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+        if ((status as string) === 'SUBSCRIBED') {
           stopFallback();
           reconnectAttempts = 0;
           return;
         }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if ((status as string) === 'CHANNEL_ERROR' || (status as string) === 'TIMED_OUT') {
           reconnectAttempts += 1;
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             startFallback();

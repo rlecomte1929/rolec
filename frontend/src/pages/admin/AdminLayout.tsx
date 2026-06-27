@@ -39,7 +39,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
       </a>
 
       <PlatformShellSidebar
-        role="ADMIN"
+        persona="ADMIN"
         companySlot={<CompanySwitcher />}
         user={{
           initials: deriveInitials(userName),

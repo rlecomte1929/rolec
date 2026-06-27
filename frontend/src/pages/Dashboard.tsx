@@ -157,7 +157,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="mb-6">
         <div className="border-b border-[#e2e8f0]">
-          <nav role="tablist" aria-label="Dashboard sections" className="flex -mb-px space-x-8">
+          <div role="tablist" aria-label="Dashboard sections" className="flex -mb-px space-x-8">
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'timeline', label: 'Timeline' },
@@ -187,7 +187,7 @@ export const Dashboard: React.FC = () => {
                 )}
               </Button>
             ))}
-          </nav>
+          </div>
         </div>
       </div>
 

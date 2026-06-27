@@ -217,7 +217,7 @@ const SectionHeading: React.FC<{ label: string; count?: number; collapsed: boole
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface PlatformShellSidebarProps {
-  role: SidebarRole;
+  persona: SidebarRole;
   /** Optional slot for the company widget under the brand (CompanySwitcher / CompanyBrand). */
   companySlot?: React.ReactNode;
   /** Footer identity. Defaults to a sensible placeholder if absent. */
@@ -239,7 +239,7 @@ function readCollapsed(): boolean {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role, companySlot, user }) => {
+export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ persona, companySlot, user }) => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
 
@@ -263,7 +263,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   // Notification polling — only what the visible sections need
   const [hrNotif, setHrNotif] = useState<HrNotificationCounts | null>(null);
   const [adminNotif, setAdminNotif] = useState<AdminNotificationCounts | null>(null);
-  const rank = ROLE_RANK[role];
+  const rank = ROLE_RANK[persona];
 
   useEffect(() => {
     if (rank < ROLE_RANK.HR) return;
@@ -317,7 +317,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     if (item.id === 'detailed-intake' && effectiveCaseId) {
       return buildRoute('employeeCaseIntake', { caseId: effectiveCaseId });
     }
-    return item.toByRole?.[role] ?? item.to;
+    return item.toByRole?.[persona] ?? item.to;
   };
 
   const isActive = (item: SectionItem) => {
@@ -337,7 +337,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     return childTab === currentTab;
   };
 
-  const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount, assignmentsLoading };
+  const visibilityCtx: SidebarVisibilityCtx = { role: persona, linkedCount, assignmentsLoading };
   const visibleSections = SECTIONS
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
     .map((s) => {
@@ -345,7 +345,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
       // model, but should NOT see that persona's exclusive surfaces — only items
       // that explicitly declare a route for their role (e.g. the shared Inbox via
       // toByRole). Admin keeps everything for cross-persona preview.
-      const borrowed = ROLE_RANK[s.minRole] < rank && role !== 'ADMIN';
+      const borrowed = ROLE_RANK[s.minRole] < rank && persona !== 'ADMIN';
       return {
         ...s,
         // Suppress the persona heading on a borrowed section: its surviving shared
@@ -353,7 +353,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
         borrowed,
         items: s.items.filter((item) => {
           if (item.hidden?.(visibilityCtx)) return false;
-          if (borrowed) return Boolean(item.toByRole?.[role]);
+          if (borrowed) return Boolean(item.toByRole?.[persona]);
           return true;
         }),
       };
@@ -535,7 +535,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
-                <p className="text-[10px] text-slate-400 truncate">{user?.role ?? role.toLowerCase()}</p>
+                <p className="text-[10px] text-slate-400 truncate">{user?.role ?? persona.toLowerCase()}</p>
               </div>
               <Button unstyled aria-label="Account menu" className="text-slate-400 hover:text-slate-600 shrink-0">
                 <ChevronRight size={14} />

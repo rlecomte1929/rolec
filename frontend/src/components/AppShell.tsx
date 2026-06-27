@@ -187,7 +187,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         onClick={() => setMobileNavOpen(false)}
       >
         <PlatformShellSidebar
-          role={sbRole}
+          persona={sbRole}
           companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
           user={{
             initials: userInitials,
