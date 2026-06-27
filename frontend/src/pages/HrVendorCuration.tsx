@@ -762,8 +762,8 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                     />
                     <span className="min-w-0">
                       <span className="font-medium text-[#0b2b43]">{row.name}</span>
-                      {row.source && (
-                        <span className="ml-2 text-xs text-[#94a3b8]">source: {row.source}</span>
+                      {row.source === 'hr_promoted' && (
+                        <span className="ml-2 text-xs text-[#94a3b8]">Added by your team</span>
                       )}
                       {pending && (
                         <span className="ml-2 inline-flex items-center rounded-full border border-[#fde68a] bg-[#fef9c3] px-2 py-0.5 text-xs font-medium text-[#854d0e]">
