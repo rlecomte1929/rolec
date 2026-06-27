@@ -111,7 +111,7 @@ export function AvailableNowWidget({
               lineHeight: 1.5,
             }}
           >
-            We couldn't work out your next actions because your roadmap has a
+            We couldn&apos;t work out your next actions because your roadmap has a
             circular dependency. Please contact support so we can fix it.
           </div>
         </WidgetShell>

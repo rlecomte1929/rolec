@@ -192,7 +192,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
               : "Immigration guidance for this corridor isn't available yet"}
           </p>
           <p className="mt-1 text-xs text-[#94a3b8]">
-            We don't yet have a verified document checklist for this corridor and
+            We don&apos;t yet have a verified document checklist for this corridor and
             visa type, so none is shown.
           </p>
         </div>

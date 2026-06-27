@@ -206,7 +206,7 @@ const OcrErrorCard: React.FC<OcrErrorCardProps> = ({ error, onSkip }) => {
           onClick={onSkip}
           className="text-xs font-medium text-[#0b2b43] underline underline-offset-2 hover:no-underline"
         >
-          Skip scan — I'll enter my details manually →
+          Skip scan — I&apos;ll enter my details manually →
         </Button>
       </div>
     </div>
@@ -428,8 +428,8 @@ const ConfirmStep: React.FC<ConfirmStepProps> = ({ result, onSaved, onDiscard })
           <ul className="text-xs space-y-1">
             {conflicts.map((c) => (
               <li key={c.field_name}>
-                <strong>{FIELD_LABELS[c.field_name] || c.field_name}</strong>: OCR says "
-                {c.ocr_value}" · profile ({c.vault_source}) has "{c.vault_value}" — the OCR value
+                <strong>{FIELD_LABELS[c.field_name] || c.field_name}</strong>: OCR says &quot;
+                {c.ocr_value}&quot; · profile ({c.vault_source}) has &quot;{c.vault_value}&quot; — the OCR value
                 was saved; you can correct it in the interview.
               </li>
             ))}
@@ -536,7 +536,7 @@ export const PassportOCRFlow: React.FC<PassportOCRFlowProps> = ({ caseId, onComp
                 onClick={onSkip}
                 className="text-sm text-[#64748b] hover:text-[#0b2b43] font-medium"
               >
-                Skip — I'll enter details manually
+                Skip — I&apos;ll enter details manually
               </Button>
             </div>
           </>

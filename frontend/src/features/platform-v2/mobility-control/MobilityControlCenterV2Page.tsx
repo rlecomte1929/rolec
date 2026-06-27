@@ -700,7 +700,7 @@ export function MobilityControlCenterV2Page() {
         {backendDegraded && (
           <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span>
-              Some data couldn't load — showing partial results. Refresh to try again.
+              Some data couldn&apos;t load — showing partial results. Refresh to try again.
             </span>
             <Button unstyled type="button" onClick={() => void dashboardQuery.refetch()} className="text-amber-700 hover:underline">Retry</Button>
           </div>

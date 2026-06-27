@@ -75,8 +75,8 @@ export const ServicesEstimate: React.FC = () => {
               ("Empty states: No X yet. [Reason or guidance] → [CTA]") */}
           <p className="text-sm font-medium text-[#0b2b43] mb-1">No estimate yet</p>
           <p className="text-sm text-[#6b7280] mb-4">
-            You haven't picked any services yet. Choose what you need, set a few preferences,
-            and we'll build a side-by-side view of what your company's policy covers and what
+            You haven&apos;t picked any services yet. Choose what you need, set a few preferences,
+            and we&apos;ll build a side-by-side view of what your company&apos;s policy covers and what
             comes out of pocket. Your selections save automatically — you can come back any time.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -114,7 +114,7 @@ export const ServicesEstimate: React.FC = () => {
       <Card padding="lg" className="mb-6">
         <p className="text-sm text-[#0b2b43] font-medium mb-1">What happens next</p>
         <p className="text-sm text-[#4b5563]">
-          Pick the vendors you want quotes from — we'll send the request in one click.
+          Pick the vendors you want quotes from — we&apos;ll send the request in one click.
           Offers come back here as vendors respond, then you compare and decide.
         </p>
       </Card>

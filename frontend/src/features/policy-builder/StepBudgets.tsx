@@ -113,7 +113,7 @@ export const StepBudgets: React.FC<Props> = ({
           <Tip text="Define the maximum amount the company will cover for each tier and destination. More-specific destinations override the default." />
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          For each tier and destination, set a budget cap. The "Any destination" row is the
+          For each tier and destination, set a budget cap. The &quot;Any destination&quot; row is the
           default used when no specific destination matches.
         </p>
       </div>

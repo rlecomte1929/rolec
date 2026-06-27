@@ -361,7 +361,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm font-semibold text-[#0b2b43]">Vendor quote requests</div>
-              <p className="text-xs text-[#94a3b8] mt-0.5">RFQs you've sent to vendors for this case</p>
+              <p className="text-xs text-[#94a3b8] mt-0.5">RFQs you&apos;ve sent to vendors for this case</p>
             </div>
             <Button unstyled
               type="button"

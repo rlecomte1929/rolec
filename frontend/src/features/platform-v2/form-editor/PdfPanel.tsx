@@ -32,7 +32,7 @@ export const PdfPanel: React.FC<PdfPanelProps> = ({ url, formName }) => {
         </svg>
         <p className="text-sm font-medium text-slate-500">No PDF available</p>
         <p className="text-xs text-slate-400 mt-1">
-          The original form PDF hasn't been attached yet.
+          The original form PDF hasn&apos;t been attached yet.
         </p>
       </div>
     );

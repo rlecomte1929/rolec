@@ -63,7 +63,7 @@ export const PolicyBuilderWizard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-[#0b2b43]">Policy Builder</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Create or update your company's relocation policy in a few guided steps.
+            Create or update your company&apos;s relocation policy in a few guided steps.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
@@ -153,7 +153,7 @@ export const PolicyBuilderWizard: React.FC = () => {
 
       {/* Bottom save hint */}
       <p className="text-xs text-slate-400 text-center">
-        Your progress is saved as a draft — it won't go live until you activate it in Step 5.
+        Your progress is saved as a draft — it won&apos;t go live until you activate it in Step 5.
       </p>
     </div>
   );

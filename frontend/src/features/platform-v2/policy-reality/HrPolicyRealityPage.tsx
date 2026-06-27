@@ -341,7 +341,7 @@ export function HrPolicyRealityPage() {
           </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          Compare your company's policy commitments against what employees are actually selecting from service providers.
+          Compare your company&apos;s policy commitments against what employees are actually selecting from service providers.
         </p>
       </div>
 

@@ -614,7 +614,7 @@ export const EmployeeJourney: React.FC = () => {
           <div className="min-w-0">
             <div className="font-semibold text-[#0b2b43]">New assignment for your email</div>
             <p className="text-sm text-[#334155] mt-1">
-              Accept it below when you're ready. Your existing case is unchanged.
+              Accept it below when you&apos;re ready. Your existing case is unchanged.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
@@ -859,7 +859,7 @@ export const EmployeeJourney: React.FC = () => {
                 <div>
                   <div className="text-lg font-semibold text-[#0b2b43]">Enter your case code manually</div>
                   <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
-                    Use if your case didn't appear automatically or HR sent you a code directly.
+                    Use if your case didn&apos;t appear automatically or HR sent you a code directly.
                   </p>
                 </div>
                 {!manualClaimExpanded ? (

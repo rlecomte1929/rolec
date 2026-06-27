@@ -449,7 +449,7 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({ question, value, on
                 Upload will go to <code className="text-xs bg-[#e2e8f0] px-1 rounded">{endpoint}</code>
                 <br />
                 <span className="text-xs text-[#94a3b8] mt-1 inline-block">
-                  Use the "Upload passport" step (before the interview) for a faster, auto-filled experience.
+                  Use the &quot;Upload passport&quot; step (before the interview) for a faster, auto-filled experience.
                 </span>
               </>
             ) : (

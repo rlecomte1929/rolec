@@ -183,7 +183,7 @@ export const PdfUploadField: React.FC<PdfUploadFieldProps> = ({
 
       {state.kind === 'success' && (
         <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          Uploaded — don't forget to save the template to persist the URL.
+          Uploaded — don&apos;t forget to save the template to persist the URL.
         </div>
       )}
     </div>

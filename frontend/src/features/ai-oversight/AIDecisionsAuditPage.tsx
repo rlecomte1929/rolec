@@ -309,7 +309,7 @@ export function AIDecisionsAuditPage() {
                         </span>
                       </td>
                       <td className="py-3 pr-3 text-xs text-slate-600 max-w-md">
-                        {r.reason ? <span className="italic">"{r.reason}"</span> : <span className="text-slate-300">—</span>}
+                        {r.reason ? <span className="italic">&quot;{r.reason}&quot;</span> : <span className="text-slate-300">—</span>}
                       </td>
                     </tr>
                   );

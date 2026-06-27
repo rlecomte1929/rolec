@@ -231,7 +231,7 @@ export default tseslint.config(
 
       // — Cosmetic / low-count, demoted for now (tracked for follow-up; several are
       //   trivially fixable and should be drained + re-promoted in the epics) —
-      'react/no-unescaped-entities': 'warn',
+      'react/no-unescaped-entities': 'error',
       'react/prop-types': 'warn',
       'no-constant-binary-expression': 'warn',
       '@typescript-eslint/no-redundant-type-constituents': 'warn',

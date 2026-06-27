@@ -225,7 +225,7 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold text-[#0b2b43]">Policy caps</div>
         <span className="text-[11px] text-slate-500">
-          Cap source: your company's published HR policy
+          Cap source: your company&apos;s published HR policy
         </span>
       </div>
       <Alert variant="info" className="mb-3">

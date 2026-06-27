@@ -205,8 +205,8 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
       <Card padding="lg" className="border-[#e2e8f0]">
         <p className="text-sm font-medium text-[#0b2b43] mb-1">No company linked yet</p>
         <p className="text-sm text-[#64748b]">
-          Your company's relocation policy will appear here automatically once HR links your account to an assignment.
-          No action is needed on your part — you'll be able to view your full benefit entitlements as soon as they've set it up.
+          Your company&apos;s relocation policy will appear here automatically once HR links your account to an assignment.
+          No action is needed on your part — you&apos;ll be able to view your full benefit entitlements as soon as they&apos;ve set it up.
         </p>
       </Card>
     );

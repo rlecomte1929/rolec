@@ -160,7 +160,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                   Reference: <span className="font-mono font-semibold text-gray-600">{reportId}</span>
                 </p>
               )}
-              <p className="text-xs text-gray-400">We'll look into it.</p>
+              <p className="text-xs text-gray-400">We&apos;ll look into it.</p>
             </div>
           )}
 

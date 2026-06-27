@@ -285,7 +285,7 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
           </Alert>
         ) : (
           <p className="text-sm text-slate-600 mt-2">
-            No draft in progress. When you edit the matrix, you'll see what changed here
+            No draft in progress. When you edit the matrix, you&apos;ll see what changed here
             before publishing.
           </p>
         )}

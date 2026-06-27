@@ -435,7 +435,7 @@ function RequestCountryModal({
 
           {/* Info callout */}
           <div style={{ padding: '10px 14px', borderRadius: 10, background: TL, border: `1px solid ${T}40`, fontSize: 11, color: '#374151', lineHeight: 1.5 }}>
-            <strong style={{ color: T }}>What happens next?</strong> Your HR team will receive a notification and validate the country's immigration requirements, company policy, and compliance obligations. You'll be notified by email once approved — usually within 1–2 business days.
+            <strong style={{ color: T }}>What happens next?</strong> Your HR team will receive a notification and validate the country&apos;s immigration requirements, company policy, and compliance obligations. You&apos;ll be notified by email once approved — usually within 1–2 business days.
           </div>
         </div>
 
@@ -591,7 +591,7 @@ function CountryGrid({
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            My country isn't listed — request it from HR
+            My country isn&apos;t listed — request it from HR
           </Button>
         </div>
       )}
