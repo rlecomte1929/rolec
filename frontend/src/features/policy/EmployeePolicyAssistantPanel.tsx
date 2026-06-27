@@ -184,7 +184,6 @@ function AnswerResultCard({
   return (
     <article
       className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-[0_2px_14px_rgba(15,23,42,0.06)] ring-1 ring-slate-100/80"
-      role="article"
       aria-label="Policy Q&A"
     >
       {/* Header row is the collapse toggle. Click anywhere on the

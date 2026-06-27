@@ -682,6 +682,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
               <label htmlFor="hcf-receipt-reference" className="block text-xs font-medium text-slate-700">
                 Receipt / Reference <span className="text-rose-500">*</span>
               </label>
+              {/* eslint-disable jsx-a11y/no-autofocus */}{/* modal dialog: focus first field for keyboard users */}
               <Input id="hcf-receipt-reference" unstyled
                 type="text"
                 value={submitReceiptRef}
@@ -690,6 +691,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                 autoFocus
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
               />
+              {/* eslint-enable jsx-a11y/no-autofocus */}
               <label htmlFor="hcf-note-optional" className="block text-xs font-medium text-slate-700 mt-2">Note (optional)</label>
               <Input id="hcf-note-optional" unstyled
                 type="text"
@@ -738,6 +740,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="e.g. Missing apostille on birth certificate."
                 rows={3}
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- modal dialog: focus first field for keyboard users
                 autoFocus
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none"
               />

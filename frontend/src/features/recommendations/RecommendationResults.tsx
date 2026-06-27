@@ -348,7 +348,6 @@ function RecCard({
             rows={2}
             placeholder="Explain why this option fits this case better."
             className="mt-2 w-full rounded-md border border-accent-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-200 resize-none bg-white"
-            autoFocus
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <p className="text-[11px] text-accent-500">Logged for human oversight audit · EU AI Act Art. 14</p>

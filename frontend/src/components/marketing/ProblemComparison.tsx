@@ -23,7 +23,7 @@ export const ProblemComparison: React.FC<ProblemComparisonProps> = ({
         <h3 className="text-sm font-semibold uppercase tracking-wider text-marketing-text-subtle mb-4">
           {todayTitle}
         </h3>
-        <ul className="space-y-3" role="list">
+        <ul className="space-y-3">
           {todayItems.map((item, i) => (
             <li key={i} className="flex gap-3 items-center">
               <span
@@ -41,7 +41,7 @@ export const ProblemComparison: React.FC<ProblemComparisonProps> = ({
         <h3 className="text-sm font-semibold uppercase tracking-wider text-marketing-accent mb-4">
           {withReloPassTitle}
         </h3>
-        <ul className="space-y-3" role="list">
+        <ul className="space-y-3">
           {withReloPassItems.map((item, i) => (
             <li key={i} className="flex gap-3 items-center">
               <span

@@ -38,6 +38,8 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
         Skip to main content
       </a>
 
+      {/* eslint-disable jsx-a11y/aria-role */}
+      {/* `role` is a PlatformShellSidebar component prop (SidebarRole enum), not an ARIA role */}
       <PlatformShellSidebar
         role="ADMIN"
         companySlot={<CompanySwitcher />}
@@ -47,6 +49,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
           role: 'Admin · superuser',
         }}
       />
+      {/* eslint-enable jsx-a11y/aria-role */}
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -202,6 +205,8 @@ const CompanySwitcher: React.FC = () => {
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-[60vh] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
           <div className="sticky top-0 z-10 border-b border-slate-100 bg-white p-2">
+            {/* eslint-disable jsx-a11y/no-autofocus */}
+            {/* tenant switcher dropdown: focus filter input when popover opens for keyboard users */}
             <Input unstyled
               type="search"
               placeholder="Filter tenants…"
@@ -210,6 +215,7 @@ const CompanySwitcher: React.FC = () => {
               autoFocus
               className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
+            {/* eslint-enable jsx-a11y/no-autofocus */}
           </div>
           {filtered.length === 0 ? (
             <div className="px-3 py-3 text-xs text-slate-400">No tenants match.</div>

@@ -15,7 +15,6 @@ export const BulletBlock: React.FC<BulletBlockProps> = ({
   return (
     <ul
       className={`space-y-2 ${className}`}
-      role="list"
     >
       {items.map((item, i) => (
         <li key={i} className="flex gap-3 items-center">
