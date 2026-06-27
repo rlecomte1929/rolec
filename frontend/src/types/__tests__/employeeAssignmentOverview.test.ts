@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatDestinationLabel,
   formatCaseReference,
+  caseNavId,
 } from '../employeeAssignmentOverview';
 
 /**
@@ -49,5 +50,35 @@ describe('formatCaseReference', () => {
 
   it('returns empty string when no id is available', () => {
     expect(formatCaseReference({})).toBe('');
+  });
+});
+
+/**
+ * AIQ-1318: the id used to navigate to a case must mirror the id its on-card
+ * Reference is derived from, so the case UUID in the URL matches the Reference
+ * the user sees (case_id preferred, assignment_id fallback).
+ */
+describe('caseNavId', () => {
+  it('prefers case_id', () => {
+    expect(caseNavId({ case_id: 'case-95606df0', assignment_id: 'assign-120d6fd0' })).toBe(
+      'case-95606df0',
+    );
+  });
+
+  it('falls back to assignment_id when case_id is absent', () => {
+    expect(caseNavId({ assignment_id: 'assign-120d6fd0' })).toBe('assign-120d6fd0');
+    expect(caseNavId({ case_id: null, assignment_id: 'assign-120d6fd0' })).toBe('assign-120d6fd0');
+  });
+
+  it('returns empty string when no id is available', () => {
+    expect(caseNavId({})).toBe('');
+  });
+
+  it('shares its id with formatCaseReference (reference == last-8 of the nav id)', () => {
+    const withCase = { case_id: 'abc12345-6789-defg', assignment_id: 'assign-90ab' };
+    const onlyAssignment = { assignment_id: 'assign-90ab' };
+    for (const row of [withCase, onlyAssignment]) {
+      expect(formatCaseReference(row)).toBe(caseNavId(row).slice(-8).toUpperCase());
+    }
   });
 });

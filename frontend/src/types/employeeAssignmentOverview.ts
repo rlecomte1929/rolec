@@ -95,3 +95,15 @@ export function formatCaseReference(row: { case_id?: string | null; assignment_i
   const id = (row.case_id || row.assignment_id || '').trim();
   return id ? id.slice(-8).toUpperCase() : '';
 }
+
+/**
+ * The id to use when navigating to a case. Mirrors {@link formatCaseReference}
+ * (case_id preferred, assignment_id fallback) so the URL the user lands on
+ * carries the same id their on-card Reference is derived from. The case-scoped
+ * routes accept either id-type — EmployeeIntakePage's resolveIntakeIds()
+ * normalizes a case_id to its assignment_id for the assignment-scoped endpoints
+ * (AIQ-976/AIQ-1318). (Empty string only when the row has neither id.)
+ */
+export function caseNavId(row: { case_id?: string | null; assignment_id?: string | null }): string {
+  return (row.case_id || row.assignment_id || '').trim();
+}
