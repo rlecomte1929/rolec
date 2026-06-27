@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { type AxiosError } from 'axios';
+import type { ApiErrorBody } from './types';
 import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary, PolicyVersionSummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
@@ -97,7 +98,7 @@ type CacheEntry<T> = {
   promise?: Promise<T>;
 };
 
-const apiCache = new Map<string, CacheEntry<any>>();
+const apiCache = new Map<string, CacheEntry<unknown>>();
 
 /** Clear a cached value so the next request fetches fresh. Use after 401 or when user retries. */
 export function invalidateApiCache(key: string): void {
@@ -221,7 +222,7 @@ api.interceptors.response.use(
     }
     return res;
   },
-  (err) => {
+  (err: AxiosError<ApiErrorBody>) => {
     try {
       const cfg = (err?.config || {}) as PerfConfig;
       const meta = cfg._perfMeta;
