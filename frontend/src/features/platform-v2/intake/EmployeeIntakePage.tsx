@@ -18,6 +18,7 @@ import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
 import { resolveIntakeIds } from './resolveIntakeIds';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { parseSubmitError } from './parseSubmitError';
+import { matchCountry } from './countryMatch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -286,13 +287,11 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
           onChange={(v) => {
             setQuery(v);
             setOpen(true);
-            // Auto-commit when the typed text exactly matches a country so the
-            // user isn't left with an empty value (and a disabled Continue) after
-            // typing the full name without clicking the dropdown.
-            const norm = v.trim().toLowerCase();
-            const exact = COUNTRIES.find(
-              (c) => c.name.toLowerCase() === norm || c.code.toLowerCase() === norm,
-            );
+            // Auto-commit when the typed text unambiguously identifies a country so
+            // the user isn't left with an empty value (and a disabled Continue) after
+            // typing the full name without clicking the dropdown. See matchCountry for
+            // the name-prefix guard that keeps a code match from firing early.
+            const exact = matchCountry(v, COUNTRIES);
             if (exact) { onChange(exact.code); setOpen(false); setQuery(''); }
           }}
           onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
