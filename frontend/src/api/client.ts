@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import type { IntakeData } from '../features/platform-v2/intake/EmployeeIntakePage';
 import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
 import { swallow } from '../lib/errorTracking';
+import { queryClient } from '../lib/queryClient';
 import type {
   LoginRequest,
   LoginResponse,
@@ -2417,6 +2418,7 @@ export const employeeAPI = {
     const response = await api.post<{ success: boolean; assignmentId?: string }>(`/api/employee/assignments/${assignmentId}/claim`, { email });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   /** Magic-link token claim: employee arrived via invite URL with ?token=<uuid>. */
@@ -2424,6 +2426,7 @@ export const employeeAPI = {
     const response = await api.post<{ success: boolean; assignmentId?: string }>('/api/employee/assignments/claim-by-token', { token });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   /**
@@ -2442,6 +2445,7 @@ export const employeeAPI = {
       { step, total_steps: totalSteps },
     );
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   /**
@@ -2484,6 +2488,7 @@ export const employeeAPI = {
     const response = await api.post<{ success: boolean; assignmentId?: string; alreadyLinked?: boolean }>(`/api/employee/assignments/${assignmentId}/link-pending`, { email });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {
@@ -2500,11 +2505,9 @@ export const employeeAPI = {
   },
   submitAssignment: async (assignmentId: string): Promise<unknown> => {
     const response = await api.post<unknown>(`/api/employee/assignments/${assignmentId}/submit`);
-    // Submit advances the assignment to 'submitted' — bust the 60s overview/current
-    // caches so the dashboard reflects the new status (and roadmap-unlocked) on the
-    // post-submit redirect instead of serving the stale pre-submit row.
     invalidateApiCache('employee:assignments-overview');
     invalidateApiCache('employee:current-assignment');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   updateProfilePhoto: async (assignmentId: string, photoUrl: string): Promise<unknown> => {
