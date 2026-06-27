@@ -45,7 +45,7 @@ export function resolveCaseStage({ status, servicesComplete }: ResolveCaseStageI
   return {
     intake: intakeDone ? 'done' : 'active',
     services: !intakeDone ? 'locked' : servicesComplete ? 'done' : 'active',
-    roadmap: intakeDone ? 'active' : 'locked',
+    roadmap: intakeDone && servicesComplete ? 'active' : 'locked',
   };
 }
 

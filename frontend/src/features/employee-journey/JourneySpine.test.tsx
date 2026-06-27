@@ -47,20 +47,28 @@ describe('JourneySpine', () => {
     expect(onPreviewBenefits).toHaveBeenCalledTimes(1);
   });
 
-  it('locks Roadmap when onViewRoadmap is omitted', () => {
+  it('locks Roadmap when onViewRoadmap is omitted (intake not done)', () => {
     render(<JourneySpine {...baseProps} />);
-    const locked = screen.getByRole('button', { name: /Locked until intake/i });
+    const locked = screen.getByRole('button', { name: /Locked/i });
     expect(locked).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'View roadmap' })).not.toBeInTheDocument();
   });
 
-  it('enables Roadmap when onViewRoadmap is provided; click fires it', () => {
+  it('locks Roadmap with "Complete step 2 first" when intake done but services not complete', () => {
     const onViewRoadmap = vi.fn();
-    render(<JourneySpine {...baseProps} onViewRoadmap={onViewRoadmap} />);
+    render(<JourneySpine {...baseProps} intakeStep={5} intakeTotalSteps={5} onViewRoadmap={onViewRoadmap} />);
+    const locked = screen.getByRole('button', { name: 'Complete step 2 first' });
+    expect(locked).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'View roadmap' })).not.toBeInTheDocument();
+  });
+
+  it('enables Roadmap when both servicesComplete and onViewRoadmap are provided; click fires it', () => {
+    const onViewRoadmap = vi.fn();
+    render(<JourneySpine {...baseProps} intakeStep={5} intakeTotalSteps={5} servicesComplete onViewRoadmap={onViewRoadmap} />);
     const cta = screen.getByRole('button', { name: 'View roadmap' });
     fireEvent.click(cta);
     expect(onViewRoadmap).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: /Locked until intake/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Locked/i })).not.toBeInTheDocument();
   });
 
   it('marks intake done and surfaces Services as the active phase once intake completes', () => {
@@ -87,10 +95,10 @@ describe('isIntakeComplete', () => {
 describe('JourneySpine — status is the source of truth (overrides stale intakeStep)', () => {
   it('submitted case: intake Done + roadmap unlocked + NO "Step X of 5", even with intakeStep=1', () => {
     render(
-      <JourneySpine {...baseProps} intakeStep={1} status="submitted" onViewRoadmap={() => {}} />,
+      <JourneySpine {...baseProps} intakeStep={1} status="submitted" servicesComplete onViewRoadmap={() => {}} />,
     );
-    // intake station reads Done despite intakeStep=1
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    // intake station reads Done despite intakeStep=1 (services is also Done here)
+    expect(screen.getAllByText('Done').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/Step 1 of 5/)).not.toBeInTheDocument();
     // roadmap unlocked (EmployeeJourney passes onViewRoadmap when complete)
     expect(screen.getByRole('button', { name: 'View roadmap' })).toBeInTheDocument();

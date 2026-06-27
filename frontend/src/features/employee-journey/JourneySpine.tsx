@@ -190,25 +190,35 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
         )}
       </Station>
 
-      {/* Roadmap */}
-      <Station kind={onViewRoadmap ? 'active' : 'locked'} glyph="3" last>
+      {/* Roadmap — locked until Services & policy is done (servicesDone). */}
+      <Station kind={servicesDone && onViewRoadmap ? 'active' : 'locked'} glyph="3" last>
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`font-semibold text-sm ${onViewRoadmap ? 'text-[#0b2b43]' : 'text-[#94a3b8]'}`}>Roadmap</span>
-          <StatusPill status={onViewRoadmap ? 'ready' : 'upcoming'}>
-            {onViewRoadmap ? 'Ready' : 'Locked'}
+          <span className={`font-semibold text-sm ${servicesDone && onViewRoadmap ? 'text-[#0b2b43]' : 'text-[#94a3b8]'}`}>Roadmap</span>
+          <StatusPill status={servicesDone && onViewRoadmap ? 'ready' : 'upcoming'}>
+            {servicesDone && onViewRoadmap ? 'Ready' : 'Locked'}
           </StatusPill>
         </div>
         <div className="mt-1">
           <div className="text-xs text-[#94a3b8]">
-            {onViewRoadmap ? 'Your step-by-step relocation roadmap is ready.' : 'Unlocks at the end, after intake.'}
+            {servicesDone && onViewRoadmap
+              ? 'Your step-by-step relocation roadmap is ready.'
+              : servicesActive && !servicesDone
+                ? 'Complete step 2 first.'
+                : 'Unlocks after intake.'}
           </div>
-          {onViewRoadmap ? (
+          {servicesDone && onViewRoadmap ? (
             <Button variant="primary" size="sm" className="mt-2" onClick={onViewRoadmap}>
               View roadmap
             </Button>
           ) : (
-            <Button variant="primary" size="sm" className="mt-2" disabled>
-              Locked until intake
+            <Button
+              variant="primary"
+              size="sm"
+              className="mt-2"
+              disabled
+              title={servicesActive && !servicesDone ? 'Complete step 2 first' : undefined}
+            >
+              {servicesActive && !servicesDone ? 'Complete step 2 first' : 'Locked'}
             </Button>
           )}
         </div>
