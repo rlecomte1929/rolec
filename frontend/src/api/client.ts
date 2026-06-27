@@ -55,6 +55,7 @@ import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryRespon
 import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
 import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
 import { ragResponseToEmployeeResponse, ragResponseToHrResponse } from './policyAssistantRagAdapter';
+import type { RagQueryResponse } from './policyAssistantRagAdapter';
 import {
   intakeEnvelopeSchema,
   assignmentsOverviewSchema,
@@ -630,9 +631,9 @@ export const hrAPI = {
     const response = await api.post<unknown>(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
     return response.data;
   },
-  getCompanyProfile: async (): Promise<{ company: any | null }> => {
+  getCompanyProfile: async (): Promise<{ company: Record<string, unknown> | null }> => {
     return cachedRequest('hr:company-profile', 60_000, async () => {
-      const response = await api.get<{ company: any | null }>('/api/hr/company-profile');
+      const response = await api.get<{ company: Record<string, unknown> | null }>('/api/hr/company-profile');
       return response.data;
     });
   },
@@ -683,13 +684,13 @@ export const hrAPI = {
     invalidateApiCache('company:get');
     return response.data;
   },
-  listMessages: async (): Promise<{ messages: any[] }> => {
-    const response = await api.get<{ messages: any[] }>('/api/hr/messages');
+  listMessages: async (): Promise<{ messages: unknown[] }> => {
+    const response = await api.get<{ messages: unknown[] }>('/api/hr/messages');
     return response.data;
   },
   /** Send a message to the assigned employee on a case thread (tenant-scoped server-side). */
-  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: any }> => {
-    const response = await api.post<{ ok: boolean; message: any }>('/api/hr/messages', {
+  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: unknown }> => {
+    const response = await api.post<{ ok: boolean; message: unknown }>('/api/hr/messages', {
       assignment_id: assignmentId,
       body,
     });
@@ -703,9 +704,9 @@ export const hrAPI = {
     limit?: number;
     offset?: number;
     signal?: AbortSignal;
-  }): Promise<{ conversations: any[]; has_more?: boolean }> => {
+  }): Promise<{ conversations: Record<string, unknown>[]; has_more?: boolean }> => {
     const { signal, ...query } = params ?? {};
-    const response = await api.get('/api/hr/messages/conversations', {
+    const response = await api.get<{ conversations: Record<string, unknown>[]; has_more?: boolean }>('/api/hr/messages/conversations', {
       signal,
       params: {
         ...(query.q && { q: query.q }),
@@ -720,8 +721,8 @@ export const hrAPI = {
   getMessageThread: async (
     assignmentId: string,
     opts?: { signal?: AbortSignal }
-  ): Promise<{ assignment_id: string; messages: any[] }> => {
-    const response = await api.get<{ assignment_id: string; messages: any[] }>(
+  ): Promise<{ assignment_id: string; messages: Record<string, unknown>[] }> => {
+    const response = await api.get<{ assignment_id: string; messages: Record<string, unknown>[] }>(
       `/api/hr/messages/threads/${encodeURIComponent(assignmentId)}`,
       { signal: opts?.signal }
     );
@@ -2364,35 +2365,35 @@ export const adminOpsAnalyticsAPI = {
 // Admin Collaboration API (admin-only, internal threads)
 export const adminCollaborationAPI = {
   getThread: (targetType: string, targetId: string) =>
-    api.get('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+    api.get<unknown>('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
   getOrCreateThread: (targetType: string, targetId: string, title?: string) =>
-    api.post('/api/admin/collaboration/threads/by-target', null, {
+    api.post<unknown>('/api/admin/collaboration/threads/by-target', null, {
       params: { target_type: targetType, target_id: targetId, title: title || undefined },
     }).then((r) => r.data),
   getSummary: (targetType: string, targetId: string) =>
-    api.get('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+    api.get<unknown>('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
   getSummariesBatch: (targets: { target_type: string; target_id: string }[]) =>
-    api.post('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
+    api.post<{ summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }> }>('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
   getThreadById: (threadId: string) =>
-    api.get(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
   getComments: (threadId: string) =>
-    api.get(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
+    api.get<unknown>(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
   createComment: (threadId: string, body: string, parentCommentId?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
   editComment: (commentId: string, body: string) =>
-    api.patch(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
+    api.patch<unknown>(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
   deleteComment: (commentId: string) =>
-    api.delete(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data),
+    api.delete<unknown>(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data),
   resolveThread: (threadId: string, note?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
   reopenThread: (threadId: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
   closeThread: (threadId: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
   markRead: (threadId: string, lastCommentId?: string) =>
-    api.post(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data),
+    api.post<unknown>(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data),
   getUnreadCount: () =>
-    api.get('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
+    api.get<unknown>('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
 };
 
 export const requirementsAPI = {
@@ -2404,9 +2405,9 @@ export const requirementsAPI = {
 
 export const employeeAPI = {
   getCurrentAssignment: async (): Promise<{
-    assignment: any;
-    linked_assignments?: any[];
-    pending_claim_assignments?: any[];
+    assignment: unknown;
+    linked_assignments?: unknown[];
+    pending_claim_assignments?: unknown[];
   }> => {
     return cachedRequest('employee:current-assignment', 30_000, async () => {
       const response = await api.get('/api/employee/assignments/current');
@@ -2414,22 +2415,22 @@ export const employeeAPI = {
     });
   },
   /** Compact linked + pending summaries (no case draft hydration). */
-  getAssignmentsOverview: async (): Promise<{ linked: any[]; pending: any[] }> => {
+  getAssignmentsOverview: async (): Promise<{ linked: unknown[]; pending: unknown[] }> => {
     return cachedRequest('employee:assignments-overview', 60_000, async () => {
       const response = await api.get('/api/employee/assignments/overview');
       return parseResponse(assignmentsOverviewSchema, response.data, 'getAssignmentsOverview');
     });
   },
   listMessages: async (): Promise<{
-    messages: any[];
-    quote_threads?: any[];
+    messages: unknown[];
+    quote_threads?: unknown[];
   }> => {
-    const response = await api.get('/api/employee/messages');
+    const response = await api.get<{ messages: unknown[]; quote_threads?: unknown[] }>('/api/employee/messages');
     return response.data;
   },
   /** Send a message to HR on your own assignment thread (ownership enforced server-side). */
-  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: any }> => {
-    const response = await api.post<{ ok: boolean; message: any }>('/api/employee/messages', {
+  sendMessage: async (assignmentId: string, body: string): Promise<{ ok: boolean; message: unknown }> => {
+    const response = await api.post<{ ok: boolean; message: unknown }>('/api/employee/messages', {
       assignment_id: assignmentId,
       body,
     });
@@ -2516,7 +2517,7 @@ export const employeeAPI = {
     const response = await api.get<Array<{ id: string; assignment_id: string; message: string; created_at: string }>>('/api/employee/assignment-feedback', { params: { assignment_id: assignmentId } });
     return response.data;
   },
-  submitAnswer: async (assignmentId: string, questionId: string, answer: any): Promise<EmployeeJourneyResponse> => {
+  submitAnswer: async (assignmentId: string, questionId: string, answer: unknown): Promise<EmployeeJourneyResponse> => {
     const response = await api.post<EmployeeJourneyResponse>('/api/employee/journey/answer', { assignmentId, questionId, answer });
     return response.data;
   },
@@ -2536,8 +2537,8 @@ export const employeeAPI = {
     });
     return response.data;
   },
-  getRecommendations: async (): Promise<{ housing: any[]; schools: any[]; movers: any[] }> => {
-    const response = await api.get<{ housing: any[]; schools: any[]; movers: any[] }>('/api/employee/recommendations');
+  getRecommendations: async (): Promise<{ housing: HousingRecommendation[]; schools: SchoolRecommendation[]; movers: MoverRecommendation[] }> => {
+    const response = await api.get<{ housing: HousingRecommendation[]; schools: SchoolRecommendation[]; movers: MoverRecommendation[] }>('/api/employee/recommendations');
     return response.data;
   },
   getPolicyCaps: async (): Promise<{
@@ -2550,7 +2551,13 @@ export const employeeAPI = {
     schools_usd: number | null;
     immigration_usd: number | null;
   }> => {
-    const response = await api.get('/api/employee/policy/caps');
+    const response = await api.get<{
+      has_policy?: boolean;
+      housing_monthly_usd: number | null;
+      movers_usd: number | null;
+      schools_usd: number | null;
+      immigration_usd: number | null;
+    }>('/api/employee/policy/caps');
     return response.data;
   },
   getAssignmentServices: async (assignmentId: string): Promise<{
@@ -2567,7 +2574,20 @@ export const employeeAPI = {
       currency: string | null;
     }>;
   }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/services`);
+    const response = await api.get<{
+      assignment_id: string;
+      case_id: string;
+      services: Array<{
+        id: string;
+        assignment_id: string;
+        case_id: string;
+        service_key: string;
+        category: string;
+        selected: number | boolean;
+        estimated_cost: number | null;
+        currency: string | null;
+      }>;
+    }>(`/api/employee/assignments/${assignmentId}/services`);
     return response.data;
   },
   saveAssignmentServices: async (
@@ -2579,8 +2599,8 @@ export const employeeAPI = {
       estimated_cost: number | null;
       currency?: string | null;
     }>
-  ): Promise<{ ok: boolean; services: any[] }> => {
-    const response = await api.post<{ ok: boolean; services: any[] }>(`/api/employee/assignments/${assignmentId}/services`, { services });
+  ): Promise<{ ok: boolean; services: unknown[] }> => {
+    const response = await api.post<{ ok: boolean; services: unknown[] }>(`/api/employee/assignments/${assignmentId}/services`, { services });
     return response.data;
   },
   /**
@@ -2624,8 +2644,16 @@ export const employeeAPI = {
       source?: string | null;
     };
   }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/services-policy-context`);
-    return response.data;
+    const response = await api.get<unknown>(`/api/employee/assignments/${assignmentId}/services-policy-context`);
+    return response.data as {
+      ok?: boolean; has_policy?: boolean; comparison_available?: boolean;
+      comparison_readiness?: { comparison_ready: boolean; comparison_blockers: string[]; partial_numeric_coverage?: boolean };
+      currency: string;
+      categories: Record<string, { wizard_key: string; benefit_key: string | null; determination: string; show_policy_comparison: boolean; primary_label: string; detail?: string | null; approval_required?: boolean; cap_summary?: string | null }>;
+      source?: string;
+      policy_surface?: { id?: string; title?: string; version?: number; effective_date?: string | null; company_name?: string | null };
+      resolution_context?: { assignment_type?: string | null; family_status?: string | null; tier?: string | null; source?: string | null };
+    };
   },
   getPolicyBudget: async (assignmentId: string): Promise<{
     ok?: boolean;
@@ -2641,8 +2669,8 @@ export const employeeAPI = {
     total_cap?: number | null;
     budget?: unknown;
   }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-budget`);
-    return response.data;
+    const response = await api.get<unknown>(`/api/employee/assignments/${assignmentId}/policy-budget`);
+    return response.data as { ok?: boolean; has_policy?: boolean; comparison_available?: boolean; comparison_readiness?: { comparison_ready: boolean; comparison_blockers: string[]; partial_numeric_coverage?: boolean }; currency: string; caps: Record<string, number>; total_cap?: number | null; budget?: unknown };
   },
   getApplicablePolicy: async (assignmentId?: string): Promise<{
     policy: Record<string, unknown> | null;
@@ -2652,7 +2680,7 @@ export const employeeAPI = {
     assignmentType?: string;
   }> => {
     const params = assignmentId ? { assignmentId } : {};
-    const response = await api.get('/api/employee/policy/applicable', { params });
+    const response = await api.get<{ policy: Record<string, unknown> | null; allowedBenefits: Array<Record<string, unknown>>; wizardCriteria: Record<string, unknown>; employeeBand?: string; assignmentType?: string }>('/api/employee/policy/applicable', { params });
     return response.data;
   },
   /** Resolved policy from published company policy (preferred when assignmentId available) */
@@ -2683,8 +2711,16 @@ export const employeeAPI = {
       partial_numeric_coverage?: boolean;
     };
   }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy`);
-    return response.data;
+    const response = await api.get<unknown>(`/api/employee/assignments/${assignmentId}/policy`);
+    return response.data as {
+      policy: { id: string; title: string; version: number; effective_date: string } | null;
+      benefits: Array<{ benefit_key: string; included: boolean; min_value?: number; standard_value?: number; max_value?: number; currency?: string; approval_required: boolean; evidence_required_json?: string[]; condition_summary?: string; exclusions_json?: Array<{ domain?: string; description?: string }> }>;
+      exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
+      resolved_at?: string;
+      resolution_context?: { assignment_type?: string; family_status?: string; tier?: string };
+      message?: string; has_policy?: boolean; message_secondary?: string; comparison_available?: boolean;
+      comparison_readiness?: { comparison_ready: boolean; comparison_blockers: string[]; partial_numeric_coverage?: boolean };
+    };
   },
   /**
    * Single round-trip for Assignment Package & Limits (employee HR Policy page).
@@ -2710,8 +2746,8 @@ export const employeeAPI = {
       partial_numeric_coverage?: boolean;
     };
   }> => {
-    const response = await api.get('/api/employee/me/assignment-package-policy');
-    return response.data;
+    const response = await api.get<unknown>('/api/employee/me/assignment-package-policy');
+    return response.data as { status: 'found' | 'no_policy_found' | 'no_assignment' | 'error'; ok?: boolean; assignment_id: string | null; has_policy?: boolean; policy: Record<string, unknown> | null; benefits: unknown[]; exclusions: unknown[]; resolved_at?: string | null; resolution_context?: Record<string, unknown> | null; message?: string | null; message_secondary?: string | null; company_id_used?: string; comparison_available?: boolean; comparison_readiness?: { comparison_ready: boolean; comparison_blockers: string[]; partial_numeric_coverage?: boolean } };
   },
   /** Policy envelope (envelope cards ready) for comparison/budget logic */
   getPolicyEnvelope: async (assignmentId: string): Promise<{
@@ -2732,8 +2768,8 @@ export const employeeAPI = {
     }>;
     message?: string;
   }> => {
-    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-envelope`);
-    return response.data;
+    const response = await api.get<unknown>(`/api/employee/assignments/${assignmentId}/policy-envelope`);
+    return response.data as { policy: Record<string, unknown> | null; benefits: unknown[]; exclusions: unknown[]; envelopes: Array<{ key: string; label: string; included: boolean; capped: boolean; min_value?: number; standard_value?: number; max_value?: number; currency: string; approval_required: boolean; evidence_required: string[] }>; message?: string };
   },
   /** Compare selected services vs resolved policy (read-only, explanatory) */
   getPolicyServiceComparison: async (assignmentId: string): Promise<PolicyServiceComparisonResponse> => {
@@ -2747,7 +2783,7 @@ export const employeeAPI = {
   ): Promise<EmployeePolicyAssistantQueryResponse> => {
     // AIQ-833 / F2: cut over to the constrained RAG engine (company scoping is
     // server-derived). assignment_id is kept on the signature + response shape.
-    const response = await api.post(
+    const response = await api.post<RagQueryResponse>(
       '/api/policy-assistant/rag-query',
       { question: message },
       { timeout: 120_000 }
@@ -2768,7 +2804,7 @@ export const employeeAPI = {
     status: string;
     created_at: string;
   }> => {
-    const response = await api.post('/api/employee/quote-requests', payload);
+    const response = await api.post<{ id: string; case_id: string; status: string; created_at: string }>('/api/employee/quote-requests', payload);
     return response.data;
   },
 
@@ -2781,7 +2817,7 @@ export const employeeAPI = {
     status: string;
     created_at: string;
   }>> => {
-    const response = await api.get('/api/employee/quote-requests');
+    const response = await api.get<Array<{ id: string; case_id: string; service_categories: string[]; notes: string | null; budget_range: string | null; status: string; created_at: string }>>('/api/employee/quote-requests');
     return Array.isArray(response.data) ? response.data : [];
   },
 
@@ -2813,37 +2849,37 @@ export const servicesAPI = {
     case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
     /** AIQ-1249d: canonical move date for the services context banner. */
     target_start_date?: string | null;
-    services: Array<{ service_key: string; selected: boolean | number; [k: string]: any }>;
-    answers: Array<{ service_key: string; answers: Record<string, any> }>;
-    questions: any[];
+    services: Array<{ service_key: string; selected: boolean | number; [k: string]: unknown }>;
+    answers: Array<{ service_key: string; answers: Record<string, unknown> }>;
+    questions: unknown[];
     selected_services: string[];
   }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get('/api/services/context', { params });
+    const response = await api.get<{ assignment_id: string; case_id: string; case_context: Record<string, unknown>; target_start_date?: string | null; services: Array<{ service_key: string; selected: boolean | number; [k: string]: unknown }>; answers: Array<{ service_key: string; answers: Record<string, unknown> }>; questions: unknown[]; selected_services: string[] }>('/api/services/context', { params });
     return response.data;
   },
-  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: any[] }> => {
+  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: unknown[] }> => {
     const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
-    const response = await api.get<{ case_id: string; answers: any[] }>('/api/services/answers', { params: p });
+    const response = await api.get<{ case_id: string; answers: unknown[] }>('/api/services/answers', { params: p });
     return response.data;
   },
   getServiceQuestions: async (
     assignmentId: string,
     fallbackServices?: string[]
-  ): Promise<{ questions: any[]; selected_services: string[] }> => {
+  ): Promise<{ questions: unknown[]; selected_services: string[] }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
       params.fallback_services = fallbackServices.join(',');
     }
-    const response = await api.get<{ questions: any[]; selected_services: string[] }>('/api/services/questions', { params });
+    const response = await api.get<{ questions: unknown[]; selected_services: string[] }>('/api/services/questions', { params });
     return response.data;
   },
   saveServiceAnswers: async (
     caseId: string,
-    items: Array<{ service_key: string; answers: Record<string, any> }>,
+    items: Array<{ service_key: string; answers: Record<string, unknown> }>,
     options?: { signal?: AbortSignal }
   ): Promise<{ ok: boolean }> => {
     const config = options?.signal ? { signal: options.signal } : {};
@@ -2852,7 +2888,7 @@ export const servicesAPI = {
   },
   createRfq: async (
     caseId: string,
-    items: Array<{ service_key: string; requirements: Record<string, any> }>,
+    items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
     supplierIds: string[]
   ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
     const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string } }>('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
@@ -3828,26 +3864,24 @@ function handle401Redirect(response: Response): void {
   }
 }
 
-function buildApiError(response: Response, bodyText: string) {
-  let detail: any = bodyText;
+function buildApiError(response: Response, bodyText: string): Error {
+  let detail: unknown = bodyText;
   let message = bodyText || `${response.status} ${response.statusText}`;
 
   try {
-    const parsed = JSON.parse(bodyText);
-    detail = parsed?.detail ?? parsed;
+    const parsed: unknown = JSON.parse(bodyText);
+    const parsedObj = parsed && typeof parsed === 'object' ? (parsed as { detail?: unknown; message?: string }) : null;
+    detail = parsedObj?.detail ?? parsed;
     if (typeof detail === 'string') {
       message = detail;
     } else if (detail && typeof detail === 'object') {
-      message = detail.message || JSON.stringify(detail);
+      message = (detail as { message?: string }).message || JSON.stringify(detail);
     }
   } catch {
     // bodyText wasn't JSON
   }
 
-  const err: any = new Error(message);
-  err.status = response.status;
-  err.detail = detail;
-  return err;
+  return Object.assign(new Error(message), { status: response.status, detail });
 }
 
 function authHeaders(): Record<string, string> {
@@ -3912,7 +3946,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
 
 export async function apiPost<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
@@ -3971,7 +4005,7 @@ export async function apiPost<T>(
 
 export async function apiPatch<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
@@ -4030,7 +4064,7 @@ export async function apiPatch<T>(
 
 export async function apiPut<T>(
   path: string,
-  body?: any,
+  body?: unknown,
   opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
