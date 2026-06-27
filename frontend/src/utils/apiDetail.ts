@@ -20,7 +20,7 @@ export function formatDetailToString(detail: unknown, fallback = ''): string {
     if (o.message) return String(o.message);
     if (o.msg) return String(o.msg);
   }
-  return fallback || String(detail);
+  return fallback || (typeof detail === 'object' && detail !== null ? JSON.stringify(detail as Record<string, unknown>) : String(detail as string | number | boolean | null | undefined));
 }
 
 /**

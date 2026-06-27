@@ -297,7 +297,7 @@ export const ServicesQuestions: React.FC = () => {
         ? 'Loading recommendations...'
         : undefined;
 
-  const destinationCity = String(initialAnswers.dest_city ?? '').trim();
+  const destinationCity = ((initialAnswers.dest_city as string | null | undefined) ?? '').trim();
   const destinationCountry = String(caseContext?.destCountry ?? '').trim();
   const missingDestination = caseDetailsLoaded && (!destinationCity || !destinationCountry);
 

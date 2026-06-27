@@ -124,7 +124,7 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
       setSubmitting(true);
       setError(null);
       try {
-        const response = await api.post('/api/hr/immigration/cases', {
+        const response = await api.post<{ id: string }>('/api/hr/immigration/cases', {
           case_id: form.caseId,
           corridor_from: form.corridorFrom,
           corridor_to: form.corridorTo,
@@ -133,7 +133,7 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
           expected_submission_date: form.expectedSubmissionDate || null,
           expected_grant_date: form.expectedGrantDate || null,
         });
-        setSuccessId(response.data.id as string);
+        setSuccessId(response.data.id);
       } catch (err: unknown) {
         const msg =
           err instanceof Error ? err.message : 'Failed to create immigration case.';

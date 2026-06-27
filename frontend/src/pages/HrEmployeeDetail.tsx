@@ -93,8 +93,9 @@ export const HrEmployeeDetail: React.FC = () => {
       setSaved(true);
       // Refetch re-seeds the form from the saved server state.
       await queryClient.invalidateQueries({ queryKey: ['hr', 'employee', id] });
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
+    } catch (err) {
+      const e = err as { response?: { status?: number } };
+      if (e.response?.status === 404) {
         setError('Employee not found.');
       } else {
         setError('Failed to save.');

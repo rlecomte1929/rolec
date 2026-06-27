@@ -14,7 +14,7 @@ import { RequireHrRoute } from '../RequireHrRoute';
 
 const getAuthItem = vi.fn();
 vi.mock('../../../utils/demo', () => ({
-  getAuthItem: (key: string) => getAuthItem(key),
+  getAuthItem: (key: string): unknown => getAuthItem(key),
 }));
 
 function renderGuarded(allowEmployee = false) {

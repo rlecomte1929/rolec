@@ -87,8 +87,8 @@ export function ApprovalModal() {
         body: JSON.stringify({ request_id: current.id, approved }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string })?.error ?? `HTTP ${res.status}`);
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
       }
       removeFromQueue(current.id);
     } catch (err) {

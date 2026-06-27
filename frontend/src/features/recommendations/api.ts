@@ -18,7 +18,7 @@ export async function rateProvider(
   supplierId: string,
   payload: { caseId: string; score: number; comment?: string },
 ): Promise<ProviderRatingResult> {
-  const res = await api.post(`/api/employee/providers/${encodeURIComponent(supplierId)}/rating`, {
+  const res = await api.post<ProviderRatingResult>(`/api/employee/providers/${encodeURIComponent(supplierId)}/rating`, {
     case_id: payload.caseId,
     score: payload.score,
     comment: payload.comment,
@@ -28,12 +28,12 @@ export async function rateProvider(
 
 export const recommendationsEngineAPI = {
   listCategories: async (): Promise<{ categories: CategoryInfo[] }> => {
-    const res = await api.get(`${BASE}/categories`);
+    const res = await api.get<{ categories: CategoryInfo[] }>(`${BASE}/categories`);
     return res.data;
   },
 
   getSchema: async (category: string): Promise<Record<string, unknown>> => {
-    const res = await api.get(`${BASE}/${category}/schema`);
+    const res = await api.get<Record<string, unknown>>(`${BASE}/${category}/schema`);
     return res.data;
   },
 
@@ -42,7 +42,7 @@ export const recommendationsEngineAPI = {
     criteria: Record<string, unknown>,
     topN = 10
   ): Promise<RecommendationResponse> => {
-    const res = await api.post(`${BASE}/${category}`, {
+    const res = await api.post<RecommendationResponse>(`${BASE}/${category}`, {
       criteria,
       top_n: topN,
     });
@@ -54,7 +54,7 @@ export const recommendationsEngineAPI = {
     assignmentId: string,
     selectedServices?: string[]
   ): Promise<{ results: Record<string, RecommendationResponse> }> => {
-    const res = await api.post(`${BASE}/batch`, {
+    const res = await api.post<{ results: Record<string, RecommendationResponse> }>(`${BASE}/batch`, {
       assignment_id: assignmentId,
       selected_services: selectedServices ?? undefined,
     });

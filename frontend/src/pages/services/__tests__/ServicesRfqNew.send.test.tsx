@@ -15,7 +15,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const mockCreate = vi.fn();
 
 vi.mock('../../../api/client', () => ({
-  employeeAPI: { createQuoteRequest: (...a: unknown[]) => mockCreate(...a) },
+  employeeAPI: { createQuoteRequest: (...a: unknown[]): unknown => mockCreate(...a) },
 }));
 vi.mock('../../../components/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -55,7 +55,7 @@ describe('ServicesRfqNew send', () => {
     fireEvent.click(btn);
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    const payload = mockCreate.mock.calls[0][0];
+    const payload = mockCreate.mock.calls[0][0] as { case_id: string; service_categories: string[] };
     expect(payload.case_id).toBe('case-1');
     expect(payload.service_categories).toEqual(['living_areas', 'movers']);
 

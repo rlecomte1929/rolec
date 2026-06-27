@@ -8,8 +8,8 @@ export interface Question {
   options?: QuestionOption[];
   required: boolean;
   mapsTo: string;
-  dependsOn?: any;
-  validation?: any;
+  dependsOn?: unknown;
+  validation?: unknown;
   allowUnknown: boolean;
 }
 
@@ -141,7 +141,7 @@ export interface DossierQuestion {
 export interface DossierQuestionsResponse {
   destination_country?: string | null;
   questions: DossierQuestion[];
-  answers: Record<string, any>;
+  answers: Record<string, unknown>;
   mandatory_unanswered_count: number;
   is_step5_complete: boolean;
   sources_used: Array<{ title?: string; url: string; snippet?: string }>;
@@ -184,7 +184,7 @@ export interface User {
 
 export interface AnswerRequest {
   questionId: string;
-  answer: any;
+  answer: unknown;
   isUnknown?: boolean;
 }
 
@@ -397,7 +397,7 @@ export interface EmployeeProfileDTO {
   passportExpiry?: string;
   residenceCountry?: string;
   email?: string;
-  ocr?: Record<string, any>;
+  ocr?: Record<string, unknown>;
 }
 
 export interface FamilyMemberDTO {
@@ -446,7 +446,7 @@ export interface CaseDTO {
   destCity?: string;
   purpose?: string;
   targetMoveDate?: string;
-  flags?: Record<string, any>;
+  flags?: Record<string, unknown>;
   requirementsSnapshotId?: string;
 }
 

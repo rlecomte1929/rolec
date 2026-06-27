@@ -53,7 +53,7 @@ function parseEnvJson(raw: string): Partial<Record<Tier, number>> | null {
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
        
       console.warn(
-        `staleness: ${ENV_VAR}.${tier} must be a non-negative integer (got ${String(v)}); using default`,
+        `staleness: ${ENV_VAR}.${tier} must be a non-negative integer (got ${String(v as string | number | boolean | null | undefined)}); using default`,
       );
       continue;
     }
@@ -65,7 +65,7 @@ function parseEnvJson(raw: string): Partial<Record<Tier, number>> | null {
 export function loadConfig(env?: Record<string, string | undefined>): StalenessConfig {
   // import.meta.env is the Vite source; tests can pass an explicit env map.
    
-  const source: Record<string, string | undefined> = env ?? ((import.meta as any)?.env ?? {});
+  const source: Record<string, string | undefined> = env ?? ((import.meta as { env?: Record<string, string | undefined> }).env ?? {});
   const raw = source[ENV_VAR];
   if (!raw) return { thresholdsDays: { ...DEFAULT_THRESHOLDS_DAYS } };
 

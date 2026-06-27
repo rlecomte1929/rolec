@@ -22,17 +22,17 @@ export interface ProviderRealtimeCallbacks {
 
 function rowToTask(row: Record<string, unknown>): ProviderTaskItem {
   return {
-    id:            String(row.id ?? ''),
-    case_id:       String(row.case_id ?? ''),
-    provider_id:   String(row.provider_id ?? ''),
-    provider_name: row.provider_name != null ? String(row.provider_name) : null,
-    title:         String(row.title ?? ''),
-    description:   row.description != null ? String(row.description) : null,
+    id:            (row.id as string | null | undefined) ?? '',
+    case_id:       (row.case_id as string | null | undefined) ?? '',
+    provider_id:   (row.provider_id as string | null | undefined) ?? '',
+    provider_name: (row.provider_name as string | null | undefined) ?? null,
+    title:         (row.title as string | null | undefined) ?? '',
+    description:   (row.description as string | null | undefined) ?? null,
     status:        (row.status as ProviderTaskItem['status']) ?? 'pending',
-    due_date:      row.due_date != null ? String(row.due_date) : null,
-    notes:         row.notes != null ? String(row.notes) : null,
-    created_at:    String(row.created_at ?? ''),
-    updated_at:    String(row.updated_at ?? ''),
+    due_date:      (row.due_date as string | null | undefined) ?? null,
+    notes:         (row.notes as string | null | undefined) ?? null,
+    created_at:    (row.created_at as string | null | undefined) ?? '',
+    updated_at:    (row.updated_at as string | null | undefined) ?? '',
   };
 }
 
