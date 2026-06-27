@@ -3,8 +3,8 @@ import type { CompanyProfilePayload } from '../../../types';
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { PlatformShellSidebar } from '../../../components/PlatformShellSidebar';
 import { CompanyBrand } from '../../../components/CompanyBrand';
-import { CompanyProfileForm } from './CompanyProfileForm';
 import { trackCompanyProfileSaved } from '../../../perf/hrOnboardingInstrumentation';
+import { CompanyProfileForm } from './CompanyProfileForm';
 
 /**
  * HR's own-company profile page. Data comes from useHrCompanyContext

@@ -319,20 +319,23 @@ export const AdminAssignments: React.FC = () => {
                             setSelectionMode(false);
                             setTimeout(() => setDeleteFeedback('idle'), 3000);
                           } else {
-                            const firstReason = rejected[0]?.reason;
+                            const firstReason = rejected[0]?.reason as { response?: { data?: { detail?: unknown } }; message?: string } | undefined;
                             const detail =
-                              firstReason?.response?.data?.detail ||
-                              firstReason?.message ||
+                              (typeof firstReason?.response?.data?.detail === 'string' ? firstReason.response.data.detail : null) ??
+                              firstReason?.message ??
                               'unknown error';
                             const suffix = failed > 1 ? ` (${failed} failed; first: ${detail})` : ` ${detail}`;
                             setDeleteErrorDetail(suffix.trim());
                             setTimeout(() => setDeleteFeedback('idle'), 8000);
                           }
-                        } catch (e: any) {
+                        } catch (e) {
+                          const err = e as { response?: { data?: { detail?: unknown } }; message?: string };
                           logger.error(e);
                           await queryClient.invalidateQueries({ queryKey: ['admin', 'assignments'] });
                           setDeleteErrorDetail(
-                            e?.response?.data?.detail || e?.message || 'unknown error',
+                            (typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : null) ??
+                            err?.message ??
+                            'unknown error',
                           );
                           setDeleteFeedback('error');
                           setTimeout(() => setDeleteFeedback('idle'), 8000);

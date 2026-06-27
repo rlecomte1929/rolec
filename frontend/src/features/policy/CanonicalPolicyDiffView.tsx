@@ -166,6 +166,12 @@ const RemovedRule: React.FC<{ r: RuleRow }> = ({ r }) => (
   </li>
 );
 
+const displayStr = (v: unknown): string => {
+  if (v == null) return '—';
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return '—';
+};
+
 const ChangedRuleRow: React.FC<{ entry: ChangedRule }> = ({ entry }) => {
   const { before, after, changed_fields } = entry;
   return (
@@ -185,11 +191,11 @@ const ChangedRuleRow: React.FC<{ entry: ChangedRule }> = ({ entry }) => {
                 {RULE_FIELD_LABELS[f] ?? f}:
               </span>{' '}
               <span className="text-red-700 line-through decoration-red-300">
-                {String(lhs ?? '—')}
+                {displayStr(lhs)}
               </span>{' '}
               <span className="text-slate-500">→</span>{' '}
               <span className="text-emerald-800 font-medium">
-                {String(rhs ?? '—')}
+                {displayStr(rhs)}
               </span>
             </li>
           );
@@ -230,11 +236,11 @@ const ChangedExclusionRow: React.FC<{ entry: ChangedExclusion }> = ({ entry }) =
               {EXCL_FIELD_LABELS[f] ?? f}:
             </span>{' '}
             <span className="text-red-700 line-through decoration-red-300">
-              {String(lhs ?? '—')}
+              {displayStr(lhs)}
             </span>{' '}
             <span className="text-slate-500">→</span>{' '}
             <span className="text-emerald-800 font-medium">
-              {String(rhs ?? '—')}
+              {displayStr(rhs)}
             </span>
           </li>
         );

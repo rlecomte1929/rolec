@@ -156,6 +156,12 @@ const RemovedRow: React.FC<{
   </li>
 );
 
+const displayStr = (v: unknown): string => {
+  if (v == null) return '—';
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return '—';
+};
+
 const ChangedRow: React.FC<{
   entry: ChangedEntry;
   reverting: boolean;
@@ -181,11 +187,11 @@ const ChangedRow: React.FC<{
                     {FIELD_LABELS[field] ?? field}:
                   </span>{' '}
                   <span className="text-red-700 line-through decoration-red-300">
-                    {String(lhs ?? '—')}
+                    {displayStr(lhs)}
                   </span>{' '}
                   <span className="text-slate-500">→</span>{' '}
                   <span className="text-emerald-800 font-medium">
-                    {String(rhs ?? '—')}
+                    {displayStr(rhs)}
                   </span>
                 </li>
               );

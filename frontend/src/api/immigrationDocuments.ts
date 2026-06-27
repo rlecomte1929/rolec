@@ -38,7 +38,7 @@ export const immigrationDocumentsAPI = {
   ): Promise<{ document_id: string; ocr_status: string }> => {
     const form = new FormData();
     form.append('file', file);
-    const res = await api.post(
+    const res = await api.post<{ document_id: string; ocr_status: string }>(
       `/api/immigration/cases/${caseId}/documents`,
       form,
       {
@@ -52,7 +52,7 @@ export const immigrationDocumentsAPI = {
   },
 
   list: async (caseId: string): Promise<ImmigrationDocument[]> => {
-    const res = await api.get(`/api/immigration/cases/${caseId}/documents`);
+    const res = await api.get<{ documents: ImmigrationDocument[] }>(`/api/immigration/cases/${caseId}/documents`);
     return res.data?.documents ?? [];
   },
 };

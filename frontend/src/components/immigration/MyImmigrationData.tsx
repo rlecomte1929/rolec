@@ -143,7 +143,7 @@ function formatValue(value: unknown): string {
       .filter((v) => v !== null && v !== undefined && v !== '')
       .join(', ') || '—';
   }
-  return String(value);
+  return String(value as string | number | boolean | bigint);
 }
 
 export const MyImmigrationData: React.FC = () => {

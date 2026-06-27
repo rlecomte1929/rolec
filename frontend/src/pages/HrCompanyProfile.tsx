@@ -50,9 +50,9 @@ export const HrCompanyProfile: React.FC = () => {
 
   useEffect(() => {
     if (company) {
-      const c = company;
-      const pick = (snake: string, camel: string) =>
-        String((c[snake] ?? c[camel] ?? '') || '').trim();
+      const c = company as Record<string, string | null | undefined>;
+      const pick = (snake: string, camel: string): string =>
+        ((c[snake] ?? c[camel] ?? '') || '').trim();
       setName(pick('name', 'name'));
       setCountry(pick('country', 'country'));
       setSizeBand(pick('size_band', 'sizeBand'));
@@ -204,7 +204,7 @@ export const HrCompanyProfile: React.FC = () => {
         <div className="space-y-4">
           {profileLoading ? (
             <>
-              {[...Array(12)].map((_, i) => <FieldSkeleton key={i} />)}
+              {Array.from({ length: 12 }).map((_, i) => <FieldSkeleton key={i} />)}
               <div className="pt-2">
                 <div className="h-4 w-40 rounded bg-[#e2e8f0] animate-pulse mb-2" />
                 <div className="h-24 rounded-lg bg-[#e2e8f0] animate-pulse" />

@@ -35,7 +35,7 @@ export const AdminTags: React.FC = () => {
 
   useEffect(() => {
     void load();
-  }, [filterGroup]);
+  }, [filterGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = async (id: string, payload: { key?: string; label?: string; tag_group?: string }) => {
     try {

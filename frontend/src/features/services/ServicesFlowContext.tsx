@@ -34,7 +34,7 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [selectedServices, setSelectedServices] = useState<Set<ServiceKey>>(() => {
     try {
       const raw = localStorage.getItem('services_selected');
-      return raw ? new Set(JSON.parse(raw)) : new Set();
+      return raw ? new Set(JSON.parse(raw) as ServiceKey[]) : new Set();
     } catch {
       return new Set();
     }
@@ -42,7 +42,7 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {
     try {
       const raw = localStorage.getItem('services_answers');
-      return raw ? JSON.parse(raw) : {};
+      return raw ? JSON.parse(raw) as Record<string, unknown> : {};
     } catch {
       return {};
     }
@@ -50,7 +50,7 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [recommendations, setRecommendations] = useState<Record<string, RecommendationResponse> | null>(() => {
     try {
       const raw = localStorage.getItem('services_recommendations');
-      return raw ? JSON.parse(raw) : null;
+      return raw ? JSON.parse(raw) as Record<string, RecommendationResponse> : null;
     } catch {
       return null;
     }
@@ -58,7 +58,7 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [shortlist, setShortlist] = useState<Map<string, string>>(() => {
     try {
       const raw = localStorage.getItem('services_shortlist');
-      return raw ? new Map(JSON.parse(raw)) : new Map();
+      return raw ? new Map(JSON.parse(raw) as [string, string][]) : new Map();
     } catch {
       return new Map();
     }

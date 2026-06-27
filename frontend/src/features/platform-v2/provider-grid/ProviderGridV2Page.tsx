@@ -37,7 +37,7 @@ export function ProviderGridV2Page({ embedded = false }: { embedded?: boolean } 
     queryKey: ['hr', 'provider-status-grid'],
     queryFn: () => hrAPI.getProviderStatusGrid(),
   });
-  const rows: ProviderGridRow[] = gridQuery.data?.rows ?? [];
+  const rows: ProviderGridRow[] = useMemo(() => gridQuery.data?.rows ?? [], [gridQuery.data]);
   const loading = gridQuery.isLoading;
   const lastRefreshed: Date | null = gridQuery.dataUpdatedAt
     ? new Date(gridQuery.dataUpdatedAt)

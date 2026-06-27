@@ -512,7 +512,7 @@ export function EmployeeRichProfilePage() {
     const states = SECTIONS.map((s) => sectionCompletionState(s.id, profile, members));
     const scored = states.map((st) => (st === 'complete' ? 1 : st === 'partial' ? 0.5 : 0));
     return Math.round(((scored as number[]).reduce((a, b) => a + b, 0) / SECTIONS.length) * 100);
-  }, [profile, SECTIONS]);
+  }, [profile, SECTIONS, members]);
 
   const completeCount = SECTIONS.filter(
     (s) => sectionCompletionState(s.id, profile, members) === 'complete',

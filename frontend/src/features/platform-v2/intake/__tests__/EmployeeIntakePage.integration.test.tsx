@@ -21,6 +21,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { EmployeeLinkedOverviewRow } from '../../../../types/employeeAssignmentOverview';
+import { EmployeeIntakePage } from '../EmployeeIntakePage';
 
 // ── Stub AppShell (layout shell with its own mount-time network) ──────────────
 vi.mock('../../../../components/AppShell', () => ({
@@ -64,14 +65,12 @@ vi.mock('../../../../api/client', () => ({
   apiPost: vi.fn().mockResolvedValue({}),
   invalidateApiCache: vi.fn(),
   employeeAPI: {
-    getIntake: (...a: unknown[]) => getIntake(...a),
-    updateIntakeDraft: (...a: unknown[]) => updateIntakeDraft(...a),
-    updateIntakeProgress: (...a: unknown[]) => updateIntakeProgress(...a),
+    getIntake: (...a: unknown[]): unknown => getIntake(...a),
+    updateIntakeDraft: (...a: unknown[]): unknown => updateIntakeDraft(...a),
+    updateIntakeProgress: (...a: unknown[]): unknown => updateIntakeProgress(...a),
     submitAssignment: vi.fn().mockResolvedValue({}),
   },
 }));
-
-import { EmployeeIntakePage } from '../EmployeeIntakePage';
 
 const SAVED_DRAFT = {
   full_name: 'Marc Bouchard',

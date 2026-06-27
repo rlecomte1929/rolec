@@ -10,7 +10,7 @@ export async function emailRoadmapPlan(
   caseId: string,
   to?: string,
 ): Promise<{ emailed_to: string; subject: string }> {
-  const r = await api.post(`/api/cases/${caseId}/roadmap/email`, to ? { to } : {});
+  const r = await api.post<{ emailed_to: string; subject: string }>(`/api/cases/${caseId}/roadmap/email`, to ? { to } : {});
   return r.data;
 }
 

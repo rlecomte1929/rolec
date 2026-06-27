@@ -7,7 +7,6 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-
 import { PrefillConfirmation } from '../PrefillConfirmation';
 import type { FieldValueItem } from '../../../../api/formEditor';
 

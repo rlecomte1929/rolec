@@ -55,7 +55,8 @@ function formatApiDetail(detail: unknown): string {
   }
   if (typeof detail === 'string') return detail;
   if (detail == null) return '';
-  return String(detail);
+  if (typeof detail === 'number' || typeof detail === 'boolean') return String(detail);
+  return '';
 }
 
 function formatDateTime(val: string | null | undefined): string {
@@ -431,7 +432,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           .join(' · ');
         if (nd) m = `${m} ${nd}`;
       }
-      if (data?.hint) m = `${m} ${data.hint}`;
+      const hint = typeof data?.hint === 'string' ? data.hint : '';
+      if (hint) m = `${m} ${hint}`;
       setMessage(m);
       setMessageVariant('error');
     } finally {
@@ -494,7 +496,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const avgConfidence = useMemo(() => {
     const rules = normalized?.benefit_rules || [];
     if (!rules.length) return null;
-    const sum = rules.reduce((a: number, r: any) => a + (r.confidence ?? 0), 0);
+    const sum = rules.reduce((a: number, r) => a + (r.confidence ?? 0), 0);
     return Math.round((sum / rules.length) * 100);
   }, [normalized?.benefit_rules]);
 

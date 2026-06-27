@@ -62,13 +62,14 @@ interface Persona {
   color: string;
 }
 
+const demoEnv = import.meta.env as Record<string, string | undefined>;
 const DEMO_PERSONAS: Persona[] = [
   {
     id: 'admin',
     label: 'Platform Admin',
     role: 'admin',
-    email: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',
-    password: import.meta.env.VITE_DEMO_ADMIN_PASS ?? 'AdminPass!1',
+    email: demoEnv.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',
+    password: demoEnv.VITE_DEMO_ADMIN_PASS ?? 'AdminPass!1',
     description: 'Full platform access, policy builder, org settings',
     emoji: '🛡️',
     color: '#4A9AE8',
@@ -77,8 +78,8 @@ const DEMO_PERSONAS: Persona[] = [
     id: 'hr',
     label: 'HR Manager',
     role: 'hr',
-    email: import.meta.env.VITE_DEMO_HR_USER ?? 'hr@testingapril.com',
-    password: import.meta.env.VITE_DEMO_HR_PASS ?? 'HrPass!1',
+    email: demoEnv.VITE_DEMO_HR_USER ?? 'hr@testingapril.com',
+    password: demoEnv.VITE_DEMO_HR_PASS ?? 'HrPass!1',
     description: 'Case management, approvals, HR control panel',
     emoji: '👩‍💼',
     color: '#1DBFA2',
@@ -87,8 +88,8 @@ const DEMO_PERSONAS: Persona[] = [
     id: 'employee',
     label: 'Employee',
     role: 'employee',
-    email: import.meta.env.VITE_DEMO_EMP_USER ?? 'employee@testingapril.com',
-    password: import.meta.env.VITE_DEMO_EMP_PASS ?? 'EmpPass!1',
+    email: demoEnv.VITE_DEMO_EMP_USER ?? 'employee@testingapril.com',
+    password: demoEnv.VITE_DEMO_EMP_PASS ?? 'EmpPass!1',
     description: 'Roadmap, dossier, documents, inbox',
     emoji: '🧳',
     color: '#EFA827',

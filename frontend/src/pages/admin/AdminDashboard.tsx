@@ -73,7 +73,7 @@ export const AdminDashboard: React.FC = () => {
                 payload: {
                   active_statuses: ['assigned', 'awaiting_intake', 'submitted'],
                 },
-              });
+              }) as { stats?: { assignments_deleted?: number; relocation_cases_deleted?: number } };
               alert(`Purge complete. Assignments deleted: ${res.stats?.assignments_deleted ?? 0}, Relocation cases deleted: ${res.stats?.relocation_cases_deleted ?? 0}`);
             } finally {
               setPurging(false);

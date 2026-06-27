@@ -5,14 +5,14 @@ import { Card, Button, Input } from './antigravity';
 
 interface GuidedQuestionCardProps {
   question: Question;
-  onAnswer: (answer: any, isUnknown: boolean) => void;
+  onAnswer: (answer: string | boolean | string[] | null, isUnknown: boolean) => void;
 }
 
 export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
   question,
   onAnswer,
 }) => {
-  const [answer, setAnswer] = useState<any>('');
+  const [answer, setAnswer] = useState<string>('');
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,16 +25,16 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     
-    let finalAnswer = answer;
-    
+    let finalAnswer: string | boolean | string[] = answer;
+
     if (question.type === 'multi_select') {
       finalAnswer = selectedOptions;
     } else if (question.type === 'boolean') {
-      finalAnswer = answer === 'true' || answer === true;
+      finalAnswer = answer === 'true';
     } else if (question.type === 'single_select' && question.options && !answer) {
       return; // Require selection
     }
-    
+
     await onAnswer(finalAnswer, false);
     setIsSubmitting(false);
   };

@@ -20,7 +20,8 @@ function capSummary(b: PolicyConfigBenefitRow): string | null {
   }
   if (o.cap_amount != null) {
     const cur = (o.cap_currency as string) || currency || '';
-    return cur ? `Cap ${o.cap_amount} ${cur}` : `Cap ${o.cap_amount}`;
+    const capAmount = o.cap_amount as number | string;
+    return cur ? `Cap ${capAmount} ${cur}` : `Cap ${capAmount}`;
   }
   return null;
 }

@@ -141,8 +141,9 @@ export const HrComplianceCheck: React.FC = () => {
         (old: { assignment: AssignmentDetail; policy: PolicyResponse; report: ComplianceCaseReport } | undefined) =>
           old ? { ...old, report: complianceData } : old,
       );
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to run compliance.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Unable to run compliance.');
     } finally {
       setComplianceRunPending(false);
     }
@@ -155,10 +156,11 @@ export const HrComplianceCheck: React.FC = () => {
     setError('');
     try {
       await hrAPI.recordComplianceAction(caseId, { checkId, actionType, notes });
-    } catch (err: any) {
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
       setError(
-        typeof err.response?.data?.detail === 'string'
-          ? err.response.data.detail
+        typeof e.response?.data?.detail === 'string'
+          ? e.response.data.detail
           : 'Unable to record action.'
       );
     } finally {
@@ -178,10 +180,11 @@ export const HrComplianceCheck: React.FC = () => {
         reason: 'Auto-requested from Compliance Check.',
       });
       await queryClient.invalidateQueries({ queryKey: ['hr', 'case-compliance', caseId] });
-    } catch (err: any) {
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
       setError(
-        typeof err.response?.data?.detail === 'string'
-          ? err.response.data.detail
+        typeof e.response?.data?.detail === 'string'
+          ? e.response.data.detail
           : 'Unable to request exception.'
       );
     } finally {

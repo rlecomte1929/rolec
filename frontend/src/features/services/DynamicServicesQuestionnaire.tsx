@@ -21,7 +21,7 @@ function evalAppliesIf(appliesIf: Record<string, unknown> | null | undefined, an
   if (!appliesIf) return true;
   for (const [k, expected] of Object.entries(appliesIf)) {
     if (k === '!exists') {
-      const key = String(expected || '');
+      const key = String((expected as string | number | boolean | null | undefined) || '');
       if (key && answers[key] === undefined) continue;
       return false;
     }
@@ -103,7 +103,7 @@ export const DynamicServicesQuestionnaire: React.FC<{
 
                   {q.type === 'text' && (
                     <Input
-                      value={String(val)}
+                      value={String(val as string | number | boolean | null | undefined)}
                       onChange={(v) => setValue(id, v)}
                       placeholder={q.placeholder || undefined}
                       fullWidth
@@ -113,7 +113,7 @@ export const DynamicServicesQuestionnaire: React.FC<{
                   {q.type === 'number' && (
                     <Input
                       type="number"
-                      value={String(val)}
+                      value={String(val as string | number | boolean | null | undefined)}
                       onChange={(v) => {
                         const n = parseInt(v, 10);
                         setValue(id, Number.isNaN(n) ? '' : n);
@@ -124,7 +124,7 @@ export const DynamicServicesQuestionnaire: React.FC<{
 
                   {q.type === 'select' && (
                     <Select
-                      value={String(val ?? '')}
+                      value={String((val as string | number | boolean | null | undefined) ?? '')}
                       onChange={(v) => setValue(id, v)}
                       options={q.options || []}
                       placeholder={q.placeholder || 'Select...'}

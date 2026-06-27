@@ -8,6 +8,8 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { AdminPrompts } from '../AdminPrompts';
+import { promptsAPI } from '../../../api/client';
 
 // AdminLayout pulls in nav chrome we don't need for these assertions.
 vi.mock('../AdminLayout', () => ({
@@ -22,9 +24,6 @@ vi.mock('../../../api/client', () => ({
     winRates: vi.fn().mockResolvedValue({}),
   },
 }));
-
-import { AdminPrompts } from '../AdminPrompts';
-import { promptsAPI } from '../../../api/client';
 
 const ROWS = [
   {

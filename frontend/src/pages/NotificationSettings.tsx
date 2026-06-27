@@ -47,8 +47,9 @@ export const NotificationSettings: React.FC = () => {
         }
       });
       setPrefs(map);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load preferences.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : undefined;
+      setError(msg || 'Failed to load preferences.');
     } finally {
       setLoading(false);
     }
@@ -80,8 +81,9 @@ export const NotificationSettings: React.FC = () => {
           [field]: value,
         },
       }));
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : undefined;
+      setError(msg || 'Failed to save.');
     } finally {
       setSaving(null);
     }

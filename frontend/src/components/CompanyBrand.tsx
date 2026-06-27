@@ -53,7 +53,8 @@ export const CompanyBrand: React.FC = () => {
     return null;
   }
 
-  const name = String((company as Record<string, unknown>).name ?? '');
+  const nameRaw = (company as Record<string, unknown>).name;
+  const name = typeof nameRaw === 'string' ? nameRaw : '';
   const displayName =
     name.length > MAX_NAME_LENGTH
       ? `${name.slice(0, MAX_NAME_LENGTH - 1)}…`

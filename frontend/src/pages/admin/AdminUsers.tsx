@@ -329,8 +329,10 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
         company_id: company_id || undefined,
       });
       onSaved();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Failed to save');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: unknown }; status?: number }; message?: string };
+      const detail = e?.response?.data?.detail;
+      setError((typeof detail === 'string' ? detail : null) ?? e?.message ?? 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -448,13 +450,14 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onR
         // Failure → keep the modal open with a red banner the admin can act on.
         setInviteFailure({ error: result?.invite_error || null });
       }
-    } catch (err: any) {
-      const detail = err?.response?.data;
-      let message = err?.message || 'Failed to create person';
+    } catch (err) {
+      const e = err as { response?: { data?: unknown }; message?: string };
+      const detail = e?.response?.data;
+      let message = e?.message ?? 'Failed to create person';
       if (typeof detail === 'string') {
         message = detail;
-      } else if (detail?.message) {
-        message = detail.message;
+      } else if (detail && typeof detail === 'object' && 'message' in detail && typeof (detail as { message?: unknown }).message === 'string') {
+        message = (detail as { message: string }).message;
       }
       setError(message);
     } finally {

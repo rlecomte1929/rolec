@@ -56,7 +56,7 @@ export const AdminStagingResources: React.FC = () => {
       if (listItems.length > 0) {
         adminCollaborationAPI.getSummariesBatch(
           listItems.map((i: { id: string }) => ({ target_type: 'staged_resource_candidate', target_id: i.id }))
-        ).then((r) => setThreadSummaries(r.summaries || {})).catch(() => {});
+        ).then((r: { summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }> }) => setThreadSummaries(r.summaries ?? {})).catch(() => {});
       } else {
         setThreadSummaries({});
       }

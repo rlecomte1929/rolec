@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import type { IntakeData } from '../features/platform-v2/intake/EmployeeIntakePage';
 import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
 import { swallow } from '../lib/errorTracking';
+import { queryClient } from '../lib/queryClient';
 import type {
   LoginRequest,
   LoginResponse,
@@ -1706,7 +1707,40 @@ export const adminAPI = {
     );
     return response.data;
   },
+  /** AIQ-1219: Upload a policy PDF/DOCX and get a workflow summary. */
+  analyzePolicy: async (file: File): Promise<PolicyAnalysisResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<PolicyAnalysisResult>('/api/admin/policy-analysis', form, { timeout: 120_000 });
+    return response.data;
+  },
 };
+
+export interface PolicyWorkflowSummary {
+  policy_title: string | null;
+  effective_date: string | null;
+  tiers: Array<{ name: string; bands: string[]; benefits_count: number }>;
+  tasks: Array<{ category: string; task: string; owner: string; benefit_key: string; confidence: number }>;
+  timeline: Array<{ phase: string; duration: string; tasks: string[] }>;
+  cost_summary: {
+    total_range: { min: number; max: number; currency: string } | null;
+    by_category: Array<{ category: string; estimated_range: { min: number; max: number; currency: string } }>;
+    note: string;
+  };
+  benefits_count: number;
+}
+
+export interface PolicyAnalysisResult {
+  workflow_summary: PolicyWorkflowSummary;
+  extraction: {
+    llm_used: boolean;
+    llm_unavailable_reason: string | null;
+    model: string | null;
+    truncated: boolean;
+    benefits_count: number;
+  };
+  elapsed_ms: number;
+}
 
 // Supplier Registry API (admin)
 export const suppliersAPI = {
@@ -2406,6 +2440,7 @@ export const employeeAPI = {
     const response = await api.post<{ success: boolean; assignmentId?: string }>(`/api/employee/assignments/${assignmentId}/claim`, { email });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   /** Magic-link token claim: employee arrived via invite URL with ?token=<uuid>. */
@@ -2413,6 +2448,7 @@ export const employeeAPI = {
     const response = await api.post<{ success: boolean; assignmentId?: string }>('/api/employee/assignments/claim-by-token', { token });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   /**
@@ -2431,6 +2467,7 @@ export const employeeAPI = {
       { step, total_steps: totalSteps },
     );
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   /**
@@ -2473,6 +2510,7 @@ export const employeeAPI = {
     const response = await api.post<{ success: boolean; assignmentId?: string; alreadyLinked?: boolean }>(`/api/employee/assignments/${assignmentId}/link-pending`, { email });
     invalidateApiCache('employee:current-assignment');
     invalidateApiCache('employee:assignments-overview');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {
@@ -2489,11 +2527,9 @@ export const employeeAPI = {
   },
   submitAssignment: async (assignmentId: string): Promise<unknown> => {
     const response = await api.post<unknown>(`/api/employee/assignments/${assignmentId}/submit`);
-    // Submit advances the assignment to 'submitted' — bust the 60s overview/current
-    // caches so the dashboard reflects the new status (and roadmap-unlocked) on the
-    // post-submit redirect instead of serving the stale pre-submit row.
     invalidateApiCache('employee:assignments-overview');
     invalidateApiCache('employee:current-assignment');
+    void queryClient.invalidateQueries({ queryKey: ['employee', 'assignments-overview'] });
     return response.data;
   },
   updateProfilePhoto: async (assignmentId: string, photoUrl: string): Promise<unknown> => {

@@ -4,6 +4,8 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { adminAPI, adminReviewQueueAPI, suppliersAPI } from '../../../api/client';
+import { AdminOverviewPage } from '../AdminOverviewPage';
 
 vi.mock('../AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
@@ -19,9 +21,6 @@ vi.mock('../../../api/client', () => ({
   adminReviewQueueAPI: { getStats: vi.fn() },
   suppliersAPI: { list: vi.fn() },
 }));
-
-import { adminAPI, adminReviewQueueAPI, suppliersAPI } from '../../../api/client';
-import { AdminOverviewPage } from '../AdminOverviewPage';
 
 const mocked = <T,>(fn: T) => fn as T & ReturnType<typeof vi.fn>;
 

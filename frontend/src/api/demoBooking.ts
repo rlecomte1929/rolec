@@ -23,7 +23,7 @@ export type DemoBookingResult = DemoBookingSuccess | DemoBookingFailure;
 
 export async function submitDemoBooking(input: DemoBookingInput): Promise<DemoBookingResult> {
   try {
-    const { data, error } = await supabase.functions.invoke('submit-demo-request', {
+    const invokeResult = await supabase.functions.invoke('submit-demo-request', {
       body: {
         firstName: input.firstName,
         email: input.email,
@@ -32,6 +32,8 @@ export async function submitDemoBooking(input: DemoBookingInput): Promise<DemoBo
         sourcePage: input.sourcePage ?? null,
       },
     });
+    const data = invokeResult.data as { ok?: boolean; demoId?: string } | null;
+    const error: unknown = invokeResult.error;
 
     // Edge Function returned a non-2xx — supabase-js surfaces the response in `error.context`.
     if (error) {
@@ -43,8 +45,8 @@ export async function submitDemoBooking(input: DemoBookingInput): Promise<DemoBo
       };
     }
 
-    if (data && typeof data === 'object' && 'ok' in data && data.ok === true && typeof (data).demoId === 'string') {
-      return { ok: true, demoId: (data).demoId };
+    if (data?.ok === true && typeof data.demoId === 'string') {
+      return { ok: true, demoId: data.demoId };
     }
 
     return {

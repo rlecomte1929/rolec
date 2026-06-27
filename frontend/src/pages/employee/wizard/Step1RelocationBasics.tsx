@@ -4,8 +4,9 @@ import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
-import type { CaseDraftDTO } from '../../../types';
+import type { CaseDraftDTO, RelocationBasicsDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
+import { getApiErrorMessage } from '../../../utils/apiDetail';
 import { COUNTRY_OPTIONS, getCitiesForCountry, isCityInList } from '../../../utils/countries';
 
 interface StepProps {
@@ -41,7 +42,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
   const showOriginOtherInput = !local.originCity || !isCityInList(local.originCountry || '', local.originCity || '');
   const showDestOtherInput = !local.destCity || !isCityInList(local.destCountry || '', local.destCity || '');
 
-  const update = (key: keyof typeof local, value: any) => {
+  const update = (key: keyof RelocationBasicsDTO, value: RelocationBasicsDTO[keyof RelocationBasicsDTO]) => {
     setLocal({ ...local, [key]: value });
   };
 
@@ -227,8 +228,8 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
                 logger.debug('Save & Exit -> /employee/dashboard');
               }
               navigate(ROUTES.EMP_DASH);
-            } catch (err: any) {
-              setError(err?.message || "Couldn't save draft. Try again.");
+            } catch (err) {
+              setError(getApiErrorMessage(err, "Couldn't save draft. Try again."));
             } finally {
               setDraftExitSaving(false);
             }

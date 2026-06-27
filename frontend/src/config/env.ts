@@ -39,11 +39,11 @@ const envSchema = z.object({
 
 const raw = {
   VITE_API_URL: import.meta.env.VITE_API_URL,
-  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL as string | undefined,
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
   VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
-  VITE_POSTHOG_KEY: import.meta.env.VITE_POSTHOG_KEY,
-  VITE_POSTHOG_HOST: import.meta.env.VITE_POSTHOG_HOST,
+  VITE_POSTHOG_KEY: import.meta.env.VITE_POSTHOG_KEY as string | undefined,
+  VITE_POSTHOG_HOST: import.meta.env.VITE_POSTHOG_HOST as string | undefined,
 };
 
 const parsed = envSchema.safeParse(raw);

@@ -17,9 +17,9 @@ import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssista
 import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
 import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
 import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
+import { trackPolicyPublished } from '../../../perf/hrOnboardingInstrumentation';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
 import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
-import { trackPolicyPublished } from '../../../perf/hrOnboardingInstrumentation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';

@@ -35,7 +35,7 @@ function mockChangelogFetch(payload: unknown = SAMPLE_ENTRIES) {
     ok: true,
     json: () => Promise.resolve(payload),
   });
-  (globalThis as any).fetch = fetchMock;
+  (globalThis as Record<string, unknown>)['fetch'] = fetchMock;
   return fetchMock;
 }
 

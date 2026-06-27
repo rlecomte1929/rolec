@@ -14,11 +14,11 @@ const setEmployerRegNumber = vi.fn();
 const setExpectedStartDate = vi.fn();
 
 vi.mock('../../../api/compliance', () => ({
-  listComplianceAlerts: (...args: unknown[]) => listComplianceAlerts(...args),
-  evaluateCompliance: (...args: unknown[]) => evaluateCompliance(...args),
+  listComplianceAlerts: (...args: unknown[]): unknown => listComplianceAlerts(...args),
+  evaluateCompliance: (...args: unknown[]): unknown => evaluateCompliance(...args),
   resolveComplianceAlert: vi.fn(),
-  setEmployerRegNumber: (...args: unknown[]) => setEmployerRegNumber(...args),
-  setExpectedStartDate: (...args: unknown[]) => setExpectedStartDate(...args),
+  setEmployerRegNumber: (...args: unknown[]): unknown => setEmployerRegNumber(...args),
+  setExpectedStartDate: (...args: unknown[]): unknown => setExpectedStartDate(...args),
 }));
 
 import ComplianceAlertsPanel from '../ComplianceAlertsPanel';

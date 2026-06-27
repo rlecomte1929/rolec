@@ -224,6 +224,7 @@ from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
 from .app.routers import compliance as compliance_router  # [BL-Compliance.4] /api/compliance
+from .app.routers import policy_analysis as policy_analysis_router  # [AIQ-1219] policy PDF → workflow summary
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -742,6 +743,7 @@ app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 —
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)
+app.include_router(policy_analysis_router.router)  # [AIQ-1219] policy PDF → workflow summary (dual-layer registration)
 app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
 app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
 app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
@@ -5771,19 +5773,23 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
                     if (assignment.get("case_id") or "").strip()
                     else None
                 )
-                if wc:
+                # Promote the route onto relocation_cases. Prefer the authoritative
+                # assignment-derived draft (AIQ-1311); fall back to the wizard_cases
+                # draft. CRITICAL: run the sync even when there is NO wizard_cases row
+                # (wc is None) — a freshly-created case has only a relocation_cases row,
+                # and gating this on `if wc:` skipped the promotion entirely, leaving
+                # HR's origin/destination NULL ("Not provided") after submit (AIQ-1311
+                # criterion 3; caught live by scripts/verify_intake_submit_spine.py).
+                promote_draft: Optional[Dict[str, Any]] = None
+                if submit_draft and not missing_intake_basics(submit_draft):
+                    promote_draft = submit_draft
+                elif wc:
                     try:
-                        draft = json.loads(wc.draft_json or "{}")
+                        promote_draft = json.loads(wc.draft_json or "{}")
                     except (json.JSONDecodeError, TypeError, ValueError):
-                        draft = {}
-                    # Prefer the authoritative assignment-derived draft (AIQ-1311):
-                    # the wizard_cases draft can be empty when the frontend patched
-                    # a divergent case-id, which is exactly what left HR's case
-                    # showing "Not provided" after the employee submitted.
-                    if submit_draft and not missing_intake_basics(submit_draft):
-                        draft = submit_draft
-                    if isinstance(draft, dict):
-                        db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
+                        promote_draft = {}
+                if isinstance(promote_draft, dict) and promote_draft:
+                    db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, promote_draft)
         except Exception as exc:
             log.warning(
                 "submit_assignment: relocation_cases draft sync failed assignment_id=%s case_id=%s error=%s",

@@ -6,6 +6,7 @@ import { clearAuthItems, normalizeStoredRole, setAuthItem } from '../utils/demo'
 import { buildRoute } from '../navigation/routes';
 import { Card } from './antigravity';
 import { Button } from './antigravity/Button';
+import { getApiErrorMessage } from '../utils/apiDetail';
 
 interface Props {
   open: boolean;
@@ -46,8 +47,8 @@ export const SwitchUserModal: React.FC<Props> = ({ open, onClose }) => {
             ? buildRoute('adminOverview')
             : '/hr/dashboard';
       window.location.href = target;
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Login failed. Make sure the account exists.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Login failed. Make sure the account exists.'));
       setSwitching(null);
     }
   };
