@@ -1,7 +1,11 @@
 """
-Sync passport-type case_evidence into graph case_documents (one row per mobility case).
+Sync document-type case_evidence into graph case_documents (one row per (case, document_key)).
 
-Source of truth remains case_evidence; graph row is a derived index for mobility context / future eval.
+Source of truth remains case_evidence; the graph row is a derived index for mobility
+context / future eval. Originally passport-only; generalized so any roadmap document key
+(passport_copy, employment_letter, spouse_passport_copy, income_proof, …) gets the same
+upsert treatment via ``ensure_case_document_for_key``. ``ensure_passport_case_document_for_assignment``
+is preserved as a thin wrapper so existing callers keep working unchanged.
 """
 from __future__ import annotations
 
@@ -22,15 +26,44 @@ log = logging.getLogger(__name__)
 # Graph document_key aligned with pilot / CaseContext tests (not requirement_code strings).
 GRAPH_PASSPORT_DOCUMENT_KEY = "passport_copy"
 
-# Explicit evidence_type values only (no filename heuristics).
-_PASSPORT_EVIDENCE_TYPES = frozenset(
-    {
-        "passport_scan",  # Phase 1 docs example
-        "passport_copy",
-        "passport",
-        "doc_passport",  # HR readiness checklist key
-    }
-)
+# ---------------------------------------------------------------------------
+# Evidence-type → canonical document_key registry.
+#
+# Canonical keys map 1:1 to themselves (identity). Aliases (legacy / source-system
+# spellings) fold into their canonical key. Anything NOT listed here is treated as a
+# canonical key in its own right (identity fallback), so a brand-new document_key
+# uploaded directly through the case-documents endpoint (evidence_type == document_key)
+# still matches itself without needing a registry entry.
+# ---------------------------------------------------------------------------
+EVIDENCE_TYPE_TO_DOCUMENT_KEY: Dict[str, str] = {
+    # passport (canonical + aliases) — preserves the original passport set.
+    "passport_copy": "passport_copy",
+    "passport_scan": "passport_copy",
+    "passport": "passport_copy",
+    "doc_passport": "passport_copy",
+    # employment / assignment letter.
+    "employment_letter": "employment_letter",
+    "employment_contract": "employment_letter",
+    "signed_employment_contract": "employment_letter",
+    "assignment_letter": "employment_letter",
+    "doc_employment_letter": "employment_letter",
+    # spouse / dependant identity.
+    "spouse_passport_copy": "spouse_passport_copy",
+    "spouse_passport": "spouse_passport_copy",
+    # relationship proof.
+    "marriage_or_partnership_cert": "marriage_or_partnership_cert",
+    "marriage_certificate": "marriage_or_partnership_cert",
+    "partnership_certificate": "marriage_or_partnership_cert",
+    # finances.
+    "income_proof": "income_proof",
+    "proof_of_income": "income_proof",
+    # housing.
+    "accommodation_proof_nl": "accommodation_proof_nl",
+    "accommodation_proof": "accommodation_proof_nl",
+    # schooling.
+    "previous_school_reports": "previous_school_reports",
+    "school_reports": "previous_school_reports",
+}
 
 
 def _strip(s: Optional[Any]) -> Optional[str]:
@@ -45,9 +78,20 @@ def _dialect_name(engine: Any) -> str:
     return getattr(d, "name", "") or ""
 
 
-def _is_passport_evidence_type(evidence_type: Optional[str]) -> bool:
+def document_key_for_evidence_type(evidence_type: Optional[str]) -> Optional[str]:
+    """Resolve an evidence_type to its canonical document_key.
+
+    Known aliases fold into their canonical key; unknown values are treated as
+    canonical in their own right (identity). Empty/None → None.
+    """
     et = (evidence_type or "").strip().lower()
-    return et in _PASSPORT_EVIDENCE_TYPES
+    if not et:
+        return None
+    return EVIDENCE_TYPE_TO_DOCUMENT_KEY.get(et, et)
+
+
+def _evidence_matches_document_key(evidence_type: Optional[str], document_key: str) -> bool:
+    return document_key_for_evidence_type(evidence_type) == document_key
 
 
 def map_case_evidence_status_to_document_status(evidence_status: Optional[str]) -> str:
@@ -93,9 +137,12 @@ def _employee_person_id_for_case(conn: Any, mobility_case_id: str, is_pg: bool) 
     return str(row["id"]).strip()
 
 
-def _pick_newest_passport_evidence(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _pick_newest_evidence_for_key(
+    rows: List[Dict[str, Any]], document_key: str
+) -> Optional[Dict[str, Any]]:
+    """Rows are newest-first (list_assignment_evidence orders created_at DESC)."""
     for r in rows:
-        if _is_passport_evidence_type(r.get("evidence_type")):
+        if _evidence_matches_document_key(r.get("evidence_type"), document_key):
             return r
     return None
 
@@ -121,20 +168,25 @@ def _build_document_metadata(ev: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in meta.items() if v is not None}
 
 
-def ensure_passport_case_document_for_assignment(
+def ensure_case_document_for_key(
     db: "Database",
     assignment_id: str,
+    document_key: str,
     *,
     request_id: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Upsert one case_documents row (document_key=passport_copy) from newest matching case_evidence.
+    Upsert one case_documents row (for ``document_key``) from the newest matching
+    case_evidence (evidence_type that maps to ``document_key``).
 
-    Returns case_documents.id, or None if no mobility link, no passport evidence, or schema missing.
-    Does not delete graph rows when evidence disappears (conservative).
+    Returns case_documents.id, or None if no mobility link, no matching evidence, or
+    schema missing. Does not delete graph rows when evidence disappears (conservative).
+
+    Unique (case_id, document_key): repeated calls update the same row in place.
     """
     aid = _strip(assignment_id)
-    if not aid:
+    dk = _strip(document_key)
+    if not aid or not dk:
         return None
 
     is_pg = _dialect_name(db.engine) == "postgresql"
@@ -147,7 +199,7 @@ def ensure_passport_case_document_for_assignment(
             return None
 
         rows = db.list_assignment_evidence(aid, request_id=request_id)
-        ev = _pick_newest_passport_evidence(rows)
+        ev = _pick_newest_evidence_for_key(rows, dk)
         if not ev:
             return None
 
@@ -164,7 +216,7 @@ def ensure_passport_case_document_for_assignment(
                     + ("CAST(:cid AS uuid)" if is_pg else ":cid")
                     + " AND document_key = :dk LIMIT 1"
                 ),
-                {"cid": mid, "dk": GRAPH_PASSPORT_DOCUMENT_KEY},
+                {"cid": mid, "dk": dk},
             ).mappings().first()
 
             if existing:
@@ -219,7 +271,7 @@ def ensure_passport_case_document_for_assignment(
                                 "did": did,
                                 "cid": mid,
                                 "pid": pid,
-                                "dk": GRAPH_PASSPORT_DOCUMENT_KEY,
+                                "dk": dk,
                                 "ds": doc_status,
                                 "meta": meta_json,
                             },
@@ -235,7 +287,7 @@ def ensure_passport_case_document_for_assignment(
                             {
                                 "did": did,
                                 "cid": mid,
-                                "dk": GRAPH_PASSPORT_DOCUMENT_KEY,
+                                "dk": dk,
                                 "ds": doc_status,
                                 "meta": meta_json,
                             },
@@ -251,7 +303,7 @@ def ensure_passport_case_document_for_assignment(
                             "did": did,
                             "cid": mid,
                             "pid": pid,
-                            "dk": GRAPH_PASSPORT_DOCUMENT_KEY,
+                            "dk": dk,
                             "ds": doc_status,
                             "meta": meta_json,
                             "ca": now,
@@ -265,7 +317,7 @@ def ensure_passport_case_document_for_assignment(
                         + ("CAST(:cid AS uuid)" if is_pg else ":cid")
                         + " AND document_key = :dk LIMIT 1"
                     ),
-                    {"cid": mid, "dk": GRAPH_PASSPORT_DOCUMENT_KEY},
+                    {"cid": mid, "dk": dk},
                 ).mappings().first()
                 if not row2:
                     raise
@@ -305,6 +357,21 @@ def ensure_passport_case_document_for_assignment(
                     )
             return did
     except (ProgrammingError, OperationalError) as exc:
-        log.debug("ensure_passport_case_document_for_assignment failed: %s", exc)
+        log.debug("ensure_case_document_for_key(%s) failed: %s", document_key, exc)
         return None
 
+
+def ensure_passport_case_document_for_assignment(
+    db: "Database",
+    assignment_id: str,
+    *,
+    request_id: Optional[str] = None,
+) -> Optional[str]:
+    """Thin wrapper — preserves the original passport-only call shape.
+
+    Existing callers (backend/main.py add_assignment_evidence) keep working; this
+    now just delegates to the generic upsert with ``passport_copy``.
+    """
+    return ensure_case_document_for_key(
+        db, assignment_id, GRAPH_PASSPORT_DOCUMENT_KEY, request_id=request_id
+    )
