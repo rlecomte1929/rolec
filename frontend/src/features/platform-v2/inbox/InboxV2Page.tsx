@@ -231,7 +231,8 @@ export function InboxV2Page() {
         ]);
         if (cancelled) return;
         const labels = new Map<string, string>();
-        for (const row of overview.linked || []) {
+        type LinkedRow = { assignment_id?: string; company?: { name?: string } };
+        for (const row of (overview.linked as LinkedRow[] | undefined) ?? []) {
           const aid = row.assignment_id;
           const nm = row.company?.name?.trim();
           if (aid && nm) labels.set(aid, nm);

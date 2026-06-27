@@ -88,7 +88,7 @@ interface SidebarPersistedState {
 function loadState(): SidebarPersistedState {
   try {
     const raw = localStorage.getItem('rp-sidebar');
-    if (raw) return JSON.parse(raw);
+    if (raw) return JSON.parse(raw) as SidebarPersistedState;
   } catch { /* ignore */ }
   return { is_collapsed: false, section_order: NAV_SECTIONS.map(s => s.key) };
 }

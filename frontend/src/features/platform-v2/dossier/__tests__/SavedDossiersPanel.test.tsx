@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
+import { SavedDossiersPanel } from '../SavedDossiersPanel';
 
 expect.extend(matchers);
 
@@ -35,15 +36,13 @@ const mockDelete = vi.fn();
 
 vi.mock('../../../../api/dossier', () => ({
   dossierPackageAPI: {
-    list: (...args: unknown[]) => mockList(...args),
-    regenerate: (...args: unknown[]) => mockRegenerate(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
+    list: (...args: unknown[]): unknown => mockList(...args),
+    regenerate: (...args: unknown[]): unknown => mockRegenerate(...args),
+    delete: (...args: unknown[]): unknown => mockDelete(...args),
     getPdfUrl: (caseId: string, id: string) => `/api/cases/${caseId}/dossiers/${id}/pdf`,
     getZipUrl: (caseId: string, id: string) => `/api/cases/${caseId}/dossiers/${id}/zip`,
   },
 }));
-
-import { SavedDossiersPanel } from '../SavedDossiersPanel';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,7 +74,7 @@ function renderPanel(caseId = CASE_ID, onChanged?: () => void) {
 // ---------------------------------------------------------------------------
 
 describe('SavedDossiersPanel — loading state', () => {
-  it('shows a loading spinner while fetching', async () => {
+  it('shows a loading spinner while fetching', () => {
     // Never resolves during this test
     mockList.mockReturnValue(new Promise(() => {}));
     renderPanel();
@@ -221,7 +220,7 @@ describe('SavedDossiersPanel — regenerate', () => {
     renderPanel();
 
     const btn = await screen.findByTestId('regenerate-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     expect(mockRegenerate).toHaveBeenCalledWith(CASE_ID, 'pkg-1');
   });
@@ -235,7 +234,7 @@ describe('SavedDossiersPanel — regenerate', () => {
     expect(await screen.findByTestId('stale-badge')).toBeInTheDocument();
 
     const btn = screen.getByTestId('regenerate-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     await waitFor(() =>
       expect(screen.queryByTestId('stale-badge')).not.toBeInTheDocument(),
@@ -249,7 +248,7 @@ describe('SavedDossiersPanel — regenerate', () => {
     renderPanel(CASE_ID, onChanged);
 
     const btn = await screen.findByTestId('regenerate-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
   });
@@ -271,7 +270,7 @@ describe('SavedDossiersPanel — delete', () => {
     renderPanel();
 
     const btn = await screen.findByTestId('delete-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     expect(window.confirm).toHaveBeenCalled();
   });
@@ -282,7 +281,7 @@ describe('SavedDossiersPanel — delete', () => {
     renderPanel();
 
     const btn = await screen.findByTestId('delete-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     await waitFor(() =>
       expect(mockDelete).toHaveBeenCalledWith(CASE_ID, 'pkg-1'),
@@ -304,7 +303,7 @@ describe('SavedDossiersPanel — delete', () => {
 
     // Delete the first one — find delete buttons in order
     const deleteButtons = screen.getAllByTestId('delete-button');
-    await act(async () => { fireEvent.click(deleteButtons[0]); });
+    act(() => { fireEvent.click(deleteButtons[0]); }); // sync click, no await needed
 
     await waitFor(() =>
       expect(screen.getAllByTestId('saved-dossier-row')).toHaveLength(1),
@@ -319,7 +318,7 @@ describe('SavedDossiersPanel — delete', () => {
     renderPanel();
 
     const btn = await screen.findByTestId('delete-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     expect(mockDelete).not.toHaveBeenCalled();
     // Row should still be visible
@@ -333,7 +332,7 @@ describe('SavedDossiersPanel — delete', () => {
     renderPanel(CASE_ID, onChanged);
 
     const btn = await screen.findByTestId('delete-button');
-    await act(async () => { fireEvent.click(btn); });
+    act(() => { fireEvent.click(btn); });
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
   });

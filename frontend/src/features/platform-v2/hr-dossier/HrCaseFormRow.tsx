@@ -194,8 +194,8 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
         body: JSON.stringify({ status: newStatus, note: statusNote.trim() || undefined }),
       });
       if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.detail?.error || body.detail || `Status ${resp.status}`);
+        const body = await resp.json().catch(() => ({})) as { detail?: string };
+        throw new Error(body.detail ?? `Status ${resp.status}`);
       }
       setStatusNote('');
       onRefresh();
@@ -262,8 +262,8 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
         }),
       });
       if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.detail?.error || body.detail || `Status ${resp.status}`);
+        const body = await resp.json().catch(() => ({})) as { detail?: string };
+        throw new Error(body.detail ?? `Status ${resp.status}`);
       }
       setShowSubmitModal(false);
       setSubmitReceiptRef('');
@@ -298,8 +298,8 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
         }),
       });
       if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.detail?.error || body.detail || `Status ${resp.status}`);
+        const body = await resp.json().catch(() => ({})) as { detail?: string };
+        throw new Error(body.detail ?? `Status ${resp.status}`);
       }
       // If re-open: immediately transition to in_progress so the employee can correct
       if (reopenForCorrection) {

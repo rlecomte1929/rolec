@@ -14,9 +14,9 @@ const mockRemove = vi.fn();
 
 vi.mock('../../../../api/dossier', () => ({
   formDocumentsAPI: {
-    list: (...a: unknown[]) => mockList(...a),
-    upload: (...a: unknown[]) => mockUpload(...a),
-    remove: (...a: unknown[]) => mockRemove(...a),
+    list: (...a: unknown[]): unknown => mockList(...a),
+    upload: (...a: unknown[]): unknown => mockUpload(...a),
+    remove: (...a: unknown[]): unknown => mockRemove(...a),
   },
 }));
 
@@ -57,7 +57,7 @@ describe('FormDocuments', () => {
     await screen.findByText('No documents uploaded yet.');
 
     const file = new File(['x'], 'passport.pdf', { type: 'application/pdf' });
-    const input = screen.getByLabelText('Upload supporting document') as HTMLInputElement;
+    const input = screen.getByLabelText('Upload supporting document');
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(mockUpload).toHaveBeenCalledWith('c1', 'f1', file, null));
