@@ -210,7 +210,8 @@ export default tseslint.config(
       // recommendedTypeChecked default) — Epic A1. New floating promises now fail CI.
 
       // — Accessibility epic (clickable-div + jsx-a11y) —
-      'local/no-clickable-div': 'warn',
+      // Epic C / R-CLICK: DRAINED to 0 + re-promoted to 'error' (with its ride-along rules below).
+      'local/no-clickable-div': 'error',
       // label-has-associated-control: DRAINED to 0 + re-promoted to 'error' (Epic C / R1).
       // controlComponents recognises the antigravity wrappers that render native form controls.
       // Select (antigravity) is NOT listed — it doesn't expose id, so pairs use native <select> with id instead.
@@ -218,13 +219,13 @@ export default tseslint.config(
         controlComponents: ['Checkbox', 'Input', 'FileInput', 'Radio'],
         depth: 3,
       }],
-      'jsx-a11y/click-events-have-key-events': 'warn',
-      'jsx-a11y/no-static-element-interactions': 'warn',
-      'jsx-a11y/no-noninteractive-element-interactions': 'warn',
+      'jsx-a11y/click-events-have-key-events': 'error',
+      'jsx-a11y/no-static-element-interactions': 'error',
+      'jsx-a11y/no-noninteractive-element-interactions': 'error',
       // Epic C / R3: DRAINED to 0 + re-promoted to 'error'. These now fail CI on any new violation.
       'jsx-a11y/no-redundant-roles': 'error',
-      // no-autofocus stays 'warn': 1 remaining in features/hr/HrTeamList.tsx (deferred file — needs browser-verified fix).
-      'jsx-a11y/no-autofocus': 'warn',
+      // Epic C / R-AUTOFOCUS: DRAINED to 0 + re-promoted to 'error'.
+      'jsx-a11y/no-autofocus': 'error',
       'jsx-a11y/interactive-supports-focus': 'error',
       'jsx-a11y/aria-role': 'error',
       'jsx-a11y/no-noninteractive-element-to-interactive-role': 'error',
