@@ -34,44 +34,47 @@ export interface PolicyBenefitRow {
   service_category: string;
   benefit_key: string;
   benefit_label: string;
-  eligibility?: Record<string, any> | null;
-  limits?: Record<string, any> | null;
+  eligibility?: Record<string, unknown> | null;
+  limits?: Record<string, unknown> | null;
   notes?: string | null;
   source_quote?: string | null;
   source_section?: string | null;
   confidence?: number | null;
 }
 
-const formatLimits = (limits?: Record<string, any> | null) => {
+const toDisplay = (v: unknown): string | number =>
+  typeof v === 'string' || typeof v === 'number' ? v : '';
+
+const formatLimits = (limits?: Record<string, unknown> | null) => {
   if (!limits) return '-';
   const parts: string[] = [];
-  if (limits.days) parts.push(`${limits.days} days`);
-  if (limits.percent) parts.push(`${limits.percent}%`);
-  const caps = limits.monthly_cap || limits.cap;
-  if (caps && typeof caps === 'object') {
-    const entries = Object.entries(caps)
-      .map(([k, v]) => (typeof v === 'number' ? `${k} ${v}` : `${k}: ${v}`))
+  if (limits.days) parts.push(`${toDisplay(limits.days)} days`);
+  if (limits.percent) parts.push(`${toDisplay(limits.percent)}%`);
+  const capsRaw = limits.monthly_cap ?? limits.cap;
+  if (capsRaw != null && typeof capsRaw === 'object') {
+    const entries = Object.entries(capsRaw as Record<string, unknown>)
+      .map(([k, v]) => (typeof v === 'number' ? `${k} ${v}` : `${k}: ${toDisplay(v)}`))
       .join(', ');
-    parts.push(limits.monthly_cap ? `Monthly cap: ${entries}` : `Cap: ${entries}`);
+    parts.push(limits.monthly_cap != null ? `Monthly cap: ${entries}` : `Cap: ${entries}`);
   }
-  if (limits.per_assignment_type && typeof limits.per_assignment_type === 'object') {
-    const summaries = Object.entries(limits.per_assignment_type)
+  if (limits.per_assignment_type != null && typeof limits.per_assignment_type === 'object') {
+    const summaries = Object.entries(limits.per_assignment_type as Record<string, unknown>)
       .slice(0, 2)
-      .map(([k, v]) => (typeof v === 'object' ? `${k}` : `${k}: ${v}`))
+      .map(([k, v]) => (typeof v === 'object' ? `${k}` : `${k}: ${toDisplay(v)}`))
       .join('; ');
     parts.push(`By type: ${summaries}`);
   }
   return parts.length ? parts.join(' • ') : '-';
 };
 
-const formatEligibility = (elig?: Record<string, any> | null) => {
+const formatEligibility = (elig?: Record<string, unknown> | null) => {
   if (!elig) return '-';
   const parts: string[] = [];
   if (Array.isArray(elig.assignment_types)) {
-    parts.push(`Assignment: ${elig.assignment_types.join(', ')}`);
+    parts.push(`Assignment: ${(elig.assignment_types as string[]).join(', ')}`);
   }
   if (Array.isArray(elig.bands)) {
-    parts.push(`Bands: ${elig.bands.join(', ')}`);
+    parts.push(`Bands: ${(elig.bands as string[]).join(', ')}`);
   }
   return parts.length ? parts.join(' • ') : '-';
 };
@@ -90,7 +93,7 @@ export const PolicyBenefitsTable: React.FC<{
     return groups;
   }, [benefits]);
 
-  const updateRow = (idx: number, key: keyof PolicyBenefitRow, value: any, category: string) => {
+  const updateRow = <K extends keyof PolicyBenefitRow>(idx: number, key: K, value: PolicyBenefitRow[K], category: string) => {
     if (!onChange) return;
     const next = benefits.map((b) => ({ ...b }));
     const group = grouped[category] || [];
@@ -98,7 +101,7 @@ export const PolicyBenefitsTable: React.FC<{
     if (!row) return;
     const realIdx = benefits.findIndex((b) => b.benefit_key === row.benefit_key);
     if (realIdx >= 0) {
-      (next[realIdx] as any)[key] = value;
+      next[realIdx] = { ...next[realIdx], [key]: value } as PolicyBenefitRow;
       onChange(next);
     }
   };
@@ -121,7 +124,7 @@ export const PolicyBenefitsTable: React.FC<{
                       value={JSON.stringify(row.eligibility || {})}
                       onChange={(val) => {
                         try {
-                          updateRow(idx, 'eligibility', JSON.parse(val), category);
+                          updateRow(idx, 'eligibility', JSON.parse(val) as Record<string, unknown>, category);
                         } catch {
                           updateRow(idx, 'eligibility', row.eligibility || {}, category);
                         }
@@ -139,7 +142,7 @@ export const PolicyBenefitsTable: React.FC<{
                       value={JSON.stringify(row.limits || {})}
                       onChange={(val) => {
                         try {
-                          updateRow(idx, 'limits', JSON.parse(val), category);
+                          updateRow(idx, 'limits', JSON.parse(val) as Record<string, unknown>, category);
                         } catch {
                           updateRow(idx, 'limits', row.limits || {}, category);
                         }

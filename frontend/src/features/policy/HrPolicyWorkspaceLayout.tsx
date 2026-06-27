@@ -71,12 +71,16 @@ function Badge({
 }
 
 function formatEntitlementRow(row: Record<string, unknown>): string {
-  const sk = row.service_key || row.canonical_service_key || row.benefit_key;
-  const label = row.label || row.summary || row.service_label;
-  const cap = row.numeric_max ?? row.max_value ?? row.standard_value;
-  const cur = row.currency || 'USD';
-  const parts = [label || sk, cap != null ? `${cur} ${cap}` : null].filter(Boolean);
-  return parts.join(' · ') || String(sk || 'Benefit');
+  const rawSk = row.service_key ?? row.canonical_service_key ?? row.benefit_key;
+  const sk = typeof rawSk === 'string' ? rawSk : null;
+  const rawLabel = row.label ?? row.summary ?? row.service_label;
+  const label = typeof rawLabel === 'string' ? rawLabel : sk;
+  const rawCap = row.numeric_max ?? row.max_value ?? row.standard_value;
+  const cap: string | number | null =
+    typeof rawCap === 'number' || typeof rawCap === 'string' ? rawCap : null;
+  const cur = typeof row.currency === 'string' ? row.currency : 'USD';
+  const parts = [label, cap != null ? `${cur} ${cap}` : null].filter((v): v is string => v != null && v !== '');
+  return parts.join(' · ') || (sk ?? 'Benefit');
 }
 
 function EmployeeViewComparePanels({
