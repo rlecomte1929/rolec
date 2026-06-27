@@ -25,20 +25,20 @@ export type HrPolicyLifecycleContext = {
 };
 
 function norm(s: unknown): string {
-  return String(s ?? '')
-    .trim()
-    .toLowerCase();
+  if (s == null) return '';
+  const raw = typeof s === 'string' ? s : typeof s === 'number' ? String(s) : '';
+  return raw.trim().toLowerCase();
 }
 
 export function isTemplatePolicy(policy: Record<string, unknown> | null | undefined): boolean {
   if (!policy) return false;
   if (policy.template_source === 'default_platform_template') return true;
-  const tn = String(policy.template_name || '');
+  const tn = typeof policy.template_name === 'string' ? policy.template_name : '';
   return tn.startsWith('starter_');
 }
 
 function templateTierLabel(policy: Record<string, unknown> | null | undefined): string | null {
-  const tn = String(policy?.template_name || '');
+  const tn = typeof policy?.template_name === 'string' ? policy.template_name : '';
   const m = tn.match(/^starter_(conservative|standard|premium)$/);
   const tier = m?.[1];
   if (!tier) return null;

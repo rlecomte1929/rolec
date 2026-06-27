@@ -70,23 +70,27 @@ export function labelForLegacyPolicyStatus(status: string): string {
 }
 
 export function formatPolicyLimitSnapshot(snap: Record<string, unknown>): string | null {
-  const max = snap.max_value ?? snap.standard_value ?? snap.min_value;
-  const cur = snap.currency;
-  const unit = snap.amount_unit;
-  const freq = snap.frequency;
+  const rawMax = snap.max_value ?? snap.standard_value ?? snap.min_value;
+  const max: string | number | null =
+    typeof rawMax === 'number' || typeof rawMax === 'string' ? rawMax : null;
+  const cur = typeof snap.currency === 'string' ? snap.currency : '';
+  const unit = typeof snap.amount_unit === 'string' ? snap.amount_unit : '';
+  const freq = typeof snap.frequency === 'string' ? snap.frequency : '';
   if (max == null && !unit && !freq) return null;
   const parts: string[] = [];
-  if (max != null) parts.push(`${cur ? `${String(cur)} ` : ''}${max}${unit ? ` ${unit}` : ''}`.trim());
+  if (max != null) parts.push(`${cur ? `${cur} ` : ''}${max}${unit ? ` ${unit}` : ''}`.trim());
   else if (cur || unit) parts.push([cur, unit].filter(Boolean).join(' '));
-  if (freq) parts.push(String(freq));
+  if (freq) parts.push(freq);
   return parts.length ? parts.join(' · ') : null;
 }
 
 export function formatSelectedSnapshot(snap: Record<string, unknown>): string | null {
-  const est = snap.estimated_cost;
-  const cur = snap.currency;
+  const rawEst = snap.estimated_cost;
+  const est: string | number | null =
+    typeof rawEst === 'number' || typeof rawEst === 'string' ? rawEst : null;
+  const cur = typeof snap.currency === 'string' ? snap.currency : '';
   if (est == null) return null;
-  return `${cur ? `${String(cur)} ` : ''}${est}`;
+  return `${cur ? `${cur} ` : ''}${est}`;
 }
 
 export type PackBenefitRow = {

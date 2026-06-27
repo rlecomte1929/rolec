@@ -76,9 +76,9 @@ export function deriveHrPolicyPrimaryAction(resolved: HrPolicyWorkspaceResolved)
 }
 
 function normStatus(v: unknown): string {
-  return String(v || '')
-    .trim()
-    .toLowerCase();
+  if (v == null) return '';
+  const raw = typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '';
+  return raw.trim().toLowerCase();
 }
 
 function isPublishedRow(row: unknown): boolean {
@@ -131,11 +131,13 @@ export function resolveHrPolicyWorkspaceState(input: {
   const published = (normalized?.published_version || null) as Record<string, unknown> | null;
   const latest = (normalized?.version || null) as Record<string, unknown> | null;
   const hasPublished = isPublishedRow(published);
-  const pr = (normalized?.policy_readiness || null) as {
+  type PolicyReadinessShape = {
     publish_readiness?: ReadinessSlice;
     comparison_readiness?: ReadinessSlice;
     normalization_readiness?: ReadinessSlice;
-  } | null;
+  };
+  const pr: PolicyReadinessShape | null =
+    (normalized?.policy_readiness as PolicyReadinessShape | null | undefined) ?? null;
 
   const publishReadiness = pr?.publish_readiness ?? null;
   const comparisonReadiness = pr?.comparison_readiness ?? null;
@@ -195,8 +197,8 @@ export function resolveHrPolicyWorkspaceState(input: {
     phase = 'draft_not_publishable';
   }
 
-  const latestId = latest?.id ? String(latest.id) : null;
-  const publishedId = published?.id ? String(published.id) : null;
+  const latestId = typeof latest?.id === 'string' ? latest.id : null;
+  const publishedId = typeof published?.id === 'string' ? published.id : null;
   const hasUnpublishedDraftAhead =
     hasPublished &&
     !!latest &&
