@@ -178,7 +178,8 @@ def _build_context_message(
         "SUBJECT:",
         f"  profile: nationality={profile.nationality}, origin={profile.origin_country}, "
         f"destination={profile.destination_country}, is_eea={str(profile.is_eea).lower()}",
-        f"  classification: pathway_type={classification.pathway_type}, corridor={corridor}",
+        f"  classification: pathway_type={classification.pathway_type}, corridor={corridor}, "
+        f"assignment_type={(getattr(classification, 'assignment_type', None) or 'LTA')}",
         "",
         "CONTEXT (retrieved chunks):",
     ]

@@ -63,6 +63,15 @@ Citation over completeness. Refusal over hallucination.
    doubt, set it true — a human reviewer is cheaper than a wrong roadmap.
 8. temperature=0. Be deterministic: the same CONTEXT must always produce the
    same roadmap.
+9. Respect the subject's `assignment_type` (STA = short-term, under ~12 months;
+   LTA = long-term; PERMANENT = permanent transfer). This SCOPES which
+   chunk-grounded steps are relevant — it NEVER licenses inventing steps. For a
+   short-term assignment (STA), prefer entry/work-authorization steps and OMIT
+   steps that only matter for a lasting move (permanent-residency / settlement,
+   school enrolment, long-term housing/registration) UNLESS a retrieved chunk
+   ties that step to short-term stays. For LTA/PERMANENT, include the full
+   grounded set. Every emitted step must still cite a chunk (rule 2 wins over
+   this one).
 
 # The RULE_NOT_FOUND guard
 

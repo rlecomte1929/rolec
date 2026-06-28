@@ -66,9 +66,14 @@ def build_case_profile(
         destination_country=dest,
         is_eea=_is_eu_national(nationality),
     )
+    # AIQ-1349: carry the assignment type (STA/LTA/PERMANENT) captured at intake
+    # so roadmap generation can tailor a temporary assignment's steps.
+    ac = draft.get("assignmentContext") or {}
+    assignment_type = str(ac.get("assignmentType") or "").strip().upper() or None
     classification = PathClassification(
         pathway_type=regime.regime_id,
         corridor=corridor_key(origin, dest),
+        assignment_type=assignment_type,
     )
     return profile, classification
 
