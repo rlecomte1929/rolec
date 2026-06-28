@@ -29,17 +29,20 @@ def exclude_test_companies(name_col: str = "name") -> str:
     """SQL fragment that is TRUE for real (non-seed) company rows.
 
     Deliberately narrow — only the task's named patterns plus the active
-    re-seeder ('Test company') and the unambiguous '… (Seed)' marker. We do NOT
-    pattern on 'Test%' / 'TestCo%' etc.: that would hide real/demo tenants such
-    as 'Testing April'. Broader synthetic-tenant pollution (e.g. 'Brand New Co
-    <ts>', 'TestCo WZ4 …') needs a proper is_test marker or routing e2e off prod
-    (AIQ-913 root-cause follow-up), not fragile name matching.
+    re-seeder ('Test company'), the unambiguous '… (Seed)' marker, and the
+    'Brand New Co <epoch>' tenants the Wave-3 onboarding e2e flow creates
+    (AIQ-1325a). We do NOT pattern on 'Test%' / 'TestCo%' etc.: that would hide
+    real/demo tenants such as 'Testing April'. The 'Brand New Co ' literal keeps
+    its trailing space so a hypothetical real 'Brand New Co' (no suffix) is not
+    over-matched. Remaining synthetic pollution (e.g. 'TestCo WZ4 …') still needs
+    a proper is_test marker or routing e2e off prod, not fragile name matching.
     """
     names = ", ".join("'" + n.replace("'", "''") + "'" for n in _TEST_COMPANY_NAMES)
     return (
         f"({name_col} IS NULL OR ("
         f"{name_col} NOT IN ({names}) "
         f"AND {name_col} NOT LIKE 'Probe ISO-%' "
+        f"AND {name_col} NOT LIKE 'Brand New Co %' "
         f"AND {name_col} NOT LIKE '%(Seed)%'))"
     )
 
@@ -57,8 +60,11 @@ def exclude_test_people(email_col: str = "email") -> str:
 # by the migration. Demo tenants are intentionally NOT matched (see module docstring).
 
 # Company-name prefixes the verify/e2e seeders use ('Probe ISO-…' from the tenant-
-# isolation probe, 'Probe RLS-…' from verify_tenant_isolation.py).
-_TEST_COMPANY_PREFIXES = ("Probe ISO-", "Probe RLS-")
+# isolation probe, 'Probe RLS-…' from verify_tenant_isolation.py, 'Brand New Co …'
+# from the Wave-3 onboarding e2e flow — AIQ-1325a). New 'Brand New Co <epoch>'
+# tenants are thus stamped is_test=true at create time, while the read-time
+# exclude_test_companies() LIKE covers rows already in prod.
+_TEST_COMPANY_PREFIXES = ("Probe ISO-", "Probe RLS-", "Brand New Co ")
 
 # Synthetic email domains: '@testco.com' (e2e runner + verify_fresh_onboarding) and
 # '@probe.test' (verify_tenant_isolation.py). Kept as exact suffixes so real domains
