@@ -325,7 +325,12 @@ export const ProvidersPage: React.FC = () => {
         .map(([k]) => k as ServiceKey)
     );
     setSelectedServices(selected);
-    navigate(buildRoute('caseServicesQuestions', { caseId: assignmentId }));
+    // AIQ-1334: keep the URL keyed by case_id through the whole services flow.
+    navigate(
+      buildRoute('caseServicesQuestions', {
+        caseId: caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '',
+      })
+    );
   };
 
   if (assignmentLoading || isLoading) {

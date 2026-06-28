@@ -50,8 +50,9 @@ export const ServicesRecommendations: React.FC = () => {
     return () => setActiveCaseId(null);
   }, [assignmentId, linkedSummaries, setActiveCaseId]);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
-  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
+  // AIQ-1334: employee case sub-routes are keyed by case_id — build with the resolved case_id.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: routeCaseId });
   // AIQ-1249d: case-context banner — which move this services flow is scoped to.
   const moveBanner = useServicesMoveBanner(assignmentId || null);
 

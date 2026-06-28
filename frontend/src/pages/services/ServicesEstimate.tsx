@@ -43,8 +43,9 @@ export const ServicesEstimate: React.FC = () => {
     () => resolveScopedAssignmentId({ linkedSummaries, primaryAssignmentId, queryAssignmentId }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId],
   );
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
-  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
+  // AIQ-1334: employee case sub-routes are keyed by case_id — build with the resolved case_id.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: routeCaseId });
   useEffect(() => {
     // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
     setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
@@ -163,7 +164,7 @@ export const ServicesEstimate: React.FC = () => {
           status="Estimate ready"
           hint="Your service picks are saved. The relocation plan aggregates all phases — visa, housing, schooling, and more — into one timeline."
           primaryLabel="View my relocation plan →"
-          primaryHref={buildRoute('employeeCasePlan', { caseId: assignmentId })}
+          primaryHref={buildRoute('employeeCasePlan', { caseId: routeCaseId })}
           secondaryLabel="Back to recommendations"
           secondaryHref={caseStep('caseServicesRecommendations')}
         />
