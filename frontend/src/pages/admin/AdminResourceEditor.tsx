@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Checkbox } from '../../components/antigravity/Checkbox';
@@ -24,6 +25,7 @@ export const AdminResourceEditor: React.FC = () => {
   const [sources, setSources] = useState<{ id: string; source_name: string }[]>([]);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [approveNotes, setApproveNotes] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [auditEntries, setAuditEntries] = useState<Array<{ action_type: string; created_at: string; performed_by_user_id?: string; previous_status?: string; new_status?: string; change_summary?: string }>>([]);
   const [form, setForm] = useState<Record<string, unknown>>({
     country_code: 'NO',
@@ -119,6 +121,19 @@ export const AdminResourceEditor: React.FC = () => {
     } catch (e) {
       alert((e as Error).message || 'Save failed');
     } finally {
+      setSaving(false);
+    }
+  };
+
+  // [AIQ-1333] Soft-delete a draft/archived resource, then return to the list.
+  const handleDelete = async () => {
+    if (!id || isNew) return;
+    setSaving(true);
+    try {
+      await adminResourcesAPI.deleteResource(id);
+      navigate(buildRoute('adminResources'));
+    } catch (e) {
+      alert((e as Error).message || 'Delete failed');
       setSaving(false);
     }
   };
@@ -253,6 +268,47 @@ export const AdminResourceEditor: React.FC = () => {
           <Button variant="secondary" onClick={() => workflow('restore')} disabled={saving}>
             Restore
           </Button>
+        )}
+        {/* [AIQ-1333] Delete is destructive and only offered for draft/archived —
+            a published resource must be unpublished/archived first. */}
+        {!isNew && ((form.status as string) === 'draft' || (form.status as string) === 'archived') && (
+          <Button
+            onClick={() => setDeleteModalOpen(true)}
+            disabled={saving}
+            className="ml-auto !bg-red-600 hover:!bg-red-700 !text-white !border-transparent"
+            aria-label="Delete resource"
+          >
+            <Trash2 className="w-4 h-4 mr-1" aria-hidden="true" /> Delete
+          </Button>
+        )}
+        {deleteModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            onClick={(e) => { if (e.target === e.currentTarget) setDeleteModalOpen(false); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') setDeleteModalOpen(false); }}
+            role="button"
+            tabIndex={-1}
+            aria-label="Close delete dialog"
+          >
+            <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4">
+              <h4 className="font-semibold mb-2">Delete resource</h4>
+              <p className="text-sm text-slate-600 mb-4">
+                This removes “{(form.title as string) || 'this resource'}” from the CMS. This can’t be undone here.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => { setDeleteModalOpen(false); void handleDelete(); }}
+                  disabled={saving}
+                  className="!bg-red-600 hover:!bg-red-700 !text-white !border-transparent"
+                >
+                  {saving ? 'Deleting…' : 'Delete'}
+                </Button>
+                <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

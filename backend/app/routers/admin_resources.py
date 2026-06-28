@@ -19,6 +19,7 @@ from ..services.admin_resources import (
     create_resource_source,
     create_resource_tag,
     deactivate_resource_category,
+    delete_resource,
     get_admin_dashboard_counts,
     get_admin_event_by_id,
     get_admin_resource_by_id,
@@ -354,6 +355,20 @@ def restore_resource_endpoint(resource_id: str, user: Dict[str, Any] = Depends(_
     if not r:
         raise HTTPException(status_code=404, detail="Resource not found or not archived")
     return r
+
+
+@router.delete("/{resource_id}")
+def delete_resource_endpoint(resource_id: str, user: Dict[str, Any] = Depends(_require_admin)):
+    # [AIQ-1333] Soft-delete (is_active=false) a resource from the CMS. Restricted to
+    # draft/archived — a published resource must be unpublished/archived first, so the
+    # public surface can never lose a live resource via this control.
+    r = get_admin_resource_by_id(resource_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    if r.get("status") not in ("draft", "archived"):
+        raise HTTPException(status_code=400, detail="Only draft or archived resources can be deleted")
+    delete_resource(resource_id, user["id"])
+    return {"ok": True, "id": resource_id}
 
 
 @router.get("/{resource_id}/audit")
