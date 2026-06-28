@@ -334,7 +334,7 @@ export const HrAnalytics: React.FC = () => {
             </h2>
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 animate-pulse">
-                {[...Array(4)].map((_, i) => (
+                {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-16 bg-[#f3f4f6] rounded-lg" />
                 ))}
               </div>
@@ -397,7 +397,7 @@ export const HrAnalytics: React.FC = () => {
             </h2>
             {loading ? (
               <div className="space-y-3 animate-pulse">
-                {[...Array(4)].map((_, i) => (
+                {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-5 bg-[#f3f4f6] rounded" />
                 ))}
               </div>
@@ -417,7 +417,7 @@ export const HrAnalytics: React.FC = () => {
               </h2>
               {loading ? (
                 <div className="space-y-2 animate-pulse">
-                  {[...Array(4)].map((_, i) => (
+                  {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="h-8 bg-[#f3f4f6] rounded" />
                   ))}
                 </div>

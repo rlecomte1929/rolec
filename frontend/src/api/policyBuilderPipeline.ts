@@ -145,7 +145,7 @@ export interface DocumentDiffResponse {
 export const policyBuilderPipelineAPI = {
   /** Fetch HR review queue for the latest ingestion snapshot */
   getReviewQueue: async (params?: { snapshot_id?: string }): Promise<ReviewQueueResponse> => {
-    const response = await api.get('/api/hr/policy-builder/review', { params });
+    const response = await api.get<ReviewQueueResponse>('/api/hr/policy-builder/review', { params });
     return response.data;
   },
 
@@ -154,13 +154,13 @@ export const policyBuilderPipelineAPI = {
     factId: string,
     body: ReviewItemActionRequest,
   ): Promise<ReviewItemActionResponse> => {
-    const response = await api.patch(`/api/hr/policy-builder/review/${factId}`, body);
+    const response = await api.patch<ReviewItemActionResponse>(`/api/hr/policy-builder/review/${factId}`, body);
     return response.data;
   },
 
   /** List all uploaded policy documents with pipeline status */
   listDocuments: async (): Promise<PolicyDocumentsListResponse> => {
-    const response = await api.get('/api/hr/policy-builder/documents');
+    const response = await api.get<PolicyDocumentsListResponse>('/api/hr/policy-builder/documents');
     return response.data;
   },
 
@@ -169,7 +169,7 @@ export const policyBuilderPipelineAPI = {
     snapshotAId: string,
     snapshotBId: string,
   ): Promise<DocumentDiffResponse> => {
-    const response = await api.get('/api/hr/policy-builder/documents/diff', {
+    const response = await api.get<DocumentDiffResponse>('/api/hr/policy-builder/documents/diff', {
       params: { snapshot_a: snapshotAId, snapshot_b: snapshotBId },
     });
     return response.data;

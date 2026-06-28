@@ -1,88 +1,21 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2 } from 'lucide-react';
+import {
+  adminAPI,
+  suppliersAPI,
+  adminReviewQueueAPI,
+  adminOpsAnalyticsAPI,
+  adminResourcesAPI,
+  adminProspectsAPI,
+} from '../../api/client';
+import { getRagEvalMetrics, type RagEvalDashboard } from '../../api/ragEval';
+import { StatCard } from '../../components/admin/overview/StatCard';
+import { ModuleCard } from '../../components/admin/overview/ModuleCard';
 import { Button } from '../../components/antigravity/Button';
-import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
-
-// ── Loading skeleton ───────────────────────────────────────────────────────────
-// A muted pulse instead of a bare '…', which read as a broken/WIP value (UI9).
-
-const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
-  <span
-    aria-hidden="true"
-    className={`inline-block animate-pulse rounded bg-slate-200 align-middle ${className ?? ''}`}
-  />
-);
-
-// ── Stat card ─────────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  testId: string;
-  label: string;
-  value: number | null;
-  sub?: string;
-  loading?: boolean;
-}
-
-const MetricValue: React.FC<{ value: string | number | null }> = ({ value }) =>
-  value === null ? <span className="text-base font-medium text-amber-700">Unavailable</span> : <>{value}</>;
-
-const StatCard: React.FC<StatCardProps> = ({ testId, label, value, sub, loading }) => (
-  <div data-testid={testId} className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
-    <p className="text-3xl font-semibold text-slate-900">
-      {loading ? <Skeleton className="h-7 w-16" /> : <MetricValue value={value} />}
-    </p>
-    {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
-  </div>
-);
-
-// ── Module card ───────────────────────────────────────────────────────────────
-
-interface ModuleRow { label: string; value: string | number | null }
-
-interface ModuleCardProps {
-  testId: string;
-  to: string;
-  icon: string;
-  title: string;
-  subtitle: string;
-  metric: string | number | null;
-  rows: ModuleRow[];
-  loading?: boolean;
-}
-
-const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtitle, metric, rows, loading }) => (
-  <Link data-testid={testId} to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
-    <div className="flex items-start justify-between mb-4">
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base shrink-0">
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="text-xs text-slate-400">{subtitle}</p>
-        </div>
-      </div>
-      <span className="text-2xl font-semibold text-slate-900">
-        {loading ? <Skeleton className="h-6 w-10" /> : <MetricValue value={metric} />}
-      </span>
-    </div>
-    <div className="space-y-1.5">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">{row.label}</span>
-          <span className="text-xs font-medium text-slate-700">
-            {loading ? <Skeleton className="h-3 w-8" /> : <MetricValue value={row.value} />}
-          </span>
-        </div>
-      ))}
-    </div>
-  </Link>
-);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -94,6 +27,17 @@ type OverviewStats = {
   activeSuppliers: number | null;
   reviewOpen: number | null;
   reviewUnassigned: number | null;
+  // Module-card aggregates (AIQ-1329) — lightweight counts from each section's
+  // existing endpoint so the cards show live numbers instead of 'Unavailable'.
+  opsOpen: number | null;
+  opsBreached: number | null;
+  workflowCases: number | null;
+  workflowRfqs: number | null;
+  resourcesPublished: number | null;
+  resourcesDraft: number | null;
+  prospectsTotal: number | null;
+  ragHealthy: number | null;
+  ragTotal: number | null;
 };
 
 const EMPTY_STATS: OverviewStats = {
@@ -104,6 +48,15 @@ const EMPTY_STATS: OverviewStats = {
   activeSuppliers: null,
   reviewOpen: null,
   reviewUnassigned: null,
+  opsOpen: null,
+  opsBreached: null,
+  workflowCases: null,
+  workflowRfqs: null,
+  resourcesPublished: null,
+  resourcesDraft: null,
+  prospectsTotal: null,
+  ragHealthy: null,
+  ragTotal: null,
 };
 
 function settledArrayCount<T>(
@@ -141,6 +94,12 @@ export const AdminOverviewPage: React.FC = () => {
         // Review-queue totals use the same aggregate as /admin/review-queue.
         adminReviewQueueAPI.getStats(),
         suppliersAPI.list({ status: 'active' }),
+        // Module-card sources (AIQ-1329) — all lightweight aggregates/counts.
+        adminOpsAnalyticsAPI.getSlaOverview({ days: 30 }),
+        adminOpsAnalyticsAPI.getWorkflowOverview({ days: 30 }),
+        adminResourcesAPI.getCounts(),
+        adminProspectsAPI.list({ limit: 1 }), // limit=1: we only read `total`, not rows
+        getRagEvalMetrics(),
       ]);
 
       return {
@@ -151,12 +110,26 @@ export const AdminOverviewPage: React.FC = () => {
         reviewOpen: settledNumber(results[4], (value) => (value as { open_items_count?: number }).open_items_count),
         reviewUnassigned: settledNumber(results[4], (value) => (value as { unassigned_count?: number }).unassigned_count),
         activeSuppliers: settledArrayCount(results[5], (value) => (value as { suppliers?: unknown[] }).suppliers),
+        opsOpen: settledNumber(results[6], (value) => (value as { open_count?: number }).open_count),
+        opsBreached: settledNumber(results[6], (value) => (value as { breached_count?: number }).breached_count),
+        workflowCases: settledNumber(results[7], (value) => value.events?.case_created),
+        workflowRfqs: settledNumber(results[7], (value) => value.events?.rfq_created),
+        resourcesPublished: settledNumber(results[8], (value) => value.resources_published),
+        resourcesDraft: settledNumber(results[8], (value) => value.resources_draft),
+        prospectsTotal: settledNumber(results[9], (value) => value.total),
+        ragHealthy: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.filter((m) => !m.alert.firing).length),
+        ragTotal: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.length),
       };
     },
     enabled: role === 'ADMIN',
   });
   const stats: OverviewStats = statsQuery.data ?? EMPTY_STATS;
   const loading = statsQuery.isLoading;
+
+  // RAG quality has no single count — summarise it as "healthy / total" metrics
+  // and surface how many thresholds are currently alerting.
+  const ragSummary = stats.ragTotal === null ? null : `${stats.ragHealthy ?? 0}/${stats.ragTotal}`;
+  const ragAlerting = stats.ragTotal === null ? null : stats.ragTotal - (stats.ragHealthy ?? 0);
 
   if (role !== 'ADMIN') {
     return (
@@ -213,7 +186,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-review-queue"
           to={buildRoute('adminReviewQueue')}
-          icon="🔁"
+          icon={<ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Review queue"
           subtitle={metricSummary(stats.reviewOpen, 'open items')}
           metric={stats.reviewOpen}
@@ -226,61 +199,72 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-ops-analytics"
           to={buildRoute('adminOpsSla')}
-          icon="📈"
+          icon={<LineChart className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Ops analytics"
           subtitle="SLA, bottlenecks, reviewer load"
-          metric={null}
+          metric={stats.opsOpen}
           loading={loading}
-          rows={[{ label: 'Status', value: 'No aggregate endpoint connected' }]}
+          rows={[
+            { label: 'Open SLA items', value: stats.opsOpen },
+            { label: 'Breached', value: stats.opsBreached },
+          ]}
         />
         <ModuleCard
           testId="module-workflow-analytics"
           to={buildRoute('adminOpsQueue')}
-          icon="🔀"
+          icon={<Shuffle className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Workflow analytics"
           subtitle="Recommendations, RFQ conversion"
-          metric={null}
+          metric={stats.workflowCases}
           loading={loading}
-          rows={[{ label: 'Status', value: 'No aggregate endpoint connected' }]}
+          rows={[
+            { label: 'Cases created (30d)', value: stats.workflowCases },
+            { label: 'RFQs created (30d)', value: stats.workflowRfqs },
+          ]}
         />
         <ModuleCard
           testId="module-resources"
           to={buildRoute('adminResources')}
-          icon="📋"
+          icon={<FileText className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Resources CMS"
           subtitle="Guides, requirements, taxonomy"
-          metric={null}
+          metric={stats.resourcesPublished}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open the CMS for live counts' }]}
+          rows={[
+            { label: 'Published', value: stats.resourcesPublished },
+            { label: 'Draft', value: stats.resourcesDraft },
+          ]}
         />
         <ModuleCard
           testId="module-prospects"
           to={buildRoute('adminProspects')}
-          icon="🎯"
+          icon={<Target className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Prospects"
           subtitle="HR pipeline · ICP-scored"
-          metric={null}
+          metric={stats.prospectsTotal}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open pipeline for live counts' }]}
+          rows={[{ label: 'Total in pipeline', value: stats.prospectsTotal }]}
         />
         <ModuleCard
           testId="module-rag-quality"
           to={buildRoute('adminRagQuality')}
-          icon="📈"
+          icon={<Activity className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="RAG quality"
           subtitle="Retrieval & generation health over time"
-          metric={null}
+          metric={ragSummary}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open dashboard for live metrics' }]}
+          rows={[{ label: 'Thresholds alerting', value: ragAlerting }]}
         />
       </div>
 
       {/* ── Module grid — row 2 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 mb-6">
+      {/* Only 2 cards here, so cap at md:grid-cols-2 — the row-1 breakpoints (…2xl:grid-cols-5)
+          would strand these two as wide orphans in a 5-column ghost grid at large viewports. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <ModuleCard
           testId="module-suppliers"
           to={buildRoute('adminSuppliers')}
-          icon="🔗"
+          icon={<Link2 className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Suppliers"
           subtitle="Active supplier records"
           metric={stats.activeSuppliers}
@@ -292,7 +276,7 @@ export const AdminOverviewPage: React.FC = () => {
         <ModuleCard
           testId="module-companies"
           to={buildRoute('adminCompanies')}
-          icon="🏢"
+          icon={<Building2 className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Companies & users"
           subtitle="Tenants, allowlists, roles"
           metric={stats.companies}

@@ -115,22 +115,6 @@
       "new_failures": 0,
       "notion_synced": false,
       "notes": "UX Sprint validation + regression. 0 regressions; +4. 14/15 UX fixes merged (F1/F4 landed this run via #664/#670); F1,F3,F4,F7,F8,F11,F12 verified LIVE via Playwright; F10/AIQ-987 verified already-correct (All0+No-forms-yet). Only unbuilt gap closed: none outstanding."
-    },
-    {
-      "id": 7,
-      "label": "C7",
-      "date": "2026-06-27",
-      "run_by": "auto",
-      "results_file": "results/test_results_2026-06-27T15-34.json",
-      "report_file": "results/campaign_report_2026-06-28T07-10.json",
-      "overall_score": 100.0,
-      "health_band": "GREEN",
-      "delta": 1.2,
-      "regressions": 0,
-      "fixed": 2,
-      "new_failures": 0,
-      "notion_synced": false,
-      "notes": "First 100% GREEN campaign. 79/79 API PASS. Runner v3.0. Admin Console fixed (+16.7% vs C6, resolving the CT4/B9 admin assignments gap). End-to-End Flows fixed (+4.2%, T15/T16 fully passing). 0 Notion candidates from scorer — Wave 3 UX audit (same day) produced 12 tasks in Notion queue covering UI polish and data issues not captured by the API runner. scenarios.json updated to v1.1 (T10/T14/T15 steps corrected for v2 wizard). Platform confirmed launch-ready from API perspective; remaining work is all UI/UX polish (Wave 3 queue)."
     }
   ]
 }

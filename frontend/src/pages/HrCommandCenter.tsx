@@ -112,7 +112,7 @@ export const HrCommandCenter: React.FC = () => {
           </div>
           {casesLoading && cases.length === 0 ? (
             <div className="space-y-2 py-6">
-              {[...Array(5)].map((_, i) => (
+              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex gap-4 py-3 border-b border-[#e2e8f0] last:border-0">
                   <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-32" />
                   <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-16" />
@@ -148,6 +148,7 @@ export const HrCommandCenter: React.FC = () => {
                   {cases.map((row) => (
                     <tr
                       key={row.id}
+                      role="button"
                       onClick={() => handleRowClick(row.id)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(row.id); } }}
                       tabIndex={0}

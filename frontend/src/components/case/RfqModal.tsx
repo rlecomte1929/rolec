@@ -87,6 +87,7 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, 
   return (
     <>
       {/* Backdrop */}
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss backdrop (aria-hidden); the modal is keyboard-dismissible via its own controls */}
       <div
         className="fixed inset-0 bg-black/40 z-60"
         onClick={onClose}

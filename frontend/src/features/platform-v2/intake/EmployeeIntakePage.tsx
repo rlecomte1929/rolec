@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import type * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
+import { useGeocodedAddress } from '../../../components/geocode';
 import { patchCase } from '../../../api/cases';
 import { employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
@@ -16,6 +18,17 @@ import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
 import { resolveIntakeIds } from './resolveIntakeIds';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
+import { parseSubmitError } from './parseSubmitError';
+import { matchCountry } from './countryMatch';
+// Identity fields (nationality, passport) accept the full ISO list; the local
+// COUNTRIES below stays scoped to the relocation origin/destination pickers,
+// which also rely on CITIES_BY_COUNTRY (AIQ-1341).
+import { COUNTRY_OPTIONS as ALL_COUNTRY_OPTIONS } from '../../policy-config/countryList';
+
+// Leaflet is heavy — only load the real commute map once an address resolves.
+const RichCommuteMap = lazy(() =>
+  import('../../../components/RichCommuteMap').then((m) => ({ default: m.RichCommuteMap }))
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -252,16 +265,18 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
 
-function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled, testId }: {
+function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled, testId, options = COUNTRIES }: {
   value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean; testId?: string;
+  // Defaults to the relocation-destination list; identity fields pass the full ISO list (AIQ-1341).
+  options?: ReadonlyArray<{ code: string; name: string; flag?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-  const selected = COUNTRIES.find((c) => c.code === value);
+  const selected = options.find((c) => c.code === value);
   const filtered = query
-    ? COUNTRIES.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
-    : COUNTRIES;
+    ? options.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
+    : options;
 
   useEffect(() => {
     if (!open) return;
@@ -273,7 +288,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   return (
     <div ref={ref} className="relative">
       <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
-        <span className="px-3 text-base">{selected ? selected.flag : '🔍'}</span>
+        <span className="px-3 text-base">{selected ? (selected.flag ?? '🌐') : '🔍'}</span>
         <Input unstyled
           type="text"
           data-testid={testId}
@@ -281,7 +296,16 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
           value={open ? query : selected ? selected.name : ''}
           placeholder={placeholder}
           disabled={disabled}
-          onChange={(v) => { setQuery(v); setOpen(true); }}
+          onChange={(v) => {
+            setQuery(v);
+            setOpen(true);
+            // Auto-commit when the typed text unambiguously identifies a country so
+            // the user isn't left with an empty value (and a disabled Continue) after
+            // typing the full name without clicking the dropdown. See matchCountry for
+            // the name-prefix guard that keeps a code match from firing early.
+            const exact = matchCountry(v, [...options]);
+            if (exact) { onChange(exact.code); setOpen(false); setQuery(''); }
+          }}
           onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
           autoComplete="off"
         />
@@ -289,12 +313,19 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
       </div>
       {open && !disabled && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+          {query && filtered.length > 0 && (
+            <div className="px-4 pt-2 pb-1 text-[11px] text-gray-400">Select your country from the list</div>
+          )}
           {filtered.length === 0
             ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
             : filtered.map((c) => (
               <div key={c.code} onClick={() => { onChange(c.code); setOpen(false); setQuery(''); }}
+                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(c.code); setOpen(false); setQuery(''); } }}
+                role="option"
+                aria-selected={value === c.code}
+                tabIndex={0}
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-accent-50 text-accent-700' : ''}`}>
-                <span className="text-base">{c.flag}</span>
+                <span className="text-base">{c.flag ?? ''}</span>
                 <span className="flex-1">{c.name}</span>
                 <span className="text-xs text-gray-400">{c.code}</span>
               </div>
@@ -329,6 +360,10 @@ function CityCombo({ country, value, onChange, testId }: { country: string; valu
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
           {opts.map((c) => (
             <div key={c} onClick={() => { onChange(c); setOpen(false); }}
+              onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(c); setOpen(false); } }}
+              role="option"
+              aria-selected={value === c}
+              tabIndex={0}
               className="px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50">{c}</div>
           ))}
         </div>
@@ -337,57 +372,9 @@ function CityCombo({ country, value, onChange, testId }: { country: string; valu
   );
 }
 
-// ─── Commute map (SVG) ────────────────────────────────────────────────────────
-
-const NEIGHBORHOODS = [
-  { id: 'n1', x: 50, y: 28, t_min: 8,  name: 'Vika' },
-  { id: 'n2', x: 28, y: 35, t_min: 14, name: 'Frogner' },
-  { id: 'n3', x: 70, y: 38, t_min: 16, name: 'Grünerløkka' },
-  { id: 'n4', x: 38, y: 56, t_min: 22, name: 'Bygdøy' },
-  { id: 'n5', x: 64, y: 60, t_min: 26, name: 'Tøyen' },
-  { id: 'n6', x: 22, y: 70, t_min: 34, name: 'Bærum' },
-  { id: 'n7', x: 78, y: 73, t_min: 42, name: 'Furuset' },
-  { id: 'n8', x: 50, y: 82, t_min: 52, name: 'Sandvika' },
-];
-
-function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
-  const radius = Math.min(50, (maxMins / 60) * 50 + 5);
-  const cx = 50, cy = 48;
-  const inCount = NEIGHBORHOODS.filter((n) => n.t_min <= maxMins).length;
-  return (
-    <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-950">
-      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-600 text-white text-[10px] font-medium">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" /> live
-      </span>
-      <svg viewBox="0 0 100 100" className="w-full h-48" preserveAspectRatio="xMidYMid meet" aria-hidden>
-        {[20, 40, 60, 80].map((v) => (
-          <g key={`g${v}`}>
-            <line x1={v} y1={0} x2={v} y2={100} stroke="#1f2937" strokeWidth="0.3" />
-            <line x1={0} y1={v} x2={100} y2={v} stroke="#1f2937" strokeWidth="0.3" />
-          </g>
-        ))}
-        <circle cx={cx} cy={cy} r={radius} fill="rgba(31, 142, 139,0.12)" stroke="rgba(31, 142, 139,0.4)" strokeWidth="0.6" />
-        {NEIGHBORHOODS.map((n) => {
-          const inside = n.t_min <= maxMins;
-          return (
-            <g key={n.id}>
-              <circle cx={n.x} cy={n.y} r="3.5" fill={inside ? '#1f8e8b' : '#374151'} />
-              <text x={n.x} y={n.y + 7} textAnchor="middle" fontSize="3.5"
-                fill={inside ? '#6ec0bd' : '#6b7280'}>{n.name}</text>
-            </g>
-          );
-        })}
-        <circle cx={cx} cy={cy} r="8" fill="rgba(31, 142, 139,0.2)" stroke="#1f8e8b" strokeWidth="1" />
-        <circle cx={cx} cy={cy} r="2.5" fill="#1f8e8b" />
-        <text x={cx} y={cy - 5} textAnchor="middle" fontSize="3" fill="#6ec0bd">Office</text>
-      </svg>
-      <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-gray-400">
-        <strong className="text-accent-400">{inCount} neighborhoods</strong> within {maxMins}min
-        {mode.length > 0 ? ` by ${mode.slice(0, 2).map((m) => m === 'public_transit' ? 'transit' : m).join('/')}` : ''}
-      </div>
-    </div>
-  );
-}
+// AIQ-1345: the hardcoded Oslo SVG CommuteMap was removed. The commute preview
+// is now the real, geocoded <RichCommuteMap> (lazy-loaded), gated on a resolved
+// office address — see the "Work & Place" step render below.
 
 // ─── Household member cards ───────────────────────────────────────────────────
 
@@ -719,6 +706,10 @@ export function EmployeeIntakePage() {
   const partner = data.members.find((m) => m.kind === 'partner');
   const children = data.members.filter((m) => m.kind === 'child');
 
+  // AIQ-1345: geocode the office address (debounced) so the "Verified" badge and
+  // the commute preview reflect the real, resolved location — not a fake.
+  const officeGeo = useGeocodedAddress(data.office_address);
+
   const addMember = (kind: MemberKind, extra?: Partial<Member>) => {
     const id = kind + Date.now();
     setField('members', [...data.members, { id, kind, count: 1, ...extra }]);
@@ -922,7 +913,7 @@ export function EmployeeIntakePage() {
         {Object.values(locks).some(Boolean) && (
           <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
             <span className="flex-shrink-0">ℹ</span>
-            <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click "Edit" on any pre-filled field if anything looks wrong.</div>
+            <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click &quot;Edit&quot; on any pre-filled field if anything looks wrong.</div>
           </div>
         )}
 
@@ -932,8 +923,8 @@ export function EmployeeIntakePage() {
         {hydrateError && (
           <div className="flex items-start justify-between gap-3 p-3 mb-5 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700">
             <div>
-              <strong>Couldn't load your saved answers.</strong> To avoid overwriting what
-              you've already saved, editing is paused until this loads.
+              <strong>Couldn&apos;t load your saved answers.</strong> To avoid overwriting what
+              you&apos;ve already saved, editing is paused until this loads.
             </div>
             <button
               type="button"
@@ -960,7 +951,7 @@ export function EmployeeIntakePage() {
                   onClick={retryIntakeSave}
                   className="font-medium text-red-600 hover:underline"
                 >
-                  Couldn't save — retry
+                  Couldn&apos;t save — retry
                 </button>
               ) : (
                 <span>Auto-saved {savedLabel}</span>
@@ -1050,7 +1041,7 @@ export function EmployeeIntakePage() {
                 </Grid>
                 {international && (
                   <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                    🌍 <span><strong>International move detected.</strong> We'll automatically include visa, customs, international movers, and pet import (if relevant) in your roadmap.</span>
+                    🌍 <span><strong>International move detected.</strong> We&apos;ll automatically include visa, customs, international movers, and pet import (if relevant) in your roadmap.</span>
                   </div>
                 )}
               </>
@@ -1070,10 +1061,10 @@ export function EmployeeIntakePage() {
                       onChange={(v) => setField('email', v)} />
                   </FieldWrap>
                   <FieldWrap label="Nationality" required>
-                    <CountryCombo testId="intake-nationality" value={data.nationality} onChange={(v) => setField('nationality', v)} />
+                    <CountryCombo testId="intake-nationality" value={data.nationality} onChange={(v) => setField('nationality', v)} options={ALL_COUNTRY_OPTIONS} />
                   </FieldWrap>
                   <FieldWrap label="Passport country" required>
-                    <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} />
+                    <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} options={ALL_COUNTRY_OPTIONS} />
                   </FieldWrap>
                   <FieldWrap label="Passport expiry" required>
                     <Input unstyled type="date" data-testid="intake-passport_expiry" className={inputCls()} value={data.passport_expiry}
@@ -1120,7 +1111,7 @@ export function EmployeeIntakePage() {
                 </div>
                 {data.members.length === 1 && (
                   <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                    ℹ <span><strong>Moving solo?</strong> That's fine — just continue. You can add household members later from your profile.</span>
+                    ℹ <span><strong>Moving solo?</strong> That&apos;s fine — just continue. You can add household members later from your profile.</span>
                   </div>
                 )}
               </>
@@ -1157,9 +1148,17 @@ export function EmployeeIntakePage() {
                     <Input unstyled className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
                       placeholder="Start typing…" onChange={(v) => setField('office_address', v)} />
                     {data.office_address && (
-                      <div className="flex items-center gap-2 mt-1 px-2.5 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500">
+                      <div className={`flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-lg text-xs ${
+                        officeGeo.status === 'notfound' ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'
+                      }`}>
                         📍 <span className="flex-1">{data.office_address}</span>
-                        <span className="text-green-600 font-medium">Verified</span>
+                        {officeGeo.status === 'loading' && <span className="text-gray-400">Locating…</span>}
+                        {officeGeo.status === 'ok' && (
+                          <span className="text-green-600 font-medium">Verified</span>
+                        )}
+                        {officeGeo.status === 'notfound' && (
+                          <span className="font-medium">Couldn&apos;t find that address — check the spelling</span>
+                        )}
                       </div>
                     )}
                   </FieldWrap>
@@ -1194,13 +1193,28 @@ export function EmployeeIntakePage() {
                     </div>
                     <div>
                       <div className="text-xs font-semibold text-gray-700 mb-1.5">Commute map · live preview</div>
-                      <CommuteMap maxMins={data.commute_mins} mode={data.commute_mode} />
+                      {officeGeo.status === 'ok' ? (
+                        <Suspense fallback={<div className="rounded-xl border border-gray-100 bg-gray-50 h-48 flex items-center justify-center text-xs text-gray-400">Loading commute map…</div>}>
+                          <RichCommuteMap
+                            officeAddress={data.office_address}
+                            commuteMins={data.commute_mins}
+                            commuteMode={data.commute_mode}
+                            hasChildren={children.length > 0}
+                          />
+                        </Suspense>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 h-48 flex items-center justify-center px-4 text-center text-xs text-gray-400">
+                          {officeGeo.status === 'notfound'
+                            ? 'We couldn’t locate that office address — fix it above to preview your commute area.'
+                            : 'Enter your office address above to preview your commute area.'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
                 {data.work_pattern === 'Fully remote' && (
                   <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                    ℹ <span><strong>Working fully remote.</strong> We'll skip commute filtering and lead housing search with neighborhood quality and lifestyle priorities instead.</span>
+                    ℹ <span><strong>Working fully remote.</strong> We&apos;ll skip commute filtering and lead housing search with neighborhood quality and lifestyle priorities instead.</span>
                   </div>
                 )}
               </>
@@ -1294,8 +1308,13 @@ export function EmployeeIntakePage() {
                           : ROUTE_DEFS.employeeDashboard.path,
                       );
                     } catch (e) {
-                      setSubmitError((e as Error).message ?? 'Submission failed. Please try again.');
+                      // AIQ-1311: surface the server's human message + route the
+                      // user back to the step it pinpoints, instead of the raw
+                      // "Request failed with status code 400".
+                      const { message, suggestedStep } = parseSubmitError(e);
+                      setSubmitError(message);
                       setSubmitting(false);
+                      if (suggestedStep != null) setStep(suggestedStep);
                     }
                   }}
                   className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${

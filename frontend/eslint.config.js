@@ -188,15 +188,15 @@ export default tseslint.config(
       ],
 
       // — TS type-safety epic (the no-unsafe-* family stems from untyped API responses) —
-      '@typescript-eslint/no-unsafe-member-access': 'warn',
-      '@typescript-eslint/no-unsafe-assignment': 'warn',
-      '@typescript-eslint/no-unsafe-return': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
-      '@typescript-eslint/no-unsafe-call': 'warn',
-      '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-base-to-string': 'warn',
-      '@typescript-eslint/restrict-template-expressions': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-base-to-string': 'error',
+      '@typescript-eslint/restrict-template-expressions': 'error',
 
       // — Async-safety epic —
       // no-misused-promises: DRAINED + re-promoted to 'error' (Epic A2). The
@@ -210,20 +210,29 @@ export default tseslint.config(
       // recommendedTypeChecked default) — Epic A1. New floating promises now fail CI.
 
       // — Accessibility epic (clickable-div + jsx-a11y) —
-      'local/no-clickable-div': 'warn',
-      'jsx-a11y/label-has-associated-control': 'warn',
-      'jsx-a11y/click-events-have-key-events': 'warn',
-      'jsx-a11y/no-static-element-interactions': 'warn',
-      'jsx-a11y/no-noninteractive-element-interactions': 'warn',
-      'jsx-a11y/no-redundant-roles': 'warn',
-      'jsx-a11y/no-autofocus': 'warn',
-      'jsx-a11y/interactive-supports-focus': 'warn',
-      'jsx-a11y/aria-role': 'warn',
-      'jsx-a11y/no-noninteractive-element-to-interactive-role': 'warn',
+      // Epic C / R-CLICK: DRAINED to 0 + re-promoted to 'error' (with its ride-along rules below).
+      'local/no-clickable-div': 'error',
+      // label-has-associated-control: DRAINED to 0 + re-promoted to 'error' (Epic C / R1).
+      // controlComponents recognises the antigravity wrappers that render native form controls.
+      // Select (antigravity) is NOT listed — it doesn't expose id, so pairs use native <select> with id instead.
+      'jsx-a11y/label-has-associated-control': ['error', {
+        controlComponents: ['Checkbox', 'Input', 'FileInput', 'Radio'],
+        depth: 3,
+      }],
+      'jsx-a11y/click-events-have-key-events': 'error',
+      'jsx-a11y/no-static-element-interactions': 'error',
+      'jsx-a11y/no-noninteractive-element-interactions': 'error',
+      // Epic C / R3: DRAINED to 0 + re-promoted to 'error'. These now fail CI on any new violation.
+      'jsx-a11y/no-redundant-roles': 'error',
+      // Epic C / R-AUTOFOCUS: DRAINED to 0 + re-promoted to 'error'.
+      'jsx-a11y/no-autofocus': 'error',
+      'jsx-a11y/interactive-supports-focus': 'error',
+      'jsx-a11y/aria-role': 'error',
+      'jsx-a11y/no-noninteractive-element-to-interactive-role': 'error',
 
       // — Cosmetic / low-count, demoted for now (tracked for follow-up; several are
       //   trivially fixable and should be drained + re-promoted in the epics) —
-      'react/no-unescaped-entities': 'warn',
+      'react/no-unescaped-entities': 'error',
       'react/prop-types': 'warn',
       'no-constant-binary-expression': 'warn',
       '@typescript-eslint/no-redundant-type-constituents': 'warn',
@@ -249,6 +258,14 @@ export default tseslint.config(
       'no-console': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-base-to-string': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
     },
   },
 );

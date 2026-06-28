@@ -663,7 +663,9 @@ function BottomSheet({ open, task, caseId, role, onClose, onSaved }: BottomSheet
   return (
     // Outer: lg:hidden so it never appears on desktop
     <div className={`lg:hidden`} aria-hidden={!open}>
-      {/* Backdrop */}
+      {/* Backdrop — presentational mouse-dismiss overlay (aria-hidden); keyboard/AT users
+          dismiss the drawer via its in-sheet close control, so it is not a focusable control. */}
+      {/* eslint-disable-next-line local/no-clickable-div */}
       <div
         onClick={onClose}
         className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-200 ${
@@ -1125,7 +1127,6 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
             {/* LEFT: timeline list */}
             <div className="overflow-y-auto max-h-[70vh] pr-1">
               <ul
-                role="list"
                 aria-label="Relocation milestones"
                 className="relative space-y-1 pl-3"
               >

@@ -80,9 +80,9 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 function normKey(s: unknown): string {
-  return String(s ?? '')
-    .trim()
-    .toLowerCase();
+  if (s == null) return '';
+  const raw = typeof s === 'string' ? s : typeof s === 'number' ? String(s) : '';
+  return raw.trim().toLowerCase();
 }
 
 export function formatDocumentTypeLabel(raw: unknown): string {
@@ -127,7 +127,7 @@ export function formatReadinessIssueForDisplay(issue: HrPolicyReviewIssue): stri
 }
 
 export function formatIssueTierLabel(tier: unknown): string {
-  const k = String(tier || '').trim();
+  const k = normKey(tier);
   if (!k) return 'Review';
   if (TIER_LABELS[k]) return TIER_LABELS[k];
   if (k.startsWith('draft_')) {
@@ -206,7 +206,7 @@ export function deriveReviewStatusBanner(args: {
 
 export function confidencePercent(raw: unknown): string | null {
   if (raw == null || raw === '') return null;
-  const n = typeof raw === 'number' ? raw : parseFloat(String(raw));
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? parseFloat(raw) : NaN;
   if (Number.isNaN(n)) return null;
   const pct = n <= 1 && n >= 0 ? Math.round(n * 100) : Math.round(Math.min(100, Math.max(0, n)));
   return `${pct}%`;
@@ -215,7 +215,7 @@ export function confidencePercent(raw: unknown): string | null {
 export function groupLayer2BenefitRules(rules: Array<Record<string, unknown>>): Array<{ key: string; label: string; rows: typeof rules }> {
   const by: Record<string, typeof rules> = {};
   for (const r of rules) {
-    const cat = String(r.benefit_category || r.domain || 'misc').trim() || 'misc';
+    const cat = normKey(r.benefit_category) || normKey(r.domain) || 'misc';
     if (!by[cat]) by[cat] = [];
     by[cat].push(r);
   }
@@ -236,7 +236,7 @@ export function groupLayer2BenefitRules(rules: Array<Record<string, unknown>>): 
 export function groupLayer2Exclusions(exclusions: Array<Record<string, unknown>>): Array<{ key: string; label: string; rows: typeof exclusions }> {
   const by: Record<string, typeof exclusions> = {};
   for (const r of exclusions) {
-    const dom = String(r.domain || 'misc').trim() || 'misc';
+    const dom = normKey(r.domain) || 'misc';
     if (!by[dom]) by[dom] = [];
     by[dom].push(r);
   }
@@ -298,16 +298,19 @@ export function employeeComparisonVisibilityLabel(args: {
 }
 
 export function formatBenefitRuleBusinessLine(rule: Record<string, unknown>): string {
-  const desc = String(rule.description || '').trim();
-  const bk = String(rule.benefit_key || '').trim();
+  const desc = typeof rule.description === 'string' ? rule.description.trim() : '';
+  const bk = typeof rule.benefit_key === 'string' ? rule.benefit_key.trim() : '';
   const parts: string[] = [];
   if (desc) parts.push(desc);
   else if (bk) parts.push(humanizeToken(bk.replace(/_/g, ' ')));
-  const amt = rule.amount_value;
-  const cur = rule.currency;
-  const unit = rule.amount_unit;
-  const freq = rule.frequency;
-  if (amt != null && amt !== '') {
+  const rawAmt = rule.amount_value;
+  const amt: string | number | null =
+    (rawAmt != null && rawAmt !== '') ?
+      (typeof rawAmt === 'number' || typeof rawAmt === 'string' ? rawAmt : null) : null;
+  const cur = typeof rule.currency === 'string' ? rule.currency : '';
+  const unit = typeof rule.amount_unit === 'string' ? rule.amount_unit : '';
+  const freq = typeof rule.frequency === 'string' ? rule.frequency : '';
+  if (amt != null) {
     parts.push(`${cur ? `${cur} ` : ''}${amt}${unit ? ` ${unit}` : ''}${freq ? ` · ${freq}` : ''}`.trim());
   } else if (parts.length === 0) {
     parts.push('Benefit rule');
@@ -316,6 +319,6 @@ export function formatBenefitRuleBusinessLine(rule: Record<string, unknown>): st
 }
 
 export function formatExclusionBusinessLine(rule: Record<string, unknown>): string {
-  const d = String(rule.description || '').trim();
+  const d = typeof rule.description === 'string' ? rule.description.trim() : '';
   return d || 'Exclusion';
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { buildRoute } from '../../../navigation/routes';
+import { buildRoute, type RouteKey } from '../../../navigation/routes';
 
 type Summary = {
   comment_count: number;
@@ -25,7 +25,7 @@ export const ThreadSummaryBadge: React.FC<Props> = ({
 }) => {
   if (!summary || summary.comment_count === 0) return null;
 
-  const to = linkRoute ? buildRoute(linkRoute as any, { ...linkParams, id: targetId }) : undefined;
+  const to = linkRoute ? buildRoute(linkRoute as RouteKey, { ...linkParams, id: targetId }) : undefined;
   const badge = (
     <span
       className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs ${

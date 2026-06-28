@@ -6,6 +6,7 @@ import { Alert, Button, Card } from '../../components/antigravity';
 import { DynamicServicesQuestionnaire, validateDynamicAnswers, type DynamicQuestion } from '../../features/services/DynamicServicesQuestionnaire';
 import { PetRelocationCard } from '../../features/services/PetRelocationCard';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
 import { logServicesWorkflow } from '../../features/services/servicesWorkflowInstrumentation';
 import { useServicesWorkflowState } from '../../features/services/useServicesWorkflowState';
 import { servicesAPI } from '../../api/client';
@@ -14,7 +15,7 @@ import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { ROUTE_DEFS, buildRoute, type RouteKey } from '../../navigation/routes';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
@@ -59,10 +60,12 @@ export const ServicesQuestions: React.FC = () => {
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
+  // AIQ-1334: employee case sub-routes are keyed by case_id (not assignment_id),
+  // so in-flow nav targets use the resolved case_id for a consistent URL.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
   const caseStep = useCallback(
-    (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' }),
-    [assignmentId],
+    (key: RouteKey) => buildRoute(key, { caseId: routeCaseId }),
+    [routeCaseId],
   );
   const workflow = useServicesWorkflowState();
 
@@ -76,7 +79,7 @@ export const ServicesQuestions: React.FC = () => {
   const [questions, setQuestions] = useState<DynamicQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
-  const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string; originCountry?: string } | null>(null);
+  const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string; originCity?: string; originCountry?: string; date?: string | null } | null>(null);
   const [caseDetailsLoaded, setCaseDetailsLoaded] = useState(false);
   const [isSavingAnswers, setIsSavingAnswers] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -87,9 +90,10 @@ export const ServicesQuestions: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -142,7 +146,9 @@ export const ServicesQuestions: React.FC = () => {
         setCaseContext({
           destCity: destCity || undefined,
           destCountry: destCountry || undefined,
+          originCity: (ctx.originCity) || undefined,
           originCountry: (ctx.originCountry) || undefined,
+          date: res.target_start_date || null,
         });
 
         const fromCase = caseToInitialAnswers(null, {
@@ -294,7 +300,7 @@ export const ServicesQuestions: React.FC = () => {
         ? 'Loading recommendations...'
         : undefined;
 
-  const destinationCity = String(initialAnswers.dest_city ?? '').trim();
+  const destinationCity = ((initialAnswers.dest_city as string | null | undefined) ?? '').trim();
   const destinationCountry = String(caseContext?.destCountry ?? '').trim();
   const missingDestination = caseDetailsLoaded && (!destinationCity || !destinationCountry);
 
@@ -335,6 +341,11 @@ export const ServicesQuestions: React.FC = () => {
 
   return (
     <AppShell title="Service questions" subtitle="Refine your provider matches.">
+      <ServicesContextBanner
+        originCity={caseContext?.originCity || caseContext?.originCountry}
+        destCity={caseContext?.destCity || caseContext?.destCountry}
+        date={caseContext?.date}
+      />
       <ServicesNavRibbon />
       {workflow.state === 'loading_recommendations' && (
         <div

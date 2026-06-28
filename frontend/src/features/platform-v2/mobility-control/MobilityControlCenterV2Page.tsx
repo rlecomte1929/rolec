@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import type * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
@@ -366,7 +367,7 @@ export function MobilityControlCenterV2Page() {
     completedCount: number;
     budgetOverrunsCount: number;
   } | null = dashboardQuery.data?.kpis ?? null;
-  const cases: CommandCenterCaseRow[] = dashboardQuery.data?.cases ?? [];
+  const cases: CommandCenterCaseRow[] = useMemo(() => dashboardQuery.data?.cases ?? [], [dashboardQuery.data]);
   const approvals: ApprovalRow[] = dashboardQuery.data?.approvals ?? [];
   const backendDegraded = dashboardQuery.data?.degraded ?? false;
   const loading = dashboardQuery.isLoading;
@@ -700,7 +701,7 @@ export function MobilityControlCenterV2Page() {
         {backendDegraded && (
           <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span>
-              Some data couldn't load — showing partial results. Refresh to try again.
+              Some data couldn&apos;t load — showing partial results. Refresh to try again.
             </span>
             <Button unstyled type="button" onClick={() => void dashboardQuery.refetch()} className="text-amber-700 hover:underline">Retry</Button>
           </div>
@@ -767,10 +768,11 @@ export function MobilityControlCenterV2Page() {
                   {riskFeed.map((row) => {
                     const age = daysAgo(row.updatedAt);
                     return (
-                      <li
-                        key={row.id}
+                      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- <li> as interactive list item; button role enables keyboard activation
+                      <li key={row.id} role="button" tabIndex={0}
                         className="cursor-pointer text-[12.5px] hover:opacity-90"
                         onClick={() => goToCase(row)}
+                        onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToCase(row); } }}
                       >
                         <div className="flex items-center gap-1.5">
                           <span className={`inline-block h-1.5 w-1.5 rounded-full ${row.riskStatus === 'red' ? 'bg-rose-500' : 'bg-amber-500'}`} />

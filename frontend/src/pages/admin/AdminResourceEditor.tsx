@@ -76,7 +76,7 @@ export const AdminResourceEditor: React.FC = () => {
 
   useEffect(() => {
     void load();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAudit = async () => {
     if (isNew || !id) return;
@@ -90,7 +90,7 @@ export const AdminResourceEditor: React.FC = () => {
 
   useEffect(() => {
     if (!isNew && id) void loadAudit();
-  }, [id, isNew]);
+  }, [id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -181,7 +181,7 @@ export const AdminResourceEditor: React.FC = () => {
       subtitle={
         isNew
           ? 'Create a new country resource'
-          : `Status: ${form.status || 'draft'}${form.is_visible_to_end_users ? ' • Visible to end users' : ''}`
+          : `Status: ${(form.status as string | undefined) || 'draft'}${form.is_visible_to_end_users ? ' • Visible to end users' : ''}`
       }
     >
       <div className="mb-4 flex gap-2">
@@ -470,16 +470,16 @@ export const AdminResourceEditor: React.FC = () => {
               <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
                 <div className="font-medium text-[#0b2b43]">{(form.title as string) || 'Untitled'}</div>
                 {form.summary ? (
-                  <p className="text-sm text-slate-600 mt-1">{String(form.summary)}</p>
+                  <p className="text-sm text-slate-600 mt-1">{form.summary as string}</p>
                 ) : null}
                 {form.trust_tier ? (
                   <span className="inline-block mt-2 text-xs px-1.5 py-0.5 rounded bg-slate-200">
-                    {String(form.trust_tier)}
+                    {form.trust_tier as string}
                   </span>
                 ) : null}
                 {form.external_url ? (
                   <a
-                    href={String(form.external_url)}
+                    href={form.external_url as string}
                     target="_blank"
                     rel="noreferrer"
                     className="text-sm text-blue-600 mt-2 inline-block"

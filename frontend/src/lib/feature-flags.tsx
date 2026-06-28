@@ -81,9 +81,11 @@ async function resolveVariant(
 // ─── Flag fetcher (internal) ──────────────────────────────────────────────────
 
 async function fetchAllFlags(): Promise<Record<string, FeatureFlag>> {
-  const { data, error } = await supabase.functions.invoke('get-feature-flags');
+  const invokeResult = await supabase.functions.invoke('get-feature-flags');
+  const data = invokeResult.data as { flags?: Record<string, FeatureFlag> } | null;
+  const error: unknown = invokeResult.error;
   if (error || !data?.flags) return {};
-  return data.flags as Record<string, FeatureFlag>;
+  return data.flags;
 }
 
 // ─── getVariant (public, non-hook) ────────────────────────────────────────────

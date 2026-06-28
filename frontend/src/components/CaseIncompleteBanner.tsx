@@ -16,8 +16,13 @@ const REQUIRED_PROFILE_FIELDS: { path: string; label: string }[] = [
   { path: 'primaryApplicant.employer.roleTitle', label: 'Job title' },
 ];
 
-function getNestedValue(obj: any, path: string): any {
-  return path.split('.').reduce((o, k) => o?.[k], obj);
+function getNestedValue(obj: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((o, k) => {
+    if (o !== null && typeof o === 'object') {
+      return (o as Record<string, unknown>)[k];
+    }
+    return undefined;
+  }, obj);
 }
 
 export function getCaseMissingFields(assignment: AssignmentDetail | null): string[] {

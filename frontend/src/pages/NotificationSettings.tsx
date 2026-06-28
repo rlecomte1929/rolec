@@ -18,9 +18,11 @@ const TYPE_LABELS: Record<string, string> = {
   [NOTIFICATION_TYPES.HR_FEEDBACK_POSTED]: 'New feedback from HR',
   [NOTIFICATION_TYPES.EMPLOYEE_SAVED]: 'Employee updated the case',
   [NOTIFICATION_TYPES.CASE_STATUS_CHANGED]: 'Case status changed',
+  [NOTIFICATION_TYPES.INTAKE_SUBMITTED]: 'Employee submitted their intake',
 };
 
 const SUPPORTED_TYPES = [
+  NOTIFICATION_TYPES.INTAKE_SUBMITTED,
   NOTIFICATION_TYPES.CASE_STATUS_CHANGED,
   NOTIFICATION_TYPES.EMPLOYEE_SAVED,
   NOTIFICATION_TYPES.HR_FEEDBACK_POSTED,
@@ -47,8 +49,9 @@ export const NotificationSettings: React.FC = () => {
         }
       });
       setPrefs(map);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load preferences.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : undefined;
+      setError(msg || 'Failed to load preferences.');
     } finally {
       setLoading(false);
     }
@@ -80,8 +83,9 @@ export const NotificationSettings: React.FC = () => {
           [field]: value,
         },
       }));
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : undefined;
+      setError(msg || 'Failed to save.');
     } finally {
       setSaving(null);
     }

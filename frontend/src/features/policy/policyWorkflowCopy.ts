@@ -32,7 +32,7 @@ const COMPARISON_STATUS: Record<string, string> = {
 };
 
 export function formatPublishReadinessBadge(raw: unknown): string {
-  const k = String(raw ?? '')
+  const k = (typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : '')
     .trim()
     .toLowerCase()
     .replace(/-/g, '_');
@@ -41,7 +41,7 @@ export function formatPublishReadinessBadge(raw: unknown): string {
 }
 
 export function formatComparisonReadinessBadge(raw: unknown): string {
-  const k = String(raw ?? '')
+  const k = (typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : '')
     .trim()
     .toLowerCase()
     .replace(/-/g, '_');
@@ -65,8 +65,7 @@ type PhaseSignal = {
     | 'no_policy'
     | 'draft_not_publishable'
     | 'ready_to_publish'
-    | 'published'
-    | string;
+    | 'published';
   hasUnpublishedDraftAhead?: boolean;
   highlightIssues?: Array<unknown>;
 };

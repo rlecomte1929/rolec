@@ -9,7 +9,7 @@
  */
 
 // @ts-expect-error — storybook not yet installed; see note above
-import type { Meta, StoryObj } from '@storybook/react';
+import type { StoryObj } from '@storybook/react';
 import { RelocationTimeline } from './RelocationTimeline';
 import type { RelocationPlanViewResponseDTO } from '../../types/relocationPlanView';
 
@@ -179,7 +179,7 @@ const meta = {
     assignmentId: 'assign-mock-001',
     role: 'employee',
   },
-} satisfies Meta<typeof RelocationTimeline>;
+};
 
 export default meta;
 type Story = StoryObj<typeof meta>;

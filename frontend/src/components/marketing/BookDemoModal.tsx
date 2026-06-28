@@ -158,6 +158,10 @@ export const BookDemoModal: React.FC = () => {
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) requestClose();
       }}
+      onKeyDown={(e) => { if (e.key === 'Escape') requestClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
       <div
         ref={dialogRef}
@@ -201,7 +205,7 @@ export const BookDemoModal: React.FC = () => {
               <div>
                 <p className="text-base font-medium text-marketing-primary">Request received.</p>
                 <p className="mt-1 text-sm text-marketing-text-muted">
-                  We'll reply within the next few business days.
+                  We&apos;ll reply within the next few business days.
                 </p>
               </div>
             </div>

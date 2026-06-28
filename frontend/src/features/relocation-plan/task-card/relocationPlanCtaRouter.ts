@@ -97,15 +97,13 @@ function uploadDocumentTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigat
     return { kind: 'internal', to: buildRoute('submissionCenter') };
   }
 
-  // D1: document-upload tasks land on the case-scoped dossier — the surface that
-  // actually hosts uploads ("your forms and uploads are below") — instead of the
-  // intake wizard. Completing an upload there marks the document present, which the
-  // relocation-plan view re-derives to a completed task on its next fetch (D2).
-  // [AIQ-1252] best-effort deep-link: ?form=<docKey> so the dossier auto-expands
-  // the form whose required documents include that key.
-  const base = buildRoute('employeeCaseDossier', { caseId: aid });
+  // [doc-flow P3] Document-upload tasks land on the case-scoped documents surface —
+  // the dedicated page that hosts case-document uploads. ?doc=<docKey> focuses that
+  // document's upload control; completing the upload marks the document present, which
+  // the relocation-plan view re-derives to a completed task on its next fetch.
+  const base = buildRoute('employeeCaseDocuments', { caseId: aid });
   const hint = (ctx.formHint ?? '').trim();
-  return { kind: 'internal', to: hint ? `${base}?form=${encodeURIComponent(hint)}` : base };
+  return { kind: 'internal', to: hint ? `${base}?doc=${encodeURIComponent(hint)}` : base };
 }
 
 function completeWizardStepTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {

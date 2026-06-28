@@ -27,7 +27,14 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       id={id}
-      onClick={onClick}
+      {...(onClick ? {
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+        },
+        role: 'button' as const,
+        tabIndex: 0,
+      } : {})}
       className={`bg-white rounded-xl shadow-sm border border-[#e2e8f0] ${paddings[padding]} ${clickableClass} ${className}`}
     >
       {children}

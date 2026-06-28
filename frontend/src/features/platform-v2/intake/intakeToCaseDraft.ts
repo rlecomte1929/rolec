@@ -36,7 +36,7 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       spouse: partner
         ? {
             fullName: partner.name || undefined,
-            wantsToWork: partner.needs_work_permit === 'yes' || undefined,
+            wantsToWork: partner.needs_work_permit?.toLowerCase() === 'yes' || undefined,
           }
         : undefined,
       children: childMembers.map((c) => ({

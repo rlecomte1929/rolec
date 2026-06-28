@@ -16,6 +16,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import type * as React from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Radio } from '../../../components/antigravity/Radio';
 import { Input } from '../../../components/antigravity/Input';
@@ -191,11 +192,11 @@ function householdToDraft(id: string) {
 // Step-specific info tips
 function getInfoTip(step: number, state: IntakeState): string | null {
   if (step === 1 && state.toCode === 'NO')
-    return 'Most EU employees moving to Norway file civil documents from the origin country first — we\'ll pre-fill those.';
+    return "Most EU employees moving to Norway file civil documents from the origin country first — we'll pre-fill those.";
   if (step === 2)
     return 'ReloPass currently has corridor-grade requirements for 47 destinations.';
   if (step === 3 && state.fromCode && state.toCode)
-    return `We\'ll tailor your document checklist to the exact ${getCountry(state.fromCode)?.name} → ${getCountry(state.toCode)?.name} corridor.`;
+    return `We'll tailor your document checklist to the exact ${getCountry(state.fromCode)?.name} → ${getCountry(state.toCode)?.name} corridor.`;
   return null;
 }
 
@@ -364,11 +365,14 @@ function RequestCountryModal({
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', background: 'rgba(12,25,41,.65)', backdropFilter: 'blur(3px)' }}
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
       <div
         style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 520, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,.28)' }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -435,7 +439,7 @@ function RequestCountryModal({
 
           {/* Info callout */}
           <div style={{ padding: '10px 14px', borderRadius: 10, background: TL, border: `1px solid ${T}40`, fontSize: 11, color: '#374151', lineHeight: 1.5 }}>
-            <strong style={{ color: T }}>What happens next?</strong> Your HR team will receive a notification and validate the country's immigration requirements, company policy, and compliance obligations. You'll be notified by email once approved — usually within 1–2 business days.
+            <strong style={{ color: T }}>What happens next?</strong> Your HR team will receive a notification and validate the country&apos;s immigration requirements, company policy, and compliance obligations. You&apos;ll be notified by email once approved — usually within 1–2 business days.
           </div>
         </div>
 
@@ -510,7 +514,12 @@ function ProgressStepper({
             </Button>
             {/* Label */}
             <span
-              onClick={() => isNavigable && onStepClick(stepNum)}
+              {...(isNavigable ? {
+                onClick: () => onStepClick(stepNum),
+                onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStepClick(stepNum); } },
+                role: 'button' as const,
+                tabIndex: 0,
+              } : {})}
               className={`mt-1.5 text-[10px] font-medium text-center leading-tight transition-colors ${
                 isActive
                   ? 'text-gray-800'
@@ -591,7 +600,7 @@ function CountryGrid({
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            My country isn't listed — request it from HR
+            My country isn&apos;t listed — request it from HR
           </Button>
         </div>
       )}
@@ -884,7 +893,7 @@ export function RelocatePlanIntakePage() {
   }, [caseId]);
 
   const handleSelect = useCallback((value: string) => {
-    let nextState = { ...state };
+    const nextState = { ...state };
     let patch: object = {};
 
     if (step === 1) {

@@ -17,9 +17,9 @@ import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssista
 import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
 import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
 import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
+import { trackPolicyPublished } from '../../../perf/hrOnboardingInstrumentation';
 import { canvasPolicyToConfigDraft, type CanvasMapResult } from './canvasPolicyToConfigDraft';
 import { configDraftToCanvasPolicy } from './configDraftToCanvasPolicy';
-import { trackPolicyPublished } from '../../../perf/hrOnboardingInstrumentation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';
@@ -569,8 +569,11 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
                   <div key={cat.id}>
                     {/* category header */}
                     <div
+                      role="button"
+                      tabIndex={0}
                       className="h-[41px] flex items-center gap-2 px-4 bg-gray-50 border-b border-gray-200 cursor-pointer select-none"
-                      onClick={() => setCollapsed(c => ({ ...c, [cat.id]: !c[cat.id] }))}>
+                      onClick={() => setCollapsed(c => ({ ...c, [cat.id]: !c[cat.id] }))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed(c => ({ ...c, [cat.id]: !c[cat.id] })); } }}>
                       {isCol ? <ChevronRight size={12} className="text-gray-400 flex-shrink-0"/> : <ChevronDown size={12} className="text-gray-400 flex-shrink-0"/>}
                       <span className="text-[11.5px] font-semibold text-gray-700 flex-1 truncate">{cat.t}</span>
                       <span className="text-[10px] text-gray-400 font-medium bg-gray-200 px-1.5 py-0.5 rounded-full">{cat.benefits.length}</span>
@@ -613,7 +616,10 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
               })}
               {/* Add tier */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={addTier}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addTier(); } }}
                 className="w-[52px] flex-shrink-0 flex items-center justify-center border-l border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors group">
                 <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-blue-600">
                   <Plus size={18}/>
@@ -679,8 +685,10 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       {/* ── Template picker ── */}
       {templateOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6"
-             onClick={() => setTemplateOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+             role="button" tabIndex={-1} aria-label="Close template picker"
+             onClick={(e) => { if (e.target === e.currentTarget) setTemplateOpen(false); }}
+             onKeyDown={(e) => { if (e.key === 'Escape') setTemplateOpen(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center gap-3 p-5 border-b border-gray-200">
               <Sparkles size={18} className="text-blue-600"/>
               <h2 className="text-base font-semibold text-gray-900 flex-1">Choose a template</h2>
@@ -780,8 +788,11 @@ function PreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6"
+         role="button" tabIndex={-1} aria-label="Close preview"
+         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+         onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
         <div className="flex items-center gap-3 p-5 border-b border-gray-200">
           <Eye size={18} className="text-blue-600"/>
           <div className="flex-1">
@@ -1073,7 +1084,8 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/20 z-30" onClick={onClose}/>
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
+      <div className="fixed inset-0 bg-black/20 z-30" aria-hidden="true" onClick={onClose}/>
       <aside className="fixed right-0 top-0 bottom-0 w-[420px] bg-white shadow-2xl z-40 flex flex-col">
         <div className="flex items-start gap-3 p-5 border-b border-gray-200">
           <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1100,12 +1112,13 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
                 {opts.map(([v, l]) => {
                   const on = local[axis].includes(v);
                   return (
-                    <label key={v}
-                      className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${on ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    <button key={v}
+                      type="button"
+                      className={`flex w-full items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors text-left ${on ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
                       onClick={() => toggle(axis, v)}>
                       <Checkbox readOnly checked={on} className="accent-blue-600"/>
                       <span className={`text-[12.5px] ${on ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>{l}</span>
-                    </label>
+                    </button>
                   );
                 })}
               </div>
@@ -1115,7 +1128,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
           {conflict && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-[12px] text-amber-800">
               <AlertTriangle size={14} className="flex-shrink-0 mt-0.5 text-amber-600"/>
-              <span><strong>Overlap detected with "{conflict.name}".</strong> The first matching tier (left-to-right) wins. Drag to reorder or refine rules to remove the overlap.</span>
+              <span><strong>Overlap detected with &quot;{conflict.name}&quot;.</strong> The first matching tier (left-to-right) wins. Drag to reorder or refine rules to remove the overlap.</span>
             </div>
           )}
         </div>
@@ -1234,7 +1247,9 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6"
-         onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+         role="button" tabIndex={-1} aria-label="Close document import"
+         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+         onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
@@ -1278,8 +1293,11 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
               />
               {!file ? (
                 <div
+                  role="button"
+                  tabIndex={0}
                   className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-colors ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-300'}`}
                   onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}>
@@ -1432,7 +1450,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                         ))}
                       </div>
                       {r.assign_to.length === 0 && (
-                        <div className="mt-2 text-[11px] text-red-500">⚠ No tier selected — this rule won't be applied.</div>
+                        <div className="mt-2 text-[11px] text-red-500">⚠ No tier selected — this rule won&apos;t be applied.</div>
                       )}
                     </div>
                   ))}

@@ -15,7 +15,11 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.db.test_data_filter import exclude_test_companies, exclude_test_people  # noqa: E402
+from backend.db.test_data_filter import (  # noqa: E402
+    exclude_test_companies,
+    exclude_test_people,
+    strip_verify_prefix,
+)
 
 
 class TestDataFilterTests(unittest.TestCase):
@@ -27,7 +31,8 @@ class TestDataFilterTests(unittest.TestCase):
             INSERT INTO companies (name) VALUES
               ('Acme GmbH'), ('Globex'), ('Testing April'),
               ('Other Corp'), ('Test Co (Seed)'), ('Test company'),
-              ('Other Corp (Seed)'), ('Probe ISO-A'), ('Probe ISO-B'), (NULL);
+              ('Other Corp (Seed)'), ('Probe ISO-A'), ('Probe ISO-B'),
+              ('Brand New Co 1782553314571'), (NULL);
             CREATE TABLE people (email TEXT);
             INSERT INTO people (email) VALUES
               ('real.person@acme.com'), ('hr@testcompany.com'),
@@ -47,9 +52,10 @@ class TestDataFilterTests(unittest.TestCase):
         names = {r[0] for r in rows}
         # real + NULL kept — incl. 'Testing April' (the real demo, must NOT be caught by a naive Test%)
         self.assertEqual(names, {"Acme GmbH", "Globex", "Testing April", None})
-        # every synthetic name gone
+        # every synthetic name gone (incl. Wave-3 'Brand New Co <epoch>' — AIQ-1325a)
         for bad in ("Other Corp", "Test Co (Seed)", "Test company",
-                    "Other Corp (Seed)", "Probe ISO-A", "Probe ISO-B"):
+                    "Other Corp (Seed)", "Probe ISO-A", "Probe ISO-B",
+                    "Brand New Co 1782553314571"):
             self.assertNotIn(bad, names)
 
     def test_people_filter_excludes_only_testco_domain(self):
@@ -69,6 +75,34 @@ class TestDataFilterTests(unittest.TestCase):
             f"SELECT email FROM people WHERE email = 'hr@testcompany.com' AND {exclude_test_people('email')}"
         ).fetchall()
         self.assertEqual(len(rows), 1)
+
+
+class StripVerifyPrefixTests(unittest.TestCase):
+    """AIQ-1325b — read-time scrub of the '[verify]' marker from inbox text."""
+
+    def test_strips_leading_marker_and_space(self):
+        self.assertEqual(strip_verify_prefix("[verify] Hello"), "Hello")
+
+    def test_case_insensitive(self):
+        self.assertEqual(strip_verify_prefix("[VERIFY] x"), "x")
+
+    def test_no_space_after_marker(self):
+        self.assertEqual(strip_verify_prefix("[verify]Hello"), "Hello")
+
+    def test_collapses_extra_leading_whitespace(self):
+        self.assertEqual(strip_verify_prefix("[verify]   spaced"), "spaced")
+
+    def test_normal_text_unchanged(self):
+        self.assertEqual(strip_verify_prefix("Your relocation case is ready"),
+                         "Your relocation case is ready")
+
+    def test_marker_only_when_leading(self):
+        # Not at the start → left alone.
+        self.assertEqual(strip_verify_prefix("re: [verify] later"), "re: [verify] later")
+
+    def test_none_and_empty_passthrough(self):
+        self.assertIsNone(strip_verify_prefix(None))
+        self.assertEqual(strip_verify_prefix(""), "")
 
 
 if __name__ == "__main__":

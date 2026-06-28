@@ -153,7 +153,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
           <div className="flex-1 text-sm text-slate-700">
             <strong>AI recommendation {action === 'accept' ? 'accepted' : action === 'override' ? 'overridden' : 'rejected'}.</strong>
             {submitted.reason && (
-              <p className="text-xs text-slate-500 italic mt-1">Reason: "{submitted.reason}"</p>
+              <p className="text-xs text-slate-500 italic mt-1">Reason: &quot;{submitted.reason}&quot;</p>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <p className="text-[11px] text-slate-400">Logged for human oversight audit · EU AI Act Art. 14</p>
@@ -222,7 +222,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
               <strong>Changing previous decision.</strong>
               <span className="ml-1">
                 You previously {priorDecision.decision === 'accept' ? 'accepted' : priorDecision.decision === 'override' ? 'overrode' : 'rejected'} this recommendation
-                {priorDecision.reason ? <> with reason <span className="italic">"{priorDecision.reason}"</span></> : null}.
+                {priorDecision.reason ? <> with reason <span className="italic">&quot;{priorDecision.reason}&quot;</span></> : null}.
               </span>
               <p className="text-[11px] text-amber-700 mt-1">The previous decision stays in the audit log; the new decision is recorded as a separate row referencing it.</p>
             </div>

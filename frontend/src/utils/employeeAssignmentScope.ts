@@ -21,6 +21,39 @@ export function parseAssignmentSearchParam(search: string): string | null {
   return v || null;
 }
 
+/**
+ * Map a resolved assignment id back to its canonical case_id for **case-scoped**
+ * endpoints — e.g. `GET/PUT /api/cases/{caseId}/services-state`. The services
+ * pages resolve an `assignment_id` (via resolveScopedAssignmentId) but the
+ * services-state route is keyed by case_id; passing the assignment_id 404s
+ * ("Case not found"). Resolve via linkedSummaries; fall back to the id itself
+ * when no linked row matches (HR/legacy). (AIQ-1320)
+ */
+export function caseIdForAssignment(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  id: string | null,
+): string | null {
+  if (!id) return null;
+  const row = linkedSummaries.find((r) => r.assignment_id === id || r.case_id === id);
+  return row?.case_id ?? id;
+}
+
+/**
+ * Inverse of {@link caseIdForAssignment}: map a scope id — which may be a
+ * **case_id** (the canonical employee URL id, AIQ-1334) or an assignment_id — to
+ * its assignment_id. Falls back to the id itself when no linked row matches
+ * (HR/legacy). Lets the services pages accept a case_id in the URL while still
+ * resolving the assignment_id their APIs key on.
+ */
+export function assignmentIdForScopeId(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  id: string | null,
+): string | null {
+  if (!id) return null;
+  const row = linkedSummaries.find((r) => r.assignment_id === id || r.case_id === id);
+  return row?.assignment_id ?? id;
+}
+
 /** Collapse duplicate overview rows (same assignment_id) so UI / picker logic stay consistent. */
 export function dedupeLinkedSummariesByAssignmentId(
   rows: EmployeeLinkedOverviewRow[]
@@ -67,13 +100,17 @@ export function resolveScopedAssignmentId(input: {
   /** Pass null to skip reading storage (tests). Omit to use getPreferredEmployeeAssignmentId(). */
   preferredAssignmentId?: string | null;
 }): { effectiveId: string | null; needsPicker: boolean } {
-  const { linkedSummaries, primaryAssignmentId, queryAssignmentId } = input;
+  const { linkedSummaries, primaryAssignmentId } = input;
   const unique = dedupeLinkedSummariesByAssignmentId(linkedSummaries);
   const linkedCount = unique.length;
   const allowed = new Set(
     unique.map((r) => r.assignment_id).filter((x): x is string => Boolean(x))
   );
   const primary = unique[0]?.assignment_id ?? primaryAssignmentId;
+
+  // AIQ-1334: the path id may be a case_id (the canonical employee URL id) or an
+  // assignment_id — normalize to the assignment_id so either resolves.
+  const queryAssignmentId = assignmentIdForScopeId(linkedSummaries, input.queryAssignmentId);
 
   if (queryAssignmentId && allowed.has(queryAssignmentId)) {
     return { effectiveId: queryAssignmentId, needsPicker: false };

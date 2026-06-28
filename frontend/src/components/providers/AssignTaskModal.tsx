@@ -48,6 +48,10 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close dialog"
     >
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
         <h2 className="text-base font-semibold text-[#0b2b43] mb-1">Assign task</h2>
@@ -66,8 +70,9 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({
           />
 
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Description</label>
+            <label htmlFor="atm-description" className="block text-sm font-medium text-[#374151] mb-1">Description</label>
             <textarea
+              id="atm-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}

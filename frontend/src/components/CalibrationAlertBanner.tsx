@@ -68,7 +68,7 @@ const AlertRow: React.FC<AlertRowProps> = ({ alert, onDismiss, dismissingId }) =
         </span>
         <span className="text-amber-800 text-sm ml-2">
           — {alert.exception_count} exception{alert.exception_count !== 1 ? 's' : ''} in 30 days,{' '}
-          avg {pct}% over cap. Consider revising this benefit's policy cap.
+          avg {pct}% over cap. Consider revising this benefit&apos;s policy cap.
         </span>
       </div>
       <Button unstyled

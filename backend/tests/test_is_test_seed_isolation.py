@@ -38,12 +38,15 @@ class WriteTimeClassifierTests(unittest.TestCase):
             "Probe ISO-A",
             "Probe RLS-A 1718000000",
             "Probe RLS-B 1718000000",
+            "Brand New Co 1782553314571",  # Wave-3 onboarding e2e (AIQ-1325a)
         ):
             self.assertTrue(looks_like_test_company(name), f"{name!r} should be test")
 
     def test_demo_and_real_companies_not_flagged(self):
         # The demo tenant and ordinary customers must never be hidden.
-        for name in ("Testing April", "Acme GmbH", "Globex", "Probe Industries", "", None):
+        # 'Brand New Company GmbH' must NOT match the tight 'Brand New Co ' prefix.
+        for name in ("Testing April", "Acme GmbH", "Globex", "Probe Industries",
+                     "Brand New Company GmbH", "", None):
             self.assertFalse(looks_like_test_company(name), f"{name!r} should be real")
 
     def test_synthetic_emails_flagged(self):

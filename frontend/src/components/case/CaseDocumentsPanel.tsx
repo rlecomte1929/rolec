@@ -238,7 +238,7 @@ export function CaseDocumentsPanel({ caseId, canUpload = false }: CaseDocumentsP
                       <div key={k} className="flex gap-2 text-xs">
                         <dt className="font-medium text-slate-500">{k}:</dt>
                         <dd className="truncate text-slate-800">
-                          {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                          {typeof v === 'object' ? JSON.stringify(v) : String(v as string | number | boolean | bigint)}
                         </dd>
                       </div>
                     ))}

@@ -141,7 +141,6 @@ export const ReviewRow: React.FC<ReviewRowProps> = ({ item, onApprove, onEdit, o
               value={editValue}
               onChange={(v) => setEditValue(v)}
               className="w-24 rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-              autoFocus
             />
             <Button unstyled
               type="button"

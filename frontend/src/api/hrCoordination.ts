@@ -20,9 +20,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let message = `Request failed with status ${res.status}`
     try {
-      const body = await res.json()
-      if (body?.detail) {
-        message = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail)
+      const body = await res.json() as Record<string, unknown>
+      if (body.detail != null) {
+        message = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail as Record<string, unknown>)
       }
     } catch {
       // ignore JSON parse errors — use the default message

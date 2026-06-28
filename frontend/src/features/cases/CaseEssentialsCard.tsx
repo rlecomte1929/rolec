@@ -63,14 +63,14 @@ export const CaseEssentialsCard: React.FC<Props> = ({
 
         <div className="pt-1 border-t border-[#e2e8f0]">
           <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
-            Assignment ID
+            Reference
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span
               className="text-sm font-mono font-semibold text-[#0b2b43] break-all"
               title={assignment.id}
             >
-              {assignment.id || '-'}
+              {assignment.id ? assignment.id.slice(-8).toUpperCase() : '-'}
             </span>
             {assignment.id ? (
               <Button

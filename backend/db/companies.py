@@ -1336,6 +1336,38 @@ class CompaniesMixin:
                 )
         return {"ok": True, "policy_id": policy_id, "version_id": version_id}
 
+    def _log_orphan_company_ids(self, seen: set) -> None:
+        """Log company_ids referenced elsewhere but absent from the companies
+        registry. Diagnostics only (AIQ-1330): opens its OWN connection per table
+        so a query error never poisons the caller's transaction, and casts every
+        company_id to text so a uuid column (profiles.company_id) doesn't hit
+        btrim(uuid) / uuid-IN-text on Postgres."""
+        orphan_ids: set = set()
+        for table, col in [("hr_users", "company_id"), ("profiles", "company_id"),
+                           ("company_policies", "company_id"), ("relocation_cases", "company_id")]:
+            try:
+                base = (
+                    f"SELECT DISTINCT CAST({col} AS TEXT) AS id FROM {table} "
+                    f"WHERE {col} IS NOT NULL AND TRIM(CAST({col} AS TEXT)) <> ''"
+                )
+                if seen:
+                    placeholders = ",".join([f":s{i}" for i in range(len(seen))])
+                    sql = text(base + f" AND CAST({col} AS TEXT) NOT IN ({placeholders})")
+                    params = {f"s{i}": s for i, s in enumerate(seen)}
+                else:
+                    sql = text(base)
+                    params = {}
+                with self.engine.connect() as diag_conn:
+                    orows = diag_conn.execute(sql, params).fetchall()
+                for o in orows:
+                    cid = (o._mapping.get("id") or "").strip()
+                    if cid and cid not in seen:
+                        orphan_ids.add(cid)
+            except Exception as e:
+                log.warning("admin_company_index: orphan lookup %s.%s failed: %s", table, col, e)
+        if orphan_ids:
+            log.warning("admin_company_index: orphan company_ids (not in registry): %s", sorted(orphan_ids))
+
     def get_admin_company_index(
         self, query: Optional[str] = None, include_test: bool = False
     ) -> List[Dict[str, Any]]:
@@ -1354,6 +1386,13 @@ class CompaniesMixin:
             params: Dict[str, Any] = {}
             if not include_test and "is_test" in _table_columns(conn, "companies"):
                 base_sql += " AND COALESCE(is_test, false) = false"
+            if not include_test:
+                # [AIQ-1325a-followup] Also hide synthetic tenants by name, matching
+                # list_companies. The is_test guard above misses rows created before
+                # the flag existed (e.g. the 'Brand New Co <epoch>' seeds), so apply
+                # the same read-time name filter here for consistency.
+                from .test_data_filter import exclude_test_companies
+                base_sql += f" AND {exclude_test_companies('name')}"
             if q:
                 base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
                 params["q"] = f"%{q}%"
@@ -1368,32 +1407,15 @@ class CompaniesMixin:
             # columns below (companies.id is uuid); otherwise the orphan NOT IN
             # check compares text vs uuid and mis-flags every id as an orphan.
             seen = {str(r["id"]) for r in result}
-            # Collect orphan company_ids for logging only; do not add them to the visible list.
-            orphan_ids: set = set()
-            for table, col in [("hr_users", "company_id"), ("profiles", "company_id"),
-                              ("company_policies", "company_id"), ("relocation_cases", "company_id")]:
-                try:
-                    orphan_sql = text(
-                        f"SELECT DISTINCT {col} AS id FROM {table} WHERE {col} IS NOT NULL AND TRIM({col}) <> ''"
-                    )
-                    if seen:
-                        placeholders = ",".join([f":s{i}" for i in range(len(seen))])
-                        orphan_sql = text(
-                            f"SELECT DISTINCT {col} AS id FROM {table} WHERE {col} IS NOT NULL AND TRIM({col}) <> '' "
-                            f"AND {col} NOT IN ({placeholders})"
-                        )
-                        orphan_params = {f"s{i}": s for i, s in enumerate(seen)}
-                    else:
-                        orphan_params = {}
-                    orows = conn.execute(orphan_sql, orphan_params).fetchall()
-                    for o in orows:
-                        cid = (o._mapping.get("id") or "").strip()
-                        if cid and cid not in seen:
-                            orphan_ids.add(cid)
-                except Exception as e:
-                    log.warning("admin_company_index: orphan lookup %s.%s failed: %s", table, col, e)
-            if orphan_ids:
-                log.warning("admin_company_index: orphan company_ids (not in registry): %s", sorted(orphan_ids))
+            # [AIQ-1330] Orphan-id diagnostics are logging-only. Run them on a
+            # SEPARATE connection so a query error (e.g. TRIM on the uuid column
+            # profiles.company_id -> btrim(uuid) on Postgres) can never abort the
+            # connection used for the load-bearing enrich counts below — which was
+            # zeroing every per-company tile.
+            try:
+                self._log_orphan_company_ids(seen)
+            except Exception as e:  # diagnostics must never break the index
+                log.warning("admin_company_index: orphan diagnostics skipped: %s", e)
 
             # Enrich each row with grouped counts instead of correlated subqueries per company.
             if result:

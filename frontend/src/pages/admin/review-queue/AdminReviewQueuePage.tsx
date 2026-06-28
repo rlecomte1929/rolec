@@ -93,7 +93,7 @@ export const AdminReviewQueuePage: React.FC = () => {
       if (listItems.length > 0) {
         adminCollaborationAPI.getSummariesBatch(
           listItems.map((i: { id: string }) => ({ target_type: 'review_queue_item', target_id: i.id }))
-        ).then((r) => setThreadSummaries(r.summaries || {})).catch(() => {});
+        ).then((r: { summaries?: Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }> }) => setThreadSummaries(r.summaries ?? {})).catch(() => {});
       } else {
         setThreadSummaries({});
       }
@@ -181,19 +181,19 @@ export const AdminReviewQueuePage: React.FC = () => {
         {/* KPI cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-[#0b2b43]">{Number(stats?.open_items_count) ?? 0}</div>
+            <div className="text-xl font-semibold text-[#0b2b43]">{Number(stats?.open_items_count ?? 0)}</div>
             <div className="text-xs text-slate-600">Open</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-amber-700">{Number(stats?.unassigned_count) ?? 0}</div>
+            <div className="text-xl font-semibold text-amber-700">{Number(stats?.unassigned_count ?? 0)}</div>
             <div className="text-xs text-slate-600">Unassigned</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-blue-700">{Number(stats?.in_progress_count) ?? 0}</div>
+            <div className="text-xl font-semibold text-blue-700">{Number(stats?.in_progress_count ?? 0)}</div>
             <div className="text-xs text-slate-600">In progress</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-red-700">{Number(stats?.overdue_count) ?? 0}</div>
+            <div className="text-xl font-semibold text-red-700">{Number(stats?.overdue_count ?? 0)}</div>
             <div className="text-xs text-slate-600">Overdue</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">

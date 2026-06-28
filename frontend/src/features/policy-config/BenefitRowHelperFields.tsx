@@ -173,10 +173,11 @@ export const BenefitRowHelperFields: React.FC<Props> = ({ row, helper, disabled,
     return (
       <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-3 space-y-3">
         {sectionTitle('Education arrangement')}
-        <label className="block text-sm font-medium text-[#374151] mb-1">
+        <label htmlFor="brhf-tuition-logic" className="block text-sm font-medium text-[#374151] mb-1">
           Tuition &amp; fee difference logic (how you compare host vs home costs)
         </label>
         <textarea
+          id="brhf-tuition-logic"
           disabled={disabled}
           className="w-full min-h-[100px] px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43] text-sm disabled:opacity-60"
           value={readEligibilityNotes(row)}

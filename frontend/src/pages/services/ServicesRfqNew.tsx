@@ -9,7 +9,7 @@ import { employeeAPI } from '../../api/client';
 import { RfqWorkflowDiagram } from '../../features/services/RfqWorkflowDiagram';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 
 const SERVICE_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -47,8 +47,9 @@ export const ServicesRfqNew: React.FC = () => {
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
-  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
+  // AIQ-1334: employee case sub-routes are keyed by case_id — build with the resolved case_id.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: routeCaseId });
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);

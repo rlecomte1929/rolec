@@ -178,14 +178,14 @@ export function initErrorTracking(): void {
 
   window.onerror = (message, _source, _lineno, _colno, error) => {
     void reportError({
-      message: error?.message ?? String(message),
+      message: error?.message ?? (typeof message === 'string' ? message : ''),
       stack:   error?.stack ?? null,
     });
     return false; // do not suppress default browser behavior
   };
 
   window.addEventListener('unhandledrejection', (event) => {
-    const err = event.reason;
+    const err: unknown = event.reason;
     void reportError({
       message: err instanceof Error ? err.message : String(err),
       stack:   err instanceof Error ? err.stack ?? null : null,

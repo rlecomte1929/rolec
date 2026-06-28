@@ -1293,6 +1293,9 @@ def create_case_quote_request(
     Employee submits a quote request for their relocation case (Step 4 / WZ4).
     Creates an entry in the quote_requests table and returns the new record.
     """
+    # Tenant isolation: only the case assignee (or HR in-company / admin) may
+    # write a quote request — same guard the sibling PATCH routes use.
+    _assert_case_access(user, case_id)
     profile = main_db.get_profile_record(user.get("id"))
     company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
     if not company_id:
@@ -1379,6 +1382,9 @@ def post_case_message(
     Post a message to the case thread (Step 5 / WZ5).
     Any authenticated user linked to the case (employee or HR) can post.
     """
+    # Tenant isolation: enforce that the caller is actually linked to the case
+    # (assignee / HR in-company / admin) — previously this endpoint had no check.
+    _assert_case_access(user, case_id)
     if not body.content.strip():
         raise HTTPException(status_code=422, detail="content must not be empty")
 

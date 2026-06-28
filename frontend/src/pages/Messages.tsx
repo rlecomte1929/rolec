@@ -76,7 +76,9 @@ export const Messages: React.FC = () => {
         const raw = (res.messages || []) as Record<string, unknown>[];
         const quoteRaw = (res.quote_threads || []) as Record<string, unknown>[];
         const labels = new Map<string, string>();
-        for (const row of overview.linked || []) {
+        type LinkedItem = { assignment_id?: string; company?: { name?: string } };
+        const linked = (overview as { linked?: LinkedItem[] }).linked ?? [];
+        for (const row of linked) {
           const aid = row.assignment_id;
           const nm = row.company?.name?.trim();
           if (aid && nm) labels.set(aid, nm);

@@ -103,17 +103,18 @@ export const PolicyTemplatePicker: React.FC<Props> = ({
   if (!open) return null;
 
   return (
+    // eslint-disable-next-line local/no-clickable-div, jsx-a11y/no-noninteractive-element-interactions -- role="dialog" is correct ARIA (rule allowlists only button/link/tab); backdrop-click + Escape dismiss
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Choose a policy template"
       data-testid="policy-template-picker"
-      onClick={() => !applyingKey && onClose()}
+      onClick={(e) => { if (e.target === e.currentTarget && !applyingKey) onClose(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape' && !applyingKey) onClose(); }}
     >
       <div
         className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#0b2b43]">

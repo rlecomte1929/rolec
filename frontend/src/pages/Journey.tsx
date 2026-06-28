@@ -33,8 +33,9 @@ export const Journey: React.FC = () => {
       if (questionData.isComplete) {
         navigate('/dashboard');
       }
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err) {
+      const e = err as { response?: { status?: number } };
+      if (e.response?.status === 401) {
         navigate('/');
       } else {
         setError("Couldn't load profile. Refresh to try again.");
@@ -44,19 +45,19 @@ export const Journey: React.FC = () => {
     }
   };
 
-  const handleAnswer = async (answer: any, isUnknown: boolean) => {
+  const handleAnswer = async (answer: unknown, isUnknown: boolean) => {
     if (!nextQuestion?.question) return;
 
     try {
-      const response = await profileAPI.submitAnswer({
+      const response = (await profileAPI.submitAnswer({
         questionId: nextQuestion.question.id,
         answer,
         isUnknown,
-      });
+      })) as { nextQuestion: NextQuestionResponse };
 
       // Update state with new question
       setNextQuestion(response.nextQuestion);
-      
+
       // Reload profile
       const updatedProfile = await profileAPI.getCurrent();
       setProfile(updatedProfile);
@@ -65,7 +66,7 @@ export const Journey: React.FC = () => {
       if (response.nextQuestion.isComplete) {
         navigate('/dashboard');
       }
-    } catch (err: any) {
+    } catch {
       setError("Couldn't save answer. Try again.");
     }
   };

@@ -133,8 +133,9 @@ export const HrCaseReview: React.FC = () => {
             <Card padding="lg">
               <div className="text-sm font-semibold text-[#0b2b43] mb-3">Feedback</div>
               <div className="mb-3">
-                <label className="text-xs text-[#6b7280] block mb-1">Section</label>
+                <label htmlFor="hcr-section" className="text-xs text-[#6b7280] block mb-1">Section</label>
                 <select
+                  id="hcr-section"
                   value={section}
                   onChange={(e) => setSection(e.target.value as FeedbackSection)}
                   className="w-full rounded border border-[#e2e8f0] px-2 py-1.5 text-sm"
@@ -145,8 +146,9 @@ export const HrCaseReview: React.FC = () => {
                 </select>
               </div>
               <div className="mb-3">
-                <label className="text-xs text-[#6b7280] block mb-1">Message</label>
+                <label htmlFor="hcr-message" className="text-xs text-[#6b7280] block mb-1">Message</label>
                 <textarea
+                  id="hcr-message"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Add feedback for the employee..."

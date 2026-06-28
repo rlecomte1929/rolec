@@ -379,8 +379,9 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
             <BenefitRowHelperFields row={row} helper={helper} disabled={disabled} onChange={onChange} />
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-[#374151]">Notes for employees</label>
+              <label htmlFor="bre-notes" className="block text-sm font-medium text-[#374151]">Notes for employees</label>
               <textarea
+                id="bre-notes"
                 className={textareaClass}
                 value={row.notes ?? ''}
                 onChange={(e) => onChange({ ...row, notes: e.target.value || null })}
@@ -389,10 +390,11 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-[#374151]">
+              <label htmlFor="bre-eligibility" className="block text-sm font-medium text-[#374151]">
                 Eligibility &amp; extra conditions
               </label>
               <textarea
+                id="bre-eligibility"
                 className={textareaClass}
                 value={readAdditionalTerms(row)}
                 onChange={(e) => onChange(patchAdditionalTerms(row, e.target.value))}

@@ -7,7 +7,7 @@ import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
-import { COUNTRY_OPTIONS } from '../../utils/countries';
+import { DESTINATION_COUNTRIES } from '../../utils/countries';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
 import { AdminLayout } from './AdminLayout';
 
@@ -34,7 +34,7 @@ const ASSIGNMENT_STATUS_OPTIONS = [
 
 const DESTINATION_COUNTRY_OPTIONS = [
   { value: '', label: 'All destinations' },
-  ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name })),
+  ...DESTINATION_COUNTRIES.map((c) => ({ value: c.name, label: c.name })),
 ];
 
 const employeeName = (a: AdminAssignment) =>
@@ -319,20 +319,23 @@ export const AdminAssignments: React.FC = () => {
                             setSelectionMode(false);
                             setTimeout(() => setDeleteFeedback('idle'), 3000);
                           } else {
-                            const firstReason = rejected[0]?.reason;
+                            const firstReason = rejected[0]?.reason as { response?: { data?: { detail?: unknown } }; message?: string } | undefined;
                             const detail =
-                              firstReason?.response?.data?.detail ||
-                              firstReason?.message ||
+                              (typeof firstReason?.response?.data?.detail === 'string' ? firstReason.response.data.detail : null) ??
+                              firstReason?.message ??
                               'unknown error';
                             const suffix = failed > 1 ? ` (${failed} failed; first: ${detail})` : ` ${detail}`;
                             setDeleteErrorDetail(suffix.trim());
                             setTimeout(() => setDeleteFeedback('idle'), 8000);
                           }
-                        } catch (e: any) {
+                        } catch (e) {
+                          const err = e as { response?: { data?: { detail?: unknown } }; message?: string };
                           logger.error(e);
                           await queryClient.invalidateQueries({ queryKey: ['admin', 'assignments'] });
                           setDeleteErrorDetail(
-                            e?.response?.data?.detail || e?.message || 'unknown error',
+                            (typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : null) ??
+                            err?.message ??
+                            'unknown error',
                           );
                           setDeleteFeedback('error');
                           setTimeout(() => setDeleteFeedback('idle'), 8000);
@@ -452,8 +455,15 @@ export const AdminAssignments: React.FC = () => {
       </Card>
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowAddModal(false); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close add assignment modal"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4">
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
             {createError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900 whitespace-pre-wrap">
@@ -510,7 +520,7 @@ export const AdminAssignments: React.FC = () => {
                 label="Destination country"
                 value={addForm.destination_country}
                 onChange={(v) => setAddForm((f) => ({ ...f, destination_country: v }))}
-                options={[{ value: '', label: 'Select destination' }, ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name }))]}
+                options={[{ value: '', label: 'Select destination' }, ...DESTINATION_COUNTRIES.map((c) => ({ value: c.name, label: c.name }))]}
               />
             </div>
             {addForm.company_id && !addForm.hr_user_id && (
@@ -665,6 +675,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch">
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
       <div className="flex-1 bg-black/30" onClick={onClose} aria-hidden="true" />
       <div className="w-full max-w-xl bg-white shadow-xl overflow-y-auto flex flex-col">
         <div className="p-4 border-b border-[#e2e8f0] flex items-center justify-between">

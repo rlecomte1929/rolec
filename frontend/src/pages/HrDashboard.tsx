@@ -234,12 +234,13 @@ export const HrDashboard: React.FC = () => {
         setInviteToken(response.inviteToken);
       }
       await reloadAssignments();
-    } catch (err: any) {
-      const data = err.response?.data;
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string; error?: string } } };
+      const data = e.response?.data;
       const msg = data?.detail || data?.error || 'Unable to assign case.';
       setError(msg);
       // Log full error to console for debugging (see docs/DEBUG_ASSIGN_ERROR.md)
-      logger.error('[Assign failed]', msg, data || err);
+      logger.error('[Assign failed]', msg, data ?? err);
     } finally {
       setSubmitting(false);
       // Measure click -> UI render (best-effort).
@@ -271,8 +272,9 @@ export const HrDashboard: React.FC = () => {
       setIsConfirmingRemoval(false);
       setIsManageMode(false);
       await reloadAssignments();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to remove some cases.');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Failed to remove some cases.');
     } finally {
       setIsDeleting(false);
     }
@@ -645,7 +647,7 @@ export const HrDashboard: React.FC = () => {
 
           {isLoading && (
             <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
+              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="grid grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] first:border-t-0">
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-32" />
                   <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
@@ -692,6 +694,8 @@ export const HrDashboard: React.FC = () => {
                 return (
                   <div
                     key={assignment.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       if (isManageMode) {
                         toggleSelection(assignment.id);
@@ -700,17 +704,17 @@ export const HrDashboard: React.FC = () => {
                       setSelectedCaseId(assignment.id);
                       navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                     }}
-                    {...(!isManageMode && {
-                      role: 'button',
-                      tabIndex: 0,
-                      onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
+                    onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        if (isManageMode) {
+                          toggleSelection(assignment.id);
+                        } else {
                           setSelectedCaseId(assignment.id);
                           navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                         }
-                      },
-                    })}
+                      }
+                    }}
                     className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${gridCols} ${
                       isManageMode
                         ? (isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]')

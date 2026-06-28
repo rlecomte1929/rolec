@@ -153,20 +153,21 @@ function ExceptionForm({ benefits, onSubmit, onCancel }: ExceptionFormProps) {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       <div>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+        <label htmlFor="ps-benefit" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
           Benefit
         </label>
-        <select value={benefitName} onChange={e => setBenefitName(e.target.value)} style={inputStyle}>
+        <select id="ps-benefit" value={benefitName} onChange={e => setBenefitName(e.target.value)} style={inputStyle}>
           {benefits.map(b => (
             <option key={b.id} value={b.name}>{b.name}</option>
           ))}
         </select>
       </div>
       <div>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+        <label htmlFor="ps-requested-value" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
           Requested value
         </label>
         <Input unstyled
+          id="ps-requested-value"
           type="text"
           value={requestedValue}
           onChange={v => setRequestedValue(v)}
@@ -176,10 +177,11 @@ function ExceptionForm({ benefits, onSubmit, onCancel }: ExceptionFormProps) {
         />
       </div>
       <div>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+        <label htmlFor="ps-justification" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
           Justification
         </label>
         <textarea
+          id="ps-justification"
           value={justification}
           onChange={e => setJustification(e.target.value)}
           rows={4}

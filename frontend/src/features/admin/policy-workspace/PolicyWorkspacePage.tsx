@@ -145,11 +145,14 @@ export const PolicyWorkspacePage: React.FC = () => {
       {publishModalOpen && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
-          onClick={closePublishModal}
+          onClick={(e) => { if (e.target === e.currentTarget) closePublishModal(); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') closePublishModal(); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close publish modal"
         >
           <div
             className="bg-white rounded-lg shadow-xl max-w-md w-full p-5"
-            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-2">Publish structured baseline?</h3>
             <p className="text-sm text-[#64748b] mb-4">
@@ -158,8 +161,9 @@ export const PolicyWorkspacePage: React.FC = () => {
               <span className="font-mono text-xs">{matrixPayload?.policy_version?.slice(0, 10) ?? '—'}…</span>
             </p>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#374151] mb-1">Effective date (required)</label>
+              <label htmlFor="pw-effective-date" className="block text-sm font-medium text-[#374151] mb-1">Effective date (required)</label>
               <Input unstyled
+                id="pw-effective-date"
                 type="date"
                 className="w-full border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm"
                 value={publishEffectiveDate}
@@ -248,10 +252,16 @@ export const PolicyWorkspacePage: React.FC = () => {
       <PolicyImportSection />
 
       {publishedOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closePublished}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closePublished(); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') closePublished(); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close published baseline preview"
+        >
           <div
             className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center gap-2">
               <h3 className="text-lg font-semibold text-[#0b2b43]">Published structured baseline</h3>

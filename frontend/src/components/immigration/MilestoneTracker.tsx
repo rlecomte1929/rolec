@@ -130,7 +130,7 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
         <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-6 text-center">
           <p className="text-sm font-medium text-[#64748b]">Set a move date to see your timeline</p>
           <p className="mt-1 text-xs text-[#94a3b8]">
-            Milestone deadlines are calculated from the case's expected move date.
+            Milestone deadlines are calculated from the case&apos;s expected move date.
           </p>
         </div>
       </section>

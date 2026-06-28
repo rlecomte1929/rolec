@@ -25,6 +25,7 @@ import {
 } from '../../messages/utils';
 import type { Conversation, Message } from '../../messages/types';
 import { AppShell } from '../../../components/AppShell';
+import { ComposeNewMessage } from './ComposeNewMessage';
 
 type MailboxKey = 'inbox' | 'hr' | 'vendors' | 'authorities' | 'family' | 'sent' | 'archive';
 
@@ -109,6 +110,25 @@ function initials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/**
+ * [AIQ-1332] Never surface a raw email as a person label. When the only available
+ * identity is an email, fall back to its humanised local part (e.g.
+ * "alice.dupont@acme.com" -> "alice dupont") so the thread never shows an address.
+ */
+function humanizeName(raw: string | null | undefined): string {
+  const v = (raw || '').trim();
+  if (!v) return '';
+  if (EMAIL_RE.test(v)) return v.split('@')[0]!.replace(/[._-]+/g, ' ').trim();
+  return v;
+}
+
+/** [AIQ-1332] Friendly case reference — last 8 chars uppercased, e.g. "Case 5200D907". */
+function friendlyCaseRef(caseId: string): string {
+  return `Case ${caseId.slice(-8).toUpperCase()}`;
+}
+
 function deriveSubject(c: Conversation): string {
   const firstWithSubject = (c.messages || []).find((m) => m.subject && m.subject.trim());
   if (firstWithSubject?.subject) return firstWithSubject.subject;
@@ -124,7 +144,7 @@ interface Stakeholder {
 function deriveStakeholders(conversations: Conversation[]): Stakeholder[] {
   const map = new Map<string, Stakeholder>();
   for (const c of conversations) {
-    const name = c.other_participant_name || 'Unknown';
+    const name = humanizeName(c.other_participant_name) || 'Unknown';
     const key = name.toLowerCase();
     if (map.has(key)) continue;
     map.set(key, {
@@ -156,8 +176,13 @@ export function InboxV2Page() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
   const [starred, setStarred] = useState<Set<string>>(new Set());
+  // Compose-new-thread modal (AIQ-1326) + the assignment to select once the
+  // list refetch surfaces its freshly-created thread.
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [pendingSelectAid, setPendingSelectAid] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
@@ -230,7 +255,8 @@ export function InboxV2Page() {
         ]);
         if (cancelled) return;
         const labels = new Map<string, string>();
-        for (const row of overview.linked || []) {
+        type LinkedRow = { assignment_id?: string; company?: { name?: string } };
+        for (const row of (overview.linked as LinkedRow[] | undefined) ?? []) {
           const aid = row.assignment_id;
           const nm = row.company?.name?.trim();
           if (aid && nm) labels.set(aid, nm);
@@ -270,6 +296,16 @@ export function InboxV2Page() {
       setSearchParams(next, { replace: true });
     }
   }, [assignmentIdFromUrl, conversations, searchParams, setSearchParams]);
+
+  // After composing a new thread, select it once the list refetch surfaces it.
+  useEffect(() => {
+    if (!pendingSelectAid) return;
+    const target = `conv-${pendingSelectAid}`;
+    if (conversations.some((c) => c.id === target)) {
+      setActiveId(target);
+      setPendingSelectAid(null);
+    }
+  }, [pendingSelectAid, conversations]);
 
   // Default-select first conversation in the active mailbox once loaded.
   const filteredConversations = useMemo(() => {
@@ -397,13 +433,15 @@ export function InboxV2Page() {
   const handleSend = useCallback(async () => {
     const text = draft.trim();
     if (!text || !activeConversation) return;
+    const aid = activeConversation.assignment_id;
+    const convId = activeConversation.id;
+    const localId = `local-${Date.now()}`;
     setSending(true);
-    // No public send endpoint exists yet for either HR or employee inboxes.
-    // Optimistically append the draft so the user gets immediate feedback;
-    // a follow-up commit will wire this to POST /api/{hr|employee}/messages.
+    setSendError(null);
+    // Optimistically append so the user gets immediate feedback, then POST.
     const optimistic: Message = {
-      id: `local-${Date.now()}`,
-      assignment_id: activeConversation.assignment_id,
+      id: localId,
+      assignment_id: aid,
       body: text,
       created_at: new Date().toISOString(),
       sender_user_id: userId,
@@ -414,7 +452,7 @@ export function InboxV2Page() {
     };
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === activeConversation.id
+        c.id === convId
           ? {
               ...c,
               messages: [...c.messages, optimistic],
@@ -425,7 +463,29 @@ export function InboxV2Page() {
       )
     );
     setDraft('');
-    setSending(false);
+    try {
+      const send = isHrLike ? hrAPI.sendMessage : employeeAPI.sendMessage;
+      await send(aid, text);
+      // Confirm delivery on the optimistic row.
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => (m.id === localId ? { ...m, status_delivery: 'sent' } : m)) }
+            : c
+        )
+      );
+    } catch {
+      // Roll the optimistic message back and restore the draft so the user can retry.
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId ? { ...c, messages: c.messages.filter((m) => m.id !== localId) } : c
+        )
+      );
+      setDraft(text);
+      setSendError("Couldn't send your message. Please try again.");
+    } finally {
+      setSending(false);
+    }
   }, [draft, activeConversation, userId, userName, isHrLike]);
 
   const handleDraftWithAi = useCallback(() => {
@@ -433,8 +493,8 @@ export function InboxV2Page() {
     const last = [...activeConversation.messages].reverse().find((m) => !m.is_from_me);
     const subject = activeConversation.last_message_preview || 'your last message';
     const stub = last
-      ? `Hi ${activeConversation.other_participant_name.split(' ')[0] || 'there'} — thanks for the update on "${subject}". `
-      : `Hi ${activeConversation.other_participant_name.split(' ')[0] || 'there'} — `;
+      ? `Hi ${humanizeName(activeConversation.other_participant_name).split(' ')[0] || 'there'} — thanks for the update on "${subject}". `
+      : `Hi ${humanizeName(activeConversation.other_participant_name).split(' ')[0] || 'there'} — `;
     setDraft((d) => (d ? d : stub));
   }, [activeConversation]);
 
@@ -529,6 +589,8 @@ export function InboxV2Page() {
               </div>
               <Button unstyled
                 type="button"
+                title="Start a new message"
+                onClick={() => setComposeOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -563,7 +625,11 @@ export function InboxV2Page() {
                   </Button>
                 </div>
               ) : filteredConversations.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-slate-500">{MAILBOX_EMPTY_COPY[mailbox]}</div>
+                <div className="px-4 py-6 text-sm text-slate-500">
+                {isHrLike && mailbox === 'inbox'
+                  ? 'No conversations yet. Open a case and message the employee to start a thread.'
+                  : MAILBOX_EMPTY_COPY[mailbox]}
+              </div>
               ) : (
                 filteredConversations.map((c) => {
                   const isActive = activeId === c.id;
@@ -584,7 +650,7 @@ export function InboxV2Page() {
                             unread ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'
                           }`}
                         >
-                          {c.other_participant_name}
+                          {humanizeName(c.other_participant_name) || 'Unknown'}
                         </span>
                         <span className="shrink-0 text-[11px] text-slate-400">
                           {formatThreadTime(c.last_message_at)}
@@ -633,7 +699,7 @@ export function InboxV2Page() {
                       {activeConversation.case_id && (
                         <>
                           <span className="text-slate-300">·</span>
-                          <span>Case {activeConversation.case_id}</span>
+                          <span>{friendlyCaseRef(activeConversation.case_id)}</span>
                         </>
                       )}
                     </div>
@@ -689,7 +755,7 @@ export function InboxV2Page() {
                         <MessageCard
                           key={m.id}
                           message={m}
-                          counterparty={activeConversation.other_participant_name}
+                          counterparty={humanizeName(activeConversation.other_participant_name) || 'Unknown'}
                         />
                       ))}
                       <div ref={messagesEndRef} />
@@ -701,7 +767,7 @@ export function InboxV2Page() {
                 <div className="border-t border-slate-200 bg-white px-6 py-4 shrink-0">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs text-slate-500">
-                      Reply to <span className="font-medium text-slate-700">{activeConversation.other_participant_name}</span>
+                      Reply to <span className="font-medium text-slate-700">{humanizeName(activeConversation.other_participant_name) || 'Unknown'}</span>
                     </p>
                     <Button unstyled
                       type="button"
@@ -712,6 +778,9 @@ export function InboxV2Page() {
                       Draft with AI
                     </Button>
                   </div>
+                  {sendError && (
+                    <p className="mb-1 text-xs text-red-500" role="alert">{sendError}</p>
+                  )}
                   <textarea
                     id="inbox-v2-composer"
                     value={draft}
@@ -764,13 +833,25 @@ export function InboxV2Page() {
           </section>
         </div>
       </div>
+      <ComposeNewMessage
+        open={composeOpen}
+        isHr={isHrLike}
+        onClose={() => setComposeOpen(false)}
+        onSent={(aid) => {
+          // Surface the freshly-created thread: show the inbox, refetch the list,
+          // and select the conversation once it appears (pendingSelect effect).
+          setMailbox('inbox');
+          setReloadKey((k) => k + 1);
+          setPendingSelectAid(aid);
+        }}
+      />
     </AppShell>
   );
 }
 
 function MessageCard({ message, counterparty }: { message: Message; counterparty: string }) {
   const isMine = !!message.is_from_me;
-  const displayName = isMine ? 'You' : message.sender_name || counterparty;
+  const displayName = isMine ? 'You' : humanizeName(message.sender_name) || counterparty;
   return (
     <div
       className={`rounded-lg border bg-white p-4 shadow-sm ${

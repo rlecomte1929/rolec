@@ -117,11 +117,12 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
 
             {/* Tier name */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor={`st-name-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">
                 Tier name
                 <Tip text='A short name visible to HR, e.g. "Standard", "Senior Hire", "Executive".' />
               </label>
               <Input
+                id={`st-name-${idx}`}
                 value={tier.name}
                 onChange={(value) => updateTier(idx, { name: value })}
                 placeholder='e.g. "Standard relocation"'
@@ -133,12 +134,13 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
 
             {/* Description (optional) */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor={`st-desc-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">
                 Description
                 <span className="ml-1 text-xs font-normal text-slate-400">(optional)</span>
                 <Tip text="A short note for HR explaining who this tier covers." />
               </label>
               <Input
+                id={`st-desc-${idx}`}
                 value={tier.description ?? ''}
                 onChange={(value) => updateTier(idx, { description: value })}
                 placeholder='e.g. "For individual contributors and associates"'
@@ -147,10 +149,10 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
 
             {/* Qualifying employee levels */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <span className="block text-sm font-medium text-slate-700 mb-2">
                 Who qualifies for this tier?
                 <Tip text="Employees at these levels will be assigned this tier's benefits when a relocation case is created." />
-              </label>
+              </span>
               <div className="flex flex-wrap gap-2">
                 {EMPLOYEE_LEVELS.map((lvl) => {
                   const selected = tier.qualifying_levels.includes(lvl.value);

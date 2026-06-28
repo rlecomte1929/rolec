@@ -4,9 +4,12 @@ import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
-import type { CaseDraftDTO } from '../../../types';
+import type { CaseDraftDTO, EmployeeProfileDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
-import { COUNTRY_OPTIONS } from '../../../utils/countries';
+// Identity fields (nationality, passport, residence) must accept the full ISO
+// list, not the restricted relocation-destination list (AIQ-1341).
+import { COUNTRY_OPTIONS } from '../../../features/policy-config/countryList';
+import { getApiErrorMessage } from '../../../utils/apiDetail';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -38,7 +41,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
     setLocal(draft.employeeProfile || {});
   }, [draft.employeeProfile]);
 
-  const update = (key: keyof typeof local, value: any) => {
+  const update = (key: keyof EmployeeProfileDTO, value: EmployeeProfileDTO[keyof EmployeeProfileDTO]) => {
     setLocal({ ...local, [key]: value });
   };
 
@@ -202,8 +205,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
                   logger.debug('Save & Exit -> /employee/dashboard');
                 }
                 navigate(ROUTES.EMP_DASH);
-              } catch (err: any) {
-                setError(err?.message || "Couldn't save draft. Try again.");
+              } catch (err) {
+                setError(getApiErrorMessage(err, "Couldn't save draft. Try again."));
               } finally {
                 setDraftExitSaving(false);
               }

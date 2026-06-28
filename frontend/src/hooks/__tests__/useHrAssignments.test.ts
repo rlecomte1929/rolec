@@ -18,8 +18,7 @@ vi.mock('../../navigation/safeNavigate', () => ({ safeNavigate: vi.fn() }));
 
 const mockList = hrAPI.listAssignments as unknown as ReturnType<typeof vi.fn>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const page = (n: number, start = 0): any =>
+const page = (n: number, start = 0): Array<{ id: string }> =>
   Array.from({ length: n }, (_, i) => ({ id: `a${start + i}` }));
 
 const filters = { search: '', status: 'all', destination: '' };

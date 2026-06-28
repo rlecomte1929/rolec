@@ -264,8 +264,8 @@ def enrich_assignment_compliance_report(
             "source_last_reviewed_at": pack.get("source_last_reviewed_at"),
         }
         enriched["rationale_legal_safety"] = (
-            "Derived from configured internal policy rules (mobility_rules.json / defaults), "
-            "not from immigration law."
+            "Based on your company's configured policy rules (or defaults), "
+            "not on immigration law."
         )
         checks_out.append(enriched)
     out["checks"] = checks_out

@@ -6,7 +6,28 @@ import { adminStagingAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { InternalThreadPanel } from '../../../components/admin/collaboration/InternalThreadPanel';
 
-type Candidate = Record<string, unknown>;
+type Candidate = {
+  id?: string;
+  status?: string;
+  title?: string;
+  description?: string;
+  event_type?: string;
+  venue_name?: string;
+  address?: string;
+  start_datetime?: string;
+  end_datetime?: string;
+  is_free?: boolean;
+  price_text?: string;
+  is_family_friendly?: boolean;
+  source_url?: string;
+  source_name?: string;
+  trust_tier?: string;
+  confidence_score?: number;
+  extraction_method?: string;
+  created_at?: string;
+  review_reason?: string;
+  provenance_json?: Record<string, unknown>;
+};
 type Match = {
   id: string;
   title?: string;
@@ -49,7 +70,7 @@ export const AdminStagingEventDetail: React.FC = () => {
     void load();
   }, [load]);
 
-  const status = (candidate?.status as string) ?? 'new';
+  const status = candidate?.status ?? 'new';
   const isApproved = status === 'approved_new' || status === 'approved_merged';
   const canRestore =
     ['rejected', 'duplicate', 'ignored'].includes(status) && !isApproved;
@@ -171,12 +192,12 @@ export const AdminStagingEventDetail: React.FC = () => {
     );
   }
 
-  const prov = (candidate.provenance_json as Record<string, unknown>) || {};
+  const prov = candidate.provenance_json ?? {};
 
   return (
     <AdminLayout
       title="Staged Event"
-      subtitle={(candidate.title as string) || 'Detail'}
+      subtitle={candidate.title || 'Detail'}
     >
       <div className="mb-4">
         <Link
@@ -194,26 +215,26 @@ export const AdminStagingEventDetail: React.FC = () => {
             <dl className="space-y-2 text-sm">
               <div>
                 <dt className="text-slate-500">Title</dt>
-                <dd className="font-medium">{String(candidate.title ?? '-')}</dd>
+                <dd className="font-medium">{candidate.title ?? '-'}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Description</dt>
                 <dd className="whitespace-pre-wrap">
-                  {(candidate.description as string) || '-'}
+                  {candidate.description || '-'}
                 </dd>
               </div>
               <div className="flex gap-4 flex-wrap">
                 <div>
                   <dt className="text-slate-500">Event type</dt>
-                  <dd>{String(candidate.event_type ?? '-')}</dd>
+                  <dd>{candidate.event_type ?? '-'}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Venue</dt>
-                  <dd>{String(candidate.venue_name ?? '-')}</dd>
+                  <dd>{candidate.venue_name ?? '-'}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Address</dt>
-                  <dd>{String(candidate.address ?? '-')}</dd>
+                  <dd>{candidate.address ?? '-'}</dd>
                 </div>
               </div>
               <div className="flex gap-4 flex-wrap">
@@ -221,7 +242,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                   <dt className="text-slate-500">Start</dt>
                   <dd>
                     {candidate.start_datetime
-                      ? new Date(candidate.start_datetime as string).toLocaleString()
+                      ? new Date(candidate.start_datetime).toLocaleString()
                       : '-'}
                   </dd>
                 </div>
@@ -229,7 +250,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                   <dt className="text-slate-500">End</dt>
                   <dd>
                     {candidate.end_datetime
-                      ? new Date(candidate.end_datetime as string).toLocaleString()
+                      ? new Date(candidate.end_datetime).toLocaleString()
                       : '-'}
                   </dd>
                 </div>
@@ -238,7 +259,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                 <div>
                   <dt className="text-slate-500">Price</dt>
                   <dd>
-                    {candidate.is_free ? 'Free' : String(candidate.price_text ?? '-')}
+                    {candidate.is_free ? 'Free' : (candidate.price_text ?? '-')}
                   </dd>
                 </div>
                 <div>
@@ -250,12 +271,12 @@ export const AdminStagingEventDetail: React.FC = () => {
                 <dt className="text-slate-500">Source URL</dt>
                 <dd>
                   <a
-                    href={(candidate.source_url as string) || '#'}
+                    href={candidate.source_url || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[#0b2b43] hover:underline"
                   >
-                    {String(candidate.source_url ?? '-')}
+                    {candidate.source_url ?? '-'}
                   </a>
                 </dd>
               </div>
@@ -267,11 +288,11 @@ export const AdminStagingEventDetail: React.FC = () => {
             <dl className="space-y-1 text-sm text-slate-600">
               <div>
                 <dt className="inline font-medium">Source:</dt>{' '}
-                <dd className="inline">{String(candidate.source_name ?? '-')}</dd>
+                <dd className="inline">{candidate.source_name ?? '-'}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Trust tier:</dt>{' '}
-                <dd className="inline">{String(candidate.trust_tier ?? '-')}</dd>
+                <dd className="inline">{candidate.trust_tier ?? '-'}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Confidence:</dt>{' '}
@@ -283,21 +304,21 @@ export const AdminStagingEventDetail: React.FC = () => {
               </div>
               <div>
                 <dt className="inline font-medium">Extraction method:</dt>{' '}
-                <dd className="inline">{String(candidate.extraction_method ?? '-')}</dd>
+                <dd className="inline">{candidate.extraction_method ?? '-'}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Fetched:</dt>{' '}
                 <dd className="inline">
                   {candidate.created_at
-                    ? new Date(candidate.created_at as string).toLocaleString()
+                    ? new Date(candidate.created_at).toLocaleString()
                     : '-'}
                 </dd>
               </div>
-              {Boolean((prov)?.snippet) && (
+              {Boolean(prov.snippet) && (
                 <div>
                   <dt className="block font-medium">Snippet</dt>
                   <dd className="mt-1 rounded bg-white p-2 text-xs">
-                    {String((prov)?.snippet ?? '').slice(0, 300)}...
+                    {String((prov.snippet as string | undefined) ?? '').slice(0, 300)}...
                   </dd>
                 </div>
               )}
@@ -321,9 +342,9 @@ export const AdminStagingEventDetail: React.FC = () => {
                 {String(status)}
               </span>
             </p>
-            {Boolean((candidate as Record<string, unknown>).review_reason) && (
+            {Boolean(candidate.review_reason) && (
               <p className="mt-2 text-sm text-slate-600">
-                <strong>Review note:</strong> {String((candidate as Record<string, unknown>).review_reason ?? '')}
+                <strong>Review note:</strong> {candidate.review_reason ?? ''}
               </p>
             )}
           </div>
@@ -349,10 +370,11 @@ export const AdminStagingEventDetail: React.FC = () => {
                 {matches.length > 0 && (
                   <>
                     <div className="border-t border-slate-100 pt-2">
-                      <label className="block text-xs text-slate-500">
+                      <label htmlFor="asede-merge-target" className="block text-xs text-slate-500">
                         Merge into live event
                       </label>
                       <select
+                        id="asede-merge-target"
                         value={mergeTargetId}
                         onChange={(e) => setMergeTargetId(e.target.value)}
                         className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"

@@ -60,6 +60,8 @@ const CasePlanToRoadmapRedirect = lazy(() => import('./pages/employee/CasePlanTo
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 // [P1-5] Dossier & Forms list view
 const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierPage').then((module) => ({ default: module.EmployeeDossierPage })));
+// Employee document vault (case-scoped + assignment fallback)
+const EmployeeDocumentsPage = lazy(() => import('./pages/employee/EmployeeDocumentsPage').then((module) => ({ default: module.EmployeeDocumentsPage })));
 // [P1-6] Case roadmap page
 const EmployeeCaseRoadmapPage = lazy(() => import('./pages/employee/EmployeeCaseRoadmapPage').then((module) => ({ default: module.EmployeeCaseRoadmapPage })));
 const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
@@ -260,7 +262,7 @@ function App() {
         <Route path="/design-preview" element={<DesignPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}
         <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
-        <Route path="/journey" element={<Journey />} />
+        <Route path="/journey" element={<RequireEmployeeRoute><Journey /></RequireEmployeeRoute>} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         {/* Bare /employee/roadmap has no caseId — keep logged-in employees in-app
@@ -371,6 +373,9 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
+        {/* Employee document vault — case-scoped + bare /employee/documents (assignment fallback) */}
+        <Route path={ROUTE_DEFS.employeeCaseDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
         {/* [P1-6] Case roadmap */}
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
         {/* [MVG-6B] Employee — immigration document checklist; allowHR so HR can view via timeline link */}

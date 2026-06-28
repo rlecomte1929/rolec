@@ -55,7 +55,8 @@ function formatApiDetail(detail: unknown): string {
   }
   if (typeof detail === 'string') return detail;
   if (detail == null) return '';
-  return String(detail);
+  if (typeof detail === 'number' || typeof detail === 'boolean') return String(detail);
+  return '';
 }
 
 function formatDateTime(val: string | null | undefined): string {
@@ -431,7 +432,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           .join(' · ');
         if (nd) m = `${m} ${nd}`;
       }
-      if (data?.hint) m = `${m} ${data.hint}`;
+      const hint = typeof data?.hint === 'string' ? data.hint : '';
+      if (hint) m = `${m} ${hint}`;
       setMessage(m);
       setMessageVariant('error');
     } finally {
@@ -494,7 +496,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const avgConfidence = useMemo(() => {
     const rules = normalized?.benefit_rules || [];
     if (!rules.length) return null;
-    const sum = rules.reduce((a: number, r: any) => a + (r.confidence ?? 0), 0);
+    const sum = rules.reduce((a: number, r) => a + (r.confidence ?? 0), 0);
     return Math.round((sum / rules.length) * 100);
   }, [normalized?.benefit_rules]);
 
@@ -751,8 +753,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       <Card padding="lg">
         <div className="text-sm font-semibold text-[#0b2b43] mb-2">Policy & version</div>
         <div className="flex flex-wrap gap-3 items-center">
-          <label className="text-sm text-[#6b7280]">Policy:</label>
+          <label htmlFor="hprw-policy" className="text-sm text-[#6b7280]">Policy:</label>
           <select
+            id="hprw-policy"
             value={selectedPolicyId || ''}
             onChange={(e) => setSelectedPolicyId(e.target.value || null)}
             disabled={Boolean(loading && policies.length > 0)}
@@ -1138,6 +1141,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           tabIndex={0}
           aria-label="Close"
         >
+          {/* eslint-disable-next-line local/no-clickable-div -- role="presentation" is the correct ARIA role for the modal content wrapper; backdrop-click + Escape are the standard dismiss interactions */}
           <div role="presentation" onClick={(e): void => e.stopPropagation()}>
             <Card padding="lg" className="max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-3">

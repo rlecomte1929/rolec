@@ -30,7 +30,7 @@ export const TrustDifferentiation: React.FC<TrustDifferentiationProps> = ({
         </p>
       </div>
       <div className="rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8">
-        <ul className="space-y-3" role="list">
+        <ul className="space-y-3">
           {checklist.map((item, i) => (
             // <li> must be a direct child of <ul> for valid list semantics
             // (Lighthouse a11y `listitem`); the FadeIn moves inside the <li> and

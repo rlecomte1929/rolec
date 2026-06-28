@@ -176,7 +176,7 @@ export function CaseAuditTimeline({ caseId }: { caseId: string }) {
         {events === null ? (
           <div className="py-3 text-sm text-[#64748b]">Loading audit trail…</div>
         ) : error ? (
-          <div className="py-3 text-sm text-[#64748b]">Couldn't load the audit trail.</div>
+          <div className="py-3 text-sm text-[#64748b]">Couldn&apos;t load the audit trail.</div>
         ) : events.length === 0 ? (
           <div className="py-3 text-sm text-[#64748b]">No recorded actions on this case yet.</div>
         ) : (

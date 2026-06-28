@@ -4,7 +4,7 @@
  * Falls back to polling when Supabase is unavailable or subscription drops.
  */
 
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { listNotifications, getUnreadCount } from './notifications';
 import type { NotificationListItem } from './notifications';
@@ -27,15 +27,15 @@ export interface SubscribeCallbacks {
 
 function rowToNotificationListItem(row: Record<string, unknown>): NotificationListItem {
   return {
-    id: String(row.id ?? ''),
-    created_at: String(row.created_at ?? ''),
-    assignment_id: row.assignment_id != null ? String(row.assignment_id) : null,
-    case_id: row.case_id != null ? String(row.case_id) : null,
-    type: String(row.type ?? ''),
-    title: String(row.title ?? ''),
-    body: row.body != null ? String(row.body) : null,
+    id: (row.id as string | null | undefined) ?? '',
+    created_at: (row.created_at as string | null | undefined) ?? '',
+    assignment_id: (row.assignment_id as string | null | undefined) ?? null,
+    case_id: (row.case_id as string | null | undefined) ?? null,
+    type: (row.type as string | null | undefined) ?? '',
+    title: (row.title as string | null | undefined) ?? '',
+    body: (row.body as string | null | undefined) ?? null,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
-    read_at: row.read_at != null ? String(row.read_at) : null,
+    read_at: (row.read_at as string | null | undefined) ?? null,
   };
 }
 
@@ -132,12 +132,12 @@ export function subscribeToNotificationsRealtime(
         }
       )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
           stopFallback();
           reconnectAttempts = 0;
           return;
         }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR || status === REALTIME_SUBSCRIBE_STATES.TIMED_OUT) {
           reconnectAttempts += 1;
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             startFallback();

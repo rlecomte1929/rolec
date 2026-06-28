@@ -112,6 +112,7 @@ export const OriginalPdfDrawer: React.FC<OriginalPdfDrawerProps> = ({
     <>
       {/* Backdrop — click to close */}
       {isOpen && (
+        // eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls
         <div
           className="fixed inset-0 z-40 bg-black/20"
           aria-hidden="true"

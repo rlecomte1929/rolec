@@ -28,7 +28,6 @@ export const FlowSteps: React.FC<FlowStepsProps> = ({
     <div className={className}>
       <ol
         className={`grid ${gridClass[layout]} gap-6 lg:gap-4`}
-        role="list"
       >
         {steps.map((step, index) => (
           <li key={index} className="flex flex-col">

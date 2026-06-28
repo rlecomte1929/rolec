@@ -37,11 +37,13 @@ export default function TestRpc() {
 
   async function runRpc() {
     setStatus("Calling RPC...");
-    const { data, error } = await supabase.rpc("transition_assignment", {
+    const rpcResult = await supabase.rpc("transition_assignment", {
       p_assignment_id: ASSIGNMENT_ID,
       p_action: "EMPLOYEE_UNSUBMIT",
       p_note: null,
     });
+    const data: unknown = rpcResult.data;
+    const error = rpcResult.error;
 
     if (error) setStatus(`RPC error: ${error.code ?? ""} ${error.message}`);
     else setStatus(`RPC OK: ${JSON.stringify(data)}`);

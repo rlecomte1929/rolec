@@ -12,6 +12,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import type * as React from 'react';
 import { GlobeCanvas } from '../auth/GlobeCanvas';
 import { Button } from '../../../components/antigravity/Button';
 import {
@@ -378,6 +379,9 @@ export function DashboardScreen({
                   <tr
                     key={c.id}
                     onClick={() => onViewCase(c.id)}
+                    onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViewCase(c.id); } }}
+                    role="button"
+                    tabIndex={0}
                     style={{
                       borderBottom: i < snapshot_cases.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                       cursor: 'pointer',
@@ -504,7 +508,7 @@ export function DashboardScreen({
                         fontWeight: 500,
                       }}
                     >
-                      {item.case_employee}'s case
+                      {item.case_employee}&apos;s case
                     </Button>
                   </p>
                 </div>

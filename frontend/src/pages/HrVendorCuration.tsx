@@ -563,7 +563,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           <p className="mt-3 text-xs text-[#64748b]">
             AI catalog quota today: <strong className="text-[#0b2b43]">{quota.used}/{quota.limit}</strong> used
             ({quota.remaining} remaining; resets at midnight UTC). Each service category that
-            actually calls the AI counts as 1 — already-populated categories don't.
+            actually calls the AI counts as 1 — already-populated categories don&apos;t.
           </p>
         )}
         {populateResult && populateResult.status === 'completed' && (
@@ -603,12 +603,17 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       </Card>
 
       {requestModalOpen && (
+        // eslint-disable-next-line local/no-clickable-div, jsx-a11y/no-noninteractive-element-interactions -- role="dialog" is the correct ARIA role; backdrop-click + Escape are the standard dismiss interactions
         <div
           role="dialog"
           aria-modal="true"
+          tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b2b43]/40 px-4"
           onClick={(e) => {
             if (e.target === e.currentTarget && !requesting) setRequestModalOpen(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && !requesting) setRequestModalOpen(false);
           }}
         >
           <Card padding="lg" className="w-full max-w-md bg-white">
@@ -757,8 +762,8 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                     />
                     <span className="min-w-0">
                       <span className="font-medium text-[#0b2b43]">{row.name}</span>
-                      {row.source && (
-                        <span className="ml-2 text-xs text-[#94a3b8]">source: {row.source}</span>
+                      {row.source === 'hr_promoted' && (
+                        <span className="ml-2 text-xs text-[#94a3b8]">Added by your team</span>
                       )}
                       {pending && (
                         <span className="ml-2 inline-flex items-center rounded-full border border-[#fde68a] bg-[#fef9c3] px-2 py-0.5 text-xs font-medium text-[#854d0e]">

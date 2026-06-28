@@ -5,10 +5,12 @@ import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
+import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
 import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
@@ -41,16 +43,20 @@ export const ServicesEstimate: React.FC = () => {
     () => resolveScopedAssignmentId({ linkedSummaries, primaryAssignmentId, queryAssignmentId }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId],
   );
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
-  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
+  // AIQ-1334: employee case sub-routes are keyed by case_id — build with the resolved case_id.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: routeCaseId });
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
   // Records this as the resume target so re-entering from dashboard
   // returns the user to the estimate / shortlist instead of forcing a
   // restart of the services flow.
   useTrackLastVisited(assignmentId || null);
+  // AIQ-1249d: case-context banner — which move this services flow is scoped to.
+  const moveBanner = useServicesMoveBanner(assignmentId || null);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations) {
@@ -71,8 +77,8 @@ export const ServicesEstimate: React.FC = () => {
               ("Empty states: No X yet. [Reason or guidance] → [CTA]") */}
           <p className="text-sm font-medium text-[#0b2b43] mb-1">No estimate yet</p>
           <p className="text-sm text-[#6b7280] mb-4">
-            You haven't picked any services yet. Choose what you need, set a few preferences,
-            and we'll build a side-by-side view of what your company's policy covers and what
+            You haven&apos;t picked any services yet. Choose what you need, set a few preferences,
+            and we&apos;ll build a side-by-side view of what your company&apos;s policy covers and what
             comes out of pocket. Your selections save automatically — you can come back any time.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -98,6 +104,11 @@ export const ServicesEstimate: React.FC = () => {
       >
         ← Back to recommendations
       </button>
+      <ServicesContextBanner
+        originCity={moveBanner?.originCity}
+        destCity={moveBanner?.destCity}
+        date={moveBanner?.date}
+      />
       <ServicesNavRibbon />
       {/* Stage 5 (audit) — replaced generic numbered list with outcome-described copy
           per audit/re-audit-stage-2-copy.md COPY-5 + docs/product-copy-rules.md
@@ -105,7 +116,7 @@ export const ServicesEstimate: React.FC = () => {
       <Card padding="lg" className="mb-6">
         <p className="text-sm text-[#0b2b43] font-medium mb-1">What happens next</p>
         <p className="text-sm text-[#4b5563]">
-          Pick the vendors you want quotes from — we'll send the request in one click.
+          Pick the vendors you want quotes from — we&apos;ll send the request in one click.
           Offers come back here as vendors respond, then you compare and decide.
         </p>
       </Card>
@@ -153,7 +164,7 @@ export const ServicesEstimate: React.FC = () => {
           status="Estimate ready"
           hint="Your service picks are saved. Your roadmap aggregates all phases — visa, housing, schooling, and more — into one timeline."
           primaryLabel="View my roadmap →"
-          primaryHref={buildRoute('employeeCaseRoadmap', { caseId: assignmentId })}
+          primaryHref={buildRoute('employeeCaseRoadmap', { caseId: routeCaseId })}
           secondaryLabel="Back to recommendations"
           secondaryHref={caseStep('caseServicesRecommendations')}
         />

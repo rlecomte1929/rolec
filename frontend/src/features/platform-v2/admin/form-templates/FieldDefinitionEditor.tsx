@@ -130,7 +130,7 @@ export const FieldDefinitionEditor: React.FC<FieldDefinitionEditorProps> = ({
         <span className="col-span-2">Field ID</span>
         <span className="col-span-3">Label</span>
         <span className="col-span-2">Type</span>
-        <span className="col-span-1 text-center">Req'd</span>
+        <span className="col-span-1 text-center">Req&apos;d</span>
         <span className="col-span-2">Prefill source</span>
         <span className="col-span-1 text-center">Orig.</span>
       </div>

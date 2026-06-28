@@ -21,6 +21,7 @@ from .routers import (
     case_integrations,
     cases_read,
     cases_write,
+    case_documents,
     conjoint,
     employee_quotes,
     employee_steps,
@@ -53,6 +54,7 @@ from .routers import (
     mobility_context,
     nlg,
     pets,
+    policy_analysis,
     policy_canonical,
     policy_gaps,
     policy_publish,
@@ -98,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(cases_read.router)
     app.include_router(case_integrations.router)  # I-4 — email plan + calendar .ics
     app.include_router(cases_write.router)
+    app.include_router(case_documents.router)  # [DOCFLOW P1] case-scoped document upload/status
     app.include_router(cases_admin.router)
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
     app.include_router(admin.router)
@@ -176,6 +179,9 @@ def create_app() -> FastAPI:
     app.include_router(specialist_review.router)
     app.include_router(rag_roadmap.router)  # [P1-01d] /api/internal/rag/generate-roadmap
     app.include_router(compliance.router)  # [BL-Compliance.4] /api/compliance
+
+    # ── AIQ-1219 PR2: policy analysis (PDF → workflow summary) ─────────────────
+    app.include_router(policy_analysis.router)
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)

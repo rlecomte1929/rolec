@@ -4,10 +4,20 @@ import { Button, Card } from '../antigravity';
 import { guidanceAPI } from '../../api/client';
 import { swallow } from '../../lib/errorTracking';
 import { useAdminContext } from '../../features/admin/useAdminContext';
+import { getApiErrorMessage } from '../../utils/apiDetail';
 
 const GUIDANCE_ENABLED =
   import.meta.env.NEXT_PUBLIC_FEATURE_GUIDANCE_PACK === 'true' ||
   import.meta.env.VITE_FEATURE_GUIDANCE_PACK === 'true';
+
+type ExplainLog = {
+  rule_key: string;
+  version: number;
+  evaluation_result?: boolean;
+  was_baseline?: boolean;
+  injected_for_minimum?: boolean;
+  snapshot_subset?: Record<string, unknown>;
+};
 
 type GuidancePack = {
   guidance_mode?: 'demo' | 'strict';
@@ -79,20 +89,20 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'plan' | 'checklist' | 'sources' | 'guide' | 'explain'>('plan');
   const [mode, setMode] = useState<'demo' | 'strict'>('demo');
-  const [explain, setExplain] = useState<{ trace_id?: string | null; rejected_count?: number; logs: any[] } | null>(null);
+  const [explain, setExplain] = useState<{ trace_id?: string | null; rejected_count?: number; logs: ExplainLog[] } | null>(null);
   const { context: adminContext } = useAdminContext();
 
   useEffect(() => {
     if (!GUIDANCE_ENABLED || !caseId) return;
     guidanceAPI.getLatest(caseId)
-      .then((res) => setPack(res))
+      .then((res) => setPack(res as GuidancePack | null))
       .catch((e) => swallow(e, 'GuidancePackPanel: getLatest'));
   }, [caseId]);
 
   useEffect(() => {
     if (!GUIDANCE_ENABLED || !caseId || tab !== 'explain') return;
     guidanceAPI.explain(caseId)
-      .then((res) => setExplain(res))
+      .then((res) => setExplain(res as { trace_id?: string | null; rejected_count?: number; logs: ExplainLog[] } | null))
       .catch((e) => swallow(e, 'GuidancePackPanel: explain'));
   }, [caseId, tab]);
 
@@ -117,11 +127,13 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
     setLoading(true);
     try {
       const res = await guidanceAPI.generate(caseId, adminContext?.isAdmin ? mode : undefined);
-      setPack(res);
+      // Boundary cast: the API returns the guidance pack with opaque plan/checklist; this panel's
+      // GuidancePack view type narrows them. Shapes are otherwise identical.
+      setPack(res as GuidancePack);
       setGeneratedAt(new Date().toLocaleString());
       setTab('plan');
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Unable to generate guidance pack.');
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'Unable to generate guidance pack.'));
     } finally {
       setLoading(false);
     }
@@ -351,7 +363,10 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
                   </div>
                   {log.snapshot_subset && Object.keys(log.snapshot_subset).length > 0 && (
                     <div className="text-xs text-[#6b7280] mt-1">
-                      Snapshot fields: {Object.entries(log.snapshot_subset).map(([k, v]) => `${k}: ${v ?? 'unknown'}`).join(' · ')}
+                      Snapshot fields: {Object.entries(log.snapshot_subset).map(([k, v]) => {
+                        const display = v == null ? 'unknown' : typeof v === 'object' ? JSON.stringify(v) : String(v as string | number | boolean | bigint);
+                        return `${k}: ${display}`;
+                      }).join(' · ')}
                     </div>
                   )}
                 </div>

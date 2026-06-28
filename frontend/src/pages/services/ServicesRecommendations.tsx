@@ -5,9 +5,11 @@ import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
+import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -43,12 +45,16 @@ export const ServicesRecommendations: React.FC = () => {
     [linkedSummaries, primaryAssignmentId, queryAssignmentId],
   );
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped — map assignment_id → case_id (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
-  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' });
+  // AIQ-1334: employee case sub-routes are keyed by case_id — build with the resolved case_id.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
+  const caseStep = (key: RouteKey) => buildRoute(key, { caseId: routeCaseId });
+  // AIQ-1249d: case-context banner — which move this services flow is scoped to.
+  const moveBanner = useServicesMoveBanner(assignmentId || null);
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
     return (
@@ -65,6 +71,11 @@ export const ServicesRecommendations: React.FC = () => {
 
   return (
     <AppShell title="Recommendations" subtitle="Shortlist by service.">
+      <ServicesContextBanner
+        originCity={moveBanner?.originCity}
+        destCity={moveBanner?.destCity}
+        date={moveBanner?.date}
+      />
       <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">

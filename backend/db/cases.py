@@ -37,6 +37,7 @@ from ..readiness_service import (
     resolve_readiness_route_key,
 )
 from ..sla_rules import compute_sla_status
+from ..intake_route_fields import wizard_basics_to_route
 
 log = logging.getLogger(__name__)
 
@@ -2473,17 +2474,24 @@ class CasesMixin:
         """
         prof = self.get_employee_profile(assignment_id)
         raw = extract_destination_from_profile(prof)
-        if not raw:
+        # Fall back when the profile destination is MISSING *or* doesn't normalise to a
+        # country key — e.g. a city-only value like "Amsterdam" with no country (AIQ-1321).
+        # The old `if not raw` only caught the empty case, so a truthy-but-unnormalisable
+        # value short-circuited to no_destination instead of using the canonical host_country.
+        if not normalize_destination_key(raw):
             asn = self.get_assignment_by_id(assignment_id)
             if asn:
                 cid = (asn.get("case_id") or "").strip()
                 case = self.get_case_by_id(cid) if cid else None
                 if case:
-                    if case.get("host_country"):
-                        raw = str(case.get("host_country")).strip() or None
-                    if not raw:
+                    host = str(case.get("host_country") or "").strip() or None
+                    if normalize_destination_key(host):
+                        raw = host
+                    else:
                         # Last-resort fallback to the historical blob.
-                        raw = extract_destination_from_case_profile(case.get("profile_json"))
+                        blob = extract_destination_from_case_profile(case.get("profile_json"))
+                        if normalize_destination_key(blob):
+                            raw = blob
         key = normalize_destination_key(raw)
         return raw, key
 
@@ -2689,22 +2697,47 @@ class CasesMixin:
         *,
         home_country: Optional[str] = None,
         host_country: Optional[str] = None,
+        origin_city: Optional[str] = None,
+        dest_city: Optional[str] = None,
+        target_start_date: Optional[str] = None,
     ) -> None:
-        """Denormalize wizard origin/destination onto relocation_cases for HR lists and filters."""
+        """Denormalize wizard origin/destination onto relocation_cases for HR lists and filters.
+
+        AIQ-1311 PR2: also writes origin_country_code/dest_country_code/origin_city/
+        dest_city/target_start_date — the columns hr_case_detail.get_case_overview
+        reads (corridor is a generated column derived from the codes). The legacy
+        home_country/host_country are still written (case-list surfaces read those).
+        """
         rid = (relocation_case_id or "").strip()
-        if not rid or (not home_country and not host_country):
+        if not rid:
+            return
+        # origin/dest *_country_code mirror home/host — the overview reads the former.
+        col_vals = {
+            "home_country": home_country,
+            "host_country": host_country,
+            "origin_country_code": home_country,
+            "dest_country_code": host_country,
+            "origin_city": origin_city,
+            "dest_city": dest_city,
+        }
+        if not any(col_vals.values()) and not target_start_date:
             return
         if not self.get_case_by_id(rid):
             return
         now = datetime.utcnow().isoformat()
         parts = ["updated_at = :ua"]
         params: Dict[str, Any] = {"cid": rid, "ua": now}
-        if home_country:
-            parts.append("home_country = :home")
-            params["home"] = home_country
-        if host_country:
-            parts.append("host_country = :host")
-            params["host"] = host_country
+        for col, val in col_vals.items():
+            if val:
+                parts.append(f"{col} = :{col}")
+                params[col] = val
+        if target_start_date:
+            # DATE column: bind plain on SQLite, CAST on Postgres (mirrors the
+            # _is_sqlite branch the other date/jsonb writes here use).
+            parts.append(
+                "target_start_date = :tsd" if _is_sqlite else "target_start_date = CAST(:tsd AS date)"
+            )
+            params["tsd"] = target_start_date
         sql = f"UPDATE relocation_cases SET {', '.join(parts)} WHERE id::text = :cid"
         with self.engine.begin() as conn:
             conn.execute(text(sql), params)
@@ -2712,23 +2745,19 @@ class CasesMixin:
     def sync_relocation_case_route_from_wizard_draft(self, relocation_case_id: str, draft: Dict[str, Any]) -> None:
         """
         Denormalize relocationBasics onto relocation_cases (same fields as PATCH /api/cases).
-        Used on employee submit so HR lists stay current without an extra wizard save.
+        Used on employee submit so HR lists + the case overview stay current without an
+        extra wizard save. AIQ-1311 PR2: now also carries city + target move date.
         """
-        basics = draft.get("relocationBasics") or {}
-        home = (basics.get("originCountry") or basics.get("origin_country") or "").strip() or None
-        host = (
-            basics.get("destCountry")
-            or basics.get("destination_country")
-            or basics.get("hostCountry")
-            or basics.get("host_country")
-            or ""
-        )
-        host = (host or "").strip() or None
-        if home or host:
+        basics = (draft or {}).get("relocationBasics") or {}
+        route = wizard_basics_to_route(basics)
+        if any(route.values()):
             self.touch_relocation_case_route_from_wizard(
                 relocation_case_id,
-                home_country=home,
-                host_country=host,
+                home_country=route["origin_country"],
+                host_country=route["dest_country"],
+                origin_city=route["origin_city"],
+                dest_city=route["dest_city"],
+                target_start_date=route["target_start_date"],
             )
 
     def _sync_case_dependents_from_draft(self, canonical_case_id: str, draft: Dict[str, Any]) -> None:
@@ -3341,7 +3370,82 @@ class CasesMixin:
             """),
                 {"aid": assignment_id},
             ).fetchall()
-        return self._rows_to_list(rows)
+        items = self._rows_to_list(rows)
+        # AIQ-1325b: defensively scrub a leading '[verify]' marker from per-message
+        # subjects at read time (display-only) so it never surfaces as a thread title.
+        from .test_data_filter import strip_verify_prefix
+        for it in items:
+            if it.get("subject"):
+                it["subject"] = strip_verify_prefix(it["subject"])
+        return items
+
+    def insert_message(
+        self,
+        *,
+        assignment_id: str,
+        body: str,
+        sender_user_id: str,
+        recipient_user_id: Optional[str] = None,
+        hr_user_id: Optional[str] = None,
+        employee_identifier: Optional[str] = None,
+        status: str = "sent",
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Insert one HR<->employee message on an assignment thread via the legacy
+        assignment-based columns the inbox read path uses
+        (list_messages_by_assignment / list_messages_for_{hr,employee}). The
+        thread-model columns (thread_id/sender_id/sender_name/sender_initials) are
+        left NULL — see migration 20260727000000. Tenant scoping is the caller's
+        responsibility (the handler verifies assignment access first). The id is
+        generated here so the insert is identical on Postgres and SQLite. Returns
+        the created row, or None when assignment_id / body / sender are blank."""
+        import uuid as _uuid
+
+        aid = (assignment_id or "").strip()
+        text_body = (body or "").strip()
+        suid = (sender_user_id or "").strip()
+        if not aid or not text_body or not suid:
+            return None
+        mid = str(_uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        params = {
+            "id": mid,
+            "aid": aid,
+            "body": text_body,
+            "suid": suid,
+            "ruid": (recipient_user_id or None),
+            "hruid": (hr_user_id or None),
+            "emp": (employee_identifier or None),
+            "status": status,
+            "now": now,
+        }
+        cols = (
+            "id, assignment_id, body, sender_user_id, recipient_user_id, "
+            "hr_user_id, employee_identifier, status, created_at, sent_at"
+        )
+        if _is_sqlite:
+            sql = (
+                f"INSERT INTO messages ({cols}) "
+                "VALUES (:id, :aid, :body, :suid, :ruid, :hruid, :emp, :status, :now, :now)"
+            )
+        else:
+            sql = (
+                f"INSERT INTO messages ({cols}) "
+                "VALUES (:id, :aid, :body, :suid, :ruid, :hruid, :emp, :status, "
+                "CAST(:now AS timestamptz), CAST(:now AS timestamptz))"
+            )
+        with self.engine.begin() as conn:
+            self._exec(conn, sql, params, op_name="insert_message", request_id=request_id)
+        return {
+            "id": mid,
+            "assignment_id": aid,
+            "body": text_body,
+            "sender_user_id": suid,
+            "recipient_user_id": recipient_user_id,
+            "hr_user_id": hr_user_id,
+            "status": status,
+            "created_at": now,
+        }
 
     def get_admin_assignments_index(
         self,

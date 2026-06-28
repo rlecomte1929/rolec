@@ -57,7 +57,7 @@ export const AdminEventEditor: React.FC = () => {
 
   useEffect(() => {
     void load();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -99,7 +99,7 @@ export const AdminEventEditor: React.FC = () => {
 
   useEffect(() => {
     if (!isNew && id) void loadAudit();
-  }, [id, isNew]);
+  }, [id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const workflow = async (action: string, notes?: string) => {
     if (!id || isNew) return;
@@ -156,7 +156,7 @@ export const AdminEventEditor: React.FC = () => {
   return (
     <AdminLayout
       title={isNew ? 'New Event' : (form.title as string) || 'Edit Event'}
-      subtitle={isNew ? 'Create a new event' : `Status: ${form.status || 'draft'}`}
+      subtitle={isNew ? 'Create a new event' : `Status: ${(form.status as string | undefined) || 'draft'}`}
     >
       <div className="mb-4 flex gap-2">
         <Link to={buildRoute('adminEvents')}>
@@ -401,10 +401,10 @@ export const AdminEventEditor: React.FC = () => {
               <h3 className="font-semibold mb-3">Public preview</h3>
               <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
                 <div className="font-medium text-[#0b2b43]">{(form.title as string) || 'Untitled'}</div>
-                {form.description ? <p className="text-sm text-slate-600 mt-1">{String(form.description)}</p> : null}
-                {form.venue_name ? <p className="text-xs text-slate-500 mt-1">{String(form.venue_name)}</p> : null}
+                {form.description ? <p className="text-sm text-slate-600 mt-1">{form.description as string}</p> : null}
+                {form.venue_name ? <p className="text-xs text-slate-500 mt-1">{form.venue_name as string}</p> : null}
                 {form.start_datetime ? <p className="text-sm mt-1">{new Date(form.start_datetime as string).toLocaleString()}</p> : null}
-                {form.is_free ? <span className="text-xs text-green-600">Free</span> : form.price_text ? <span className="text-sm">{String(form.price_text)}</span> : null}
+                {form.is_free ? <span className="text-xs text-green-600">Free</span> : form.price_text ? <span className="text-sm">{form.price_text as string}</span> : null}
                 {form.is_family_friendly ? <span className="text-xs text-slate-500 ml-2">Family-friendly</span> : null}
               </div>
             </Card>

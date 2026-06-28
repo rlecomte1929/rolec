@@ -26,11 +26,12 @@ export async function signInSupabase(email: string, password: string): Promise<{
       logger.debug('[Supabase sign-in] Session established; tokens will auto-refresh');
     }
     return { ok: true };
-  } catch (err: any) {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : undefined;
     if (import.meta.env.DEV) {
-      logger.warn('[Supabase sign-in]', err?.message);
+      logger.warn('[Supabase sign-in]', msg);
     }
-    return { ok: false, error: err?.message };
+    return { ok: false, error: msg };
   }
 }
 

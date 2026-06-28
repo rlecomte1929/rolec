@@ -137,9 +137,9 @@ export const JurisdictionOverridesEditor: React.FC<Props> = ({
 
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs font-medium text-[#374151] mb-1">
+                    <span className="block text-xs font-medium text-[#374151] mb-1">
                       Countries (where this override applies)
-                    </label>
+                    </span>
                     <CountryMultiSelect
                       value={ov.jurisdiction_countries || []}
                       onChange={(next) =>

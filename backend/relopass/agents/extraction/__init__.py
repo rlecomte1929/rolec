@@ -76,6 +76,13 @@ from .foster_care_order import (
     load_foster_care_order_prompt,
     normalize_dependency_type,
 )
+from .visa_permit import (
+    VISA_PERMIT_AGENT_NAME,
+    VISA_PERMIT_DOCUMENT_TYPE,
+    VisaPermitAgent,
+    VisaPermitResult,
+    load_visa_permit_prompt,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Document-type → agent-class registry (C2-01 wiring)
@@ -90,6 +97,7 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
     BIRTH_CERT_DOCUMENT_TYPE: BirthCertAgent,
     FOSTER_CARE_ORDER_DOCUMENT_TYPE: FosterCareOrderAgent,
     ID_CARD_DOCUMENT_TYPE: IdCardAgent,
+    VISA_PERMIT_DOCUMENT_TYPE: VisaPermitAgent,
 }
 
 
@@ -162,6 +170,12 @@ __all__ = [
     "GuardianResolution",
     "load_foster_care_order_prompt",
     "normalize_dependency_type",
+    # visa_permit (AIQ-1309 follow-up)
+    "VISA_PERMIT_AGENT_NAME",
+    "VISA_PERMIT_DOCUMENT_TYPE",
+    "VisaPermitAgent",
+    "VisaPermitResult",
+    "load_visa_permit_prompt",
     # registry wiring (C2-01)
     "EXTRACTION_AGENT_REGISTRY",
     "get_extraction_agent_class",

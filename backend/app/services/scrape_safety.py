@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -41,6 +42,23 @@ DEFAULT_DAILY_QUOTA = 20
 
 def _norm(s: Optional[str]) -> str:
     return (s or "").strip()
+
+
+# AIQ-1325c: the allowlist was seeded with ReloPass-internal tags in `notes`
+# ('AIQ-28-A seed', 'B14 seed', 'aiq-28-a-backfill original countries') that leak
+# ticket IDs into the admin /catalog-queue UI. Normalise those to a clean label at
+# read time (display-only; the stored row is untouched). Genuine HR-entered notes
+# pass through unchanged.
+_SEED_NOTE_LABEL = "ReloPass curated"
+_SEED_NOTE_RE = re.compile(r"^(aiq|b\d+ seed)", re.IGNORECASE)
+
+
+def _clean_seed_note(note: Optional[str]) -> Optional[str]:
+    """Return a clean label for ReloPass-internal seed tags; pass real notes
+    (and None/empty) through unchanged."""
+    if not note:
+        return note
+    return _SEED_NOTE_LABEL if _SEED_NOTE_RE.match(note.strip()) else note
 
 
 def is_destination_allowlisted(city: str, country: Optional[str]) -> bool:
@@ -72,6 +90,7 @@ def list_allowlist() -> List[Dict[str, Any]]:
         v = d.get("approved_at")
         if hasattr(v, "isoformat"):
             d["approved_at"] = v.isoformat()
+        d["notes"] = _clean_seed_note(d.get("notes"))  # AIQ-1325c
         out.append(d)
     return out
 

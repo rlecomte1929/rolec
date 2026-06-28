@@ -255,6 +255,8 @@ function CountryDropdown({
           overflow: 'hidden',
         }}>
           <div style={{ padding: '8px' }}>
+            {/* eslint-disable jsx-a11y/no-autofocus */}
+            {/* dropdown search: focus input when popover opens for keyboard users */}
             <Input unstyled
               autoFocus
               value={search}
@@ -272,6 +274,7 @@ function CountryDropdown({
                 boxSizing: 'border-box',
               }}
             />
+            {/* eslint-enable jsx-a11y/no-autofocus */}
           </div>
           <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
             {filtered.length === 0 ? (
@@ -441,8 +444,8 @@ export function IntakeWizard({ case_id: _case_id, employee_id, onComplete, onCan
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as Record<string, string>).message ?? `HTTP ${res.status}`);
+        const err = await res.json().catch(() => ({})) as { message?: string };
+        throw new Error(err.message ?? `HTTP ${res.status}`);
       }
 
       const { data } = await res.json() as { data: { id: string } };

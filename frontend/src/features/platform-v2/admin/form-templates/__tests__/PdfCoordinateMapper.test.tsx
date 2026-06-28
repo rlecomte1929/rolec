@@ -7,6 +7,11 @@
  * surface area of the component; everything else is React state plumbing.
  */
 import { describe, expect, it, vi } from 'vitest';
+import {
+  pdfPointToScreen,
+  screenToPdfPoint,
+  type PageScale,
+} from '../PdfCoordinateMapper';
 
 // react-pdf transitively loads pdfjs-dist@4.8.69, whose node_utils.js calls
 // Promise.withResolvers() (Node 22+) at import time — which crashes under the
@@ -19,12 +24,6 @@ vi.mock('react-pdf', () => ({
   Page: () => null,
   pdfjs: { GlobalWorkerOptions: { workerSrc: '' }, version: '4.8.69' },
 }));
-
-import {
-  pdfPointToScreen,
-  screenToPdfPoint,
-  type PageScale,
-} from '../PdfCoordinateMapper';
 
 // A4 in PDF points (595 × 842), rendered at the default 700px width.
 const A4_SCALE: PageScale = {

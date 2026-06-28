@@ -9,8 +9,14 @@ export interface CountryOption {
   cities: string[];
 }
 
-/** Countries and cities, alphabetically by country name, cities within each country alphabetically. */
-export const COUNTRY_OPTIONS: CountryOption[] = [
+/**
+ * Restricted relocation-DESTINATION list (with per-country cities). Use this ONLY
+ * for relocation origin/destination pickers — NOT for identity fields like
+ * nationality, passport, or country of incorporation, which must accept the full
+ * ISO list (`COUNTRY_OPTIONS` in features/policy-config/countryList.ts). AIQ-1341.
+ * Alphabetical by country name; cities within each country alphabetical.
+ */
+export const DESTINATION_COUNTRIES: CountryOption[] = [
   { code: 'AR', name: 'Argentina', cities: ['Buenos Aires', 'Córdoba', 'La Plata', 'Mar del Plata', 'Mendoza', 'Rosario', 'Salta', 'San Juan', 'San Miguel de Tucumán', 'Santa Fe'] },
   { code: 'AT', name: 'Austria', cities: ['Dornbirn', 'Graz', 'Innsbruck', 'Klagenfurt', 'Linz', 'Salzburg', 'St. Pölten', 'Vienna', 'Villach', 'Wels'] },
   { code: 'AU', name: 'Australia', cities: ['Adelaide', 'Brisbane', 'Canberra', 'Gold Coast', 'Melbourne', 'Newcastle', 'Perth', 'Sunshine Coast', 'Sydney', 'Wollongong'] },
@@ -65,14 +71,14 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
 export function getCountryName(codeOrName: string | null | undefined): string {
   const v = (codeOrName ?? '').trim();
   if (!v) return '';
-  const byCode = COUNTRY_OPTIONS.find((c) => c.code.toLowerCase() === v.toLowerCase());
+  const byCode = DESTINATION_COUNTRIES.find((c) => c.code.toLowerCase() === v.toLowerCase());
   if (byCode) return byCode.name;
   return v;
 }
 
 /** Get cities for a country by name */
 export function getCitiesForCountry(countryName: string): string[] {
-  const country = COUNTRY_OPTIONS.find((c) => c.name === countryName);
+  const country = DESTINATION_COUNTRIES.find((c) => c.name === countryName);
   return country?.cities ?? [];
 }
 

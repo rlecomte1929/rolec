@@ -70,7 +70,7 @@ describe('HrResourcesPreview', () => {
     await waitFor(() => {
       expect(resourcesAPI.getHrPreviewPage).toHaveBeenCalled();
     });
-    const firstCall = (resourcesAPI.getHrPreviewPage as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const firstCall = (resourcesAPI.getHrPreviewPage as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as { countryCode: string; familyType: string; relocationType: string };
     expect(firstCall.countryCode).toBe('DE'); // seeded from company default "Germany"
     expect(firstCall.familyType).toBe('single');
     expect(firstCall.relocationType).toBe('permanent');
@@ -95,7 +95,7 @@ describe('HrResourcesPreview', () => {
       expect(resourcesAPI.getHrPreviewPage).toHaveBeenCalled();
     });
     const calls = (resourcesAPI.getHrPreviewPage as unknown as ReturnType<typeof vi.fn>).mock.calls;
-    const lastCall = calls[calls.length - 1][0];
+    const lastCall = calls[calls.length - 1][0] as { countryCode: string; countryName: string };
     expect(lastCall.countryCode).toBe('FR');
     expect(lastCall.countryName).toBe('France');
   });

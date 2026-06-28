@@ -63,6 +63,7 @@ from .app.services.policy_extractor import (
 from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
 from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
 from .intake_completeness import incomplete_intake_detail, missing_intake_basics
+from .intake_draft_to_case_draft import intake_draft_to_case_draft
 from .app.services.country_resources import (
     build_profile_context,
     get_personalization_hints,
@@ -133,6 +134,7 @@ from .app.routers import cases as cases_router  # noqa: F401 — kept for backwa
 from .app.routers import cases_read as cases_read_router
 from .app.routers import case_integrations as case_integrations_router
 from .app.routers import cases_write as cases_write_router
+from .app.routers import case_documents as case_documents_router
 from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
@@ -223,6 +225,7 @@ from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
 from .app.routers import compliance as compliance_router  # [BL-Compliance.4] /api/compliance
+from .app.routers import policy_analysis as policy_analysis_router  # [AIQ-1219] policy PDF → workflow summary
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -734,6 +737,7 @@ app.include_router(compat_router.router)
 app.include_router(cases_read_router.router)  # [AUDIT-B9-cases-6] split 1/3 — 20 GET handlers (formerly cases.router)
 app.include_router(case_integrations_router.router)  # I-4 — email plan + calendar .ics
 app.include_router(cases_write_router.router)  # [AUDIT-B9-cases-6] split 2/3 — 14 POST/PATCH/PUT mutation handlers
+app.include_router(case_documents_router.router)  # [DOCFLOW P1] case-scoped document upload/status
 app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 — 1 DELETE (delete_dossier) — re-scoped from empty admin bucket
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
@@ -741,6 +745,7 @@ app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 —
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)
+app.include_router(policy_analysis_router.router)  # [AIQ-1219] policy PDF → workflow summary (dual-layer registration)
 app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
 app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
 app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
@@ -4980,6 +4985,45 @@ def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.
     return {"messages": items, "quote_threads": quote_threads}
 
 
+class _SendMessageRequest(BaseModel):
+    assignment_id: str
+    body: str
+
+
+@app.post("/api/employee/messages")
+def send_employee_message(
+    payload: _SendMessageRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """Employee sends a message to HR on their own assignment thread (Wave1 P1).
+
+    Tenant isolation: the assignment must belong to this employee. Persists via
+    the legacy assignment-based ``messages`` columns the inbox read path uses
+    (db.list_messages_by_assignment / list_messages_for_employee)."""
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    body_txt = (payload.body or "").strip()
+    if not body_txt:
+        raise HTTPException(status_code=400, detail="Message body is required.")
+    assignment = db.get_assignment_by_id(payload.assignment_id) or db.get_assignment_by_case_id(
+        payload.assignment_id
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if assignment.get("employee_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Assignment not assigned to user")
+    msg = db.insert_message(
+        assignment_id=assignment["id"],
+        body=body_txt,
+        sender_user_id=effective["id"],
+        recipient_user_id=assignment.get("hr_user_id"),
+        employee_identifier=effective.get("email") or effective["id"],
+        status="sent",
+    )
+    if not msg:
+        raise HTTPException(status_code=400, detail="Message could not be sent.")
+    return {"ok": True, "message": msg}
+
+
 def _validated_employee_claim_identifiers(
     effective: Dict[str, Any],
     claim: ClaimAssignmentRequest,
@@ -5449,6 +5493,14 @@ def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> D
     ac = draft.get("assignmentContext", {}) or {}
     origin = ", ".join(filter(None, [basics.get("originCity"), basics.get("originCountry")])) or "Unknown"
     dest = ", ".join(filter(None, [basics.get("destCity"), basics.get("destCountry")])) or "Unknown"
+    # Build employer with only the fields the draft actually carries — never emit
+    # an explicit None, so a blank pass can't clobber a previously-saved value once
+    # deep-merged (AIQ-1343). roleTitle is the single source of truth for job title.
+    employer: Dict[str, Any] = {}
+    if ac.get("employerName"):
+        employer["name"] = ac.get("employerName")
+    if ac.get("jobTitle"):
+        employer["roleTitle"] = ac.get("jobTitle")
     profile: Dict[str, Any] = {
         "userId": assignment_id,
         "familySize": 1,
@@ -5464,7 +5516,7 @@ def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> D
                 "expiryDate": ep.get("passportExpiry"),
                 "issuingCountry": ep.get("passportCountry"),
             },
-            "employer": {"name": ac.get("employerName"), "roleTitle": ac.get("jobTitle")},
+            "employer": employer,
             "assignment": {"startDate": ac.get("contractStartDate")},
         },
         "maritalStatus": fm.get("maritalStatus"),
@@ -5485,9 +5537,14 @@ def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> D
 
 
 def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
-    """Deep-merge update into base; update wins for leaf values."""
+    """Deep-merge update into base; update wins for leaf values, except a None
+    update value never overwrites an existing one. The wizard intentionally drops
+    blank fields (intakeToCaseDraft.ts) so a later partial save can't wipe data
+    captured earlier — e.g. job title -> employer.roleTitle (AIQ-1343)."""
     result = dict(base)
     for k, v in update.items():
+        if v is None:
+            continue
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
             result[k] = _merge_profiles(result[k], v)
         else:
@@ -5665,21 +5722,53 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
     wizard_complete = False
     # Which step-1 basics are missing → drives a field-level 400 below.
     missing_basics: List[str] = []
-    # If profile missing/incomplete, try syncing from wizard Case draft (wizard may use assignment_id or case_id as URL param)
+    # AIQ-1311: the reliable source of truth is the assignment autosave draft
+    # (case_assignments.intake_draft — flat snake_case, keyed by assignment_id,
+    # written on every keystroke). Convert it to the canonical camelCase
+    # CaseDraftDTO the validator/promotion expect, rather than depending on the
+    # frontend having patched the right wizard_cases row: it resolved a divergent
+    # case-id, so submit read an empty draft and 400'd a fully-filled wizard. The
+    # wizard_cases draft stays a back-compat fallback for legacy cases created
+    # before the autosave path. Hoisted so the relocation_cases sync below reuses
+    # the same authoritative draft (HR-readable fields).
+    submit_draft: Optional[Dict[str, Any]] = None
     if not profile or (orchestrator.compute_completion_state(profile).get("profileCompleteness", 0) < 90):
-        with SessionLocal() as session:
-            case = app_crud.get_case(session, assignment_id) or (
-                app_crud.get_case(session, assignment.get("case_id", "")) if assignment.get("case_id") else None
+        try:
+            _intake = db.get_assignment_intake(
+                assignment_id=assignment_id, employee_user_id=effective["id"]
             )
-            if case:
-                draft = json.loads(case.draft_json)
-                missing_basics = missing_intake_basics(draft)
-                # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
-                if not missing_basics:
-                    wizard_profile = _draft_to_relocation_profile(draft, assignment_id)
-                    profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
-                    db.save_employee_profile(assignment_id, profile)
-                    wizard_complete = True
+            _snake = (_intake or {}).get("intake_draft")
+            if _snake:
+                submit_draft = intake_draft_to_case_draft(_snake)
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: assignment intake_draft read failed assignment_id=%s error=%s",
+                assignment_id, str(exc), exc_info=True,
+            )
+        # Fall back to the wizard_cases draft only when the assignment draft is
+        # absent or itself incomplete.
+        if submit_draft is None or missing_intake_basics(submit_draft):
+            with SessionLocal() as session:
+                case = app_crud.get_case(session, assignment_id) or (
+                    app_crud.get_case(session, assignment.get("case_id", "")) if assignment.get("case_id") else None
+                )
+                if case:
+                    try:
+                        wc_draft = json.loads(case.draft_json or "{}")
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        wc_draft = {}
+                    if isinstance(wc_draft, dict) and (
+                        submit_draft is None or missing_intake_basics(submit_draft)
+                    ):
+                        submit_draft = wc_draft
+        if submit_draft is not None:
+            missing_basics = missing_intake_basics(submit_draft)
+            # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
+            if not missing_basics:
+                wizard_profile = _draft_to_relocation_profile(submit_draft, assignment_id)
+                profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
+                db.save_employee_profile(assignment_id, profile)
+                wizard_complete = True
 
     # These raise BEFORE set_assignment_submitted → no status transition on incomplete data.
     if not profile:
@@ -5699,13 +5788,23 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
                     if (assignment.get("case_id") or "").strip()
                     else None
                 )
-                if wc:
+                # Promote the route onto relocation_cases. Prefer the authoritative
+                # assignment-derived draft (AIQ-1311); fall back to the wizard_cases
+                # draft. CRITICAL: run the sync even when there is NO wizard_cases row
+                # (wc is None) — a freshly-created case has only a relocation_cases row,
+                # and gating this on `if wc:` skipped the promotion entirely, leaving
+                # HR's origin/destination NULL ("Not provided") after submit (AIQ-1311
+                # criterion 3; caught live by scripts/verify_intake_submit_spine.py).
+                promote_draft: Optional[Dict[str, Any]] = None
+                if submit_draft and not missing_intake_basics(submit_draft):
+                    promote_draft = submit_draft
+                elif wc:
                     try:
-                        draft = json.loads(wc.draft_json or "{}")
+                        promote_draft = json.loads(wc.draft_json or "{}")
                     except (json.JSONDecodeError, TypeError, ValueError):
-                        draft = {}
-                    if isinstance(draft, dict):
-                        db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
+                        promote_draft = {}
+                if isinstance(promote_draft, dict) and promote_draft:
+                    db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, promote_draft)
         except Exception as exc:
             log.warning(
                 "submit_assignment: relocation_cases draft sync failed assignment_id=%s case_id=%s error=%s",
@@ -5818,6 +5917,29 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             log.warning(
                 "submit_assignment: could not enqueue background plan build case_id=%s: %s",
                 case_id, str(exc),
+            )
+
+    # Notify the assigned HR user that the employee has submitted their intake so
+    # the case doesn't stall silently until HR happens to look (AIQ-1342). Mirrors
+    # the /api/notifications/notify-hr handler's use of create_notification_with_preferences.
+    # Guard on hr_user_id (an unassigned case has none) and keep it best-effort: a
+    # notification failure must never fail the submit the employee just completed.
+    hr_user_id = assignment.get("hr_user_id")
+    if hr_user_id:
+        try:
+            db.create_notification_with_preferences(
+                user_id=hr_user_id,
+                type_="INTAKE_SUBMITTED",
+                title="Employee submitted their intake",
+                body=f"Intake was submitted for case {assignment_id[:8]}…",
+                assignment_id=assignment_id,
+                case_id=case_id,
+                metadata={"assignment_id": assignment_id, "case_id": case_id},
+            )
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: HR notification failed assignment_id=%s hr_user_id=%s error=%s",
+                assignment_id, hr_user_id, str(exc), exc_info=True,
             )
 
     track_event(
@@ -6316,6 +6438,38 @@ def list_hr_messages(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     effective = _effective_user(user, UserRole.HR)
     items = db.list_messages_for_hr(effective["id"])
     return {"messages": items}
+
+
+@app.post("/api/hr/messages")
+def send_hr_message(
+    payload: _SendMessageRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR sends a message to the assigned employee on an assignment thread (Wave1
+    P1). Tenant isolation: HR must be able to access the assignment (admin, owner,
+    or same company) — the same check the thread read endpoint uses."""
+    effective = _effective_user(user, UserRole.HR)
+    body_txt = (payload.body or "").strip()
+    if not body_txt:
+        raise HTTPException(status_code=400, detail="Message body is required.")
+    assignment = db.get_assignment_by_id(payload.assignment_id) or db.get_assignment_by_case_id(
+        payload.assignment_id
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    msg = db.insert_message(
+        assignment_id=assignment["id"],
+        body=body_txt,
+        sender_user_id=effective["id"],
+        recipient_user_id=assignment.get("employee_user_id"),
+        hr_user_id=effective["id"],
+        status="sent",
+    )
+    if not msg:
+        raise HTTPException(status_code=400, detail="Message could not be sent.")
+    return {"ok": True, "message": msg}
 
 
 class HrConversationsArchiveRequest(BaseModel):
@@ -8124,15 +8278,23 @@ def get_assignment_services(
 
 @app.get("/api/services/context")
 def get_services_context(
-    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    assignment_id: Optional[str] = Query(None, description="Assignment id (gate for access)"),
+    case_id: Optional[str] = Query(None, description="Case id (alternative gate; resolves to its assignment)"),
     fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none"),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """
     Combined endpoint: assignment, case context, services, answers, and questions in one round-trip.
     Reduces 4 requests to 1 for the services questions page.
+
+    AIQ-1249b: accepts case_id OR assignment_id (mirrors /api/services/answers).
+    Both resolve through _require_assignment_visibility, which rejects cross-case
+    access; the assignment_id path is unchanged.
     """
-    assignment = _require_assignment_visibility(assignment_id, user)
+    gate_id = assignment_id or case_id
+    if not gate_id:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id required")
+    assignment = _require_assignment_visibility(gate_id, user)
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")
@@ -8146,6 +8308,7 @@ def get_services_context(
 
     draft = {}
     dest_city = dest_country = origin_city = origin_country = None
+    target_move_date = None
     with SessionLocal() as session:
         case = app_crud.get_case(session, case_id)
         if case:
@@ -8157,6 +8320,7 @@ def get_services_context(
             dest_country = getattr(case, "dest_country", None)
             origin_city = getattr(case, "origin_city", None)
             origin_country = getattr(case, "origin_country", None)
+            target_move_date = getattr(case, "target_move_date", None)
     basics = draft.get("relocationBasics") or {}
     case_context = {
         "destCity": basics.get("destCity") or dest_city,
@@ -8164,6 +8328,12 @@ def get_services_context(
         "originCity": basics.get("originCity") or origin_city,
         "originCountry": origin_country or basics.get("originCountry"),
     }
+    # AIQ-1249d: canonical move date for the services context banner. Prefer the
+    # structured case column (public.cases.target_move_date), fall back to the
+    # wizard draft.
+    target_start_date = (
+        str(target_move_date) if target_move_date else (basics.get("targetMoveDate") or None)
+    )
 
     saved_rows = db.list_case_service_answers(case_id)
     saved_flat: Dict[str, Any] = {}
@@ -8190,6 +8360,7 @@ def get_services_context(
         "assignment_id": assignment["id"],
         "case_id": case_id,
         "case_context": case_context,
+        "target_start_date": target_start_date,
         "services": services,
         "answers": saved_rows,
         "questions": questions,
@@ -8266,12 +8437,19 @@ def get_service_answers(
 
 @app.get("/api/services/questions")
 def get_service_questions(
-    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    assignment_id: Optional[str] = Query(None, description="Assignment id (gate for access)"),
+    case_id: Optional[str] = Query(None, description="Case id (alternative gate; resolves to its assignment)"),
     fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none (e.g. housing,schools)"),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """Return dynamic questions for selected services. Adapts to case context and saved answers."""
-    assignment = _require_assignment_visibility(assignment_id, user)
+    """Return dynamic questions for selected services. Adapts to case context and saved answers.
+
+    AIQ-1249b: accepts case_id OR assignment_id (mirrors /api/services/answers);
+    both resolve via _require_assignment_visibility (rejects cross-case access)."""
+    gate_id = assignment_id or case_id
+    if not gate_id:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id required")
+    assignment = _require_assignment_visibility(gate_id, user)
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")

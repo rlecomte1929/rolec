@@ -14,6 +14,7 @@ import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ImmigrationChecklistPage } from '../ImmigrationChecklistPage';
 
 expect.extend(matchers);
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -27,8 +28,6 @@ vi.mock('../../../components/AppShell', () => ({
 vi.mock('../../../components/case/CaseDocumentsPanel', () => ({
   CaseDocumentsPanel: () => <div data-testid="case-documents-panel" />,
 }));
-
-import { ImmigrationChecklistPage } from '../ImmigrationChecklistPage';
 
 const CASE_ID = 'case-1';
 const MOCK_CASE = {

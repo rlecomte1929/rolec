@@ -267,7 +267,7 @@ const JourneyProgressMini: React.FC<{ row: EmployeeLinkedOverviewRow }> = ({ row
         ))}
       </div>
       <span className="text-[11px] leading-tight text-slate-500">
-        Step {labelIndex + 1} of {JOURNEY_STEP_LABELS.length} · {JOURNEY_STEP_LABELS[labelIndex]}
+        Phase {labelIndex + 1} of {JOURNEY_STEP_LABELS.length} · {JOURNEY_STEP_LABELS[labelIndex]}
       </span>
     </div>
   );

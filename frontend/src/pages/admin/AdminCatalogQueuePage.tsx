@@ -280,7 +280,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
           <div>
             <h2 className="text-lg font-semibold text-[#0b2b43]">HR scrape requests</h2>
             <p className="text-sm text-[#6b7280] mt-1">
-              Tickets opened by HR when they ask the AI to populate a destination that isn't yet
+              Tickets opened by HR when they ask the AI to populate a destination that isn&apos;t yet
               on our supported list. Approving auto-adds (city, country) to the allowlist for
               every company.
             </p>
@@ -303,7 +303,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
         </div>
         {loading && tickets.length === 0 ? (
           <div className="space-y-2 py-3">
-            {[...Array(3)].map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-14 rounded-lg bg-[#f1f5f9] animate-pulse" />
             ))}
           </div>

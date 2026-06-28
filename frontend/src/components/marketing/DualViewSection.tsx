@@ -26,7 +26,7 @@ export const DualViewSection: React.FC<DualViewSectionProps> = ({
         <h3 className="text-marketing-h3 font-semibold text-marketing-primary mb-4">
           {leftTitle}
         </h3>
-        <ul className="space-y-3" role="list">
+        <ul className="space-y-3">
           {leftItems.map((item, i) => (
             <li key={i} className="flex gap-3 items-center">
               <span
@@ -44,7 +44,7 @@ export const DualViewSection: React.FC<DualViewSectionProps> = ({
         <h3 className="text-marketing-h3 font-semibold text-marketing-primary mb-4">
           {rightTitle}
         </h3>
-        <ul className="space-y-3" role="list">
+        <ul className="space-y-3">
           {rightItems.map((item, i) => (
             <li key={i} className="flex gap-3 items-center">
               <span

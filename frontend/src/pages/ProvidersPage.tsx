@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -10,6 +10,7 @@ import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import {
+  caseIdForAssignment,
   parseAssignmentSearchParam,
   resolveScopedAssignmentId,
   setPreferredEmployeeAssignmentId,
@@ -23,6 +24,8 @@ import { useServicesFlow } from '../features/services/ServicesFlowContext';
 import {
   SERVICES_DISPLAY_CURRENCIES,
   SERVICES_DISPLAY_CURRENCY_STORAGE_KEY,
+  getDefaultCurrencyForCountry,
+  shouldApplyDestinationCurrency,
 } from '../features/services/servicesCurrency';
 import type { ServicePolicyHint } from '../features/services/ServiceCard';
 import {
@@ -150,21 +153,72 @@ export const ProvidersPage: React.FC = () => {
   }, [servicesQuery.isError, servicesQuery.error, load401]);
 
   useEffect(() => {
-    setActiveCaseId(assignmentId || null);
+    // services-state is case-scoped (/api/cases/{caseId}/...); map the resolved
+    // assignment_id to its case_id so the GET/PUT don't 404 (AIQ-1320).
+    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
     return () => setActiveCaseId(null);
-  }, [assignmentId, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, setActiveCaseId]);
   // AIQ-1276: the estimate currency auto-applies on change — no pending state /
   // Apply button (the select writes straight to displayCurrency).
 
+  // Only a REAL published-policy currency is authoritative. The policy-context
+  // endpoint returns currency: "USD" even when has_policy is false, so gate on
+  // has_policy — otherwise this applies the meaningless USD default and persists
+  // it, which is the AIQ-1327 bug (the destination default below never fires).
+  const policyCurrency =
+    svcPolicy?.has_policy && svcPolicy?.currency ? String(svcPolicy.currency) : null;
   useEffect(() => {
-    if (!svcPolicy?.currency) return;
+    if (!policyCurrency) return;
     try {
       if (localStorage.getItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY)) return;
-      setDisplayCurrency(String(svcPolicy.currency));
+      setDisplayCurrency(policyCurrency);
     } catch {
       // ignore
     }
-  }, [svcPolicy?.currency, setDisplayCurrency]);
+  }, [policyCurrency, setDisplayCurrency]);
+
+  // AIQ-1327: when there's no policy currency and the user hasn't chosen one yet,
+  // default the estimate currency to the destination country's currency
+  // (e.g. Netherlands → EUR) instead of the bare USD fallback. Runs once, after
+  // the services query settles, so the policy-currency effect above still wins
+  // when a policy exists. The selector stays fully user-editable.
+  // The route param can be either the case_id or the assignment_id, so match the
+  // linked row on either to resolve the destination country.
+  const destCountry = useMemo(
+    () =>
+      linkedSummaries.find((r) => r.assignment_id === assignmentId || r.case_id === assignmentId)
+        ?.destination?.host_country ?? null,
+    [linkedSummaries, assignmentId]
+  );
+  const destCurrencyAppliedRef = useRef(false);
+  const [currencyAutoDetected, setCurrencyAutoDetected] = useState(false);
+  useEffect(() => {
+    if (destCurrencyAppliedRef.current) return;
+    if (isLoading) return; // wait for svcPolicy to settle so a real policy currency wins
+    if (!destCountry) return;
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY);
+    } catch {
+      saved = null;
+    }
+    // Only a REAL policy currency (has_policy) blocks the destination default;
+    // a prior localStorage choice or an already-non-default value is respected.
+    if (
+      !shouldApplyDestinationCurrency({
+        hasRealPolicyCurrency: !!policyCurrency,
+        savedCurrency: saved,
+        currentCurrency: displayCurrency,
+      })
+    )
+      return;
+    destCurrencyAppliedRef.current = true;
+    const ccy = getDefaultCurrencyForCountry(destCountry);
+    if (ccy !== displayCurrency) {
+      setDisplayCurrency(ccy);
+      setCurrencyAutoDetected(true);
+    }
+  }, [isLoading, policyCurrency, destCountry, displayCurrency, setDisplayCurrency]);
 
   // Seed the form-local `services` map from the loaded data, and sync the
   // selected set to context so the questions page has the right selection on a
@@ -271,7 +325,12 @@ export const ProvidersPage: React.FC = () => {
         .map(([k]) => k as ServiceKey)
     );
     setSelectedServices(selected);
-    navigate(buildRoute('caseServicesQuestions', { caseId: assignmentId }));
+    // AIQ-1334: keep the URL keyed by case_id through the whole services flow.
+    navigate(
+      buildRoute('caseServicesQuestions', {
+        caseId: caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '',
+      })
+    );
   };
 
   if (assignmentLoading || isLoading) {
@@ -336,7 +395,10 @@ export const ProvidersPage: React.FC = () => {
               <select
                 className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm text-[#0b2b43] w-full max-w-xs"
                 value={displayCurrency}
-                onChange={(e) => setDisplayCurrency(e.target.value)}
+                onChange={(e) => {
+                  setDisplayCurrency(e.target.value);
+                  setCurrencyAutoDetected(false);
+                }}
                 aria-label="Currency for service estimates"
               >
                 {SERVICES_DISPLAY_CURRENCIES.map((o) => (
@@ -345,6 +407,9 @@ export const ProvidersPage: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {currencyAutoDetected && (
+                <span className="text-xs text-[#64748b]">(auto-detected from your destination)</span>
+              )}
             </div>
           </label>
         </div>

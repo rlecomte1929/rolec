@@ -46,6 +46,7 @@ function ReadinessItem({ ok, label, emptyText }: { ok: boolean; label: string; e
 
 function dash(v: unknown): string {
   if (v == null || v === '') return '—';
+  if (typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean') return '—';
   return String(v);
 }
 
@@ -142,8 +143,9 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
               navigate(`/admin/mobility/cases/${encodeURIComponent(id)}`);
             }}
           >
-            <label className="block text-sm font-medium text-[#0b2b43]">Mobility case UUID</label>
+            <label htmlFor="amci-case-id" className="block text-sm font-medium text-[#0b2b43]">Mobility case UUID</label>
             <Input unstyled
+              id="amci-case-id"
               className="w-full border border-[#cbd5e1] rounded-md px-3 py-2 text-sm font-mono"
               placeholder="33333333-3333-4333-8333-333333333301"
               value={manualId}
@@ -450,13 +452,13 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
                     className="border border-[#e2e8f0] rounded-md p-2 text-xs bg-[#fafafa]"
                   >
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-[#0b2b43]">
-                      <span className="font-medium">{String(row.created_at ?? '')}</span>
+                      <span className="font-medium">{(row.created_at as string | undefined) ?? ''}</span>
                       <span>{String(row.action_type)}</span>
                       <span className="text-[#64748b]">{String(row.entity_type)}</span>
                       <span className="font-mono">{String(row.entity_id)}</span>
                       <span className="text-[#64748b]">
-                        actor: {String(row.actor_type)}
-                        {row.actor_id != null ? ` / ${String(row.actor_id)}` : ''}
+                        actor: {String(row.actor_type as string | number | boolean)}
+                        {row.actor_id != null ? ` / ${row.actor_id as string}` : ''}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">

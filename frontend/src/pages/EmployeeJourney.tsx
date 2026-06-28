@@ -5,13 +5,14 @@ import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/
 import { RefreshButton } from '../components/RefreshButton';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
-import { formatDestinationLabel, formatCaseReference } from '../types/employeeAssignmentOverview';
+import { formatDestinationLabel, formatCaseReference, caseNavId } from '../types/employeeAssignmentOverview';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { formatRichMessage } from '../utils/richMessage';
 import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
@@ -31,10 +32,10 @@ import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '
  * wizard (/employee/case/{id}/intake — AIQ-976, so a multi-case employee opens
  * the clicked case, not the primary one).
  */
-function openCaseHref(assignmentId: string, status?: string | null): string {
+function openCaseHref(navId: string, status?: string | null): string {
   return isIntakeComplete(status)
-    ? `/employee/case/${assignmentId}/roadmap`
-    : `/employee/case/${assignmentId}/intake`;
+    ? `/employee/case/${navId}/roadmap`
+    : `/employee/case/${navId}/intake`;
 }
 
 /**
@@ -166,7 +167,16 @@ export const EmployeeJourney: React.FC = () => {
   // AIQ-1269b: first-time welcome card for the primary linked case, shown only
   // before intake has begun (status assigned/awaiting_intake & intake_step 0) and
   // until the employee dismisses it. Dismissal is persisted per assignment.
-  const primaryRow = linkedSummaries[0] ?? null;
+  // AIQ-1318: resolve the primary card to the SAME case the sidebar treats as active
+  // (the last-selected case), so the highlighted card + its 'Open case' CTA match the
+  // sidebar. Mirrors PlatformShellSidebar's effectiveCaseId fallback (minus the URL case,
+  // which doesn't exist on the dashboard). Falls back to linkedSummaries[0] (single-case
+  // employees are unaffected).
+  const { selectedCaseId } = useSelectedCase();
+  const primaryRow =
+    linkedSummaries.find((r) => r.case_id === selectedCaseId || r.assignment_id === selectedCaseId)
+    ?? linkedSummaries[0]
+    ?? null;
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   useEffect(() => {
     setWelcomeDismissed(primaryRow?.assignment_id ? isWelcomeDismissed(primaryRow.assignment_id) : false);
@@ -599,7 +609,7 @@ export const EmployeeJourney: React.FC = () => {
             {formatDestinationLabel(primaryRow.destination)}. Here&rsquo;s what to do first:
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => navigate(`/employee/case/${primaryRow.assignment_id}/intake`)}>
+            <Button onClick={() => navigate(`/employee/case/${caseNavId(primaryRow)}/intake`)}>
               Start intake →
             </Button>
             <Button variant="outline" onClick={handleDismissWelcomeCard}>
@@ -614,7 +624,7 @@ export const EmployeeJourney: React.FC = () => {
           <div className="min-w-0">
             <div className="font-semibold text-[#0b2b43]">New assignment for your email</div>
             <p className="text-sm text-[#334155] mt-1">
-              Accept it below when you're ready. Your existing case is unchanged.
+              Accept it below when you&apos;re ready. Your existing case is unchanged.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
@@ -702,7 +712,7 @@ export const EmployeeJourney: React.FC = () => {
                               {currentStep} / {totalSteps} steps
                             </Badge>
                             <Link
-                              to={`/employee/case/${row.assignment_id}/intake`}
+                              to={`/employee/case/${caseNavId(row)}/intake`}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Continue
@@ -712,7 +722,7 @@ export const EmployeeJourney: React.FC = () => {
                           <>
                             <Badge variant="warning" size="sm">Not started</Badge>
                             <Link
-                              to={`/employee/case/${row.assignment_id}/intake`}
+                              to={`/employee/case/${caseNavId(row)}/intake`}
                               className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
                             >
                               Start
@@ -728,7 +738,7 @@ export const EmployeeJourney: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex sm:flex-col sm:justify-center shrink-0">
-                      <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
+                      <Button onClick={() => navigate(openCaseHref(caseNavId(row), row.status))}>Open case</Button>
                     </div>
                   </li>
                 );
@@ -859,7 +869,7 @@ export const EmployeeJourney: React.FC = () => {
                 <div>
                   <div className="text-lg font-semibold text-[#0b2b43]">Enter your case code manually</div>
                   <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
-                    Use if your case didn't appear automatically or HR sent you a code directly.
+                    Use if your case didn&apos;t appear automatically or HR sent you a code directly.
                   </p>
                 </div>
                 {!manualClaimExpanded ? (

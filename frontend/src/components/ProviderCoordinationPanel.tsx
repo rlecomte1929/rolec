@@ -340,9 +340,12 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
   }
 
   return (
+    // eslint-disable-next-line local/no-clickable-div, jsx-a11y/no-noninteractive-element-interactions -- role="dialog" is the correct ARIA role; backdrop-click + Escape are the standard dismiss interactions
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       role="dialog"
       aria-modal="true"

@@ -38,11 +38,15 @@ def post_recommendations_batch(
     Get recommendations for all selected services in one round-trip.
     Uses canonical criteria builder (assignment, case, saved answers, policy).
     """
-    assignment_id = body.get("assignment_id")
-    if not assignment_id:
-        raise HTTPException(status_code=400, detail="assignment_id is required")
+    # AIQ-1249b: accept case_id OR assignment_id (mirrors /api/services/answers).
+    # The gate id resolves through require_assignment_visibility (rejects
+    # cross-case access); the canonical assignment id is taken from the resolved
+    # assignment below so the criteria builder always sees a real assignment id.
+    gate_id = body.get("assignment_id") or body.get("case_id")
+    if not gate_id:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id is required")
     req = _BatchRequest(
-        assignment_id=str(assignment_id),
+        assignment_id=str(gate_id),
         selected_services=body.get("selected_services"),
     )
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
@@ -57,6 +61,9 @@ def post_recommendations_batch(
     from .. import crud as app_crud
 
     assignment = require_assignment_visibility(req.assignment_id, user)
+    # Normalise to the canonical assignment id (req.assignment_id may have been a
+    # case_id); everything downstream — criteria builder, logs — keys on this.
+    req.assignment_id = str(assignment.get("id") or req.assignment_id)
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")

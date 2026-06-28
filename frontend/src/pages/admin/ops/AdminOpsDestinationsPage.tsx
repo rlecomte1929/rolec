@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
 import { AdminOpsLayout } from './AdminOpsLayout';
 
+type DestRow = { country_code?: string; city_name?: string; total?: number; critical?: number };
+
 export const AdminOpsDestinationsPage: React.FC = () => {
-  const [data, setData] = useState<{ items?: Array<Record<string, unknown>> } | null>(null);
+  const [data, setData] = useState<{ items?: DestRow[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +14,7 @@ export const AdminOpsDestinationsPage: React.FC = () => {
     setError(null);
     try {
       const res = await adminOpsAnalyticsAPI.getDestinations();
-      setData(res as { items?: Record<string, unknown>[] });
+      setData(res as { items?: DestRow[] });
     } catch (e) {
       setError((e as Error)?.message || 'Failed to load');
     } finally {
@@ -51,10 +53,10 @@ export const AdminOpsDestinationsPage: React.FC = () => {
                 ) : (
                   items.map((d, i) => (
                     <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 font-medium">{String(d.country_code ?? '-')}</td>
-                      <td className="px-3 py-2">{String(d.city_name ?? '-')}</td>
-                      <td className="px-3 py-2 text-right">{Number(d.total ?? 0)}</td>
-                      <td className="px-3 py-2 text-right text-red-600">{Number(d.critical ?? 0)}</td>
+                      <td className="px-3 py-2 font-medium">{d.country_code ?? '-'}</td>
+                      <td className="px-3 py-2">{d.city_name ?? '-'}</td>
+                      <td className="px-3 py-2 text-right">{d.total ?? 0}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{d.critical ?? 0}</td>
                     </tr>
                   ))
                 )}

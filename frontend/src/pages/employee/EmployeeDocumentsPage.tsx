@@ -1,7 +1,9 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { DocumentsScreen } from '../../features/platform-v2/documents/DocumentsScreen';
 import { useDocuments } from '../../features/platform-v2/documents/useDocuments';
+import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 
 // Shared inline styles for the non-DocumentsScreen states.
 const centeredMessage = (color: string): React.CSSProperties => ({
@@ -12,15 +14,23 @@ const centeredMessage = (color: string): React.CSSProperties => ({
 });
 
 export function EmployeeDocumentsPage() {
+  // Case-scoped route (/employee/case/:caseId/documents) supplies caseId via the
+  // URL. The bare /employee/documents route has no param — useValidatedParams
+  // returns null there (no redirect), so useDocuments falls back to the primary
+  // assignment.
+  const routeCaseId = useValidatedParams(caseParamsSchema)?.caseId;
+  const [searchParams] = useSearchParams();
+  // Deep-link: ?doc=<document_key> scrolls to + highlights + focuses that row.
+  const deepLinkKey = searchParams.get('doc');
+
   const {
     documents,
     isLoading,
     error,
     handleUpload,
-    handleDelete,
     handleRemind,
     caseId,
-  } = useDocuments();
+  } = useDocuments(routeCaseId);
 
   // ── No active case ─────────────────────────────────────────────────────────
   if (!caseId && !isLoading) {
@@ -57,21 +67,17 @@ export function EmployeeDocumentsPage() {
       <DocumentsScreen
         documents={documents}
         onUpload={handleUpload}
-        onDelete={handleDelete}
-        onReupload={handleDelete} // re-upload = delete old then UploadZone handles new file
         onRemind={handleRemind}
+        deepLinkKey={deepLinkKey}
         onPreview={(doc) => {
-          if (caseId) {
-            window.open(`/api/cases/${caseId}/documents/${doc.id}/download`, '_blank');
-          }
+          if (doc.file_url) window.open(doc.file_url, '_blank', 'noopener,noreferrer');
         }}
         onDownload={(doc) => {
-          if (caseId) {
-            const link = window.document.createElement('a');
-            link.href = `/api/cases/${caseId}/documents/${doc.id}/download`;
-            link.download = doc.filename;
-            link.click();
-          }
+          if (!doc.file_url) return;
+          const link = window.document.createElement('a');
+          link.href = doc.file_url;
+          link.download = doc.filename;
+          link.click();
         }}
       />
     </AppShell>

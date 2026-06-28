@@ -39,11 +39,16 @@ class _StubResolver:
 
     def resolve(self):
         raw = extract_destination_from_profile(self.employee_profile)
-        if not raw and self.case:
-            if self.case.get("host_country"):
-                raw = str(self.case["host_country"]).strip() or None
-            if not raw:
-                raw = extract_destination_from_case_profile(self.case.get("profile_json"))
+        # Fall back when the profile destination is missing OR doesn't normalise
+        # (e.g. city-only "Amsterdam") — mirrors the real resolver (AIQ-1321).
+        if not normalize_destination_key(raw) and self.case:
+            host = str(self.case.get("host_country") or "").strip() or None
+            if normalize_destination_key(host):
+                raw = host
+            else:
+                blob = extract_destination_from_case_profile(self.case.get("profile_json"))
+                if normalize_destination_key(blob):
+                    raw = blob
         return raw, normalize_destination_key(raw)
 
 
@@ -94,6 +99,69 @@ class DestinationResolutionPriorityTests(unittest.TestCase):
         raw, key = r.resolve()
         self.assertEqual(raw, "Spain")
         self.assertEqual(key, "ES")
+
+
+class DestinationFallbackOnUnnormalizableTests(unittest.TestCase):
+    """AIQ-1321: the resolver must fall back to the canonical host_country when the
+    profile destination is truthy but doesn't normalise (e.g. a city-only value), not
+    only when it's empty — otherwise readiness degrades to no_destination."""
+
+    def test_city_only_profile_falls_back_to_host_country(self):
+        # "Amsterdam" alone has no country → normalises to None → use host_country.
+        r = _StubResolver(
+            employee_profile={"movePlan": {"destination": "Amsterdam"}},
+            case={"host_country": "NL", "profile_json": None},
+        )
+        raw, key = r.resolve()
+        self.assertEqual(raw, "NL")
+        self.assertEqual(key, "NL")
+
+    def test_reported_aiq1321_case_resolves(self):
+        # The actual case 120d6fd0: movePlan "Amsterdam, NL" normalises (via #1058) → used as-is.
+        r = _StubResolver(
+            employee_profile={"movePlan": {"destination": "Amsterdam, NL"}},
+            case={"host_country": "NL", "profile_json": None},
+        )
+        raw, key = r.resolve()
+        self.assertEqual(raw, "Amsterdam, NL")
+        self.assertEqual(key, "NL")
+
+    def test_unnormalizable_everywhere_stays_no_destination(self):
+        # Nothing resolves → key None (no_destination), correctly.
+        r = _StubResolver(
+            employee_profile={"movePlan": {"destination": "Atlantis"}},
+            case={"host_country": None, "profile_json": None},
+        )
+        _, key = r.resolve()
+        self.assertIsNone(key)
+
+
+class CombinedCityCountryNormalizationTests(unittest.TestCase):
+    """AIQ-1311 follow-up: the wizard stores movePlan.destination as "<city>, <country>"
+    (e.g. "Amsterdam, NL"). That must normalize to the country key so HR readiness
+    resolves (NL has a template) instead of degrading to reason="no_destination"."""
+
+    def test_city_plus_iso2_code(self):
+        self.assertEqual(normalize_destination_key("Amsterdam, NL"), "NL")
+        self.assertEqual(normalize_destination_key("Oslo, NO"), "NO")
+
+    def test_city_plus_country_name(self):
+        self.assertEqual(normalize_destination_key("Paris, France"), "FR")
+        self.assertEqual(normalize_destination_key("Munich, Germany"), "DE")
+
+    def test_city_state_country_three_parts(self):
+        self.assertEqual(normalize_destination_key("New York, NY, US"), "US")
+
+    def test_plain_inputs_unaffected(self):
+        # No comma → unchanged behavior.
+        self.assertEqual(normalize_destination_key("NL"), "NL")
+        self.assertEqual(normalize_destination_key("Singapore"), "SG")
+        self.assertIsNone(normalize_destination_key("Atlantis"))
+        self.assertIsNone(normalize_destination_key(None))
+
+    def test_unresolvable_tokens_return_none(self):
+        # A comma string with no recognizable country token still yields None.
+        self.assertIsNone(normalize_destination_key("Somewhere, Nowhere"))
 
 
 if __name__ == "__main__":

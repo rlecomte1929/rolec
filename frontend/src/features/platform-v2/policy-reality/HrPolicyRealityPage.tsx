@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type * as React from 'react';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Button } from '../../../components/antigravity/Button';
 import { AppShell } from '../../../components/AppShell';
@@ -161,7 +162,8 @@ function CaseDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
+      {/* eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay (aria-hidden); keyboard users dismiss via the panel's own controls */}
+      <div className="fixed inset-0 z-40 bg-black/20" aria-hidden="true" onClick={onClose} />
       <aside className="fixed right-0 top-0 bottom-0 z-50 w-[420px] bg-white border-l border-slate-200 shadow-xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-slate-100 flex items-start gap-3">
@@ -341,7 +343,7 @@ export function HrPolicyRealityPage() {
           </Button>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          Compare your company's policy commitments against what employees are actually selecting from service providers.
+          Compare your company&apos;s policy commitments against what employees are actually selecting from service providers.
         </p>
       </div>
 
@@ -537,6 +539,9 @@ export function HrPolicyRealityPage() {
                     <tr
                       key={c.id}
                       onClick={() => setActiveCaseId(c.id)}
+                      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveCaseId(c.id); } }}
+                      role="button"
+                      tabIndex={0}
                       className="border-t border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <td className="px-4 py-3">

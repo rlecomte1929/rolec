@@ -45,7 +45,9 @@ describe('intakeToCaseDraft', () => {
     const withDeps = intakeToCaseDraft(makeIntake({
       members: [
         { id: 'self', kind: 'self' },
-        { id: 'p', kind: 'partner', name: 'Priya', needs_work_permit: 'yes' },
+        // 'Yes' (capital) is the real value the intake <select> emits — a
+        // lowercase fixture here previously masked the case-sensitive bug.
+        { id: 'p', kind: 'partner', name: 'Priya', needs_work_permit: 'Yes' },
         { id: 'c', kind: 'child', dob: '2018-04-01' },
       ] as unknown as IntakeData['members'],
     }));
