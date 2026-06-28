@@ -72,6 +72,8 @@ async def get_current_user(
         return {
             "id": "cron",
             "role": UserRole.ADMIN.value,
+            "roles": [UserRole.ADMIN.value],
+            "primary_role": UserRole.ADMIN.value,
             "is_admin": True,
             "email": "cron@relopass.com",
             "auth_uuid": None,
@@ -97,6 +99,22 @@ async def get_current_user(
     # (AUTH-ID-1). None when a legacy id can't be mapped — callers degrade
     # gracefully rather than 500 on a uuid cast.
     user["auth_uuid"] = _resolve_auth_uuid(user)
+    # [AIQ-1353] Multi-role read layer: surface all roles the user holds from the
+    # user_roles junction, with primary_role, falling back to the legacy single
+    # users.role when the junction has no rows (or doesn't exist yet). user['role']
+    # is kept unchanged for downstream compatibility.
+    _role_rows = db.get_user_roles(user["id"])
+    _roles = [r["role"] for r in _role_rows] or [user.get("role", UserRole.EMPLOYEE.value)]
+    if user.get("is_admin") and UserRole.ADMIN.value not in _roles:
+        _roles.append(UserRole.ADMIN.value)
+    user["roles"] = _roles
+    if user.get("is_admin"):
+        user["primary_role"] = UserRole.ADMIN.value
+    else:
+        user["primary_role"] = next(
+            (r["role"] for r in _role_rows if r.get("is_primary")),
+            user.get("role", UserRole.EMPLOYEE.value),
+        )
     if request is not None:
         try:
             request.state.user_id = user.get("id")

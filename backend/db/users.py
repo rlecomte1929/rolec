@@ -149,6 +149,27 @@ class UsersMixin:
             row = conn.execute(text("SELECT * FROM users WHERE id = :id"), {"id": user_id}).fetchone()
         return self._row_to_dict(row)
 
+    def get_user_roles(self, user_id: str) -> List[Dict[str, Any]]:
+        """[AIQ-1353] Return the user's roles from public.user_roles as
+        ``[{'role': str, 'is_primary': bool}, ...]``. Returns ``[]`` when the
+        junction table is absent (pre-migration / SQLite) or the user has no rows;
+        callers fall back to the legacy ``users.role``. Never raises."""
+        uid = (user_id or "").strip()
+        if not uid:
+            return []
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text("SELECT role, is_primary FROM user_roles WHERE user_id = :uid"),
+                    {"uid": uid},
+                ).fetchall()
+        except Exception:
+            return []
+        return [
+            {"role": r._mapping["role"], "is_primary": bool(r._mapping["is_primary"])}
+            for r in rows
+        ]
+
     def save_profile(self, user_id: str, profile: Dict[str, Any]) -> bool:
         now = datetime.utcnow().isoformat()
         pj = json.dumps(profile)
