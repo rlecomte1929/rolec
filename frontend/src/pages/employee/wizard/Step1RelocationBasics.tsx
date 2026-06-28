@@ -7,7 +7,7 @@ import { logger } from '../../../lib/logger';
 import type { CaseDraftDTO, RelocationBasicsDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
 import { getApiErrorMessage } from '../../../utils/apiDetail';
-import { COUNTRY_OPTIONS, getCitiesForCountry, isCityInList } from '../../../utils/countries';
+import { DESTINATION_COUNTRIES, getCitiesForCountry, isCityInList } from '../../../utils/countries';
 
 interface StepProps {
   caseId: string;
@@ -84,7 +84,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             >
               <option value="">Select country</option>
-              {COUNTRY_OPTIONS.map((country) => (
+              {DESTINATION_COUNTRIES.map((country) => (
                 <option key={country.code} value={country.name}>
                   {country.name}
                 </option>
@@ -131,7 +131,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             >
               <option value="">Select country</option>
-              {COUNTRY_OPTIONS.map((country) => (
+              {DESTINATION_COUNTRIES.map((country) => (
                 <option key={country.code} value={country.name}>
                   {country.name}
                 </option>

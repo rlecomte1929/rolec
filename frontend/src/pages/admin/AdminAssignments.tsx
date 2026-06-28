@@ -7,7 +7,7 @@ import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
-import { COUNTRY_OPTIONS } from '../../utils/countries';
+import { DESTINATION_COUNTRIES } from '../../utils/countries';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
 import { AdminLayout } from './AdminLayout';
 
@@ -34,7 +34,7 @@ const ASSIGNMENT_STATUS_OPTIONS = [
 
 const DESTINATION_COUNTRY_OPTIONS = [
   { value: '', label: 'All destinations' },
-  ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name })),
+  ...DESTINATION_COUNTRIES.map((c) => ({ value: c.name, label: c.name })),
 ];
 
 const employeeName = (a: AdminAssignment) =>
@@ -520,7 +520,7 @@ export const AdminAssignments: React.FC = () => {
                 label="Destination country"
                 value={addForm.destination_country}
                 onChange={(v) => setAddForm((f) => ({ ...f, destination_country: v }))}
-                options={[{ value: '', label: 'Select destination' }, ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name }))]}
+                options={[{ value: '', label: 'Select destination' }, ...DESTINATION_COUNTRIES.map((c) => ({ value: c.name, label: c.name }))]}
               />
             </div>
             {addForm.company_id && !addForm.hr_user_id && (

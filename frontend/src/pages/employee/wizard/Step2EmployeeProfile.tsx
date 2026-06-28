@@ -6,7 +6,9 @@ import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
 import type { CaseDraftDTO, EmployeeProfileDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
-import { COUNTRY_OPTIONS } from '../../../utils/countries';
+// Identity fields (nationality, passport, residence) must accept the full ISO
+// list, not the restricted relocation-destination list (AIQ-1341).
+import { COUNTRY_OPTIONS } from '../../../features/policy-config/countryList';
 import { getApiErrorMessage } from '../../../utils/apiDetail';
 
 interface StepProps {

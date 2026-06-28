@@ -8,40 +8,10 @@ import type { CompanyProfilePayload } from '../../../types';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { useCompanyProfileForm } from './useCompanyProfileForm';
 import type { SectionKey } from './useCompanyProfileForm';
-
-// ── Option lists (mirror the prototype's static lists) ──────────────────────
-
-const COUNTRIES: ReadonlyArray<{ code: string; name: string; flag: string }> = [
-  { code: 'FR', name: 'France', flag: '🇫🇷' },
-  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
-  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
-  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
-  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
-  { code: 'FI', name: 'Finland', flag: '🇫🇮' },
-  { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
-  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
-  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
-  { code: 'IE', name: 'Ireland', flag: '🇮🇪' },
-  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
-  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
-  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
-  { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
-  { code: 'AT', name: 'Austria', flag: '🇦🇹' },
-  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
-  { code: 'US', name: 'United States', flag: '🇺🇸' },
-  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
-  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
-  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
-  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
-  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
-  { code: 'CN', name: 'China', flag: '🇨🇳' },
-  { code: 'IN', name: 'India', flag: '🇮🇳' },
-  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
-  { code: 'AE', name: 'UAE', flag: '🇦🇪' },
-  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
-  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
-  { code: 'ZA', name: 'South Africa', flag: '🇿🇦' },
-];
+// Country of incorporation is an identity field → full ISO list. The default
+// destination is a relocation destination → restricted list (AIQ-1341).
+import { COUNTRY_OPTIONS } from '../../policy-config/countryList';
+import { DESTINATION_COUNTRIES } from '../../../utils/countries';
 
 const INDUSTRIES = [
   'Technology', 'Financial Services', 'Professional Services',
@@ -356,6 +326,7 @@ export function CompanyProfileForm({
                   <CountrySelect
                     value={field.value}
                     onChange={field.onChange}
+                    options={COUNTRY_OPTIONS}
                   />
                 )}
               />
@@ -464,6 +435,7 @@ export function CompanyProfileForm({
                   <CountrySelect
                     value={field.value}
                     onChange={field.onChange}
+                    options={DESTINATION_COUNTRIES}
                   />
                 )}
               />
@@ -703,23 +675,25 @@ function InfoBanner({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CountrySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const selected = COUNTRIES.find((c) => c.code === value);
+function CountrySelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: ReadonlyArray<{ code: string; name: string }>;
+}) {
   return (
     <div className="relative">
-      {selected && (
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px]">
-          {selected.flag}
-        </span>
-      )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${selectCx} ${selected ? 'pl-9' : ''}`}
+        className={selectCx}
       >
         <option value="">—</option>
-        {COUNTRIES.map((c) => (
-          <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+        {options.map((c) => (
+          <option key={c.code} value={c.code}>{c.name}</option>
         ))}
       </select>
     </div>
