@@ -418,8 +418,11 @@ class HrMixin:
             aid = r.get("assignment_id")
             if not aid:
                 continue
-            raw_body = r.get("last_body") or ""
-            raw_sub = r.get("last_subject") or ""
+            # AIQ-1325b: scrub a leading '[verify]' marker (verify/e2e seed) from
+            # the inbox preview at read time — display-only, stored row untouched.
+            from .test_data_filter import strip_verify_prefix
+            raw_body = strip_verify_prefix(r.get("last_body") or "") or ""
+            raw_sub = strip_verify_prefix(r.get("last_subject") or "") or ""
             preview_src = raw_body.strip() or raw_sub.strip() or ""
             last_body = preview_src[:100]
             if len(preview_src) > 100:

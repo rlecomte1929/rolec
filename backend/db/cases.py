@@ -3370,7 +3370,14 @@ class CasesMixin:
             """),
                 {"aid": assignment_id},
             ).fetchall()
-        return self._rows_to_list(rows)
+        items = self._rows_to_list(rows)
+        # AIQ-1325b: defensively scrub a leading '[verify]' marker from per-message
+        # subjects at read time (display-only) so it never surfaces as a thread title.
+        from .test_data_filter import strip_verify_prefix
+        for it in items:
+            if it.get("subject"):
+                it["subject"] = strip_verify_prefix(it["subject"])
+        return items
 
     def insert_message(
         self,

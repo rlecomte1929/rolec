@@ -90,3 +90,23 @@ def looks_like_test_email(email: "str | None") -> bool:
     """True if an email is on a synthetic seeder domain (@testco.com / @probe.test)."""
     e = (email or "").strip().lower()
     return any(e.endswith(d) for d in _TEST_EMAIL_DOMAINS)
+
+
+# ── Read-time display scrub (AIQ-1325b) ─────────────────────────────────────────
+# Verify/e2e runs against prod send messages whose text is prefixed '[verify] '.
+# Those leak into inbox thread previews/titles. Strip the marker for DISPLAY only
+# (the stored row is untouched) so a real customer / demo guest never sees it. The
+# prefix is produced by an external runner (no committed code emits it), so this is
+# a defensive read-time guard, not a one-time purge.
+_VERIFY_MARKER = "[verify]"
+
+
+def strip_verify_prefix(text: "str | None") -> "str | None":
+    """Remove a single leading '[verify]' marker (+ any following whitespace) from
+    inbox-facing message text. Case-insensitive; a no-op for normal text, None, or
+    empty. Non-destructive (display-time only)."""
+    if not text:
+        return text
+    if text[: len(_VERIFY_MARKER)].lower() == _VERIFY_MARKER:
+        return text[len(_VERIFY_MARKER):].lstrip()
+    return text

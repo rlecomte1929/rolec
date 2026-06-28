@@ -4028,8 +4028,11 @@ class MiscMixin:
             aid = r.get("assignment_id")
             if not aid:
                 continue
-            last_body = (r.get("last_body") or "")[:100]
-            if len((r.get("last_body") or "")) > 100:
+            # AIQ-1325b: scrub a leading '[verify]' marker from the preview (display-only).
+            from .test_data_filter import strip_verify_prefix
+            cleaned_body = strip_verify_prefix(r.get("last_body") or "") or ""
+            last_body = cleaned_body[:100]
+            if len(cleaned_body) > 100:
                 last_body = last_body.rstrip() + "…"
             emp_name = r.get("employee_full_name") or r.get("employee_identifier") or "—"
             hr_name = r.get("hr_full_name") or "—"
