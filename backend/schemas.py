@@ -433,6 +433,10 @@ class AssignmentDetail(BaseModel):
     linkedEmployeeFullName: Optional[str] = Field(default=None)
     caseOriginHint: Optional[str] = Field(default=None)
     caseDestinationHint: Optional[str] = Field(default=None)
+    # [AIQ-1336] City-level corridor so the HR case detail can show "Paris, France"
+    # rather than just "France". Optional; the frontend falls back to the country hint.
+    caseOriginCity: Optional[str] = Field(default=None)
+    caseDestinationCity: Optional[str] = Field(default=None)
     intakeChecklist: List[IntakeChecklistItem] = Field(default_factory=list)
     readinessSnapshot: Optional[Dict[str, Any]] = None
     caseReadinessUi: Optional[CaseReadinessUi] = None

@@ -50,6 +50,18 @@ export type CaseEssentialsVM = {
   destination: string;
 };
 
+/**
+ * [AIQ-1336] City-level location label: "City, Country" when a city is known,
+ * else the country alone, else the city alone. Resolves ISO codes to full names
+ * via getCountryName (same normalisation as the country-only path it replaces),
+ * so the HR case detail reads "Paris, France" instead of just "France".
+ */
+function formatLocation(city?: string, country?: string): string | undefined {
+  const c = country ? getCountryName(country) || country : undefined;
+  if (city && c) return `${city}, ${c}`;
+  return c ?? city;
+}
+
 export function deriveCaseEssentials(a: AssignmentDetail): CaseEssentialsVM {
   const p = a.profile ?? undefined;
 
@@ -73,11 +85,16 @@ export function deriveCaseEssentials(a: AssignmentDetail): CaseEssentialsVM {
   // ("NO") while origin is a full name ("France"), so a raw corridor reads
   // "France → NO". getCountryName passes through unknown/free-text values.
   const origin =
-    getCountryName(nonEmpty(p?.movePlan?.origin) ?? nonEmpty(a.caseOriginHint)) || NOT_PROVIDED;
+    formatLocation(
+      nonEmpty(a.caseOriginCity),
+      nonEmpty(p?.movePlan?.origin) ?? nonEmpty(a.caseOriginHint),
+    ) || NOT_PROVIDED;
 
   const destination =
-    getCountryName(nonEmpty(p?.movePlan?.destination) ?? nonEmpty(a.caseDestinationHint)) ||
-    NOT_PROVIDED;
+    formatLocation(
+      nonEmpty(a.caseDestinationCity),
+      nonEmpty(p?.movePlan?.destination) ?? nonEmpty(a.caseDestinationHint),
+    ) || NOT_PROVIDED;
 
   return { fullName, email, familyStatus, origin, destination };
 }

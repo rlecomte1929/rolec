@@ -6853,6 +6853,36 @@ def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple
     return origin, dest
 
 
+def _hr_assignment_case_route_city_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
+    """
+    [AIQ-1336] Origin/destination CITY hints from relocation_cases — the city-level
+    sibling of _hr_assignment_case_route_hints, so the HR case detail can render a
+    city-level corridor ("Paris, France → ...") instead of country-only.
+    Precedence: relocationBasics city in profile_json (wizard draft), then the stored
+    origin_city / dest_city columns. Returns (None, None) when no city is known.
+    """
+    if not case_row:
+        return None, None
+    origin = (case_row.get("origin_city") or "").strip() or None
+    dest = (case_row.get("dest_city") or "").strip() or None
+    raw = case_row.get("profile_json")
+    if not raw:
+        return origin, dest
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(data, dict):
+            rb = data.get("relocationBasics") or {}
+            oc = (rb.get("originCity") or "").strip()
+            dc = (rb.get("destCity") or "").strip()
+            if oc:
+                origin = oc
+            if dc:
+                dest = dc
+    except Exception:
+        pass
+    return origin, dest
+
+
 @app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
 def get_hr_assignment(
     request: Request,
@@ -6930,6 +6960,7 @@ def get_hr_assignment(
                 e,
             )
         case_origin_hint, case_dest_hint = _hr_assignment_case_route_hints(case_row)
+        case_origin_city, case_dest_city = _hr_assignment_case_route_city_hints(case_row)
 
         linked_email = None
         linked_full_name = None
@@ -7011,6 +7042,8 @@ def get_hr_assignment(
             linkedEmployeeFullName=linked_full_name,
             caseOriginHint=case_origin_hint,
             caseDestinationHint=case_dest_hint,
+            caseOriginCity=case_origin_city,
+            caseDestinationCity=case_dest_city,
             intakeChecklist=intake_models,
             readinessSnapshot=readiness_snap,
             caseReadinessUi=case_readiness_ui,
