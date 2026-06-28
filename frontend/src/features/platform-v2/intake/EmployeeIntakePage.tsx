@@ -89,6 +89,10 @@ export interface IntakeData {
   salary_band: string;
   office_address: string;
   work_pattern: string;
+  /** AIQ-1349: STA (short-term) / LTA (long-term) / PERMANENT — shapes the
+   *  duration-aware policy resolution + roadmap. Defaults to LTA (the prior
+   *  implicit "full relocation" behaviour) so existing flows are unchanged. */
+  assignment_type: string;
   commute_mins: number;
   commute_mode: string[];
   consent: boolean;
@@ -169,6 +173,9 @@ const INITIAL_DATA: IntakeData = {
   salary_band: '',
   office_address: '',
   work_pattern: '',
+  // AIQ-1349: default LTA = the prior implicit "full relocation" behaviour, so
+  // the new control never blocks Continue and existing cases are unaffected.
+  assignment_type: 'LTA',
   commute_mins: 30,
   commute_mode: [],
   consent: false,
@@ -1165,6 +1172,18 @@ export function EmployeeIntakePage() {
                   <FieldWrap label="Work pattern" required className="sm:col-span-2">
                     <MultiChip value={data.work_pattern ? [data.work_pattern] : []} onChange={(v) => setField('work_pattern', v[v.length - 1] || '')}
                       options={['Full in-office', 'Hybrid', 'Fully remote']} />
+                  </FieldWrap>
+                  {/* AIQ-1349: assignment type drives the duration-aware policy +
+                      roadmap. STA gets a lighter journey; LTA/PERMANENT the full one. */}
+                  <FieldWrap label="Assignment type" required className="sm:col-span-2"
+                    why="Short-term assignments get a lighter roadmap and different benefits than a permanent move.">
+                    <MultiChip value={data.assignment_type ? [data.assignment_type] : []}
+                      onChange={(v) => setField('assignment_type', v[v.length - 1] || '')}
+                      options={[
+                        { value: 'STA', label: 'Short-term (under 12 months)' },
+                        { value: 'LTA', label: 'Long-term (1–5 years)' },
+                        { value: 'PERMANENT', label: 'Permanent transfer' },
+                      ]} />
                   </FieldWrap>
                 </Grid>
 

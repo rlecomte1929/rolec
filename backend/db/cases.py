@@ -2888,10 +2888,20 @@ class CasesMixin:
         purpose = _CASE_PURPOSE_MAP.get(_raw_purpose, "work")
         dest_city = (derived.get("dest_city") or "").strip() or None
         move = (derived.get("target_move_date") or "") or ""
+        # AIQ-1349: carry assignment type + expected duration onto the canonical
+        # case so the (STA/LTA-aware) policy resolver + roadmap generation can
+        # branch on them. Both columns are nullable; no CHECK constraint.
+        assignment_type = (derived.get("assignment_type") or "").strip().upper() or None
+        _dur = derived.get("expected_duration_months")
+        try:
+            duration_months = int(_dur) if _dur is not None and str(_dur).strip() != "" else None
+        except (TypeError, ValueError):
+            duration_months = None
         params = {
             "id": case_id, "company": company_id, "emp": employee_uuid,
             "origin": origin, "dest": dest, "dest_city": dest_city,
             "purpose": purpose, "move": move,
+            "assignment_type": assignment_type, "duration_months": duration_months,
         }
         # public.cases enforces CHECK constraints — status in (draft, active,
         # on_hold, completed, cancelled), stage in (discovery, dossier, roadmap,
@@ -2902,20 +2912,25 @@ class CasesMixin:
         if self.engine.dialect.name == "postgresql":
             sql = (
                 "INSERT INTO cases "
-                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, created_at, updated_at) "
-                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'active', 'discovery', CAST(NULLIF(:move,'') AS date), now(), now()) "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, assignment_type, expected_duration_months, created_at, updated_at) "
+                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'active', 'discovery', CAST(NULLIF(:move,'') AS date), :assignment_type, :duration_months, now(), now()) "
                 "ON CONFLICT (id) DO UPDATE SET "
                 "dest_country_code = EXCLUDED.dest_country_code, origin_country_code = EXCLUDED.origin_country_code, "
-                "dest_city = EXCLUDED.dest_city, purpose = EXCLUDED.purpose, employee_id = EXCLUDED.employee_id, updated_at = now()"
+                "dest_city = EXCLUDED.dest_city, purpose = EXCLUDED.purpose, employee_id = EXCLUDED.employee_id, "
+                "assignment_type = COALESCE(EXCLUDED.assignment_type, cases.assignment_type), "
+                "expected_duration_months = COALESCE(EXCLUDED.expected_duration_months, cases.expected_duration_months), "
+                "updated_at = now()"
             )
         else:
             sql = (
                 "INSERT INTO cases "
-                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date) "
-                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'active', 'discovery', NULLIF(:move,'')) "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, assignment_type, expected_duration_months) "
+                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'active', 'discovery', NULLIF(:move,''), :assignment_type, :duration_months) "
                 "ON CONFLICT (id) DO UPDATE SET dest_country_code=excluded.dest_country_code, "
                 "origin_country_code=excluded.origin_country_code, dest_city=excluded.dest_city, "
-                "purpose=excluded.purpose, employee_id=excluded.employee_id"
+                "purpose=excluded.purpose, employee_id=excluded.employee_id, "
+                "assignment_type=COALESCE(excluded.assignment_type, cases.assignment_type), "
+                "expected_duration_months=COALESCE(excluded.expected_duration_months, cases.expected_duration_months)"
             )
         try:
             with self.engine.begin() as conn:

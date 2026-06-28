@@ -50,6 +50,9 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       contractStartDate: data.contract_start || undefined,
       salaryBand: data.salary_band || undefined,
       workLocation: data.office_address || undefined,
+      // AIQ-1349: STA/LTA/PERMANENT — backend bridges this onto
+      // public.cases.assignment_type for duration-aware policy + roadmap.
+      assignmentType: data.assignment_type || undefined,
     },
   };
 }

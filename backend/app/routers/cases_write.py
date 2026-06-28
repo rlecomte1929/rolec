@@ -84,6 +84,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
 
+def _assignment_derived(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract assignment-type signals from a case draft for the canonical-case
+    bridge (AIQ-1349). Normalizes ``assignmentType`` to upper-case (STA / LTA /
+    PERMANENT) and coerces ``expectedDurationMonths`` to int. These feed both the
+    ``derived`` dict and the new ``public.cases`` columns so the (already
+    STA/LTA-aware) policy resolver and roadmap generation can branch on them.
+    Returns ``None`` values when absent so the deep-merge never clobbers."""
+    ac = draft.get("assignmentContext") or {}
+    at = ac.get("assignmentType")
+    at = at.strip().upper() if isinstance(at, str) and at.strip() else None
+    dur = ac.get("expectedDurationMonths")
+    try:
+        dur = int(dur) if dur is not None and str(dur).strip() != "" else None
+    except (TypeError, ValueError):
+        dur = None
+    return {"assignment_type": at, "expected_duration_months": dur}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Mutation handlers (14 total — 6× POST, 7× PATCH, 1× PUT)
 # Order preserved from cases.py source.
@@ -125,6 +143,7 @@ def patch_case(
             "dest_city": basics.get("destCity"),
             "purpose": basics.get("purpose"),
             "target_move_date": basics.get("targetMoveDate"),
+            **_assignment_derived(draft),  # AIQ-1349: assignment_type + duration
         }
         flags = {
             "hasDependents": basics.get("hasDependents"),
@@ -334,6 +353,7 @@ def update_household(
             "dest_city": basics.get("destCity"),
             "purpose": basics.get("purpose"),
             "target_move_date": basics.get("targetMoveDate"),
+            **_assignment_derived(draft),  # AIQ-1349: assignment_type + duration
         }
         flags = {"hasDependents": basics.get("hasDependents")}
         crud.update_case(db, case, draft, derived, flags)

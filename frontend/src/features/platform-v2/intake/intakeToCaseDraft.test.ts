@@ -33,6 +33,15 @@ describe('intakeToCaseDraft', () => {
     expect(d.assignmentContext).toMatchObject({ jobTitle: 'Senior SWE', contractType: 'permanent', salaryBand: 'L5', workLocation: 'Berlin office' });
   });
 
+  it('maps assignment_type onto assignmentContext.assignmentType (AIQ-1349)', () => {
+    const sta = intakeToCaseDraft(makeIntake({ assignment_type: 'STA' } as Partial<IntakeData>));
+    expect(sta.assignmentContext?.assignmentType).toBe('STA');
+    const lta = intakeToCaseDraft(makeIntake({ assignment_type: 'LTA' } as Partial<IntakeData>));
+    expect(lta.assignmentContext?.assignmentType).toBe('LTA');
+    // empty → undefined so the backend deep-merge never clobbers
+    expect(intakeToCaseDraft(makeIntake()).assignmentContext?.assignmentType).toBeUndefined();
+  });
+
   it('leaves empty fields undefined (so the backend deep-merge keeps existing values)', () => {
     const d = intakeToCaseDraft(makeIntake({ dest_country: 'DE' }));
     expect(d.relocationBasics?.destCountry).toBe('DE');
