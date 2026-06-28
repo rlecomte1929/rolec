@@ -165,6 +165,29 @@ class AuthMixin:
                 self.assign_employee_profile_to_company_directory(
                     user_id.strip(), cc, request_id=request_id
                 )
+        # [AIQ-1362] One identity, many roles: this account is now the employee on an
+        # assignment, so it also holds an EMPLOYEE role. Add it idempotently rather than
+        # rejecting on the unique-email wall (e.g. an existing HR user being relocated
+        # gains EMPLOYEE without a duplicate account). is_primary stays false so the
+        # user's existing primary role is untouched. Wrapped so a missing junction
+        # (pre-migration / SQLite without the table) never breaks the contact link.
+        try:
+            with self.engine.begin() as conn:
+                self._exec(
+                    conn,
+                    "INSERT INTO user_roles (user_id, role, is_primary) "
+                    "VALUES (:uid, 'EMPLOYEE', :fp) "
+                    "ON CONFLICT (user_id, role) DO NOTHING",
+                    {"uid": user_id.strip(), "fp": False},
+                    op_name="link_user_employee_role_upsert",
+                    request_id=request_id,
+                )
+        except Exception as exc:
+            log.warning(
+                "link_employee_contact_to_auth_user: EMPLOYEE user_roles upsert failed user_id=%s err=%s",
+                user_id.strip()[:8],
+                exc,
+            )
 
     def list_pending_claim_assignments_for_auth_user(
         self,
