@@ -12,9 +12,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { RequireHrRoute } from '../RequireHrRoute';
 
-const getAuthItem = vi.fn();
+const getStoredRoles = vi.fn<() => string[]>();
+const getActiveRole = vi.fn<() => string>();
 vi.mock('../../../utils/demo', () => ({
-  getAuthItem: (key: string): unknown => getAuthItem(key),
+  getStoredRoles: (): string[] => getStoredRoles(),
+  getActiveRole: (): string => getActiveRole(),
 }));
 
 function renderGuarded(allowEmployee = false) {
@@ -38,36 +40,47 @@ function renderGuarded(allowEmployee = false) {
 
 describe('RequireHrRoute', () => {
   beforeEach(() => {
-    getAuthItem.mockReset();
+    getStoredRoles.mockReset();
+    getActiveRole.mockReset();
+    getActiveRole.mockReturnValue('');
   });
 
   it('renders children for ADMIN', () => {
-    getAuthItem.mockReturnValue('ADMIN');
+    getStoredRoles.mockReturnValue(['ADMIN']);
     renderGuarded();
     expect(screen.getByText('HR CONTENT')).toBeInTheDocument();
   });
 
   it('renders children for HR', () => {
-    getAuthItem.mockReturnValue('HR');
+    getStoredRoles.mockReturnValue(['HR']);
     renderGuarded();
     expect(screen.getByText('HR CONTENT')).toBeInTheDocument();
   });
 
-  it('redirects EMPLOYEE to their dashboard', () => {
-    getAuthItem.mockReturnValue('EMPLOYEE');
+  it('redirects single-role EMPLOYEE to their dashboard (B15/B20)', () => {
+    getStoredRoles.mockReturnValue(['EMPLOYEE']);
+    getActiveRole.mockReturnValue('EMPLOYEE');
     renderGuarded();
     expect(screen.queryByText('HR CONTENT')).not.toBeInTheDocument();
     expect(screen.getByText('EMPLOYEE HOME')).toBeInTheDocument();
   });
 
   it('allows EMPLOYEE through when allowEmployee is set', () => {
-    getAuthItem.mockReturnValue('EMPLOYEE');
+    getStoredRoles.mockReturnValue(['EMPLOYEE']);
     renderGuarded(true);
     expect(screen.getByText('HR CONTENT')).toBeInTheDocument();
   });
 
+  it('allows a dual HR+EMPLOYEE user even when active role is EMPLOYEE', () => {
+    getStoredRoles.mockReturnValue(['EMPLOYEE', 'HR']);
+    getActiveRole.mockReturnValue('EMPLOYEE');
+    renderGuarded();
+    expect(screen.getByText('HR CONTENT')).toBeInTheDocument();
+  });
+
   it('redirects unauthenticated users to landing', () => {
-    getAuthItem.mockReturnValue(null);
+    getStoredRoles.mockReturnValue([]);
+    getActiveRole.mockReturnValue('');
     renderGuarded();
     expect(screen.queryByText('HR CONTENT')).not.toBeInTheDocument();
     expect(screen.getByText('LANDING')).toBeInTheDocument();

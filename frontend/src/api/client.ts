@@ -316,6 +316,11 @@ export const authAPI = {
     const response = await api.post<LoginResponse>('/api/auth/register', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
     return response.data;
   },
+  // AIQ-1355/1357: set the active role for a multi-role user to one they hold.
+  switchRole: async (role: string): Promise<{ roles: string[]; primary_role: string }> => {
+    const response = await api.post<{ roles: string[]; primary_role: string }>('/api/auth/switch-role', { role });
+    return response.data;
+  },
   logout: async (): Promise<void> => {
     const token = getAuthItem('relopass_token');
     try {

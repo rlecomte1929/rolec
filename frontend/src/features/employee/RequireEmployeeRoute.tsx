@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { getAuthItem } from '../../utils/demo';
+import { getStoredRoles, getActiveRole } from '../../utils/demo';
+import { roleHomePath } from '../../navigation/roleHome';
 
 interface RequireEmployeeRouteProps {
   children: React.ReactNode;
@@ -24,24 +25,24 @@ interface RequireEmployeeRouteProps {
  * The cached role is derived from the server login response (useAuth.ts → setSession).
  */
 export const RequireEmployeeRoute: React.FC<RequireEmployeeRouteProps> = ({ children, allowHR = false }) => {
-  const role = (getAuthItem('relopass_role') || '').toUpperCase();
+  // AIQ-1364: decide by ROLE MEMBERSHIP (multi-role). Single-role users have
+  // roles === [their role], so a single-role HR is still redirected out of the
+  // employee tree (B15/B20 preserved). Redirect honours the active role's home.
+  const roles = getStoredRoles();
   const location = useLocation();
 
-  if (role === 'ADMIN') {
+  if (roles.includes('ADMIN')) {
     // Admins can view employee-facing pages for support/debug purposes.
     return <>{children}</>;
   }
 
-  if (role === 'HR' && allowHR) {
+  if (roles.includes('HR') && allowHR) {
     // Explicitly opted-in HR access (e.g. HR reviewing employee immigration checklist).
     return <>{children}</>;
   }
 
-  if (role !== 'EMPLOYEE') {
-    // HR and any unrecognised role → redirect to their own landing page.
-    const redirectTo =
-      role === 'HR' ? '/hr/dashboard' : '/';
-    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+  if (!roles.includes('EMPLOYEE')) {
+    return <Navigate to={roleHomePath(getActiveRole())} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { getAuthItem } from '../../utils/demo';
+import { getStoredRoles, getActiveRole } from '../../utils/demo';
+import { roleHomePath } from '../../navigation/roleHome';
 
 interface RequireHrRouteProps {
   children: React.ReactNode;
@@ -26,18 +27,20 @@ interface RequireHrRouteProps {
  * docs/security/SEC-FE-4_authz_coverage.md).
  */
 export const RequireHrRoute: React.FC<RequireHrRouteProps> = ({ children, allowEmployee = false }) => {
-  const role = (getAuthItem('relopass_role') || '').toUpperCase();
+  // AIQ-1364: decide by ROLE MEMBERSHIP (multi-role) — a user passes if they HOLD
+  // HR/ADMIN, not only if it's their single legacy role. Single-role users have
+  // roles === [their role], so this is identical to the old behaviour for them
+  // (B15/B20 separation preserved). Redirect honours the active role's home.
+  const roles = getStoredRoles();
   const location = useLocation();
 
-  if (role === 'ADMIN' || role === 'HR') {
+  if (roles.includes('ADMIN') || roles.includes('HR')) {
     return <>{children}</>;
   }
 
-  if (role === 'EMPLOYEE' && allowEmployee) {
+  if (roles.includes('EMPLOYEE') && allowEmployee) {
     return <>{children}</>;
   }
 
-  // EMPLOYEE (without opt-in) and any unrecognised role → redirect to their landing.
-  const redirectTo = role === 'EMPLOYEE' ? '/employee/dashboard' : '/';
-  return <Navigate to={redirectTo} state={{ from: location }} replace />;
+  return <Navigate to={roleHomePath(getActiveRole())} state={{ from: location }} replace />;
 };

@@ -178,6 +178,10 @@ export interface User {
   username?: string;
   email?: string;
   role: UserRole;
+  // AIQ-1361/1363 multi-role: all roles the user holds + the active/primary role.
+  // Optional so legacy callers/tests are unaffected.
+  roles?: string[];
+  primary_role?: string | null;
   name?: string;
   company?: string;
 }
