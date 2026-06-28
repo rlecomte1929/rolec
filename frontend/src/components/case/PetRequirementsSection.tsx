@@ -167,8 +167,12 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
         .select('id, name, species, breed')
         .eq('case_id', caseId);
 
-      if (petsError) throw petsError;
-      const pets = (petsRaw ?? []) as Pet[];
+      // Pet data is optional. A failed or empty pets read almost always means the
+      // case simply has no pets — treat it as a neutral empty state (the section
+      // hides itself below) rather than alarming HR with a red connection error.
+      // The error banner is reserved for a genuine failure once we KNOW pets exist
+      // (the per-pet rules lookup below). AIQ-1344.
+      const pets = (petsError ? [] : (petsRaw ?? [])) as Pet[];
       if (pets.length === 0) {
         setPetsWithRules([]);
         setLoading(false);
