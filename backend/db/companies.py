@@ -1386,6 +1386,13 @@ class CompaniesMixin:
             params: Dict[str, Any] = {}
             if not include_test and "is_test" in _table_columns(conn, "companies"):
                 base_sql += " AND COALESCE(is_test, false) = false"
+            if not include_test:
+                # [AIQ-1325a-followup] Also hide synthetic tenants by name, matching
+                # list_companies. The is_test guard above misses rows created before
+                # the flag existed (e.g. the 'Brand New Co <epoch>' seeds), so apply
+                # the same read-time name filter here for consistency.
+                from .test_data_filter import exclude_test_companies
+                base_sql += f" AND {exclude_test_companies('name')}"
             if q:
                 base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
                 params["q"] = f"%{q}%"
