@@ -32,6 +32,8 @@ vi.mock('../../../utils/employeeAssignmentScope', () => ({
   parseAssignmentSearchParam: () => null,
   resolveScopedAssignmentId: () => ({ effectiveId: 'case-1', needsPicker: false }),
   withAssignmentQuery: (p: string) => p,
+  // AIQ-1334: ServicesRfqNew now resolves a case_id for in-flow nav targets.
+  caseIdForAssignment: (_rows: unknown, id: string | null) => id,
 }));
 vi.mock('../../../features/services/ServicesFlowContext', () => ({
   useServicesFlow: () => ({
