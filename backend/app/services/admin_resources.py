@@ -644,18 +644,25 @@ def get_resource_audit_log_global(
 
 
 def get_admin_dashboard_counts() -> Dict[str, int]:
-    """Return counts for draft, in_review, published, archived (admin dashboard)."""
+    """Return counts for draft, in_review, published, archived (admin dashboard).
+
+    AIQ-1331: these used ``head=True`` with ``count="exact"``, which returns 0 in
+    the installed supabase-py (the list endpoint, which uses ``count="exact"``
+    WITHOUT head, returns the real total). That made every CMS count tile read 0
+    even with 57 published resources live. Use ``.limit(1)`` instead of ``head`` so
+    the exact count is populated while still transferring a single row.
+    """
     supabase = _get_supabase()
     counts = {}
     for status in ("draft", "in_review", "published", "archived"):
         try:
-            r = supabase.table("country_resources").select("id", count="exact", head=True).eq("is_active", True).eq("status", status).execute()
+            r = supabase.table("country_resources").select("id", count="exact").eq("is_active", True).eq("status", status).limit(1).execute()
             counts[f"resources_{status}"] = r.count or 0
         except Exception:
             counts[f"resources_{status}"] = 0
     for status in ("draft", "in_review", "published", "archived"):
         try:
-            r = supabase.table("rkg_country_events").select("id", count="exact", head=True).eq("status", status).execute()
+            r = supabase.table("rkg_country_events").select("id", count="exact").eq("status", status).limit(1).execute()
             counts[f"events_{status}"] = r.count or 0
         except Exception:
             counts[f"events_{status}"] = 0
