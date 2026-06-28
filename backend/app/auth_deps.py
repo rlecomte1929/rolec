@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Depends, Header, HTTPException, Request
 
@@ -53,6 +53,17 @@ def _is_admin_user(user: Dict[str, Any]) -> bool:
         return True
     return False
 
+def derive_roles(role_rows: List[Dict[str, Any]], fallback_role: str) -> Tuple[List[str], str]:
+    """[AIQ-1353] From public.user_roles rows ({role, is_primary}) compute
+    (roles, primary_role). Falls back to the legacy single role when the junction
+    is empty/absent, so legacy single-role users are unaffected."""
+    roles = [r["role"] for r in role_rows if r.get("role")]
+    if not roles:
+        return [fallback_role], fallback_role
+    primary = next((r["role"] for r in role_rows if r.get("is_primary")), None)
+    return roles, (primary or fallback_role)
+
+
 async def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
@@ -72,6 +83,8 @@ async def get_current_user(
         return {
             "id": "cron",
             "role": UserRole.ADMIN.value,
+            "roles": [UserRole.ADMIN.value],
+            "primary_role": UserRole.ADMIN.value,
             "is_admin": True,
             "email": "cron@relopass.com",
             "auth_uuid": None,
@@ -97,6 +110,11 @@ async def get_current_user(
     # (AUTH-ID-1). None when a legacy id can't be mapped — callers degrade
     # gracefully rather than 500 on a uuid cast.
     user["auth_uuid"] = _resolve_auth_uuid(user)
+    # [AIQ-1353] Expose all roles the user holds (multi-role) alongside the legacy
+    # single `role`, with a fallback to it when the user_roles junction is empty.
+    user["roles"], user["primary_role"] = derive_roles(
+        db.get_user_roles(user["id"]), user.get("role", UserRole.EMPLOYEE.value)
+    )
     if request is not None:
         try:
             request.state.user_id = user.get("id")
@@ -110,23 +128,30 @@ async def get_current_user(
         }
     return user
 
+def _held_roles(user: Dict[str, Any]) -> List[str]:
+    """[AIQ-1360] Roles the user holds — the multi-role list, falling back to the
+    legacy single role for sessions/users that predate roles[]."""
+    return [r for r in (user.get("roles") or [user.get("role")]) if r]
+
+
 def require_role(role: UserRole):
     """Return a FastAPI dependency that requires *role*. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-        user_role = user.get("role")
-        if user_role == UserRole.ADMIN.value:
+        # [AIQ-1360] Membership check — a multi-role user passes if they HOLD the
+        # role, not only if it's their single legacy role. ADMIN passes all.
+        if user.get("role") == UserRole.ADMIN.value or user.get("is_admin"):
             return user
-        if user_role != role.value:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return user
+        if role.value in _held_roles(user):
+            return user
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     return dependency
 
 def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Allow HR or Employee. Admin passes as HR."""
-    r = user.get("role")
-    if r == UserRole.ADMIN.value:
+    if user.get("role") == UserRole.ADMIN.value or user.get("is_admin"):
         return user
-    if r in (UserRole.HR.value, UserRole.EMPLOYEE.value):
+    held = _held_roles(user)
+    if UserRole.HR.value in held or UserRole.EMPLOYEE.value in held:
         return user
     raise HTTPException(status_code=403, detail="HR or Employee only")
 
@@ -138,10 +163,9 @@ def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str,
 
 def require_admin_or_hr(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Admin or HR. Used for read-only access to suppliers (HR picks from approved list)."""
-    r = user.get("role")
-    if r == UserRole.ADMIN.value or user.get("is_admin"):
+    if user.get("role") == UserRole.ADMIN.value or user.get("is_admin"):
         return user
-    if r == UserRole.HR.value:
+    if UserRole.HR.value in _held_roles(user):
         return user
     raise HTTPException(status_code=403, detail="Admin or HR only")
 

@@ -149,6 +149,32 @@ class UsersMixin:
             row = conn.execute(text("SELECT * FROM users WHERE id = :id"), {"id": user_id}).fetchone()
         return self._row_to_dict(row)
 
+    def get_user_roles(self, user_id: str) -> List[Dict[str, Any]]:
+        """[AIQ-1353] Roles a user holds, from public.user_roles, as rows of
+        ``{role, is_primary}`` (primary first). Table-missing-safe: returns ``[]``
+        when the junction isn't present yet, so callers fall back to users.role."""
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT role, is_primary FROM user_roles WHERE user_id = :uid "
+                        "ORDER BY is_primary DESC, role ASC"
+                    ),
+                    {"uid": user_id},
+                ).fetchall()
+            return [dict(r._mapping) for r in rows]
+        except Exception:
+            return []
+
+    def set_primary_role(self, user_id: str, role: str) -> None:
+        """[AIQ-1355] Make ``role`` the user's single primary role (all others
+        non-primary) in one statement. Caller must validate ``role`` is held."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE user_roles SET is_primary = (role = :role) WHERE user_id = :uid"),
+                {"role": role, "uid": user_id},
+            )
+
     def save_profile(self, user_id: str, profile: Dict[str, Any]) -> bool:
         now = datetime.utcnow().isoformat()
         pj = json.dumps(profile)
