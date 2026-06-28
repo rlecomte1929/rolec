@@ -206,6 +206,9 @@ class RelocationPlanPhaseTask(BaseModel):
     owner: RelocationPlanTaskOwner
     priority: RelocationPlanTaskPriority
     due_date: Optional[date] = None
+    # [AIQ-1340] True when due_date was auto-estimated from the move date (no real
+    # deadline). Lets the UI show a "Suggested" indicator vs a committed deadline.
+    due_date_is_suggested: bool = False
     is_overdue: bool = False
     is_due_soon: bool = False
     blocked_by: List[str] = Field(

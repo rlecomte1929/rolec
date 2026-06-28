@@ -99,11 +99,15 @@ export function rowStatus(t: RelocationPlanPhaseTaskDTO): { label: string; tone:
 
 export function formatDue(t: RelocationPlanPhaseTaskDTO): string {
   if (!t.due_date) return 'No date set';
-  if (t.is_overdue) return 'Overdue';
   const d = new Date(t.due_date);
+  const abs = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  // [AIQ-1340] An estimated date reads as "Suggested · <date>" — never "Overdue"
+  // or a "Due in N days" countdown, which would imply a committed deadline.
+  if (t.due_date_is_suggested) return `Suggested · ${abs}`;
+  if (t.is_overdue) return 'Overdue';
   const days = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
   if (days >= 0 && days <= 7) return days === 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`;
-  return `Due ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  return `Due ${abs}`;
 }
 
 export function docCount(t: RelocationPlanPhaseTaskDTO): { present: number; total: number } | null {

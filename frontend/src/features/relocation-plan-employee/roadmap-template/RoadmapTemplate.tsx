@@ -159,7 +159,9 @@ function ActionCard({ task, onCta }: { task: RelocationPlanPhaseTaskDTO; onCta: 
   return (
     <div className="flex flex-1 flex-col rounded-xl border border-slate-200 bg-white p-3.5">
       <div className="mb-2 flex items-center gap-2">
-        <Chip tone={task.is_overdue ? 'wait' : 'ready'}>{formatDue(task)}</Chip>
+        <span title={task.due_date_is_suggested ? 'Auto-estimated from your move date' : undefined}>
+          <Chip tone={task.is_overdue ? 'wait' : 'ready'}>{formatDue(task)}</Chip>
+        </span>
         {task.priority === 'critical' && <Flag size={13} className="text-rose-500" />}
       </div>
       <div className="text-[14.5px] font-semibold text-[#0b2b43]">{task.title}</div>
@@ -214,7 +216,12 @@ function TaskRow({
       </div>
       <div className="shrink-0 text-right">
         <Chip tone={st.tone}>{st.label}</Chip>
-        <div className="mt-1 text-[11.5px] text-slate-400">{formatDue(task)}</div>
+        <div
+          className={`mt-1 text-[11.5px] text-slate-400${task.due_date_is_suggested ? ' italic' : ''}`}
+          title={task.due_date_is_suggested ? 'Auto-estimated from your move date' : undefined}
+        >
+          {formatDue(task)}
+        </div>
         {actionable && (
           <button
             type="button"
