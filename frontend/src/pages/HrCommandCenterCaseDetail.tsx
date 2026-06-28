@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
+import { getCountryName } from '../utils/countries';
 import { Card, Button } from '../components/antigravity';
 import { RiskBadge } from '../components/command-center/RiskBadge';
 import { hrAPI } from '../api/client';
@@ -46,8 +47,12 @@ type QuoteRequest = {
  * (coordinated with BRAND-5). If an origin is added to the payload later,
  * this is the single place to switch to the "<origin> → <dest>" form.
  */
-function corridorLabel(destCountry?: string): string {
-  const dest = destCountry?.trim();
+function corridorLabel(destCity?: string, destCountry?: string): string {
+  // [AIQ-1336] City-level destination ("Amsterdam, Netherlands") for parity with the
+  // case summary; falls back to country-only, then city-only, then a neutral label.
+  const city = destCity?.trim();
+  const country = destCountry?.trim() ? getCountryName(destCountry.trim()) : undefined;
+  const dest = city && country ? `${city}, ${country}` : country || city;
   return dest ? `Relocating to ${dest}` : 'Corridor not set';
 }
 
@@ -55,6 +60,7 @@ type CaseDetail = {
   id: string;
   employeeIdentifier: string;
   destCountry?: string;
+  destCity?: string;
   status: string;
   riskStatus: string;
   budgetLimit?: number;
@@ -164,7 +170,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
     <AppShell
       section="Case detail"
       title={detail.employeeIdentifier}
-      subtitle={corridorLabel(detail.destCountry)}
+      subtitle={corridorLabel(detail.destCity, detail.destCountry)}
     >
       <div className="space-y-6">
         {/* BRAND-4: the case leads with identity — employee name/email (H1) +

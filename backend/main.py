@@ -14355,6 +14355,7 @@ class CommandCenterCaseDetail(BaseModel):
     caseId: Optional[str] = None  # relocation_cases UUID — use this for /api/hr/cases/{id} navigation
     employeeIdentifier: str
     destCountry: Optional[str] = None
+    destCity: Optional[str] = None  # [AIQ-1336] city-level destination for the corridor subtitle
     status: str
     riskStatus: str
     budgetLimit: Optional[float] = None

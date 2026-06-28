@@ -2160,6 +2160,7 @@ class CasesMixin:
                         SELECT ca.*, {dest_sql} as intake_dest_country,
                                wc.origin_country as wizard_origin_country,
                                wc.dest_country as wizard_dest_country,
+                               wc.dest_city as wizard_dest_city,
                                wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
                         LEFT JOIN relocation_cases rc ON {rc_join}
@@ -2182,6 +2183,7 @@ class CasesMixin:
                         SELECT ca.*, {dest_sql} as intake_dest_country,
                                wc.origin_country as wizard_origin_country,
                                wc.dest_country as wizard_dest_country,
+                               wc.dest_city as wizard_dest_city,
                                wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
                         LEFT JOIN relocation_cases rc ON {rc_join}
@@ -2193,6 +2195,7 @@ class CasesMixin:
                         SELECT ca.*, {dest_sql} as intake_dest_country,
                                wc.origin_country as wizard_origin_country,
                                wc.dest_country as wizard_dest_country,
+                               wc.dest_city as wizard_dest_city,
                                wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
                         LEFT JOIN relocation_cases rc ON {rc_join}
@@ -2230,6 +2233,10 @@ class CasesMixin:
                 dest_val = m.get("intake_dest_country")
                 if dest_val is not None and isinstance(dest_val, str) and not dest_val.strip():
                     dest_val = None
+                # [AIQ-1336] city-level destination from the intake source of truth.
+                dest_city_val = m.get("wizard_dest_city")
+                if isinstance(dest_city_val, str) and not dest_city_val.strip():
+                    dest_city_val = None
                 display_status = self._command_center_display_status(
                     m.get("status"),
                     m.get("wizard_origin_country"),
@@ -2241,6 +2248,7 @@ class CasesMixin:
                     "caseId": m.get("case_id") or None,
                     "employeeIdentifier": m.get("employee_identifier") or "",
                     "destCountry": dest_val,
+                    "destCity": dest_city_val,
                     "status": display_status,
                     "riskStatus": m.get("risk_status") or "green",
                     "budgetLimit": m.get("budget_limit"),
