@@ -1410,44 +1410,47 @@ class CompaniesMixin:
                 else:
                     # Postgres: relocation_cases.id is uuid, case_assignments.case_id / canonical_case_id are text UUIDs.
                     join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+                # [AIQ-1330] Per-aggregate isolation. Previously a single broad
+                # try/except wrapped all four enrichment queries, so ONE failing query
+                # (e.g. a transient timeout on the assignments join) silently zeroed
+                # EVERY tile for EVERY company, with only a generic warning — the
+                # recurring, undiagnosable "all 0" symptom. Now each rollup runs
+                # independently: a failure degrades only its own tile and logs which
+                # aggregate broke. Keys are str() so they match companies.id (uuid in
+                # Postgres) against the TEXT company_id columns (AIQ-864; SQLite is
+                # all-text so its tests can't see the uuid/text skew).
+                def _safe_counts(label: str, sql: str) -> Dict[str, int]:
+                    try:
+                        rows = conn.execute(text(sql), params_agg).fetchall()
+                        return {str(row._mapping["id"]): int(row._mapping["cnt"] or 0) for row in rows}
+                    except Exception as e:  # noqa: BLE001 — degrade one tile, keep the rest
+                        log.warning("admin_company_index: %s aggregate failed: %s", label, e)
+                        return {}
+
+                hr_counts = _safe_counts(
+                    "hr_users",
+                    f"SELECT company_id AS id, COUNT(*) AS cnt FROM hr_users "
+                    f"WHERE company_id IN ({id_placeholders}) GROUP BY company_id",
+                )
+                employee_counts = _safe_counts(
+                    "employees",
+                    f"SELECT company_id AS id, COUNT(*) AS cnt FROM employees "
+                    f"WHERE company_id IN ({id_placeholders}) GROUP BY company_id",
+                )
+                assignment_counts = _safe_counts(
+                    "assignments",
+                    f"""
+                    SELECT COALESCE(rc.company_id, hu.company_id) AS id, COUNT(*) AS cnt
+                    FROM case_assignments a
+                    LEFT JOIN relocation_cases rc ON {join_on_cases}
+                    LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                    WHERE COALESCE(rc.company_id, hu.company_id) IN ({id_placeholders})
+                    GROUP BY COALESCE(rc.company_id, hu.company_id)
+                    """,
+                )
+
+                first_contacts: Dict[str, Optional[str]] = {}
                 try:
-                    hr_count_rows = conn.execute(
-                        text(
-                            f"""
-                            SELECT company_id AS id, COUNT(*) AS hr_users_count
-                            FROM hr_users
-                            WHERE company_id IN ({id_placeholders})
-                            GROUP BY company_id
-                            """
-                        ),
-                        params_agg,
-                    ).fetchall()
-                    employee_count_rows = conn.execute(
-                        text(
-                            f"""
-                            SELECT company_id AS id, COUNT(*) AS employee_count
-                            FROM employees
-                            WHERE company_id IN ({id_placeholders})
-                            GROUP BY company_id
-                            """
-                        ),
-                        params_agg,
-                    ).fetchall()
-                    assignment_count_rows = conn.execute(
-                        text(
-                            f"""
-                            SELECT
-                                COALESCE(rc.company_id, hu.company_id) AS id,
-                                COUNT(*) AS assignments_count
-                            FROM case_assignments a
-                            LEFT JOIN relocation_cases rc ON {join_on_cases}
-                            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-                            WHERE COALESCE(rc.company_id, hu.company_id) IN ({id_placeholders})
-                            GROUP BY COALESCE(rc.company_id, hu.company_id)
-                            """
-                        ),
-                        params_agg,
-                    ).fetchall()
                     contact_rows = conn.execute(
                         text(
                             f"""
@@ -1460,33 +1463,21 @@ class CompaniesMixin:
                         ),
                         params_agg,
                     ).fetchall()
-                    # [AIQ-864] Normalize all keys to str. companies.id is a uuid
-                    # (returned as a uuid.UUID object) while hr_users/employees/
-                    # case_assignments .company_id are text, so the aggregate dicts
-                    # were str-keyed and `.get(uuid)` always missed → every rollup
-                    # tile showed 0 in prod (SQLite tests are all-text → false green).
-                    hr_counts = {str(row._mapping["id"]): int(row._mapping["hr_users_count"] or 0) for row in hr_count_rows}
-                    employee_counts = {str(row._mapping["id"]): int(row._mapping["employee_count"] or 0) for row in employee_count_rows}
-                    assignment_counts = {str(row._mapping["id"]): int(row._mapping["assignments_count"] or 0) for row in assignment_count_rows}
-                    first_contacts: Dict[str, Optional[str]] = {}
                     for row in contact_rows:
                         company_id = str(row._mapping["id"])
                         if company_id not in first_contacts:
                             first_contacts[company_id] = row._mapping.get("contact_name")
-                    for r in result:
-                        rid = str(r["id"])
-                        r["hr_users_count"] = hr_counts.get(rid, 0)
-                        r["employee_count"] = employee_counts.get(rid, 0)
-                        r["assignments_count"] = assignment_counts.get(rid, 0)
-                        explicit_contact = (r.get("hr_contact") or "").strip() if isinstance(r.get("hr_contact"), str) else None
-                        r["primary_contact_name"] = explicit_contact or first_contacts.get(rid)
-                except Exception as e:
-                    log.warning("admin_company_index: enrich counts failed: %s", e)
-                    for r in result:
-                        r["hr_users_count"] = 0
-                        r["employee_count"] = 0
-                        r["assignments_count"] = 0
-                        r["primary_contact_name"] = None
+                except Exception as e:  # noqa: BLE001
+                    log.warning("admin_company_index: contacts aggregate failed: %s", e)
+
+                # Assembly always runs — reads whichever aggregates succeeded.
+                for r in result:
+                    rid = str(r["id"])
+                    r["hr_users_count"] = hr_counts.get(rid, 0)
+                    r["employee_count"] = employee_counts.get(rid, 0)
+                    r["assignments_count"] = assignment_counts.get(rid, 0)
+                    explicit_contact = (r.get("hr_contact") or "").strip() if isinstance(r.get("hr_contact"), str) else None
+                    r["primary_contact_name"] = explicit_contact or first_contacts.get(rid)
         return result
 
     def list_company_preferred_suppliers(
