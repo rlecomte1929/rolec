@@ -91,6 +91,10 @@ class PathClassification:
 
     pathway_type: str
     corridor: Optional[str] = None
+    # AIQ-1349: STA / LTA / PERMANENT — lets the (LLM) generator tailor the
+    # roadmap (e.g. a short-term assignment skips permanent-residency / school
+    # / long-term-housing steps). None ⇒ treated as a long-term move.
+    assignment_type: Optional[str] = None
 
 
 def corridor_key(origin: str, destination: str) -> str:
