@@ -41,14 +41,18 @@ describe('useGeocodedAddress', () => {
 
   it('reaches ok with coords on a resolvable address', async () => {
     vi.stubGlobal('fetch', fetchReturning([{ lat: '52.37', lon: '4.89' }]));
-    const { result } = renderHook(() => useGeocodedAddress(uniq('Amsterdam'), 5));
+    // NB: compute the address ONCE — calling uniq() inside the render callback
+    // would change the hook input every render and loop forever.
+    const addr = uniq('Amsterdam');
+    const { result } = renderHook(() => useGeocodedAddress(addr, 5));
     await waitFor(() => expect(result.current.status).toBe('ok'));
     expect(result.current.coords).toEqual({ lat: 52.37, lng: 4.89 });
   });
 
   it('reaches notfound (never a false ok) on an unresolvable address', async () => {
     vi.stubGlobal('fetch', fetchReturning([]));
-    const { result } = renderHook(() => useGeocodedAddress(uniq('zzzz'), 5));
+    const addr = uniq('zzzz');
+    const { result } = renderHook(() => useGeocodedAddress(addr, 5));
     await waitFor(() => expect(result.current.status).toBe('notfound'));
     expect(result.current.coords).toBeNull();
   });
