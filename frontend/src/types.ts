@@ -723,6 +723,9 @@ export interface AssignmentDetail {
   /** relocation_cases / draft relocationBasics: fallback when movePlan empty */
   caseOriginHint?: string | null;
   caseDestinationHint?: string | null;
+  /** [AIQ-1336] City-level corridor so the case detail shows "Paris, France" not "France" */
+  caseOriginCity?: string | null;
+  caseDestinationCity?: string | null;
   /** Explicit intake + document checkpoints (merged readiness block) */
   intakeChecklist?: IntakeChecklistItemDTO[];
   readinessSnapshot?: Record<string, unknown> | null;
