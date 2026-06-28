@@ -110,6 +110,25 @@ function initials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/**
+ * [AIQ-1332] Never surface a raw email as a person label. When the only available
+ * identity is an email, fall back to its humanised local part (e.g.
+ * "alice.dupont@acme.com" -> "alice dupont") so the thread never shows an address.
+ */
+function humanizeName(raw: string | null | undefined): string {
+  const v = (raw || '').trim();
+  if (!v) return '';
+  if (EMAIL_RE.test(v)) return v.split('@')[0]!.replace(/[._-]+/g, ' ').trim();
+  return v;
+}
+
+/** [AIQ-1332] Friendly case reference — last 8 chars uppercased, e.g. "Case 5200D907". */
+function friendlyCaseRef(caseId: string): string {
+  return `Case ${caseId.slice(-8).toUpperCase()}`;
+}
+
 function deriveSubject(c: Conversation): string {
   const firstWithSubject = (c.messages || []).find((m) => m.subject && m.subject.trim());
   if (firstWithSubject?.subject) return firstWithSubject.subject;
@@ -125,7 +144,7 @@ interface Stakeholder {
 function deriveStakeholders(conversations: Conversation[]): Stakeholder[] {
   const map = new Map<string, Stakeholder>();
   for (const c of conversations) {
-    const name = c.other_participant_name || 'Unknown';
+    const name = humanizeName(c.other_participant_name) || 'Unknown';
     const key = name.toLowerCase();
     if (map.has(key)) continue;
     map.set(key, {
@@ -474,8 +493,8 @@ export function InboxV2Page() {
     const last = [...activeConversation.messages].reverse().find((m) => !m.is_from_me);
     const subject = activeConversation.last_message_preview || 'your last message';
     const stub = last
-      ? `Hi ${activeConversation.other_participant_name.split(' ')[0] || 'there'} — thanks for the update on "${subject}". `
-      : `Hi ${activeConversation.other_participant_name.split(' ')[0] || 'there'} — `;
+      ? `Hi ${humanizeName(activeConversation.other_participant_name).split(' ')[0] || 'there'} — thanks for the update on "${subject}". `
+      : `Hi ${humanizeName(activeConversation.other_participant_name).split(' ')[0] || 'there'} — `;
     setDraft((d) => (d ? d : stub));
   }, [activeConversation]);
 
@@ -631,7 +650,7 @@ export function InboxV2Page() {
                             unread ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'
                           }`}
                         >
-                          {c.other_participant_name}
+                          {humanizeName(c.other_participant_name) || 'Unknown'}
                         </span>
                         <span className="shrink-0 text-[11px] text-slate-400">
                           {formatThreadTime(c.last_message_at)}
@@ -680,7 +699,7 @@ export function InboxV2Page() {
                       {activeConversation.case_id && (
                         <>
                           <span className="text-slate-300">·</span>
-                          <span>Case {activeConversation.case_id}</span>
+                          <span>{friendlyCaseRef(activeConversation.case_id)}</span>
                         </>
                       )}
                     </div>
@@ -736,7 +755,7 @@ export function InboxV2Page() {
                         <MessageCard
                           key={m.id}
                           message={m}
-                          counterparty={activeConversation.other_participant_name}
+                          counterparty={humanizeName(activeConversation.other_participant_name) || 'Unknown'}
                         />
                       ))}
                       <div ref={messagesEndRef} />
@@ -748,7 +767,7 @@ export function InboxV2Page() {
                 <div className="border-t border-slate-200 bg-white px-6 py-4 shrink-0">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs text-slate-500">
-                      Reply to <span className="font-medium text-slate-700">{activeConversation.other_participant_name}</span>
+                      Reply to <span className="font-medium text-slate-700">{humanizeName(activeConversation.other_participant_name) || 'Unknown'}</span>
                     </p>
                     <Button unstyled
                       type="button"
@@ -832,7 +851,7 @@ export function InboxV2Page() {
 
 function MessageCard({ message, counterparty }: { message: Message; counterparty: string }) {
   const isMine = !!message.is_from_me;
-  const displayName = isMine ? 'You' : message.sender_name || counterparty;
+  const displayName = isMine ? 'You' : humanizeName(message.sender_name) || counterparty;
   return (
     <div
       className={`rounded-lg border bg-white p-4 shadow-sm ${
