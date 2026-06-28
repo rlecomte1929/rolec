@@ -5906,6 +5906,29 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
                 case_id, str(exc),
             )
 
+    # Notify the assigned HR user that the employee has submitted their intake so
+    # the case doesn't stall silently until HR happens to look (AIQ-1342). Mirrors
+    # the /api/notifications/notify-hr handler's use of create_notification_with_preferences.
+    # Guard on hr_user_id (an unassigned case has none) and keep it best-effort: a
+    # notification failure must never fail the submit the employee just completed.
+    hr_user_id = assignment.get("hr_user_id")
+    if hr_user_id:
+        try:
+            db.create_notification_with_preferences(
+                user_id=hr_user_id,
+                type_="INTAKE_SUBMITTED",
+                title="Employee submitted their intake",
+                body=f"Intake was submitted for case {assignment_id[:8]}…",
+                assignment_id=assignment_id,
+                case_id=case_id,
+                metadata={"assignment_id": assignment_id, "case_id": case_id},
+            )
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: HR notification failed assignment_id=%s hr_user_id=%s error=%s",
+                assignment_id, hr_user_id, str(exc), exc_info=True,
+            )
+
     track_event(
         "assignment.submitted",
         entity_type="assignment",
