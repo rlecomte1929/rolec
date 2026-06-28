@@ -93,6 +93,8 @@ export interface RelocationPlanPhaseTaskDTO {
   owner: RelocationPlanTaskOwnerWire;
   priority: RelocationPlanTaskPriorityWire;
   due_date?: string | null;
+  /** [AIQ-1340] true when due_date was auto-estimated from the move date (no real deadline). */
+  due_date_is_suggested?: boolean | null;
   is_overdue: boolean;
   is_due_soon: boolean;
   blocked_by: string[];

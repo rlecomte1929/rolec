@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from threading import Lock
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from sqlalchemy import text
@@ -39,6 +39,7 @@ from ...relocation_plan_service import (
 )
 from ...relocation_plan_draft_normalize import profile_for_plan_derivation
 from ...relocation_plan_task_library import estimated_effort_for
+from .roadmap_lead_times import lead_time_days_for_phase  # [AIQ-1340]
 from ...relocation_plan_status_derivation import (
     DerivationThresholds,
     RelocationPlanDerivationContext,
@@ -317,8 +318,18 @@ def _enriched_to_schema_task(
     status_by_code: Dict[str, str],
     viewer_role: str,
     today: date,
+    move_date: Optional[date] = None,
 ) -> RelocationPlanPhaseTask:
     due = _parse_iso_date_only(t.target_date)
+    # [AIQ-1340] No real deadline → suggest move_date − phase lead time (pre-move
+    # phases only); flag it so the UI shows "Suggested" vs a committed deadline.
+    # overdue/due_soon below stay based on the REAL target_date, never the estimate.
+    due_is_suggested = False
+    if due is None and move_date is not None:
+        lead = lead_time_days_for_phase(t.phase_key)
+        if lead is not None:
+            due = move_date - timedelta(days=lead)
+            due_is_suggested = True
     internal_cta = infer_plan_task_cta_type(t, viewer_role)
     cta_t, cta_label = _wire_cta(internal_cta)
     terminal = _is_terminal_plan_status(t.status)
@@ -351,6 +362,7 @@ def _enriched_to_schema_task(
         owner=_safe_task_owner(t.owner),
         priority=_safe_task_priority(t.priority),
         due_date=due,
+        due_date_is_suggested=due_is_suggested,
         is_overdue=overdue,
         is_due_soon=due_soon,
         blocked_by=_blocked_by_codes(t, status_by_code),
@@ -453,6 +465,7 @@ def build_relocation_plan_view_response(
     mobility_case_id: Optional[str],
     db: Database,
     viewer_role: str,
+    move_date: Optional[date] = None,  # [AIQ-1340] case target_move_date for suggested due dates
     debug: bool = False,
     request_id: Optional[str] = None,
 ) -> RelocationPlanViewResponse:
@@ -514,6 +527,7 @@ def build_relocation_plan_view_response(
                         status_by_code=status_by_code,
                         viewer_role=role_wire,
                         today=today,
+                        move_date=move_date,
                     )
                     for t in b.tasks
                 ],
@@ -615,6 +629,16 @@ def load_profile_draft_for_case(session, case_id: str) -> Dict[str, Any]:
         return {}
 
 
+def load_move_date_for_case(session, case_id: str) -> Optional[date]:
+    """[AIQ-1340] The case's ``target_move_date`` (a ``date`` column) for suggested
+    due-date estimates, or ``None`` when no move date is set."""
+    from .. import crud as app_crud
+
+    case = app_crud.get_case(session, case_id)
+    md = getattr(case, "target_move_date", None) if case else None
+    return md if isinstance(md, date) else None
+
+
 def get_relocation_plan_view_for_case_assignment(
     *,
     db: Database,
@@ -655,6 +679,7 @@ def get_relocation_plan_view_for_case_assignment(
     profile_started_at = time.perf_counter()
     with session_factory() as session:
         profile = load_profile_draft_for_case(session, case_id_effective)
+        move_date = load_move_date_for_case(session, case_id_effective)  # [AIQ-1340]
     profile_ms = (time.perf_counter() - profile_started_at) * 1000
 
     assembly_started_at = time.perf_counter()
@@ -666,6 +691,7 @@ def get_relocation_plan_view_for_case_assignment(
         mobility_case_id=mobility_case_id,
         db=db,
         viewer_role=viewer_role,
+        move_date=move_date,  # [AIQ-1340]
         debug=debug,
         request_id=request_id,
     )

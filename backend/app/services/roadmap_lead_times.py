@@ -49,3 +49,21 @@ def lead_time_days_for(bucket_or_category: str) -> int | None:
     """Return the lead time (days before move date) for a track bucket key or a
     form category, or ``None`` if the key is unknown."""
     return LEAD_TIME_DAYS.get(bucket_or_category)
+
+
+# [AIQ-1340] The LIVE employee roadmap (timeline view) groups tasks by *phase*,
+# not by form category/track, so its tasks have no category key to feed
+# ``lead_time_days_for``. Map the pre-move phases to a lead time directly. Only
+# pre-move phases are listed: ``arrival`` / ``post_arrival`` happen AT/AFTER the
+# move, so a ``move_date − lead`` estimate doesn't apply (those tasks stay undated).
+PHASE_LEAD_TIME_DAYS: dict[str, int] = {
+    "pre_departure": 90,
+    "immigration": 90,
+    "logistics": 45,
+}
+
+
+def lead_time_days_for_phase(phase_key: str) -> int | None:
+    """Lead time (days before move date) for a roadmap *phase* key, or ``None``
+    for phases at/after the move (arrival/post_arrival) or any unknown key."""
+    return PHASE_LEAD_TIME_DAYS.get(phase_key)
