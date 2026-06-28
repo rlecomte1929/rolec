@@ -138,7 +138,7 @@ export const EmployeeCaseSummary: React.FC = () => {
     (fm.spouse?.fullName || (fm.children?.length ?? 0) > 0) ||
     (ac.employerName || ac.jobTitle || ac.contractStartDate);
 
-  const planHref = assignmentId ? buildRoute('employeeCasePlan', { caseId: assignmentId }) : buildRoute('employeeDashboard');
+  const roadmapHref = assignmentId ? buildRoute('employeeCaseRoadmap', { caseId: assignmentId }) : buildRoute('employeeDashboard');
   const immigrationHref = assignmentId ? buildRoute('employeeCaseImmigration', { caseId: assignmentId }) : null;
 
   return (
@@ -283,9 +283,9 @@ export const EmployeeCaseSummary: React.FC = () => {
               . Use <strong>Policy Assistant</strong> on that page for questions tied to your published policy.
             </li>
             <li>
-              <strong>Tasks with HR</strong> (checklist, due dates) are on the{' '}
-              <Link to={planHref} className="font-medium text-[#0b2b43] underline">
-                Relocation plan
+              <strong>Tasks with HR</strong> (checklist, due dates) are on your{' '}
+              <Link to={roadmapHref} className="font-medium text-[#0b2b43] underline">
+                Roadmap
               </Link>{' '}
               tab.
             </li>
@@ -319,10 +319,10 @@ export const EmployeeCaseSummary: React.FC = () => {
               ? "Pick up where you left off — the wizard remembers your inputs."
               : "Start your intake to unlock services and the relocation plan."
           }
-          primaryLabel={hasAnyData ? 'View relocation plan →' : 'Start intake →'}
+          primaryLabel={hasAnyData ? 'View my roadmap →' : 'Start intake →'}
           primaryHref={
             hasAnyData
-              ? planHref
+              ? roadmapHref
               : buildRoute('employeeIntake')
           }
           secondaryLabel={hasAnyData ? 'Continue editing intake' : undefined}

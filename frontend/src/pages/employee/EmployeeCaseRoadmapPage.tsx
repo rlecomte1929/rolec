@@ -11,6 +11,9 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { useTextSelection } from '../../hooks/useTextSelection';
 import { ExplainTermPopover } from '../../features/explain/ExplainTermPopover';
+import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
+import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
+import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
@@ -31,6 +34,9 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const navigate = useNavigate();
   const selectionRef = useRef<HTMLDivElement>(null);
   const { selection, clear } = useTextSelection(selectionRef);
+  // [AIQ-1259b] Policy Assistant ported from the retired /plan page so the
+  // affordance survives the Plan→Roadmap consolidation.
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   // H-08 (AIQ-1255): the page had no title — the browser tab + bookmarks were
   // unlabelled. Set a document title for the duration the page is mounted.
@@ -165,23 +171,43 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   return (
     <AppShell>
-      <div ref={selectionRef} className="mx-auto max-w-5xl px-6 py-6">
-        {/* H-08 (AIQ-1255): page heading so the employee has orientation above the hero. */}
-        <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
-        <RoadmapTemplate
-          data={data}
-          header={header}
-          caseId={caseId ?? ''}
-          onCta={handleCta}
-          validated={validated}
-          validatedAt={validatedAt}
-          validating={validating}
-          onValidate={onValidate}
-        />
-      </div>
-      {selection && (
-        <ExplainTermPopover selection={selection} assignmentId={caseId ?? ''} onClose={clear} />
-      )}
+      <PolicyAssistantDockedShell
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        title="Ask about your policy"
+        subtitle="Bounded Q&A on your published policy."
+        titleId="employee-roadmap-assistant-shell-title"
+        assistant={() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={caseId ?? ''}
+            assignmentLoading={false}
+            variant="embedded"
+          />
+        )}
+      >
+        <div ref={selectionRef} className="mx-auto max-w-5xl px-6 py-6">
+          {/* H-08 (AIQ-1255): page heading so the employee has orientation above the hero. */}
+          <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
+          <RoadmapTemplate
+            data={data}
+            header={header}
+            caseId={caseId ?? ''}
+            onCta={handleCta}
+            validated={validated}
+            validatedAt={validatedAt}
+            validating={validating}
+            onValidate={onValidate}
+          />
+        </div>
+        {selection && (
+          <ExplainTermPopover selection={selection} assignmentId={caseId ?? ''} onClose={clear} />
+        )}
+      </PolicyAssistantDockedShell>
+      <PolicyAssistantFab
+        label="Ask about your policy"
+        isPanelOpen={assistantOpen}
+        onClick={() => setAssistantOpen((v) => !v)}
+      />
     </AppShell>
   );
 };

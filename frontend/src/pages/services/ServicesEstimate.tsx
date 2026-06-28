@@ -162,9 +162,9 @@ export const ServicesEstimate: React.FC = () => {
       {assignmentId && (
         <EmployeeNextActionBar
           status="Estimate ready"
-          hint="Your service picks are saved. The relocation plan aggregates all phases — visa, housing, schooling, and more — into one timeline."
-          primaryLabel="View my relocation plan →"
-          primaryHref={buildRoute('employeeCasePlan', { caseId: routeCaseId })}
+          hint="Your service picks are saved. Your roadmap aggregates all phases — visa, housing, schooling, and more — into one timeline."
+          primaryLabel="View my roadmap →"
+          primaryHref={buildRoute('employeeCaseRoadmap', { caseId: routeCaseId })}
           secondaryLabel="Back to recommendations"
           secondaryHref={caseStep('caseServicesRecommendations')}
         />

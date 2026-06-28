@@ -56,8 +56,8 @@ const EmployeeBenefitComparisonPage = lazy(() => import('./pages/employee/Employ
 // Legacy CaseWizardPage is no longer routed (staged unification C1) — its routes
 // redirect to the canonical v2 intake. The component file stays dormant.
 const LegacyWizardRedirect = lazy(() => import('./pages/employee/LegacyWizardRedirect').then((module) => ({ default: module.LegacyWizardRedirect })));
+const CasePlanToRoadmapRedirect = lazy(() => import('./pages/employee/CasePlanToRoadmapRedirect').then((module) => ({ default: module.CasePlanToRoadmapRedirect })));
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
-const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
 // [P1-5] Dossier & Forms list view
 const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierPage').then((module) => ({ default: module.EmployeeDossierPage })));
 // Employee document vault (case-scoped + assignment fallback)
@@ -367,7 +367,8 @@ function App() {
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<RequireEmployeeRoute><LegacyWizardRedirect /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<RequireEmployeeRoute><LegacyWizardRedirect /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<RequireEmployeeRoute><EmployeeCaseSummary /></RequireEmployeeRoute>} />
-        <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><EmployeeRelocationPlanPage /></RequireEmployeeRoute>} />
+        {/* [AIQ-1259b] /plan consolidated into /roadmap — redirect, preserving caseId. */}
+        <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><CasePlanToRoadmapRedirect /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseImmigration.path} element={<RequireEmployeeRoute><ImmigrationPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
