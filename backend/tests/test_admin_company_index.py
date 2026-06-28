@@ -54,7 +54,7 @@ CREATE TABLE profiles (id TEXT, full_name TEXT, email TEXT);
 """
 
 _SEED = """
-INSERT INTO companies (id, name) VALUES ('c1', 'Acme'), ('c2', 'Globex');
+INSERT INTO companies (id, name) VALUES ('c1', 'Acme'), ('c2', 'Globex'), ('c3', 'Brand New Co 1782553314571');
 INSERT INTO hr_users (company_id, profile_id, created_at) VALUES ('c1', 'p1', '2026-01-01');
 INSERT INTO employees (company_id) VALUES ('c1'), ('c1');
 INSERT INTO relocation_cases (id, company_id) VALUES ('case1', 'c1');
@@ -94,6 +94,18 @@ class AdminCompanyIndexTests(unittest.TestCase):
         self.assertGreaterEqual(acme["assignments_count"], 1)
         # a company with no members stays at 0 (sanity, not a false-positive)
         self.assertEqual(self._row(result, "Globex")["hr_users_count"], 0)
+
+    def test_synthetic_named_companies_hidden(self):
+        # [AIQ-1325a-followup] 'Brand New Co <epoch>' is filtered by name even when
+        # is_test is unset (the is_test guard is skipped here, mirroring prod's
+        # pre-flag rows); real tenants remain.
+        result = self.db.get_admin_company_index()
+        names = {r["name"] for r in result}
+        self.assertNotIn("Brand New Co 1782553314571", names)
+        self.assertIn("Acme", names)
+        # include_test=True still shows everything
+        all_names = {r["name"] for r in self.db.get_admin_company_index(include_test=True)}
+        self.assertIn("Brand New Co 1782553314571", all_names)
 
     def test_orphan_diagnostics_failure_does_not_zero_tiles(self):
         # The regression's behavioural guarantee: even if the orphan diagnostics
