@@ -1,7 +1,15 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2 } from 'lucide-react';
-import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
+import {
+  adminAPI,
+  suppliersAPI,
+  adminReviewQueueAPI,
+  adminOpsAnalyticsAPI,
+  adminResourcesAPI,
+  adminProspectsAPI,
+} from '../../api/client';
+import { getRagEvalMetrics, type RagEvalDashboard } from '../../api/ragEval';
 import { StatCard } from '../../components/admin/overview/StatCard';
 import { ModuleCard } from '../../components/admin/overview/ModuleCard';
 import { Button } from '../../components/antigravity/Button';
@@ -19,6 +27,17 @@ type OverviewStats = {
   activeSuppliers: number | null;
   reviewOpen: number | null;
   reviewUnassigned: number | null;
+  // Module-card aggregates (AIQ-1329) — lightweight counts from each section's
+  // existing endpoint so the cards show live numbers instead of 'Unavailable'.
+  opsOpen: number | null;
+  opsBreached: number | null;
+  workflowCases: number | null;
+  workflowRfqs: number | null;
+  resourcesPublished: number | null;
+  resourcesDraft: number | null;
+  prospectsTotal: number | null;
+  ragHealthy: number | null;
+  ragTotal: number | null;
 };
 
 const EMPTY_STATS: OverviewStats = {
@@ -29,6 +48,15 @@ const EMPTY_STATS: OverviewStats = {
   activeSuppliers: null,
   reviewOpen: null,
   reviewUnassigned: null,
+  opsOpen: null,
+  opsBreached: null,
+  workflowCases: null,
+  workflowRfqs: null,
+  resourcesPublished: null,
+  resourcesDraft: null,
+  prospectsTotal: null,
+  ragHealthy: null,
+  ragTotal: null,
 };
 
 function settledArrayCount<T>(
@@ -66,6 +94,12 @@ export const AdminOverviewPage: React.FC = () => {
         // Review-queue totals use the same aggregate as /admin/review-queue.
         adminReviewQueueAPI.getStats(),
         suppliersAPI.list({ status: 'active' }),
+        // Module-card sources (AIQ-1329) — all lightweight aggregates/counts.
+        adminOpsAnalyticsAPI.getSlaOverview({ days: 30 }),
+        adminOpsAnalyticsAPI.getWorkflowOverview({ days: 30 }),
+        adminResourcesAPI.getCounts(),
+        adminProspectsAPI.list({ limit: 1 }), // limit=1: we only read `total`, not rows
+        getRagEvalMetrics(),
       ]);
 
       return {
@@ -76,12 +110,26 @@ export const AdminOverviewPage: React.FC = () => {
         reviewOpen: settledNumber(results[4], (value) => (value as { open_items_count?: number }).open_items_count),
         reviewUnassigned: settledNumber(results[4], (value) => (value as { unassigned_count?: number }).unassigned_count),
         activeSuppliers: settledArrayCount(results[5], (value) => (value as { suppliers?: unknown[] }).suppliers),
+        opsOpen: settledNumber(results[6], (value) => (value as { open_count?: number }).open_count),
+        opsBreached: settledNumber(results[6], (value) => (value as { breached_count?: number }).breached_count),
+        workflowCases: settledNumber(results[7], (value) => value.events?.case_created),
+        workflowRfqs: settledNumber(results[7], (value) => value.events?.rfq_created),
+        resourcesPublished: settledNumber(results[8], (value) => value.resources_published),
+        resourcesDraft: settledNumber(results[8], (value) => value.resources_draft),
+        prospectsTotal: settledNumber(results[9], (value) => value.total),
+        ragHealthy: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.filter((m) => !m.alert.firing).length),
+        ragTotal: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.length),
       };
     },
     enabled: role === 'ADMIN',
   });
   const stats: OverviewStats = statsQuery.data ?? EMPTY_STATS;
   const loading = statsQuery.isLoading;
+
+  // RAG quality has no single count — summarise it as "healthy / total" metrics
+  // and surface how many thresholds are currently alerting.
+  const ragSummary = stats.ragTotal === null ? null : `${stats.ragHealthy ?? 0}/${stats.ragTotal}`;
+  const ragAlerting = stats.ragTotal === null ? null : stats.ragTotal - (stats.ragHealthy ?? 0);
 
   if (role !== 'ADMIN') {
     return (
@@ -154,9 +202,12 @@ export const AdminOverviewPage: React.FC = () => {
           icon={<LineChart className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Ops analytics"
           subtitle="SLA, bottlenecks, reviewer load"
-          metric={null}
+          metric={stats.opsOpen}
           loading={loading}
-          rows={[{ label: 'Status', value: 'No aggregate endpoint connected' }]}
+          rows={[
+            { label: 'Open SLA items', value: stats.opsOpen },
+            { label: 'Breached', value: stats.opsBreached },
+          ]}
         />
         <ModuleCard
           testId="module-workflow-analytics"
@@ -164,9 +215,12 @@ export const AdminOverviewPage: React.FC = () => {
           icon={<Shuffle className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Workflow analytics"
           subtitle="Recommendations, RFQ conversion"
-          metric={null}
+          metric={stats.workflowCases}
           loading={loading}
-          rows={[{ label: 'Status', value: 'No aggregate endpoint connected' }]}
+          rows={[
+            { label: 'Cases created (30d)', value: stats.workflowCases },
+            { label: 'RFQs created (30d)', value: stats.workflowRfqs },
+          ]}
         />
         <ModuleCard
           testId="module-resources"
@@ -174,9 +228,12 @@ export const AdminOverviewPage: React.FC = () => {
           icon={<FileText className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Resources CMS"
           subtitle="Guides, requirements, taxonomy"
-          metric={null}
+          metric={stats.resourcesPublished}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open the CMS for live counts' }]}
+          rows={[
+            { label: 'Published', value: stats.resourcesPublished },
+            { label: 'Draft', value: stats.resourcesDraft },
+          ]}
         />
         <ModuleCard
           testId="module-prospects"
@@ -184,9 +241,9 @@ export const AdminOverviewPage: React.FC = () => {
           icon={<Target className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="Prospects"
           subtitle="HR pipeline · ICP-scored"
-          metric={null}
+          metric={stats.prospectsTotal}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open pipeline for live counts' }]}
+          rows={[{ label: 'Total in pipeline', value: stats.prospectsTotal }]}
         />
         <ModuleCard
           testId="module-rag-quality"
@@ -194,9 +251,9 @@ export const AdminOverviewPage: React.FC = () => {
           icon={<Activity className="h-[18px] w-[18px]" aria-hidden="true" />}
           title="RAG quality"
           subtitle="Retrieval & generation health over time"
-          metric={null}
+          metric={ragSummary}
           loading={loading}
-          rows={[{ label: 'Status', value: 'Open dashboard for live metrics' }]}
+          rows={[{ label: 'Thresholds alerting', value: ragAlerting }]}
         />
       </div>
 

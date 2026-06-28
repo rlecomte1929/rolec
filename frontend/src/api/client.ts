@@ -2391,6 +2391,12 @@ export const adminNotificationsAPI = {
 export const adminOpsAnalyticsAPI = {
   getSlaOverview: (params?: { country_code?: string; days?: number }) =>
     api.get<unknown>('/api/admin/ops/sla/overview', { params }).then((r) => r.data),
+  getWorkflowOverview: (params?: { country_code?: string; days?: number }) =>
+    // The aggregate event counts are nested under `events` (alongside period_days/rates).
+    api.get<{ events?: { case_created?: number; rfq_created?: number; recommendations_generated?: number; quote_received?: number } }>(
+      '/api/admin/workflow/overview',
+      { params },
+    ).then((r) => r.data),
   getQueueBacklog: (params?: { country_code?: string }) =>
     api.get<unknown>('/api/admin/ops/queue/backlog', { params }).then((r) => r.data),
   getQueueBreaches: (params?: { country_code?: string; limit?: number }) =>
