@@ -1,0 +1,1527 @@
+{
+  "generated_at": "2026-06-28T07:10:52.697185+00:00",
+  "scorer_version": "1.1",
+  "current_file": "results/test_results_2026-06-27T15-34.json",
+  "prev_file": "results/test_results_2026-06-12T13-24.json",
+  "current_summary": {
+    "total": 79,
+    "pass": 79,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0
+  },
+  "overall_score": 100.0,
+  "prev_overall": 98.8,
+  "delta": 1.2,
+  "health_band": "GREEN",
+  "domain_scores": {
+    "Authentication": {
+      "score_pct": 100.0,
+      "pass": 6.0,
+      "total": 6,
+      "weight": 4,
+      "p0_fails": 0
+    },
+    "Case Management": {
+      "score_pct": 100.0,
+      "pass": 6.0,
+      "total": 6,
+      "weight": 4,
+      "p0_fails": 0
+    },
+    "Security & RLS": {
+      "score_pct": 100.0,
+      "pass": 11.0,
+      "total": 11,
+      "weight": 4,
+      "p0_fails": 0
+    },
+    "Admin Console": {
+      "score_pct": 100.0,
+      "pass": 3.0,
+      "total": 3,
+      "weight": 1,
+      "p0_fails": 0
+    },
+    "Employee Journey": {
+      "score_pct": 100.0,
+      "pass": 2.0,
+      "total": 2,
+      "weight": 4,
+      "p0_fails": 0
+    },
+    "Resources": {
+      "score_pct": 100.0,
+      "pass": 1.0,
+      "total": 1,
+      "weight": 2,
+      "p0_fails": 0
+    },
+    "Suppliers & Vendors": {
+      "score_pct": 100.0,
+      "pass": 1.0,
+      "total": 1,
+      "weight": 2,
+      "p0_fails": 0
+    },
+    "Performance": {
+      "score_pct": 100.0,
+      "pass": 7.0,
+      "total": 7,
+      "weight": 2,
+      "p0_fails": 0
+    },
+    "End-to-End Flows": {
+      "score_pct": 100.0,
+      "pass": 12.0,
+      "total": 12,
+      "weight": 3,
+      "p0_fails": 0
+    }
+  },
+  "regressions": [],
+  "fixed": [],
+  "new_failures": [],
+  "still_broken": [],
+  "notion_candidates": [],
+  "per_test": {
+    "AT1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Authentication",
+      "priority": "P0",
+      "title": "Platform admin login",
+      "notion_worthy": true
+    },
+    "AT2": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Authentication",
+      "priority": "P0",
+      "title": "Fresh HR account registered",
+      "notion_worthy": true
+    },
+    "AT2b": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Authentication",
+      "priority": "P0",
+      "title": "Fresh HR linked to company (B18)",
+      "notion_worthy": true
+    },
+    "AT3": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Authentication",
+      "priority": "P0",
+      "title": "Fresh Employee account registered",
+      "notion_worthy": true
+    },
+    "AT4": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Authentication",
+      "priority": "P0",
+      "title": "Invalid credentials rejected",
+      "notion_worthy": true
+    },
+    "AT5": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Authentication",
+      "priority": "P0",
+      "title": "Registration token is full 36-char UUID",
+      "notion_worthy": true
+    },
+    "CT1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Case Management",
+      "priority": "P0",
+      "title": "GET /api/hr/cases not 405",
+      "notion_worthy": true
+    },
+    "CT2": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Case Management",
+      "priority": "P0",
+      "title": "POST /api/hr/cases creates draft",
+      "notion_worthy": true
+    },
+    "CT5": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Case Management",
+      "priority": "P0",
+      "title": "GET /api/hr/assignments responds <8s",
+      "notion_worthy": true
+    },
+    "HP1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Case Management",
+      "priority": "P1",
+      "title": "HR command center returns cases",
+      "notion_worthy": true
+    },
+    "HP2": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "HR individual case RLS (B8)",
+      "notion_worthy": true
+    },
+    "AD1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Admin Console",
+      "priority": "P1",
+      "title": "Admin assignment endpoint not 500",
+      "notion_worthy": true
+    },
+    "EP1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Employee Journey",
+      "priority": "P0",
+      "title": "Employee API rejects HR token",
+      "notion_worthy": true
+    },
+    "RT1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Resources",
+      "priority": "P0",
+      "title": "Destination count ≥20",
+      "notion_worthy": true
+    },
+    "VT1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Suppliers & Vendors",
+      "priority": "P1",
+      "title": "Service categories count ≥14",
+      "notion_worthy": true
+    },
+    "RE1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P0",
+      "title": "5 health checks pass",
+      "notion_worthy": true
+    },
+    "WZ0": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Employee Journey",
+      "priority": "P0",
+      "title": "Wizard test case creation",
+      "notion_worthy": true
+    },
+    "CORS__api_auth_login": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "CORS preflight: POST /api/auth/login",
+      "notion_worthy": false
+    },
+    "CORS__api_hr_cases": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "CORS preflight: POST /api/hr/cases",
+      "notion_worthy": false
+    },
+    "CORS__api_cases_00000000-": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "CORS preflight: PATCH /api/cases/{id}",
+      "notion_worthy": false
+    },
+    "CORS__api_hr_cases_000000": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "CORS preflight: POST /api/hr/cases/{id}/assign",
+      "notion_worthy": false
+    },
+    "CORS__api_hr_assignments": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "CORS preflight: GET /api/hr/assignments",
+      "notion_worthy": false
+    },
+    "CORS1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "CORS summary: all key endpoints pass preflight",
+      "notion_worthy": true
+    },
+    "RL1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "Rate limit on /api/auth/login",
+      "notion_worthy": true
+    },
+    "SEC1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P1",
+      "title": "XSS: case creation with script payload",
+      "notion_worthy": true
+    },
+    "PERF1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P1",
+      "title": "GET /health avg response time",
+      "notion_worthy": true
+    },
+    "PERF2": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P1",
+      "title": "POST /api/auth/login avg response time",
+      "notion_worthy": true
+    },
+    "PERF3": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P1",
+      "title": "GET /api/hr/cases avg response time",
+      "notion_worthy": true
+    },
+    "PERF4": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P1",
+      "title": "GET /api/hr/assignments avg response time",
+      "notion_worthy": true
+    },
+    "PERF5": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P1",
+      "title": "GET /api/hr/resources/destinations avg",
+      "notion_worthy": true
+    },
+    "PERF6": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Performance",
+      "priority": "P1",
+      "title": "GET /api/hr/service-categories avg",
+      "notion_worthy": true
+    },
+    "RLS0": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "Second HR (Other Corp) registered + linked",
+      "notion_worthy": true
+    },
+    "RLS1": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "title": "RLS case creation",
+      "notion_worthy": true
+    },
+    "T1_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "title": "T1 Adrien Moreau: France Passeport Talent",
+      "notion_worthy": true
+    },
+    "T2_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "title": "T2 Camille Renard: Belgium→UK",
+      "notion_worthy": true
+    },
+    "T3_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "title": "T3 Stefan Weber: Germany→Netherlands",
+      "notion_worthy": true
+    },
+    "T4_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "title": "T4 Lucia Martinez: Spain→Germany",
+      "notion_worthy": true
+    },
+    "T5_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "title": "T5 Anders Lindqvist: Sweden→Singapore",
+      "notion_worthy": true
+    },
+    "T6_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P2",
+      "title": "T6 Marc Dubois: France→Tokyo (unsupported)",
+      "notion_worthy": true
+    },
+    "T7_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "title": "T7 Camille Dupont: France→Canada",
+      "notion_worthy": true
+    },
+    "T8_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "title": "T8 Valentine Martin: France→UAE",
+      "notion_worthy": true
+    },
+    "T15_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "title": "T15 Isabelle Fontaine: intra-EU",
+      "notion_worthy": true
+    },
+    "T16_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P2",
+      "title": "T16 Ahmed Mansouri: Dubai (unsupported)",
+      "notion_worthy": true
+    },
+    "T13_B9": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Admin Console",
+      "priority": "P1",
+      "title": "Admin assignments endpoint (B9)",
+      "notion_worthy": true
+    },
+    "T13_B2_API": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Admin Console",
+      "priority": "P1",
+      "title": "Admin create user via API (B2)",
+      "notion_worthy": true
+    },
+    "T13_B1_FRESH": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Case Management",
+      "priority": "P1",
+      "title": "Fresh HR user: /api/hr/assignments <5s",
+      "notion_worthy": false
+    },
+    "T13_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "title": "T13 Admin Onboarding full flow",
+      "notion_worthy": true
+    },
+    "T14_CREATE": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "Case Management",
+      "priority": "P0",
+      "title": "HR creates fresh case for T14",
+      "notion_worthy": true
+    },
+    "T14_FLOW": {
+      "status": "PASS",
+      "points": 1.0,
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "title": "T14 Cross-Role Full-Stack",
+      "notion_worthy": true
+    }
+  },
+  "scenario_breakdown": [
+    {
+      "scenario_id": "T17_FLOW",
+      "title": "Multi-Company RLS Isolation",
+      "priority": "P0",
+      "flow_status": "SKIP",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "Admin",
+          "method": "API",
+          "action": "Register HR-A linked to 'Test company', register HR-B linked to 'Other Corp'",
+          "test_id": "RLS0",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR-A",
+          "method": "API",
+          "action": "POST /api/hr/cases — create case-A",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR-B",
+          "method": "API",
+          "action": "POST /api/hr/cases — create case-B",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 4,
+          "role": "HR-B",
+          "method": "API",
+          "action": "GET /api/hr/cases using HR-B token → verify case-A NOT in list",
+          "test_id": "HP2",
+          "status": "PASS"
+        },
+        {
+          "step": 5,
+          "role": "HR-B",
+          "method": "API",
+          "action": "GET /api/hr/cases/{caseId-A} using HR-B token → must return 403/404",
+          "test_id": "RLS1",
+          "status": "PASS"
+        },
+        {
+          "step": 6,
+          "role": "HR-A",
+          "method": "API",
+          "action": "GET /api/hr/cases/{caseId-B} using HR-A token → must return 403/404",
+          "test_id": "RLS1",
+          "status": "PASS"
+        },
+        {
+          "step": 7,
+          "role": "HR-B",
+          "method": "UI",
+          "action": "Open HR-B command center → verify only Company B cases shown",
+          "test_id": "HP1",
+          "status": "PASS"
+        },
+        {
+          "step": 8,
+          "role": "HR-B",
+          "method": "API",
+          "action": "PATCH /api/cases/{caseId-A} using HR-B token",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T9_FLOW",
+      "title": "HR Command Center",
+      "priority": "P1",
+      "flow_status": "SKIP",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "UI",
+          "action": "Log in as hr_test@relopass.com → navigate to /hr/dashboard",
+          "test_id": "HP1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify case list shows and count cases",
+          "test_id": "HP1",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify KPI cards show numbers, not ellipsis",
+          "test_id": "HP1",
+          "status": "PASS"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Click one case → verify it opens without error",
+          "test_id": "HP2",
+          "status": "PASS"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Navigate directly to /hr/cases",
+          "test_id": "CT1",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T12_FLOW",
+      "title": "Resources Preview",
+      "priority": "P1",
+      "flow_status": "SKIP",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "GET /api/hr/resources/destinations → count returned destinations",
+          "test_id": "RT1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "UI",
+          "action": "Navigate to /hr/resources → open destination dropdown, count countries",
+          "test_id": "RT1",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select Germany + Family + Long-term → verify content appears",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select an unsupported destination → verify explicit error shown",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Compare content for STA vs LTA assignment length",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T11_FLOW",
+      "title": "Vendor Curation",
+      "priority": "P1",
+      "flow_status": "SKIP",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "GET /api/hr/service-categories → count categories",
+          "test_id": "VT1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "UI",
+          "action": "Navigate to /hr/vendor-curation → verify 'Employees waiting' widget resolves within 10s",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select Germany → verify vendors pre-loaded",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Add a custom vendor",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Trigger 'AI populate' feature",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T10_FLOW",
+      "title": "Employee Portal Self-Service",
+      "priority": "P1",
+      "flow_status": "SKIP",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Log in as employee_test@relopass.com → navigate to /employee/dashboard",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 2,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Check v2 wizard Step 1 'Move details' — interactive form with origin, destination, assignment type, duration fields?",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 3,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Check v2 wizard Step 2 'About You' — personal details form (nationality, languages) interactive?",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Check v2 wizard Step 3 'My People' — family member form interactive?",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Check v2 wizard Step 4 'Work & Place' — work contract and housing preference form interactive?",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 6,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Check v2 wizard Step 5 'Review' — submit button functional; after submission does roadmap generate?",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 7,
+          "role": "HR",
+          "method": "UI",
+          "action": "Log in as HR → navigate to /employee/dashboard → verify redirect to /hr/dashboard",
+          "test_id": "EP1",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T13_FLOW",
+      "title": "Admin Onboarding — New HR User",
+      "priority": "P1",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "Admin",
+          "method": "UI",
+          "action": "Log in as admin@relopass.com → navigate to admin portal",
+          "test_id": "AD1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "Admin",
+          "method": "UI",
+          "action": "People → Add person: first=Onboard, last=Test, email=onboard_test_{epoch}@testco.com, role=HR → Save",
+          "test_id": "T13_B2_API",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "Admin",
+          "method": "UI",
+          "action": "Check inbox for onboard_test@testco.com: invite/magic-link email received?",
+          "test_id": "T13_B2_API",
+          "status": "PASS"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Follow invite link → set password → confirm login works",
+          "test_id": "AT2",
+          "status": "PASS"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Navigate to /hr/dashboard as new HR user with zero cases",
+          "test_id": "T13_B1_FRESH",
+          "status": "PASS"
+        },
+        {
+          "step": 6,
+          "role": "Admin",
+          "method": "API",
+          "action": "GET /api/admin/assignments/{id} — verify returns 200 (not 500)",
+          "test_id": "T13_B9",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T1_FLOW",
+      "title": "Simple LTA — Adrien Moreau (Lyon → Berlin)",
+      "priority": "P0",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create case for Adrien Moreau",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "HYBRID",
+          "action": "Verify employer name in case profile_json (B5 regression)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases/{caseId}/assign — assign to employee_test@relopass.com, measure response time",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 4,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Log in as employee → verify case visible in /employee/dashboard",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Fill Step 1: origin=Lyon/France, destination=Berlin/Germany, type=LTA, duration=18mo → Save",
+          "test_id": "EMP-001",
+          "status": "SKIP"
+        },
+        {
+          "step": 6,
+          "role": "HR",
+          "method": "UI",
+          "action": "Open same case in HR view → verify employee-filled data is visible",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 7,
+          "role": "DB",
+          "method": "DB",
+          "action": "Query audit log for full event trail",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T2_FLOW",
+      "title": "LTA with Family — Camille Renard (Paris → Madrid)",
+      "priority": "P0",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create for Camille Renard",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases/{id}/assign — assign to employee",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 3,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Fill Step 1 + complete family section: spouse field, 2 dependents with ages + language needs",
+          "test_id": "EMP-001",
+          "status": "SKIP"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Open HR case view → verify family data visible (spouse, 2 children)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Check vendor categories for Spain include Schools + Childcare",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T3_FLOW",
+      "title": "Cross-border Transfer — Stefan Weber (Frankfurt → Boston, L1B)",
+      "priority": "P0",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create for Stefan Weber",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST assign",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 3,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Fill visa/immigration type field (L1B), nationality, spouse immigration needs",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Check 'Legal & Admin' vendor category exists for USA",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Resources → USA → verify immigration guidance present",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T4_FLOW",
+      "title": "Permanent Transfer — Lucia Martinez (Madrid → Amsterdam)",
+      "priority": "P1",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create for Lucia Martinez",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST assign",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select 'Permanent' in assignment type → verify UI adjusts",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Fill case as permanent relocation",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T5_FLOW",
+      "title": "Short-Term Assignment — Anders Lindqvist (Berlin → Singapore, 6-month STA)",
+      "priority": "P1",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "GET /api/hr/resources/destinations — confirm Singapore present",
+          "test_id": "RT1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create for Anders Lindqvist with destination=Singapore",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "API",
+          "action": "POST assign",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select 'Short-term' / 6-month duration → verify STA-specific services (per-diem, serviced apartment)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Resources → Singapore + Short-term → verify content appears",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T6_FLOW",
+      "title": "Complex Enterprise — Marc Dubois (Paris → Tokyo)",
+      "priority": "P2",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "GET /api/hr/resources/destinations → check Japan/Tokyo present, count total",
+          "test_id": "RT1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "UI",
+          "action": "If Japan found: create case for Marc Dubois + assign (requires B3 PASS)",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify Japan-specific services available (immigration, housing)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Resources → Japan → verify content appears",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "If Japan NOT found: verify 'Request new destination' mechanism exists",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T7_FLOW",
+      "title": "Repatriation — Camille Dupont (Madrid → Paris)",
+      "priority": "P1",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "UI",
+          "action": "Check for dedicated 'Repatriation' case type in case creation UI",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "UI",
+          "action": "Create repatriation case — verify home country pre-populates as destination",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify services differ from outbound LTA (reverse logistics, home search in France)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Check active case has 'End of assignment' or 'Repatriation' milestone",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T8_FLOW",
+      "title": "Domestic Relocation — Valentine Martin (Paris → Lyon)",
+      "priority": "P1",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "UI",
+          "action": "Create case: origin=France, destination=France — verify both selectable",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST assign",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 3,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Open case as employee → verify immigration section is hidden",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify budget/policy rules differ from international LTA",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T14_FLOW",
+      "title": "Cross-Role Full-Stack — HR → Employee → HR",
+      "priority": "P0",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — fresh case with no pre-existing seed data",
+          "test_id": "T14_CREATE",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "HYBRID",
+          "action": "Verify employer name in case JSON (B5 regression check)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases/{id}/assign → measure response time",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 4,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Log in as employee_test@relopass.com → verify new case visible in /employee/dashboard",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Verify Step 1 is interactive (not locked/spinner)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 6,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Fill Step 1: origin=Lyon, destination=Berlin, LTA, 18mo → Save",
+          "test_id": "EMP-001",
+          "status": "SKIP"
+        },
+        {
+          "step": 7,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Navigate to /services (case-scoped, AIQ-1285) → verify service catalog loads with Berlin/Germany context",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 8,
+          "role": "HR",
+          "method": "UI",
+          "action": "Log in as HR → open same case → verify employee-filled data visible (B17 regression)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 9,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify no 'Loading…' spinner on filled case page within 3s (B10 regression)",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 10,
+          "role": "DB",
+          "method": "DB",
+          "action": "Query full audit log for this assignment",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T15_FLOW",
+      "title": "Full Employee Wizard — Isabelle Fontaine (Lyon → Zurich, 24-month LTA)",
+      "priority": "P1",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "GET /api/hr/resources/destinations — confirm Switzerland present",
+          "test_id": "RT1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create for Isabelle Fontaine, destination=Zurich",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "API",
+          "action": "POST assign",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 4,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Verify case notification visible in employee dashboard within 30s",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Step 1: origin=Lyon, dest=Zurich, LTA, 24mo → Save → verify persists on refresh",
+          "test_id": "EMP-001",
+          "status": "SKIP"
+        },
+        {
+          "step": 6,
+          "role": "Employee",
+          "method": "UI",
+          "action": "v2 wizard Step 2 'About You': fill nationality (French), primary language (French/English) → Save",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 7,
+          "role": "Employee",
+          "method": "UI",
+          "action": "v2 wizard Step 3 'My People': confirm no dependents (single assignment) → proceed to Step 4",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 8,
+          "role": "Employee",
+          "method": "UI",
+          "action": "v2 wizard Step 4 'Work & Place': fill work contract details and housing preferences → Save",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 9,
+          "role": "Employee",
+          "method": "UI",
+          "action": "v2 wizard Step 5 'Review': submit intake → verify roadmap generates at /employee/journey/roadmap; verify /services shows Switzerland/Zurich context; verify HR-employee thread exists at /employee/messages",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 10,
+          "role": "HR",
+          "method": "UI",
+          "action": "HR opens case → wizard completion shown in case timeline; employee-filled data (Lyon→Zurich, LTA, 24mo) visible",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    },
+    {
+      "scenario_id": "T16_FLOW",
+      "title": "Vendor Selection & Budget — Ahmed Mansouri (Paris → Dubai)",
+      "priority": "P2",
+      "flow_status": "PASS",
+      "first_failure_step": null,
+      "blocking_role": null,
+      "blocking_action": null,
+      "blocking_bug": null,
+      "steps": [
+        {
+          "step": 1,
+          "role": "HR",
+          "method": "API",
+          "action": "GET /api/hr/resources/destinations — confirm UAE/Dubai present",
+          "test_id": "RT1",
+          "status": "PASS"
+        },
+        {
+          "step": 2,
+          "role": "HR",
+          "method": "API",
+          "action": "POST /api/hr/cases — create for Ahmed Mansouri, destination=Dubai",
+          "test_id": "CT2",
+          "status": "PASS"
+        },
+        {
+          "step": 3,
+          "role": "HR",
+          "method": "API",
+          "action": "POST assign",
+          "test_id": "CASE-002",
+          "status": "SKIP"
+        },
+        {
+          "step": 4,
+          "role": "HR",
+          "method": "UI",
+          "action": "Navigate to /hr/vendor-curation with case selected → verify vendor list filters to UAE",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 5,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select housing vendor → appears in case",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 6,
+          "role": "HR",
+          "method": "UI",
+          "action": "Select tax advisory vendor → appears in case",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 7,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify budget estimate generated after vendor selection",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 8,
+          "role": "HR",
+          "method": "UI",
+          "action": "Verify policy limits shown alongside vendor costs",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 9,
+          "role": "HR",
+          "method": "UI",
+          "action": "Share vendor shortlist with employee",
+          "test_id": null,
+          "status": "UNTESTED"
+        },
+        {
+          "step": 10,
+          "role": "Employee",
+          "method": "UI",
+          "action": "Verify vendor shortlist visible in employee dashboard",
+          "test_id": null,
+          "status": "UNTESTED"
+        }
+      ]
+    }
+  ]
+}
