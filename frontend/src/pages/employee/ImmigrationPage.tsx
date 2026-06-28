@@ -80,8 +80,8 @@ export const ImmigrationPage: React.FC = () => {
     void load();
   }, [load]);
 
-  const casePlanHref = caseId
-    ? buildRoute('employeeCasePlan', { caseId })
+  const caseRoadmapHref = caseId
+    ? buildRoute('employeeCaseRoadmap', { caseId })
     : buildRoute('employeeDashboard');
 
   return (
@@ -143,7 +143,7 @@ export const ImmigrationPage: React.FC = () => {
         <ImmigrationInterviewShell
           caseId={caseId}
           onComplete={() => setStage('complete')}
-          onSaveAndExit={() => navigate(casePlanHref)}
+          onSaveAndExit={() => navigate(caseRoadmapHref)}
         />
       )}
 
@@ -180,8 +180,8 @@ export const ImmigrationPage: React.FC = () => {
               </p>
             )}
             <div className="mt-6 flex flex-col gap-2 items-center">
-              <Button variant="primary" onClick={() => navigate(casePlanHref)}>
-                Back to my relocation plan
+              <Button variant="primary" onClick={() => navigate(caseRoadmapHref)}>
+                Back to my roadmap
               </Button>
               <Button unstyled
                 type="button"

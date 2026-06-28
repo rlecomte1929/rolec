@@ -22,8 +22,6 @@ export const ROUTE_DEFS = {
   employeeQuoteRequest: { path: '/employee/quote-request', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Employee document vault — categorised uploads with expiry & deadline tracking. */
   employeeDocuments: { path: '/employee/documents', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
-  /** Relocation task checklist (per assignment). */
-  employeeCasePlan: { path: '/employee/case/:caseId/plan', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** [AIQ-976] Case-scoped intake wizard — opens the clicked case (vs the bare
    *  /employee/intake which resolves the primary case from context). */
   employeeCaseIntake: { path: '/employee/case/:caseId/intake', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
