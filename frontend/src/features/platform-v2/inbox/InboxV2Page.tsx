@@ -25,6 +25,7 @@ import {
 } from '../../messages/utils';
 import type { Conversation, Message } from '../../messages/types';
 import { AppShell } from '../../../components/AppShell';
+import { ComposeNewMessage } from './ComposeNewMessage';
 
 type MailboxKey = 'inbox' | 'hr' | 'vendors' | 'authorities' | 'family' | 'sent' | 'archive';
 
@@ -159,6 +160,10 @@ export function InboxV2Page() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
   const [starred, setStarred] = useState<Set<string>>(new Set());
+  // Compose-new-thread modal (AIQ-1326) + the assignment to select once the
+  // list refetch surfaces its freshly-created thread.
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [pendingSelectAid, setPendingSelectAid] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
@@ -272,6 +277,16 @@ export function InboxV2Page() {
       setSearchParams(next, { replace: true });
     }
   }, [assignmentIdFromUrl, conversations, searchParams, setSearchParams]);
+
+  // After composing a new thread, select it once the list refetch surfaces it.
+  useEffect(() => {
+    if (!pendingSelectAid) return;
+    const target = `conv-${pendingSelectAid}`;
+    if (conversations.some((c) => c.id === target)) {
+      setActiveId(target);
+      setPendingSelectAid(null);
+    }
+  }, [pendingSelectAid, conversations]);
 
   // Default-select first conversation in the active mailbox once loaded.
   const filteredConversations = useMemo(() => {
@@ -556,14 +571,7 @@ export function InboxV2Page() {
               <Button unstyled
                 type="button"
                 title="Start a new message"
-                onClick={() => {
-                  // Conversations are one-per-assignment and always exist, so a
-                  // "new message" is: open a thread (the active one, or the first)
-                  // and focus the composer to start writing.
-                  const target = activeId ?? filteredConversations[0]?.id ?? null;
-                  if (target && target !== activeId) setActiveId(target);
-                  setTimeout(() => document.getElementById('inbox-v2-composer')?.focus(), 50);
-                }}
+                onClick={() => setComposeOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -806,6 +814,18 @@ export function InboxV2Page() {
           </section>
         </div>
       </div>
+      <ComposeNewMessage
+        open={composeOpen}
+        isHr={isHrLike}
+        onClose={() => setComposeOpen(false)}
+        onSent={(aid) => {
+          // Surface the freshly-created thread: show the inbox, refetch the list,
+          // and select the conversation once it appears (pendingSelect effect).
+          setMailbox('inbox');
+          setReloadKey((k) => k + 1);
+          setPendingSelectAid(aid);
+        }}
+      />
     </AppShell>
   );
 }
