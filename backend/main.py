@@ -6961,6 +6961,15 @@ def get_hr_assignment(
             )
         case_origin_hint, case_dest_hint = _hr_assignment_case_route_hints(case_row)
         case_origin_city, case_dest_city = _hr_assignment_case_route_city_hints(case_row)
+        # [AIQ-1336 follow-up] wizard_cases is the intake source of truth for city (the
+        # command-center reads it too); relocation_cases / the draft often lack it. Prefer
+        # the wizard city, fall back to the relocation_cases-based hints above.
+        try:
+            _wc_origin_city, _wc_dest_city = db.get_assignment_route_cities(aid)
+            case_origin_city = _wc_origin_city or case_origin_city
+            case_dest_city = _wc_dest_city or case_dest_city
+        except Exception:
+            pass
 
         linked_email = None
         linked_full_name = None

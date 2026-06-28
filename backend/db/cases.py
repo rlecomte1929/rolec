@@ -114,6 +114,36 @@ class CasesMixin:
             row = conn.execute(text("SELECT * FROM relocation_cases WHERE id::text = :id"), {"id": case_id}).fetchone()
         return self._row_to_dict(row)
 
+    def get_assignment_route_cities(self, assignment_id: str) -> tuple:
+        """[AIQ-1336] Origin/destination CITY for an assignment from wizard_cases — the
+        intake source of truth, reached via the SAME case_assignments→wizard_cases join
+        the command-center uses. Returns (origin_city, dest_city), each None when unknown.
+
+        relocation_cases frequently lacks the city (it lives in the wizard draft), so the
+        HR case detail prefers this over the relocation_cases-based route hints. Defensive:
+        any error / no match yields (None, None) so the caller falls back to country-only."""
+        if not assignment_id or not str(assignment_id).strip():
+            return (None, None)
+        wc_join = self._command_center_join_wizard_cases()
+        sql = f"""
+            SELECT wc.origin_city AS oc, wc.dest_city AS dc
+            FROM case_assignments ca
+            LEFT JOIN wizard_cases wc ON {wc_join}
+            WHERE ca.id = :aid
+            LIMIT 1
+        """
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(sql), {"aid": str(assignment_id).strip()}).fetchone()
+            if not row:
+                return (None, None)
+            m = row._mapping
+            oc = (m.get("oc") or "").strip() or None
+            dc = (m.get("dc") or "").strip() or None
+            return (oc, dc)
+        except Exception:
+            return (None, None)
+
     def redact_case_identity_data(
         self,
         case_id: str,
