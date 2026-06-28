@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/client';
 import { signInSupabase } from '../api/supabaseAuth';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
-import { normalizeStoredRole, setAuthItem } from '../utils/demo';
+import { normalizeStoredRole, setAuthItem, setStoredRoles, setActiveRole } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { homeRouteKeyForRole, type RouteKey } from '../navigation/routes';
 import { trackAuthPerf } from '../perf/authPerf';
@@ -24,7 +24,7 @@ function shouldPersistReconciliation(rec: PostSignupReconciliation | null | unde
 export const useAuth = () => {
   const navigate = useNavigate();
 
-  const setSession = (token: string, user: { id: string; role: UserRole; email?: string | null; username?: string | null; name?: string | null }) => {
+  const setSession = (token: string, user: { id: string; role: UserRole; email?: string | null; username?: string | null; name?: string | null; roles?: string[] | null; primary_role?: string | null }) => {
     setAuthItem('relopass_token', token);
     setAuthItem('relopass_user_id', user.id);
     if (user.email) setAuthItem('relopass_email', user.email);
@@ -34,6 +34,11 @@ export const useAuth = () => {
     // This localStorage copy is a cache/UX hint only — it is NOT the access boundary
     // (the backend re-derives role + company-scope from the token on every request).
     setAuthItem('relopass_role', normalizeStoredRole(user.role));
+    // AIQ-1363: multi-role — persist all held roles + the active (primary) role.
+    // Falls back to the single role so single-role users are unchanged.
+    const roles = user.roles && user.roles.length ? user.roles : [user.role];
+    setStoredRoles(roles);
+    setActiveRole(user.primary_role || user.role);
   };
 
   const postAuthRouteKey = (role: UserRole | string): RouteKey => homeRouteKeyForRole(normalizeStoredRole(role));
