@@ -608,10 +608,10 @@ export const EmployeeJourney: React.FC = () => {
             Your HR team at {primaryRow.company?.name || 'your company'} has started your relocation to{' '}
             {formatDestinationLabel(primaryRow.destination)}. Here&rsquo;s what to do first:
           </p>
+          {/* [AIQ-1348] The "Start intake" action lives on the case row below (one clear,
+              state-aware next action) — the welcome card only orients and can be dismissed,
+              so a new employee no longer sees two buttons to the same destination. */}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => navigate(`/employee/case/${caseNavId(primaryRow)}/intake`)}>
-              Start intake →
-            </Button>
             <Button variant="outline" onClick={handleDismissWelcomeCard}>
               Skip for now
             </Button>
@@ -738,7 +738,11 @@ export const EmployeeJourney: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex sm:flex-col sm:justify-center shrink-0">
-                      <Button onClick={() => navigate(openCaseHref(caseNavId(row), row.status))}>Open case</Button>
+                      {/* [AIQ-1348] One state-aware action that names what it does, instead of
+                          an ambiguous "Open case" that silently changes meaning after intake. */}
+                      <Button onClick={() => navigate(openCaseHref(caseNavId(row), row.status))}>
+                        {intakeSubmitted ? 'View roadmap' : intakeStarted ? 'Continue intake' : 'Start intake'}
+                      </Button>
                     </div>
                   </li>
                 );
