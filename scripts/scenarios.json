@@ -1,7 +1,9 @@
 {
   "_meta": {
-    "version": "1.0",
+    "version": "1.1",
     "created": "2026-05-23",
+    "last_updated": "2026-06-28",
+    "changelog": "v1.1: T10 steps 2-6 updated to v2 wizard labels (Move details/About You/My People/Work & Place/Review). T14 step 7 updated — quotes are now at /services not in wizard. T15 steps 6-9 rewritten for v2 wizard (old steps 2-5 with services/budget/quotes/message were pre-v2). Wave 3 audit 2026-06-27.",
     "description": "Machine-readable definition of every ReloPass E2E scenario. Each scenario has an ordered step list tagged by role (HR / Employee / Admin), the API call or UI action, the test_id that covers it, the expected outcome, and the DB verification query. The campaign scorer uses this to produce step-level breakdowns instead of binary PASS/BLOCKED.",
     "run_order": ["T17","T9","T12","T11","T10","T13","T1","T2","T3","T4","T5","T6","T7","T8","T14","T15","T16"],
     "method_types": {
@@ -91,15 +93,15 @@
       "fixture": { "employee_user": "employee_test@relopass.com", "hr_user": "hr_test@relopass.com" },
       "steps": [
         { "step": 1, "role": "Employee", "method": "UI", "action": "Log in as employee_test@relopass.com → navigate to /employee/dashboard", "expected": "Dashboard loads", "blocking_bug": null, "test_id": null },
-        { "step": 2, "role": "Employee", "method": "UI", "action": "Check Step 1 'Fill your case' — functional or locked?", "expected": "Functional (interactive form)", "blocking_bug": null, "test_id": null },
-        { "step": 3, "role": "Employee", "method": "UI", "action": "Check Step 2 'Choose services' — functional or placeholder?", "expected": "Functional", "blocking_bug": null, "test_id": null },
-        { "step": 4, "role": "Employee", "method": "UI", "action": "Check Step 3 'Review budget vs policy' — functional?", "expected": "Functional", "blocking_bug": null, "test_id": null },
-        { "step": 5, "role": "Employee", "method": "UI", "action": "Check Step 4 'Request quotes' — interactive form or still '(Soon)'?", "expected": "Interactive form (B11 fixed)", "blocking_bug": "B11", "test_id": null },
-        { "step": 6, "role": "Employee", "method": "UI", "action": "Check Step 5 'Exchange with HR' — functional?", "expected": "Functional", "blocking_bug": null, "test_id": null },
+        { "step": 2, "role": "Employee", "method": "UI", "action": "Check v2 wizard Step 1 'Move details' — interactive form with origin, destination, assignment type, duration fields?", "expected": "Move details form interactive and fillable", "blocking_bug": null, "test_id": null },
+        { "step": 3, "role": "Employee", "method": "UI", "action": "Check v2 wizard Step 2 'About You' — personal details form (nationality, languages) interactive?", "expected": "About You form interactive", "blocking_bug": null, "test_id": null },
+        { "step": 4, "role": "Employee", "method": "UI", "action": "Check v2 wizard Step 3 'My People' — family member form interactive?", "expected": "My People step accessible and interactive", "blocking_bug": null, "test_id": null },
+        { "step": 5, "role": "Employee", "method": "UI", "action": "Check v2 wizard Step 4 'Work & Place' — work contract and housing preference form interactive?", "expected": "Work & Place form interactive (v2 wizard — no 'Request quotes' step exists)", "blocking_bug": null, "test_id": null },
+        { "step": 6, "role": "Employee", "method": "UI", "action": "Check v2 wizard Step 5 'Review' — submit button functional; after submission does roadmap generate?", "expected": "Submit button works; roadmap visible after submission", "blocking_bug": null, "test_id": null },
         { "step": 7, "role": "HR",      "method": "UI", "action": "Log in as HR → navigate to /employee/dashboard → verify redirect to /hr/dashboard", "expected": "HR redirected away from employee portal (B15 fixed)", "blocking_bug": "B15", "test_id": "EP1" }
       ],
-      "pass_condition": "Steps 1–5 functional + Step 4 implemented + HR role guard redirects",
-      "partial_condition": "Steps 1–3 + 5 functional but Step 4 still '(Soon)' or role guard missing",
+      "pass_condition": "All 5 v2 wizard steps (Move details → About You → My People → Work & Place → Review) interactive + HR role guard redirects",
+      "partial_condition": "Some wizard steps accessible but not all interactive, or role guard missing",
       "blocked_condition": "Employee portal does not load",
       "db_verify": null
     },
@@ -387,7 +389,7 @@
         { "step": 4,  "role": "Employee", "method": "UI",  "action": "Log in as employee_test@relopass.com → verify new case visible in /employee/dashboard", "expected": "Case appears in employee's list", "blocking_bug": null, "test_id": null },
         { "step": 5,  "role": "Employee", "method": "UI",  "action": "Verify Step 1 is interactive (not locked/spinner)", "expected": "Step 1 interactive", "blocking_bug": "B10", "test_id": null },
         { "step": 6,  "role": "Employee", "method": "UI",  "action": "Fill Step 1: origin=Lyon, destination=Berlin, LTA, 18mo → Save", "expected": "Confirmation, no error", "blocking_bug": null, "test_id": "EMP-001", "db_verify": "SELECT status FROM public.case_assignments WHERE id = '<assignmentId>';" },
-        { "step": 7,  "role": "Employee", "method": "UI",  "action": "Check Step 4 'Request quotes' — interactive or '(Soon)'?", "expected": "Interactive (B11 should be fixed)", "blocking_bug": "B11", "test_id": null },
+        { "step": 7,  "role": "Employee", "method": "UI",  "action": "Navigate to /services (case-scoped, AIQ-1285) → verify service catalog loads with Berlin/Germany context", "expected": "Services page loads showing Germany-relevant service categories; case header shows Paris→Berlin corridor (old 'Request quotes' wizard step is gone in v2)", "blocking_bug": null, "test_id": null },
         { "step": 8,  "role": "HR",       "method": "UI",  "action": "Log in as HR → open same case → verify employee-filled data visible (B17 regression)", "expected": "Origin, destination, type, duration shown in HR view", "blocking_bug": "B17", "test_id": null },
         { "step": 9,  "role": "HR",       "method": "UI",  "action": "Verify no 'Loading…' spinner on filled case page within 3s (B10 regression)", "expected": "Case loads <3s", "blocking_bug": "B10", "test_id": null },
         { "step": 10, "role": "DB",       "method": "DB",  "action": "Query full audit log for this assignment", "expected": "CASE_CREATED, CASE_ASSIGNED, WIZARD_SAVE all present", "blocking_bug": null, "test_id": null, "db_verify": "SELECT action, created_at, actor_user_id FROM public.assignment_audit_log WHERE assignment_id = '<assignmentId>' ORDER BY created_at;" }
@@ -404,7 +406,7 @@
       "subtitle": "All 5 wizard steps end-to-end — definitive self-service test",
       "priority": "P1",
       "roles": ["HR", "Employee"],
-      "blocking_bugs": ["B3", "B19", "B14"],
+      "blocking_bugs": ["B3", "B14"],
       "prerequisites": ["T1_FLOW", "T14_FLOW"],
       "fixture": {
         "persona": "Isabelle Fontaine",
@@ -421,16 +423,16 @@
         { "step": 3, "role": "HR",       "method": "API", "action": "POST assign", "expected": "<3s", "blocking_bug": "B3", "test_id": "CASE-002" },
         { "step": 4, "role": "Employee", "method": "UI",  "action": "Verify case notification visible in employee dashboard within 30s", "expected": "Case appears", "blocking_bug": null, "test_id": null },
         { "step": 5, "role": "Employee", "method": "UI",  "action": "Step 1: origin=Lyon, dest=Zurich, LTA, 24mo → Save → verify persists on refresh", "expected": "Data saved and persists", "blocking_bug": null, "test_id": "EMP-001", "db_verify": "SELECT status FROM public.case_assignments WHERE id = '<assignmentId>';" },
-        { "step": 6, "role": "Employee", "method": "UI",  "action": "Step 2: verify Switzerland services menu, select Housing + Tax + Schooling + Banking → Save", "expected": "Services selectable and saved", "blocking_bug": "B19", "test_id": null },
-        { "step": 7, "role": "Employee", "method": "UI",  "action": "Step 3: verify budget summary loads with policy limits and estimated total", "expected": "Budget vs policy shown, flags over-budget items", "blocking_bug": "B19", "test_id": null },
-        { "step": 8, "role": "Employee", "method": "UI",  "action": "Step 4: verify interactive quote request form (not '(Soon)') → submit ≥1 request", "expected": "Form works, quote submitted", "blocking_bug": "B11", "test_id": null },
-        { "step": 9, "role": "Employee", "method": "UI",  "action": "Step 5: send message to HR via thread", "expected": "Message sent, thread created", "blocking_bug": null, "test_id": null },
-        { "step": 10,"role": "HR",       "method": "UI",  "action": "HR opens case → all 5 steps shown as complete in case timeline", "expected": "Full wizard completion visible to HR", "blocking_bug": "B17", "test_id": null }
+        { "step": 6, "role": "Employee", "method": "UI",  "action": "v2 wizard Step 2 'About You': fill nationality (French), primary language (French/English) → Save", "expected": "About You data saved; wizard advances to Step 3 (old 'Choose services' menu does not exist in v2)", "blocking_bug": null, "test_id": null },
+        { "step": 7, "role": "Employee", "method": "UI",  "action": "v2 wizard Step 3 'My People': confirm no dependents (single assignment) → proceed to Step 4", "expected": "My People step accepted with no family members; wizard advances (old 'budget summary' step does not exist in v2)", "blocking_bug": null, "test_id": null },
+        { "step": 8, "role": "Employee", "method": "UI",  "action": "v2 wizard Step 4 'Work & Place': fill work contract details and housing preferences → Save", "expected": "Work & Place data saved; wizard advances to Review (old 'quote request form' step does not exist in v2)", "blocking_bug": null, "test_id": null },
+        { "step": 9, "role": "Employee", "method": "UI",  "action": "v2 wizard Step 5 'Review': submit intake → verify roadmap generates at /employee/journey/roadmap; verify /services shows Switzerland/Zurich context; verify HR-employee thread exists at /employee/messages", "expected": "Intake submitted; roadmap appears with ≥1 task; /services shows Zurich corridor context; message thread with HR exists (old 'Step 5: send message' wizard step is now a separate /messages page)", "blocking_bug": null, "test_id": null },
+        { "step": 10,"role": "HR",       "method": "UI",  "action": "HR opens case → wizard completion shown in case timeline; employee-filled data (Lyon→Zurich, LTA, 24mo) visible", "expected": "Full intake visible to HR", "blocking_bug": "B17", "test_id": null }
       ],
-      "pass_condition": "All 5 steps functional, data persists, HR sees full picture",
-      "partial_condition": "Steps 1–3 work but 4–5 partially implemented",
+      "pass_condition": "All 5 v2 wizard steps functional + data persists + roadmap generated + /services loads for Switzerland + HR-employee message thread exists + HR sees intake data",
+      "partial_condition": "Steps 1–3 work but Step 4/5 fail, or /services missing Switzerland context",
       "unsupported_condition": "Switzerland not in destination list (B14 not fixed)",
-      "blocked_condition": "Assign hangs (B3) or Steps 2–4 have no endpoints (B19 not fixed)",
+      "blocked_condition": "Assign hangs (B3) or Switzerland not in destination list (B14)",
       "db_verify": "SELECT action, created_at FROM public.assignment_audit_log WHERE assignment_id = '<assignmentId>' ORDER BY created_at;"
     },
 
