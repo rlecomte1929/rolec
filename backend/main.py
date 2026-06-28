@@ -5493,6 +5493,14 @@ def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> D
     ac = draft.get("assignmentContext", {}) or {}
     origin = ", ".join(filter(None, [basics.get("originCity"), basics.get("originCountry")])) or "Unknown"
     dest = ", ".join(filter(None, [basics.get("destCity"), basics.get("destCountry")])) or "Unknown"
+    # Build employer with only the fields the draft actually carries — never emit
+    # an explicit None, so a blank pass can't clobber a previously-saved value once
+    # deep-merged (AIQ-1343). roleTitle is the single source of truth for job title.
+    employer: Dict[str, Any] = {}
+    if ac.get("employerName"):
+        employer["name"] = ac.get("employerName")
+    if ac.get("jobTitle"):
+        employer["roleTitle"] = ac.get("jobTitle")
     profile: Dict[str, Any] = {
         "userId": assignment_id,
         "familySize": 1,
@@ -5508,7 +5516,7 @@ def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> D
                 "expiryDate": ep.get("passportExpiry"),
                 "issuingCountry": ep.get("passportCountry"),
             },
-            "employer": {"name": ac.get("employerName"), "roleTitle": ac.get("jobTitle")},
+            "employer": employer,
             "assignment": {"startDate": ac.get("contractStartDate")},
         },
         "maritalStatus": fm.get("maritalStatus"),
@@ -5529,9 +5537,14 @@ def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> D
 
 
 def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
-    """Deep-merge update into base; update wins for leaf values."""
+    """Deep-merge update into base; update wins for leaf values, except a None
+    update value never overwrites an existing one. The wizard intentionally drops
+    blank fields (intakeToCaseDraft.ts) so a later partial save can't wipe data
+    captured earlier — e.g. job title -> employer.roleTitle (AIQ-1343)."""
     result = dict(base)
     for k, v in update.items():
+        if v is None:
+            continue
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
             result[k] = _merge_profiles(result[k], v)
         else:
