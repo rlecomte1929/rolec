@@ -23,7 +23,7 @@ import time
 import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, Header, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
 from passlib.context import CryptContext
 
 from ...database import db
@@ -50,7 +50,7 @@ from ..services.audit_log_service import (
     ACTION_DELETE,
     ACTOR_HUMAN,
 )
-from ..auth_deps import _is_admin_user
+from ..auth_deps import _is_admin_user, derive_roles, get_current_user
 
 log = logging.getLogger(__name__)
 
@@ -347,6 +347,8 @@ def register(body: RegisterRequest, request: Request):
                 relopass_user_id=user_id,
                 full_name=body.name,
             )
+        # [AIQ-1361] Surface all roles the user holds + their primary role.
+        _roles, _primary = derive_roles(db.get_user_roles(user_id), role.value)
         return LoginResponse(
             token=token,
             user=UserResponse(
@@ -354,6 +356,8 @@ def register(body: RegisterRequest, request: Request):
                 username=username,
                 email=email,
                 role=role,
+                roles=_roles,
+                primary_role=_primary,
                 name=body.name,
                 company=company_id,
             ),
@@ -536,6 +540,8 @@ def login(body: LoginRequest, request: Request):
         (time.perf_counter() - t0) * 1000,
         200,
     )
+    # [AIQ-1361] Surface all roles the user holds + their primary role.
+    _roles, _primary = derive_roles(db.get_user_roles(user["id"]), effective_role.value)
     return LoginResponse(
         token=token,
         user=UserResponse(
@@ -543,11 +549,31 @@ def login(body: LoginRequest, request: Request):
             username=user.get("username"),
             email=user.get("email"),
             role=effective_role,
+            roles=_roles,
+            primary_role=_primary,
             name=user.get("name"),
             company=profile.get("company_id") if profile else user.get("company"),
         ),
         reconciliation=reconciliation_payload,
     )
+
+
+@router.post("/api/auth/switch-role")
+def switch_role(
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """[AIQ-1355] Set the active/primary role for a multi-role user to one they
+    actually hold. 403 if the requested role isn't in the user's roles[]. Persists
+    by flipping is_primary in public.user_roles; returns the updated roles[]/primary_role.
+    Registered on the existing auth router (already mounted in both app instances)."""
+    requested = (body.get("role") or "").strip().upper()
+    held = user.get("roles") or [user.get("role")]
+    if requested not in held:
+        raise HTTPException(status_code=403, detail="You do not hold that role")
+    db.set_primary_role(user["id"], requested)
+    roles, primary = derive_roles(db.get_user_roles(user["id"]), requested)
+    return {"roles": roles, "primary_role": primary}
 
 
 def _verify_supabase_access_token(token: str) -> Dict[str, Any]:
@@ -653,6 +679,8 @@ def exchange_supabase_token(
     _audit_auth(entity_type="session", entity_id=user["id"], action_type=ACTION_INSERT, actor_id=user["id"])
     log.info("auth_exchange success user_id=%s", user["id"][:8])
     _log_auth_perf("/api/auth/exchange-supabase-token", request_id, user["id"], (time.perf_counter() - t0) * 1000, 200)
+    # [AIQ-1361] Surface all roles the user holds + their primary role.
+    _roles, _primary = derive_roles(db.get_user_roles(user["id"]), effective_role.value)
     return LoginResponse(
         token=session_token,
         user=UserResponse(
@@ -660,6 +688,8 @@ def exchange_supabase_token(
             username=user.get("username"),
             email=user.get("email"),
             role=effective_role,
+            roles=_roles,
+            primary_role=_primary,
             name=user.get("name"),
             company=profile.get("company_id") if profile else user.get("company"),
         ),

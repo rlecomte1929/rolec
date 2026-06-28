@@ -220,6 +220,10 @@ class UserResponse(BaseModel):
     username: Optional[str] = None
     email: Optional[str] = None
     role: UserRole
+    # [AIQ-1361] Multi-role: all roles the user holds + their primary/active role.
+    # Default to empty/None so legacy callers and existing tests are unaffected.
+    roles: List[str] = []
+    primary_role: Optional[str] = None
     name: Optional[str] = None
     company: Optional[str] = None
 

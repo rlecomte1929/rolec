@@ -170,6 +170,15 @@ class UsersMixin:
             for r in rows
         ]
 
+    def set_primary_role(self, user_id: str, role: str) -> None:
+        """[AIQ-1355] Make ``role`` the user's single primary role (all others
+        non-primary) in one statement. Caller must validate ``role`` is held."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE user_roles SET is_primary = (role = :role) WHERE user_id = :uid"),
+                {"role": role, "uid": user_id},
+            )
+
     def save_profile(self, user_id: str, profile: Dict[str, Any]) -> bool:
         now = datetime.utcnow().isoformat()
         pj = json.dumps(profile)
