@@ -113,13 +113,22 @@ class UsersMixin:
         return self._row_to_dict(row)
 
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        # AIQ-1347: match case-insensitively to mirror get_user_by_email (username
+        # was previously case-SENSITIVE, so 'JohnDoe' registered + 'johndoe' typed
+        # failed login). The exact-case-first tie-break keeps the result
+        # deterministic if a future 'John'/'john' pair ever coexists (username's
+        # UNIQUE constraint is case-sensitive), so no duplicate-match ambiguity.
         username_norm = (username or "").strip()
         if not username_norm:
             return None
         with self.engine.connect() as conn:
             row = conn.execute(
-                text("SELECT * FROM users WHERE TRIM(username) = :username"),
-                {"username": username_norm},
+                text(
+                    "SELECT * FROM users WHERE LOWER(TRIM(username)) = :u_lower "
+                    "ORDER BY CASE WHEN TRIM(username) = :u_exact THEN 0 ELSE 1 END "
+                    "LIMIT 1"
+                ),
+                {"u_lower": username_norm.lower(), "u_exact": username_norm},
             ).fetchone()
         return self._row_to_dict(row)
 

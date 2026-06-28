@@ -528,7 +528,7 @@ export const Auth: React.FC = () => {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label htmlFor="auth-login-identifier" className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Email or username
+                  Email
                 </label>
                 <Input unstyled
                   id="auth-login-identifier"
