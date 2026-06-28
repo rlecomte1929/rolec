@@ -50,6 +50,11 @@ class AssignmentContextDTO(BaseModel):
     salaryBand: Optional[str] = None
     jobTitle: Optional[str] = None
     seniorityBand: Optional[str] = None
+    # AIQ-1349: STA / LTA / PERMANENT — without this field the PATCH body's
+    # assignmentType is silently dropped (CaseDraftDTO is extra="ignore"), so the
+    # canonical-case bridge never sees it. Drives duration-aware policy + roadmap.
+    assignmentType: Optional[str] = None
+    expectedDurationMonths: Optional[int] = None
 
 
 class CaseDraftDTO(BaseModel):
