@@ -51,7 +51,7 @@ const stubModuleSources = (mode: 'values' | 'zeros' | 'reject') => {
   }
   const z = mode === 'zeros';
   mocked(adminOpsAnalyticsAPI.getSlaOverview).mockResolvedValue({ open_count: z ? 0 : 11, breached_count: z ? 0 : 12 });
-  mocked(adminOpsAnalyticsAPI.getWorkflowOverview).mockResolvedValue({ case_created: z ? 0 : 13, rfq_created: z ? 0 : 14 });
+  mocked(adminOpsAnalyticsAPI.getWorkflowOverview).mockResolvedValue({ events: { case_created: z ? 0 : 13, rfq_created: z ? 0 : 14 } });
   mocked(adminResourcesAPI.getCounts).mockResolvedValue({ resources_published: z ? 0 : 15, resources_draft: z ? 0 : 16 });
   mocked(adminProspectsAPI.list).mockResolvedValue({ total: z ? 0 : 17, limit: 1, offset: 0, prospects: [] });
   // The card only reads `.metrics[].alert.firing` and `.metrics.length`, so a
