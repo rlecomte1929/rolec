@@ -2073,6 +2073,9 @@ export const adminResourcesAPI = {
     api.post<unknown>(`/api/admin/resources/${id}/archive`).then((r) => r.data),
   restoreResource: async (id: string) =>
     api.post<unknown>(`/api/admin/resources/${id}/restore`).then((r) => r.data),
+  // [AIQ-1333] Soft-delete a draft/archived resource (server enforces the status guard).
+  deleteResource: async (id: string) =>
+    api.delete<{ ok: boolean; id: string }>(`/api/admin/resources/${id}`).then((r) => r.data),
   getResourceAudit: async (id: string, limit?: number) =>
     api.get<unknown>(`/api/admin/resources/${id}/audit`, { params: { limit } }).then((r) => r.data),
   getGlobalAuditLog: async (params?: { entity_type?: string; limit?: number; offset?: number }) =>
