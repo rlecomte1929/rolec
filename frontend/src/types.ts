@@ -427,6 +427,10 @@ export interface AssignmentContextDTO {
   salaryBand?: string;
   jobTitle?: string;
   seniorityBand?: string;
+  /** AIQ-1349: STA / LTA / PERMANENT — drives duration-aware policy + roadmap. */
+  assignmentType?: string;
+  /** AIQ-1349: expected assignment length in months. */
+  expectedDurationMonths?: number;
 }
 
 export interface CaseDraftDTO {
