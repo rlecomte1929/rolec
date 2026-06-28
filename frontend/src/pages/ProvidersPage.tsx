@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
@@ -24,6 +24,7 @@ import { useServicesFlow } from '../features/services/ServicesFlowContext';
 import {
   SERVICES_DISPLAY_CURRENCIES,
   SERVICES_DISPLAY_CURRENCY_STORAGE_KEY,
+  getDefaultCurrencyForCountry,
 } from '../features/services/servicesCurrency';
 import type { ServicePolicyHint } from '../features/services/ServiceCard';
 import {
@@ -168,6 +169,41 @@ export const ProvidersPage: React.FC = () => {
       // ignore
     }
   }, [svcPolicy?.currency, setDisplayCurrency]);
+
+  // AIQ-1327: when there's no policy currency and the user hasn't chosen one yet,
+  // default the estimate currency to the destination country's currency
+  // (e.g. Netherlands → EUR) instead of the bare USD fallback. Runs once, after
+  // the services query settles, so the policy-currency effect above still wins
+  // when a policy exists. The selector stays fully user-editable.
+  const destCountry = useMemo(
+    () =>
+      linkedSummaries.find((r) => r.assignment_id === assignmentId)?.destination?.host_country ??
+      null,
+    [linkedSummaries, assignmentId]
+  );
+  const destCurrencyAppliedRef = useRef(false);
+  const [currencyAutoDetected, setCurrencyAutoDetected] = useState(false);
+  useEffect(() => {
+    if (destCurrencyAppliedRef.current) return;
+    if (isLoading) return; // wait for svcPolicy to settle so a policy currency wins
+    if (svcPolicy?.currency) return; // policy currency takes precedence (handled above)
+    if (!destCountry) return;
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY);
+    } catch {
+      saved = null;
+    }
+    // Respect an explicit prior choice (localStorage) or a non-default value a
+    // per-case server sync may have already loaded.
+    if (saved || displayCurrency !== 'USD') return;
+    destCurrencyAppliedRef.current = true;
+    const ccy = getDefaultCurrencyForCountry(destCountry);
+    if (ccy !== displayCurrency) {
+      setDisplayCurrency(ccy);
+      setCurrencyAutoDetected(true);
+    }
+  }, [isLoading, svcPolicy?.currency, destCountry, displayCurrency, setDisplayCurrency]);
 
   // Seed the form-local `services` map from the loaded data, and sync the
   // selected set to context so the questions page has the right selection on a
@@ -339,7 +375,10 @@ export const ProvidersPage: React.FC = () => {
               <select
                 className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm text-[#0b2b43] w-full max-w-xs"
                 value={displayCurrency}
-                onChange={(e) => setDisplayCurrency(e.target.value)}
+                onChange={(e) => {
+                  setDisplayCurrency(e.target.value);
+                  setCurrencyAutoDetected(false);
+                }}
                 aria-label="Currency for service estimates"
               >
                 {SERVICES_DISPLAY_CURRENCIES.map((o) => (
@@ -348,6 +387,9 @@ export const ProvidersPage: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {currencyAutoDetected && (
+                <span className="text-xs text-[#64748b]">(auto-detected from your destination)</span>
+              )}
             </div>
           </label>
         </div>
