@@ -27,7 +27,8 @@ class TestDataFilterTests(unittest.TestCase):
             INSERT INTO companies (name) VALUES
               ('Acme GmbH'), ('Globex'), ('Testing April'),
               ('Other Corp'), ('Test Co (Seed)'), ('Test company'),
-              ('Other Corp (Seed)'), ('Probe ISO-A'), ('Probe ISO-B'), (NULL);
+              ('Other Corp (Seed)'), ('Probe ISO-A'), ('Probe ISO-B'),
+              ('Brand New Co 1782553314571'), (NULL);
             CREATE TABLE people (email TEXT);
             INSERT INTO people (email) VALUES
               ('real.person@acme.com'), ('hr@testcompany.com'),
@@ -47,9 +48,10 @@ class TestDataFilterTests(unittest.TestCase):
         names = {r[0] for r in rows}
         # real + NULL kept — incl. 'Testing April' (the real demo, must NOT be caught by a naive Test%)
         self.assertEqual(names, {"Acme GmbH", "Globex", "Testing April", None})
-        # every synthetic name gone
+        # every synthetic name gone (incl. Wave-3 'Brand New Co <epoch>' — AIQ-1325a)
         for bad in ("Other Corp", "Test Co (Seed)", "Test company",
-                    "Other Corp (Seed)", "Probe ISO-A", "Probe ISO-B"):
+                    "Other Corp (Seed)", "Probe ISO-A", "Probe ISO-B",
+                    "Brand New Co 1782553314571"):
             self.assertNotIn(bad, names)
 
     def test_people_filter_excludes_only_testco_domain(self):
