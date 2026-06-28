@@ -243,5 +243,25 @@ class ScrapeSafetyTests(unittest.TestCase):
         self.assertIn(("catalog_destination_requests", "update"), types)
 
 
+class CleanSeedNoteTests(unittest.TestCase):
+    """AIQ-1325c — read-time scrub of ReloPass-internal seed tags from allowlist notes."""
+
+    def test_internal_seed_tags_relabelled(self):
+        for note in ("AIQ-28-A seed", "B14 seed", "aiq-28-a-backfill original countries"):
+            self.assertEqual(scrape_safety._clean_seed_note(note), "ReloPass curated")
+
+    def test_genuine_hr_note_preserved(self):
+        note = "HR requested for new Lisbon office"
+        self.assertEqual(scrape_safety._clean_seed_note(note), note)
+
+    def test_backfill_word_alone_not_matched(self):
+        # Only the 'aiq…' / 'b<digits> seed' shapes are internal tags.
+        self.assertEqual(scrape_safety._clean_seed_note("Backfill for Q3"), "Backfill for Q3")
+
+    def test_none_and_empty_passthrough(self):
+        self.assertIsNone(scrape_safety._clean_seed_note(None))
+        self.assertEqual(scrape_safety._clean_seed_note(""), "")
+
+
 if __name__ == "__main__":
     unittest.main()
