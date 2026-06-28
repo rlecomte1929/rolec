@@ -348,7 +348,9 @@ def register(body: RegisterRequest, request: Request):
                 full_name=body.name,
             )
         # [AIQ-1361] Surface all roles the user holds + their primary role.
-        _roles, _primary = derive_roles(db.get_user_roles(user_id), role.value)
+        _roles, _primary = derive_roles(
+            db.get_user_roles(user_id), role.value, is_admin=(role == UserRole.ADMIN)
+        )
         return LoginResponse(
             token=token,
             user=UserResponse(
@@ -541,7 +543,9 @@ def login(body: LoginRequest, request: Request):
         200,
     )
     # [AIQ-1361] Surface all roles the user holds + their primary role.
-    _roles, _primary = derive_roles(db.get_user_roles(user["id"]), effective_role.value)
+    _roles, _primary = derive_roles(
+        db.get_user_roles(user["id"]), effective_role.value, is_admin=(effective_role == UserRole.ADMIN)
+    )
     return LoginResponse(
         token=token,
         user=UserResponse(
@@ -572,7 +576,9 @@ def switch_role(
     if requested not in held:
         raise HTTPException(status_code=403, detail="You do not hold that role")
     db.set_primary_role(user["id"], requested)
-    roles, primary = derive_roles(db.get_user_roles(user["id"]), requested)
+    roles, primary = derive_roles(
+        db.get_user_roles(user["id"]), requested, is_admin=bool(user.get("is_admin"))
+    )
     return {"roles": roles, "primary_role": primary}
 
 
@@ -680,7 +686,9 @@ def exchange_supabase_token(
     log.info("auth_exchange success user_id=%s", user["id"][:8])
     _log_auth_perf("/api/auth/exchange-supabase-token", request_id, user["id"], (time.perf_counter() - t0) * 1000, 200)
     # [AIQ-1361] Surface all roles the user holds + their primary role.
-    _roles, _primary = derive_roles(db.get_user_roles(user["id"]), effective_role.value)
+    _roles, _primary = derive_roles(
+        db.get_user_roles(user["id"]), effective_role.value, is_admin=(effective_role == UserRole.ADMIN)
+    )
     return LoginResponse(
         token=session_token,
         user=UserResponse(

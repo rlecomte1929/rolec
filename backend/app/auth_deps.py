@@ -53,13 +53,25 @@ def _is_admin_user(user: Dict[str, Any]) -> bool:
         return True
     return False
 
-def derive_roles(role_rows: List[Dict[str, Any]], fallback_role: str) -> Tuple[List[str], str]:
+def derive_roles(
+    role_rows: List[Dict[str, Any]], fallback_role: str, is_admin: bool = False
+) -> Tuple[List[str], str]:
     """[AIQ-1353] From public.user_roles rows ({role, is_primary}) compute
     (roles, primary_role). Falls back to the legacy single role when the junction
-    is empty/absent, so legacy single-role users are unaffected."""
+    is empty/absent, so legacy single-role users are unaffected.
+
+    [AIQ-1367] When is_admin, ADMIN is always present in roles and is the primary —
+    restoring #1108's contract (an allowlist admin whose only junction row says
+    EMPLOYEE must still derive ADMIN). `is_admin` is the server-derived
+    _is_admin_user/allowlist signal supplied by the caller — never a client value
+    or a junction-only role — so this never widens a non-admin."""
     roles = [r["role"] for r in role_rows if r.get("role")]
     if not roles:
-        return [fallback_role], fallback_role
+        roles = [fallback_role]
+    if is_admin:
+        if UserRole.ADMIN.value not in roles:
+            roles.append(UserRole.ADMIN.value)
+        return roles, UserRole.ADMIN.value
     primary = next((r["role"] for r in role_rows if r.get("is_primary")), None)
     return roles, (primary or fallback_role)
 
@@ -113,7 +125,9 @@ async def get_current_user(
     # [AIQ-1353] Expose all roles the user holds (multi-role) alongside the legacy
     # single `role`, with a fallback to it when the user_roles junction is empty.
     user["roles"], user["primary_role"] = derive_roles(
-        db.get_user_roles(user["id"]), user.get("role", UserRole.EMPLOYEE.value)
+        db.get_user_roles(user["id"]),
+        user.get("role", UserRole.EMPLOYEE.value),
+        is_admin=bool(user.get("is_admin")),
     )
     if request is not None:
         try:

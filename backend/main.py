@@ -13925,7 +13925,9 @@ _SIGNED_URL_BUCKETS = {"hr-policies", "case-documents", "form-templates"}
 def get_file_signed_url(
     bucket: str = Query(..., description="Storage bucket id"),
     path: str = Query(..., description="Object key within the bucket"),
-    user: Dict[str, Any] = Depends(require_role(UserRole.ADMIN)),
+    # [AIQ-1367] Single-source admin authority through _is_admin_user (is_admin),
+    # not roles[] membership — a rogue user_roles ADMIN row must not mint signed URLs.
+    user: Dict[str, Any] = Depends(_require_admin_v2),
 ):
     """
     SEC-006 - mint a short-lived (15 min) signed URL for a private storage
