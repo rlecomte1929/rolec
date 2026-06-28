@@ -64,6 +64,30 @@ export function getDefaultCurrencyForCountry(countryCode: string | null | undefi
   return normalizeServicesCurrency(COUNTRY_TO_CURRENCY[c] ?? 'USD');
 }
 
+/**
+ * Decide whether the services page should auto-apply the destination-country
+ * currency on load (AIQ-1327). It applies ONLY when nothing more authoritative
+ * already determines the currency:
+ *   - `hasRealPolicyCurrency`: a PUBLISHED policy provides a currency (has_policy
+ *     === true). NB the policy-context endpoint returns a `currency` of "USD"
+ *     even when has_policy is false, so callers must pass the has_policy-gated
+ *     value here — not merely `!!svcPolicy.currency` (that bug made the default
+ *     dead code, since USD is always present).
+ *   - `savedCurrency`: an explicit prior choice persisted in localStorage.
+ *   - `currentCurrency`: a non-default value already in state (e.g. loaded by a
+ *     per-case server sync) is respected.
+ */
+export function shouldApplyDestinationCurrency(opts: {
+  hasRealPolicyCurrency: boolean;
+  savedCurrency: string | null | undefined;
+  currentCurrency: string;
+}): boolean {
+  if (opts.hasRealPolicyCurrency) return false;
+  if (opts.savedCurrency) return false;
+  if (opts.currentCurrency !== 'USD') return false;
+  return true;
+}
+
 /** Convert an amount stored as USD nominal into the display currency (same basis as caps in PackageSummary). */
 export function convertUsdToDisplay(usd: number, displayCurrency: string): number {
   const cur = normalizeServicesCurrency(displayCurrency);

@@ -25,6 +25,7 @@ import {
   SERVICES_DISPLAY_CURRENCIES,
   SERVICES_DISPLAY_CURRENCY_STORAGE_KEY,
   getDefaultCurrencyForCountry,
+  shouldApplyDestinationCurrency,
 } from '../features/services/servicesCurrency';
 import type { ServicePolicyHint } from '../features/services/ServiceCard';
 import {
@@ -160,33 +161,40 @@ export const ProvidersPage: React.FC = () => {
   // AIQ-1276: the estimate currency auto-applies on change — no pending state /
   // Apply button (the select writes straight to displayCurrency).
 
+  // Only a REAL published-policy currency is authoritative. The policy-context
+  // endpoint returns currency: "USD" even when has_policy is false, so gate on
+  // has_policy — otherwise this applies the meaningless USD default and persists
+  // it, which is the AIQ-1327 bug (the destination default below never fires).
+  const policyCurrency =
+    svcPolicy?.has_policy && svcPolicy?.currency ? String(svcPolicy.currency) : null;
   useEffect(() => {
-    if (!svcPolicy?.currency) return;
+    if (!policyCurrency) return;
     try {
       if (localStorage.getItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY)) return;
-      setDisplayCurrency(String(svcPolicy.currency));
+      setDisplayCurrency(policyCurrency);
     } catch {
       // ignore
     }
-  }, [svcPolicy?.currency, setDisplayCurrency]);
+  }, [policyCurrency, setDisplayCurrency]);
 
   // AIQ-1327: when there's no policy currency and the user hasn't chosen one yet,
   // default the estimate currency to the destination country's currency
   // (e.g. Netherlands → EUR) instead of the bare USD fallback. Runs once, after
   // the services query settles, so the policy-currency effect above still wins
   // when a policy exists. The selector stays fully user-editable.
+  // The route param can be either the case_id or the assignment_id, so match the
+  // linked row on either to resolve the destination country.
   const destCountry = useMemo(
     () =>
-      linkedSummaries.find((r) => r.assignment_id === assignmentId)?.destination?.host_country ??
-      null,
+      linkedSummaries.find((r) => r.assignment_id === assignmentId || r.case_id === assignmentId)
+        ?.destination?.host_country ?? null,
     [linkedSummaries, assignmentId]
   );
   const destCurrencyAppliedRef = useRef(false);
   const [currencyAutoDetected, setCurrencyAutoDetected] = useState(false);
   useEffect(() => {
     if (destCurrencyAppliedRef.current) return;
-    if (isLoading) return; // wait for svcPolicy to settle so a policy currency wins
-    if (svcPolicy?.currency) return; // policy currency takes precedence (handled above)
+    if (isLoading) return; // wait for svcPolicy to settle so a real policy currency wins
     if (!destCountry) return;
     let saved: string | null = null;
     try {
@@ -194,16 +202,23 @@ export const ProvidersPage: React.FC = () => {
     } catch {
       saved = null;
     }
-    // Respect an explicit prior choice (localStorage) or a non-default value a
-    // per-case server sync may have already loaded.
-    if (saved || displayCurrency !== 'USD') return;
+    // Only a REAL policy currency (has_policy) blocks the destination default;
+    // a prior localStorage choice or an already-non-default value is respected.
+    if (
+      !shouldApplyDestinationCurrency({
+        hasRealPolicyCurrency: !!policyCurrency,
+        savedCurrency: saved,
+        currentCurrency: displayCurrency,
+      })
+    )
+      return;
     destCurrencyAppliedRef.current = true;
     const ccy = getDefaultCurrencyForCountry(destCountry);
     if (ccy !== displayCurrency) {
       setDisplayCurrency(ccy);
       setCurrencyAutoDetected(true);
     }
-  }, [isLoading, svcPolicy?.currency, destCountry, displayCurrency, setDisplayCurrency]);
+  }, [isLoading, policyCurrency, destCountry, displayCurrency, setDisplayCurrency]);
 
   // Seed the form-local `services` map from the loaded data, and sync the
   // selected set to context so the questions page has the right selection on a
