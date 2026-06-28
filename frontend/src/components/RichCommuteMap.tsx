@@ -20,6 +20,7 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { geocodeAddress, type LatLng } from './geocode';
 
 // ── Fix Leaflet default icon for Vite (no webpack loader) ─────────────────────
 // Leaflet's internal property is not in the TS declarations — cast through Record.
@@ -60,28 +61,8 @@ function computeRadiusM(commuteMins: number, modes: string[]): number {
   return Math.round(speed * commuteMins);
 }
 
-// ── Geocode with Nominatim ─────────────────────────────────────────────────────
-interface LatLng { lat: number; lng: number }
-
-const GEO_CACHE = new Map<string, LatLng>();
-
-async function geocodeAddress(address: string): Promise<LatLng | null> {
-  if (GEO_CACHE.has(address)) return GEO_CACHE.get(address)!;
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-    const res = await fetch(url, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'ReloPass/1.0 (intake-map)' },
-    });
-    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
-    const first = data[0];
-    if (!first) return null;
-    const point: LatLng = { lat: parseFloat(first.lat), lng: parseFloat(first.lon) };
-    GEO_CACHE.set(address, point);
-    return point;
-  } catch {
-    return null;
-  }
-}
+// Geocoding (Nominatim) + LatLng live in ./geocode (shared, Leaflet-free) so the
+// intake "Verified" badge can reuse them without importing Leaflet.
 
 // ── Overpass API helper ────────────────────────────────────────────────────────
 interface OverpassNode {

@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import type * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
+import { useGeocodedAddress } from '../../../components/geocode';
 import { patchCase } from '../../../api/cases';
 import { employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
@@ -19,6 +20,11 @@ import { resolveIntakeIds } from './resolveIntakeIds';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { parseSubmitError } from './parseSubmitError';
 import { matchCountry } from './countryMatch';
+
+// Leaflet is heavy — only load the real commute map once an address resolves.
+const RichCommuteMap = lazy(() =>
+  import('../../../components/RichCommuteMap').then((m) => ({ default: m.RichCommuteMap }))
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -360,57 +366,9 @@ function CityCombo({ country, value, onChange, testId }: { country: string; valu
   );
 }
 
-// ─── Commute map (SVG) ────────────────────────────────────────────────────────
-
-const NEIGHBORHOODS = [
-  { id: 'n1', x: 50, y: 28, t_min: 8,  name: 'Vika' },
-  { id: 'n2', x: 28, y: 35, t_min: 14, name: 'Frogner' },
-  { id: 'n3', x: 70, y: 38, t_min: 16, name: 'Grünerløkka' },
-  { id: 'n4', x: 38, y: 56, t_min: 22, name: 'Bygdøy' },
-  { id: 'n5', x: 64, y: 60, t_min: 26, name: 'Tøyen' },
-  { id: 'n6', x: 22, y: 70, t_min: 34, name: 'Bærum' },
-  { id: 'n7', x: 78, y: 73, t_min: 42, name: 'Furuset' },
-  { id: 'n8', x: 50, y: 82, t_min: 52, name: 'Sandvika' },
-];
-
-function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
-  const radius = Math.min(50, (maxMins / 60) * 50 + 5);
-  const cx = 50, cy = 48;
-  const inCount = NEIGHBORHOODS.filter((n) => n.t_min <= maxMins).length;
-  return (
-    <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-950">
-      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-600 text-white text-[10px] font-medium">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" /> live
-      </span>
-      <svg viewBox="0 0 100 100" className="w-full h-48" preserveAspectRatio="xMidYMid meet" aria-hidden>
-        {[20, 40, 60, 80].map((v) => (
-          <g key={`g${v}`}>
-            <line x1={v} y1={0} x2={v} y2={100} stroke="#1f2937" strokeWidth="0.3" />
-            <line x1={0} y1={v} x2={100} y2={v} stroke="#1f2937" strokeWidth="0.3" />
-          </g>
-        ))}
-        <circle cx={cx} cy={cy} r={radius} fill="rgba(31, 142, 139,0.12)" stroke="rgba(31, 142, 139,0.4)" strokeWidth="0.6" />
-        {NEIGHBORHOODS.map((n) => {
-          const inside = n.t_min <= maxMins;
-          return (
-            <g key={n.id}>
-              <circle cx={n.x} cy={n.y} r="3.5" fill={inside ? '#1f8e8b' : '#374151'} />
-              <text x={n.x} y={n.y + 7} textAnchor="middle" fontSize="3.5"
-                fill={inside ? '#6ec0bd' : '#6b7280'}>{n.name}</text>
-            </g>
-          );
-        })}
-        <circle cx={cx} cy={cy} r="8" fill="rgba(31, 142, 139,0.2)" stroke="#1f8e8b" strokeWidth="1" />
-        <circle cx={cx} cy={cy} r="2.5" fill="#1f8e8b" />
-        <text x={cx} y={cy - 5} textAnchor="middle" fontSize="3" fill="#6ec0bd">Office</text>
-      </svg>
-      <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-gray-400">
-        <strong className="text-accent-400">{inCount} neighborhoods</strong> within {maxMins}min
-        {mode.length > 0 ? ` by ${mode.slice(0, 2).map((m) => m === 'public_transit' ? 'transit' : m).join('/')}` : ''}
-      </div>
-    </div>
-  );
-}
+// AIQ-1345: the hardcoded Oslo SVG CommuteMap was removed. The commute preview
+// is now the real, geocoded <RichCommuteMap> (lazy-loaded), gated on a resolved
+// office address — see the "Work & Place" step render below.
 
 // ─── Household member cards ───────────────────────────────────────────────────
 
@@ -741,6 +699,10 @@ export function EmployeeIntakePage() {
 
   const partner = data.members.find((m) => m.kind === 'partner');
   const children = data.members.filter((m) => m.kind === 'child');
+
+  // AIQ-1345: geocode the office address (debounced) so the "Verified" badge and
+  // the commute preview reflect the real, resolved location — not a fake.
+  const officeGeo = useGeocodedAddress(data.office_address);
 
   const addMember = (kind: MemberKind, extra?: Partial<Member>) => {
     const id = kind + Date.now();
@@ -1180,9 +1142,17 @@ export function EmployeeIntakePage() {
                     <Input unstyled className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
                       placeholder="Start typing…" onChange={(v) => setField('office_address', v)} />
                     {data.office_address && (
-                      <div className="flex items-center gap-2 mt-1 px-2.5 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500">
+                      <div className={`flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-lg text-xs ${
+                        officeGeo.status === 'notfound' ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'
+                      }`}>
                         📍 <span className="flex-1">{data.office_address}</span>
-                        <span className="text-green-600 font-medium">Verified</span>
+                        {officeGeo.status === 'loading' && <span className="text-gray-400">Locating…</span>}
+                        {officeGeo.status === 'ok' && (
+                          <span className="text-green-600 font-medium">Verified</span>
+                        )}
+                        {officeGeo.status === 'notfound' && (
+                          <span className="font-medium">Couldn&apos;t find that address — check the spelling</span>
+                        )}
                       </div>
                     )}
                   </FieldWrap>
@@ -1217,7 +1187,22 @@ export function EmployeeIntakePage() {
                     </div>
                     <div>
                       <div className="text-xs font-semibold text-gray-700 mb-1.5">Commute map · live preview</div>
-                      <CommuteMap maxMins={data.commute_mins} mode={data.commute_mode} />
+                      {officeGeo.status === 'ok' ? (
+                        <Suspense fallback={<div className="rounded-xl border border-gray-100 bg-gray-50 h-48 flex items-center justify-center text-xs text-gray-400">Loading commute map…</div>}>
+                          <RichCommuteMap
+                            officeAddress={data.office_address}
+                            commuteMins={data.commute_mins}
+                            commuteMode={data.commute_mode}
+                            hasChildren={children.length > 0}
+                          />
+                        </Suspense>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 h-48 flex items-center justify-center px-4 text-center text-xs text-gray-400">
+                          {officeGeo.status === 'notfound'
+                            ? 'We couldn’t locate that office address — fix it above to preview your commute area.'
+                            : 'Enter your office address above to preview your commute area.'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
