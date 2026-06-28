@@ -60,10 +60,12 @@ export const ServicesQuestions: React.FC = () => {
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
-  // [AIQ-1285] case-scoped in-flow nav target (caseId === assignmentId).
+  // AIQ-1334: employee case sub-routes are keyed by case_id (not assignment_id),
+  // so in-flow nav targets use the resolved case_id for a consistent URL.
+  const routeCaseId = caseIdForAssignment(linkedSummaries, assignmentId) ?? pathCaseId ?? '';
   const caseStep = useCallback(
-    (key: RouteKey) => buildRoute(key, { caseId: assignmentId ?? '' }),
-    [assignmentId],
+    (key: RouteKey) => buildRoute(key, { caseId: routeCaseId }),
+    [routeCaseId],
   );
   const workflow = useServicesWorkflowState();
 

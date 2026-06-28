@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { caseIdForAssignment } from '../employeeAssignmentScope';
+import {
+  caseIdForAssignment,
+  assignmentIdForScopeId,
+  resolveScopedAssignmentId,
+} from '../employeeAssignmentScope';
 import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
 
 const rows = [
@@ -28,5 +32,48 @@ describe('caseIdForAssignment', () => {
 
   it('returns null for a null id', () => {
     expect(caseIdForAssignment(rows, null)).toBeNull();
+  });
+});
+
+/**
+ * AIQ-1334: employee case URLs are keyed by case_id. The services pages must
+ * still resolve to the assignment_id their APIs use — assignmentIdForScopeId
+ * accepts either id, and resolveScopedAssignmentId normalizes a case_id path
+ * param so a case_id URL resolves even for multi-case employees (no false picker).
+ */
+describe('assignmentIdForScopeId', () => {
+  it('maps a case_id to its assignment_id', () => {
+    expect(assignmentIdForScopeId(rows, 'case-2')).toBe('assign-2');
+  });
+  it('returns the id unchanged when it is already an assignment_id', () => {
+    expect(assignmentIdForScopeId(rows, 'assign-1')).toBe('assign-1');
+  });
+  it('falls back to the id itself when no row matches, and null for null', () => {
+    expect(assignmentIdForScopeId(rows, 'unknown')).toBe('unknown');
+    expect(assignmentIdForScopeId(rows, null)).toBeNull();
+  });
+});
+
+describe('resolveScopedAssignmentId — case_id path param (AIQ-1334)', () => {
+  it('resolves a case_id in the path to its assignment_id for a multi-case employee (no picker)', () => {
+    const { effectiveId, needsPicker } = resolveScopedAssignmentId({
+      linkedSummaries: rows,
+      primaryAssignmentId: 'assign-1',
+      queryAssignmentId: 'case-2', // a case_id in the URL
+      preferredAssignmentId: null,
+    });
+    expect(effectiveId).toBe('assign-2');
+    expect(needsPicker).toBe(false);
+  });
+
+  it('still resolves an assignment_id in the path directly', () => {
+    const { effectiveId, needsPicker } = resolveScopedAssignmentId({
+      linkedSummaries: rows,
+      primaryAssignmentId: 'assign-1',
+      queryAssignmentId: 'assign-2',
+      preferredAssignmentId: null,
+    });
+    expect(effectiveId).toBe('assign-2');
+    expect(needsPicker).toBe(false);
   });
 });
