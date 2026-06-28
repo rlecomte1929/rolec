@@ -19,6 +19,10 @@ import { resolveIntakeIds } from './resolveIntakeIds';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { parseSubmitError } from './parseSubmitError';
 import { matchCountry } from './countryMatch';
+// Identity fields (nationality, passport) accept the full ISO list; the local
+// COUNTRIES below stays scoped to the relocation origin/destination pickers,
+// which also rely on CITIES_BY_COUNTRY (AIQ-1341).
+import { COUNTRY_OPTIONS as ALL_COUNTRY_OPTIONS } from '../../policy-config/countryList';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -255,16 +259,18 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
 
-function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled, testId }: {
+function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled, testId, options = COUNTRIES }: {
   value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean; testId?: string;
+  // Defaults to the relocation-destination list; identity fields pass the full ISO list (AIQ-1341).
+  options?: ReadonlyArray<{ code: string; name: string; flag?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-  const selected = COUNTRIES.find((c) => c.code === value);
+  const selected = options.find((c) => c.code === value);
   const filtered = query
-    ? COUNTRIES.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
-    : COUNTRIES;
+    ? options.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
+    : options;
 
   useEffect(() => {
     if (!open) return;
@@ -276,7 +282,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   return (
     <div ref={ref} className="relative">
       <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
-        <span className="px-3 text-base">{selected ? selected.flag : '🔍'}</span>
+        <span className="px-3 text-base">{selected ? (selected.flag ?? '🌐') : '🔍'}</span>
         <Input unstyled
           type="text"
           data-testid={testId}
@@ -291,7 +297,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
             // the user isn't left with an empty value (and a disabled Continue) after
             // typing the full name without clicking the dropdown. See matchCountry for
             // the name-prefix guard that keeps a code match from firing early.
-            const exact = matchCountry(v, COUNTRIES);
+            const exact = matchCountry(v, [...options]);
             if (exact) { onChange(exact.code); setOpen(false); setQuery(''); }
           }}
           onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
@@ -313,7 +319,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
                 aria-selected={value === c.code}
                 tabIndex={0}
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-accent-50 text-accent-700' : ''}`}>
-                <span className="text-base">{c.flag}</span>
+                <span className="text-base">{c.flag ?? ''}</span>
                 <span className="flex-1">{c.name}</span>
                 <span className="text-xs text-gray-400">{c.code}</span>
               </div>
@@ -1093,10 +1099,10 @@ export function EmployeeIntakePage() {
                       onChange={(v) => setField('email', v)} />
                   </FieldWrap>
                   <FieldWrap label="Nationality" required>
-                    <CountryCombo testId="intake-nationality" value={data.nationality} onChange={(v) => setField('nationality', v)} />
+                    <CountryCombo testId="intake-nationality" value={data.nationality} onChange={(v) => setField('nationality', v)} options={ALL_COUNTRY_OPTIONS} />
                   </FieldWrap>
                   <FieldWrap label="Passport country" required>
-                    <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} />
+                    <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} options={ALL_COUNTRY_OPTIONS} />
                   </FieldWrap>
                   <FieldWrap label="Passport expiry" required>
                     <Input unstyled type="date" data-testid="intake-passport_expiry" className={inputCls()} value={data.passport_expiry}
