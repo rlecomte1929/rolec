@@ -33,6 +33,24 @@ Universal types (apply to all, incl. STA) stay un-tagged: passport validity, emp
    to preview, `--country` to scope).
 4. **Verify** — an LTA case in that country surfaces the long-term requirements; an STA case does not.
 
+## On-demand research lifecycle (the moat — AIQ-1349 P2/P3)
+When a corridor is uncovered, customers can request research; it is curated and published under a strict,
+human-gated process:
+1. **Request** — employee/HR clicks "Request research" on the uncovered-corridor state →
+   `POST /api/research-requests` → `research_requests` row (`pending`) + a `research_request` review-queue
+   item. `company_id` is resolved server-side (never trusted from the client).
+2. **Approve** — admin `PATCH /api/admin/research-requests/{id}` `{status:'approved'}` → `in_progress`
+   (a curator owns it; `estimated_cost` recorded).
+3. **Curate** — the curator authors `corpus/{from}_{to}_corridor.json` + a requirement YAML
+   (citation-bound, tiered official sources, like FR/NL), commits them, and applies via the ops pipeline
+   (reindex workflow for the corpus + `seed_requirements.py` for the catalog).
+4. **Review (mandatory human gate)** — a human resolves the curation review-queue item
+   (`review_queue_service`). Completion is BLOCKED until this is `resolved`.
+5. **Complete/publish** — admin `POST /api/admin/research-requests/{id}/complete`
+   `{result_summary, actual_cost}` → request `completed`, `actual_cost` recorded (invoice line),
+   queue item resolved, and the **requester is notified** (`RESEARCH_COMPLETED`). The corridor is now live.
+Nothing goes live without ≥1 citation + the disclaimer + a resolved human review.
+
 ## Provenance
 Every seeded requirement is `representative` until expert-verified; descriptions end
 "Indicative — confirm with {authority}". This matches the platform's content-honesty model.
