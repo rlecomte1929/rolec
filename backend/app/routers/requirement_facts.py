@@ -7,9 +7,10 @@ Admin-only. The persist is best-effort (a missing/un-applied table never fails t
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -88,3 +89,85 @@ async def extract_requirement_facts_endpoint(
             log.warning("requirement_fact_candidates insert skipped err=%s", exc)
 
     return {"extracted": len(facts), "pending": pending, "facts": [_serialize(f) for f in facts]}
+
+
+# ── P4-03 (AIQ-1092): admin review — list + approve/reject ───────────────────
+
+_CANDIDATE_COLUMNS = (
+    "id, created_at, source_url, corridor, requirement_type, fact_text, "
+    "confidence_score, source_quote, extraction_method, status, reviewed_by, reviewed_at"
+)
+
+
+class RequirementFactReview(BaseModel):
+    status: Literal["approved", "rejected"]
+
+
+def _serialize_candidate(row: Any) -> Dict[str, Any]:
+    """Normalise a requirement_fact_candidates row (Postgres or SQLite) to JSON-safe types."""
+    def _iso(v: Any) -> Optional[str]:
+        return v.isoformat() if hasattr(v, "isoformat") else (str(v) if v is not None else None)
+
+    conf = row["confidence_score"]
+    return {
+        "id": str(row["id"]),
+        "created_at": _iso(row["created_at"]),
+        "source_url": row["source_url"],
+        "corridor": row["corridor"],
+        "requirement_type": row["requirement_type"],
+        "fact_text": row["fact_text"],
+        "confidence_score": float(conf) if conf is not None else None,
+        "source_quote": row["source_quote"],
+        "extraction_method": row["extraction_method"],
+        "status": row["status"],
+        "reviewed_by": (str(row["reviewed_by"]) if row["reviewed_by"] is not None else None),
+        "reviewed_at": _iso(row["reviewed_at"]),
+    }
+
+
+@router.get("/requirement-facts")
+def list_requirement_facts(
+    status: str = Query("pending"),
+    limit: int = Query(100, ge=1, le=500),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    """List extracted requirement-fact candidates by status (default: pending), newest first."""
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                f"SELECT {_CANDIDATE_COLUMNS} FROM requirement_fact_candidates "
+                "WHERE status = :status ORDER BY created_at DESC LIMIT :limit"
+            ),
+            {"status": status, "limit": limit},
+        ).mappings().all()
+    return [_serialize_candidate(r) for r in rows]
+
+
+@router.patch("/requirement-facts/{fact_id}")
+def review_requirement_fact(
+    fact_id: str,
+    body: RequirementFactReview,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Approve or reject one extracted requirement fact (records reviewer + timestamp)."""
+    now = datetime.now(timezone.utc).isoformat()
+    with db.engine.begin() as conn:
+        existing = conn.execute(
+            text("SELECT id FROM requirement_fact_candidates WHERE id = :id"),
+            {"id": fact_id},
+        ).first()
+        if not existing:
+            raise HTTPException(status_code=404, detail="requirement fact not found")
+
+        conn.execute(
+            text(
+                "UPDATE requirement_fact_candidates "
+                "SET status = :status, reviewed_by = :uid, reviewed_at = :now WHERE id = :id"
+            ),
+            {"status": body.status, "uid": str(user.get("id")), "now": now, "id": fact_id},
+        )
+        row = conn.execute(
+            text(f"SELECT {_CANDIDATE_COLUMNS} FROM requirement_fact_candidates WHERE id = :id"),
+            {"id": fact_id},
+        ).mappings().first()
+    return _serialize_candidate(row)
