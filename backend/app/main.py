@@ -70,6 +70,7 @@ from .routers import (
     rag_roadmap,
     relocation_profile,
     roadmap_audit,
+    case_rule_updates,
     specialist_review,
     support,
     translation,
@@ -142,6 +143,7 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_notes.router)
     # P1-08c/d/e: roadmap as_of reconstruction + legal export + rule-change notifier.
     app.include_router(roadmap_audit.router)
+    app.include_router(case_rule_updates.router)  # AIQ-693 — P2-02e rule-update banner read/dismiss
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
     app.include_router(hr_case_escalation.router)  # W2-3 — HR case escalation
