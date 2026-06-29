@@ -1,83 +1,133 @@
-# AIQ-1349 — requirement seed for France. verification_status: representative.
+# AIQ-1349 — requirement seed for France. verification_status: corpus_grounded.
 #
-# Reviewed + loaded to prod. Items are REPRESENTATIVE (descriptions end
-# "Indicative — confirm with {authority}") — promote to expert_verified after a
-# legal review, ideally corpus-grounded against the US→FR immigration chunks.
+# CORPUS-GROUNDED against the live US→FR immigration corpus (policy_assistant_chunks,
+# source_type=immigration_rule), which cites tier-1 official sources
+# (france-visas.gouv.fr, service-public.fr). Each requirement carries its source in
+# `citations`. This raises provenance from representative → corpus_grounded; it is
+# NOT yet human-expert-verified (a French immigration lawyer should sign off to reach
+# expert_verified).
 #
-# Reload (idempotent):
-#   python backend/scripts/seed_requirements.py --file backend/seeds/requirements/france.yaml
-# FR→FRANCE resolution lives in requirements_builder._ISO_TO_CATALOG_NAME.
+# SCOPE: the salaried route for NON-EEA (e.g. US) nationals — VLS-TS Salarié /
+# Passeport Talent. EEA/EU nationals have free movement and need none of this.
+#
+# Grounding correction: most steps below apply to ANY VLS-TS stay (incl. a short
+# assignment that still needs a long-stay visa), so they are universal (applies=null).
+# The only clearly long-term-only step is the multi-year residence-card renewal.
+#
+# Reload (idempotent): python backend/scripts/seed_requirements.py --file backend/seeds/requirements/france.yaml
 
-verification_status: representative
+verification_status: corpus_grounded
+source_scope: "US->FR corpus (non-EEA salaried route); EEA nationals exempt"
 purposes_by_country:
   FRANCE: [employment, other]
 
 requirements:
-  # ── Universal (apply to all assignment lengths, incl. STA) ──
-  - key: valid_passport
+  - key: passport
     pillar: IDENTITY
     severity: BLOCKER
     owner: EMPLOYEE
     applies_to_assignment_types: null
     confidence: high
     requires_expert_review: false
+    citations: ["https://www.france-visas.gouv.fr/en/visa-de-long-sejour", "immigration_rule.us_fr_lsv_passport"]
     countries:
       FRANCE:
-        title: "Valid passport (6+ months)"
-        description: "A passport valid for at least 6 months beyond the intended stay. Indicative — confirm with the French consulate."
+        title: "Valid passport"
+        description: "A valid passport is the primary identity document for the VLS-TS Salarié / Passeport Talent application. Indicative — confirm with france-visas.gouv.fr."
+  - key: long_stay_work_visa
+    pillar: RESIDENCE
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: true
+    citations: ["https://www.france-visas.gouv.fr/en/visa-de-long-sejour", "immigration_rule.us_fr_pathway_long_stay_visa", "immigration_rule.us_fr_overview"]
+    countries:
+      FRANCE:
+        title: "Long-stay work visa (VLS-TS Salarié / Passeport Talent)"
+        description: "Non-EEA nationals need a long-stay visa serving as a residence permit: VLS-TS Salarie (min salary ~SMIC) or Passeport Talent (Master's + salary >= EUR 43,243). Indicative — confirm with france-visas.gouv.fr."
   - key: employment_contract
     pillar: EMPLOYMENT
     severity: WARN
     owner: EMPLOYEE
     applies_to_assignment_types: null
-    confidence: medium
-    requires_expert_review: true
+    confidence: high
+    requires_expert_review: false
+    citations: ["immigration_rule.us_fr_lsv_employment_contract"]
     countries:
       FRANCE:
-        title: "Employment contract (contrat de travail)"
-        description: "A signed French employment contract or assignment letter, often required for the work-authorization / visa file. Indicative — confirm with your employer / DREETS."
-  - key: minimum_lead_time
-    pillar: TIMELINE
+        title: "Signed employment contract (CDI or CDD >= 3 months)"
+        description: "A signed French employment contract (CDI, or CDD of at least 3 months) supporting the long-stay visa file. Indicative — confirm with your employer / DREETS."
+  - key: dgef_work_authorization
+    pillar: EMPLOYMENT
     severity: WARN
     owner: HR
     applies_to_assignment_types: null
-    confidence: medium
+    confidence: high
     requires_expert_review: true
+    citations: ["immigration_rule.us_fr_lsv_work_authorization"]
     countries:
       FRANCE:
-        title: "Minimum lead time"
-        description: "Allow sufficient lead time for the work-authorization and long-stay visa process before the start date. Indicative — confirm with the French consulate / OFII."
-  # ── Long-term-only (LTA / PERMANENT — dropped for STA) ──
-  - key: residence_permit_validation
+        title: "DGEF work authorization (employer-initiated)"
+        description: "For salaried VLS-TS, the employer initiates the DGEF work authorization before arrival. Indicative — confirm with DREETS / DGEF."
+  - key: proof_of_accommodation
+    pillar: HOUSING
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: false
+    citations: ["https://www.france-visas.gouv.fr/en/visa-de-long-sejour", "immigration_rule.us_fr_lsv_proof_of_accommodation"]
+    countries:
+      FRANCE:
+        title: "Proof of accommodation in France"
+        description: "Proof of accommodation (lease, hotel reservation >= 3 months, or attestation d'hebergement) for the long-stay visa. Indicative — confirm with france-visas.gouv.fr."
+  - key: health_insurance
+    pillar: HEALTHCARE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: false
+    citations: ["immigration_rule.us_fr_lsv_health_insurance"]
+    countries:
+      FRANCE:
+        title: "Health insurance covering the visa validity"
+        description: "Health insurance covering the full visa validity period, required for the long-stay visa. Indicative — confirm with france-visas.gouv.fr."
+  - key: anef_vls_ts_validation
+    pillar: RESIDENCE
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: true
+    citations: ["immigration_rule.us_fr_anef_validation"]
+    countries:
+      FRANCE:
+        title: "ANEF VLS-TS validation (within 90 days of arrival)"
+        description: "Validate the VLS-TS online on ANEF within 90 days of arrival; failure invalidates legal residence and triggers a fine. Indicative — confirm on the ANEF portal (administration-etrangers.interieur.gouv.fr)."
+  - key: anef_address_declaration
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: medium
+    requires_expert_review: true
+    citations: ["immigration_rule.us_fr_anef_address_declaration"]
+    countries:
+      FRANCE:
+        title: "ANEF address declaration (within 90 days)"
+        description: "Declare your French address in ANEF within 90 days of arrival (after VLS-TS validation). Indicative — confirm on the ANEF portal."
+  # ── The only genuinely long-term-only step (skipped for short assignments) ──
+  - key: residence_card_renewal
     pillar: RESIDENCE
     severity: WARN
     owner: EMPLOYEE
     applies_to_assignment_types: [LTA, PERMANENT]
-    confidence: medium
+    confidence: high
     requires_expert_review: true
+    citations: ["immigration_rule.us_fr_residence_card_renewal"]
     countries:
       FRANCE:
-        title: "Residence permit validation (VLS-TS / titre de séjour)"
-        description: "Validate the long-stay visa (VLS-TS) with the OFII on arrival, or obtain the residence permit (titre de séjour). Indicative — confirm with OFII / the préfecture."
-  - key: long_term_rental_contract
-    pillar: HOUSING
-    severity: WARN
-    owner: EMPLOYEE
-    applies_to_assignment_types: [LTA, PERMANENT]
-    confidence: medium
-    requires_expert_review: true
-    countries:
-      FRANCE:
-        title: "Long-term rental contract (bail)"
-        description: "Secure a long-term rental contract (bail); proof of accommodation supports residence and banking steps. Indicative — confirm with your housing provider."
-  - key: social_security_registration
-    pillar: SOCIAL_SECURITY
-    severity: WARN
-    owner: HR
-    applies_to_assignment_types: [LTA, PERMANENT]
-    confidence: medium
-    requires_expert_review: true
-    countries:
-      FRANCE:
-        title: "Social security registration (numéro de sécurité sociale)"
-        description: "Register for French social security and obtain a numéro de sécurité sociale; the employer typically initiates this. Indicative — confirm with CPAM / URSSAF."
+        title: "Multi-year residence card renewal"
+        description: "If staying beyond the initial 1-year VLS-TS, apply for the multi-year residence card ~2 months before expiry (~305 days after arrival). Indicative — confirm with the prefecture."
