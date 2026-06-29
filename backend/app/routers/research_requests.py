@@ -13,12 +13,27 @@ from pydantic import BaseModel
 
 from ..auth_deps import require_admin, require_hr_or_employee
 from ..services import research_request_service as svc
+from ...database import db as main_db
 
 router = APIRouter(tags=["research-requests"])
 
 
+def _caller_company_id(user: Dict[str, Any]) -> str:
+    """Resolve the caller's company SERVER-SIDE — never trust a client-supplied
+    company_id (the service uses the admin client, so a body value would be an
+    IDOR). Mirrors hr_catalog._caller_company_id."""
+    uid = user.get("id")
+    company_id = (
+        (main_db.get_hr_company_id(uid) if uid else None)
+        or (main_db.get_profile_record(uid) or {}).get("company_id")
+        or user.get("company")
+    )
+    if not company_id:
+        raise HTTPException(status_code=403, detail="No company associated with this user")
+    return str(company_id)
+
+
 class CreateResearchRequestBody(BaseModel):
-    company_id: str
     dest_country: str
     origin_country: Optional[str] = None
     purpose: Optional[str] = None
@@ -37,10 +52,8 @@ def create_research_request(
 ) -> Dict[str, Any]:
     if not body.dest_country.strip():
         raise HTTPException(status_code=400, detail="dest_country is required")
-    # NOTE: company_id is taken from the case context the requester is viewing;
-    # server-side company validation is a P2 hardening follow-up.
     return svc.open_research_request(
-        company_id=body.company_id,
+        company_id=_caller_company_id(user),  # server-resolved (anti-IDOR)
         requester_user_id=str(user.get("id")),
         dest_country=body.dest_country,
         origin_country=body.origin_country,

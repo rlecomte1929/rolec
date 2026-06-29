@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import { MilestoneTracker } from '../immigration/MilestoneTracker';
+import { RequestResearchButton } from './RequestResearchButton';
 import type { ImmigrationContext } from './immigrationContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -195,6 +196,13 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
             We don&apos;t yet have a verified document checklist for this corridor and
             visa type, so none is shown.
           </p>
+          <div className="mt-4">
+            <RequestResearchButton
+              destCountry={immData.corridor_to}
+              originCountry={immData.corridor_from}
+              corridorLabel={immData.corridor}
+            />
+          </div>
         </div>
         <QuickActions onFindVendor={() => onFindVendor(buildImmigrationContext())} onViewProfile={onViewProfile} />
       </div>
