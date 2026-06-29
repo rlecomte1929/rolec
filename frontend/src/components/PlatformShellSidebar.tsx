@@ -178,6 +178,7 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.adminCatalogQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
       },
+      { id: 'requirement-facts', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
       { id: 'research-requests', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
     ],
   },

@@ -78,6 +78,13 @@ def test_non_admin_forbidden(client):
     assert r.status_code == 403
 
 
+def test_non_admin_forbidden_on_list(client):
+    # [AIQ-1092] the GET review-list endpoint shares the same require_admin guard.
+    app.dependency_overrides[auth_deps.get_current_user] = _employee
+    r = client.get("/api/admin/requirement-facts?status=pending")
+    assert r.status_code == 403
+
+
 def test_requirement_type_hint_filters(client):
     app.dependency_overrides[auth_deps.get_current_user] = _admin
     r = client.post(
