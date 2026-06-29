@@ -21,7 +21,8 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
     # local work authorization and children aren't enrolled in a local school for
     # a brief posting. Suppress those two so STA gets a lighter requirement set.
     # (LTA/PERMANENT keep the full set.)
-    is_sta = str(assignment.get("assignmentType") or "").strip().upper() == "STA"
+    case_assignment_type = str(assignment.get("assignmentType") or "").strip().upper() or None
+    is_sta = case_assignment_type == "STA"
 
     if basics.get("targetMoveDate") and profile.get("passportExpiry"):
         try:
@@ -81,7 +82,29 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
             "assignmentContext.contractStartDate",
         ]
 
+    # AIQ-1349: data-driven applicability. A requirement may declare
+    # appliesToAssignmentTypes (a list, e.g. ["LTA","PERMANENT"]); drop it for a
+    # case whose assignment_type isn't listed. None/empty ⇒ applies to all. Only
+    # filters when the case has a known assignment_type (legacy cases keep all).
+    if case_assignment_type:
+        dropped = [r for r in expanded if not _applies_to_assignment_type(r, case_assignment_type)]
+        if dropped:
+            expanded = [r for r in expanded if _applies_to_assignment_type(r, case_assignment_type)]
+            flags.setdefault("staWaived", []).extend(
+                r.get("title") for r in dropped if r.get("title")
+            )
+
     return required_fields, expanded, flags
+
+
+def _applies_to_assignment_type(requirement: Dict[str, Any], case_assignment_type: str) -> bool:
+    """True when the requirement applies to the case's assignment type. A
+    requirement with no ``appliesToAssignmentTypes`` (None/empty) applies to all."""
+    allowed = requirement.get("appliesToAssignmentTypes")
+    if not allowed:
+        return True
+    norm = {str(a).strip().upper() for a in allowed if str(a).strip()}
+    return (not norm) or (case_assignment_type in norm)
 
 
 def _child_age(date_str: Optional[str]) -> int:
