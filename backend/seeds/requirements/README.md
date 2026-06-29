@@ -56,12 +56,11 @@ Status per (country × purpose). `LT` = long-term-only types seeded; `U` = unive
 | SINGAPORE | U + LT | — | U + LT | — |
 | UNITED KINGDOM | U + LT | U + LT | — | — |
 | UNITED STATES | U + LT | U + LT | — | U + LT |
-| FRANCE | draft | draft | — | — |
-| NETHERLANDS | draft | draft | — | — |
+| FRANCE | U + LT | U + LT | — | — |
+| NETHERLANDS | U + LT | U + LT | — | — |
 
-`draft` = a `verification_status: draft` seed exists (`france.yaml` / `netherlands.yaml`) pending human
-review; not yet loaded. To go live: review → add the ISO→name mapping in
-`requirements_builder._ISO_TO_CATALOG_NAME` (FR→FRANCE, NL→NETHERLANDS) → `seed_requirements.py` load → verify.
-Note: France has `US→FR` corpus chunks (corpus-groundable); the Netherlands corpus is not yet indexed.
+France & Netherlands are loaded as `representative` (FR/NL resolve via
+`requirements_builder._ISO_TO_CATALOG_NAME`). Promote to `expert_verified` after legal review —
+France is corpus-groundable (`US→FR` chunks); the Netherlands corpus still needs indexing.
 
 Extend by drafting → reviewing → loading new countries/purposes; update this table per load.

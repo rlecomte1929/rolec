@@ -1,16 +1,14 @@
-# AIQ-1349 — DRAFT requirement seed for France. verification_status: draft.
+# AIQ-1349 — requirement seed for France. verification_status: representative.
 #
-# Taxonomy-authored draft (the immigration corpus has US→FR chunks that should be
-# used to expert-verify / ground these before promotion; run draft_requirements.py
-# against prod to corpus-ground, then a human confirms each against the authority).
-# REVIEW REQUIRED before loading: confirm each item with the named authority and
-# promote verification_status to representative/expert_verified.
+# Reviewed + loaded to prod. Items are REPRESENTATIVE (descriptions end
+# "Indicative — confirm with {authority}") — promote to expert_verified after a
+# legal review, ideally corpus-grounded against the US→FR immigration chunks.
 #
-# Load (after review):
+# Reload (idempotent):
 #   python backend/scripts/seed_requirements.py --file backend/seeds/requirements/france.yaml
-# NOTE: going live also needs FR→FRANCE in requirements_builder._ISO_TO_CATALOG_NAME.
+# FR→FRANCE resolution lives in requirements_builder._ISO_TO_CATALOG_NAME.
 
-verification_status: draft
+verification_status: representative
 purposes_by_country:
   FRANCE: [employment, other]
 
