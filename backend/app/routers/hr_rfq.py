@@ -231,7 +231,9 @@ async def create_rfq(
     with db.engine.begin() as conn:
         from sqlalchemy import text
         vendor_row = conn.execute(
-            text("SELECT id, name, contact_email, corridors FROM vendors WHERE id = :id AND is_approved = true"),
+            # public.vendors columns are id, name, email, countries_served, is_active
+            # (NOT contact_email / corridors / is_approved — those 500'd every RFQ create).
+            text("SELECT id, name, email, countries_served FROM vendors WHERE id = :id AND is_active = true"),
             {"id": body.vendor_id},
         ).mappings().first()
 
@@ -239,7 +241,7 @@ async def create_rfq(
         raise HTTPException(status_code=404, detail="Vendor not found")
 
     vendor = dict(vendor_row)
-    vendor_corridors = vendor.get("corridors") or []
+    vendor_corridors = vendor.get("countries_served") or []
     corridor = vendor_corridors[0] if vendor_corridors else "—"
 
     # Fetch case destination for corridor context
@@ -308,7 +310,7 @@ async def create_rfq(
     # Send email in background
     background_tasks.add_task(
         _send_rfq_email,
-        vendor_email=vendor["contact_email"],
+        vendor_email=vendor["email"],
         vendor_name=vendor["name"],
         service_category=body.service_category,
         corridor=corridor,
