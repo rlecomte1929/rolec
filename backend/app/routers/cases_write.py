@@ -223,6 +223,36 @@ def validate_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE,
         new_value={"event": "roadmap_validated"},
     )
+    # [CASE_STATUS_CHANGED] Notify the assigned HR that the employee validated
+    # their roadmap and started tasks — a real case-status milestone HR cares
+    # about that previously fired nothing (the type was defined + had a settings
+    # toggle but was never emitted anywhere). Recipient is HR, not the employee,
+    # because this is the employee's own action. Best-effort: never fail the
+    # validate. Mirrors the INTAKE_SUBMITTED → HR notify (AIQ-1342).
+    try:
+        assignment = main_db.get_assignment_by_case_id(case_id) or {}
+        hr_user_id = assignment.get("hr_user_id")
+        if hr_user_id:
+            assignment_id = str(assignment.get("id") or "")
+            emp_name = (
+                assignment.get("employee_full_name")
+                or assignment.get("employee_first_name")
+                or "Your employee"
+            )
+            main_db.create_notification_with_preferences(
+                user_id=hr_user_id,
+                type_="CASE_STATUS_CHANGED",
+                title="Employee started their relocation",
+                body=f"{emp_name} validated their roadmap and started their tasks.",
+                assignment_id=assignment_id or None,
+                case_id=case_id,
+                metadata={"event": "roadmap_validated", "case_id": case_id},
+            )
+    except Exception as exc:
+        logger.warning(
+            "validate_roadmap: HR notification failed case_id=%s error=%s",
+            case_id, str(exc), exc_info=True,
+        )
     return {
         "roadmap_validated": True,
         "roadmap_validated_at": result["validated_at"],
