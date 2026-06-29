@@ -145,6 +145,7 @@ from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parke
 from .app.routers import admin_prompts as admin_prompts_router  # [Parker-D] dual-layer registration (PR #207 §9)
 from .app.routers import ai_feedback as ai_feedback_router  # [Parker-E] dual-layer registration (PR #207 §9)
 from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
+from .app.routers import ocr as ocr_router  # [AIQ-1148] general document OCR endpoint
 from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
@@ -752,6 +753,7 @@ app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 �
 app.include_router(admin_prompts_router.router, prefix="/api/admin")  # [Parker-D] PR #207 §9 — dual-layer registration
 app.include_router(ai_feedback_router.router)  # [Parker-E] PR #207 §9 — dual-layer registration
 app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
+app.include_router(ocr_router.router)  # [AIQ-1148] /api/ocr/process — general document OCR
 app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
 app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval/metrics — dual-layer registration
 app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration

@@ -50,3 +50,24 @@ def test_image_uses_image_url_channel(monkeypatch):
     out = moc.mistral_ocr_text(b"img-bytes", "image/png", api_key="sk-test")
     assert out == "scanned"
     assert captured["doc_type"] == "image_url"
+
+
+# ── AIQ-1148: mistral_ocr_document (markdown + page count) ────────────────────
+
+
+def test_document_returns_markdown_and_page_count(monkeypatch):
+    def _fake_post(url, headers=None, json=None, timeout=None):
+        return SimpleNamespace(
+            raise_for_status=lambda: None,
+            # markdown page, text-only page, empty page → count is len(pages)
+            json=lambda: {"pages": [{"markdown": "a"}, {"text": "b"}, {"markdown": ""}]},
+        )
+
+    monkeypatch.setattr(moc.requests, "post", _fake_post)
+    res = moc.mistral_ocr_document(b"pdf-bytes", "application/pdf", api_key="sk-test")
+    assert res == {"markdown": "a\n\nb", "pages_count": 3}
+
+
+def test_document_no_key_degrades(monkeypatch):
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    assert moc.mistral_ocr_document(b"x", "application/pdf") == {"markdown": "", "pages_count": 0}

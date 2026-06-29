@@ -14,6 +14,7 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    ocr,
     benefit_optimizer,
     case_forms_adhoc,
     cases,
@@ -105,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
     app.include_router(admin.router)
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
+    app.include_router(ocr.router)  # [AIQ-1148] /api/ocr/process — general document OCR
     app.include_router(employee_quotes.router)
     app.include_router(provider_ratings.router)  # CATALOG-3 employee provider ratings
     app.include_router(hr_vendor_performance.router)  # NAV-SP-2 HR vendor performance dashboard

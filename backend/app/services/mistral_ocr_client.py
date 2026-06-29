@@ -17,7 +17,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -26,6 +26,42 @@ log = logging.getLogger(__name__)
 _OCR_URL = "https://api.mistral.ai/v1/ocr"
 _MODEL = "mistral-ocr-latest"
 _TIMEOUT_S = 60
+
+
+def _ocr_pages(
+    content: bytes,
+    mime_type: str,
+    *,
+    api_key: Optional[str] = None,
+    timeout: int = _TIMEOUT_S,
+) -> List[Dict[str, Any]]:
+    """POST the document to Mistral Document AI and return its raw ``pages`` list
+    (``[]`` when ``MISTRAL_API_KEY`` is unset). Shared by ``mistral_ocr_text`` and
+    ``mistral_ocr_document``; raises on an API/HTTP error (callers handle it)."""
+    key = api_key or os.environ.get("MISTRAL_API_KEY")
+    if not key:
+        log.info("MISTRAL_API_KEY unset — general OCR disabled (document yields no text)")
+        return []
+
+    b64 = base64.b64encode(content).decode("ascii")
+    if (mime_type or "").lower().startswith("image/"):
+        document = {"type": "image_url", "image_url": f"data:{mime_type};base64,{b64}"}
+    else:
+        # PDFs (and anything non-image) go through the document_url channel.
+        document = {"type": "document_url", "document_url": f"data:application/pdf;base64,{b64}"}
+
+    resp = requests.post(
+        _OCR_URL,
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json={"model": _MODEL, "document": document, "include_image_base64": False},
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    return resp.json().get("pages") or []
+
+
+def _join_pages(pages: List[Dict[str, Any]]) -> str:
+    return "\n\n".join((p.get("markdown") or p.get("text") or "").strip() for p in pages).strip()
 
 
 def mistral_ocr_text(
@@ -42,24 +78,19 @@ def mistral_ocr_text(
     until the key is provisioned. Raises on an API/HTTP error; the ``rce_ocr_parser``
     caller catches it → fail-soft empty ParsedDocument with a logged reason.
     """
-    key = api_key or os.environ.get("MISTRAL_API_KEY")
-    if not key:
-        log.info("MISTRAL_API_KEY unset — general OCR disabled (document yields no text)")
-        return ""
+    return _join_pages(_ocr_pages(content, mime_type, api_key=api_key, timeout=timeout))
 
-    b64 = base64.b64encode(content).decode("ascii")
-    if (mime_type or "").lower().startswith("image/"):
-        document = {"type": "image_url", "image_url": f"data:{mime_type};base64,{b64}"}
-    else:
-        # PDFs (and anything non-image) go through the document_url channel.
-        document = {"type": "document_url", "document_url": f"data:application/pdf;base64,{b64}"}
 
-    resp = requests.post(
-        _OCR_URL,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={"model": _MODEL, "document": document, "include_image_base64": False},
-        timeout=timeout,
-    )
-    resp.raise_for_status()
-    pages = resp.json().get("pages") or []
-    return "\n\n".join((p.get("markdown") or p.get("text") or "").strip() for p in pages).strip()
+def mistral_ocr_document(
+    content: bytes,
+    mime_type: str,
+    *,
+    api_key: Optional[str] = None,
+    timeout: int = _TIMEOUT_S,
+) -> Dict[str, Any]:
+    """[AIQ-1148] OCR a document and return both the combined markdown and the page
+    count: ``{"markdown": str, "pages_count": int}`` (``{"", 0}`` when the key is
+    unset). Used by the general ``/api/ocr/process`` endpoint, which needs the page
+    count that ``mistral_ocr_text`` discards."""
+    pages = _ocr_pages(content, mime_type, api_key=api_key, timeout=timeout)
+    return {"markdown": _join_pages(pages), "pages_count": len(pages)}
