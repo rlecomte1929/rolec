@@ -12,10 +12,9 @@ What the migration intends (and what we assert):
   • country_events / country_profiles / country_resource_items /
     country_resource_sections / requirements_catalog / requirement_items
         → PUBLIC read (anon + authenticated), admin-only write.
-  • default_policy_templates
-        → AUTHENTICATED read only (no anon), admin-only write. (Deliberate
-          least-privilege deviation: it's config-flow seed data, not a public
-          lookup — see the migration header.)
+
+(TPL-3/AIQ-1133: default_policy_templates was retired — its auth-only read +
+admin-write assertions were removed with the table.)
 
 Three personas (per the execution prompt):
   1. Anon (no user JWT)              → reads public catalog; cannot write.
@@ -67,8 +66,8 @@ PUBLIC_READ_TABLES = [
     "requirements_catalog",
     "requirement_items",
 ]
-# Authenticated-only read (anon denied).
-AUTH_ONLY_TABLES = ["default_policy_templates"]
+# Authenticated-only read (anon denied). (TPL-3: default_policy_templates retired.)
+AUTH_ONLY_TABLES: list[str] = []
 
 
 def _new_uuid() -> str:
@@ -122,11 +121,6 @@ def seed():
                 (f"{tag}_ri", "test", "test", tag, "desc", "info",
                  "system", "[]", "[]", now_ts),
             )
-            cur.execute(
-                "INSERT INTO default_policy_templates (template_name, version) VALUES (%s,%s)",
-                (tag, "v-test"),
-            )
-
             # Temporarily allowlist a real auth user for the admin-write case.
             cur.execute("SELECT id FROM auth.users LIMIT 1")
             row = cur.fetchone()
@@ -149,7 +143,6 @@ def seed():
             cur.execute("DELETE FROM country_resource_items WHERE title=%s", (tag,))
             cur.execute("DELETE FROM country_resource_sections WHERE id=%s", (section_id,))
             cur.execute("DELETE FROM requirement_items WHERE id=%s", (f"{tag}_ri",))
-            cur.execute("DELETE FROM default_policy_templates WHERE template_name=%s", (tag,))
         conn.close()
 
 
@@ -198,7 +191,6 @@ def _sentinel_filter(table: str, tag: str) -> dict:
         "country_resource_sections": {"section_key": f"eq.{tag}"},
         "country_resource_items": {"title": f"eq.{tag}"},
         "requirement_items": {"id": f"eq.{tag}_ri"},
-        "default_policy_templates": {"template_name": f"eq.{tag}"},
     }[table]
 
 
@@ -233,22 +225,6 @@ def test_authenticated_reads_catalog_and_templates(seed):
     for table in PUBLIC_READ_TABLES + AUTH_ONLY_TABLES:
         n = _visible_sentinel(table, _sentinel_filter(table, seed["tag"]), user)
         assert n >= 1, f"{table}: authenticated user could not read its seeded row"
-
-
-# ---------------------------------------------------------------------------
-# 3b. default_policy_templates is NOT anon-readable (authenticated-only).
-# ---------------------------------------------------------------------------
-@pytest.mark.integration
-def test_templates_not_anon_readable(seed):
-    status, rows = _rest_get(
-        "default_policy_templates",
-        {**_sentinel_filter("default_policy_templates", seed["tag"]), "select": "*"},
-        ANON_KEY,
-    )
-    assert not (status == 200 and rows), (
-        f"default_policy_templates leaked to anon (status={status}) — should be "
-        "authenticated-only."
-    )
 
 
 # ---------------------------------------------------------------------------
