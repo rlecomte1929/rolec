@@ -56,11 +56,14 @@ Status per (country × purpose). `LT` = long-term-only types seeded; `U` = unive
 | SINGAPORE | U + LT | — | U + LT | — |
 | UNITED KINGDOM | U + LT | U + LT | — | — |
 | UNITED STATES | U + LT | U + LT | — | U + LT |
-| FRANCE | U + LT | U + LT | — | — |
+| FRANCE | grounded | grounded | — | — |
 | NETHERLANDS | U + LT | U + LT | — | — |
 
-France & Netherlands are loaded as `representative` (FR/NL resolve via
-`requirements_builder._ISO_TO_CATALOG_NAME`). Promote to `expert_verified` after legal review —
-France is corpus-groundable (`US→FR` chunks); the Netherlands corpus still needs indexing.
+**France** is `corpus_grounded` — its 9 requirements are grounded in the live `US→FR` immigration
+corpus (VLS-TS / Passeport Talent route for non-EEA nationals) with per-item source citations.
+Grounding showed most steps apply to *any* VLS-TS stay, so only the multi-year residence-card renewal
+is long-term-only (LTA → 9 reqs, STA → 8). Still pending human `expert_verified` (French immigration
+lawyer sign-off). **Netherlands** is `representative` (taxonomy-authored; corpus not yet indexed).
+Both resolve via `requirements_builder._ISO_TO_CATALOG_NAME`.
 
 Extend by drafting → reviewing → loading new countries/purposes; update this table per load.
