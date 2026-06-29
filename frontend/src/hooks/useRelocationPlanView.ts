@@ -39,7 +39,9 @@ export function useRelocationPlanView(
       const transport = getClientTransportErrorMessage(err);
       const msg = transport ?? getApiErrorMessage(err, (err as Error)?.message || '');
       setError(msg.trim() ? msg : 'Failed to load relocation plan');
-      setData(null);
+      // AIQ-1377: keep the last good data on a transient error so a retry/poll
+      // can recover without blanking an already-rendered roadmap. The page treats
+      // an error within the generation window as "not ready yet", not a dead end.
     } finally {
       setLoading(false);
     }

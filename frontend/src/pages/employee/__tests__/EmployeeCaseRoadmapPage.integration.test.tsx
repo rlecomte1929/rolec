@@ -11,11 +11,12 @@
  * AppShell is stubbed (layout + unrelated mount-time network). The page uses a
  * custom data hook (not useQuery), so only MemoryRouter (for :caseId) is needed.
  */
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { RelocationPlanViewResponseDTO } from '../../../types/relocationPlanView';
 import { EmployeeCaseRoadmapPage } from '../EmployeeCaseRoadmapPage';
+import { resolveRoadmapBuildVariant } from '../roadmapBuildVariant';
 
 // ── Stub AppShell ────────────────────────────────────────────────────────────
 vi.mock('../../../components/AppShell', () => ({
@@ -121,5 +122,62 @@ describe('EmployeeCaseRoadmapPage — roadmap orchestration', () => {
     // removed in AIQ-1246c; the page now leads with the "My roadmap" heading.)
     expect(screen.getByText('My roadmap')).toBeInTheDocument();
     expect(fetchRelocationPlanView).toHaveBeenCalledWith('c1', expect.objectContaining({ role: 'employee' }));
+  });
+});
+
+// ── AIQ-1377: the plan-view endpoint can transiently 4xx/5xx for a freshly-
+// provisioned employee. A single error must NOT dead-end the page with
+// "We couldn't load your roadmap"; it should keep retrying within the bounded
+// window and only resolve to the failed state on a PERSISTENT error.
+describe('EmployeeCaseRoadmapPage — AIQ-1377 transient-error resilience', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('retries through a transient error and renders the roadmap (never "couldn\'t load")', async () => {
+    // first fetch fails, the retry succeeds. (mockReset: clearAllMocks keeps impls.)
+    fetchRelocationPlanView.mockReset();
+    fetchRelocationPlanView.mockRejectedValueOnce(new Error('boom')).mockResolvedValue(READY_PLAN);
+    renderPage();
+
+    // first (rejected) fetch settles → must NOT be a dead-end yet.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.queryByText(/couldn't load/i)).toBeNull();
+
+    // the 4s poll fires → the retry resolves → the roadmap renders.
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    expect(screen.getAllByText('Apply for work visa').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/couldn't load/i)).toBeNull();
+  });
+
+  it('keeps showing the "building" state on a persistent error within the window (no dead-end)', async () => {
+    fetchRelocationPlanView.mockReset();
+    fetchRelocationPlanView.mockRejectedValue(new Error('down'));
+    renderPage();
+
+    // first error + a couple of retries: still "building", never the dead-end screen.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    expect(screen.getByText(/building your roadmap/i)).toBeInTheDocument();
+    expect(screen.queryByText(/couldn't load/i)).toBeNull();
+  });
+});
+
+// The terminal-variant mapping (give-up after the retry window) is deterministic
+// and is unit-tested directly — driving 15 self-rescheduling async polls under
+// fake timers is a harness fight, not a code path worth asserting that way.
+describe('resolveRoadmapBuildVariant — terminal state mapping (AIQ-1377)', () => {
+  it('stays "generating" until the retry window elapses', () => {
+    expect(resolveRoadmapBuildVariant(false, true)).toBe('generating');
+    expect(resolveRoadmapBuildVariant(false, false)).toBe('generating');
+  });
+  it('resolves a persistent error to "failed" once the window elapses', () => {
+    expect(resolveRoadmapBuildVariant(true, true)).toBe('failed');
+  });
+  it('resolves a persistently-empty plan to "empty" once the window elapses', () => {
+    expect(resolveRoadmapBuildVariant(true, false)).toBe('empty');
   });
 });
