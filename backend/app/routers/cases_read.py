@@ -130,6 +130,17 @@ def _bucket_confidence(pct: Optional[int]) -> Optional[str]:
     return "LOW"
 
 
+def _tier_to_confidence(tier: Optional[str]) -> str:
+    """[P3-04e-FU] Map a source page's trust tier to a roadmap-step confidence level.
+
+    ``source_pages.tier`` is TEXT ('1'/'2'/'3', default '1'). Tier 1 = official
+    primary authority → HIGH; tier 2 → MEDIUM; tier 3 → LOW. Anything missing or
+    unrecognised → UNKNOWN (honest — never fabricate confidence). Distinct from
+    _bucket_confidence, which maps the requirements.confidence_pct path.
+    """
+    return {"1": "HIGH", "2": "MEDIUM", "3": "LOW"}.get(str(tier).strip() if tier is not None else "", "UNKNOWN")
+
+
 def _suggested_due_date(
     due_date: Optional[str],
     track_key: str,
@@ -172,6 +183,9 @@ class _DossierFormTemplate(BaseModel):
     source_url: Optional[str] = None
     # [P1-05d] When the source URL was last fetched/verified (source_pages.last_fetched_at).
     source_last_verified: Optional[str] = None
+    # [P3-04e-FU] Trust tier of the source page ('1'/'2'/'3' from source_pages.tier);
+    # drives the roadmap step's confidence_level (tier 1→HIGH, 2→MEDIUM, 3→LOW).
+    source_tier: Optional[str] = None
     # [WS1] Content-maturity flag: 'representative' (default scaffolding, not yet
     # human-verified), 'draft' (under review), or 'verified' (ops/legal confirmed).
     # Drives the "indicative guidance — confirm with the authority" notice so the
@@ -409,6 +423,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             fields_total=0,
             source_url=None,
             source_last_verified=None,
+            source_tier=None,
             required_documents=[],
         )
     else:
@@ -424,6 +439,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             fields_total=fields_total,
             source_url=row.get("template_source_url"),  # [P1-05]
             source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
+            source_tier=(str(row["source_tier"]) if row.get("source_tier") is not None else None),  # [P3-04e-FU]
             verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
             required_documents=required_documents,  # [P1-05 checklist]
         )
@@ -1038,6 +1054,13 @@ def get_case_roadmap_tracks(
                     doc_count=0,
                     worst_doc_status=None,
                     estimated_effort=s.estimated_effort,  # [AIQ-869]
+                    # [P3-04e-FU] per-step confidence + source from the form's template
+                    # source (form_templates.source_url + source_pages.tier). Honest
+                    # UNKNOWN when the form has no source — never a fabricated HIGH.
+                    confidence_level=(_tier_to_confidence(s.source_tier) if s.source_url else "UNKNOWN"),
+                    source_url=s.source_url,
+                    source_fetched_at=s.source_fetched_at,
+                    source_excerpt=None,
                 )
             )
         tracks.append(
@@ -1208,6 +1231,7 @@ def _load_case_form_summaries(
           ft.source_url AS template_source_url,
           ft.verification_status AS template_verification_status,
           sp.last_fetched_at AS source_last_verified,
+          sp.tier AS source_tier,
           rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,

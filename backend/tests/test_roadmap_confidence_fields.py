@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 
 # The live router is cases_read.py (cases.py is the unwired dead duplicate).
-from backend.app.routers.cases_read import RoadmapStepV2, _bucket_confidence
+from backend.app.routers.cases_read import RoadmapStepV2, _bucket_confidence, _tier_to_confidence
 
 
 CONFIDENCE_FIELDS = ("confidence_level", "source_url", "source_fetched_at", "source_excerpt")
@@ -67,3 +67,22 @@ class TestBucketConfidence:
     )
     def test_thresholds(self, pct, expected):
         assert _bucket_confidence(pct) == expected
+
+
+class TestTierToConfidence:
+    """[P3-04e-FU] source_pages.tier → roadmap-step confidence level."""
+
+    @pytest.mark.parametrize(
+        "tier,expected",
+        [
+            ("1", "HIGH"),
+            ("2", "MEDIUM"),
+            ("3", "LOW"),
+            (" 1 ", "HIGH"),    # whitespace-tolerant
+            (None, "UNKNOWN"),  # no source page → honest UNKNOWN
+            ("", "UNKNOWN"),
+            ("9", "UNKNOWN"),   # unrecognised tier → UNKNOWN, never fabricated HIGH
+        ],
+    )
+    def test_tier_mapping(self, tier, expected):
+        assert _tier_to_confidence(tier) == expected
