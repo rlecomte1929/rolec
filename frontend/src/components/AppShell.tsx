@@ -11,6 +11,7 @@ import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentSco
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
 import { ChangelogBell } from './ChangelogBell';
+import { NotificationsBell } from './NotificationsBell';
 import { RoleSwitcher } from './RoleSwitcher';
 import { Breadcrumb } from './Breadcrumb';
 import { Button } from './antigravity/Button';
@@ -219,6 +220,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
           </button>
           <div className="flex items-center gap-3 shrink-0 md:ml-auto">
             <RoleSwitcher />
+            <NotificationsBell />
             <ChangelogBell />
             <LogoutButton />
             {identity && (
