@@ -95,6 +95,18 @@ def main():
         or cur.fetchall())]
     print(f"is_test companies={test_companies}  profiles={test_profiles}  test relocation_cases={len(case_ids)}")
 
+    # [AIQ-1375] public.cases (the new case engine) is NOT covered by relocation_cases above. Its
+    # employee_id/hr_owner_id columns FK to profiles, so the `DELETE FROM profiles` below FK-fails
+    # (cases_employee_id_fkey) unless the test cases go first. 17 of cases' 18 children are
+    # ON DELETE CASCADE (1 is SET NULL), so a single scoped DELETE cleans them. Scope by the two
+    # profile FKs — those are the blockers.
+    pub_case_ids = [r[0] for r in (cur.execute(
+        """SELECT id::text FROM cases
+           WHERE employee_id::text IN (SELECT id::text FROM profiles WHERE COALESCE(is_test,false))
+              OR hr_owner_id::text IN (SELECT id::text FROM profiles WHERE COALESCE(is_test,false))""")
+        or cur.fetchall())]
+    print(f"test public.cases (engine)={len(pub_case_ids)}")
+
     if not args.apply:
         print("\nDRY-RUN — counts of rows that WOULD be deleted (pass --apply to delete):")
         for table, col, src in CASE_CHILDREN:
@@ -107,6 +119,7 @@ def main():
             if n:
                 print(f"  {table:28} {n}")
         print(f"  relocation_cases             {len(case_ids)}")
+        print(f"  cases (engine)               {len(pub_case_ids)}")
         print(f"  profiles (is_test)           {test_profiles}")
         print(f"  companies (is_test)          {test_companies}")
         conn.rollback()
@@ -127,6 +140,9 @@ def main():
             deleted[table] = n
     if case_ids:
         deleted["relocation_cases"] = guarded(cur, "DELETE FROM relocation_cases WHERE id::text = ANY(%s)", (case_ids,))
+    # [AIQ-1375] delete test public.cases (CASCADE cleans its 17 children) so the profiles delete won't FK-fail.
+    if pub_case_ids:
+        deleted["cases"] = guarded(cur, "DELETE FROM cases WHERE id::text = ANY(%s)", (pub_case_ids,))
     deleted["profiles"] = guarded(cur, "DELETE FROM profiles WHERE COALESCE(is_test,false)")
     deleted["companies"] = guarded(cur, "DELETE FROM companies WHERE COALESCE(is_test,false)")
 
