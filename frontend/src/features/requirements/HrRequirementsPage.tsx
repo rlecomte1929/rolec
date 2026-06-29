@@ -5,6 +5,7 @@ import { Button, Card, Badge } from '../../components/antigravity';
 import { ROUTE_DEFS, buildRoute } from '../../navigation/routes';
 import { useSelectedCase } from '../../contexts/SelectedCaseContext';
 import { ImmigrationStatusPanel } from '../../components/case/ImmigrationStatusPanel';
+import { ImmigrationDisclaimer } from '../../components/requirements/ImmigrationDisclaimer';
 import { hrAPI } from '../../api/client';
 import { listExceptionRequestsForCase, type ExceptionRequest } from '../../api/exceptions';
 
@@ -118,6 +119,7 @@ export function HrRequirementsPage() {
 
   return (
     <AppShell section="HR Operations" title="Requirements" subtitle={SUBTITLE}>
+      <ImmigrationDisclaimer className="mb-5" />
       {/* Summary bar — one-line health check across the case's requirements. */}
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Document requirements" value={reqCount} />
