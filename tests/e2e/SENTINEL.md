@@ -52,9 +52,19 @@ Two manual workflows ship gated-OFF (no-op until you opt in):
    the score lands in the run **Summary** and the report is uploaded as an artifact.
 3. **Actions → "E2E Sentinel Purge" → Run workflow** (`apply` unchecked = dry-run).
 
-## Phase 2 (not yet wired)
-- Trigger the campaign on `push: main` with a wait-for-deploy `/health` gate.
-- Slack notification (`E2E_SLACK_ENABLED` + `SLACK_WEBHOOK_URL`).
-- Notion sync of `notion_candidates` via the bug-triage skill.
-- Per-run auto-delete on PASS (`E2E_AUTODELETE_ENABLED`).
-- Deep roadmap/vendor UX journey on a fully-provisioned case.
+## Phase 2 (shipped)
+- ✅ Campaign also triggers on `push: main` with a `/health` + deploy-grace gate.
+- ✅ Deep provisioned-case journey (`tests/deep/journey.spec.ts`): fill wizard → submit → poll roadmap → assert it renders.
+- ✅ Gated Slack notify (`E2E_SLACK_ENABLED` + `SLACK_WEBHOOK_URL`).
+- ✅ Gated per-run auto-delete of `is_test` data (`E2E_AUTODELETE_ENABLED` + `DATABASE_URL`).
+- ✅ Deterministic Notion Work Queue sync (`E2E_NOTION_SYNC_ENABLED` + `NOTION_API_KEY`) —
+  `scripts/notion_sync_candidates.py` creates/updates tasks from `notion_candidates`, de-duped, no LLM.
+
+### Notion sync (manual run)
+```bash
+NOTION_QUEUE_TOKEN=<secret> python3 scripts/notion_sync_candidates.py   # dry-run (read-only)
+NOTION_QUEUE_TOKEN=<secret> python3 scripts/notion_sync_candidates.py --apply
+```
+
+## Optional extra toggles (vars)
+`E2E_SLACK_ENABLED`, `E2E_AUTODELETE_ENABLED`, `E2E_NOTION_SYNC_ENABLED`, `E2E_DEPLOY_GRACE` (seconds).
