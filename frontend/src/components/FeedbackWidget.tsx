@@ -2,7 +2,7 @@
  * FeedbackWidget — floating feedback button for authenticated users.
  *
  * Fixed bottom-right on all product pages.
- * Submits to the `feedback` Supabase table via direct insert.
+ * Submits via the FastAPI backend (POST /api/feedback) → public.feedback.
  *
  * Features:
  * - Category: Bug / Idea / Other
@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { supabase } from '../api/supabase';
+import { submitProductFeedback } from '../api/productFeedback';
 import { Button } from './antigravity/Button';
 
 type Category    = 'bug' | 'idea' | 'other';
@@ -113,21 +113,23 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     const rid = reportId ?? makeReportId(category);
     setReportId(rid);
 
-    void userId; // kept for future analytics; DB uses auth.uid() default
-    const { error } = await supabase.from('feedback').insert({
-      page_url:        window.location.pathname,
-      category,
-      message:         trimmed.slice(0, 2000),
-      report_id:       rid,
-      screenshot_data: screenshot ?? null,
-    });
+    void userId; // kept for future analytics; the backend derives user_id from the session
 
-    if (error) {
-      setState('error');
-      setTimeout(() => setState('open'), 2500);
-    } else {
+    // Route through the FastAPI backend (ReloPass session auth) — the prior direct
+    // Supabase insert failed for employees without a live Supabase Auth session.
+    try {
+      await submitProductFeedback({
+        category,
+        message:         trimmed.slice(0, 2000),
+        page_url:        window.location.pathname,
+        report_id:       rid,
+        screenshot_data: screenshot ?? null,
+      });
       setState('success');
       setTimeout(() => close(), 3500);
+    } catch {
+      setState('error');
+      setTimeout(() => setState('open'), 2500);
     }
   }
 
