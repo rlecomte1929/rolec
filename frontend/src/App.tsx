@@ -52,6 +52,7 @@ const HrVendorCuration = lazy(() => import('./pages/HrVendorCuration').then((mod
 const HrServiceProvidersPage = lazy(() => import('./pages/HrServiceProvidersPage').then((module) => ({ default: module.HrServiceProvidersPage })));
 const HrPolicy = lazy(() => import('./pages/HrPolicy').then((module) => ({ default: module.HrPolicy })));
 const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPage').then((module) => ({ default: module.EmployeePolicyPage })));
+const ImmigrationAssistantPage = lazy(() => import('./pages/employee/ImmigrationAssistantPage').then((module) => ({ default: module.ImmigrationAssistantPage })));
 const EmployeeBenefitComparisonPage = lazy(() => import('./pages/employee/EmployeeBenefitComparisonPage').then((module) => ({ default: module.EmployeeBenefitComparisonPage })));
 // Legacy CaseWizardPage is no longer routed (staged unification C1) — its routes
 // redirect to the canonical v2 intake. The component file stays dormant.
@@ -372,6 +373,7 @@ function App() {
         {/* [AIQ-1259b] /plan consolidated into /roadmap — redirect, preserving caseId. */}
         <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><CasePlanToRoadmapRedirect /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseImmigration.path} element={<RequireEmployeeRoute><ImmigrationPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeImmigrationAssistant.path} element={<RequireEmployeeRoute><ImmigrationAssistantPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
