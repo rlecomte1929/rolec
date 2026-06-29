@@ -12,6 +12,7 @@ import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidate
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
 import { PrivacyNotice } from '../../privacy/PrivacyNotice';
+import { OutcomeSharingOptIn } from './OutcomeSharingOptIn';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacyNoticeContent';
 import { MultiChip } from './MultiChip';
 import { INTAKE_STEP_LABELS } from './intakeSteps';
@@ -1259,6 +1260,9 @@ export function EmployeeIntakePage() {
                     checked={data.consent}
                     onChange={(v) => setField('consent', v)}
                   />
+                  {/* P1-07c / AIQ-686 — optional anonymized outcome-sharing opt-in.
+                      Distinct from the mandatory Art.13 ack above; never gates submit. */}
+                  <OutcomeSharingOptIn caseId={caseIdRef.current} />
                 </div>
               </>
             )}
