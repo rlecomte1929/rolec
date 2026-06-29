@@ -74,10 +74,21 @@ function readLocalStorage(key: V2FlagKey): boolean | null {
   }
 }
 
+/**
+ * [AIQ-759] Flags that default ON for everyone — no env var or localStorage
+ * needed. A per-session localStorage `'off'` override still wins (so it can be
+ * disabled for QA), and the legacy code path it gated stays as a one-release
+ * fallback. `companies_resizable` ships the resize + drag-reorder + persisted-
+ * layout admin companies table (CompaniesV2Table) as the default; the legacy
+ * hand-written <table> branch in CompaniesV2.tsx remains the fallback.
+ */
+const DEFAULT_ON: ReadonlyArray<V2FlagKey> = ['companies_resizable'];
+
 export function isV2FlagOn(key: V2FlagKey): boolean {
   const ls = readLocalStorage(key);
   if (ls !== null) return ls;
-  return readEnv(key);
+  if (readEnv(key)) return true;
+  return DEFAULT_ON.includes(key);
 }
 
 export function setV2FlagOverride(key: V2FlagKey, value: boolean | null): void {
