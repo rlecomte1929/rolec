@@ -109,6 +109,9 @@ def compute_priority_score(
     elif queue_item_type == "research_request":
         score += 22
         reasons.append("Customer-requested corridor research")
+    elif queue_item_type == "requirement_expert_verification":
+        score += 28
+        reasons.append("Immigration catalog awaiting expert sign-off")
     else:
         score += 10
 
@@ -175,6 +178,56 @@ def compute_priority_score(
 def _ensure_table():
     """Ensure review_queue_items exists (for SQLite/local dev without migration)."""
     pass  # Rely on migration
+
+
+def create_queue_item_from_requirement_verification(
+    country: str, current_status: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """AIQ-1349 — enqueue an expert-verification task so a licensed immigration
+    professional can review a country's requirement catalog and sign it off
+    (→ expert_verified). De-duplicates per country (one open item)."""
+    supabase = _get_supabase()
+    if not country:
+        return None
+    existing = (
+        supabase.table("review_queue_items")
+        .select("id")
+        .eq("created_from_signal_type", "requirement_expert_verification")
+        .eq("created_from_signal_id", country)
+        .in_("status", list(_OPEN_STATUSES))
+        .limit(1)
+        .execute()
+    ).data
+    if existing:
+        return None
+    score, band, reasons = compute_priority_score(
+        queue_item_type="requirement_expert_verification", content_domain="immigration"
+    )
+    row = {
+        "queue_item_type": "requirement_expert_verification",
+        "status": "new",
+        "priority_score": score,
+        "priority_band": band,
+        "country_code": country,
+        "content_domain": "immigration",
+        "title": f"Expert-verify immigration requirements: {country}"[:500],
+        "summary": (
+            f"The {country} requirement catalog is '{current_status or 'representative'}'. A licensed "
+            "immigration professional should review it and sign off (→ expert_verified)."
+        )[:1000],
+        "created_from_signal_type": "requirement_expert_verification",
+        "created_from_signal_id": country,
+        "priority_reasons_json": json.dumps(reasons),
+    }
+    r = supabase.table("review_queue_items").insert(row).execute()
+    created = (r.data or [{}])[0] if r.data else None
+    if created:
+        try:
+            from .ops_notification_service import evaluate_queue_notification_rules
+            evaluate_queue_notification_rules(created)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Notification eval failed for expert-verification item: %s", e)
+    return created
 
 
 def create_queue_item_from_research_request(request: Dict[str, Any]) -> Optional[Dict[str, Any]]:

@@ -45,6 +45,11 @@ class ResolveResearchBody(BaseModel):
     notes: Optional[str] = None
 
 
+class CompleteResearchBody(BaseModel):
+    result_summary: str
+    actual_cost: Optional[float] = None
+
+
 @router.post("/api/research-requests")
 def create_research_request(
     body: CreateResearchRequestBody,
@@ -84,3 +89,24 @@ def resolve_research_request(
         actor_user_id=str(user.get("id")),
         notes=body.notes,
     )
+
+
+@router.post("/api/admin/research-requests/{request_id}/complete")
+def complete_research_request(
+    request_id: str,
+    body: CompleteResearchBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Publish a researched corridor: requires the curation review to be resolved
+    (strict human gate), records cost/summary, notifies the requester."""
+    try:
+        return svc.complete_research_request(
+            request_id=request_id,
+            actor_user_id=str(user.get("id")),
+            result_summary=body.result_summary,
+            actual_cost=body.actual_cost,
+        )
+    except svc.ReviewNotResolvedError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

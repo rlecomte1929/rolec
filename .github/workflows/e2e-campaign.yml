@@ -66,12 +66,8 @@ jobs:
         working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
 
-      # (Optional) API smoke layer — runs only if the secret is present, writes test_results.json
-      - name: API smoke layer
-        if: ${{ env.RELOPASS_E2E_PASSWORD != '' }}
-        continue-on-error: true
-        run: node relopass_api_runner_patched.js --api-only || true
-
+      # Provision + browser/lifecycle FIRST, so provisioning gets the fresh
+      # registration rate-limit budget (the API-smoke layer registers accounts too).
       - name: Browser + lifecycle layer
         working-directory: tests/e2e
         continue-on-error: true
@@ -82,6 +78,28 @@ jobs:
         run: |
           # shellcheck disable=SC2086  # PROJECTS is several flags; word-splitting is intended
           npx playwright test $PROJECTS
+
+      # Honest-green gate: if provisioning didn't produce all 3 sessions, the dependent
+      # tests SKIP and the scorer would read a VACUOUS 100% GREEN. Fail loudly instead.
+      - name: Verify provisioning
+        working-directory: tests/e2e
+        run: |
+          missing=0
+          for f in hr_a emp_a hr_b; do
+            if [ ! -s "playwright/.auth/${f}.json" ]; then echo "missing session: ${f}"; missing=1; fi
+          done
+          if [ ! -s "playwright/.auth/_provisioned.json" ]; then echo "missing _provisioned.json"; missing=1; fi
+          if [ "$missing" = "1" ]; then
+            echo "Provisioning incomplete — NOT a valid run (a 100% score here would be vacuous)."
+            exit 1
+          fi
+          echo "provisioning complete (hr_a, emp_a, hr_b)"
+
+      # API smoke layer runs AFTER provisioning so it doesn't eat provision's rate budget.
+      - name: API smoke layer
+        if: ${{ env.RELOPASS_E2E_PASSWORD != '' }}
+        continue-on-error: true
+        run: node relopass_api_runner_patched.js --api-only || true
 
       - uses: actions/setup-python@v6
         with:

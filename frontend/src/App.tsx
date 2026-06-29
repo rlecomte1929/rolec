@@ -126,6 +126,7 @@ const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobil
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
 const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueuePage').then((module) => ({ default: module.AdminCatalogQueuePage })));
 const AdminRequirementFactsPage = lazy(() => import('./pages/admin/AdminRequirementFactsPage').then((module) => ({ default: module.AdminRequirementFactsPage })));
+const AdminResearchRequestsPage = lazy(() => import('./pages/admin/AdminResearchRequestsPage').then((module) => ({ default: module.AdminResearchRequestsPage })));
 // AdminPolicyConfigPage (/admin/policy-config) was retired: it duplicated the
 // row-by-row editor already living in the Policy Workspace ("Edit structured
 // baseline" bulk editor). Per product direction one editor is the source of
@@ -387,6 +388,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminResearchRequests.path} element={<RequireAdminRoute><AdminResearchRequestsPage /></RequireAdminRoute>} />
         {/* platform-v2: companies promoted to default-on (2026-05-20).
             Legacy kept at /admin/companies-legacy for emergency rollback. */}
         <Route
