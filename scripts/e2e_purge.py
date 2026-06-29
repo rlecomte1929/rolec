@@ -88,7 +88,14 @@ def guarded(cur, sql, params=None):
     violation (the row is still referenced — a later cascade pass will clear it)."""
     cur.execute("SAVEPOINT s")
     try:
-        cur.execute(sql, params or ())
+        # Pass NO params arg when there are none — `params or ()` (an empty tuple)
+        # still puts psycopg2 into %-interpolation mode, which chokes on a literal
+        # `%` in the SQL (e.g. the ILIKE patterns in TEST_EMAIL_PREDICATE,
+        # '%@testco.com') → IndexError: tuple index out of range.
+        if params is None:
+            cur.execute(sql)
+        else:
+            cur.execute(sql, params)
         n = cur.rowcount
         cur.execute("RELEASE SAVEPOINT s")
         return n
