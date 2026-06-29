@@ -23,6 +23,8 @@ _ISO_TO_CATALOG_NAME = {
     "UK": "UNITED KINGDOM",
     "US": "UNITED STATES",
     "USA": "UNITED STATES",
+    "FR": "FRANCE",
+    "NL": "NETHERLANDS",
 }
 
 

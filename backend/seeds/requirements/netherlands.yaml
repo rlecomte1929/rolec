@@ -1,16 +1,16 @@
-# AIQ-1349 — DRAFT requirement seed for the Netherlands. verification_status: draft.
+# AIQ-1349 — requirement seed for the Netherlands. verification_status: representative.
 #
-# Taxonomy-authored draft. NOTE: the immigration corpus has NO Netherlands chunks
-# yet, so the citation-bound LLM drafter (draft_requirements.py) would emit nothing
-# for NL — index NL corridors via .github/workflows/immigration-indexer.yml to
-# enable corpus-grounded drafting. REVIEW REQUIRED before loading: confirm each item
-# with the named authority and promote verification_status.
+# Reviewed + loaded to prod. Items are REPRESENTATIVE (descriptions end
+# "Indicative — confirm with {authority}"). Taxonomy-authored: the immigration
+# corpus has NO Netherlands chunks yet — index NL corridors via
+# .github/workflows/immigration-indexer.yml to enable corpus-grounded re-drafting
+# and expert verification.
 #
-# Load (after review):
+# Reload (idempotent):
 #   python backend/scripts/seed_requirements.py --file backend/seeds/requirements/netherlands.yaml
-# NOTE: going live also needs NL→NETHERLANDS in requirements_builder._ISO_TO_CATALOG_NAME.
+# NL→NETHERLANDS resolution lives in requirements_builder._ISO_TO_CATALOG_NAME.
 
-verification_status: draft
+verification_status: representative
 purposes_by_country:
   NETHERLANDS: [employment, other]
 

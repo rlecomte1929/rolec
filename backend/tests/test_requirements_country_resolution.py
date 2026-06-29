@@ -16,6 +16,8 @@ def test_iso_codes_map_to_catalog_names():
     assert _resolve_catalog_country("UK") == "UNITED KINGDOM"
     assert _resolve_catalog_country("US") == "UNITED STATES"
     assert _resolve_catalog_country("usa") == "UNITED STATES"
+    assert _resolve_catalog_country("FR") == "FRANCE"
+    assert _resolve_catalog_country("NL") == "NETHERLANDS"
 
 
 def test_full_names_pass_through_uppercased():
@@ -24,6 +26,6 @@ def test_full_names_pass_through_uppercased():
 
 
 def test_unknown_falls_back_to_raw_upper():
-    assert _resolve_catalog_country("FR") == "FR"          # no catalog data yet
+    assert _resolve_catalog_country("IT") == "IT"          # no catalog data yet
     assert _resolve_catalog_country("Japan") == "JAPAN"
     assert _resolve_catalog_country("") == "UNKNOWN"
