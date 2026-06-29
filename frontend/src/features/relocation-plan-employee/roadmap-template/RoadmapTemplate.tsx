@@ -7,12 +7,14 @@
 import React, { useMemo, useState } from 'react';
 import {
   Check, Circle, Lock, Loader2, Sparkles, Flag, FileText, ChevronUp, ChevronDown,
-  Clock, ArrowRight,
+  Clock, ArrowRight, ExternalLink,
 } from 'lucide-react';
 import { CountryFlag } from '../../../components/antigravity/CountryFlag';
 import { getCountryName } from '../../../utils/countries';
 import { ownerLabel } from '../relocationPlanLabels';
 import { RoadmapActions } from '../../platform-v2/roadmap/RoadmapActions';
+import { ConfidenceBadge } from '../../platform-v2/roadmap/ConfidenceBadge';
+import { resolveConfidenceLevel, type StepConfidence } from '../../platform-v2/roadmap/confidence.tokens';
 import { deriveCanonicalProgress } from '../../employee-journey/caseStage';
 import type {
   RelocationPlanViewResponseDTO,
@@ -21,8 +23,11 @@ import type {
 } from '../../../types/relocationPlanView';
 import {
   phaseIcon, titlesByCode, actionableTasks, hrHandledTasks, resolveBlockedBy,
-  rowStatus, formatDue, docCount, daysUntil, type RowTone,
+  rowStatus, formatDue, docCount, daysUntil, normalizeStepTitle, type RowTone,
 } from './roadmapTemplateHelpers';
+
+/** Confidence keyed by normalised task title, supplied by the page from /roadmap/tracks. */
+export type ConfidenceByTitle = Record<string, StepConfidence>;
 
 export interface RoadmapHeaderMeta {
   originCity?: string;
@@ -42,6 +47,8 @@ export interface RoadmapTemplateProps {
   validatedAt: string | null;
   validating: boolean;
   onValidate: () => void;
+  /** [AIQ-806] Per-task confidence matched from the /roadmap/tracks projection. */
+  confidenceByTitle?: ConfidenceByTitle;
 }
 
 const TONE_CHIP: Record<RowTone, string> = {
@@ -182,9 +189,45 @@ function ActionCard({ task, onCta }: { task: RelocationPlanPhaseTaskDTO; onCta: 
 
 // ── Phase section + rows ─────────────────────────────────────────────────────
 
+/** [AIQ-806] Collapsible "Show source" disclosure for a confident, sourced task. */
+function SourceDisclosure({ confidence }: { confidence: StepConfidence }) {
+  const [open, setOpen] = useState(false);
+  if (!confidence.sourceUrl) return null;
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-[11.5px] font-medium text-teal-700 hover:underline"
+        aria-expanded={open}
+      >
+        {open ? 'Hide source' : 'Show source'}
+      </button>
+      {open && (
+        <div className="mt-1 rounded-lg bg-slate-50 px-2.5 py-2 text-[11.5px] text-slate-600">
+          <a
+            href={confidence.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-medium text-teal-700 hover:underline"
+          >
+            <ExternalLink size={11} /> Official source
+          </a>
+          {confidence.sourceFetchedAt && (
+            <span className="ml-2 text-slate-400">
+              Verified {new Date(confidence.sourceFetchedAt).toLocaleDateString()}
+            </span>
+          )}
+          {confidence.sourceExcerpt && <p className="mt-1 text-slate-500">{confidence.sourceExcerpt}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskRow({
-  task, titles, onCta,
-}: { task: RelocationPlanPhaseTaskDTO; titles: Record<string, string>; onCta: (t: RelocationPlanPhaseTaskDTO) => void }) {
+  task, titles, onCta, confidence,
+}: { task: RelocationPlanPhaseTaskDTO; titles: Record<string, string>; onCta: (t: RelocationPlanPhaseTaskDTO) => void; confidence?: StepConfidence }) {
   const st = rowStatus(task);
   const blocked = resolveBlockedBy(task, titles);
   const docs = docCount(task);
@@ -199,6 +242,7 @@ function TaskRow({
           <span className={`text-[14px] font-semibold ${done ? 'text-slate-400 line-through' : 'text-[#0b2b43]'}`}>
             {task.title}
           </span>
+          {confidence && <ConfidenceBadge level={resolveConfidenceLevel(confidence)} size="sm" />}
           {task.priority === 'critical' && !done && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-500"><Flag size={11} /> Critical</span>
           )}
@@ -213,6 +257,7 @@ function TaskRow({
             <span className="inline-flex items-center gap-1 text-amber-600"><Lock size={11} /> Waiting on: {blocked}</span>
           )}
         </div>
+        {confidence && <SourceDisclosure confidence={confidence} />}
       </div>
       <div className="shrink-0 text-right">
         <Chip tone={st.tone}>{st.label}</Chip>
@@ -237,8 +282,8 @@ function TaskRow({
 }
 
 function PhaseSection({
-  phase, titles, onCta, defaultOpen,
-}: { phase: RelocationPlanPhaseDTO; titles: Record<string, string>; onCta: (t: RelocationPlanPhaseTaskDTO) => void; defaultOpen: boolean }) {
+  phase, titles, onCta, defaultOpen, confidenceByTitle,
+}: { phase: RelocationPlanPhaseDTO; titles: Record<string, string>; onCta: (t: RelocationPlanPhaseTaskDTO) => void; defaultOpen: boolean; confidenceByTitle?: ConfidenceByTitle }) {
   const [open, setOpen] = useState(defaultOpen);
   const pct = Math.round((phase.completion_ratio ?? 0) * 100);
   const Icon = phaseIcon(phase.phase_key);
@@ -272,7 +317,13 @@ function PhaseSection({
       {open && (
         <div className="px-4 pb-3">
           {phase.tasks.map((t) => (
-            <TaskRow key={t.task_id} task={t} titles={titles} onCta={onCta} />
+            <TaskRow
+              key={t.task_id}
+              task={t}
+              titles={titles}
+              onCta={onCta}
+              confidence={confidenceByTitle?.[normalizeStepTitle(t.title)]}
+            />
           ))}
         </div>
       )}
@@ -283,7 +334,7 @@ function PhaseSection({
 // ── Root ─────────────────────────────────────────────────────────────────────
 
 export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
-  data, header, caseId, onCta, validated, validatedAt, validating, onValidate,
+  data, header, caseId, onCta, validated, validatedAt, validating, onValidate, confidenceByTitle,
 }) => {
   const titles = useMemo(() => titlesByCode(data.phases), [data.phases]);
   const actionable = useMemo(() => actionableTasks(data.phases, 3), [data.phases]);
@@ -343,6 +394,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
             titles={titles}
             onCta={onCta}
             defaultOpen={p.status === 'active' || (activeIdx === -1 && i === 0)}
+            confidenceByTitle={confidenceByTitle}
           />
         ))}
       </div>

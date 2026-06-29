@@ -23,6 +23,9 @@ import {
 } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { validateRoadmap } from '../../api/cases';
+import { getCaseRoadmapV2 } from '../../api/roadmapV2';
+import { buildConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/roadmapTemplateHelpers';
+import type { ConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
@@ -83,6 +86,23 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
       cancelled = true;
     };
   }, [data?.assignment_id, caseId]);
+
+  // [AIQ-806] Confidence + source provenance for plan-view tasks, matched by title
+  // from the parallel /roadmap/tracks projection (the form-backed path that carries
+  // source_pages-derived confidence). Best-effort: failures leave tasks badge-less.
+  const [confidenceByTitle, setConfidenceByTitle] = useState<ConfidenceByTitle>({});
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    getCaseRoadmapV2(caseId)
+      .then((res) => {
+        if (!cancelled) setConfidenceByTitle(buildConfidenceByTitle(res));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId]);
 
   // Validate gate.
   const [localValidatedAt, setLocalValidatedAt] = useState<string | null>(null);
@@ -197,6 +217,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
             validatedAt={validatedAt}
             validating={validating}
             onValidate={onValidate}
+            confidenceByTitle={confidenceByTitle}
           />
         </div>
         {selection && (

@@ -9,6 +9,11 @@ import type {
   RelocationPlanPhaseTaskDTO,
   RelocationPlanTaskOwnerWire,
 } from '../../../types/relocationPlanView';
+import type { RoadmapV2Response } from '../../../api/roadmapV2';
+import {
+  resolveConfidenceLevel,
+  type StepConfidence,
+} from '../../platform-v2/roadmap/confidence.tokens';
 
 /** phase_key → hero/section icon (keys come from the backend PHASE_ORDER). */
 const PHASE_ICON: Record<string, LucideIcon> = {
@@ -120,4 +125,48 @@ export function daysUntil(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
   return Number.isNaN(days) ? null : days;
+}
+
+// ── [AIQ-806] Confidence enrichment from the /roadmap/tracks projection ──────────
+//
+// The plan-view (milestone) tasks carry no source provenance, but the parallel
+// /roadmap/tracks projection (form-backed) does — confidence_level + source_url,
+// resolved from source_pages.tier (P3-04e-FU + the AIQ-806 corpus backfill). We
+// match the two by normalised step/task title (the only field they share) so a
+// confident, sourced track step lights up the matching plan-view row. Matching is
+// best-effort: an unmatched task simply shows no badge (honest — never fabricated).
+
+/** Normalise a step/task title for fuzzy matching: lowercase, strip punctuation, collapse spaces. */
+export function normalizeStepTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Build {normalizedTitle → StepConfidence} from the tracks projection, keeping
+ * only steps that resolve to a real (non-UNKNOWN) confidence — i.e. a level with
+ * a backing source. Steps with no source are dropped so the plan-view stays clean
+ * (no UNKNOWN badge noise); the first confident step per title wins.
+ */
+export function buildConfidenceByTitle(
+  tracks: RoadmapV2Response | null | undefined,
+): Record<string, StepConfidence> {
+  const out: Record<string, StepConfidence> = {};
+  for (const track of tracks?.tracks ?? []) {
+    for (const step of track.steps ?? []) {
+      if (!step.confidence_level) continue;
+      const conf: StepConfidence = {
+        level: step.confidence_level,
+        sourceUrl: step.source_url,
+        sourceFetchedAt: step.source_fetched_at,
+        sourceExcerpt: step.source_excerpt,
+      };
+      if (resolveConfidenceLevel(conf) === 'UNKNOWN') continue;
+      const key = normalizeStepTitle(step.title);
+      if (key && !(key in out)) out[key] = conf;
+    }
+  }
+  return out;
 }
