@@ -186,11 +186,16 @@ export function resolveHrPolicyWorkspaceState(input: {
     if (ri?.message) highlightIssues.push({ message: String(ri.message), tier: ri.tier });
   }
 
-  let phase: HrPolicyWorkspacePhase = 'no_policy';
-  if (!hasCompanyPolicy) {
-    phase = 'no_policy';
-  } else if (hasPublished) {
+  // [AIQ-1015] A published version ALWAYS wins over no_policy. Otherwise a company with a
+  // published policy but no `company_policies` row (matrix-only / versions-only deployments)
+  // resolves to no_policy, and the page renders the "Start your policy" onboarding ALONGSIDE
+  // the live policy state — the simultaneous live/no-policy bug. published and no_policy must
+  // be mutually exclusive.
+  let phase: HrPolicyWorkspacePhase;
+  if (hasPublished) {
     phase = 'published';
+  } else if (!hasCompanyPolicy) {
+    phase = 'no_policy';
   } else if (publishStatus === 'ready' && latest && normStatus(latest.status) !== 'published') {
     phase = 'ready_to_publish';
   } else {
@@ -223,6 +228,16 @@ export function resolveHrPolicyWorkspaceState(input: {
     exclusionCount,
     draftRuleCandidatesCount,
   };
+}
+
+/**
+ * [AIQ-1015] The HR policy "fresh build" / no-policy onboarding doors are shown ONLY when there
+ * is no live policy (canonical OR matrix) and no draft in flight — so they can never co-render
+ * with the live policy state on the HR policy page. Use the UNIFIED `hasLivePolicy` here, never
+ * the canonical-only signal (a matrix-only published company has no canonical version yet).
+ */
+export function shouldOfferFreshPolicyBuild(hasLivePolicy: boolean, hasDraftInProgress: boolean): boolean {
+  return !hasLivePolicy && !hasDraftInProgress;
 }
 
 /** User-facing strings per primary phase (headlines / bodies for layout). */
