@@ -42,3 +42,9 @@ corridor:
   sla:
     at_risk_window_days: 30
     at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (resolved relative to this directory).
+  # EEA free-movement pathway — REPRESENTATIVE content, not SME-verified.
+  pathways:
+    - id: "EEA_FREEDOM_2026"
+      file: "pathways/EEA_FREEDOM_2026/v1.yaml"

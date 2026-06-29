@@ -1,0 +1,131 @@
+# Corridor Agent — FR_DE_EU_2026  (France → Germany, EU free movement)
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Grounded in the EU
+# free-movement framework (Directive 2004/38/EC) and its German transposition
+# (FreizügG/EU). A French (EU) national needs NO visa and NO residence permit to
+# live and work in Germany; obligations are administrative (address registration,
+# health insurance, tax ID). Confirm details with the destination authority.
+#
+# Schema-versioning: bump `version` when any rule reference or step ordering
+# changes; earlier vN.yaml files coexist so historical cases keep their ruleset.
+
+corridor_agent:
+  corridor_id: FR_DE_EU_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE
+  origin_country_iso3: FRA
+  destination_country_iso3: DEU
+  description: >
+    French (EU) national → Germany under EU freedom of movement
+    (FreizügG/EU; Directive 2004/38/EC). No visa or residence title required;
+    the journey is the administrative registration sequence (Anmeldung, health
+    insurance, tax ID, bank account).
+
+  applicable_rules:
+    - legal_reference: "FreizügG/EU §2"
+      rule_id: DE_FREIZUEGG_2
+      summary: "Right of entry and residence for EU citizens and their family members."
+    - legal_reference: "FreizügG/EU §5"
+      rule_id: DE_FREIZUEGG_5
+      summary: "Documentation of the right of residence (Aufenthaltsbescheinigung where issued)."
+    - legal_reference: "Directive 2004/38/EC"
+      rule_id: EU_2004_38
+      summary: "Union citizens' right to move and reside freely within the Member States."
+    - legal_reference: "BMG §17 (Bundesmeldegesetz)"
+      rule_id: DE_BMG_17
+      summary: "Duty to register a residence (Anmeldung) within two weeks of moving in."
+    - legal_reference: "SGB V §193"
+      rule_id: DE_SGBV_193
+      summary: "Mandatory health-insurance cover for residents."
+
+  required_documents:
+    - PASSPORT_OR_NATIONAL_ID:employee
+    - PASSPORT_OR_NATIONAL_ID:family.spouse?
+    - EMPLOYMENT_CONTRACT?
+    - WOHNUNGSGEBERBESTAETIGUNG
+    - HEALTH_INSURANCE_PROOF
+    - MARRIAGE_CERT?
+
+  required_data_points:
+    - key: eu_eea_nationality
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: has_german_address
+      type: bool
+      source: USER_INPUT
+    - key: has_health_insurance
+      type: bool
+      source: USER_INPUT
+
+  # No salary floor applies to EU free movement.
+  salary_thresholds_eur: {}
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_EU_FREE_MOVEMENT
+        label: "EU freedom of movement (FreizügG/EU §2)"
+        cite: DE_FREIZUEGG_2
+        requires_all:
+          - eu_eea_nationality == true
+        verdict_on_pass: ELIGIBLE
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases:
+    - id: NON_EU_FAMILY_MEMBER
+      condition: "case.has_family_relocating == true AND family.spouse.eu_eea_nationality == false"
+      cite: EU_2004_38
+      action: SPAWN_FAMILY_CASE
+      hint: "Non-EU family member needs an Aufenthaltskarte (residence card) — separate track."
+
+  # Step graph — administrative registration sequence (no visa stage).
+  step_graph:
+    - step_id: TRAVEL_TO_DE
+      name: "Travel to Germany (no visa required for EU nationals)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: []
+
+    - step_id: WOHNUNGSGEBERBESTAETIGUNG
+      name: "Obtain landlord confirmation (Wohnungsgeberbestätigung)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [TRAVEL_TO_DE]
+
+    - step_id: ANMELDUNG
+      name: "Anmeldung (address registration) at the Bürgeramt"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [WOHNUNGSGEBERBESTAETIGUNG]
+      time_window_relative_to: TRAVEL_TO_DE
+      time_window_min_days: 0
+      time_window_max_days: 14
+      cite: DE_BMG_17
+
+    - step_id: TAX_ID
+      name: "Steuer-ID issued (auto-mailed after Anmeldung)"
+      responsible_party: AUTHORITY_DE_FINANZAMT
+      expected_duration_days: 14
+      prerequisite_step_ids: [ANMELDUNG]
+
+    - step_id: HEALTH_INSURANCE_SETUP
+      name: "Health insurance (statutory or private) enrolment"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 5
+      prerequisite_step_ids: [ANMELDUNG]
+      cite: DE_SGBV_193
+
+    - step_id: BANK_ACCOUNT
+      name: "German bank account opened"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [ANMELDUNG]
+
+    - step_id: RESIDENCE_DOCUMENTATION
+      name: "Optional Aufenthaltsbescheinigung / EU residence documentation"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [ANMELDUNG]
+      conditional_on: "wants_residence_documentation == true"
+      cite: DE_FREIZUEGG_5
