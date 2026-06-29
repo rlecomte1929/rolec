@@ -153,9 +153,18 @@ def patch_case(
             main_db.apply_wizard_patch_side_effects(case_id, draft, derived)
         except Exception:
             logger.exception("apply_wizard_patch_side_effects failed case_id=%s", case_id)
-        # P1-3: Trigger Engine — auto-create CaseForms for matched templates
-        fire_roadmap_events(case_id, draft, derived)
-        invalidate_relocation_plan_cache(case_id=case_id)
+        # P1-3: Trigger Engine — auto-create CaseForms for matched templates.
+        # [AIQ-1379] Best-effort, like apply_wizard_patch_side_effects above: the draft is already
+        # saved, so a roadmap-event / cache-invalidation failure (e.g. a cold downstream service)
+        # must NOT 5xx the wizard save. The traceback below names the root cause for a follow-up.
+        try:
+            fire_roadmap_events(case_id, draft, derived)
+        except Exception:
+            logger.exception("fire_roadmap_events failed case_id=%s", case_id)
+        try:
+            invalidate_relocation_plan_cache(case_id=case_id)
+        except Exception:
+            logger.exception("invalidate_relocation_plan_cache failed case_id=%s", case_id)
         _audit_case(entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE)
         return _case_dto(case, draft)
 
