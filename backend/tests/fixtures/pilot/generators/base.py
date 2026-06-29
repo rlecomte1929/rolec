@@ -42,6 +42,54 @@ _CITIES: List[str] = [
 ]
 
 # ---------------------------------------------------------------------------
+# FR→NO locale pools (AIQ-511) — added alongside the IN→DE pools above.
+# Synthetic only; no real PII. All selection is deterministic.
+# ---------------------------------------------------------------------------
+
+#: French given names (the relocating EU worker for the FR→NO corridor)
+_FR_FIRST_NAMES: List[str] = [
+    "Camille", "Louis", "Hugo", "Lea", "Jules",
+    "Manon", "Lucas", "Chloe", "Gabriel", "Ines",
+]
+
+#: French surnames
+_FR_SURNAMES: List[str] = [
+    "Martin", "Bernard", "Dubois", "Moreau", "Laurent",
+    "Lefebvre", "Roux", "Girard", "Fontaine", "Rousseau",
+]
+
+#: Norwegian given names (used for Norwegian local context / spouse pools)
+_NO_FIRST_NAMES: List[str] = [
+    "Emma", "Nora", "Jakob", "Emil", "Sofie",
+    "Oliver", "Ella", "Aksel", "Ingrid", "Henrik",
+]
+
+#: Norwegian surnames
+_NO_SURNAMES: List[str] = [
+    "Hansen", "Johansen", "Olsen", "Larsen", "Andersen",
+    "Pedersen", "Nilsen", "Kristiansen", "Jensen", "Karlsen",
+]
+
+#: Norwegian employers (destination companies for FR→NO)
+_NO_EMPLOYERS: List[str] = [
+    "Nordic Tech AS",
+    "Fjord Systems AS",
+    "Arctic Data AS",
+    "Viking Software AS",
+    "Aurora Solutions AS",
+]
+
+#: Norwegian destination cities
+_NO_CITIES: List[str] = [
+    "Oslo", "Bergen", "Trondheim", "Stavanger", "Tromso",
+]
+
+#: Street names (corridor-agnostic, synthetic) for address fields
+_STREETS: List[str] = [
+    "Storgata", "Kirkegata", "Hauptstrasse", "Schillerweg", "Parkveien",
+]
+
+# ---------------------------------------------------------------------------
 # Pure helpers
 # ---------------------------------------------------------------------------
 
@@ -132,3 +180,79 @@ class PageLayout:
         """Finalise the page and write the PDF to disk."""
         self._canvas.showPage()
         self._canvas.save()
+
+
+# ---------------------------------------------------------------------------
+# Document helpers (AIQ-511) — reusable single-page doc writers
+# ---------------------------------------------------------------------------
+
+
+def write_national_id_pdf(
+    path: str,
+    *,
+    surname: str,
+    given_name: str,
+    dob: str,
+    nationality: str,
+    address: str,
+) -> Dict[str, BboxRecord]:
+    """Write an EU/EEA national-ID stub (FR→NO uses this instead of passport+visa).
+
+    Returns a mapping of field-key → normalised bbox for the drawn lines.
+    """
+    layout = PageLayout(path)
+    bboxes: Dict[str, BboxRecord] = {}
+    bboxes["national_id_title"] = layout.draw_text(
+        "EUROPEAN UNION — NATIONAL IDENTITY CARD", 20 * mm, 280 * mm, "Helvetica-Bold", 12
+    )
+    bboxes["national_id_surname"] = layout.draw_text(
+        f"Surname: {surname}", 20 * mm, 270 * mm, "Helvetica", 12
+    )
+    bboxes["national_id_given_name"] = layout.draw_text(
+        f"Given name: {given_name}", 20 * mm, 260 * mm, "Helvetica", 12
+    )
+    bboxes["national_id_dob"] = layout.draw_text(
+        f"Date of birth: {dob}", 20 * mm, 250 * mm, "Helvetica", 12
+    )
+    bboxes["national_id_nationality"] = layout.draw_text(
+        f"Nationality: {nationality} (EU/EEA)", 20 * mm, 240 * mm, "Helvetica", 12
+    )
+    bboxes["national_id_address"] = layout.draw_text(
+        f"Address: {address}", 20 * mm, 230 * mm, "Helvetica", 12
+    )
+    layout.save()
+    return bboxes
+
+
+def write_spouse_pdf(
+    path: str,
+    *,
+    surname: str,
+    given_name: str,
+    dob: str,
+    nationality: str,
+    relationship: str = "Spouse",
+) -> Dict[str, BboxRecord]:
+    """Write a spouse / dependant stub document.
+
+    Returns a mapping of field-key → normalised bbox for the drawn lines.
+    """
+    layout = PageLayout(path)
+    bboxes: Dict[str, BboxRecord] = {}
+    bboxes["spouse_relationship"] = layout.draw_text(
+        f"Relationship: {relationship}", 20 * mm, 270 * mm, "Helvetica", 12
+    )
+    bboxes["spouse_surname"] = layout.draw_text(
+        f"Surname: {surname}", 20 * mm, 260 * mm, "Helvetica", 12
+    )
+    bboxes["spouse_given_name"] = layout.draw_text(
+        f"Given name: {given_name}", 20 * mm, 250 * mm, "Helvetica", 12
+    )
+    bboxes["spouse_dob"] = layout.draw_text(
+        f"Date of birth: {dob}", 20 * mm, 240 * mm, "Helvetica", 12
+    )
+    bboxes["spouse_nationality"] = layout.draw_text(
+        f"Nationality: {nationality}", 20 * mm, 230 * mm, "Helvetica", 12
+    )
+    layout.save()
+    return bboxes

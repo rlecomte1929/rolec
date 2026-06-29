@@ -227,3 +227,151 @@ def test_11_generation_meta_schema_version_default() -> None:
         generated_at="2026-06-04T12:00:00Z",
     )
     assert gm.schema_version == "1.0"
+
+
+# ---------------------------------------------------------------------------
+# AIQ-511 — Pilot corpus materialization tests (cases 12–18)
+#
+# These exercise the full 20-dossier corpus. The generators / materializer use
+# top-level `tests.*` / `eval.*` imports (they are designed to run with backend/
+# on sys.path), so we add backend/ to sys.path here before importing them.
+# ---------------------------------------------------------------------------
+
+import os
+import sys
+
+_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+#: Union of all synthetic name pools — used by the no-PII assertion.
+_SYNTHETIC_GIVEN: set = set()
+_SYNTHETIC_SURNAME: set = set()
+
+_CONTRADICTION_TYPES = {
+    "SURNAME_MISMATCH",
+    "DOB_MISMATCH",
+    "EMPLOYER_MISMATCH",
+    "SALARY_MISMATCH",
+    "ADDRESS_MISMATCH",
+}
+
+
+def _ensure_backend_on_path() -> None:
+    if _BACKEND_DIR not in sys.path:
+        sys.path.insert(0, _BACKEND_DIR)
+
+
+def _materialize(out) -> list:
+    """Materialize the corpus into *out*; return list of ground_truth dicts."""
+    _ensure_backend_on_path()
+    from tests.fixtures.pilot.materialize import materialize  # noqa: E402
+
+    return materialize(str(out))
+
+
+def _load_pools() -> None:
+    _ensure_backend_on_path()
+    from tests.fixtures.pilot.generators import base  # noqa: E402
+
+    if not _SYNTHETIC_GIVEN:
+        for pool in (base._FIRST_NAMES, base._FR_FIRST_NAMES, base._NO_FIRST_NAMES):
+            _SYNTHETIC_GIVEN.update(pool)
+        for pool in (base._PRIYA_SURNAMES, base._FR_SURNAMES, base._NO_SURNAMES):
+            _SYNTHETIC_SURNAME.update(pool)
+
+
+@pytest.fixture
+def corpus(tmp_path):
+    """Materialize the 20-dossier corpus once into tmp_path; return (gts, out_dir)."""
+    gts = _materialize(tmp_path)
+    return gts, tmp_path
+
+
+def test_12_corpus_has_exactly_twenty_dossiers(corpus) -> None:
+    """Materializing the corpus produces exactly 20 dossier directories."""
+    gts, out = corpus
+    assert len(gts) == 20
+    dossier_dirs = [
+        p for p in os.listdir(out)
+        if os.path.isdir(os.path.join(out, p))
+    ]
+    assert len(dossier_dirs) == 20
+
+
+def test_13_corpus_corridor_split(corpus) -> None:
+    """The corpus splits 10 IN→DE + 10 FR→NO by dossier-id prefix."""
+    gts, _ = corpus
+    in_de = [g for g in gts if g["dossier_id"].startswith("IN_DE")]
+    fr_no = [g for g in gts if g["dossier_id"].startswith("FR_NO")]
+    assert len(in_de) == 10
+    assert len(fr_no) == 10
+    assert len(in_de) + len(fr_no) == 20
+
+
+def test_14_every_ground_truth_validates_as_dossier(corpus) -> None:
+    """Every ground_truth.json on disk validates against the Dossier schema."""
+    gts, out = corpus
+    for g in gts:
+        gt_path = os.path.join(out, g["dossier_id"], "ground_truth.json")
+        with open(gt_path, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+        Dossier(**raw)  # raises ValidationError on failure
+
+
+def test_15_each_contradiction_type_appears_exactly_once(corpus) -> None:
+    """The 5 canonical contradiction types each appear exactly once; 15 are clean."""
+    gts, _ = corpus
+    seeded = [
+        c["contradiction_type"]
+        for g in gts
+        for c in g["seeded_contradictions"]
+    ]
+    assert sorted(seeded) == sorted(_CONTRADICTION_TYPES)
+    assert len(seeded) == 5
+    clean = [g for g in gts if not g["seeded_contradictions"]]
+    assert len(clean) == 15
+
+
+def test_16_no_real_pii_names_from_pools(corpus) -> None:
+    """Person names come only from the synthetic pools (no real PII)."""
+    gts, _ = corpus
+    _load_pools()
+    for g in gts:
+        fields = {f["field_key"]: f["value"] for f in g["extracted_fields"]}
+        assert fields["given_name"] in _SYNTHETIC_GIVEN, g["dossier_id"]
+        assert fields["surname"] in _SYNTHETIC_SURNAME, g["dossier_id"]
+
+
+def test_17_eligibility_outcomes_match_corridor(corpus) -> None:
+    """Eligibility outcomes are corridor-appropriate (Blue Card vs EU free movement)."""
+    gts, _ = corpus
+    for g in gts:
+        outcomes = g["eligibility_verdict"]["outcome_set"]
+        assert outcomes, g["dossier_id"]
+        if g["dossier_id"].startswith("FR_NO"):
+            assert outcomes == ["ELIGIBLE_EU_FREE_MOVEMENT"], g["dossier_id"]
+        elif g["dossier_id"].startswith("IN_DE_NODEG"):
+            assert outcomes == ["ELIGIBLE_BLUE_CARD_IT_EXPERIENCE"], g["dossier_id"]
+        else:  # IN_DE generic / family
+            assert outcomes == ["ELIGIBLE_BLUE_CARD"], g["dossier_id"]
+
+
+def test_18_corpus_is_deterministic(tmp_path) -> None:
+    """Re-materializing yields byte-identical ground_truth EXCEPT generated_at."""
+    out_a = tmp_path / "a"
+    out_b = tmp_path / "b"
+    _materialize(out_a)
+    _materialize(out_b)
+
+    ids_a = sorted(p for p in os.listdir(out_a) if os.path.isdir(out_a / p))
+    ids_b = sorted(p for p in os.listdir(out_b) if os.path.isdir(out_b / p))
+    assert ids_a == ids_b
+
+    for did in ids_a:
+        with open(out_a / did / "ground_truth.json", "r", encoding="utf-8") as fh:
+            a = json.load(fh)
+        with open(out_b / did / "ground_truth.json", "r", encoding="utf-8") as fh:
+            b = json.load(fh)
+        # The only permitted non-deterministic field is the generated_at timestamp.
+        a["generation_meta"].pop("generated_at", None)
+        b["generation_meta"].pop("generated_at", None)
+        assert a == b, f"{did} ground_truth differs beyond generated_at"

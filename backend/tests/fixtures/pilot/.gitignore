@@ -1,0 +1,12 @@
+# AIQ-511 — the pilot corpus is materialized on demand (python -m
+# tests.fixtures.pilot.materialize --out <dir>). Never commit the generated
+# binary PDFs or the per-dossier output directories. The generators,
+# materialize.py, SCHEMA.md, README.md and tests ARE committed.
+*.pdf
+
+# Materialized dossier directories (by id prefix) when output into this tree.
+IN_DE_*/
+FR_NO_*/
+
+# Default local output dir.
+/_corpus/
