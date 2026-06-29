@@ -116,3 +116,64 @@ def resolve_research_request(
         sb.table("research_requests").update(patch).eq("id", request_id).execute().data or [{}]
     )[0]
     return updated
+
+
+class ReviewNotResolvedError(Exception):
+    """Raised when completion is attempted before the curation review is resolved."""
+
+
+def complete_research_request(
+    *, request_id: str, actor_user_id: str, result_summary: str, actual_cost: Optional[float] = None
+) -> Dict[str, Any]:
+    """P3 — publish/complete a researched corridor. Strict curation gate: the
+    request must be in_progress AND its curation review-queue item must be
+    `resolved` by a human first. Marks the request completed, records the invoice
+    line (actual_cost) + result_summary, resolves the queue item, and notifies the
+    requester. The curated DATA itself (corridor JSON + requirement YAML) is
+    published via the ops pipeline (reindex workflow + seed_requirements)."""
+    sb = _get_supabase()
+    req = (
+        sb.table("research_requests").select("*").eq("id", request_id).limit(1).execute().data or [None]
+    )[0]
+    if not req:
+        raise ValueError("research request not found")
+    if req.get("status") != "in_progress":
+        raise ValueError("request must be approved (in_progress) before it can be completed")
+
+    # ── Mandatory human-review gate ──
+    qi_id = req.get("created_queue_item_id")
+    if qi_id:
+        from .review_queue_service import get_review_queue_item, resolve_queue_item
+        qi = get_review_queue_item(qi_id)
+        if qi and qi.get("status") != "resolved":
+            raise ReviewNotResolvedError(
+                "The curation review must be resolved before publishing this research."
+            )
+
+    now = datetime.now(timezone.utc).isoformat()
+    patch = {
+        "status": "completed",
+        "result_summary": result_summary,
+        "resolved_by": actor_user_id,
+        "resolved_at": now,
+    }
+    if actual_cost is not None:
+        patch["actual_cost"] = actual_cost
+    updated = (
+        sb.table("research_requests").update(patch).eq("id", request_id).execute().data or [{}]
+    )[0]
+
+    # Notify the requester their corridor is now covered (best-effort).
+    try:
+        from ...database import db as main_db
+        main_db.create_notification_with_preferences(
+            user_id=req.get("requester_user_id"),
+            type_="RESEARCH_COMPLETED",
+            title=f"Immigration guidance for {req.get('corridor')} is now available",
+            body=result_summary,
+            metadata={"corridor": req.get("corridor"), "research_request_id": request_id},
+        )
+    except Exception as e:  # noqa: BLE001
+        log.warning("research complete: requester notification failed: %s", e)
+
+    return updated
