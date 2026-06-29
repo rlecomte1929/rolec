@@ -10,6 +10,33 @@ from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
 from .rules_engine import apply_rules
 
 
+# AIQ-1349: requirement_items.country_code is stored as a FULL UPPERCASE name
+# ("SINGAPORE"), but cases store ISO codes ("SG"/"GB"). Without resolving, the
+# lookup misses and the case sees ZERO requirements. Map the ISO code of each
+# country we have catalog data for onto its catalog name; everything else falls
+# back to the raw value upper-cased (no catalog rows yet anyway).
+_ISO_TO_CATALOG_NAME = {
+    "DE": "GERMANY",
+    "NO": "NORWAY",
+    "SG": "SINGAPORE",
+    "GB": "UNITED KINGDOM",
+    "UK": "UNITED KINGDOM",
+    "US": "UNITED STATES",
+    "USA": "UNITED STATES",
+}
+
+
+def _resolve_catalog_country(dest: str) -> str:
+    """Resolve a case destination (ISO code or name) to the requirement catalog's
+    country_code naming (FULL UPPERCASE name)."""
+    if not dest:
+        return "UNKNOWN"
+    d = dest.strip()
+    if len(d) <= 3 and d.upper() in _ISO_TO_CATALOG_NAME:
+        return _ISO_TO_CATALOG_NAME[d.upper()]
+    return d.upper()
+
+
 def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
@@ -17,11 +44,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             raise ValueError("Case not found")
 
         draft = json.loads(case.draft_json)
-        dest_country = case.dest_country or draft.get("relocationBasics", {}).get("destCountry") or "UNKNOWN"
+        dest_raw = case.dest_country or draft.get("relocationBasics", {}).get("destCountry") or "UNKNOWN"
+        dest_country = _resolve_catalog_country(dest_raw)  # AIQ-1349: ISO → catalog name
         purpose = case.purpose or draft.get("relocationBasics", {}).get("purpose") or "employment"
 
-        sources = crud.list_sources(db, dest_country.upper())
-        requirements = crud.list_requirements(db, dest_country.upper(), purpose)
+        sources = crud.list_sources(db, dest_country)
+        requirements = crud.list_requirements(db, dest_country, purpose)
 
         base_items = [
             {
