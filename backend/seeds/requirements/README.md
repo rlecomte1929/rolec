@@ -52,8 +52,14 @@ human-gated process:
 Nothing goes live without ≥1 citation + the disclaimer + a resolved human review.
 
 ## Provenance
-Every seeded requirement is `representative` until expert-verified; descriptions end
-"Indicative — confirm with {authority}". This matches the platform's content-honesty model.
+Every requirement carries a `verification_status` (column on `requirement_items`, surfaced per-item in
+the API + a UI badge): `representative` (curated + cited) → `corpus_grounded` (grounded in the
+immigration corpus with citations, e.g. FR/NL) → `expert_verified` (signed off by a licensed
+immigration professional). Descriptions end "Indicative — confirm with {authority}" + the global
+disclaimer. **Expert sign-off is human-only**: `review_queue_service.create_queue_item_from_requirement_verification(country)`
+enqueues a `requirement_expert_verification` task; when a lawyer reviews + resolves it, set the
+country's rows to `expert_verified` (e.g. reload the YAML with `verification_status: expert_verified`,
+or `UPDATE requirement_items`). FR + NL currently have open expert-verification tasks.
 
 ## Recommended tooling
 - **Anthropic tool-use (structured output)** for drafting — deterministic JSON schema, citation-bound

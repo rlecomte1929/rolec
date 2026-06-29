@@ -102,6 +102,8 @@ class RequirementItemDTO(BaseModel):
     requiredFields: List[str]
     statusForCase: str
     citations: List[SourceRecordDTO]
+    # AIQ-1349: provenance level for this requirement.
+    verificationStatus: Optional[str] = None
 
 
 class CountryProfileDTO(BaseModel):

@@ -138,6 +138,8 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
         # AIQ-1349: keep the assignment-type applicability in sync on re-load.
         if "applies_to_assignment_types_json" in payload:
             existing.applies_to_assignment_types_json = payload["applies_to_assignment_types_json"]
+        if "verification_status" in payload:
+            existing.verification_status = payload["verification_status"]
         existing.last_verified_at = payload["last_verified_at"]
         db.commit()
         db.refresh(existing)

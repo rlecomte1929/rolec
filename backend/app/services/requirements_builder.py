@@ -70,6 +70,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     if getattr(item, "applies_to_assignment_types_json", None)
                     else None
                 ),
+                "verificationStatus": getattr(item, "verification_status", None),
             }
             for item in requirements
         ]
@@ -98,6 +99,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     requiredFields=required,
                     statusForCase=status,
                     citations=citations,
+                    verificationStatus=item.get("verificationStatus"),
                 )
             )
 

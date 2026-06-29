@@ -40,6 +40,8 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
     passed-in stamp."""
     stamp = datetime(2026, 1, 1)  # placeholder; real stamp applied at write time
     purposes_by_country: Dict[str, List[str]] = seed.get("purposes_by_country", {})
+    # AIQ-1349: file-level provenance applies to every requirement in the seed.
+    verification_status = seed.get("verification_status") or "representative"
     payloads: List[Dict[str, Any]] = []
     for req in seed.get("requirements", []):
         pillar = req["pillar"]
@@ -65,6 +67,7 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
                     "required_fields_json": json.dumps(req.get("required_fields", [])),
                     "citations_json": json.dumps(req.get("citations", [])),
                     "applies_to_assignment_types_json": applies_json,
+                    "verification_status": verification_status,
                     "last_verified_at": stamp,
                 })
     return payloads
