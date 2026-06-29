@@ -84,11 +84,14 @@ def main():
     test_companies = scalar(cur, "SELECT count(*) FROM companies WHERE COALESCE(is_test,false)")
     test_profiles = scalar(cur, "SELECT count(*) FROM profiles WHERE COALESCE(is_test,false)")
     # test cases = owned by a test company OR created/owned by a test profile
+    # cast to ::text on both sides — relocation_cases.company_id is text while
+    # companies.id is uuid (and the profile FKs vary), so a bare IN raises
+    # "operator does not exist: text = uuid".
     case_ids = [r[0] for r in (cur.execute(
-        """SELECT id FROM relocation_cases
-           WHERE company_id IN (SELECT id FROM companies WHERE COALESCE(is_test,false))
-              OR hr_user_id  IN (SELECT id FROM profiles  WHERE COALESCE(is_test,false))
-              OR employee_id IN (SELECT id FROM profiles  WHERE COALESCE(is_test,false))""")
+        """SELECT id::text FROM relocation_cases
+           WHERE company_id::text IN (SELECT id::text FROM companies WHERE COALESCE(is_test,false))
+              OR hr_user_id::text  IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))
+              OR employee_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))""")
         or cur.fetchall())]
     print(f"is_test companies={test_companies}  profiles={test_profiles}  test relocation_cases={len(case_ids)}")
 
@@ -96,10 +99,10 @@ def main():
         print("\nDRY-RUN — counts of rows that WOULD be deleted (pass --apply to delete):")
         for table, col, src in CASE_CHILDREN:
             if src == "case":
-                q = f"SELECT count(*) FROM {table} WHERE {col} = ANY(%s)"
+                q = f"SELECT count(*) FROM {table} WHERE {col}::text = ANY(%s)"
             else:
-                q = (f"SELECT count(*) FROM {table} WHERE {col} IN "
-                     f"(SELECT id FROM case_assignments WHERE case_id = ANY(%s))")
+                q = (f"SELECT count(*) FROM {table} WHERE {col}::text IN "
+                     f"(SELECT id::text FROM case_assignments WHERE case_id::text = ANY(%s))")
             n = guarded(cur, q, (case_ids,)) if case_ids else 0
             if n:
                 print(f"  {table:28} {n}")
@@ -115,15 +118,15 @@ def main():
         if not case_ids:
             break
         if src == "case":
-            q = f"DELETE FROM {table} WHERE {col} = ANY(%s)"
+            q = f"DELETE FROM {table} WHERE {col}::text = ANY(%s)"
         else:
-            q = (f"DELETE FROM {table} WHERE {col} IN "
-                 f"(SELECT id FROM case_assignments WHERE case_id = ANY(%s))")
+            q = (f"DELETE FROM {table} WHERE {col}::text IN "
+                 f"(SELECT id::text FROM case_assignments WHERE case_id::text = ANY(%s))")
         n = guarded(cur, q, (case_ids,))
         if n:
             deleted[table] = n
     if case_ids:
-        deleted["relocation_cases"] = guarded(cur, "DELETE FROM relocation_cases WHERE id = ANY(%s)", (case_ids,))
+        deleted["relocation_cases"] = guarded(cur, "DELETE FROM relocation_cases WHERE id::text = ANY(%s)", (case_ids,))
     deleted["profiles"] = guarded(cur, "DELETE FROM profiles WHERE COALESCE(is_test,false)")
     deleted["companies"] = guarded(cur, "DELETE FROM companies WHERE COALESCE(is_test,false)")
 

@@ -43,7 +43,22 @@ const SPECS: Spec[] = [
 
 setup('provision is_test personas via API', async ({ request }) => {
   setup.skip(!PW, 'RELOPASS_E2E_PASSWORD not set — cannot provision (set it to run the headless path)');
+  setup.setTimeout(240_000); // a 429 retry can wait ~60s; allow headroom for up to 3 registrations
   fs.mkdirSync(AUTH_DIR, { recursive: true });
+
+  // Registration is rate-limited; on 429 honor retry_after and retry (the API-smoke
+  // layer + these 3 registrations can otherwise blow the per-window budget).
+  async function registerWithRetry(data: Record<string, string>, key: string) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const resp = await request.post(`${API}/api/auth/register`, { data });
+      if (resp.status() !== 429) return resp;
+      let retryAfter = 60;
+      try { retryAfter = (JSON.parse(await resp.text()).retry_after as number) || 60; } catch { /* default */ }
+      console.log(`  ${key}: 429 rate-limited — waiting ${retryAfter + 3}s (attempt ${attempt}/3)`);
+      await new Promise((res) => setTimeout(res, (retryAfter + 3) * 1000));
+    }
+    return request.post(`${API}/api/auth/register`, { data });
+  }
 
   const provisioned: Record<string, Provisioned> = {};
   for (const s of SPECS) {
@@ -51,7 +66,7 @@ setup('provision is_test personas via API', async ({ request }) => {
     const data: Record<string, string> = { email, password: PW!, name: `E2E ${s.key} ${TAG}`, role: s.role };
     if (s.company_name) data.company_name = s.company_name;
 
-    const r = await request.post(`${API}/api/auth/register`, { data });
+    const r = await registerWithRetry(data, s.key);
     expect(r.status(), `register ${s.key} → ${await r.text()}`).toBeLessThan(300);
     const j = await r.json();
     const user = j.user || {};
@@ -76,7 +91,7 @@ setup('provision is_test personas via API', async ({ request }) => {
     console.log(`✔ provisioned ${s.key} (${s.role}) ${email} company=${user.company || '-'}`);
 
     // gentle pacing: consecutive registrations can trip the auth rate limiter
-    await new Promise((res) => setTimeout(res, 900));
+    await new Promise((res) => setTimeout(res, 2500));
   }
 
   // Shared identities for downstream specs (e.g. write-flow assigns emp_a by email).
