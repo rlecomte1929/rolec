@@ -33,6 +33,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                 "owner": item.owner,
                 "requiredFields": json.loads(item.required_fields_json),
                 "citations": json.loads(item.citations_json),
+                # AIQ-1349: None ⇒ applies to all assignment types.
+                "appliesToAssignmentTypes": (
+                    json.loads(item.applies_to_assignment_types_json)
+                    if getattr(item, "applies_to_assignment_types_json", None)
+                    else None
+                ),
             }
             for item in requirements
         ]

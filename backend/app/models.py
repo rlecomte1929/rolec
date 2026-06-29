@@ -61,6 +61,10 @@ class RequirementItem(Base):
     owner = Column(String, nullable=False)
     required_fields_json = Column(Text, nullable=False)
     citations_json = Column(Text, nullable=False)
+    # AIQ-1349: optional JSON array of assignment types this requirement applies
+    # to (e.g. ["LTA","PERMANENT"]). NULL ⇒ applies to all. Drives data-driven
+    # STA/LTA requirement filtering without hardcoded title heuristics.
+    applies_to_assignment_types_json = Column(Text, nullable=True)
     last_verified_at = Column(DateTime, nullable=False)
 
 
