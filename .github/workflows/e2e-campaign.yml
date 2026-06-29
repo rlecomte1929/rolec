@@ -79,7 +79,9 @@ jobs:
           # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input;
           # falls back to the default project set on a push (no dispatch input present)
           PROJECTS: ${{ github.event.inputs.projects || '--project=provision --project=core --project=write-flow --project=deep' }}
-        run: npx playwright test $PROJECTS
+        run: |
+          # shellcheck disable=SC2086  # PROJECTS is several flags; word-splitting is intended
+          npx playwright test $PROJECTS
 
       - uses: actions/setup-python@v6
         with:
@@ -119,19 +121,22 @@ jobs:
       # Optional: sync P0/P1 failures + regressions into the Notion Work Queue (gated).
       # Deterministic create-or-update, de-duped by test_id — no LLM.
       - name: Sync failures to Notion Work Queue
-        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' && secrets.NOTION_API_KEY != '' }}
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' }}
         env:
           NOTION_QUEUE_TOKEN: ${{ secrets.NOTION_API_KEY }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: python3 scripts/notion_sync_candidates.py --apply
+        run: |
+          if [ -z "$NOTION_QUEUE_TOKEN" ]; then echo "NOTION_API_KEY not set — skipping"; exit 0; fi
+          python3 scripts/notion_sync_candidates.py --apply
 
       # Optional Slack ping (gated). Reads the band line from the scorer output via env.
       - name: Notify Slack
-        if: ${{ always() && vars.E2E_SLACK_ENABLED == 'true' && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ always() && vars.E2E_SLACK_ENABLED == 'true' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then echo "SLACK_WEBHOOK_URL not set — skipping"; exit 0; fi
           band=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/score.txt 2>/dev/null | grep -oE "GREEN|AMBER|RED" | head -1 || echo "N/A")
           python3 - "$band" "$RUN_URL" <<'PY'
           import json, os, sys, urllib.request
