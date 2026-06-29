@@ -35,6 +35,10 @@ export default defineConfig({
   outputDir: `${ARTIFACTS}/_test-results`,
 
   projects: [
+    // Harness self-test (no auth, no network — setContent only). Locks the
+    // assertLogicalPage B10 cold-start tolerance. Run with --project=selftest.
+    { name: 'selftest', testDir: './tests/selftest', use: { ...devices['Desktop Chrome'] } },
+
     // ════ CI / UNATTENDED PATH (headless, self-provisioning) ═══════════════════
     // Register fresh is_test personas via API → playwright/.auth/{hr_a,emp_a,hr_b}.json.
     // No passwords typed; data is purgeable via `is_test=true`.
