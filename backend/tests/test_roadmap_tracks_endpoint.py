@@ -52,7 +52,7 @@ CREATE TABLE form_templates (
   verification_status TEXT DEFAULT 'representative'
 );
 CREATE TABLE roadmap_steps (id TEXT PRIMARY KEY, case_id TEXT, title TEXT, track_id TEXT);
-CREATE TABLE source_pages (url TEXT PRIMARY KEY, last_fetched_at TEXT);
+CREATE TABLE source_pages (url TEXT PRIMARY KEY, last_fetched_at TEXT, tier TEXT);
 CREATE TABLE case_forms (
   id TEXT PRIMARY KEY, case_id TEXT NOT NULL, form_template_id TEXT, person_id TEXT,
   dependent_id TEXT, status TEXT NOT NULL DEFAULT 'not_started',
@@ -119,6 +119,22 @@ class RoadmapTracksProjectionTests(unittest.TestCase):
             )
         return tid
 
+    def _sourced_template(self, code: str, name: str, category: str,
+                          source_url: str, tier: str, fetched_at: str = "2026-06-01") -> str:
+        """[P3-04e-FU] A template with an official source + a source_pages row carrying a tier."""
+        tid = _u()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO form_templates (id, code, name, country, category, source_url) "
+                     "VALUES (:i, :code, :n, 'NO', :cat, :u)"),
+                {"i": tid, "code": code, "n": name, "cat": category, "u": source_url},
+            )
+            conn.execute(
+                text("INSERT INTO source_pages (url, last_fetched_at, tier) VALUES (:u, :f, :t)"),
+                {"u": source_url, "f": fetched_at, "t": tier},
+            )
+        return tid
+
     def _form(self, template_id: str, status: str = "not_started") -> str:
         cf = _u()
         with self.engine.begin() as conn:
@@ -164,6 +180,37 @@ class RoadmapTracksProjectionTests(unittest.TestCase):
         self.assertEqual(labels["POL-EEA-REG"], "Visa & Permit")
         self.assertEqual(labels["GP-7-04"], "Settlement")
         self.assertEqual(labels["APOSTILLE-FR"], "Civil Documents")
+
+
+    # ── [P3-04e-FU] per-step confidence + source from the form's template source ──
+
+    def _steps_by_title(self, resp) -> dict:
+        return {s.title: s for t in resp.tracks for s in t.steps}
+
+    def test_sourced_step_gets_confidence_and_source(self) -> None:
+        # tier 1 → HIGH, tier 2 → MEDIUM, tier 3 → LOW; each with its source_url.
+        self._form(self._sourced_template("T1", "Tier-one form", "registration",
+                                          "https://gov.example/t1", "1"))
+        self._form(self._sourced_template("T2", "Tier-two form", "tax",
+                                          "https://gov.example/t2", "2"))
+        self._form(self._sourced_template("T3", "Tier-three form", "civil_documents",
+                                          "https://gov.example/t3", "3"))
+        resp = get_case_roadmap_tracks(self.case_id, user=_emp_user(self.employee_id))
+        steps = self._steps_by_title(resp)
+
+        self.assertEqual(steps["Tier-one form"].confidence_level, "HIGH")
+        self.assertEqual(steps["Tier-one form"].source_url, "https://gov.example/t1")
+        self.assertEqual(steps["Tier-one form"].source_fetched_at, "2026-06-01")
+        self.assertEqual(steps["Tier-two form"].confidence_level, "MEDIUM")
+        self.assertEqual(steps["Tier-three form"].confidence_level, "LOW")
+
+    def test_step_without_source_is_unknown(self) -> None:
+        # A plain template (no source_url) → honest UNKNOWN, no source url.
+        self._form(self._template("POL-EEA-REG", "EEA registration", "registration"))
+        resp = get_case_roadmap_tracks(self.case_id, user=_emp_user(self.employee_id))
+        step = self._steps_by_title(resp)["EEA registration"]
+        self.assertEqual(step.confidence_level, "UNKNOWN")
+        self.assertIsNone(step.source_url)
 
 
 if __name__ == "__main__":

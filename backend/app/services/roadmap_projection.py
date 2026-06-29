@@ -117,6 +117,12 @@ class ProjectedStep:
     due_date: Optional[str]
     sort_order: int
     estimated_effort: Optional[str] = None
+    # [P3-04e-FU] Provenance from the form's template source (form_templates.source_url
+    # + source_pages.tier/last_fetched_at), threaded so the live roadmap can show the
+    # per-step ConfidenceBadge + "Show source". None when the form has no source.
+    source_url: Optional[str] = None
+    source_tier: Optional[str] = None
+    source_fetched_at: Optional[str] = None
 
 
 @dataclass
@@ -190,6 +196,10 @@ def project_tracks(forms: List[Any]) -> List[ProjectedTrack]:
             due_date=getattr(form, "deadline", None),
             sort_order=len(track.steps),
             estimated_effort=estimated_effort_for_form(category, step_status),
+            # [P3-04e-FU] carry the form template's source provenance onto the step.
+            source_url=getattr(template, "source_url", None),
+            source_tier=getattr(template, "source_tier", None),
+            source_fetched_at=getattr(template, "source_last_verified", None),
         ))
 
     # Compute per-track progress and return ordered tracks.
