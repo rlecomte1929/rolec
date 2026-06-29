@@ -37,7 +37,10 @@ PW_STATUS = {
     "skipped": "SKIP",
 }
 # worst-wins ranking when an ID appears more than once
-RANK = {"FAIL": 3, "WARN": 2, "PARTIAL": 2, "SKIP": 1, "PASS": 0}
+# worst-wins ranking when an ID appears more than once. PASS must rank ABOVE SKIP:
+# parse_playwright seeds status to SKIP, so if PASS ranked below it a passing spec
+# would never overwrite the seed and would be silently dropped from the score.
+RANK = {"FAIL": 3, "WARN": 2, "PARTIAL": 2, "PASS": 1, "SKIP": 0}
 
 TAG_RE = re.compile(r"^\s*\[([^\]]+)\]")
 
