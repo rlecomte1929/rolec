@@ -126,6 +126,8 @@ export const ROUTE_DEFS = {
   /** Employee detailed intake wizard — 6-step move context, household builder, commute map. */
   employeeIntake: { path: '/employee/intake', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** Employee grounded immigration Q&A (AIQ-843 answer engine + AIQ-856 verdict capture). */
+  employeeImmigrationAssistant: { path: '/employee/immigration-assistant', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Employee Benefit Comparison dashboard — KPI tiles + per-category coverage table (P3-2). */
   employeeBenefitsComparison: { path: '/employee/benefits', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },

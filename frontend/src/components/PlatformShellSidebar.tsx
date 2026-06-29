@@ -91,6 +91,7 @@ const SECTIONS: NavSection[] = [
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'service-providers', label: 'Services', hint: 'Choose services and see recommended providers for your move', to: ROUTE_DEFS.services.path },
       { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
+      { id: 'immigration-qa', label: 'Immigration Q&A', hint: 'Grounded, cited answers to immigration questions for your corridor', to: ROUTE_DEFS.employeeImmigrationAssistant.path },
       // NAV-002: 'Resources' = the destination lifestyle guide (housing, events,
       // local services) for the employee's assignment. No badge (the old 'LIVE'
       // badge was misleading).
