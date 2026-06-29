@@ -25,11 +25,20 @@ export async function assertLogicalPage(page: Page, info: TestInfo, label: strin
     signals.push('no-h1-within-5s');
   }
 
-  // permanent spinner?
+  // PERMANENT spinner? Only a spinner that NEVER clears is a B10. A cold Render dyno
+  // makes a slow-but-resolving load (a secondary widget, e.g. the command-center's
+  // "Loading cases…" or a policy call) still spin past a few seconds — that's slow,
+  // not stuck. Poll for it to clear over a generous window; flag only if it persists
+  // the whole time. (Was a single 5s recheck → false B10 flakes on cold-start.)
+  const SPINNER_CLEAR_MS = 15000;
   const spinner = page.locator('[role="status"], .animate-spin, :text("Loading")');
   if (await spinner.first().isVisible().catch(() => false)) {
-    await page.waitForTimeout(5000);
-    if (await spinner.first().isVisible().catch(() => false)) signals.push('permanent-spinner(B10)');
+    const stillSpinning = await spinner
+      .first()
+      .waitFor({ state: 'hidden', timeout: SPINNER_CLEAR_MS })
+      .then(() => false)
+      .catch(() => true);
+    if (stillSpinning) signals.push('permanent-spinner(B10)');
   }
   // raw error / no-retry?
   const bodyText = (await page.locator('body').innerText().catch(() => '')) || '';
