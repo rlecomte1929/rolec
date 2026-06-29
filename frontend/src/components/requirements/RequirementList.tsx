@@ -21,6 +21,19 @@ const ownerVariant = (owner: RequirementItemDTO['owner']) => {
   return 'neutral';
 };
 
+// AIQ-1349: provenance badge — how trustworthy this requirement is.
+const PROVENANCE: Record<string, { label: string; variant: 'neutral' | 'info' | 'success' }> = {
+  representative: { label: 'Representative', variant: 'neutral' },
+  corpus_grounded: { label: 'Source-grounded', variant: 'info' },
+  expert_verified: { label: 'Expert-verified', variant: 'success' },
+};
+
+const provenanceBadge = (status: RequirementItemDTO['verificationStatus']) => {
+  const p = status ? PROVENANCE[status] : undefined;
+  if (!p) return null;
+  return <Badge variant={p.variant} size="sm">{p.label}</Badge>;
+};
+
 export const RequirementList: React.FC<RequirementListProps> = ({ items, onAction }) => {
   return (
     <div className="space-y-4">
@@ -38,6 +51,7 @@ export const RequirementList: React.FC<RequirementListProps> = ({ items, onActio
                 <Badge variant={ownerVariant(item.owner)} size="sm">
                   {item.owner}
                 </Badge>
+                {provenanceBadge(item.verificationStatus)}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">

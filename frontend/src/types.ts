@@ -477,6 +477,8 @@ export interface RequirementItemDTO {
   requiredFields: string[];
   statusForCase: 'PROVIDED' | 'MISSING' | 'NEEDS_REVIEW';
   citations: SourceRecordDTO[];
+  /** AIQ-1349: provenance level. */
+  verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | null;
 }
 
 export interface CountryProfileDTO {
