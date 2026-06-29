@@ -19,7 +19,7 @@ import sys
 import unittest
 from unittest import mock
 
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from fastapi.params import Depends as DependsParam
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -62,7 +62,7 @@ class PatchCaseAccessWiringTests(unittest.TestCase):
                                side_effect=HTTPException(status_code=403)) as guard:
             with self.assertRaises(HTTPException) as ctx:
                 cases_write.patch_case(case_id="c1", patch=mock.Mock(**{
-                    "model_dump.return_value": {}}), user=_OWNER)
+                    "model_dump.return_value": {}}), background_tasks=BackgroundTasks(), user=_OWNER)
         self.assertEqual(ctx.exception.status_code, 403)
         guard.assert_called_once_with(_OWNER, "c1")
         upd.assert_not_called()
@@ -74,7 +74,7 @@ class PatchCaseAccessWiringTests(unittest.TestCase):
              mock.patch.object(cases_write, "_assert_case_access") as guard:
             with self.assertRaises(_Sentinel):
                 cases_write.patch_case(case_id="new", patch=mock.Mock(**{
-                    "model_dump.return_value": {}}), user=_OWNER)
+                    "model_dump.return_value": {}}), background_tasks=BackgroundTasks(), user=_OWNER)
         guard.assert_not_called()
         create.assert_called_once()
 
