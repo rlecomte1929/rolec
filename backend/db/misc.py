@@ -395,7 +395,7 @@ class MiscMixin:
         # acquire table-level locks during the IF NOT EXISTS catalog check, and
         # on a cold start that compounds with pool warm-up to time out the
         # frontend's 15s axios window.
-        from ..database import _auto_id_col, _seed_default_policy_template_sqlite, _sqlite_ensure_canonical_policy_tenant_columns, _sqlite_ensure_policy_hardening_columns, _sqlite_ensure_policy_import_columns  # lazy: avoid import cycle
+        from ..database import _auto_id_col, _sqlite_ensure_canonical_policy_tenant_columns, _sqlite_ensure_policy_hardening_columns, _sqlite_ensure_policy_import_columns  # lazy: avoid import cycle
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
             with self.engine.connect() as conn:
                 self._db_healthcheck(conn)
@@ -2023,24 +2023,9 @@ class MiscMixin:
                     ]:
                         if col not in col_names:
                             conn.execute(text(f"ALTER TABLE company_policies ADD COLUMN {col} {ctype}"))
-                    conn.execute(text("""
-                        CREATE TABLE IF NOT EXISTS default_policy_templates (
-                            id TEXT PRIMARY KEY,
-                            template_name TEXT NOT NULL,
-                            version TEXT NOT NULL,
-                            status TEXT NOT NULL DEFAULT 'active',
-                            is_default_template INTEGER NOT NULL DEFAULT 0,
-                            snapshot_json TEXT NOT NULL DEFAULT '{}',
-                            created_at TEXT NOT NULL,
-                            updated_at TEXT NOT NULL
-                        )
-                    """))
-                    # Seed one default template if none
-                    row = conn.execute(text(
-                        "SELECT id FROM default_policy_templates WHERE is_default_template = 1 LIMIT 1"
-                    )).fetchone()
-                    if not row:
-                        _seed_default_policy_template_sqlite(conn)
+                    # TPL-3 (AIQ-1133): default_policy_templates CREATE+seed removed —
+                    # the table is retired; the platform default is code-backed
+                    # (backend/app/services/default_policy_template_snapshot.py).
                 except Exception:
                     pass
             conn.execute(text("""

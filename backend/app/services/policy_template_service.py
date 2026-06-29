@@ -24,7 +24,7 @@ tiers are new platform placeholders (lower ``field_confidence``) for HR to tune.
 """
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -382,6 +382,32 @@ class PolicyTemplateService:
 
     def list_templates(self) -> List[PolicyTemplateSchema]:
         return list(self._registry.values())
+
+    # --- platform-default template (TPL-3: replaces default_policy_templates) -----
+    @staticmethod
+    def get_default_template_record() -> Dict[str, Any]:
+        """The platform-default policy template record (id, metadata, snapshot_json).
+
+        Replaces ``db.get_default_policy_template`` / ``list_default_policy_templates``
+        — the table held exactly this one seeded row. Code-backed now (TPL-3).
+        """
+        from .default_policy_template_snapshot import get_platform_default_template
+        return get_platform_default_template()
+
+    def get_template_snapshot(self, template_id: Optional[str] = None) -> Dict[str, Any]:
+        """The platform-default ``snapshot_json`` (benefit_rules, effectiveDate, caps…).
+
+        ``template_id`` is accepted for call-site compatibility but ignored: there is a
+        single platform default. Mirrors the old ``snapshot_json`` shape exactly.
+        """
+        return self.get_default_template_record()["snapshot_json"]
+
+    def build_admin_template_list(self) -> List[Dict[str, Any]]:
+        """Admin template list (the old ``GET /api/admin/policies/templates`` shape).
+
+        The legacy table returned its single default row; preserve that.
+        """
+        return [self.get_default_template_record()]
 
     def get_benchmark_library(self) -> List[Dict[str, object]]:
         """Category-level benchmark reference library (AIQ-889), grouped by tier.

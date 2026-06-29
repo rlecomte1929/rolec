@@ -21,10 +21,7 @@ from .policy_hr_rule_override_layer import (
 )
 from .policy_processing_readiness import evaluate_stored_policy_readiness
 from .policy_hr_grouped_review import build_grouped_hr_review
-from .policy_template_first_import import (
-    build_template_first_import_payload,
-    get_template_defaults,
-)
+from .policy_template_first_import import build_template_first_import_payload
 
 
 def _strip_layer2_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -170,17 +167,10 @@ def _resolve_template_defaults(db: Any) -> Dict[str, Any]:
             return unified
     except Exception:
         pass
-    try:
-        templates = db.list_default_policy_templates() or []
-    except Exception:
-        return {}
-    if not templates:
-        return {}
-    chosen = next((t for t in templates if t.get("is_default_template")), templates[0])
-    template_id = chosen.get("id") if isinstance(chosen, dict) else None
-    if not template_id:
-        return {}
-    return get_template_defaults(db, str(template_id))
+    # TPL-3: the legacy default_policy_templates fallback is retired — the unified
+    # PolicyTemplateService above is the single source. If it yields nothing, there
+    # are no template defaults to gap-fill with.
+    return {}
 
 
 def _aggregate_issues(

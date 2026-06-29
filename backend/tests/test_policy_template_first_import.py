@@ -159,20 +159,20 @@ def test_external_reference_host_housing_flagged():
     assert host["review_needed"] is True
 
 
-def test_get_template_defaults_reads_snapshot_benefit_rules():
-    db = _FakeDb({"tmpl-1": {"id": "tmpl-1", "snapshot_json": _SNAPSHOT}})
-    defaults = get_template_defaults(db, "tmpl-1")
-    assert set(defaults.keys()) == {"housing", "movers"}
+def test_get_template_defaults_reads_platform_default_benefit_rules():
+    # TPL-3 (AIQ-1133): sourced from the code-backed PolicyTemplateService platform
+    # default (default_policy_templates retired), not the db. Any non-empty id yields
+    # the single platform default's benefit_rules keyed by benefit_key.
+    defaults = get_template_defaults(None, "any-id")
+    assert {"housing", "movers", "schools", "immigration"} <= set(defaults.keys())
     assert defaults["housing"]["amount_value"] == 5000
     assert defaults["housing"]["currency"] == "USD"
     assert defaults["movers"]["calc_type"] == "flat_amount"
 
 
-def test_get_template_defaults_missing_template_returns_empty_dict():
-    db = _FakeDb({})
-    assert get_template_defaults(db, "does-not-exist") == {}
-    assert get_template_defaults(db, "") == {}
-    assert get_template_defaults(db, None) == {}
+def test_get_template_defaults_empty_id_returns_empty_dict():
+    assert get_template_defaults(None, "") == {}
+    assert get_template_defaults(None, None) == {}
 
 
 def test_template_default_fills_unmapped_field_with_source_marker():

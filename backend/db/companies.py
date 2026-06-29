@@ -1258,7 +1258,12 @@ class CompaniesMixin:
         Returns the new policy_id and version_id.
         """
         from ..database import _policy_ag_sql, _policy_bool_bind  # lazy: avoid import cycle
-        template = self.get_default_policy_template(template_id)
+        # TPL-3: the platform default template is code-backed (PolicyTemplateService)
+        # now that default_policy_templates is retired. template_id is accepted for
+        # compatibility; there is a single platform default.
+        from ..app.services.policy_template_service import PolicyTemplateService
+
+        template = PolicyTemplateService.get_default_template_record()
         if not template:
             return {"ok": False, "error": "Template not found", "policy_id": None}
         snapshot = template.get("snapshot_json") or {}
