@@ -39,6 +39,7 @@ from .routers import (
     compliance,
     gdpr,
     privacy_consents,
+    outcome_consent,
     hr_case_resolve,
     hr_case_escalation,
     hr_catalog,
@@ -153,6 +154,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_gdpr.router)
     app.include_router(gdpr.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
     app.include_router(privacy_consents.router)  # PRIV-005 / AIQ-473 — Art. 13 notice acknowledgement
+    app.include_router(outcome_consent.router)  # P1-07c / AIQ-686 — outcome-sharing opt-in
     app.include_router(immigration_forms.router)  # IMM-11 — form library + PDF pre-fill
     app.include_router(immigration_documents.router)  # BL-OCR.2/AIQ-748 — POST /api/immigration/cases/{id}/documents
     app.include_router(immigration_retrieve.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
