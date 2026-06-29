@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from sqlalchemy import text as _sql_text
 
 from .. import crud, schemas
@@ -112,6 +112,7 @@ def _assignment_derived(draft: Dict[str, Any]) -> Dict[str, Any]:
 def patch_case(
     case_id: str,
     patch: schemas.CaseDraftDTO,
+    background_tasks: BackgroundTasks,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     with SessionLocal() as db:
@@ -154,13 +155,12 @@ def patch_case(
         except Exception:
             logger.exception("apply_wizard_patch_side_effects failed case_id=%s", case_id)
         # P1-3: Trigger Engine — auto-create CaseForms for matched templates.
-        # [AIQ-1379] Best-effort, like apply_wizard_patch_side_effects above: the draft is already
-        # saved, so a roadmap-event / cache-invalidation failure (e.g. a cold downstream service)
-        # must NOT 5xx the wizard save. The traceback below names the root cause for a follow-up.
-        try:
-            fire_roadmap_events(case_id, draft, derived)
-        except Exception:
-            logger.exception("fire_roadmap_events failed case_id=%s", case_id)
+        # [AIQ-1379 follow-up] fire_roadmap_events is heavy (~8s on prod) and was both slowing the wizard
+        # save and (cold) 5xx-ing it. Defer it OFF the response path (like the assign endpoint) so the PATCH
+        # returns the saved draft immediately; the roadmap events fire after the response and FastAPI logs
+        # any background exception. The draft is already committed, so this is safe.
+        background_tasks.add_task(fire_roadmap_events, case_id, draft, derived)
+        # invalidate stays synchronous (it's fast) so the next read is fresh — but never 5xx the save.
         try:
             invalidate_relocation_plan_cache(case_id=case_id)
         except Exception:
