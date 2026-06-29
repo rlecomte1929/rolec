@@ -1,0 +1,5 @@
+node_modules/
+playwright/.auth/
+test-artifacts/
+test-results/
+playwright-report/
