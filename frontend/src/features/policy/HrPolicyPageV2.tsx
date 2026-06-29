@@ -43,6 +43,7 @@ import { CanonicalPolicyDiffView } from './CanonicalPolicyDiffView';
 import { PolicyDiffView } from './PolicyDiffView';
 import { PolicyTemplatePicker } from './PolicyTemplatePicker';
 import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
+import { shouldOfferFreshPolicyBuild } from './hrPolicyWorkspaceState';
 
 // --- Types ------------------------------------------------------------------
 
@@ -432,13 +433,13 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
     String(normalized?.version?.status || '').toLowerCase() === 'published' ||
     matrixPayload?.status === 'published';
 
-  // Canonical lives in normalized.version.status; matrix editable + not
-  // sourced from a published clone means HR is mid-draft on the matrix.
-  // Used by Section 3 ("Build your next version") to hide the two onboarding
-  // doors once HR has any version in flight — no point offering a fresh
-  // template when they are already editing one.
-  const canonicalLive =
-    String(normalized?.version?.status || '').toLowerCase() === 'published';
+  // matrix editable + not sourced from a published clone means HR is mid-draft on
+  // the matrix. Used (with hasLivePolicy) by Section 3 ("Build your next version")
+  // to hide the onboarding doors once HR has a live policy OR a version in flight —
+  // no point offering a fresh template when they are already live or editing one.
+  // [AIQ-1015] The live check uses the UNIFIED hasLivePolicy (canonical OR matrix),
+  // not the canonical-only signal, so a matrix-only published company never shows
+  // the onboarding doors alongside its live policy.
   const hasDraftInProgress = Boolean(
     matrixPayload?.editable &&
       matrixPayload?.source !== 'published' &&
@@ -620,7 +621,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           editor below is the primary authoring surface). PR 0.5 simplification:
           template is the primary CTA; document import is a quieter secondary
           link to keep the "matrix-primary" pipeline stance clear. */}
-      {!canonicalLive && !hasDraftInProgress && (
+      {shouldOfferFreshPolicyBuild(hasLivePolicy, hasDraftInProgress) && (
         <BuildNextVersionSection
           documents={documents}
           hasLivePolicy={hasLivePolicy}
