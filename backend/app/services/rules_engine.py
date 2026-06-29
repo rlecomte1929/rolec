@@ -16,6 +16,12 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
 
     purpose = basics.get("purpose")
     has_dependents = basics.get("hasDependents")
+    # AIQ-1349 Phase 2: short-term assignments (STA, typically <12 months) don't
+    # trigger the long-term, family-settling requirements — a spouse rarely seeks
+    # local work authorization and children aren't enrolled in a local school for
+    # a brief posting. Suppress those two so STA gets a lighter requirement set.
+    # (LTA/PERMANENT keep the full set.)
+    is_sta = str(assignment.get("assignmentType") or "").strip().upper() == "STA"
 
     if basics.get("targetMoveDate") and profile.get("passportExpiry"):
         try:
@@ -38,28 +44,34 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
 
     spouse = (family.get("spouse") or {})
     if spouse and spouse.get("wantsToWork"):
-        expanded.append(_requirement(
-            "Dependent work authorization rules",
-            "DEPENDENTS",
-            "WARN",
-            "HR",
-            ["familyMembers.spouse"],
-        ))
-        flags["spouseWork"] = True
+        if is_sta:
+            flags.setdefault("staWaived", []).append("Dependent work authorization rules")
+        else:
+            expanded.append(_requirement(
+                "Dependent work authorization rules",
+                "DEPENDENTS",
+                "WARN",
+                "HR",
+                ["familyMembers.spouse"],
+            ))
+            flags["spouseWork"] = True
 
     children = family.get("children") or []
     if children:
         flags["kids"] = True
         for child in children:
             if _child_age(child.get("dateOfBirth")) in range(5, 17):
-                expanded.append(_requirement(
-                    "School enrollment documents",
-                    "DEPENDENTS",
-                    "WARN",
-                    "HR",
-                    ["familyMembers.children"],
-                ))
-                flags["kidsSchoolAge"] = True
+                if is_sta:
+                    flags.setdefault("staWaived", []).append("School enrollment documents")
+                else:
+                    expanded.append(_requirement(
+                        "School enrollment documents",
+                        "DEPENDENTS",
+                        "WARN",
+                        "HR",
+                        ["familyMembers.children"],
+                    ))
+                    flags["kidsSchoolAge"] = True
                 break
 
     if purpose == "employment":
