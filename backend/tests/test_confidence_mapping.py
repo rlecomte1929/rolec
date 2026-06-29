@@ -28,6 +28,18 @@ class TierToConfidenceTests(unittest.TestCase):
     def test_whitespace_tolerated(self):
         self.assertEqual(tier_to_confidence(" 1 "), "HIGH")
 
+    def test_crawler_trust_tiers(self):
+        # [AIQ-1378] crawler trust_tier vocabulary (crawl_tier_config.py):
+        # T0 critical + T1 stable = official Tier-1 → HIGH; T2/T3 → MEDIUM/LOW.
+        self.assertEqual(tier_to_confidence("T0"), "HIGH")
+        self.assertEqual(tier_to_confidence("T1"), "HIGH")
+        self.assertEqual(tier_to_confidence("T2"), "MEDIUM")
+        self.assertEqual(tier_to_confidence("T3"), "LOW")
+
+    def test_trust_tier_case_insensitive_and_padded(self):
+        self.assertEqual(tier_to_confidence("t0"), "HIGH")
+        self.assertEqual(tier_to_confidence(" T2 "), "MEDIUM")
+
     def test_unknown_is_honest(self):
         # Missing / unrecognised never fabricates confidence.
         self.assertEqual(tier_to_confidence(None), "UNKNOWN")
@@ -35,6 +47,8 @@ class TierToConfidenceTests(unittest.TestCase):
         self.assertEqual(tier_to_confidence("9"), "UNKNOWN")
         self.assertEqual(tier_to_confidence(0), "UNKNOWN")
         self.assertEqual(tier_to_confidence("tier-1"), "UNKNOWN")
+        self.assertEqual(tier_to_confidence("T9"), "UNKNOWN")
+        self.assertEqual(tier_to_confidence("T"), "UNKNOWN")
 
 
 if __name__ == "__main__":
