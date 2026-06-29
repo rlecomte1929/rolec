@@ -38,6 +38,13 @@ def client(monkeypatch):
         lambda content, mime: {"markdown": "# Receipt\nTotal 50 EUR", "pages_count": 1},
     )
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+
+    # [AIQ-1149] expense_receipt now routes through the field extractor — mock it to {}
+    # by default so the existing OCR tests stay hermetic (no real OpenAI call).
+    async def _no_fields(_text):
+        return {}
+
+    monkeypatch.setattr(ocr_router, "extract_expense_fields", _no_fields)
     c = TestClient(app)
     try:
         yield c
@@ -87,3 +94,42 @@ def test_empty_file_rejected(client):
         data={"document_type": "generic"},
     )
     assert r.status_code in (400, 422)
+
+
+# ── AIQ-1149: structured expense-field extraction for expense_receipt ─────────
+
+
+def test_expense_receipt_populates_extracted_fields(client, monkeypatch):
+    async def _fields(_text):
+        return {"vendor_name": "Hotel Adlon", "amount": 129.5, "currency": "EUR", "date": "2026-06-01"}
+
+    monkeypatch.setattr(ocr_router, "extract_expense_fields", _fields)
+    r = client.post(
+        "/api/ocr/process",
+        files={"file": ("receipt.png", _PNG, "image/png")},
+        data={"document_type": "expense_receipt"},
+    )
+    assert r.status_code == 200, r.text
+    ef = r.json()["extracted_fields"]
+    assert ef["vendor_name"] == "Hotel Adlon"
+    assert ef["amount"] == 129.5
+    assert ef["currency"] == "EUR"
+    assert ef["date"] == "2026-06-01"
+
+
+def test_generic_document_skips_field_extraction(client, monkeypatch):
+    called: list[int] = []
+
+    async def _spy(_text):
+        called.append(1)
+        return {"vendor_name": "should-not-appear"}
+
+    monkeypatch.setattr(ocr_router, "extract_expense_fields", _spy)
+    r = client.post(
+        "/api/ocr/process",
+        files={"file": ("doc.png", _PNG, "image/png")},
+        data={"document_type": "generic"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["extracted_fields"] == {}
+    assert called == []  # extractor is not invoked for non-receipt types
