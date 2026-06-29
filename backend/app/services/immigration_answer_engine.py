@@ -19,6 +19,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from .ai_replay_store import persist_replay_record
 from .ai_trace_logger import TraceSession
 from .immigration_answer_verifier import verify_grounding
 from .immigration_contradiction_detector import (
@@ -202,6 +203,34 @@ def _resolve_corridor_prompt(corridor: str) -> Tuple[str, str]:
     return SYSTEM_PROMPT, _MODEL
 
 
+def _persist_answer_replay(
+    tracer: TraceSession,
+    query: str,
+    corridor: str,
+    response: Dict[str, Any],
+    chunks: List[Dict[str, Any]],
+) -> None:
+    """Persist a masked, replayable record of this answer for the offline grader.
+    Best-effort: the store never raises, and we guard here so a replay failure can
+    never break the live answer path. `approved` ≈ a real, grounded answer."""
+    try:
+        kind = response.get("answer_kind")
+        persist_replay_record(
+            trace_id=tracer.trace_id,
+            feature_key=_FEATURE_KEY,
+            corridor=corridor,
+            query=query,
+            output=response,
+            retrieved_chunk_ids=[str(c.get("id")) for c in chunks if c.get("id")],
+            prompt_version_id=tracer.prompt_version_id,
+            canary_arm=tracer.canary_arm,
+            result=kind,
+            approved=(kind == "answer" and response.get("grounding_verdict") != "ungrounded"),
+        )
+    except Exception:
+        log.debug("replay record persist failed", exc_info=True)
+
+
 def generate_immigration_answer(
     chunks_payload: Dict[str, Any],
     query: str,
@@ -232,8 +261,7 @@ def generate_immigration_answer(
     # Hard guard: no context -> refuse without an LLM call.
     if not chunks:
         tracer.mark_fallback("insufficient_context")
-        tracer.flush()
-        return {
+        response = {
             "answer_text": INSUFFICIENT_CONTEXT_REFUSAL,
             "answer_kind": "refusal_insufficient_context",
             "cited_sources": [],
@@ -260,6 +288,9 @@ def generate_immigration_answer(
             "generated_at": now_iso,
             "trace_id": tracer.trace_id,
         }
+        _persist_answer_replay(tracer, query, corridor, response, chunks)
+        tracer.flush()
+        return response
 
     client = client or get_default_client()
 
@@ -369,8 +400,7 @@ def generate_immigration_answer(
     cited_chunk_ids = [c["id"] for c in chunks if c.get("source_url") in cited_urls and c.get("id")]
     tracer.record_citations(cited_chunk_ids)
 
-    tracer.flush()
-    return {
+    response = {
         "answer_text": answer_text,
         "answer_kind": answer_kind,
         "cited_sources": cited_sources,
@@ -394,3 +424,6 @@ def generate_immigration_answer(
         "generated_at": now_iso,
         "trace_id": tracer.trace_id,
     }
+    _persist_answer_replay(tracer, query, corridor, response, chunks)
+    tracer.flush()
+    return response
