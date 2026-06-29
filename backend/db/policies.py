@@ -2501,44 +2501,10 @@ class PoliciesMixin:
         out["published_at"] = published.get("updated_at") if published else None
         return out
 
-    def list_default_policy_templates(self) -> List[Dict[str, Any]]:
-        """List platform default policy templates (for admin UI)."""
-        try:
-            with self.engine.connect() as conn:
-                rows = conn.execute(
-                    text(
-                        "SELECT id, template_name, version, status, is_default_template, snapshot_json, created_at, updated_at "
-                        "FROM default_policy_templates ORDER BY is_default_template DESC, created_at ASC"
-                    ),
-                    {},
-                ).fetchall()
-            items = self._rows_to_list(rows)
-            for d in items:
-                self._parse_json_col(d, "snapshot_json")
-                if d.get("is_default_template") is not None and not isinstance(d["is_default_template"], bool):
-                    d["is_default_template"] = bool(d["is_default_template"])
-            return items
-        except (OperationalError, ProgrammingError, OSError, ValueError) as e:
-            log.warning("list_default_policy_templates failed (returning empty): %s", e)
-            return []
-        except Exception as e:
-            log.warning("list_default_policy_templates unexpected error (returning empty): %s", e, exc_info=True)
-            return []
-
-    def get_default_policy_template(self, template_id: str) -> Optional[Dict[str, Any]]:
-        """Get one default policy template by id."""
-        with self.engine.connect() as conn:
-            row = conn.execute(
-                text("SELECT * FROM default_policy_templates WHERE id = :id"),
-                {"id": template_id},
-            ).fetchone()
-        if not row:
-            return None
-        d = self._row_to_dict(row)
-        self._parse_json_col(d, "snapshot_json")
-        if d.get("is_default_template") is not None and not isinstance(d["is_default_template"], bool):
-            d["is_default_template"] = bool(d["is_default_template"])
-        return d
+    # TPL-3 (AIQ-1133): list_default_policy_templates / get_default_policy_template
+    # removed — the default_policy_templates table is retired. The single platform
+    # default now lives in backend/app/services/default_policy_template_snapshot.py
+    # (read via PolicyTemplateService.get_default_template_record / get_template_snapshot).
 
     def get_admin_policies_index(
         self, company_id: Optional[str] = None

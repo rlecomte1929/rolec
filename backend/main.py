@@ -3230,7 +3230,9 @@ def patch_admin_policy(
 def list_admin_policy_templates(user: Dict[str, Any] = Depends(require_admin)):
     """Admin: list default platform policy templates (empty list if table or data is unavailable)."""
     try:
-        templates = db.list_default_policy_templates()
+        from .app.services.policy_template_service import PolicyTemplateService
+
+        templates = PolicyTemplateService().build_admin_template_list()  # TPL-3: code-backed
         db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
         return {"templates": templates}
     except Exception as e:
@@ -3247,11 +3249,9 @@ def apply_default_template_to_company(
     """Admin: apply a default policy template to a company. Creates a new company policy from the template."""
     template_id = body.template_id
     if not template_id:
-        templates = db.list_default_policy_templates()
-        default_one = next((t for t in templates if t.get("is_default_template")), templates[0] if templates else None)
-        if not default_one:
-            raise HTTPException(status_code=404, detail="No default template found")
-        template_id = default_one["id"]
+        from .app.services.default_policy_template_snapshot import PLATFORM_DEFAULT_TEMPLATE_ID
+
+        template_id = PLATFORM_DEFAULT_TEMPLATE_ID  # TPL-3: the single platform default
     result = db.apply_default_template_to_company(
         company_id=body.company_id,
         template_id=template_id,

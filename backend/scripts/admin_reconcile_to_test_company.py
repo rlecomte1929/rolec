@@ -248,27 +248,16 @@ def reconcile_to_test_company(db: Database) -> Dict[str, Any]:
             }
             actions["policies_linked_to_test_company"] = True
         else:
-            templates = db.list_default_policy_templates()
-            default_one = next(
-                (t for t in templates if t.get("is_default_template")),
-                templates[0] if templates else None,
+            # TPL-3: the single platform default is code-backed (PolicyTemplateService).
+            from backend.app.services.default_policy_template_snapshot import PLATFORM_DEFAULT_TEMPLATE_ID
+
+            result = db.apply_default_template_to_company(
+                company_id=TEST_COMPANY_ID,
+                template_id=PLATFORM_DEFAULT_TEMPLATE_ID,
+                overwrite_existing=False,
+                created_by=None,
             )
-            if not default_one:
-                actions["backfill_policy_result"] = {
-                    "ok": False,
-                    "error": "No default template found",
-                    "policy_id": None,
-                }
-                actions["policies_linked_to_test_company"] = False
-            else:
-                tpl_id = default_one["id"]
-                result = db.apply_default_template_to_company(
-                    company_id=TEST_COMPANY_ID,
-                    template_id=tpl_id,
-                    overwrite_existing=False,
-                    created_by=None,
-                )
-                actions["backfill_policy_result"] = result
+            actions["backfill_policy_result"] = result
                 actions["policies_linked_to_test_company"] = bool(result.get("ok"))
     except Exception as exc:  # pragma: no cover - defensive
         actions["backfill_policy_result"] = {"ok": False, "error": str(exc)}

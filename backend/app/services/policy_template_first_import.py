@@ -21,22 +21,22 @@ TEMPLATE_FIRST_MODE = "canonical_lta_template_first"
 
 def get_template_defaults(db: Any, template_id: Optional[str]) -> Dict[str, Any]:
     """
-    Read ``default_policy_templates.snapshot_json`` for ``template_id`` and return a
-    gap-fill map keyed by benefit-taxonomy key (e.g. ``"housing"``, ``"movers"``).
+    Return a gap-fill map keyed by benefit-taxonomy key (e.g. ``"housing"``,
+    ``"movers"``), each value the raw ``benefit_rules`` entry for that key.
 
-    Each value is the raw ``benefit_rules`` entry for that key. Returns an empty dict
-    (never raises) when the template id is missing, unknown, or carries no benefit_rules
-    — so callers can always treat the result as "the defaults available, if any".
+    TPL-3: sourced from ``PolicyTemplateService`` (the code-backed platform default)
+    instead of the retired ``default_policy_templates`` table. ``db`` is unused now but
+    kept for call-site compatibility. Returns an empty dict (never raises) when the
+    template id is missing/empty or the snapshot carries no benefit_rules.
     """
     if not template_id:
         return {}
     try:
-        row = db.get_default_policy_template(str(template_id))
+        from .policy_template_service import PolicyTemplateService
+
+        snapshot = PolicyTemplateService().get_template_snapshot(str(template_id))
     except Exception:
         return {}
-    if not row:
-        return {}
-    snapshot = row.get("snapshot_json")
     if not isinstance(snapshot, dict):
         return {}
     defaults: Dict[str, Any] = {}
