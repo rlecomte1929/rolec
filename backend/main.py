@@ -139,6 +139,7 @@ from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
+from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
 from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parker-B] dual-layer registration (PR #207 §9)
@@ -743,6 +744,7 @@ app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 �
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
+app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)

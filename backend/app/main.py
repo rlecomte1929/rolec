@@ -15,6 +15,7 @@ from .routers import (
     ai_decisions,
     ai_feedback,
     ocr,
+    requirement_facts,
     benefit_optimizer,
     case_forms_adhoc,
     cases,
@@ -158,6 +159,7 @@ def create_app() -> FastAPI:
     app.include_router(marketplace.router)
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
     app.include_router(predictions.router)
     # [Parker-B] HR benefit-mix optimizer (Markowitz-style)
