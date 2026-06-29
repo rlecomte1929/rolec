@@ -41,6 +41,7 @@ from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
+from ..services.confidence_mapping import tier_to_confidence
 from ..services.roadmap_lead_times import lead_time_days_for
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
@@ -131,14 +132,14 @@ def _bucket_confidence(pct: Optional[int]) -> Optional[str]:
 
 
 def _tier_to_confidence(tier: Optional[str]) -> str:
-    """[P3-04e-FU] Map a source page's trust tier to a roadmap-step confidence level.
+    """[P3-04e-FU / AIQ-806] Map a source page's trust tier to a confidence level.
 
-    ``source_pages.tier`` is TEXT ('1'/'2'/'3', default '1'). Tier 1 = official
-    primary authority → HIGH; tier 2 → MEDIUM; tier 3 → LOW. Anything missing or
-    unrecognised → UNKNOWN (honest — never fabricate confidence). Distinct from
-    _bucket_confidence, which maps the requirements.confidence_pct path.
+    Thin wrapper over the shared ``confidence_mapping.tier_to_confidence`` so the
+    ``/roadmap/tracks`` projection and the relocation-plan view resolve confidence
+    from the same table — see backend/app/services/confidence_mapping.py. Distinct
+    from _bucket_confidence, which maps the requirements.confidence_pct path.
     """
-    return {"1": "HIGH", "2": "MEDIUM", "3": "LOW"}.get(str(tier).strip() if tier is not None else "", "UNKNOWN")
+    return tier_to_confidence(tier)
 
 
 def _suggested_due_date(
