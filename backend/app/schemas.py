@@ -131,6 +131,9 @@ class CaseRequirementsDTO(BaseModel):
     computedAt: datetime
     requirements: List[RequirementItemDTO]
     sources: List[SourceRecordDTO]
+    # AIQ-1349: non-liability disclaimer + provenance level for the guidance.
+    disclaimer: str = ""
+    verificationStatus: Optional[str] = None
 
 
 class AssignmentType(str, Enum):

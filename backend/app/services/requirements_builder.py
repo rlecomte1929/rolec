@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from .. import crud
 from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
+from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
 from .rules_engine import apply_rules
 
 
@@ -109,6 +110,8 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             computedAt=datetime.utcnow(),
             requirements=requirement_dtos,
             sources=source_dtos,
+            disclaimer=IMMIGRATION_DISCLAIMER,  # AIQ-1349: recommend, not liable
+            verificationStatus=DEFAULT_VERIFICATION_STATUS,
         )
 
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Badge } from '../antigravity';
 import type { RequirementItemDTO } from '../../types';
 import { Citations } from './Citations';
+import { ImmigrationDisclaimer } from './ImmigrationDisclaimer';
 
 interface RequirementListProps {
   items: RequirementItemDTO[];
@@ -23,6 +24,7 @@ const ownerVariant = (owner: RequirementItemDTO['owner']) => {
 export const RequirementList: React.FC<RequirementListProps> = ({ items, onAction }) => {
   return (
     <div className="space-y-4">
+      <ImmigrationDisclaimer />
       {items.map((item) => (
         <div key={item.id} className="border border-[#e2e8f0] rounded-xl p-4 bg-white">
           <div className="flex items-start justify-between gap-4">
