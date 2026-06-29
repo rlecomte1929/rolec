@@ -22,6 +22,7 @@ from sqlalchemy import text
 from ..auth_deps import get_current_user
 from ...database import db
 from ..services.mistral_ocr_client import mistral_ocr_document
+from ..services.receipt_field_extractor import extract_expense_fields
 from ..services.upload_validator import ALLOWED_MIME, read_and_validate
 
 log = logging.getLogger(__name__)
@@ -76,7 +77,13 @@ async def process_document(
 
     raw_markdown = result.get("markdown", "") or ""
     pages_count = int(result.get("pages_count", 0) or 0)
-    extracted_fields: Dict[str, Any] = {}  # per-type structured extraction = follow-up (AIQ-1149+)
+    # [AIQ-1149] Structured fields for expense receipts; other document_types keep {} (future work).
+    extracted_fields: Dict[str, Any] = {}
+    if dt == "expense_receipt":
+        try:
+            extracted_fields = await extract_expense_fields(raw_markdown)
+        except Exception as exc:  # fail-soft — still return the OCR text
+            log.warning("ocr_process: expense field extraction failed err=%s", exc)
 
     ocr_id = str(uuid.uuid4())
     # Defensive persist: document_ocr_results is applied out-of-band, so a missing table
