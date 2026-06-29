@@ -165,8 +165,7 @@ def complete_research_request(
 
     # Notify the requester their corridor is now covered (best-effort).
     try:
-        from ...database import db as main_db
-        main_db.create_notification_with_preferences(
+        _notify(
             user_id=req.get("requester_user_id"),
             type_="RESEARCH_COMPLETED",
             title=f"Immigration guidance for {req.get('corridor')} is now available",
@@ -177,3 +176,10 @@ def complete_research_request(
         log.warning("research complete: requester notification failed: %s", e)
 
     return updated
+
+
+def _notify(**kwargs) -> Optional[str]:
+    """Module-level indirection so the requester notification is deterministically
+    patchable in tests (avoids depending on the global db-singleton identity)."""
+    from ...database import db as main_db
+    return main_db.create_notification_with_preferences(**kwargs)

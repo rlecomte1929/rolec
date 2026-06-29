@@ -79,13 +79,9 @@ def _setup(monkeypatch, *, status, qi_status):
     import backend.app.services.review_queue_service as rq
     monkeypatch.setattr(rq, "get_review_queue_item", lambda i: {"id": i, "status": qi_status})
     monkeypatch.setattr(rq, "resolve_queue_item", lambda *a, **k: {"id": "q-1", "status": "resolved"})
-    # capture notifications
+    # capture notifications via the service's patchable indirection
     sent = {}
-    import backend.database as dbmod
-    monkeypatch.setattr(
-        dbmod.db, "create_notification_with_preferences",
-        lambda **kw: sent.update(kw) or "n-1",
-    )
+    monkeypatch.setattr(svc, "_notify", lambda **kw: sent.update(kw) or "n-1")
     return rows, sent
 
 
