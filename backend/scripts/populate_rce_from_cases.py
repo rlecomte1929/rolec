@@ -49,6 +49,30 @@ _STATUS_MAP = {
 # Cases we bother materialising — in-flight ones a rule change could affect.
 _ACTIVE_PUBLIC_STATUSES = ("active", "on_hold", "draft")
 
+# public.cases stores country fields inconsistently — some rows hold ISO-2 codes
+# ("IN", "DE"), others full names ("INDIA", "GERMANY"). Corridor pathway YAMLs are
+# keyed by ISO-2 (IN_DE, FR_NO), so a name-spelled case silently misses coverage
+# (e.g. "INDIA_GERMANY" never resolves to "IN_DE"). Normalise names → ISO-2 here so
+# both spellings resolve. Covers the names seen in prod + common relocation markets;
+# already-ISO values pass through unchanged.
+_COUNTRY_NAME_TO_ISO = {
+    "FRANCE": "FR", "GERMANY": "DE", "INDIA": "IN", "NORWAY": "NO",
+    "SPAIN": "ES", "NETHERLANDS": "NL", "SWITZERLAND": "CH", "JAPAN": "JP",
+    "CANADA": "CA", "SINGAPORE": "SG", "IRELAND": "IE", "BELGIUM": "BE",
+    "ITALY": "IT", "PORTUGAL": "PT", "SWEDEN": "SE", "DENMARK": "DK",
+    "UNITED KINGDOM": "GB", "UK": "GB", "GREAT BRITAIN": "GB",
+    "UNITED STATES": "US", "USA": "US", "UNITED STATES OF AMERICA": "US",
+    "UNITED ARAB EMIRATES": "AE", "UAE": "AE",
+}
+
+
+def to_iso_country(cc: Optional[str]) -> Optional[str]:
+    """Map a country name to its ISO-2 code; pass ISO-2 (or unknown) through."""
+    if not cc:
+        return cc
+    s = cc.strip().upper()
+    return _COUNTRY_NAME_TO_ISO.get(s, s)
+
 
 def map_status(public_status: Optional[str]) -> str:
     return _STATUS_MAP.get((public_status or "").strip().lower(), "ACTIVE")
@@ -62,7 +86,11 @@ def resolve_pathway_file(origin_cc: Optional[str], dest_cc: Optional[str]):
     """
     if not origin_cc or not dest_cc:
         return None, None, None
-    cid = corridor_registry.normalize_corridor_id(f"{origin_cc}_{dest_cc}")
+    # Normalise country names → ISO-2 before building the corridor id so that
+    # name-spelled cases (e.g. INDIA_GERMANY) resolve to their pathway (IN_DE).
+    cid = corridor_registry.normalize_corridor_id(
+        f"{to_iso_country(origin_cc)}_{to_iso_country(dest_cc)}"
+    )
     pathways = corridor_registry.get_pathways(cid)
     if not pathways:
         return None, cid, None

@@ -22,6 +22,32 @@ def test_map_status_vocabulary():
     assert pop.map_status("weird") == "ACTIVE"
 
 
+def test_to_iso_country_name_and_passthrough():
+    assert pop.to_iso_country("INDIA") == "IN"
+    assert pop.to_iso_country("Germany") == "DE"   # case-insensitive
+    assert pop.to_iso_country(" france ") == "FR"  # trims
+    assert pop.to_iso_country("UAE") == "AE"
+    assert pop.to_iso_country("IN") == "IN"        # already ISO-2 → passthrough
+    assert pop.to_iso_country("ZZ") == "ZZ"        # unknown → passthrough
+    assert pop.to_iso_country(None) is None
+
+
+def test_resolve_pathway_normalizes_country_names(monkeypatch):
+    """A name-spelled corridor (INDIA_GERMANY) resolves to the ISO pathway (IN_DE)."""
+    class _PW:
+        id = "BLUECARD_2026"
+    seen = {}
+    def _get_pathways(cid):
+        seen["cid"] = cid
+        return (_PW(),)
+    monkeypatch.setattr(pop.corridor_registry, "get_pathways", _get_pathways)
+    monkeypatch.setattr(pop.corridor_registry, "get_pathway_file", lambda cid, pid: f"/fake/{cid}/{pid}/v1.yaml")
+    path, cid, pid = pop.resolve_pathway_file("INDIA", "GERMANY")
+    assert cid == "IN_DE" and pid == "BLUECARD_2026"
+    assert path == "/fake/IN_DE/BLUECARD_2026/v1.yaml"
+    assert seen["cid"] == "IN_DE"  # name→ISO happened before the registry lookup
+
+
 def test_resolve_pathway_missing_country_codes():
     assert pop.resolve_pathway_file(None, "DE") == (None, None, None)
     assert pop.resolve_pathway_file("IN", None) == (None, None, None)
