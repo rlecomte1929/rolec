@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.0.0",
+  "verification_status": "representative",
+  "corridor": {
+    "from": "US",
+    "to": "NL",
+    "from_country_name": "United States",
+    "to_country_name": "Netherlands",
+    "classification": "non_eea_to_eea",
+    "description": "US nationals are third-country nationals for Dutch immigration. The standard route for salaried employment is the Highly Skilled Migrant (kennismigrant) residence permit, sponsored by an IND-recognised employer; the EU Blue Card is an alternative for higher-salaried graduates. US nationals are MVV-exempt (no entry visa). After arrival the employee collects the residence permit from the IND, registers at the municipality (gemeente / BRP) to obtain a BSN, and takes out Dutch health insurance. REPRESENTATIVE — confirm with the IND."
+  },
+  "fetched_at": "2026-06-29",
+  "next_review_due": "2026-12-29",
+  "primary_sources": [
+    {"url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant", "tier": 1, "title": "Highly skilled migrant — IND"},
+    {"url": "https://ind.nl/en/residence-permits/work/eu-blue-card", "tier": 1, "title": "EU Blue Card — IND"},
+    {"url": "https://www.government.nl/topics/personal-data/citizen-service-number-bsn", "tier": 1, "title": "Citizen service number (BSN) — Government.nl"},
+    {"url": "https://www.belastingdienst.nl/wps/wcm/connect/en/individuals/individuals", "tier": 1, "title": "Belastingdienst (Tax Administration) — 30% ruling / payroll"}
+  ],
+  "pathways": [
+    {
+      "visa_type": "highly_skilled_migrant",
+      "scheme_name_native": "Kennismigrant",
+      "scheme_name_en": "Highly Skilled Migrant residence permit",
+      "employee_types": ["salaried_employee", "qualified_employee"],
+      "duration_months": 60,
+      "renewable": true,
+      "renewal_path": "extension_or_permanent_residence",
+      "eligibility": {
+        "salary_min_eur_monthly_30_plus": 5688,
+        "salary_min_eur_monthly_under_30": 4171,
+        "salary_basis": "IND monthly gross thresholds (2025, excl. holiday allowance); reduced threshold for recent graduates",
+        "employer_must_be_recognised_sponsor": true,
+        "qualification_required": false
+      },
+      "typical_processing_days_low": 14,
+      "typical_processing_days_high": 90,
+      "post_arrival_validation_required": true,
+      "post_arrival_validation_window_days": 90,
+      "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+      "source_tier": 1
+    },
+    {
+      "visa_type": "eu_blue_card",
+      "scheme_name_native": "Europese blauwe kaart",
+      "scheme_name_en": "EU Blue Card",
+      "employee_types": ["qualified_employee"],
+      "duration_months": 48,
+      "renewable": true,
+      "renewal_path": "extension_or_permanent_residence",
+      "eligibility": {
+        "salary_min_eur_monthly": 5688,
+        "salary_basis": "IND EU Blue Card monthly gross threshold (2025)",
+        "qualification_required": true,
+        "qualification_level_min": "bachelor_or_higher_education_3yr",
+        "employer_must_be_recognised_sponsor": false
+      },
+      "typical_processing_days_low": 14,
+      "typical_processing_days_high": 90,
+      "post_arrival_validation_required": true,
+      "post_arrival_validation_window_days": 90,
+      "source_url": "https://ind.nl/en/residence-permits/work/eu-blue-card",
+      "source_tier": 1
+    }
+  ],
+  "required_documents": [
+    {
+      "id": "us_nl_hsm_passport",
+      "corridor_from": "US", "corridor_to": "NL",
+      "visa_type": "highly_skilled_migrant", "employee_type": "any",
+      "document_type": "passport", "document_name": "Valid US Passport",
+      "is_required": true, "is_conditional": false,
+      "validity_min_days_after_visa_expiry": 0,
+      "requires_apostille": false, "requires_translation": false,
+      "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant", "source_tier": 1
+    },
+    {
+      "id": "us_nl_hsm_employment_contract",
+      "corridor_from": "US", "corridor_to": "NL",
+      "visa_type": "highly_skilled_migrant", "employee_type": "any",
+      "document_type": "employment_contract",
+      "document_name": "Employment contract with an IND-recognised sponsor (meeting the salary threshold)",
+      "is_required": true, "is_conditional": false,
+      "requires_apostille": false, "requires_translation": false,
+      "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant", "source_tier": 1
+    },
+    {
+      "id": "us_nl_recognised_sponsor",
+      "corridor_from": "US", "corridor_to": "NL",
+      "visa_type": "highly_skilled_migrant", "employee_type": "any",
+      "document_type": "sponsor_declaration",
+      "document_name": "IND-recognised sponsor (employer files the application)",
+      "is_required": true, "is_conditional": false,
+      "requires_apostille": false, "requires_translation": false,
+      "source_url": "https://ind.nl/en/recognition-as-a-sponsor", "source_tier": 1
+    },
+    {
+      "id": "us_nl_bluecard_diploma",
+      "corridor_from": "US", "corridor_to": "NL",
+      "visa_type": "eu_blue_card", "employee_type": "qualified_employee",
+      "document_type": "degree_certificate",
+      "document_name": "Higher-education diploma (≥3-year programme), legalised/evaluated as required",
+      "is_required": true, "is_conditional": true,
+      "requires_apostille": true, "requires_translation": true,
+      "source_url": "https://ind.nl/en/residence-permits/work/eu-blue-card", "source_tier": 1
+    }
+  ],
+  "post_arrival_steps": [
+    {
+      "order": 1,
+      "name": "Collect residence permit from the IND",
+      "deadline_days_after_arrival": 90,
+      "deadline_basis": "After the IND notifies the permit is ready for collection",
+      "fee_eur": 0,
+      "where": "IND desk (by appointment)",
+      "source_url": "https://ind.nl/en/how-to-collect-your-residence-document", "source_tier": 1
+    },
+    {
+      "order": 2,
+      "name": "Register at the municipality (gemeente / BRP) and obtain a BSN",
+      "deadline_days_after_arrival": 5,
+      "deadline_basis": "Register within 5 days if staying longer than 4 months (BRP)",
+      "fee_eur": 0,
+      "where": "Local gemeente",
+      "source_url": "https://www.government.nl/topics/personal-data/citizen-service-number-bsn", "source_tier": 1
+    },
+    {
+      "order": 3,
+      "name": "Take out Dutch health insurance (zorgverzekering)",
+      "deadline_days_after_arrival": 120,
+      "deadline_basis": "Statutory basic health insurance required, typically within 4 months of becoming insured/registered",
+      "fee_eur": 0,
+      "where": "A Dutch health insurer",
+      "source_url": "https://www.government.nl/topics/health-insurance", "source_tier": 1
+    },
+    {
+      "order": 4,
+      "name": "Apply for the 30% ruling (tax) — via employer",
+      "deadline_days_after_arrival": 120,
+      "deadline_basis": "Apply within 4 months of the start of employment to receive it from the first month",
+      "fee_eur": 0,
+      "where": "Belastingdienst (employer-initiated)",
+      "source_url": "https://www.belastingdienst.nl/wps/wcm/connect/en/individuals/individuals", "source_tier": 1
+    }
+  ]
+}
