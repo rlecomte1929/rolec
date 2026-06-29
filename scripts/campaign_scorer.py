@@ -67,10 +67,28 @@ def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def extract_results(data):
+    """Return the run's results as a list of dicts, tolerant of historical shapes.
+
+    Runner output has drifted: newer files store the list under ``results``;
+    some older files store ``results`` as a dict (keyed by test_id) with the
+    list under ``results_list``. Normalise all of these to a list of dicts so
+    the scorer can compare any baseline without manual --prev juggling.
+    """
+    r = data.get("results")
+    if isinstance(r, list):
+        return r
+    rl = data.get("results_list")
+    if isinstance(rl, list):
+        return rl
+    if isinstance(r, dict):  # legacy: {test_id: {status, ...}}
+        return [{"id": v.get("id", k), **v} for k, v in r.items() if isinstance(v, dict)]
+    return []
+
 def status_of(test_id, results_list):
     """Return status string for a given test ID in a results list."""
     for r in results_list:
-        if r.get("id") == test_id:
+        if isinstance(r, dict) and r.get("id") == test_id:
             return r.get("status", "SKIP")
     return "SKIP"  # not present in this run = skip
 
@@ -551,8 +569,8 @@ def main():
     current_data = load_json(current_file)
     prev_data    = load_json(prev_file) if prev_file else None
 
-    current_results = current_data.get("results", [])
-    prev_results    = prev_data.get("results", []) if prev_data else []
+    current_results = extract_results(current_data)
+    prev_results    = extract_results(prev_data) if prev_data else []
 
     # Score
     current_domain_scores, current_overall, current_per_test = score_results(current_results, score_map)
