@@ -229,7 +229,9 @@ class PolicySummaryTests(unittest.TestCase):
             _seed_version(conn, vid=vid, policy_id=ctx["policy_id"],
                           status="published",
                           effective_date="2026-06-01",
-                          expiry_date=(date.today() + timedelta(days=30)).isoformat())
+                          # UTC to match _compute_status_banner (avoids a local-vs-UTC
+                          # day-boundary flip; see test_expired_banner_when_expiry_in_past).
+                          expiry_date=(datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat())
 
         res = get_policy_summary(
             company_id=None, tier=None,
@@ -244,7 +246,9 @@ class PolicySummaryTests(unittest.TestCase):
         with self.engine.begin() as conn:
             _seed_version(conn, vid=vid, policy_id=ctx["policy_id"],
                           status="published",
-                          expiry_date=(date.today() - timedelta(days=1)).isoformat())
+                          # UTC (not local date.today()) to match _compute_status_banner;
+                          # -2 days margin so this never flips at the UTC day boundary.
+                          expiry_date=(datetime.now(timezone.utc).date() - timedelta(days=2)).isoformat())
 
         res = get_policy_summary(
             company_id=None, tier=None,
