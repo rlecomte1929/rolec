@@ -8,6 +8,21 @@ export type UseRelocationPlanViewOptions = FetchRelocationPlanViewOptions & {
   enabled?: boolean;
 };
 
+// [AIQ-1377] The roadmap API works (DEEP-ROADMAP-API passes), so an intermittent cold-start / 5xx
+// blip must not immediately surface "We couldn't load your roadmap". Retry transient failures a
+// couple of times before giving up; deterministic 4xx fail fast.
+const ROADMAP_FETCH_ATTEMPTS = 3; // 1 try + 2 retries
+const ROADMAP_RETRY_BASE_MS = 300;
+
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Worth retrying: no HTTP response (network/timeout) or a 5xx. A 4xx is deterministic. */
+export function isRetryableFetchError(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } } | null)?.response?.status;
+  if (typeof status === 'number') return status >= 500;
+  return true;
+}
+
 export function useRelocationPlanView(
   caseId: string | null | undefined,
   options?: UseRelocationPlanViewOptions
@@ -32,19 +47,29 @@ export function useRelocationPlanView(
     }
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetchRelocationPlanView(caseId, { role, debug });
-      setData(res);
-    } catch (err: unknown) {
-      const transport = getClientTransportErrorMessage(err);
-      const msg = transport ?? getApiErrorMessage(err, (err as Error)?.message || '');
-      setError(msg.trim() ? msg : 'Failed to load relocation plan');
-      // AIQ-1377: keep the last good data on a transient error so a retry/poll
-      // can recover without blanking an already-rendered roadmap. The page treats
-      // an error within the generation window as "not ready yet", not a dead end.
-    } finally {
-      setLoading(false);
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= ROADMAP_FETCH_ATTEMPTS; attempt++) {
+      try {
+        const res = await fetchRelocationPlanView(caseId, { role, debug });
+        setData(res);
+        setLoading(false);
+        return;
+      } catch (err: unknown) {
+        lastErr = err;
+        if (attempt < ROADMAP_FETCH_ATTEMPTS && isRetryableFetchError(err)) {
+          await delay(ROADMAP_RETRY_BASE_MS * attempt); // 300ms, 600ms backoff
+          continue;
+        }
+        break;
+      }
     }
+    // [AIQ-1377] Retries exhausted: surface the error but KEEP the last-good data (no setData(null))
+    // so a poll/retry recovers without blanking an already-rendered roadmap. Combines the retry with
+    // main's keep-last-good fix — an error within the generation window is "not ready yet", not a dead end.
+    const transport = getClientTransportErrorMessage(lastErr);
+    const msg = transport ?? getApiErrorMessage(lastErr, (lastErr as Error)?.message || '');
+    setError(msg.trim() ? msg : 'Failed to load relocation plan');
+    setLoading(false);
   }, [caseId, enabled, role, debug]);
 
   useEffect(() => {
