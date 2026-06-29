@@ -1,9 +1,11 @@
 name: E2E Sentinel Campaign
 
-# Phase 1: manual trigger only. Phase 2 will add `push: branches:[main]` with a
-# wait-for-deploy /health gate. The whole job no-ops unless the repo variable
+# Runs on every deploy to main (post-deploy smoke, gated on a /health check) and
+# on manual dispatch. The whole job no-ops unless the repo variable
 # E2E_CAMPAIGN_ENABLED == 'true', so merging this file changes nothing until you opt in.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       projects:
@@ -29,8 +31,26 @@ jobs:
       E2E_API_URL: ${{ vars.E2E_API_URL || 'https://api.relopass.com' }}
       E2E_APP_URL: ${{ vars.E2E_APP_URL || 'https://relopass.com' }}
       RELOPASS_E2E_PASSWORD: ${{ secrets.RELOPASS_E2E_PASSWORD }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
+
+      # On a deploy, Render takes a few minutes to roll. Wait for the API to be
+      # healthy (and, if the API exposes its commit, for the new SHA) before testing.
+      - name: Wait for deploy / health
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "deploy grace: sleeping ${E2E_DEPLOY_GRACE:-180}s for Render to roll"
+            sleep "${E2E_DEPLOY_GRACE:-180}"
+          fi
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$E2E_API_URL/health" || true)
+            if [ "$code" = "200" ]; then echo "✔ API healthy"; exit 0; fi
+            echo "waiting for API ($code) … $i/30"; sleep 15
+          done
+          echo "✗ API not healthy after timeout"; exit 1
+        env:
+          E2E_DEPLOY_GRACE: ${{ vars.E2E_DEPLOY_GRACE }}
 
       - uses: actions/setup-node@v6
         with:
@@ -56,8 +76,9 @@ jobs:
         working-directory: tests/e2e
         continue-on-error: true
         env:
-          # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input
-          PROJECTS: ${{ github.event.inputs.projects }}
+          # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input;
+          # falls back to the default project set on a push (no dispatch input present)
+          PROJECTS: ${{ github.event.inputs.projects || '--project=provision --project=core --project=write-flow' }}
         run: npx playwright test $PROJECTS
 
       - uses: actions/setup-python@v6
@@ -94,3 +115,28 @@ jobs:
             tests/e2e/test-artifacts/${{ env.RUNID }}/_results.json
           retention-days: 30
           if-no-files-found: warn
+
+      # Optional Slack ping (gated). Reads the band line from the scorer output via env.
+      - name: Notify Slack
+        if: ${{ always() && vars.E2E_SLACK_ENABLED == 'true' && secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          band=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/score.txt 2>/dev/null | grep -oE "GREEN|AMBER|RED" | head -1 || echo "N/A")
+          python3 - "$band" "$RUN_URL" <<'PY'
+          import json, os, sys, urllib.request
+          band, url = sys.argv[1], sys.argv[2]
+          msg = {"text": f"ReloPass E2E Sentinel: {band} — {url}"}
+          req = urllib.request.Request(os.environ["SLACK_WEBHOOK_URL"], data=json.dumps(msg).encode(),
+                                       headers={"Content-Type": "application/json"})
+          urllib.request.urlopen(req, timeout=15)
+          PY
+
+      # Optional per-run auto-delete of the is_test data this run created (gated).
+      # The report artifact preserves all evidence, so purging keeps the DB lean.
+      - name: Auto-delete is_test data
+        if: ${{ always() && vars.E2E_AUTODELETE_ENABLED == 'true' && env.DATABASE_URL != '' }}
+        run: |
+          pip install --quiet psycopg2-binary
+          python3 scripts/e2e_purge.py --apply
