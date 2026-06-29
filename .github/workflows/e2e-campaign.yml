@@ -1,0 +1,96 @@
+name: E2E Sentinel Campaign
+
+# Phase 1: manual trigger only. Phase 2 will add `push: branches:[main]` with a
+# wait-for-deploy /health gate. The whole job no-ops unless the repo variable
+# E2E_CAMPAIGN_ENABLED == 'true', so merging this file changes nothing until you opt in.
+on:
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: "Playwright projects to run"
+        type: string
+        default: "--project=provision --project=core --project=write-flow"
+
+concurrency:
+  group: e2e-sentinel-campaign
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  campaign:
+    name: Provision → API + Browser → Score
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ vars.E2E_CAMPAIGN_ENABLED == 'true' }}
+    env:
+      RUNID: ci-${{ github.run_id }}-${{ github.run_number }}
+      E2E_API_URL: ${{ vars.E2E_API_URL || 'https://api.relopass.com' }}
+      E2E_APP_URL: ${{ vars.E2E_APP_URL || 'https://relopass.com' }}
+      RELOPASS_E2E_PASSWORD: ${{ secrets.RELOPASS_E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20.18.1"
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Install harness deps
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      # (Optional) API smoke layer — runs only if the secret is present, writes test_results.json
+      - name: API smoke layer
+        if: ${{ env.RELOPASS_E2E_PASSWORD != '' }}
+        continue-on-error: true
+        run: node relopass_api_runner_patched.js --api-only || true
+
+      - name: Browser + lifecycle layer
+        working-directory: tests/e2e
+        continue-on-error: true
+        env:
+          # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input
+          PROJECTS: ${{ github.event.inputs.projects }}
+        run: npx playwright test $PROJECTS
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Ingest + score
+        id: score
+        continue-on-error: true   # Phase 1: known-open bugs (RFQ 500 etc.) keep it RED; don't fail the job yet
+        run: |
+          python3 scripts/ingest_playwright_results.py \
+            --pw "tests/e2e/test-artifacts/${RUNID}/_results.json" \
+            ${{ env.RELOPASS_E2E_PASSWORD != '' && '--api test_results.json' || '' }}
+          python3 scripts/campaign_scorer.py --no-prev | tee /tmp/score.txt
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## E2E Sentinel — run ${RUNID}"
+            echo '```'
+            sed -e 's/\x1b\[[0-9;]*m//g' /tmp/score.txt 2>/dev/null | grep -E "OVERALL|RED|AMBER|GREEN|NEW FAILURES|REGRESS|•" || echo "(no score output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report + artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-sentinel-${{ github.run_id }}
+          path: |
+            results/campaign_report_*.json
+            results/test_results_*.json
+            tests/e2e/test-artifacts/${{ env.RUNID }}/_results.json
+          retention-days: 30
+          if-no-files-found: warn

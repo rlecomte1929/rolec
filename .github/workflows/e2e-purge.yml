@@ -1,0 +1,53 @@
+name: E2E Sentinel Purge
+
+# Manual-only, separate from the campaign so destructive teardown never runs
+# implicitly. No-ops unless vars.E2E_PURGE_ENABLED == 'true'. Deletes ONLY
+# is_test=true rows (never the demo/real tenants). Dry-run unless apply=true.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Actually delete? (false = dry-run, counts only)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-sentinel-purge
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  purge:
+    name: Purge is_test data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ vars.E2E_PURGE_ENABLED == 'true' }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet psycopg2-binary
+
+      - name: Dry-run (counts only)
+        run: python3 scripts/e2e_purge.py | tee /tmp/purge.txt
+
+      - name: Apply (delete)
+        if: ${{ github.event.inputs.apply == 'true' }}
+        run: python3 scripts/e2e_purge.py --apply | tee -a /tmp/purge.txt
+
+      - name: Summary
+        if: always()
+        env:
+          APPLY: ${{ github.event.inputs.apply }}
+        run: |
+          {
+            echo "## E2E Purge (apply=${APPLY})"
+            echo '```'
+            cat /tmp/purge.txt 2>/dev/null || echo "(no output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

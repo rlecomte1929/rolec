@@ -36,6 +36,17 @@
     }
   },
   "tests": {
+    "CORE-HR-dashboard":       { "domain": "Case Management",     "priority": "P1", "category": "UX Logical",         "title": "HR dashboard renders (no B10/B13, empty state)",  "notion_worthy": true  },
+    "CORE-HR-command-center":  { "domain": "Case Management",     "priority": "P0", "category": "UX Logical",         "title": "HR command-center renders (no B10 spinner)",      "notion_worthy": true  },
+    "CORE-HR-vendor-curation": { "domain": "Suppliers & Vendors", "priority": "P1", "category": "UX Logical",         "title": "HR vendor-curation renders (no B10/B13)",         "notion_worthy": true  },
+    "CORE-EMP-dashboard":      { "domain": "Employee Journey",    "priority": "P1", "category": "UX Logical",         "title": "Employee dashboard renders (graceful empty)",     "notion_worthy": true  },
+    "CORE-RLS":                { "domain": "Security & RLS",      "priority": "P0", "category": "Tenant Isolation",    "title": "HR cases scoped + admin endpoint denied (403)",   "notion_worthy": true  },
+    "CORE-DEGRADE":            { "domain": "Case Management",     "priority": "P1", "category": "Graceful Degradation","title": "Fresh HR policy-config not 5xx",                  "notion_worthy": true  },
+    "PER-H1":                  { "domain": "Case Management",     "priority": "P0", "category": "Lifecycle",          "title": "HR create case (POST /api/hr/cases)",             "notion_worthy": true  },
+    "MSG-02":                  { "domain": "Notifications",       "priority": "P1", "category": "Hand-off",           "title": "HR assigns employee (<5s); in-app notify fired?", "notion_worthy": true  },
+    "MSG-01":                  { "domain": "Notifications",       "priority": "P1", "category": "Hand-off",           "title": "Employee submit → HR notify (AIQ-1342)",          "notion_worthy": true  },
+    "MSG-03":                  { "domain": "Collaboration",       "priority": "P2", "category": "Hand-off",           "title": "HR posts case message",                           "notion_worthy": true  },
+    "VND-05":                  { "domain": "Suppliers & Vendors", "priority": "P2", "category": "RFQ",                "title": "HR sends RFQ (POST /api/hr/rfq-requests)",        "notion_worthy": true  },
     "AT1":  { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Platform admin login",                        "notion_worthy": true  },
     "AT2":  { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Fresh HR account registered",                 "notion_worthy": true  },
     "AT2b": { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Fresh HR linked to company (B18)",            "notion_worthy": true  },
