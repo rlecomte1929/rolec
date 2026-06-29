@@ -60,6 +60,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--min-completeness", type=float, default=0.9)
     parser.add_argument("--min-ordering", type=float, default=1.0)
     parser.add_argument("--gate", action="store_true", help="Exit non-zero if below thresholds.")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="Dir to write roadmap_completeness_<date>.json (rag-eval dashboard).")
     args = parser.parse_args(argv)
 
     gold = json.loads(args.gold.read_text())
@@ -72,6 +74,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     report = grade_roadmaps(produced, gold)
     print(json.dumps(report, indent=2))
+
+    if args.out:
+        from .dashboard_report import write_dashboard_report
+        dest = write_dashboard_report(args.out, "roadmap_completeness", report["completeness"], report)
+        print(f"wrote {dest}", file=sys.stderr)
 
     if args.gate and (report["completeness"] < args.min_completeness
                       or report["ordering"] < args.min_ordering):

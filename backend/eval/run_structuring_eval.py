@@ -40,10 +40,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Gate threshold (default 1.0 — the gold encodes correct behaviour).")
     parser.add_argument("--gate", action="store_true",
                         help="Exit non-zero if accuracy < --min-accuracy.")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="Dir to write structuring_accuracy_<date>.json (rag-eval dashboard).")
     args = parser.parse_args(argv)
 
     report = score_structuring(load_gold(args.gold))
     print(json.dumps(report, indent=2))
+
+    if args.out:
+        from .dashboard_report import write_dashboard_report
+        dest = write_dashboard_report(args.out, "structuring_accuracy", report["accuracy"], report)
+        print(f"wrote {dest}", file=sys.stderr)
 
     if args.gate and report["accuracy"] < args.min_accuracy:
         print(
