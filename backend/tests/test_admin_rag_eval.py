@@ -61,15 +61,18 @@ def test_mock_is_deterministic_and_three_months():
     a = svc.generate_mock_reports(date(2026, 6, 4))
     b = svc.generate_mock_reports(date(2026, 6, 4))
     assert a == b
-    assert set(a) == {"context_precision", "factual_consistency", "outcome_accuracy"}
+    assert set(a) == {"context_precision", "factual_consistency", "outcome_accuracy",
+                      "structuring_accuracy", "roadmap_completeness"}
     for points in a.values():
         assert len(points) == svc._MOCK_WEEKS  # ~3 months of weekly points
     # Last point lands on the requested end date.
     assert a["context_precision"][-1]["date"] == "2026-06-04"
 
 
-def test_mock_dashboard_demonstrates_all_alert_states():
-    dash = svc.build_dashboard(reports_dir=None, today=date(2026, 6, 4))
+def test_mock_dashboard_demonstrates_all_alert_states(tmp_path):
+    # Force the mock path with an empty dir (reports_dir=None reads the real
+    # audit/rag_eval/, which now has committed reports → would flip to 'live').
+    dash = svc.build_dashboard(reports_dir=tmp_path, today=date(2026, 6, 4))
     assert dash["source"] == "mock"
     by_metric = {m["metric"]: m for m in dash["metrics"]}
     # Engineered states: precision below, factual healthy, outcome declining.
@@ -134,7 +137,7 @@ def test_route_rejects_non_admin():
     assert _client(is_admin=False).get("/api/admin/rag-eval/metrics").status_code == 403
 
 
-def test_route_returns_three_metrics():
+def test_route_returns_all_metrics():
     r = _client().get("/api/admin/rag-eval/metrics")
     assert r.status_code == 200, r.text
     body = r.json()
@@ -143,6 +146,8 @@ def test_route_returns_three_metrics():
         "context_precision",
         "factual_consistency",
         "outcome_accuracy",
+        "structuring_accuracy",
+        "roadmap_completeness",
     }
     for m in body["metrics"]:
         assert "threshold" in m and "points" in m and "alert" in m

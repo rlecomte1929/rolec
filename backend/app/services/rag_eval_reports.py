@@ -47,6 +47,11 @@ METRIC_SPECS: List[MetricSpec] = [
     MetricSpec("context_precision", "Context precision", 0.85),
     MetricSpec("factual_consistency", "Factual consistency", 0.95),
     MetricSpec("outcome_accuracy", "Outcome accuracy", 0.90),
+    # Phase 2 evals surfaced on the dashboard (emitted by run_structuring_eval /
+    # run_roadmap_outcome_eval). structuring_accuracy = per-profile requirement
+    # matching accuracy; roadmap_completeness = recall of required roadmap steps.
+    MetricSpec("structuring_accuracy", "Structuring accuracy", 0.95),
+    MetricSpec("roadmap_completeness", "Roadmap completeness", 0.90),
 ]
 
 _SPEC_BY_KEY: Dict[str, MetricSpec] = {s.key: s for s in METRIC_SPECS}
@@ -127,6 +132,8 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "context_precision": [0.79, 0.81, 0.80, 0.83, 0.86, 0.88, 0.87, 0.89, 0.90, 0.88, 0.87, 0.85, 0.83],
     "factual_consistency": [0.95, 0.96, 0.96, 0.97, 0.97, 0.96, 0.98, 0.97, 0.98, 0.98, 0.97, 0.98, 0.97],
     "outcome_accuracy": [0.88, 0.89, 0.91, 0.92, 0.93, 0.94, 0.95, 0.94, 0.95, 0.96, 0.95, 0.94, 0.93],
+    "structuring_accuracy": [0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
 }
 _MOCK_WEEKS = 13
 
