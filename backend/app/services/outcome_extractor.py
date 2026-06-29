@@ -40,6 +40,10 @@ log = logging.getLogger(__name__)
 
 _TERMINAL_OUTCOMES = {"APPROVED", "REJECTED", "WITHDRAWN", "PENDING"}
 
+# P1-07c / AIQ-686 — the consent_records.purpose under which an employee opts in
+# to anonymized outcome sharing. Shared with backend/app/routers/outcome_consent.py.
+OUTCOME_CONSENT_PURPOSE = "outcome_sharing_anonymized"
+
 # Map a wizard/assignment status to the case_outcomes.outcome enum.
 _STATUS_TO_OUTCOME = {
     "approved": "APPROVED",
@@ -193,27 +197,37 @@ def extract_outcome_from_case(db: Session, case_id: str) -> CaseOutcomeData:
 
 
 def has_outcome_consent(db: Session, case_id: str) -> bool:
-    """Consent gate, fail-closed.
+    """Consent gate, fail-closed (P1-07c / AIQ-686).
 
     Order of precedence:
-      1. If ``users.outcome_consent_at`` exists (P1-07c shipped), the case's
-         employee must have a non-null value.
+      1. If the case has an ``outcome_sharing_anonymized`` row in
+         ``consent_records`` (the per-case consent ledger written by the
+         employee opt-in), the most recent non-withdrawn record is
+         authoritative — its ``consented`` value decides.
       2. Else if ``OUTCOME_EXTRACTION_ENABLED`` is truthy, allow (internal/test
-         data only — pre-launch).
+         data only — pre-launch, before any opt-in exists).
       3. Else deny.
+
+    The employee↔case identity is enforced at write time by the consent
+    endpoint (tenant-checked against ``case_assignments.employee_user_id``), so
+    the gate reads ``consent_records`` by ``case_id`` directly.
     """
     try:
-        val = db.execute(
+        row = db.execute(
             text(
-                "SELECT outcome_consent_at FROM users u "
-                "JOIN wizard_cases c ON c.id = :cid "
-                "WHERE u.id = c.owner_user_id"
+                "SELECT consented, withdrawn_at FROM consent_records "
+                "WHERE case_id = :cid AND purpose = :purpose "
+                "ORDER BY created_at DESC LIMIT 1"
             ),
-            {"cid": case_id},
-        ).scalar()
-        # Column exists → consent is authoritative.
-        return val is not None
-    except Exception:  # noqa: BLE001 — column/flow not built yet (P1-07c)
+            {"cid": case_id, "purpose": OUTCOME_CONSENT_PURPOSE},
+        ).first()
+        if row is not None:
+            # A consent record exists → the most recent one is authoritative.
+            # The ledger is append-only, so a withdrawal is a newer row; honour
+            # both the flag and the withdrawal marker.
+            consented, withdrawn_at = row[0], row[1]
+            return bool(consented) and withdrawn_at is None
+    except Exception:  # noqa: BLE001 — consent_records absent (e.g. partial test DB)
         pass
     return _flag_enabled("OUTCOME_EXTRACTION_ENABLED")
 
