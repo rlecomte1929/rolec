@@ -245,12 +245,43 @@ ALLOW_LEGACY_DEMO_SEED = os.getenv("ALLOW_LEGACY_DEMO_SEED", "").lower() in ("1"
 DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "true", "yes")
 # When true, skip wizard demo cases + supplier dataset seed (see lifespan below).
 DISABLE_STARTUP_SEED = os.getenv("DISABLE_STARTUP_SEED", "").lower() in ("1", "true", "yes")
+# Cold-start warm-up runs by default; disable for tests/local.
+DISABLE_STARTUP_WARMUP = os.getenv("RELOPASS_DISABLE_STARTUP_WARMUP", "").lower() in ("1", "true", "yes")
 
 
 def _get_supabase_admin_client():
     from .app.services.supabase_client import get_supabase_admin_client
 
     return get_supabase_admin_client()
+
+
+def _warmup_cold_paths() -> None:
+    """Eager-touch lazily-initialized resources after a deploy so the FIRST real request isn't cold.
+
+    The Render "wait for health" only warms /health; the first hit to a real endpoint otherwise pays
+    for the DB pool/TLS handshake to the Supabase pooler, the Supabase admin client init, and a
+    thread-pool worker spawn — the 10-15s cold spikes the E2E Sentinel flagged. Best-effort: every
+    step is isolated and never raises, so a warm-up failure can never affect startup or serving.
+    """
+    # 1. DB connection pool + TLS handshake to the Supabase pooler.
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        log.info("startup_warmup=db ok")
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        log.warning("startup_warmup=db failed: %s", exc)
+    # 2. Supabase admin client (invites / auth-sync / events — its first init is the assign cold tail).
+    try:
+        _get_supabase_admin_client()
+        log.info("startup_warmup=supabase_admin ok")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("startup_warmup=supabase_admin failed: %s", exc)
+    # 3. Pre-spawn a side-effects pool worker.
+    try:
+        _hr_assign_side_effects_executor.submit(lambda: None)
+        log.info("startup_warmup=executor ok")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("startup_warmup=executor failed: %s", exc)
 
 
 def _run_background_startup_seed() -> None:
@@ -414,6 +445,9 @@ async def lifespan(app: FastAPI):
     await asyncio.to_thread(_run_runtime_startup_initialization)
     if not DISABLE_STARTUP_SEED:
         asyncio.create_task(_background_seed_task())
+    if not DISABLE_STARTUP_WARMUP:
+        # Non-blocking: a slow/hung warm-up must never delay startup or /health.
+        asyncio.create_task(asyncio.to_thread(_warmup_cold_paths))
     yield
 
 log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
