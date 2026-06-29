@@ -194,6 +194,7 @@ from .app.routers import hr_case_detail as hr_case_detail_router  # C1-11c-be �
 from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_notes as hr_case_notes_router  # AIQ-1136 — case notes (dual-layer per CLAUDE.md)
 from .app.routers import roadmap_audit as roadmap_audit_router  # P1-08c/d/e — roadmap audit trail (dual-layer per CLAUDE.md)
+from .app.routers import case_rule_updates as case_rule_updates_router  # AIQ-693 — P2-02e rule-update banner (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be — resolve+escalate POST endpoints (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_escalation as hr_case_escalation_router  # W2-3 — HR case escalation (dual-layer per CLAUDE.md)
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
@@ -812,6 +813,7 @@ app.include_router(hr_case_detail_router.router)  # C1-11c-be — 6 per-case det
 app.include_router(hr_case_audit_router.router)  # C1-16 — GET /api/hr/cases/{id}/audit chronological lineage
 app.include_router(hr_case_notes_router.router)  # AIQ-1136 — GET/POST /api/hr/cases/{id}/notes (internal case notes)
 app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases/{id}/audit?as_of, admin export, rule-change notifier
+app.include_router(case_rule_updates_router.router)  # AIQ-693 — GET/POST /api/cases/{id}/rule-updates (P2-02e banner)
 app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps

@@ -15,6 +15,7 @@ import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
+import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
 import {
@@ -216,6 +217,8 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
         <div ref={selectionRef} className="mx-auto max-w-5xl px-6 py-6">
           {/* H-08 (AIQ-1255): page heading so the employee has orientation above the hero. */}
           <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
+          {/* [AIQ-693] P2-02e — surface approved rule-update notifications for this case. */}
+          <RuleUpdateBanner caseId={caseId ?? ''} />
           <RoadmapTemplate
             data={data}
             header={header}
