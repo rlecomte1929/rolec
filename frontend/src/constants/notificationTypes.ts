@@ -7,6 +7,8 @@ export const NOTIFICATION_TYPES = {
   EMPLOYEE_SAVED: 'EMPLOYEE_SAVED',
   CASE_STATUS_CHANGED: 'CASE_STATUS_CHANGED',
   INTAKE_SUBMITTED: 'INTAKE_SUBMITTED',
+  // [AIQ-1376] fired to the employee when HR assigns them a relocation case.
+  ASSIGNMENT_CREATED: 'ASSIGNMENT_CREATED',
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

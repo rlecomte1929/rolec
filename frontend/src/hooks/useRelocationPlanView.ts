@@ -63,10 +63,12 @@ export function useRelocationPlanView(
         break;
       }
     }
+    // [AIQ-1377] Retries exhausted: surface the error but KEEP the last-good data (no setData(null))
+    // so a poll/retry recovers without blanking an already-rendered roadmap. Combines the retry with
+    // main's keep-last-good fix — an error within the generation window is "not ready yet", not a dead end.
     const transport = getClientTransportErrorMessage(lastErr);
     const msg = transport ?? getApiErrorMessage(lastErr, (lastErr as Error)?.message || '');
     setError(msg.trim() ? msg : 'Failed to load relocation plan');
-    setData(null);
     setLoading(false);
   }, [caseId, enabled, role, debug]);
 

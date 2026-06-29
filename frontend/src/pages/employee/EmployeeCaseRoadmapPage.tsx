@@ -29,6 +29,7 @@ import type { ConfidenceByTitle } from '../../features/relocation-plan-employee/
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
+import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
 
 export const EmployeeCaseRoadmapPage: React.FC = () => {
   const caseId = useValidatedParams(caseParamsSchema, {
@@ -122,46 +123,55 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   // ── Roadmap generation state machine ────────────────────────────────────────
   // generating → ready | empty | failed. The plan builds asynchronously after
-  // submit (~60–90s), so an empty plan is polled for a bounded window before we
-  // resolve to `empty` — it must never spin indefinitely.
+  // submit (~60–90s). AIQ-1377: a TRANSIENT error from the plan-view endpoint must
+  // NOT dead-end the page. Within a bounded window an error OR an empty plan both
+  // mean "not ready yet", so we keep polling/retrying. Only after the window elapses
+  // do we resolve to a terminal state: a persistent error → failed, an empty → empty.
   const POLL_MS = 4000;
-  const GEN_TIMEOUT_MS = 60000;
-  const [pollTimedOut, setPollTimedOut] = useState(false);
-  const pollStartRef = useRef<number | null>(null);
+  const MAX_ATTEMPTS = 15; // ~60s of polling at the 4s cadence before we give up
+  const [windowElapsed, setWindowElapsed] = useState(false);
+  const [genStarted, setGenStarted] = useState(false);
+  const attemptsRef = useRef(0);
   const planEmpty = !!data && data.summary.total_tasks === 0;
   const planReady = !!data && data.summary.total_tasks > 0 && data.phases.length > 0;
+  // "not ready" = a transient error OR an empty plan still generating. Both retried.
+  const notReady = !loading && !planReady && (error != null || planEmpty);
 
   useEffect(() => {
-    if (loading || error) return;
-    if (!planEmpty) {
-      pollStartRef.current = null;
-      if (pollTimedOut) setPollTimedOut(false);
+    if (planReady) {
+      attemptsRef.current = 0;
+      if (windowElapsed) setWindowElapsed(false);
+      if (genStarted) setGenStarted(false);
       return;
     }
-    if (pollStartRef.current === null) pollStartRef.current = Date.now();
-    if (Date.now() - pollStartRef.current >= GEN_TIMEOUT_MS) {
-      if (!pollTimedOut) setPollTimedOut(true);
+    if (loading || !notReady) return;
+    if (!genStarted) setGenStarted(true);
+    if (attemptsRef.current >= MAX_ATTEMPTS) {
+      if (!windowElapsed) setWindowElapsed(true);
       return;
     }
     const t = window.setTimeout(() => {
+      attemptsRef.current += 1;
       void refetch();
     }, POLL_MS);
     return () => window.clearTimeout(t);
-  }, [loading, error, planEmpty, data, refetch, pollTimedOut]);
+  }, [loading, planReady, notReady, data, refetch, windowElapsed, genStarted]);
 
+  const resetWindow = useCallback(() => {
+    attemptsRef.current = 0;
+    setWindowElapsed(false);
+    setGenStarted(false);
+  }, []);
   const retryGeneration = useCallback(() => {
-    pollStartRef.current = null;
-    setPollTimedOut(false);
+    resetWindow();
     void ensureDefaultsAndReload();
-  }, [ensureDefaultsAndReload]);
-
+  }, [resetWindow, ensureDefaultsAndReload]);
   const retryFetch = useCallback(() => {
-    pollStartRef.current = null;
-    setPollTimedOut(false);
+    resetWindow();
     void refetch();
-  }, [refetch]);
+  }, [resetWindow, refetch]);
 
-  if (loading && !data) {
+  if (loading && !data && !genStarted) {
     return (
       <AppShell>
         <div style={{ padding: '24px', color: 'var(--text-muted)' }}>Loading roadmap…</div>
@@ -170,12 +180,10 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   }
 
   if (!planReady) {
-    // error → failed; bounded poll elapsed with no tasks → empty; otherwise still generating.
-    const variant: 'generating' | 'empty' | 'failed' = error
-      ? 'failed'
-      : planEmpty && pollTimedOut
-        ? 'empty'
-        : 'generating';
+    // Within the bounded window a transient error or empty plan both render as
+    // "generating" (we keep retrying). Only after the window elapses do we show a
+    // terminal state — persistent error → failed, empty plan → empty (AIQ-1377).
+    const variant = resolveRoadmapBuildVariant(windowElapsed, error != null);
     return (
       <AppShell>
         <div className="mx-auto max-w-5xl px-6 py-6">

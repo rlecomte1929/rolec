@@ -4256,6 +4256,34 @@ def _dispatch_hr_assign_side_effects(
                 exc,
             )
 
+        # [AIQ-1376] In-app notification to the employee on assignment. The flow
+        # already sends an invite email + drafts a message, but never created an
+        # in-app notification, so the NotificationBell showed nothing on assign
+        # (the MSG-02 sentinel's notification check failed). Best-effort: mirror
+        # the HR_FEEDBACK_POSTED pattern — never block the assign on this.
+        if employee_user_id:
+            _notif_kwargs = dict(
+                user_id=employee_user_id,
+                type_="ASSIGNMENT_CREATED",
+                title="Your relocation case is ready",
+                body="HR has assigned you a relocation case. Start your intake in My Case.",
+                assignment_id=assignment_id,
+                case_id=case_id,
+                metadata={"assignment_id": assignment_id},
+            )
+            try:
+                db.create_notification_with_preferences(**_notif_kwargs)
+            except Exception as exc:
+                try:
+                    db.insert_notification(notification_id=str(uuid.uuid4()), **_notif_kwargs)
+                except Exception as exc2:
+                    log.warning(
+                        "assignment notification skipped assignment_id=%s user_id=%s error=%s",
+                        assignment_id,
+                        employee_user_id,
+                        exc2,
+                    )
+
         invite_line = (
             f"Invitation token: {invite_token}"
             if invite_token

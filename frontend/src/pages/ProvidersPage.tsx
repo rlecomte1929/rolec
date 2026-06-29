@@ -118,20 +118,26 @@ export const ProvidersPage: React.FC = () => {
   const { setSelectedServices, displayCurrency, setDisplayCurrency, setActiveCaseId } = useServicesFlow();
   const navigate = useNavigate();
 
+  // [AIQ-1374] The vendor list (getAssignmentServices, ~0.75s) gates the spinner. The policy
+  // context (getServicesPolicyContext → the heavy policy pipeline, ~2.3s+ and far worse cold) is
+  // OPTIONAL enrichment, so it loads in a SEPARATE query and must NOT block render — blocking on it
+  // (+ the 12s axios timeout × React-Query's default retries) was the permanent-spinner on prod.
   const servicesQuery = useQuery({
     queryKey: ['employee', 'assignment-services', assignmentId],
-    queryFn: async () => {
-      const [serviceRes, ctxRes] = await Promise.all([
-        employeeAPI.getAssignmentServices(assignmentId!),
-        employeeAPI.getServicesPolicyContext(assignmentId!).catch(() => null),
-      ]);
-      return { serviceRes, ctxRes };
-    },
+    queryFn: () => employeeAPI.getAssignmentServices(assignmentId!),
     enabled: !assignmentLoading && !!assignmentId && !needsPicker,
+    retry: 1,
+  });
+
+  const policyCtxQuery = useQuery({
+    queryKey: ['employee', 'assignment-services-policy-context', assignmentId],
+    queryFn: () => employeeAPI.getServicesPolicyContext(assignmentId!),
+    enabled: !assignmentLoading && !!assignmentId && !needsPicker,
+    retry: 1,
   });
 
   const svcPolicy: Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>> | null =
-    servicesQuery.data?.ctxRes ?? null;
+    policyCtxQuery.data ?? null;
   const isLoading = servicesQuery.isLoading;
   const load401 =
     (servicesQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
@@ -194,7 +200,7 @@ export const ProvidersPage: React.FC = () => {
   const [currencyAutoDetected, setCurrencyAutoDetected] = useState(false);
   useEffect(() => {
     if (destCurrencyAppliedRef.current) return;
-    if (isLoading) return; // wait for svcPolicy to settle so a real policy currency wins
+    if (policyCtxQuery.isLoading) return; // wait for the policy context to settle so a real policy currency wins
     if (!destCountry) return;
     let saved: string | null = null;
     try {
@@ -218,13 +224,13 @@ export const ProvidersPage: React.FC = () => {
       setDisplayCurrency(ccy);
       setCurrencyAutoDetected(true);
     }
-  }, [isLoading, policyCurrency, destCountry, displayCurrency, setDisplayCurrency]);
+  }, [policyCtxQuery.isLoading, policyCurrency, destCountry, displayCurrency, setDisplayCurrency]);
 
   // Seed the form-local `services` map from the loaded data, and sync the
   // selected set to context so the questions page has the right selection on a
   // direct visit.
   useEffect(() => {
-    const serviceRes = servicesQuery.data?.serviceRes;
+    const serviceRes = servicesQuery.data;
     if (!serviceRes) return;
     const baseState: Record<string, ServiceState> = {};
     ENABLED_SERVICES.forEach((svc) => {
@@ -244,7 +250,7 @@ export const ProvidersPage: React.FC = () => {
         .map((r) => r.service_key as ServiceKey)
     );
     setSelectedServices(selected);
-  }, [servicesQuery.data?.serviceRes, setSelectedServices]);
+  }, [servicesQuery.data, setSelectedServices]);
 
   // Preserve the 401 → landing redirect from the read.
   useEffect(() => {
