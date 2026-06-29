@@ -40,3 +40,12 @@ export const resolveResearchRequest = (
   notes?: string,
 ): Promise<ResearchRequest> =>
   apiPatch(`/api/admin/research-requests/${id}`, { status, notes });
+
+/** Admin: complete/publish a researched corridor (records cost + notifies requester).
+ *  Requires the curation review to be resolved (enforced server-side). */
+export const completeResearchRequest = (
+  id: string,
+  result_summary: string,
+  actual_cost?: number,
+): Promise<ResearchRequest> =>
+  apiPost(`/api/admin/research-requests/${id}/complete`, { result_summary, actual_cost });
