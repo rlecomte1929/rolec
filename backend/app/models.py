@@ -25,6 +25,35 @@ class Case(Base):
     requirements_snapshot_id = Column(String, nullable=True)
 
 
+class CaseOutcome(Base):
+    """AIQ-685 / P1-07b — anonymized flywheel outcome row (one per case).
+
+    Mirrors supabase/migrations/20260620100000_case_outcomes.sql. PII-free by
+    construction: the only link to the real case is ``case_ref_hash`` (SHA-256
+    hex). The DB owns the CHECK constraints + PII-guard trigger + service-role
+    RLS; this model intentionally declares columns only (no PG-specific regex
+    CHECKs) so it stays portable for SQLite-backed unit tests.
+    """
+
+    __tablename__ = "case_outcomes"
+
+    id = Column(String, primary_key=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    # SHA-256 hex of the real case id — one outcome row per case.
+    case_ref_hash = Column(String, nullable=False, unique=True, index=True)
+    pathway_type = Column(String, nullable=True)
+    origin_country_code = Column(String, nullable=True)
+    dest_country_code = Column(String, nullable=True)
+    # APPROVED | REJECTED | WITHDRAWN | PENDING
+    outcome = Column(String, nullable=False)
+    processing_time_days_actual = Column(Integer, nullable=True)
+    rejection_reason_code = Column(String, nullable=True)
+    specialist_corrections_count = Column(Integer, nullable=False, default=0)
+    submitted_at = Column(DateTime, nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+
+
 class CountryProfile(Base):
     __tablename__ = "country_profiles"
 
