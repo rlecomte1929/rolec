@@ -1835,6 +1835,36 @@ class MiscMixin:
                 CREATE INDEX IF NOT EXISTS idx_pa_traces_customer_feature_created
                 ON policy_assistant_traces(customer_id, feature_key, created_at)
             """))
+            # Phase 1 eval keystone — ai_replay_records: masked, replayable record of
+            # immigration-answer / AI-roadmap generations for the offline grader.
+            # query_masked/output_masked are mask_pii-redacted by the writer before
+            # insert; retrieved_chunk_ids point at published authority source text.
+            # Mirrors supabase/migrations/20260813000000_ai_replay_records.sql.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS ai_replay_records (
+                    id TEXT PRIMARY KEY,
+                    trace_id TEXT,
+                    feature_key TEXT NOT NULL,
+                    corridor TEXT,
+                    query_masked TEXT,
+                    output_masked TEXT,
+                    retrieved_chunk_ids TEXT NOT NULL DEFAULT '[]',
+                    prompt_version_id TEXT,
+                    canary_arm TEXT,
+                    result TEXT,
+                    approved INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_ai_replay_feature_corridor_created
+                ON ai_replay_records(feature_key, corridor, created_at)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_ai_replay_trace
+                ON ai_replay_records(trace_id)
+                WHERE trace_id IS NOT NULL
+            """))
             # AUDIT-A1: SQLite-only helper. See note on _sqlite_ensure_policy_hardening_columns above.
             if _is_sqlite:
                 _sqlite_ensure_policy_import_columns(conn)
