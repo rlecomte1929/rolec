@@ -1,0 +1,85 @@
+# AIQ-1349 — DRAFT requirement seed for the Netherlands. verification_status: draft.
+#
+# Taxonomy-authored draft. NOTE: the immigration corpus has NO Netherlands chunks
+# yet, so the citation-bound LLM drafter (draft_requirements.py) would emit nothing
+# for NL — index NL corridors via .github/workflows/immigration-indexer.yml to
+# enable corpus-grounded drafting. REVIEW REQUIRED before loading: confirm each item
+# with the named authority and promote verification_status.
+#
+# Load (after review):
+#   python backend/scripts/seed_requirements.py --file backend/seeds/requirements/netherlands.yaml
+# NOTE: going live also needs NL→NETHERLANDS in requirements_builder._ISO_TO_CATALOG_NAME.
+
+verification_status: draft
+purposes_by_country:
+  NETHERLANDS: [employment, other]
+
+requirements:
+  # ── Universal (apply to all assignment lengths, incl. STA) ──
+  - key: valid_passport
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: false
+    countries:
+      NETHERLANDS:
+        title: "Valid passport (6+ months)"
+        description: "A passport valid for at least 6 months beyond the intended stay. Indicative — confirm with the Dutch consulate."
+  - key: employment_contract
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: medium
+    requires_expert_review: true
+    countries:
+      NETHERLANDS:
+        title: "Employment contract"
+        description: "A signed Dutch employment contract; for sponsored permits the employer must be an IND-recognised sponsor. Indicative — confirm with your employer / IND."
+  - key: minimum_lead_time
+    pillar: TIMELINE
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: null
+    confidence: medium
+    requires_expert_review: true
+    countries:
+      NETHERLANDS:
+        title: "Minimum lead time"
+        description: "Allow sufficient lead time for the IND residence/work-permit process before the start date. Indicative — confirm with the IND."
+  # ── Long-term-only (LTA / PERMANENT — dropped for STA) ──
+  - key: municipality_registration_bsn
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    confidence: medium
+    requires_expert_review: true
+    countries:
+      NETHERLANDS:
+        title: "Municipality registration + BSN (gemeente / BRP)"
+        description: "Register at the local municipality (gemeente) in the Personal Records Database (BRP) to obtain a citizen service number (BSN). Indicative — confirm with the gemeente."
+  - key: long_term_rental_contract
+    pillar: HOUSING
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    confidence: medium
+    requires_expert_review: true
+    countries:
+      NETHERLANDS:
+        title: "Long-term rental contract (huurcontract)"
+        description: "Secure a long-term rental contract (huurcontract); a registered address is required for municipality registration. Indicative — confirm with your housing provider."
+  - key: social_security_payroll_registration
+    pillar: SOCIAL_SECURITY
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: [LTA, PERMANENT]
+    confidence: medium
+    requires_expert_review: true
+    countries:
+      NETHERLANDS:
+        title: "Social security / payroll registration (loonheffingen)"
+        description: "Employer registers the employee for Dutch payroll taxes and social insurance (loonheffingen); a BSN is required first. Indicative — confirm with the Belastingdienst."
