@@ -18,11 +18,13 @@ corridor is a routing signal, not a roadmap.
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any, Dict, List, Optional
 
 from . import factual_verifier, immigration_retriever, roadmap_generator
+from .ai_replay_store import persist_replay_record
 from .ai_trace_logger import TraceSession
 from .immigration_retriever import (
     IMMIGRATION_CORPUS_COMPANY_ID,
@@ -60,6 +62,8 @@ def generate_roadmap(
         feature_key=_FEATURE_KEY,
     )
     started = time.time()
+    chunks: List[Dict[str, Any]] = []
+    assembled: Optional[Dict[str, Any]] = None
     try:
         # 1. Retrieve corridor/pathway-scoped chunks.
         t0 = time.time()
@@ -109,9 +113,39 @@ def generate_roadmap(
             if roadmap.get("result") != RESULT_OK:
                 tracer.mark_fallback(roadmap.get("refusal_reason") or "rule_not_found")
 
-        return _assemble(roadmap, verdicts, approved, len(chunks),
-                         int((time.time() - started) * 1000))
+        assembled = _assemble(roadmap, verdicts, approved, len(chunks),
+                              int((time.time() - started) * 1000))
+        return assembled
     finally:
+        # Persist a masked, replayable record so the offline grader can re-grade
+        # this generation without re-running the LLM. Best-effort: the store
+        # itself never raises, and we still guard here so a replay failure can
+        # never break the live roadmap path.
+        try:
+            if assembled is not None:
+                persist_replay_record(
+                    trace_id=tracer.trace_id,
+                    feature_key=_FEATURE_KEY,
+                    corridor=assembled.get("corridor") or corridor,
+                    query=json.dumps(
+                        {
+                            "nationality": profile.nationality,
+                            "origin": profile.origin_country,
+                            "destination": profile.destination_country,
+                            "pathway_type": classification.pathway_type,
+                            "assignment_type": classification.assignment_type,
+                        },
+                        separators=(",", ":"),
+                    ),
+                    output=assembled,
+                    retrieved_chunk_ids=[str(c.get("id")) for c in chunks if c.get("id")],
+                    prompt_version_id=tracer.prompt_version_id,
+                    canary_arm=tracer.canary_arm,
+                    result=assembled.get("result"),
+                    approved=bool(assembled.get("approved")),
+                )
+        except Exception:
+            log.debug("replay record persist failed", exc_info=True)
         tracer.flush()
 
 
