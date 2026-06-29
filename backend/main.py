@@ -212,6 +212,7 @@ from .app.routers import immigration_gdpr as immigration_gdpr_router
 from .app.routers import gdpr as gdpr_router
 from .app.routers import privacy_consents as privacy_consents_router
 from .app.routers import outcome_consent as outcome_consent_router
+from .app.routers import outcomes_ingest as outcomes_ingest_router
 from .app.routers import immigration_forms as immigration_forms_router
 from .app.routers import immigration_documents as immigration_documents_router  # BL-OCR.2/AIQ-748
 from .app.routers import immigration_retrieve as immigration_retrieve_router
@@ -828,6 +829,7 @@ app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — G
 app.include_router(gdpr_router.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
 app.include_router(privacy_consents_router.router)  # PRIV-005 / AIQ-473 — Art. 13 notice acknowledgement
 app.include_router(outcome_consent_router.router)  # P1-07c / AIQ-686 — outcome-sharing opt-in
+app.include_router(outcomes_ingest_router.router)  # P1-07d / AIQ-687 — internal outcome ingest trigger
 app.include_router(immigration_forms_router.router)  # IMM-11 — form library + PDF pre-fill (2 handlers)
 app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — immigration document upload
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
