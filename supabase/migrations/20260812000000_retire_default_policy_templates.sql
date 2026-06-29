@@ -1,0 +1,48 @@
+-- TPL-3 / AIQ-1133 — retire the orphaned public.default_policy_templates table.
+--
+-- The table only ever held one seeded "platform default" row. As of PR1 (#1182)
+-- every reader was repointed to the code-backed PolicyTemplateService; the
+-- platform default now lives in backend/app/services/default_policy_template_snapshot.py.
+-- No live (non-migration) code references the table, and it has no FK dependents
+-- (verified against prod). Snapshot-first DROP: the single row + full table
+-- definition (incl. RLS) are preserved in the reversible rollback block below.
+--
+-- Idempotent.
+
+DROP TABLE IF EXISTS public.default_policy_templates;
+
+-- ============================================================================
+-- ROLLBACK (reversible) — recreate the table, its RLS, and the one seeded row.
+-- Run this block to restore the pre-retirement state.
+-- ============================================================================
+-- CREATE TABLE IF NOT EXISTS public.default_policy_templates (
+--     id                  uuid PRIMARY KEY,
+--     template_name       text NOT NULL,
+--     version             text NOT NULL,
+--     status              text NOT NULL,
+--     is_default_template boolean NOT NULL,
+--     snapshot_json       jsonb NOT NULL,
+--     created_at          timestamptz NOT NULL,
+--     updated_at          timestamptz NOT NULL
+-- );
+--
+-- ALTER TABLE public.default_policy_templates ENABLE ROW LEVEL SECURITY;
+-- REVOKE ALL ON public.default_policy_templates FROM anon;
+--
+-- CREATE POLICY "default_policy_templates_auth_select" ON public.default_policy_templates
+--     FOR SELECT TO authenticated USING (true);
+-- CREATE POLICY "default_policy_templates_admin_write" ON public.default_policy_templates
+--     FOR ALL TO authenticated USING (is_admin()) WITH CHECK (is_admin());
+--
+-- INSERT INTO public.default_policy_templates
+--     (id, template_name, version, status, is_default_template, snapshot_json, created_at, updated_at)
+-- VALUES (
+--     'cf74910f-4826-411b-8072-5eb9b52631d5',
+--     'Platform default relocation policy',
+--     'v2.1',
+--     'active',
+--     true,
+--     '{"policyVersion":"v2.1","effectiveDate":"2024-10-01","jurisdictionNotes":"Base policy for global assignments. Local counsel required for exceptions.","caps":{"housing":{"amount":5000,"currency":"USD","durationMonths":12},"movers":{"amount":10000,"currency":"USD"},"schools":{"amount":20000,"currency":"USD"},"immigration":{"amount":4000,"currency":"USD"}},"approvalRules":{"nearLimit":"Manager","overLimit":"HR"},"exceptionWorkflow":{"states":["PENDING","APPROVED","REJECTED"],"requiredFields":["category","reason","amount"]},"requiredEvidence":{"housing":["Lease estimate","Budget approval"],"movers":["Vendor quote","Inventory list"],"schools":["School invoice","Enrollment confirmation"],"immigration":["Legal engagement letter","Filing receipt"]},"leadTimeRules":{"minDays":30},"riskThresholds":{"low":80,"moderate":60},"documentRequirements":{"base":["Passport scans","Employment letter"],"married":["Marriage certificate"],"children":["Birth certificates"],"spouseWork":["Spouse resume"]},"approvalThresholds":{"housing":{"jobLevelCapOverrides":{"L1":5000,"L2":7000,"L3":10000}},"movers":{"storageWeeksIncluded":4}},"benefit_rules":[{"benefit_key":"housing","benefit_category":"housing","calc_type":"unit_cap","amount_value":5000,"amount_unit":"month","currency":"USD"},{"benefit_key":"movers","benefit_category":"movers","calc_type":"flat_amount","amount_value":10000,"currency":"USD"},{"benefit_key":"schools","benefit_category":"schools","calc_type":"flat_amount","amount_value":20000,"currency":"USD"},{"benefit_key":"immigration","benefit_category":"immigration","calc_type":"flat_amount","amount_value":4000,"currency":"USD"}]}'::jsonb,
+--     '2026-03-22T09:36:53.646584+00:00'::timestamptz,
+--     '2026-03-22T09:36:53.646584+00:00'::timestamptz
+-- );
