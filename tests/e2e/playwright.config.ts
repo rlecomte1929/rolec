@@ -43,6 +43,8 @@ export default defineConfig({
     { name: 'core',       testDir: './tests/core',       dependencies: ['provision'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/hr_a.json' } },
     // Write-flow lifecycle (create→assign→submit→message→RFQ) on the fresh pair.
     { name: 'write-flow', testDir: './tests/write-flow', dependencies: ['provision'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/hr_a.json' } },
+    // Deep journey: fill wizard → submit → poll roadmap → assert it RENDERS (employee session).
+    { name: 'deep',       testDir: './tests/deep',       dependencies: ['provision'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/emp_a.json' } },
 
     // ════ LOCAL / FULL-DEMO PATH (form login — needs PW_TESTCO / PW_DEMO) ══════
     // Authenticate every demo persona once → playwright/.auth/<persona>.json.
