@@ -1,0 +1,33 @@
+# Corridor registry profile — France → Germany (EU intra-mobility).
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Authored from the
+# established EU free-movement framework (Directive 2004/38/EC + FreizügG/EU);
+# confirm specifics with the destination authority before any authoritative use.
+# Matches the platform content-provenance model (representative until verified).
+#
+# France is an EU member, so a French national relocating to Germany exercises
+# EU freedom of movement: no visa, no residence permit, no salary floor — only
+# administrative registration (Anmeldung etc.). The pathway models those steps.
+
+corridor:
+  id: "FR_DE"
+  origin_iso: "FR"
+  destination_iso: "DE"
+  display_name: "France → Germany"
+  aliases: ["FR→DE", "FR-DE"]
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (resolved relative to this directory).
+  pathways:
+    - id: "EU_FREEDOM_2026"
+      file: "pathways/EU_FREEDOM_2026/v1.yaml"
