@@ -150,7 +150,15 @@ def main():
                 OR hr_owner_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))
                 OR employee_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))""")
     case_ids = [r[0] for r in cur.fetchall()]
-    print(f"is_test companies={test_companies}  profiles={test_profiles}  test cases (both tables)={len(case_ids)}")
+    # [AIQ-1383] testco COMPANIES are not is_test-flagged (only profiles/people are), so the
+    # is_test-only companies delete below misses them → orphan accumulation. Capture them by their
+    # @testco.com profile link NOW, before the profiles are deleted (companies are deleted last).
+    cur.execute(
+        f"SELECT DISTINCT company_id::text FROM profiles "
+        f"WHERE company_id IS NOT NULL AND {TEST_EMAIL_PREDICATE}")
+    testco_company_ids = [r[0] for r in cur.fetchall()]
+    print(f"is_test companies={test_companies}  profiles={test_profiles}  test cases (both tables)={len(case_ids)}"
+          f"  testco companies (by email link)={len(testco_company_ids)}")
 
     if not args.apply:
         print("\nDRY-RUN — counts of rows that WOULD be deleted (pass --apply to delete):")
@@ -167,6 +175,7 @@ def main():
         print(f"  + FK-cascade of every table referencing the is_test profiles/companies")
         print(f"  profiles (is_test)           {test_profiles}")
         print(f"  companies (is_test)          {test_companies}")
+        print(f"  companies (by @testco link)  {len(testco_company_ids)}")
         # public.users + auth.users test accounts (matched by reserved domains, not
         # is_test — those tables have no such column). auth.users may read as n/a if
         # the role can't see the auth schema (the elevated one-time purge handles it).
@@ -222,7 +231,12 @@ def main():
 
     # finally the profiles + companies themselves (best effort — tolerate residual FK).
     bump("profiles", guarded(cur, "DELETE FROM profiles WHERE COALESCE(is_test,false)"))
-    bump("companies", guarded(cur, "DELETE FROM companies WHERE COALESCE(is_test,false)"))
+    # [AIQ-1383] is_test-flagged OR a testco company captured by email link above (empty ANY → no-op).
+    bump("companies", guarded(
+        cur,
+        "DELETE FROM companies WHERE COALESCE(is_test,false) OR id::text = ANY(%s)",
+        (testco_company_ids,),
+    ))
 
     # ...and the test accounts in public.users + auth.users (matched by reserved
     # domains). public.users children were cascaded in the loop above; deleting
