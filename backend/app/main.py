@@ -42,6 +42,7 @@ from .routers import (
     hr_case_escalation,
     hr_catalog,
     hr_vendor_widgets,
+    research_requests,
     hr_coordination,
     immigration_documents,
     immigration_forms,
@@ -124,6 +125,7 @@ def create_app() -> FastAPI:
     # ── Month-1 migration: HR cluster ─────────────────────────────────────────
     app.include_router(hr_catalog.router)
     app.include_router(hr_vendor_widgets.router)  # [B16/AIQ-422] bare-path vendor widget aliases
+    app.include_router(research_requests.router)  # [AIQ-1349 P2] research-request intake
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
     app.include_router(hr_onboarding.router)  # AIQ-1223c — deterministic onboarding inference

@@ -106,6 +106,9 @@ def compute_priority_score(
     elif queue_item_type == "coverage_gap_review":
         score += 20
         reasons.append("Coverage gap in destination")
+    elif queue_item_type == "research_request":
+        score += 22
+        reasons.append("Customer-requested corridor research")
     else:
         score += 10
 
@@ -172,6 +175,55 @@ def compute_priority_score(
 def _ensure_table():
     """Ensure review_queue_items exists (for SQLite/local dev without migration)."""
     pass  # Rely on migration
+
+
+def create_queue_item_from_research_request(request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """AIQ-1349 P2 — create a curation queue item for a customer research request.
+    De-duplicates on the request id (one open queue item per request)."""
+    supabase = _get_supabase()
+    rid = request.get("id")
+    if not rid:
+        return None
+
+    existing = (
+        supabase.table("review_queue_items")
+        .select("id")
+        .eq("created_from_signal_type", "research_request")
+        .eq("created_from_signal_id", rid)
+        .in_("status", list(_OPEN_STATUSES))
+        .limit(1)
+        .execute()
+    ).data
+    if existing:
+        return None
+
+    corridor = request.get("corridor") or request.get("dest_country") or "?"
+    score, band, reasons = compute_priority_score(
+        queue_item_type="research_request",
+        content_domain="immigration",
+    )
+    row = {
+        "queue_item_type": "research_request",
+        "status": "new",
+        "priority_score": score,
+        "priority_band": band,
+        "country_code": request.get("dest_country"),
+        "content_domain": "immigration",
+        "title": f"Research request: {corridor}"[:500],
+        "summary": (request.get("scope") or f"Customer requested immigration research for {corridor}.")[:1000],
+        "created_from_signal_type": "research_request",
+        "created_from_signal_id": rid,
+        "priority_reasons_json": json.dumps(reasons),
+    }
+    r = supabase.table("review_queue_items").insert(row).execute()
+    created = (r.data or [{}])[0] if r.data else None
+    if created:
+        try:
+            from .ops_notification_service import evaluate_queue_notification_rules
+            evaluate_queue_notification_rules(created)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Notification evaluation failed for research-request queue item: %s", e)
+    return created
 
 
 def create_queue_item_from_staged_resource(candidate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
