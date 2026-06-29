@@ -116,6 +116,15 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      # Optional: sync P0/P1 failures + regressions into the Notion Work Queue (gated).
+      # Deterministic create-or-update, de-duped by test_id — no LLM.
+      - name: Sync failures to Notion Work Queue
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' && secrets.NOTION_API_KEY != '' }}
+        env:
+          NOTION_QUEUE_TOKEN: ${{ secrets.NOTION_API_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 scripts/notion_sync_candidates.py --apply
+
       # Optional Slack ping (gated). Reads the band line from the scorer output via env.
       - name: Notify Slack
         if: ${{ always() && vars.E2E_SLACK_ENABLED == 'true' && secrets.SLACK_WEBHOOK_URL != '' }}
