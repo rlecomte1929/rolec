@@ -1,0 +1,174 @@
+{
+  "aggregate": 0.6,
+  "by_corridor": {
+    "acme_executive": 0.68,
+    "acme_standard": 0.5333,
+    "globex_standard": 1.0
+  },
+  "by_difficulty": {
+    "easy": 0.5429,
+    "hard": 0.7333,
+    "medium": 0.6
+  },
+  "by_intent": {
+    "cola": 0.6,
+    "flights": 0.4,
+    "healthcare": 0.6,
+    "home_leave": 0.6,
+    "housing_cap": 0.6,
+    "immigration_support": 0.4,
+    "intern_relocation": 1.0,
+    "language_training": 0.4,
+    "misc_allowance": 0.6,
+    "per_diem": 0.6,
+    "relocation_allowance": 0.6,
+    "repatriation": 1.0,
+    "schooling": 0.6,
+    "shipment_hhg": 0.6,
+    "spousal_support": 0.6,
+    "storage": 0.4,
+    "tax_equalization": 0.6,
+    "temporary_accommodation": 0.6
+  },
+  "extra": {
+    "corpus": "/private/tmp/rolec-wsC/backend/tests/fixtures/rag_eval/hr_policy/chunks.jsonl",
+    "k": 5,
+    "retriever": "LexicalPolicyRetriever"
+  },
+  "lowest_queries": [
+    {
+      "corridor": "acme_standard",
+      "intent": "language_training",
+      "query_id": "Q-HRP-008",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.language_training.hours",
+        "hr_policy.acme_standard.misc_allowance.timing",
+        "hr_policy.acme_standard.language_training.family",
+        "hr_policy.acme_standard.home_leave.frequency",
+        "hr_policy.acme_standard.flights.coverage"
+      ],
+      "value": 0.4
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "immigration_support",
+      "query_id": "Q-HRP-010",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.immigration_support.sponsorship",
+        "hr_policy.acme_standard.immigration_support.renewal",
+        "hr_policy.acme_standard.storage.origin_dest",
+        "hr_policy.acme_standard.housing_cap.deposit",
+        "hr_policy.acme_standard.relocation_allowance.tax"
+      ],
+      "value": 0.4
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "flights",
+      "query_id": "Q-HRP-013",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.flights.coverage",
+        "hr_policy.acme_standard.misc_allowance.timing",
+        "hr_policy.acme_standard.flights.baggage",
+        "hr_policy.acme_standard.home_leave.frequency",
+        "hr_policy.acme_standard.language_training.hours"
+      ],
+      "value": 0.4
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "storage",
+      "query_id": "Q-HRP-014",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.storage.duration",
+        "hr_policy.acme_standard.shipment_hhg.insurance",
+        "hr_policy.acme_standard.storage.cost_cap",
+        "hr_policy.acme_standard.shipment_hhg.volume",
+        "hr_policy.acme_standard.shipment_hhg.air_freight"
+      ],
+      "value": 0.4
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "housing_cap",
+      "query_id": "Q-HRP-001",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.housing_cap.monthly_cap",
+        "hr_policy.acme_standard.housing_cap.eligibility",
+        "hr_policy.acme_standard.housing_cap.city_tier",
+        "hr_policy.acme_standard.housing_cap.deposit",
+        "hr_policy.acme_standard.misc_allowance.timing"
+      ],
+      "value": 0.6
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "relocation_allowance",
+      "query_id": "Q-HRP-002",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.relocation_allowance.timing",
+        "hr_policy.acme_standard.relocation_allowance.tax",
+        "hr_policy.acme_standard.relocation_allowance.amount",
+        "hr_policy.acme_standard.misc_allowance.timing",
+        "hr_policy.acme_standard.misc_allowance.amount"
+      ],
+      "value": 0.6
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "home_leave",
+      "query_id": "Q-HRP-003",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.home_leave.family",
+        "hr_policy.acme_standard.home_leave.frequency",
+        "hr_policy.acme_standard.home_leave.class",
+        "hr_policy.acme_standard.language_training.hours",
+        "hr_policy.acme_standard.storage.duration"
+      ],
+      "value": 0.6
+    },
+    {
+      "corridor": "acme_executive",
+      "intent": "schooling",
+      "query_id": "Q-HRP-004",
+      "retrieved_ids": [
+        "hr_policy.acme_executive.schooling.tuition_cap",
+        "hr_policy.acme_executive.schooling.age_range",
+        "hr_policy.acme_executive.schooling.enrolment",
+        "hr_policy.acme_executive.tax_equalization.hypo_tax",
+        "hr_policy.acme_executive.repatriation.return_flights"
+      ],
+      "value": 0.6
+    },
+    {
+      "corridor": "acme_executive",
+      "intent": "tax_equalization",
+      "query_id": "Q-HRP-005",
+      "retrieved_ids": [
+        "hr_policy.acme_executive.tax_equalization.mechanism",
+        "hr_policy.acme_executive.tax_equalization.hypo_tax",
+        "hr_policy.acme_executive.tax_equalization.provider",
+        "hr_policy.acme_executive.tax_equalization.true_up",
+        "hr_policy.acme_executive.spousal_support.work_permit"
+      ],
+      "value": 0.6
+    },
+    {
+      "corridor": "acme_standard",
+      "intent": "shipment_hhg",
+      "query_id": "Q-HRP-006",
+      "retrieved_ids": [
+        "hr_policy.acme_standard.shipment_hhg.volume",
+        "hr_policy.acme_standard.shipment_hhg.air_freight",
+        "hr_policy.acme_standard.shipment_hhg.insurance",
+        "hr_policy.acme_standard.storage.duration",
+        "hr_policy.acme_standard.storage.cost_cap"
+      ],
+      "value": 0.6
+    }
+  ],
+  "metric": "precision_at_k",
+  "passes_threshold": true,
+  "queries_evaluated": 18,
+  "threshold": 0.5
+}

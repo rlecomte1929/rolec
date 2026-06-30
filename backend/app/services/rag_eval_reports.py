@@ -52,6 +52,11 @@ METRIC_SPECS: List[MetricSpec] = [
     # matching accuracy; roadmap_completeness = recall of required roadmap steps.
     MetricSpec("structuring_accuracy", "Structuring accuracy", 0.95),
     MetricSpec("roadmap_completeness", "Roadmap completeness", 0.90),
+    # WS-C: HR-policy retriever context precision (offline lexical eval —
+    # backend/scripts/eval_hr_policy_context_precision.py). Reports land as
+    # audit/rag_eval/hr_policy_context_precision_*.json; the first committed
+    # report flips this metric from mock to live.
+    MetricSpec("hr_policy_context_precision", "HR policy context precision", 0.50),
 ]
 
 _SPEC_BY_KEY: Dict[str, MetricSpec] = {s.key: s for s in METRIC_SPECS}
@@ -134,6 +139,7 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "outcome_accuracy": [0.88, 0.89, 0.91, 0.92, 0.93, 0.94, 0.95, 0.94, 0.95, 0.96, 0.95, 0.94, 0.93],
     "structuring_accuracy": [0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
+    "hr_policy_context_precision": [0.52, 0.54, 0.55, 0.57, 0.58, 0.60, 0.60, 0.61, 0.62, 0.61, 0.60, 0.60, 0.60],
 }
 _MOCK_WEEKS = 13
 
