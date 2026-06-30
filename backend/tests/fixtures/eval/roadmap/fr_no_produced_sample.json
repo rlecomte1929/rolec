@@ -1,0 +1,9 @@
+[
+  {
+    "corridor": "FR_NO",
+    "steps": [
+      {"order": 1, "title": "Complete EEA registration with the Norwegian police"},
+      {"order": 2, "title": "Report your move to the National Registry (Folkeregisteret)"}
+    ]
+  }
+]
