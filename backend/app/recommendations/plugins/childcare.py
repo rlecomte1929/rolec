@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
-from ..weights import WEIGHTS
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "childcare.json"
 
@@ -32,7 +32,8 @@ class ChildcarePlugin(BasePlugin):
     def score(self, criteria: ChildcareCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         r = item.get("rating", 4.0) * 20.0
         a = {"high": 100, "medium": 75, "low": 50}.get(item.get("availability_level", "medium"), 75)
-        return {"score_raw": r * WEIGHTS["childcare"]["rating"] + a * WEIGHTS["childcare"]["availability"], "breakdown": {"rating": r, "availability": a},
+        w = get_weights("childcare", segment=derive_segment(criteria))
+        return {"score_raw": r * w["rating"] + a * w["availability"], "breakdown": {"rating": r, "availability": a},
                 "summary": f"{item.get('name')} — {item.get('rating')}/5.",
                 "rationale": "Childcare and preschool options.", "pros": [], "cons": [],
                 "metadata": {"rating": item.get("rating"), "rating_count": item.get("rating_count"),

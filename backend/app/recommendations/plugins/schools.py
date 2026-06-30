@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from .base import BasePlugin
 from ..types import RecommendationTier
-from ..weights import WEIGHTS
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "schools.json"
 
@@ -176,7 +176,7 @@ class SchoolsPlugin(BasePlugin):
         rating = item.get("rating", 4.0)
         rating_score = rating * 20.0
 
-        dw = WEIGHTS["schools"]
+        dw = get_weights("schools", segment=derive_segment(c))
         w_fit = w.get("fit", dw["fit"])
         w_qual = w.get("quality", dw["quality"])
         w_lang = w.get("language", dw["language"])
