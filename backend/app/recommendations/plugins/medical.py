@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
-from ..weights import WEIGHTS
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "medical.json"
 
@@ -45,7 +45,7 @@ class MedicalPlugin(BasePlugin):
         avail = item.get("availability_level", "high")
         avail_map = {"high": 100, "medium": 75, "low": 50, "scarce": 25}
         avail_score = avail_map.get(avail, 100)
-        w = WEIGHTS["medical"]
+        w = get_weights("medical", segment=derive_segment(criteria))
         score_raw = (spec_score * w["specialty"] + lang_score * w["language"] + wait_score * w["wait"] +
                      rating * w["rating"] + avail_score * w["availability"])
         rationale = f"Specialties {item.get('specialties')}. Wait ~{wait_days} days."

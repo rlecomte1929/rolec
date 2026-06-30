@@ -13,13 +13,48 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from ..auth_deps import get_current_user, require_assignment_visibility, require_hr_or_employee
 from ...database import db as _db
 from .criteria_builder import _flatten_saved_answers, build_criteria_for_assignment
-from .engine import recommend
+from .engine import recommend, recommend_debug
 
 log = logging.getLogger(__name__)
 from .registry import get_plugin, list_categories
 from .types import RecommendationResponse
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
+
+
+def _log_slate(
+    category: str,
+    criteria: Dict[str, Any],
+    *,
+    case_id: Optional[str] = None,
+    assignment_id: Optional[str] = None,
+    company_id: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> None:
+    """[P2] Best-effort persist of the ranked candidate slate for training data.
+
+    Re-runs ``recommend_debug`` (admin/uncurated path) to capture the full ranked
+    item_ids + per-factor breakdown + scores + segment, then writes one
+    ``recommendation_slates`` row. Never raises — slate logging must never break a
+    recommendation request, mirroring the surrounding analytics emit blocks.
+    """
+    try:
+        dbg = recommend_debug(category, criteria)
+        ranked = dbg.get("ranked") or []
+        if not ranked:
+            return
+        _db.insert_recommendation_slate(
+            category=category,
+            criteria=criteria,
+            items=ranked,
+            segment=dbg.get("segment"),
+            case_id=case_id,
+            assignment_id=assignment_id,
+            company_id=company_id,
+            request_id=request_id,
+        )
+    except Exception:
+        pass
 
 
 class _BatchRequest:
@@ -161,6 +196,16 @@ def post_recommendations_batch(
         "request_id=%s assignment_id=%s services=%s recommendations_batch succeeded dur_ms=%.2f",
         request_id, req.assignment_id, list(results.keys()), dur_ms,
     )
+    # [P2] Persist each candidate slate for learned-ranking training data.
+    for backend_key in results:
+        _log_slate(
+            backend_key,
+            criteria_map.get(backend_key, {}),
+            case_id=case_id,
+            assignment_id=req.assignment_id,
+            company_id=company_id,
+            request_id=request_id,
+        )
     try:
         from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
         total_count = sum(len(r.get("items", [])) for r in results.values())
@@ -243,6 +288,13 @@ def post_recommend(
         log.info(
             "request_id=%s category=%s dest_city=%s recommendations_load succeeded dur_ms=%.2f",
             request_id, category, dest or "(none)", dur_ms,
+        )
+        # [P2] Persist the candidate slate for learned-ranking training data.
+        _log_slate(
+            category,
+            criteria,
+            company_id=user_company_id,
+            request_id=request_id,
         )
         try:
             from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED

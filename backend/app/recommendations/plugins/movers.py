@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from .base import BasePlugin
 from ..types import RecommendationTier
-from ..weights import WEIGHTS
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "movers.json"
 
@@ -129,7 +129,7 @@ class MoversPlugin(BasePlugin):
         avail_map = {"high": 100, "medium": 75, "low": 50, "scarce": 25}
         availability_score = avail_map.get(avail, 75)
 
-        dw = WEIGHTS["movers"]
+        dw = get_weights("movers", segment=derive_segment(c))
         w_cap = w.get("cost", dw["cost"])
         w_time = w.get("speed", dw["speed"])
         w_rel = w.get("reliability", dw["reliability"])

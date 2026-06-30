@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from .base import BasePlugin
 from ..types import RecommendationTier
-from ..weights import WEIGHTS
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "living_areas.json"
 
@@ -120,7 +120,7 @@ class LivingAreasPlugin(BasePlugin):
     def score(self, criteria: LivingAreasCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         c = criteria
         w = c.weights or {}
-        dw = WEIGHTS["living_areas"]
+        dw = get_weights("living_areas", segment=derive_segment(c))
         w_budget = w.get("budget", dw["budget"])
         w_commute = w.get("commute", dw["commute"])
         w_space = w.get("space", dw["space"])

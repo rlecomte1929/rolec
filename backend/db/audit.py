@@ -66,6 +66,52 @@ class AuditMixin:
         except Exception as e:
             log.debug("insert_analytics_event failed (table may not exist): %s", e)
 
+    def insert_recommendation_slate(
+        self,
+        *,
+        category: str,
+        criteria: Dict[str, Any],
+        items: List[Dict[str, Any]],
+        segment: Optional[str] = None,
+        case_id: Optional[str] = None,
+        assignment_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """[P2] Persist one recommendation candidate slate. Best-effort: never
+        raises (table may not exist pre-migration), mirroring
+        insert_analytics_event. ``criteria``/``items`` are stored as JSON."""
+        slate_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        try:
+            with self.engine.begin() as conn:
+                self._exec(
+                    conn,
+                    """
+                    INSERT INTO recommendation_slates
+                        (id, case_id, assignment_id, company_id, category, segment,
+                         criteria_json, items_json, created_at)
+                    VALUES
+                        (:id, :case_id, :assignment_id, :company_id, :category, :segment,
+                         :criteria_json, :items_json, :created_at)
+                    """,
+                    {
+                        "id": slate_id,
+                        "case_id": case_id,
+                        "assignment_id": assignment_id,
+                        "company_id": company_id,
+                        "category": category,
+                        "segment": segment,
+                        "criteria_json": json.dumps(criteria or {}),
+                        "items_json": json.dumps(items or []),
+                        "created_at": now,
+                    },
+                    op_name="insert_recommendation_slate",
+                    request_id=request_id,
+                )
+        except Exception as e:
+            log.debug("insert_recommendation_slate failed (table may not exist): %s", e)
+
     def list_analytics_events(
         self,
         event_name: Optional[str] = None,

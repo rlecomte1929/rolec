@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
-from ..weights import WEIGHTS
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "electricity.json"
 
@@ -41,7 +41,7 @@ class ElectricityPlugin(BasePlugin):
         avail = item.get("availability_level", "high")
         avail_map = {"high": 100, "medium": 75, "low": 50}
         avail_score = avail_map.get(avail, 100)
-        w = WEIGHTS["electricity"]
+        w = get_weights("electricity", segment=derive_segment(criteria))
         score_raw = (green * w["green"] + flex_score * w["flexibility"] + trans * w["transparency"] +
                      rating * w["rating"] + avail_score * w["availability"])
         return {

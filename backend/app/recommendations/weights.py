@@ -15,7 +15,11 @@ Each inner dict's weights sum to 1.0.
 """
 from __future__ import annotations
 
-from typing import Dict
+import logging
+import os
+from typing import Any, Dict, Optional
+
+log = logging.getLogger(__name__)
 
 WEIGHTS: Dict[str, Dict[str, float]] = {
     # banks.py — linear blend, no request override.
@@ -89,3 +93,93 @@ WEIGHTS: Dict[str, Dict[str, float]] = {
     "tax_finance": {"rating": 0.7, "availability": 0.3},
     "language_integration": {"rating": 0.7, "availability": 0.3},
 }
+
+
+# ── P2: per-segment learned-weight override layer ───────────────────────────
+#
+# ``get_weights(category, segment=...)`` is the single accessor every plugin now
+# calls instead of indexing ``WEIGHTS`` directly. It returns a per-segment
+# override *merged over* the global ``WEIGHTS[category]``, or exactly the global
+# dict (the same object) when no override applies. An override only ever applies
+# when BOTH (a) the ``SUPPLIER_LEARNED_WEIGHTS`` env flag is on AND (b) the
+# learned-weights store holds an entry for (category, segment). With the flag
+# OFF (the default) this is byte-identical to the pre-P2 ``w = WEIGHTS[cat]``
+# behaviour — the store is never even consulted.
+#
+# Overrides are produced offline by ``backend/scripts/fit_supplier_weights.py``
+# from logged recommendation slates ⋈ selection events and persisted in
+# ``supplier_ranking_weights`` (see ranking_weights_store.py). Serving them is a
+# deliberate, flag-gated step; the data foundation accrues regardless.
+
+
+def _learned_weights_enabled() -> bool:
+    """True only when SUPPLIER_LEARNED_WEIGHTS is explicitly on. Default OFF."""
+    return os.environ.get("SUPPLIER_LEARNED_WEIGHTS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def derive_segment(criteria: Any) -> Optional[str]:
+    """The learned-ranking segment key for a request (or ``None``).
+
+    Segments are keyed on the normalised destination city — the one location
+    field carried by both the request criteria and the destination-aware plugin
+    criteria models (movers / schools / living_areas). Categories whose criteria
+    omit a destination resolve to ``None`` (the global, un-segmented bucket).
+    Accepts either a raw criteria ``dict`` or a parsed pydantic criteria model so
+    the write path (slate logging, raw dict) and the serve path (plugins, parsed
+    model) derive identical keys.
+    """
+    if criteria is None:
+        return None
+    if isinstance(criteria, dict):
+        city = criteria.get("destination_city")
+    else:
+        city = getattr(criteria, "destination_city", None)
+    if not city or not isinstance(city, str):
+        return None
+    norm = city.split(",")[0].strip().lower()
+    return norm or None
+
+
+def _read_segment_override(
+    category: str, segment: Optional[str]
+) -> Optional[Dict[str, float]]:
+    """Best-effort load of a learned per-segment weight override; ``None`` if
+    absent or on any error (missing table, unconfigured DB, etc.)."""
+    try:
+        from .ranking_weights_store import load_segment_weights
+
+        return load_segment_weights(category, segment)
+    except Exception as exc:  # never break scoring on a store hiccup
+        log.debug("learned-weights store read failed for %s/%s: %s", category, segment, exc)
+        return None
+
+
+def get_weights(category: str, *, segment: Optional[str] = None) -> Dict[str, float]:
+    """Scoring weights for ``category``, with an optional per-segment override.
+
+    Returns the global ``WEIGHTS[category]`` (the same object — byte-identical to
+    the legacy direct-index behaviour) unless the learned-weights flag is on AND
+    the store holds an override for ``(category, segment)``, in which case a copy
+    of the global dict is returned with the stored factors merged over it. Only
+    factors that already exist in the global dict are blended, so a stale or
+    malformed override can never introduce or drop a factor.
+    """
+    base = WEIGHTS[category]
+    if not _learned_weights_enabled():
+        return base
+    override = _read_segment_override(category, segment)
+    if not override:
+        return base
+    merged = dict(base)
+    for k, v in override.items():
+        if k in merged:
+            try:
+                merged[k] = float(v)
+            except (TypeError, ValueError):
+                continue
+    return merged
