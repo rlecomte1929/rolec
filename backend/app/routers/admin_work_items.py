@@ -96,7 +96,7 @@ def list_work_items(
     sql = text(
         f"""
         SELECT id, source, source_url, kind, title, body, reporter_role, company_id,
-               status, priority, complexity, auto_fixable, triage_json, dedupe_key,
+               status, priority, complexity, auto_fixable, triage_json, plan_json, dedupe_key,
                pr_url, created_at
         FROM public.work_items
         WHERE (:status IS NULL OR status = :status)
