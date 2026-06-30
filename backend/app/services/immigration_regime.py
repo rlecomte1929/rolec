@@ -84,6 +84,19 @@ def _is_eu_destination(destination: Optional[str]) -> bool:
     return _n(destination) in _EU_EEA_COUNTRIES
 
 
+# EU member states only (EU-27) — the EU Blue Card (Directive 2021/1883) applies in
+# EU members, NOT the EEA/EFTA-only countries (Norway, Iceland, Liechtenstein,
+# Switzerland). So a non-EEA national → Norway is a national skilled-worker permit,
+# not a Blue Card. Derived from the EU/EEA set minus the EEA/EFTA members.
+_EU_MEMBER_STATES: FrozenSet[str] = _EU_EEA_COUNTRIES - frozenset({
+    "norway", "no", "iceland", "is", "liechtenstein", "li", "switzerland", "ch",
+})
+
+
+def _is_eu_member_destination(destination: Optional[str]) -> bool:
+    return _n(destination) in _EU_MEMBER_STATES
+
+
 def _is_us_destination(destination: Optional[str]) -> bool:
     return _n(destination) in _US_DESTINATIONS
 
@@ -177,6 +190,9 @@ _REGIME_EXCEPTION_TRIGGERS: Dict[str, Tuple[str, ...]] = {
     "standard_work_permit": (
         "timeline_breach",
     ),
+    "blue_card": (
+        "timeline_breach",           # qualification recognition + visa lead time
+    ),
     "domestic": (),
     "unknown": (),
 }
@@ -191,6 +207,7 @@ _REGIME_CONFIDENCE: Dict[str, float] = {
     "japan_coe": 0.9,
     "eu_free_movement": 0.9,
     "uk_skilled_worker": 0.9,
+    "blue_card": 0.9,
     "domestic": 0.9,
     "standard_work_permit": 0.5,
     "unknown": 0.2,
@@ -201,6 +218,7 @@ _REGIME_LEAD_TIME_WEEKS: Dict[str, int] = {
     "japan_coe": 16,       # COE 1–3 months + visa 2 weeks
     "eu_free_movement": 0, # No immigration lead time
     "uk_skilled_worker": 8,
+    "blue_card": 12,       # Blue Card: ~2–3 months (qualification recognition + visa)
     "standard_work_permit": 8,
     "domestic": 0,
     "unknown": 0,
@@ -295,6 +313,25 @@ class ImmigrationRegimeRouter:
                 notes=(
                     "UK Skilled Worker visa: employer must hold a sponsor licence. "
                     "Detailed implementation in a future sprint."
+                ),
+            )
+
+        # ── 5b. EU member destination + non-EU/EEA national → EU Blue Card ────
+        # The primary highly-qualified-employment route into an EU member state
+        # for a third-country national (Directive 2021/1883; e.g. AufenthG §18g in
+        # Germany). Placed after the EU free-movement check (step 4), so EU/EEA
+        # nationals never reach here; and before the catch-all, so non-EEA→EU is a
+        # Blue Card rather than a generic work permit. EEA/EFTA destinations
+        # (Norway etc.) are NOT EU members → they fall through to the catch-all.
+        if _is_eu_member_destination(destination_country) and not _is_eu_national(nationality):
+            return self._make(
+                regime_id="blue_card",
+                priority="critical",
+                notes=(
+                    "EU Blue Card (Directive 2021/1883): highly-qualified employment "
+                    "route for a third-country national — requires a qualifying job "
+                    "offer meeting the salary threshold and a recognised qualification. "
+                    "Employee applies; the employer provides the qualifying contract."
                 ),
             )
 

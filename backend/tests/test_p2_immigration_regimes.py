@@ -191,13 +191,24 @@ class TestRegimeDetection:
         r = router.detect_regime(nationality="France", destination_country="Belgium")
         assert "eu_registration" in r.task_codes
 
-    def test_non_eu_national_to_eu_dest_gets_standard(self):
-        """US national → Germany: not free movement."""
+    def test_non_eu_national_to_eu_member_gets_blue_card(self):
+        """US (non-EEA) national → Germany (EU member): EU Blue Card, not free movement."""
         r = router.detect_regime(
             nationality="American",
             destination_country="Germany",
         )
         assert r.regime_id != "eu_free_movement"
+        assert r.regime_id == "blue_card"
+        assert r.priority == "critical"
+        assert r.confidence == 0.9
+
+    def test_non_eea_national_to_eea_nonmember_gets_standard(self):
+        """US (non-EEA) national → Norway (EEA but NOT an EU member): no Blue Card,
+        falls through to the national skilled-worker catch-all."""
+        r = router.detect_regime(
+            nationality="American",
+            destination_country="Norway",
+        )
         assert r.regime_id == "standard_work_permit"
 
     # ── UK ────────────────────────────────────────────────────────────────────
