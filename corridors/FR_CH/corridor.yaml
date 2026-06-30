@@ -1,0 +1,28 @@
+# Corridor registry profile — France → Switzerland (free movement).
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Authored from the
+# EU–EFTA free movement (EU–CH AFMP; AIG + VEP/OLCP) framework; confirm specifics with the destination authority before
+# any authoritative use. Matches the platform content-provenance model.
+
+corridor:
+  id: "FR_CH"
+  origin_iso: "FR"
+  destination_iso: "CH"
+  display_name: "France → Switzerland"
+  aliases: ["FR→CH", "FR-CH"]
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  pathways:
+    - id: "CH_FREEMOVE_2026"
+      file: "pathways/CH_FREEMOVE_2026/v1.yaml"
