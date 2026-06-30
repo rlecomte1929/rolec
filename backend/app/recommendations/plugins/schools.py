@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .base import BasePlugin
 from ..types import RecommendationTier
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "schools.json"
 
@@ -175,12 +176,13 @@ class SchoolsPlugin(BasePlugin):
         rating = item.get("rating", 4.0)
         rating_score = rating * 20.0
 
-        w_fit = w.get("fit", 0.25)
-        w_qual = w.get("quality", 0.2)
-        w_lang = w.get("language", 0.15)
-        w_comm = w.get("commute", 0.15)
-        w_av = w.get("availability", 0.15)
-        w_rat = w.get("rating", 0.1)
+        dw = WEIGHTS["schools"]
+        w_fit = w.get("fit", dw["fit"])
+        w_qual = w.get("quality", dw["quality"])
+        w_lang = w.get("language", dw["language"])
+        w_comm = w.get("commute", dw["commute"])
+        w_av = w.get("availability", dw["availability"])
+        w_rat = w.get("rating", dw["rating"])
 
         score_raw = (
             w_fit * (age_fit * 0.4 + curr_fit * 0.3 + type_fit * 0.3)

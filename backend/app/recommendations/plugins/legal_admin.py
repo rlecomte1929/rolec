@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "legal_admin.json"
 
@@ -31,7 +32,7 @@ class LegalAdminPlugin(BasePlugin):
     def score(self, criteria: LegalAdminCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         r = item.get("rating", 4.0) * 20.0
         a = {"high": 100, "medium": 75}.get(item.get("availability_level", "medium"), 75)
-        return {"score_raw": r * 0.7 + a * 0.3, "breakdown": {"rating": r, "availability": a},
+        return {"score_raw": r * WEIGHTS["legal_admin"]["rating"] + a * WEIGHTS["legal_admin"]["availability"], "breakdown": {"rating": r, "availability": a},
                 "summary": f"{item.get('name')} — {item.get('rating')}/5.",
                 "rationale": "Legal and administrative support for relocation.", "pros": [], "cons": [],
                 "metadata": {"rating": item.get("rating"), "rating_count": item.get("rating_count"),
