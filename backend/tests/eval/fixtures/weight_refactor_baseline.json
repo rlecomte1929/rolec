@@ -159,43 +159,43 @@
       "scores": [
         {
           "item_id": "m-1",
-          "score_raw": 80.0
+          "score_raw": 80.3
         },
         {
           "item_id": "m-2",
-          "score_raw": 81.5
+          "score_raw": 79.5
         },
         {
           "item_id": "m-3",
-          "score_raw": 78.078947
+          "score_raw": 70.778947
         },
         {
           "item_id": "m-4",
-          "score_raw": 78.0
+          "score_raw": 76.7
         },
         {
           "item_id": "m-5",
-          "score_raw": 76.947368
+          "score_raw": 69.747368
         },
         {
           "item_id": "m-6",
-          "score_raw": 81.5
+          "score_raw": 79.6
         },
         {
           "item_id": "m-7",
-          "score_raw": 76.684211
+          "score_raw": 69.584211
         },
         {
           "item_id": "m-8",
-          "score_raw": 82.5
+          "score_raw": 74.9
         },
         {
           "item_id": "m-9",
-          "score_raw": 76.5
+          "score_raw": 74.5
         },
         {
           "item_id": "m-10",
-          "score_raw": 75.578947
+          "score_raw": 68.178947
         }
       ]
     },
@@ -332,43 +332,43 @@
       "scores": [
         {
           "item_id": "b-1",
-          "score_raw": 94.0
+          "score_raw": 93.13253
         },
         {
           "item_id": "b-2",
-          "score_raw": 89.8
+          "score_raw": 87.710843
         },
         {
           "item_id": "b-3",
-          "score_raw": 85.85
+          "score_raw": 87.248996
         },
         {
           "item_id": "b-4",
-          "score_raw": 90.45
+          "score_raw": 92.409639
         },
         {
           "item_id": "b-5",
-          "score_raw": 89.25
+          "score_raw": 91.445783
         },
         {
           "item_id": "b-6",
-          "score_raw": 86.05
+          "score_raw": 86.827309
         },
         {
           "item_id": "b-7",
-          "score_raw": 83.9
+          "score_raw": 79.899598
         },
         {
           "item_id": "b-8",
-          "score_raw": 81.2
+          "score_raw": 76.124498
         },
         {
           "item_id": "b-9",
-          "score_raw": 91.4
+          "score_raw": 86.425703
         },
         {
           "item_id": "b-10",
-          "score_raw": 91.2
+          "score_raw": 86.26506
         }
       ]
     },
@@ -392,15 +392,15 @@
         },
         {
           "item_id": "i-3",
-          "score_raw": 98.8
+          "score_raw": 101.3
         },
         {
           "item_id": "i-4",
-          "score_raw": 99.1
+          "score_raw": 101.6
         },
         {
           "item_id": "i-5",
-          "score_raw": 98.5
+          "score_raw": 101.0
         },
         {
           "item_id": "i-6",
@@ -416,7 +416,7 @@
         },
         {
           "item_id": "i-9",
-          "score_raw": 98.8
+          "score_raw": 101.3
         },
         {
           "item_id": "i-10",
