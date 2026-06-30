@@ -412,6 +412,16 @@ def dismiss_calibration_alert(
 
 
 # ── W2-5 answer provenance ────────────────────────────────────────────────
+class GateImpact(BaseModel):
+    """Estimated effect of the groundedness gate, from persisted traces only."""
+
+    min_score: float
+    n_answers: int
+    n_would_refuse: int
+    would_refuse_rate: float
+    n_would_refuse_helpful: int
+
+
 class AnswerProvenanceResponse(BaseModel):
     """Per-company Policy Assistant answer-provenance rollup over a recent window.
 
@@ -429,6 +439,10 @@ class AnswerProvenanceResponse(BaseModel):
     refusal_rate: float
     grounded_rate: float
     window_days: int
+    # P1 gate-impact canary (additive, read-only): what the groundedness gate
+    # WOULD refuse at the default min_score if POLICY_RAG_GROUNDEDNESS_GATE were
+    # flipped on. None when the rollup is unavailable. Does not change behavior.
+    gate_impact: Optional[GateImpact] = None
 
 
 @router.get(
@@ -456,6 +470,20 @@ def get_answer_provenance(
 
     since = (datetime.utcnow() - timedelta(days=window_days)).isoformat()
     rollup = main_db.get_answer_provenance_rollup(company_id=org_id, since=since)
+    # P1 gate-impact canary (additive, read-only): estimate what the groundedness
+    # gate would refuse at its default min_score. Never breaks the response.
+    gate_impact = None
+    try:
+        gi = main_db.get_gate_impact_rollup(company_id=org_id, since=since)
+        gate_impact = GateImpact(
+            min_score=gi["min_score"],
+            n_answers=gi["n_answers"],
+            n_would_refuse=gi["n_would_refuse"],
+            would_refuse_rate=gi["would_refuse_rate"],
+            n_would_refuse_helpful=gi["n_would_refuse_helpful"],
+        )
+    except Exception:
+        gate_impact = None
     return AnswerProvenanceResponse(
         total=rollup["total"],
         answers=rollup["answers"],
@@ -465,4 +493,5 @@ def get_answer_provenance(
         refusal_rate=rollup["refusal_rate"],
         grounded_rate=rollup["grounded_rate"],
         window_days=window_days,
+        gate_impact=gate_impact,
     )
