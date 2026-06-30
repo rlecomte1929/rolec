@@ -1,11 +1,15 @@
 /**
- * A-01: guard /admin/countries — non-admin must be redirected.
+ * A-01: guard /admin/countries and /admin/countries/:countryCode — non-admin must be redirected.
  *
  * TDD cycle:
  *   RED  — route renders CountriesPage without RequireAdminRoute;
  *           non-admin reaches the page → `countries-page` testid found → test FAILS.
  *   GREEN — RequireAdminRoute wraps the route in App.tsx; non-admin is
  *           redirected → testid null → PASSES.
+ *
+ * The detail route (/admin/countries/:countryCode) is also guarded — a
+ * non-admin must not be able to reach it by navigating directly to e.g.
+ * /admin/countries/FR.  See the "detail route" describe block below.
  */
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
@@ -19,6 +23,10 @@ import { RequireAdminRoute } from '../RequireAdminRoute';
 // Lightweight stand-in: skip all API/layout imports that would need heavy mocking.
 const StubCountriesPage: React.FC = () => (
   <div data-testid="countries-page">Countries</div>
+);
+
+const StubCountryDetailPage: React.FC = () => (
+  <div data-testid="country-detail-page">Country Detail</div>
 );
 
 // ── localStorage stub ─────────────────────────────────────────────────────
@@ -65,6 +73,28 @@ function renderUnguarded(role: string) {
   );
 }
 
+// ── Route helpers (detail) ────────────────────────────────────────────────
+
+/** Renders the guarded detail route (mirrors the post-fix App.tsx). */
+function renderDetailGuarded(role: string) {
+  _storage.set('relopass_role', role);
+  render(
+    <MemoryRouter initialEntries={['/admin/countries/FR']}>
+      <Routes>
+        <Route
+          path="/admin/countries/:countryCode"
+          element={
+            <RequireAdminRoute>
+              <StubCountryDetailPage />
+            </RequireAdminRoute>
+          }
+        />
+        <Route path="*" element={<div data-testid="redirect-target" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 describe('RequireAdminRoute — /admin/countries guard (A-01)', () => {
@@ -94,5 +124,25 @@ describe('RequireAdminRoute — /admin/countries guard (A-01)', () => {
     // fix is in App.tsx, not in this test helper.
     renderUnguarded('EMPLOYEE');
     expect(screen.getByTestId('countries-page')).toBeInTheDocument();
+  });
+});
+
+describe('RequireAdminRoute — /admin/countries/:countryCode detail guard (A-01)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _storage.clear();
+  });
+
+  afterEach(cleanup);
+
+  it('non-admin cannot reach /admin/countries/:countryCode (detail route redirects)', () => {
+    renderDetailGuarded('EMPLOYEE');
+    expect(screen.queryByTestId('country-detail-page')).toBeNull();
+    expect(screen.getByTestId('redirect-target')).toBeInTheDocument();
+  });
+
+  it('admin can reach /admin/countries/:countryCode', () => {
+    renderDetailGuarded('ADMIN');
+    expect(screen.getByTestId('country-detail-page')).toBeInTheDocument();
   });
 });
