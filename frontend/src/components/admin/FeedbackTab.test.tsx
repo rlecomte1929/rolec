@@ -279,3 +279,121 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     expect(dispatched.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+// ── D2: Dispatched view ────────────────────────────────────────────────────
+
+const DISPATCHED_VIEW_ITEMS: UnifiedFeedbackItem[] = [
+  {
+    id: 'disp-001',
+    stream: 'product',
+    source_ref: 'report-xyz',
+    text: 'Crash on submit',
+    verdict: 'bug',
+    user_id: 'u-10',
+    company_id: null,
+    created_at: new Date(Date.now() - 3_600_000).toISOString(),
+    status: 'acted_on',
+    owner: null,
+    resolution: null,
+    severity: 'high',
+    area: 'auth',
+    dispatch_status: 'dispatched',
+    dispatch_ref: 'DR-789',
+  },
+  {
+    id: 'disp-002',
+    stream: 'ai_answers',
+    source_ref: 'trace-abc',
+    text: 'Wrong answer given',
+    verdict: 'bug',
+    user_id: 'u-11',
+    company_id: null,
+    created_at: new Date(Date.now() - 7_200_000).toISOString(),
+    status: 'new',
+    owner: null,
+    resolution: null,
+    severity: 'critical',
+    area: 'isolation',
+    dispatch_status: 'dispatched',
+    dispatch_ref: 'DR-790',
+  },
+];
+
+describe('FeedbackTab — Dispatched view (D2)', () => {
+  function renderTab() {
+    return render(
+      <MemoryRouter>
+        <FeedbackTab />
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(feedbackApi.listFeedback).mockResolvedValue(DISPATCHED_VIEW_ITEMS);
+    vi.mocked(feedbackApi.triageFeedback).mockResolvedValue(undefined);
+    vi.mocked(feedbackApi.dispatchTicket).mockResolvedValue({
+      dispatched: true,
+      dispatch_ref: 'DR-000',
+      status: 'dispatched',
+    });
+  });
+
+  it('has a "Dispatched" tab in the stream tab bar', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    expect(screen.getByRole('button', { name: /^Dispatched$/i })).toBeTruthy();
+  });
+
+  it('clicking Dispatched tab calls listFeedback with { dispatched: true }', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    vi.mocked(feedbackApi.listFeedback).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /^Dispatched$/i }));
+    await waitFor(() =>
+      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ dispatched: true })
+    );
+  });
+
+  it('renders dispatch_ref and severity/area badges for dispatched rows', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    vi.mocked(feedbackApi.listFeedback).mockResolvedValue(DISPATCHED_VIEW_ITEMS);
+    fireEvent.click(screen.getByRole('button', { name: /^Dispatched$/i }));
+    await waitFor(() =>
+      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ dispatched: true })
+    );
+    expect(screen.getByText('DR-789')).toBeTruthy();
+    expect(screen.getByText('DR-790')).toBeTruthy();
+    expect(screen.getByText('high')).toBeTruthy();
+    expect(screen.getByText('critical')).toBeTruthy();
+    expect(screen.getByText('auth')).toBeTruthy();
+    expect(screen.getByText('isolation')).toBeTruthy();
+  });
+
+  it('shows "No dispatched tickets" when dispatched list is empty', async () => {
+    vi.mocked(feedbackApi.listFeedback).mockResolvedValue([]);
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Dispatched$/i }));
+    await waitFor(() =>
+      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ dispatched: true })
+    );
+    expect(screen.getByText(/No dispatched tickets/i)).toBeTruthy();
+  });
+
+  it('switching to a stream tab after Dispatched calls listFeedback with stream param', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Dispatched$/i }));
+    await waitFor(() =>
+      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ dispatched: true })
+    );
+    vi.mocked(feedbackApi.listFeedback).mockClear();
+    // Click the Product stream tab (first occurrence = the tab bar button)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Product$/i })[0]);
+    await waitFor(() =>
+      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ stream: 'product' })
+    );
+  });
+});

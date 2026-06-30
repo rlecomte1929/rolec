@@ -18,10 +18,11 @@ export interface UnifiedFeedbackItem {
   status: TriageStatus | null;
   owner: string | null;
   resolution: string | null;
-  /** BR-2: triage classifier fields */
+  /** BR-2 / D1: triage classifier + dispatch fields */
   severity?: string | null;
   area?: string | null;
   dispatch_status?: DispatchStatus | null;
+  dispatch_ref?: string | null;
 }
 
 export interface DispatchResult {
@@ -34,6 +35,8 @@ export async function listFeedback(params?: {
   stream?: FeedbackStream;
   status?: TriageStatus;
   since?: string;
+  /** D1: when true, sends ?dispatched=true — returns only dispatched tickets */
+  dispatched?: boolean;
 }): Promise<UnifiedFeedbackItem[]> {
   const { data } = await axios.get<{ items: UnifiedFeedbackItem[] }>(
     `${API}/api/admin/feedback`,
