@@ -1053,6 +1053,63 @@ class UsersMixin:
             ), {"email": email_norm}).fetchone()
         return bool(row and row._mapping.get("enabled") == 1)
 
+    def list_admin_allowlist(self) -> List[Dict[str, Any]]:
+        """All allowlist rows (enabled + disabled), newest first. Admin-console read."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM admin_allowlist ORDER BY created_at DESC"
+            )).mappings().all()
+        return [dict(r) for r in rows]
+
+    def count_admin_allowlist(self) -> int:
+        """Count of currently-enabled admins (for last-admin protection)."""
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT count(*) AS n FROM admin_allowlist WHERE enabled = 1"
+            )).fetchone()
+        return int(row._mapping.get("n") or 0) if row else 0
+
+    def remove_admin_allowlist(self, email: str) -> bool:
+        """Soft-revoke: set enabled = 0 (the read-check gates on enabled == 1).
+        Reversible + keeps history. Returns True if a row was affected."""
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return False
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE admin_allowlist SET enabled = 0 WHERE email = :email"
+            ), {"email": email_norm})
+        return (result.rowcount or 0) > 0
+
+    def set_admin_allowlist_user_id(self, email: str, user_id: Optional[str]) -> None:
+        """Best-effort: populate user_id so the SQL is_admin() / RLS recognise the
+        admin (the email-based request gate works regardless). Defensive — a stale
+        SQLite schema without the column simply no-ops."""
+        email_norm = (email or "").strip().lower()
+        if not email_norm or not user_id:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE admin_allowlist SET user_id = :uid WHERE email = :email"
+                ), {"uid": user_id, "email": email_norm})
+        except Exception:  # column absent on a stale local SQLite — request gate still works
+            pass
+
+    def resolve_user_id_by_email(self, email: str) -> Optional[str]:
+        """Best-effort email → profile id (so a granted admin's user_id can be set)."""
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT id FROM profiles WHERE lower(email) = :email LIMIT 1"
+                ), {"email": email_norm}).fetchone()
+            return str(row._mapping.get("id")) if row else None
+        except Exception:
+            return None
+
     def create_hr_user(
         self,
         hr_id: str,
