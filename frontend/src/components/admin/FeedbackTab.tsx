@@ -3,13 +3,16 @@
  *
  * Reads from /api/admin/feedback (normalized UNION of product/ai_answers/helpfulness).
  * Triage (status/owner/resolution) goes through PATCH — never mutates ML source tables.
+ * Dispatch goes through POST /dispatch — high-risk tickets require an explicit in-UI confirm.
  */
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '../antigravity/Button';
+import { Badge } from '../antigravity/Badge';
 import {
   listFeedback,
   triageFeedback,
+  dispatchTicket,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
@@ -57,6 +60,11 @@ function fmtDate(iso: string): string {
 
 const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness'];
 
+/** A ticket is high-risk if severity is critical OR area is isolation. */
+function isHighRisk(row: UnifiedFeedbackItem): boolean {
+  return row.severity === 'critical' || row.area === 'isolation';
+}
+
 export function FeedbackTab() {
   const [rows, setRows]                   = useState<UnifiedFeedbackItem[]>([]);
   const [loading, setLoading]             = useState(true);
@@ -65,6 +73,11 @@ export function FeedbackTab() {
   const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all');
   const [savingId, setSavingId]           = useState<string | null>(null);
   const [expanded, setExpanded]           = useState<string | null>(null);
+
+  // Dispatch state
+  const [pendingConfirmId, setPendingConfirmId] = useState<string | null>(null);
+  const [dispatchingId, setDispatchingId]       = useState<string | null>(null);
+  const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +105,38 @@ export function FeedbackTab() {
       // silently fail — user can retry via Refresh
     }
     setSavingId(null);
+  };
+
+  /** Execute the dispatch API call for a given row. */
+  const doDispatch = useCallback(async (row: UnifiedFeedbackItem, confirm?: true) => {
+    setDispatchingId(row.id);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      if (confirm) {
+        await dispatchTicket(row.stream, row.id, true);
+      } else {
+        await dispatchTicket(row.stream, row.id);
+      }
+      setRows((prev) =>
+        prev.map((r) => r.id === row.id ? { ...r, dispatch_status: 'dispatched' } : r)
+      );
+      setPendingConfirmId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Dispatch failed';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setDispatchingId(null);
+    }
+  }, []);
+
+  /** Called when the Dispatch button is clicked. */
+  const handleDispatchClick = (e: React.MouseEvent, row: UnifiedFeedbackItem) => {
+    e.stopPropagation();
+    if (isHighRisk(row)) {
+      setPendingConfirmId(row.id);
+    } else {
+      void doDispatch(row);
+    }
   };
 
   const displayed = rows.filter((r) => {
@@ -197,22 +242,28 @@ export function FeedbackTab() {
       {/* Table */}
       {displayed.length > 0 && (
         <div className="rounded-lg border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-[100px_110px_1fr_120px_120px_140px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[100px_110px_1fr_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
             <div className="px-3 py-2.5">ID</div>
             <div className="px-3 py-2.5">Stream</div>
             <div className="px-3 py-2.5">Text</div>
+            <div className="px-3 py-2.5">Tags</div>
             <div className="px-3 py-2.5">Verdict</div>
             <div className="px-3 py-2.5">Date</div>
             <div className="px-3 py-2.5">Status</div>
+            <div className="px-3 py-2.5">Dispatch</div>
           </div>
           <div className="divide-y divide-gray-100 bg-white">
             {displayed.map((row) => {
               const isExpanded = expanded === row.id;
               const effectiveStatus: TriageStatus = row.status ?? 'new';
+              const isPendingConfirm = pendingConfirmId === row.id;
+              const isDispatching = dispatchingId === row.id;
+              const dispatchErr = dispatchErrors[row.id];
+              const alreadyDispatched = row.dispatch_status === 'dispatched';
               return (
                 <div key={row.id}>
                   <div
-                    className="grid grid-cols-[100px_110px_1fr_120px_120px_140px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="grid grid-cols-[100px_110px_1fr_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => setExpanded(isExpanded ? null : row.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -237,6 +288,25 @@ export function FeedbackTab() {
                     <div className="px-3 py-2.5">
                       <p className="text-[12px] text-gray-700 truncate">{row.text ?? '—'}</p>
                     </div>
+                    {/* Tags: severity + area badges */}
+                    <div className="px-3 py-2.5 flex flex-wrap gap-1">
+                      {row.severity && (
+                        <Badge
+                          variant={row.severity === 'critical' ? 'error' : 'neutral'}
+                          size="sm"
+                        >
+                          {row.severity}
+                        </Badge>
+                      )}
+                      {row.area && (
+                        <Badge
+                          variant={row.area === 'isolation' ? 'error' : 'info'}
+                          size="sm"
+                        >
+                          {row.area}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="px-3 py-2.5">
                       <span className="text-[11px] text-gray-500">{row.verdict ?? '—'}</span>
                     </div>
@@ -258,7 +328,54 @@ export function FeedbackTab() {
                         ))}
                       </select>
                     </div>
+                    {/* Dispatch column */}
+                    <div className="px-3 py-2.5">
+                      {alreadyDispatched ? (
+                        <Badge variant="success" size="sm">dispatched</Badge>
+                      ) : (
+                        <Button
+                          unstyled
+                          disabled={isDispatching}
+                          onClick={(e) => handleDispatchClick(e, row)}
+                          className="text-[11px] font-medium px-2 py-0.5 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-50"
+                        >
+                          {isDispatching ? '…' : 'Dispatch'}
+                        </Button>
+                      )}
+                      {dispatchErr && (
+                        <p className="text-[10px] text-red-600 mt-0.5">{dispatchErr}</p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* High-risk confirm dialog — inline below the row */}
+                  {isPendingConfirm && (
+                    <div className="bg-red-50 border-t border-red-200 px-4 py-3 space-y-2">
+                      <p className="text-[12px] font-semibold text-red-800">
+                        Confirm dispatch — this ticket is high-risk
+                        {row.severity === 'critical' && ' (critical severity)'}
+                        {row.area === 'isolation' && ' (isolation area)'}
+                        . Are you sure?
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          unstyled
+                          disabled={isDispatching}
+                          onClick={() => void doDispatch(row, true)}
+                          className="text-[11px] font-medium px-3 py-1 rounded bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
+                        >
+                          I understand — dispatch
+                        </Button>
+                        <Button
+                          unstyled
+                          onClick={() => setPendingConfirmId(null)}
+                          className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {isExpanded && (
                     <div className="bg-gray-50 border-t border-gray-100 px-4 py-4 space-y-2">
