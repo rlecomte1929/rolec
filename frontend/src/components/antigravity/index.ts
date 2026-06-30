@@ -27,4 +27,11 @@ export { AutosaveChip } from './AutosaveChip';
 export { ConfirmFromIntake } from './ConfirmFromIntake';
 export type { ConfirmRow } from './ConfirmFromIntake';
 export { Modal } from './Modal';
+// COMP-2: shared primitives that were absent or hand-rolled across the app.
+export { Textarea } from './Textarea';
+export { Switch } from './Switch';
+export { Skeleton } from './Skeleton';
+export { Tabs, tabPanelProps } from './Tabs';
+export type { TabItem } from './Tabs';
+export { Pagination } from './Pagination';
 export type { ModalProps } from './Modal';
