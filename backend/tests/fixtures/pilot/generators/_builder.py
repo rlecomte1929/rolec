@@ -295,11 +295,26 @@ def build_dossier(
     if profile.has_spouse:
         steps.append({"step_id": "collect_spouse_document", "description": "Collect spouse / dependant documentation", "required": True, "order": order}); order += 1
 
+    # Eligibility input block read by the real predictor (backend/eval/
+    # eligibility_predictor.py → ImmigrationRegimeRouter). Country fields use the
+    # corridor's ISO-2 codes (the router accepts ISO or country names, case-
+    # insensitively) — NOT the persona's nationality adjective, which the router
+    # would not recognise. nationality == origin for these single-origin personas.
+    _corridor_parts = profile.corridor.split("_")
+    _origin_iso = _corridor_parts[0] if _corridor_parts else ""
+    _dest_iso = _corridor_parts[1] if len(_corridor_parts) > 1 else ""
+
     ground_truth = {
         "dossier_id": dossier_id,
         "extracted_fields": extracted_fields,
         "canonical_entities": canonical_entities,
         "eligibility_verdict": {"outcome_set": list(profile.eligibility), "citations": []},
+        "profile": {
+            "nationality": _origin_iso,
+            "origin_country": _origin_iso,
+            "destination_country": _dest_iso,
+            "contract_type": "permanent_transfer",
+        },
         "step_graph": {"steps": steps},
         "seeded_contradictions": seeded_contradictions,
         "generation_meta": generation_meta,

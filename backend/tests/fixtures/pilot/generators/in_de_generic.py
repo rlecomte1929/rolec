@@ -222,6 +222,14 @@ def generate(seed: int, output_dir: Path) -> dict:
             "outcome_set": ["ELIGIBLE_BLUE_CARD"],
             "citations": [],
         },
+        # Eligibility input read by backend/eval/eligibility_predictor.py (ISO-2;
+        # nationality == origin for this IN→DE persona). See _builder.py note.
+        "profile": {
+            "nationality": "IN",
+            "origin_country": "IN",
+            "destination_country": "DE",
+            "contract_type": "permanent_transfer",
+        },
         "step_graph": {
             "steps": [
                 {
