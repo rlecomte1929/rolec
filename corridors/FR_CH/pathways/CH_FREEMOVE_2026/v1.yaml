@@ -1,0 +1,92 @@
+# Corridor Agent — FR_CH_2026  (France → Switzerland, free movement)
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Grounded in the
+# EU–EFTA free movement (EU–CH AFMP; AIG + VEP/OLCP) framework. An EU/EEA/EFTA national needs NO visa and NO salary floor;
+# the journey is the administrative registration sequence. Confirm details with
+# the destination authority before any authoritative use.
+
+corridor_agent:
+  corridor_id: FR_CH_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE
+  origin_country_iso3: FRA
+  destination_country_iso3: CHE
+  description: >
+    France (EU/EEA/EFTA) national → Switzerland under free movement.
+    No visa or residence-permit gate; the pathway models the administrative
+    registration sequence.
+
+  applicable_rules:
+    - legal_reference: "EU–CH Agreement on Free Movement of Persons (AFMP)"
+      rule_id: CH_AFMP
+      summary: "Free movement between the EU and Switzerland."
+    - legal_reference: "AIG/LEI (Ausländer- und Integrationsgesetz)"
+      rule_id: CH_AIG
+      summary: "Foreign Nationals and Integration Act — residence framework."
+    - legal_reference: "VEP/OLCP (Verordnung über den freien Personenverkehr)"
+      rule_id: CH_VEP
+      summary: "Ordinance on free movement — registration + permit B/L."
+    - legal_reference: "KVG/LAMal"
+      rule_id: CH_KVG
+      summary: "Mandatory Swiss health insurance within three months of arrival."
+
+  required_documents:
+    - PASSPORT_OR_NATIONAL_ID:employee
+    - PASSPORT_OR_NATIONAL_ID:family.spouse?
+    - EMPLOYMENT_CONTRACT?
+
+  required_data_points:
+    - key: eu_eea_nationality
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+
+  # No salary floor applies to free movement.
+  salary_thresholds_eur: {}
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_FREE_MOVEMENT
+        label: "EU–CH free movement (AFMP)"
+        cite: CH_AFMP
+        requires_all:
+          - eu_eea_nationality == true
+        verdict_on_pass: ELIGIBLE
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases: []
+
+  step_graph:
+    - step_id: TRAVEL_TO_CH
+      name: "Travel to Switzerland (no visa for EU/EFTA nationals)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: []
+
+    - step_id: COMMUNE_REGISTRATION
+      name: "Register at the commune within 14 days of arrival"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TRAVEL_TO_CH]
+      cite: CH_VEP
+
+    - step_id: PERMIT_B
+      name: "Residence permit B/L issued (free movement)"
+      responsible_party: AUTHORITY_CH_MIGRATIONSAMT
+      expected_duration_days: 30
+      prerequisite_step_ids: [COMMUNE_REGISTRATION]
+      cite: CH_AIG
+
+    - step_id: HEALTH_INSURANCE_SETUP
+      name: "Take out mandatory health insurance (LAMal/KVG)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [COMMUNE_REGISTRATION]
+      cite: CH_KVG
+
+    - step_id: BANK_ACCOUNT
+      name: "Swiss bank account opened"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [COMMUNE_REGISTRATION]
