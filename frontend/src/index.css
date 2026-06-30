@@ -74,9 +74,9 @@ body {
   color: var(--rp-text);
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+code, pre {
+  font-family: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Monaco,
+    Consolas, 'Courier New', monospace;
 }
 
 /* Ensure full viewport height */
