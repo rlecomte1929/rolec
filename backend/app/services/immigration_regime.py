@@ -120,6 +120,7 @@ class ImmigrationRegimeResult:
     exception_triggers: Tuple[str, ...] = ()     # ExceptionFlag types to evaluate
     notes: str = ""
     requires_employer_petition: bool = False     # True when employer must file on employee's behalf
+    confidence: float = 0.0                      # 0–1 match-specificity score (additive; see _REGIME_CONFIDENCE)
 
 
 # ─── Task-code sequences per regime ──────────────────────────────────────────
@@ -178,6 +179,21 @@ _REGIME_EXCEPTION_TRIGGERS: Dict[str, Tuple[str, ...]] = {
     ),
     "domestic": (),
     "unknown": (),
+}
+
+# Match-specificity confidence per regime. Derived from how specific the matching
+# rule is: a corridor-specific pathway (us_l1b, japan_coe, eu_free_movement, …) is a
+# high-confidence exact match; the standard_work_permit catch-all is a medium-confidence
+# fallback; "unknown" (no destination / cannot determine) is low confidence. This is an
+# advisory signal only — no downstream logic gates on it.
+_REGIME_CONFIDENCE: Dict[str, float] = {
+    "us_l1b": 0.9,
+    "japan_coe": 0.9,
+    "eu_free_movement": 0.9,
+    "uk_skilled_worker": 0.9,
+    "domestic": 0.9,
+    "standard_work_permit": 0.5,
+    "unknown": 0.2,
 }
 
 _REGIME_LEAD_TIME_WEEKS: Dict[str, int] = {
@@ -312,4 +328,5 @@ class ImmigrationRegimeRouter:
             exception_triggers=_REGIME_EXCEPTION_TRIGGERS.get(regime_id, ()),
             notes=notes,
             requires_employer_petition=requires_employer_petition,
+            confidence=_REGIME_CONFIDENCE.get(regime_id, 0.2),
         )
