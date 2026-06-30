@@ -64,7 +64,7 @@ _TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
 # identical to pre-P4. When ON, the candidate pool is widened before reranking so
 # the second pass can recover relevant chunks that the first pass ranked just
 # outside top_k.
-_RERANK_POOL_FACTOR = 3
+from .policy_rerank import _RERANK_POOL_FACTOR_DEFAULT as _RERANK_POOL_FACTOR
 
 
 def _rerank_enabled() -> bool:

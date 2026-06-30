@@ -34,6 +34,12 @@ from typing import Any, Dict, List, Sequence
 # context-precision on the HR-policy golden set without regressing any query.
 _DEFAULT_ALPHA = 0.6
 
+# How many times top_k candidates the retriever should fetch before reranking,
+# so the second pass can recover relevant chunks ranked just outside top_k.
+# Lives here (the pure module) so both the retriever and the offline eval share
+# one source of truth without importing the DB-bound retriever.
+_RERANK_POOL_FACTOR_DEFAULT = 3
+
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 # Mirror of eval_hr_policy_context_precision._STOP so both ends tokenize alike.
 _STOP = {

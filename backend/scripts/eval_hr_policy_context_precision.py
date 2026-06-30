@@ -135,12 +135,45 @@ class LexicalPolicyRetriever:
         ]
 
 
-def evaluate(queries: list[GoldenQuery], retriever: LexicalPolicyRetriever, k: int) -> list[QueryResult]:
+# P4: the production second-pass reranker (pure, no DB/network) so the offline
+# eval can measure context-precision WITH and WITHOUT it on the same corpus.
+from backend.app.services.policy_rerank import (  # noqa: E402
+    _RERANK_POOL_FACTOR_DEFAULT,
+    rerank_chunks,
+)
+
+
+def _retrieve_reranked(
+    retriever: LexicalPolicyRetriever, query: str, k: int
+) -> list[str]:
+    """Widen the first-pass pool (k * factor), apply the production reranker,
+    then truncate to k — mirroring the flag-ON retrieve() path in
+    policy_chunk_retriever. The Jaccard first-pass score stands in for the
+    embedding `adjusted_score` the reranker blends in production.
+    """
+    pool = retriever.retrieve(query, k=k * _RERANK_POOL_FACTOR_DEFAULT)
+    cands = [
+        {"chunk_id": c.chunk_id, "adjusted_score": c.score, "chunk_text": c.text}
+        for c in pool
+    ]
+    reranked = rerank_chunks(query, cands)
+    return [c["chunk_id"] for c in reranked[:k]]
+
+
+def evaluate(
+    queries: list[GoldenQuery],
+    retriever: LexicalPolicyRetriever,
+    k: int,
+    rerank: bool = False,
+) -> list[QueryResult]:
     results: list[QueryResult] = []
     for q in queries:
         retriever.set_current_query(q)
-        retrieved = retriever.retrieve(q.query_text, k=k)
-        retrieved_ids = [c.chunk_id for c in retrieved]
+        if rerank:
+            retrieved_ids = _retrieve_reranked(retriever, q.query_text, k)
+        else:
+            retrieved = retriever.retrieve(q.query_text, k=k)
+            retrieved_ids = [c.chunk_id for c in retrieved]
         p = precision_at_k(retrieved_ids, q.expected_chunk_ids, k)
         r = recall_at_k(retrieved_ids, q.expected_chunk_ids, k)
         results.append(
@@ -172,6 +205,16 @@ def main(argv: list[str] | None = None) -> None:
         help="Aggregate-precision threshold for CI gating (default 0.5).",
     )
     p.add_argument("--ci", action="store_true", help="Exit non-zero if aggregate is below threshold.")
+    p.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Apply the P4 lexical second-pass reranker (widen pool then re-order).",
+    )
+    p.add_argument(
+        "--compare",
+        action="store_true",
+        help="Run WITHOUT and WITH the reranker and print both aggregates (no CI exit).",
+    )
     args = p.parse_args(argv)
 
     queries = load_queries(args.queries)
@@ -179,12 +222,39 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Loaded {len(queries)} queries and {len(chunks)} chunks.")
 
     retriever = LexicalPolicyRetriever(chunks)
-    results = evaluate(queries, retriever, k=args.k)
+
+    if args.compare:
+        off = aggregate_report(
+            evaluate(queries, retriever, k=args.k, rerank=False),
+            metric_name="precision_at_k",
+            threshold=args.threshold,
+        )
+        on = aggregate_report(
+            evaluate(queries, retriever, k=args.k, rerank=True),
+            metric_name="precision_at_k",
+            threshold=args.threshold,
+        )
+        delta = round(on["aggregate"] - off["aggregate"], 4)
+        print(f"context-precision@{args.k}  OFF = {off['aggregate']:.4f}")
+        print(f"context-precision@{args.k}  ON  = {on['aggregate']:.4f}")
+        print(f"delta (ON - OFF)             = {delta:+.4f}")
+        if args.out:
+            write_report(
+                {"k": args.k, "off": off, "on": on, "delta": delta}, args.out
+            )
+        return
+
+    results = evaluate(queries, retriever, k=args.k, rerank=args.rerank)
     report = aggregate_report(
         results,
         metric_name="precision_at_k",
         threshold=args.threshold,
-        extra={"k": args.k, "retriever": type(retriever).__name__, "corpus": str(args.chunks)},
+        extra={
+            "k": args.k,
+            "retriever": type(retriever).__name__,
+            "rerank": args.rerank,
+            "corpus": str(args.chunks),
+        },
     )
 
     if args.out:
