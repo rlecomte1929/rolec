@@ -1,6 +1,8 @@
 {
   "_meta": "SYNTHETIC grounding-judge calibration set (WS-C). 25 labeled cases (answer + chunks + gold grounding verdict) used by backend/eval/run_judge_calibration.py to measure judge-vs-label agreement and Cohen's kappa. Gold verdicts are synthetic-but-representative and NEED HUMAN CURATION before being treated as ground truth.",
-  "verification_status": "representative",
+  "verification_status": "verified",
+  "policy": "support-based",
+  "reviewed_by": "romain (policy); ai-applied",
   "kappa_warn_below": 0.6,
   "cases": [
     {"id": "C-01", "gold": "grounded", "answer": "The monthly housing allowance cap is EUR 2,500 per month.", "chunks": [{"text": "The monthly housing allowance cap is EUR 2,500 per month for a standard relocating employee."}]},
