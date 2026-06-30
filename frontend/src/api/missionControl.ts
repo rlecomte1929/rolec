@@ -53,3 +53,11 @@ export async function patchWorkItem(
 ): Promise<{ ok: boolean }> {
   return apiPatch(`/api/admin/work-items/${encodeURIComponent(id)}`, body);
 }
+
+/**
+ * P2 — launch the autofix agent for one agent-eligible demand. Server-gated
+ * (admin + feature flag + auto_fixable + not blocked); opens a draft PR.
+ */
+export async function dispatchWorkItem(id: string): Promise<{ ok: boolean; run_id?: string; pr_url?: string | null }> {
+  return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/dispatch`, {});
+}

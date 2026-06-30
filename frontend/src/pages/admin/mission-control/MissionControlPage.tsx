@@ -6,6 +6,7 @@ import {
   syncWorkItems,
   retriageWorkItem,
   patchWorkItem,
+  dispatchWorkItem,
   type WorkItem,
 } from '../../../api/missionControl';
 
@@ -81,6 +82,17 @@ export const MissionControlPage: React.FC = () => {
     }
   }
 
+  async function onExecute(it: WorkItem) {
+    if (!window.confirm(`Dispatch the agent to open a fix PR for "${it.title}"?`)) return;
+    setError(null);
+    try {
+      await dispatchWorkItem(it.id);
+      await load();
+    } catch {
+      setError('Dispatch failed — check it is agent-eligible and dispatch is enabled.');
+    }
+  }
+
   return (
     <AdminLayout
       title="Mission Control"
@@ -142,9 +154,19 @@ export const MissionControlPage: React.FC = () => {
                 {it.source_url && (
                   <a href={it.source_url} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">source</a>
                 )}
-                <button className="ml-auto text-slate-500 hover:text-navy-800" onClick={() => void onRetriage(it.id)}>
-                  Re-triage
-                </button>
+                <span className="ml-auto flex items-center gap-3">
+                  {it.pr_url && (
+                    <a href={it.pr_url} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">PR ↗</a>
+                  )}
+                  {it.auto_fixable && !it.triage_json?.blocked && (
+                    <button className="font-medium text-accent-700 hover:text-accent-800" onClick={() => void onExecute(it)}>
+                      Execute →
+                    </button>
+                  )}
+                  <button className="text-slate-500 hover:text-navy-800" onClick={() => void onRetriage(it.id)}>
+                    Re-triage
+                  </button>
+                </span>
               </div>
             </div>
           </Card>
