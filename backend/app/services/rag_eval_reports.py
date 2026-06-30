@@ -55,6 +55,8 @@ METRIC_SPECS: List[MetricSpec] = [
     # Answer-path faithfulness (run_answer_grade): grounding_rate of the immigration
     # Q&A answers (the "remove noise, ensure accuracy" surface).
     MetricSpec("answer_grounding", "Answer grounding", 0.90),
+    # Confidence calibration (run_calibration_eval): 1 − ECE; is HIGH actually right?
+    MetricSpec("calibration_score", "Confidence calibration", 0.90),
 ]
 
 _SPEC_BY_KEY: Dict[str, MetricSpec] = {s.key: s for s in METRIC_SPECS}
@@ -138,6 +140,7 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "structuring_accuracy": [0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
     "answer_grounding": [0.90, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.96],
+    "calibration_score": [0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.94, 0.95, 0.95, 0.95, 0.96, 0.96],
 }
 _MOCK_WEEKS = 13
 
