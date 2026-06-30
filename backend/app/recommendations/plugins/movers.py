@@ -121,8 +121,14 @@ class MoversPlugin(BasePlugin):
         capacity_fit = 100.0 if max_vol >= vol_est else max(0, 100 * max_vol / vol_est)
 
         intl = c.move_type == "international"
+        intl_hard_floor = False
         if intl and not intl_cap:
+            # Hard floor: a domestic-only mover is unqualified for an international move.
+            # Penalise capacity_fit for the breakdown, then cap the final score_raw ≤ 5
+            # so the mover cannot creep into top ranks via other strong signals
+            # (rating, cost, service area).
             capacity_fit *= 0.3
+            intl_hard_floor = True
         elif intl and intl_cap:
             capacity_fit = min(100, capacity_fit * 1.1)
 
@@ -182,6 +188,8 @@ class MoversPlugin(BasePlugin):
             + w_av * availability_score
             + w_sarea * service_area_score
         )
+        if intl_hard_floor:
+            score_raw = min(score_raw, 5.0)
 
         rationale = f"Volume est. {vol_est}m³ → {vol_info['suggested_truck_class']}. "
         rationale += f"Lead time ~{lead_days} days. "

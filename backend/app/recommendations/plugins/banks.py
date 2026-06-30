@@ -67,18 +67,17 @@ class BanksPlugin(BasePlugin):
         avail_score = avail_map.get(avail, 100)
 
         # Dynamic weights: scale expat/digital by stated priority (0–10), branch
-        # by need level, and fees by sensitivity.  Weights are renormalised to sum
-        # to 1.0 so scores stay in the 0–100 range.
+        # by need level.  fee_sensitivity is already captured in fee_score via
+        # fee_penalty_scale — the fees weight is NOT multiplied again to avoid
+        # double-application of the same lever.
         base_w = dict(get_weights("banks", segment=derive_segment(criteria)))
         expat_mult = 0.5 + (criteria.expat_friendliness_priority / 10.0) * 1.5
         digital_mult = 0.5 + (criteria.digital_priority / 10.0) * 1.5
         branch_mult = {"none": 0.2, "low": 0.6, "medium": 1.8, "high": 2.5}.get(bn, 1.0)
-        fee_mult = {"low": 0.4, "medium": 1.0, "high": 1.5}.get(criteria.fee_sensitivity, 1.0)
         w = dict(base_w)
         w["expat"] *= expat_mult
         w["digital"] *= digital_mult
         w["branch"] *= branch_mult
-        w["fees"] *= fee_mult
         wsum = sum(w.values())
         w = {k: v / wsum for k, v in w.items()}
 

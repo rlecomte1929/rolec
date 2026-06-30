@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Pre-refactor score_raw baseline per (category,item) used to prove the weights externalization (weights.py) is value-preserving. Regenerate by reverting weights.py and re-running the capture if plugin scoring intentionally changes.",
+    "description": "Baseline per (category,item) after ranking-engine fixes: insurance scores capped at 100 (expat bonus applied before cap); banks fee_mult weight-multiplier removed (fee_penalty_scale kept); movers domestic-only hard-floored to 5.0 on international moves. Regenerate if plugin scoring intentionally changes.",
     "verification_status": "representative",
     "generated_by": "WS-D weight externalization capture (backend/app/recommendations/plugins/*.score)"
   },
@@ -167,7 +167,7 @@
         },
         {
           "item_id": "m-3",
-          "score_raw": 70.778947
+          "score_raw": 5.0
         },
         {
           "item_id": "m-4",
@@ -175,7 +175,7 @@
         },
         {
           "item_id": "m-5",
-          "score_raw": 69.747368
+          "score_raw": 5.0
         },
         {
           "item_id": "m-6",
@@ -183,7 +183,7 @@
         },
         {
           "item_id": "m-7",
-          "score_raw": 69.584211
+          "score_raw": 5.0
         },
         {
           "item_id": "m-8",
@@ -195,7 +195,7 @@
         },
         {
           "item_id": "m-10",
-          "score_raw": 68.178947
+          "score_raw": 5.0
         }
       ]
     },
@@ -332,43 +332,43 @@
       "scores": [
         {
           "item_id": "b-1",
-          "score_raw": 93.13253
+          "score_raw": 93.595506
         },
         {
           "item_id": "b-2",
-          "score_raw": 87.710843
+          "score_raw": 88.539326
         },
         {
           "item_id": "b-3",
-          "score_raw": 87.248996
+          "score_raw": 87.687266
         },
         {
           "item_id": "b-4",
-          "score_raw": 92.409639
+          "score_raw": 92.5
         },
         {
           "item_id": "b-5",
-          "score_raw": 91.445783
+          "score_raw": 91.601124
         },
         {
           "item_id": "b-6",
-          "score_raw": 86.827309
+          "score_raw": 87.294007
         },
         {
           "item_id": "b-7",
-          "score_raw": 79.899598
+          "score_raw": 81.254682
         },
         {
           "item_id": "b-8",
-          "score_raw": 76.124498
+          "score_raw": 77.734082
         },
         {
           "item_id": "b-9",
-          "score_raw": 86.425703
+          "score_raw": 87.340824
         },
         {
           "item_id": "b-10",
-          "score_raw": 86.26506
+          "score_raw": 87.191011
         }
       ]
     },
@@ -392,15 +392,15 @@
         },
         {
           "item_id": "i-3",
-          "score_raw": 101.3
+          "score_raw": 100.0
         },
         {
           "item_id": "i-4",
-          "score_raw": 101.6
+          "score_raw": 100.0
         },
         {
           "item_id": "i-5",
-          "score_raw": 101.0
+          "score_raw": 100.0
         },
         {
           "item_id": "i-6",
@@ -416,7 +416,7 @@
         },
         {
           "item_id": "i-9",
-          "score_raw": 101.3
+          "score_raw": 100.0
         },
         {
           "item_id": "i-10",

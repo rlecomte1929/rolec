@@ -49,11 +49,11 @@ class InsurancePlugin(BasePlugin):
         # expat_specialized bonus: global expat insurers (Cigna, Allianz Care, Bupa Global, GeoBlue)
         # have purpose-built international networks and repatriation/evacuation coverage beyond what
         # local/regional insurers offer for a relocation product.  A 2.5-pt bonus breaks the cluster
-        # tie (8 providers within 1.2 raw pts) without distorting the 0–100 scale.  The bonus is
-        # applied AFTER the base-score cap so it is never swallowed by min(100, ...).
+        # tie (8 providers within 1.2 raw pts) without distorting the 0–100 scale.  The cap is
+        # applied AFTER the bonus so the final value is always ≤ 100.
         expat_bonus = 2.5 if item.get("expat_specialized", False) else 0.0
         return {
-            "score_raw": min(100, score_raw) + expat_bonus,
+            "score_raw": min(100, score_raw + expat_bonus),
             "breakdown": {"coverage": coverage_score, "deductible": ded_score, "family": family,
                           "rating": rating, "availability": avail_score},
             "summary": f"{item.get('name')} — {', '.join(item.get('coverage_types', []))}, {item.get('rating')}/5.",
