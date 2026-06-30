@@ -86,8 +86,11 @@ def test_classify_llm_pii_not_in_prompt_phone():
 
     assert len(fake.calls) == 1
     user_arg = fake.calls[0]["user"]
-    assert "+33" not in user_arg or "612345678" not in user_arg.replace(" ", ""), (
-        "Raw phone number leaked into LLM prompt"
+    # Both halves must be absent independently — an OR would let a partial
+    # redaction silently pass (e.g. prefix stripped but digits remaining).
+    assert "+33" not in user_arg, "Phone prefix +33 leaked into LLM prompt"
+    assert "612345678" not in user_arg.replace(" ", ""), (
+        "Phone digit body 612345678 leaked into LLM prompt"
     )
     # At least one REDACTED placeholder must be present
     assert "[REDACTED_" in user_arg
@@ -305,6 +308,67 @@ def test_classify_best_never_raises_when_llm_fails(monkeypatch):
     result = m.classify_best("spinner broken", "bug", db=None, client=boom)
     assert "severity" in result
     assert "area" in result
+
+
+# ---------------------------------------------------------------------------
+# PII-residue gate — masker silent-failure path
+# ---------------------------------------------------------------------------
+
+def test_classify_llm_residue_gate_blocks_llm_on_masker_failure(monkeypatch):
+    """If mask_pii returns the raw text (its silent-failure mode) and that text
+    contains PII-shaped content, classify_llm must NOT call the LLM and must
+    return the deterministic classify() result instead.
+
+    This proves the _PII_RESIDUE gate catches the path where pii_masker catches
+    its own exception internally and silently returns the unmasked input.
+    """
+    import backend.app.services.feedback_triage as m
+
+    # Input contains an email — a clear PII signal that mask_pii would normally
+    # redact.  We simulate masker failure by patching it to be a no-op.
+    raw = "Please fix this for jane@example.com urgently"
+
+    def _broken_masker(text: str) -> str:
+        """Simulate mask_pii's silent-failure return (returns raw input)."""
+        return text  # no masking — as if an internal exception was caught
+
+    monkeypatch.setattr(
+        "backend.app.services.feedback_triage.mask_pii",
+        _broken_masker,
+    )
+
+    fake = make_fake_client({"severity": "low", "area": "other"})
+    result = m.classify_llm(raw, "bug", client=fake)
+
+    # Residue gate must have fired: LLM must NOT have been called.
+    assert len(fake.calls) == 0, (
+        "classify_llm called the LLM despite PII residue in masked text; "
+        "the residue gate must block the call when masking silently failed"
+    )
+    # Must still return a valid deterministic result (fail-open, not fail-crash).
+    assert result["severity"] in {"low", "medium", "high", "critical"}
+    assert result["area"] in {"ui", "api", "isolation", "feature", "other"}
+
+
+def test_classify_llm_residue_gate_does_not_false_positive_on_clean_text(monkeypatch):
+    """PII-free feedback must pass the residue gate and reach the LLM.
+
+    "the dashboard button is broken" contains no email and no digit run of 7+,
+    so _PII_RESIDUE must not fire and the LLM client must be called exactly once.
+    """
+    import backend.app.services.feedback_triage as m
+
+    # Do NOT patch mask_pii — let the real masker run on PII-free text.
+    clean_text = "the dashboard button is broken"
+    fake = make_fake_client({"severity": "high", "area": "ui"})
+
+    result = m.classify_llm(clean_text, "bug", client=fake)
+
+    assert len(fake.calls) == 1, (
+        "classify_llm did NOT call the LLM for clean (PII-free) text; "
+        "the residue gate false-positived and blocked the LLM call"
+    )
+    assert result == {"severity": "high", "area": "ui"}
 
 
 # ---------------------------------------------------------------------------

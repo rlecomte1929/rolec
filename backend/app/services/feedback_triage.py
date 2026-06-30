@@ -34,6 +34,8 @@ import logging
 import re
 from typing import Any, Callable, Optional
 
+from .pii_masker import mask_pii  # module-level so tests can monkeypatch feedback_triage.mask_pii
+
 log = logging.getLogger(__name__)
 
 _ISOLATION_WORDS = re.compile(
@@ -61,6 +63,20 @@ _HIGH_WORDS = re.compile(
 
 _VALID_SEVERITIES = {"low", "medium", "high", "critical"}
 _VALID_AREAS = {"ui", "api", "isolation", "feature", "other"}
+
+# PII-residue check — compiled once for efficiency.
+# pii_masker.mask_pii catches its own exceptions and returns the RAW input on
+# failure (it does not raise), so the surrounding try/except in classify_llm
+# cannot catch the silent-failure path.  After masking, we scan the result for
+# PII-shaped content that must not survive masking: an email-like token and a
+# run of 7+ consecutive digits (covers phone numbers, SSNs, passport numbers,
+# etc.).  If either fires, masking clearly did not work → refuse to call the
+# LLM and fall back to the deterministic classifier.
+# NOTE: do NOT use `masked == text` as the failure signal — most clean feedback
+# ("the button is broken") contains no PII, so mask_pii correctly returns it
+# unchanged; treating equality as failure would disable the LLM for the common
+# case.
+_PII_RESIDUE: re.Pattern = re.compile(r"\S+@\S+\.\S+|\d{7,}")
 
 
 def classify(text: str, category: str | None) -> dict:
@@ -142,9 +158,18 @@ def classify_llm(
         Falls back to ``classify(text, category)`` on any error (fail-open).
     """
     try:
-        from .pii_masker import mask_pii  # lazy to keep module importable w/o deps
-
         masked = mask_pii(text or "")
+
+        # Guard against the masker's silent-failure path: mask_pii returns the
+        # raw text (without raising) when it hits an internal error.  If
+        # PII-shaped content survives — an email-like token or a 7+-digit run —
+        # the masking failed; fall back instead of leaking raw PII to the LLM.
+        if _PII_RESIDUE.search(masked):
+            log.warning(
+                "classify_llm: PII residue detected in masked text; "
+                "masker may have failed silently — falling back to deterministic"
+            )
+            return classify(text, category)
 
         _call = client
         if _call is None:
