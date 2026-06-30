@@ -142,6 +142,8 @@ const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((mod
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
 const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
+const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
+const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
 const AdminPrompts = lazy(() => import('./pages/admin/AdminPrompts').then((module) => ({ default: module.AdminPrompts })));
 const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
@@ -422,6 +424,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAuditLog.path} element={<RequireAdminRoute><AdminAuditLogPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPrompts.path} element={<RequireAdminRoute><AdminPrompts /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />
