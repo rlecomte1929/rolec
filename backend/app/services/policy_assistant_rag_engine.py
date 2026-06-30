@@ -167,20 +167,46 @@ DEFAULT_GROUNDEDNESS_MIN_SCORE = 0.5
 
 
 def _groundedness_gate_enabled() -> bool:
-    """Read the gate flag at call time (env, default OFF). Truthy values:
-    1/true/yes/on (case-insensitive). Anything else — including unset — is OFF,
-    preserving the exact current fail-open behavior."""
-    return os.environ.get(GROUNDEDNESS_GATE_FLAG, "").strip().lower() in (
-        "1", "true", "yes", "on"
-    )
+    """Read the gate flag at call time (env→DB→default OFF).
+
+    Truthy values: 1/true/yes/on (case-insensitive). Anything else is OFF.
+    DB is queried best-effort; a missing table or any error falls through to default.
+    """
+    from ..db import SessionLocal  # deferred: avoids import-at-init cost
+    from .platform_settings import get_setting as _ps_get
+    try:
+        with SessionLocal() as _db:
+            val = _ps_get(
+                "policy_rag_groundedness_gate",
+                env_var="POLICY_RAG_GROUNDEDNESS_GATE",
+                default="0",
+                db=_db,
+            )
+    except Exception:
+        val = _ps_get("policy_rag_groundedness_gate", env_var="POLICY_RAG_GROUNDEDNESS_GATE", default="0")
+    return (val or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _groundedness_min_score() -> float:
-    """Minimum acceptable grounding score when the gate is ON. Falls back to the
-    default on an unset or unparseable value."""
-    raw = os.environ.get(GROUNDEDNESS_MIN_SCORE_FLAG, "")
+    """Minimum acceptable grounding score when the gate is ON (env→DB→default 0.5)."""
+    from ..db import SessionLocal
+    from .platform_settings import get_setting as _ps_get
     try:
-        return float(raw)
+        with SessionLocal() as _db:
+            raw = _ps_get(
+                "policy_rag_groundedness_min_score",
+                env_var="POLICY_RAG_GROUNDEDNESS_MIN_SCORE",
+                default="0.5",
+                db=_db,
+            )
+    except Exception:
+        raw = _ps_get(
+            "policy_rag_groundedness_min_score",
+            env_var="POLICY_RAG_GROUNDEDNESS_MIN_SCORE",
+            default="0.5",
+        )
+    try:
+        return float(raw or "0.5")
     except (TypeError, ValueError):
         return DEFAULT_GROUNDEDNESS_MIN_SCORE
 
