@@ -4,13 +4,23 @@ import {
   askImmigrationQuestion,
   type ImmigrationAnswer,
 } from '../../api/immigrationAnswer';
+import { getPolicyAnswer } from '../../api/policyAssistantQuery';
+import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
+import {
+  deriveSupportStatus,
+  supportStatusLabel,
+  supportStatusBadgeClass,
+} from '../policy/employeePolicyAssistantModel';
 import { submitAiFeedback, type FeedbackVerdict } from '../../api/aiFeedback';
+import { classifyAssistantDomain, type AssistantDomain } from './assistantDomainRouter';
 
 /**
- * Employee-facing grounded immigration Q&A (AIQ-843 backend + AIQ-856 verdict).
- * Asks /api/immigration/answer for a corridor + question, renders the cited
- * answer, and captures a 👍/👎 verdict into ai_human_feedback (reliability loop;
- * ships dormant — RELIABILITY_WEIGHT=0 — so feedback accrues before it affects ranking).
+ * Unified relocation assistant (Slice 5 — policy bridge). One question box that
+ * routes each question to the grounded IMMIGRATION engine ("what does my move
+ * need") or the company-POLICY engine ("what does my company cover"), and asks
+ * the user when the question is genuinely ambiguous. Each engine keeps its own
+ * grounding + citations + refusal, so a misroute is bounded (the wrong engine
+ * just declines). Immigration 👍/👎 still feeds ai_human_feedback (AIQ-856).
  */
 
 type ConfidenceBadge = { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' };
@@ -34,32 +44,65 @@ export function ImmigrationAnswerPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useState<ImmigrationAnswer | null>(null);
+  const [policyAnswer, setPolicyAnswer] = useState<PolicyAssistantAnswer | null>(null);
+  const [clarifyFor, setClarifyFor] = useState<string | null>(null);
 
   const [verdict, setVerdict] = useState<FeedbackVerdict | null>(null);
   const [verdictError, setVerdictError] = useState(false);
 
-  const canAsk = !!(from.trim() && to.trim() && nationality.trim() && permitType.trim() && query.trim());
+  const canAsk = !!query.trim();
+  const corridorComplete = !!(from.trim() && to.trim() && nationality.trim() && permitType.trim());
 
-  async function ask() {
-    if (!canAsk) return;
-    setLoading(true);
+  function resetAnswers() {
     setError(null);
     setAnswer(null);
+    setPolicyAnswer(null);
     setVerdict(null);
     setVerdictError(false);
-    try {
-      const res = await askImmigrationQuestion({
-        corridor_from: from.trim().toUpperCase(),
-        corridor_to: to.trim().toUpperCase(),
-        nationality: nationality.trim().toUpperCase(),
-        permit_type: permitType.trim(),
-        query: query.trim(),
-      });
-      setAnswer(res);
-    } catch {
-      setError('Could not get an answer right now. Please try again.');
-    } finally {
-      setLoading(false);
+  }
+
+  async function ask(forced?: AssistantDomain) {
+    const q = query.trim();
+    if (!q) return;
+    const domain = forced ?? classifyAssistantDomain(q);
+    resetAnswers();
+
+    if (domain === 'ambiguous') {
+      setClarifyFor(q);
+      return;
+    }
+    setClarifyFor(null);
+
+    if (domain === 'immigration') {
+      if (!corridorComplete) {
+        setError('Add your corridor (From / To / Nationality / Permit) above for immigration questions.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await askImmigrationQuestion({
+          corridor_from: from.trim().toUpperCase(),
+          corridor_to: to.trim().toUpperCase(),
+          nationality: nationality.trim().toUpperCase(),
+          permit_type: permitType.trim(),
+          query: q,
+        });
+        setAnswer(res);
+      } catch {
+        setError('Could not get an answer right now. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setLoading(true);
+      try {
+        const res = await getPolicyAnswer(q);
+        setPolicyAnswer(res);
+      } catch {
+        setError('Could not get an answer right now. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
   }
 
@@ -77,14 +120,16 @@ export function ImmigrationAnswerPanel() {
 
   const isRefusal = !!answer && answer.answer_kind !== 'answer';
   const conf = confidenceBadge(answer?.confidence);
+  const policyStatus = policyAnswer ? deriveSupportStatus(policyAnswer) : null;
 
   return (
     <div className="max-w-3xl space-y-4">
       <Card>
         <div className="space-y-3 p-1">
           <p className="text-sm text-slate-600">
-            Ask a grounded immigration question for your corridor. Answers are sourced
-            only from official guidance and cite where each point comes from.
+            Ask about <strong>your move</strong> (visas, permits, documents) or <strong>your company&apos;s
+            benefits</strong> (allowances, what&apos;s covered). Both answers are grounded and cite where each
+            point comes from.
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Input aria-label="From country" placeholder="From (e.g. IN)" value={from} onChange={(v) => setFrom(v)} />
@@ -96,7 +141,7 @@ export function ImmigrationAnswerPanel() {
             aria-label="Your question"
             className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-accent-500"
             rows={3}
-            placeholder="e.g. What documents do I need for the work visa application?"
+            placeholder="e.g. What documents do I need? · Does my company cover temporary housing?"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -104,12 +149,26 @@ export function ImmigrationAnswerPanel() {
             <Button variant="primary" onClick={() => void ask()} disabled={!canAsk || loading}>
               {loading ? 'Asking…' : 'Ask'}
             </Button>
-            <span className="text-xs text-gray-400">Official sources only · always confirm with the cited authority</span>
+            <span className="text-xs text-gray-400">Grounded + cited · always confirm with the cited source</span>
           </div>
         </div>
       </Card>
 
       {error && <Alert variant="error">{error}</Alert>}
+
+      {clarifyFor && (
+        <Card>
+          <div className="space-y-2 p-1" data-testid="assistant-clarifier">
+            <p className="text-sm text-slate-700">
+              Is this about <strong>your move</strong>, or <strong>your company&apos;s benefits</strong>?
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => void ask('immigration')}>About my move</Button>
+              <Button variant="outline" onClick={() => void ask('policy')}>About my benefits</Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {answer && (
         <Card>
@@ -122,6 +181,7 @@ export function ImmigrationAnswerPanel() {
             ) : (
               <>
                 <div className="flex items-center gap-2">
+                  <Badge variant="neutral">Immigration guidance</Badge>
                   <Badge variant={conf.variant}>{conf.label}</Badge>
                   {answer.all_stale_warning && <Badge variant="warning">Sources may be outdated</Badge>}
                 </div>
@@ -156,6 +216,34 @@ export function ImmigrationAnswerPanel() {
                     {verdictError && <span className="text-xs text-red-500">Couldn&apos;t save — try again.</span>}
                   </>
                 )}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {policyAnswer && policyStatus && (
+        <Card>
+          <div className="space-y-3 p-1" data-testid="policy-answer">
+            <div className="flex items-center gap-2">
+              <Badge variant="neutral">Your company policy</Badge>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${supportStatusBadgeClass(policyStatus)}`}>
+                {supportStatusLabel(policyStatus)}
+              </span>
+            </div>
+            <div className="whitespace-pre-wrap text-sm text-slate-800">
+              {policyAnswer.answer_type === 'refusal'
+                ? policyAnswer.refusal?.refusal_text
+                : policyAnswer.answer_text}
+            </div>
+            {policyAnswer.cited_chunks && policyAnswer.cited_chunks.length > 0 && (
+              <div className="border-t border-gray-100 pt-3">
+                <p className="mb-1 text-xs font-semibold text-slate-500">Policy references</p>
+                <ul className="space-y-1">
+                  {policyAnswer.cited_chunks.map((c, i) => (
+                    <li key={`${c.id}-${i}`} className="text-xs text-slate-600">{c.source_ref}</li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

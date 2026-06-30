@@ -11,6 +11,9 @@ expect.extend(matchers);
 
 vi.mock('../../api/immigrationAnswer', () => ({ askImmigrationQuestion: vi.fn() }));
 vi.mock('../../api/aiFeedback', () => ({ submitAiFeedback: vi.fn() }));
+// The unified panel (Slice 5) imports the policy-query module → api/client → supabase.
+// Mock it so this immigration-only suite doesn't pull the supabase client into jsdom.
+vi.mock('../../api/policyAssistantQuery', () => ({ getPolicyAnswer: vi.fn() }));
 
 import { askImmigrationQuestion } from '../../api/immigrationAnswer';
 import { submitAiFeedback } from '../../api/aiFeedback';

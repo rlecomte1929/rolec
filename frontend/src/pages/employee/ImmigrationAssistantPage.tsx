@@ -5,10 +5,11 @@ import { ImmigrationAnswerPanel } from '../../features/immigration/ImmigrationAn
 
 /**
  * Route: /employee/immigration-assistant
- * Employee-facing grounded immigration Q&A (AIQ-843 backend + AIQ-856 verdict capture).
+ * Unified relocation assistant (Slice 5): grounded Q&A spanning immigration
+ * ("what does my move need") and company policy ("what does my company cover").
  */
 export const ImmigrationAssistantPage: React.FC = () => (
-  <AppShell title="Immigration Q&A" subtitle="Grounded, cited answers for your corridor">
+  <AppShell title="Relocation Assistant" subtitle="Grounded answers about your move and your company's benefits">
     <Container maxWidth="xl" className="py-8">
       <ImmigrationAnswerPanel />
     </Container>
