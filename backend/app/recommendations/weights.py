@@ -42,13 +42,16 @@ WEIGHTS: Dict[str, Dict[str, float]] = {
         "availability": 0.1,
     },
     # movers.py — fallbacks for criteria.weights (request may override per key).
+    # service_area (0.10) added to score destination-city coverage from service_areas dataset field;
+    # services and rating reduced by 0.05 each to keep the sum at 1.0.
     "movers": {
         "cost": 0.2,
         "speed": 0.2,
         "reliability": 0.2,
-        "services": 0.15,
-        "rating": 0.15,
-        "availability": 0.1,
+        "services": 0.10,
+        "rating": 0.10,
+        "availability": 0.10,
+        "service_area": 0.10,
     },
     # schools.py — fallbacks for criteria.weights (request may override per key).
     "schools": {

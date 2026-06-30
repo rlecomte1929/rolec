@@ -48,6 +48,37 @@ def estimate_volume_m3(criteria: Dict[str, Any]) -> Dict[str, Any]:
     return {"volume_m3_estimate": volume_m3, "suggested_truck_class": truck}
 
 
+def _service_area_score(destination_city: str, service_areas: List[str]) -> float:
+    """Score 0–100 for how well a mover's service_areas cover the destination city.
+
+    Tiers:
+    - 100: exact city name appears in service_areas (e.g. "Tokyo" for Tokyo)
+    - 85:  broad global coverage ("Global", "Worldwide")
+    - 75:  regional coverage that includes the destination continent/subregion
+           (e.g. "Asia", "Asia-Pacific" for a Japanese city)
+    - 20:  no relevant coverage (local-only or wrong region)
+    """
+    if not destination_city:
+        return 50.0  # unknown destination → neutral
+    dest = destination_city.strip().lower()
+    areas_lower = [a.strip().lower() for a in (service_areas or [])]
+
+    # Exact city match (substring in either direction)
+    if any(dest in a or a == dest for a in areas_lower):
+        return 100.0
+
+    # Global coverage keywords
+    if any(k in a for a in areas_lower for k in ("global", "worldwide")):
+        return 85.0
+
+    # Regional keywords that cover Asia/Pacific
+    asia_keywords = ("asia", "asia-pacific", "apac")
+    if any(k in a for a in areas_lower for k in asia_keywords):
+        return 75.0
+
+    return 20.0
+
+
 class MoversCriteria(BaseModel):
     origin_city: str = ""
     destination_city: str = ""
@@ -129,6 +160,10 @@ class MoversPlugin(BasePlugin):
         avail_map = {"high": 100, "medium": 75, "low": 50, "scarce": 25}
         availability_score = avail_map.get(avail, 75)
 
+        service_area_score = _service_area_score(
+            c.destination_city, item.get("service_areas") or []
+        )
+
         dw = get_weights("movers", segment=derive_segment(c))
         w_cap = w.get("cost", dw["cost"])
         w_time = w.get("speed", dw["speed"])
@@ -136,6 +171,7 @@ class MoversPlugin(BasePlugin):
         w_svc = w.get("services", dw["services"])
         w_rat = w.get("rating", dw["rating"])
         w_av = w.get("availability", dw["availability"])
+        w_sarea = w.get("service_area", dw.get("service_area", 0.0))
 
         score_raw = (
             w_cap * capacity_fit * 0.5 + w_cap * cost_score * 0.5
@@ -144,6 +180,7 @@ class MoversPlugin(BasePlugin):
             + w_svc * service_fit
             + w_rat * rating_score
             + w_av * availability_score
+            + w_sarea * service_area_score
         )
 
         rationale = f"Volume est. {vol_est}m³ → {vol_info['suggested_truck_class']}. "
@@ -169,6 +206,7 @@ class MoversPlugin(BasePlugin):
                 "language": lang_support,
                 "rating": rating_score,
                 "availability": availability_score,
+                "service_area": service_area_score,
             },
             "summary": f"{item.get('name')} — {cost_lvl} cost, ~{lead_days}d lead, {rating}/5.",
             "rationale": rationale,
