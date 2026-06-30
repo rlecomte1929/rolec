@@ -1,4 +1,4 @@
-{"_meta":true,"verification_status":"verified","severity_policy":"critical=breach|total-outage; high=core-feature-broken; medium=partial; low=cosmetic","reviewed_by":"romain (policy); ai-applied","note":"Illustrative labels — human curation required before production use."}
+{"_meta":true,"verification_status":"verified","severity_policy":"critical=breach|total-outage; high=core-feature-broken; medium=partial; low=cosmetic","reviewed_by":"romain (policy); ai-applied","note":"Curated and verified 2026-06-30 under the severity_policy above (policy by Romain, AI-applied per case); known_failure golds are human-correct (classifier is wrong). See audit/admin/35-feedback-triage-curation.md."}
 {"id":"tc-01","text":"There seems to be a data leak between tenants in the reporting module","category":"bug","gold_severity":"critical","gold_area":"isolation"}
 {"id":"tc-02","text":"After cross-company transfer, user data from another company is now visible","category":"bug","gold_severity":"critical","gold_area":"isolation"}
 {"id":"tc-03","text":"The submit button is completely broken and nothing loads","category":"bug","gold_severity":"high","gold_area":"ui"}
