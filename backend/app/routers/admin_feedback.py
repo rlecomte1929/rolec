@@ -2,6 +2,7 @@
 
 GET  /api/admin/feedback?stream=&status=&since=  → normalized rows across all streams
 PATCH /api/admin/feedback/{stream}/{id}           → upsert feedback_status + audit
+POST  /api/admin/feedback/{stream}/{id}/dispatch  → dispatch ticket to routine (BR-2)
 
 ML tables (feedback / ai_human_feedback / policy_answer_helpfulness) are NEVER mutated.
 All mutations go to feedback_status only.
@@ -11,6 +12,7 @@ Dual-registered in backend/main.py AND backend/app/main.py (CLAUDE.md rule).
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional
 
@@ -199,3 +201,86 @@ def triage_feedback(
         detail={"stream": stream, "id": item_id, "status": body.status},
     )
     return {"stream": stream, "id": item_id, "status": body.status}
+
+
+# ── Dispatch endpoint ─────────────────────────────────────────────────────────
+
+
+class DispatchBody(BaseModel):
+    confirm: Optional[bool] = None
+    note: Optional[str] = None
+
+
+@router.post("/feedback/{stream}/{item_id}/dispatch")
+def dispatch_feedback_ticket(
+    stream: str,
+    item_id: str,
+    body: DispatchBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Dispatch a feedback ticket to a routine.
+
+    High-risk tickets (severity=critical OR area=isolation) require an explicit
+    confirm=true in the request body — the human-in-the-loop gate.  Lower-risk
+    tickets dispatch without confirmation.
+
+    Side effects: sets dispatch_status/status='dispatched' + dispatch_ref on
+    feedback_status, writes a 'ticket_dispatched' audit row.
+    """
+    # 1. Load ticket severity/area — 404 if no row exists.
+    row = db.execute(
+        text(
+            "SELECT severity, area FROM feedback_status "
+            "WHERE stream = :stream AND source_id = :source_id"
+        ),
+        {"stream": stream, "source_id": item_id},
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    severity, area = row[0], row[1]
+
+    # 2. HITL gate: high-risk tickets require explicit human confirmation.
+    is_high_risk = severity == "critical" or area == "isolation"
+    if is_high_risk and not body.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="high-risk ticket requires explicit confirm",
+        )
+
+    # 3. Dispatch: generate ref, update feedback_status, audit.
+    dispatch_ref = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    db.execute(
+        text(
+            "UPDATE feedback_status "
+            "SET dispatch_ref = :dispatch_ref, dispatch_status = 'dispatched', "
+            "    status = 'dispatched', updated_at = :now "
+            "WHERE stream = :stream AND source_id = :source_id"
+        ),
+        {
+            "dispatch_ref": dispatch_ref,
+            "now": now,
+            "stream": stream,
+            "source_id": item_id,
+        },
+    )
+
+    actor_id = str(user.get("id") or user.get("user_id") or "unknown")
+    record_admin_event(
+        db,
+        actor_id=actor_id,
+        event="ticket_dispatched",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={
+            "stream": stream,
+            "severity": severity,
+            "area": area,
+            "dispatch_ref": dispatch_ref,
+            "note": body.note,
+        },
+    )
+
+    return {"dispatched": True, "dispatch_ref": dispatch_ref, "status": "dispatched"}
