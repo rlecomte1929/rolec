@@ -233,9 +233,30 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Judge: 'mock' (offline deterministic, default) or 'verifier' (real LLM).",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of the human summary.")
+    parser.add_argument(
+        "--emit-dashboard",
+        action="store_true",
+        help="Write a dated judge_calibration_kappa dashboard report into --out-dir "
+        "(off by default so tests/CI never write files).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default=os.path.join(_REPO_ROOT, "audit", "rag_eval"),
+        help="Directory for --emit-dashboard report files.",
+    )
     args = parser.parse_args(argv)
 
     report = run_eval(args.fixtures, judge_name=args.judge)
+
+    if args.emit_dashboard:
+        from pathlib import Path
+
+        from backend.eval.dashboard_report import write_dashboard_report
+
+        dest = write_dashboard_report(
+            Path(args.out_dir), "judge_calibration_kappa", report["cohen_kappa"], report
+        )
+        print(f"wrote {dest}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report, indent=2))

@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -160,12 +161,32 @@ def main() -> None:
         action="store_true",
         help="Use the real Claude judge (requires ANTHROPIC_API_KEY). Default: mock.",
     )
+    parser.add_argument(
+        "--emit-dashboard",
+        action="store_true",
+        help="Write a dated ranking_agreement dashboard report into --out-dir "
+        "(off by default so tests/CI never write files).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "audit" / "rag_eval",
+        help="Directory for --emit-dashboard report files.",
+    )
     args = parser.parse_args()
 
     os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
     with args.fixtures.open(encoding="utf-8") as f:
         fixtures = json.load(f)
     report = run_judge(fixtures, live=args.live)
+
+    if args.emit_dashboard:
+        from backend.eval.dashboard_report import write_dashboard_report
+
+        dest = write_dashboard_report(
+            args.out_dir, "ranking_agreement", report["mean_agreement"], report
+        )
+        print(f"wrote {dest}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report, indent=2))

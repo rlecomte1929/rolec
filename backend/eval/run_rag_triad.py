@@ -41,6 +41,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Make ``backend.app...`` importable whether invoked as ``python -m eval.run_rag_triad``
@@ -247,9 +248,36 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Emit a machine-readable JSON report instead of the human summary.",
     )
+    parser.add_argument(
+        "--emit-dashboard",
+        action="store_true",
+        help="Write one dated dashboard report per triad metric into --out-dir "
+        "(off by default so tests/CI never write files).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default=os.path.join(_REPO_ROOT, "audit", "rag_eval"),
+        help="Directory for --emit-dashboard report files.",
+    )
     args = parser.parse_args(argv)
 
     report = run_eval(args.fixtures, judge_name=args.judge)
+
+    if args.emit_dashboard:
+        from backend.eval.dashboard_report import write_dashboard_report
+
+        payload = {
+            "judge": report["judge"],
+            "n_cases": report["n_cases"],
+            "fixtures_path": report["fixtures_path"],
+            "thresholds": report["thresholds"],
+            "aggregates": report["aggregates"],
+            "per_metric_pass": report["per_metric_pass"],
+        }
+        out_dir = Path(args.out_dir)
+        for m in METRICS:
+            dest = write_dashboard_report(out_dir, m, report["aggregates"][m], payload)
+            print(f"wrote {dest}", file=sys.stderr)
 
     if args.json:
         serializable = {k: v for k, v in report.items() if k != "results"}
