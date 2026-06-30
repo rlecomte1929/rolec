@@ -375,3 +375,36 @@ def test_18_corpus_is_deterministic(tmp_path) -> None:
         a["generation_meta"].pop("generated_at", None)
         b["generation_meta"].pop("generated_at", None)
         assert a == b, f"{did} ground_truth differs beyond generated_at"
+
+
+def test_19_every_dossier_has_eligibility_profile(corpus) -> None:
+    """Each dossier carries a `profile` block (consumed by the real eligibility
+    predictor): ISO-2 origin/destination matching the corridor + nationality==origin."""
+    gts, _ = corpus
+    for g in gts:
+        prof = g.get("profile")
+        assert prof, f"{g['dossier_id']} missing profile block"
+        assert set(prof) >= {"nationality", "origin_country", "destination_country", "contract_type"}
+        origin, dest = g["dossier_id"].split("_")[0], g["dossier_id"].split("_")[1]
+        assert prof["origin_country"] == origin, g["dossier_id"]
+        assert prof["destination_country"] == dest, g["dossier_id"]
+        assert prof["nationality"] == origin, g["dossier_id"]
+
+
+def test_20_profile_feeds_real_predictor_for_fr_no(corpus) -> None:
+    """The profile block actually drives the real ImmigrationRegimeRouter predictor:
+    FR→NO dossiers route to EU free movement (predicted ⊆ ground-truth outcome set).
+
+    IN→DE is intentionally NOT asserted here: the router has no EU-Blue-Card regime
+    yet, so it returns ELIGIBLE_WORK_PERMIT for IN→DE — a separate router-coverage
+    follow-up, not a corpus defect.
+    """
+    from backend.eval.eligibility_predictor import predict_eligibility  # noqa: E402
+
+    gts, _ = corpus
+    fr_no = [g for g in gts if g["dossier_id"].startswith("FR_NO")]
+    assert fr_no, "no FR_NO dossiers materialized"
+    for g in fr_no:
+        predicted = set(predict_eligibility(g).get("outcome_set", []))
+        want = set(g["eligibility_verdict"]["outcome_set"])
+        assert predicted and predicted <= want, f"{g['dossier_id']}: predicted {predicted} ⊄ {want}"
