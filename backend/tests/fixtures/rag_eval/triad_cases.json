@@ -1,0 +1,91 @@
+{
+  "_meta": "SYNTHETIC RAG-triad seed set (WS-C). Each case carries a query, the retrieved chunks, and a synthesized answer. Used by backend/eval/run_rag_triad.py to score context-relevance, groundedness, and answer-relevance. All content is synthetic-but-representative and NEEDS HUMAN CURATION before being treated as ground truth.",
+  "verification_status": "representative",
+  "gate": {
+    "context_relevance": 0.15,
+    "groundedness": 0.40,
+    "answer_relevance": 0.15
+  },
+  "cases": [
+    {
+      "id": "T-01",
+      "query": "What is the monthly housing allowance cap?",
+      "retrieved_chunks": [
+        {"id": "h1", "text": "The monthly housing allowance cap is EUR 2,500 per month for a standard relocating employee."},
+        {"id": "h2", "text": "The housing allowance cap rises to EUR 3,200 per month in tier-1 cities."}
+      ],
+      "answer": "The monthly housing allowance cap is EUR 2,500 per month, rising to EUR 3,200 per month in tier-1 cities. [chunk:h1][chunk:h2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-02",
+      "query": "How many home-leave trips per year are covered?",
+      "retrieved_chunks": [
+        {"id": "hl1", "text": "The policy covers two home-leave trips per year for the assignee."},
+        {"id": "hl2", "text": "Home-leave flights are booked in economy class."}
+      ],
+      "answer": "The policy covers two home-leave trips per year, booked in economy class. [chunk:hl1][chunk:hl2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-03",
+      "query": "How does tax equalization work?",
+      "retrieved_chunks": [
+        {"id": "tx1", "text": "Under tax equalization the assignee pays a hypothetical home-country tax and the company covers all actual host and home taxes."},
+        {"id": "tx2", "text": "An annual tax-equalization true-up reconciles hypothetical tax against actual tax after filing."}
+      ],
+      "answer": "Under tax equalization you pay a hypothetical home-country tax and the company covers actual host and home taxes, reconciled by an annual true-up. [chunk:tx1][chunk:tx2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-04",
+      "query": "Is international school tuition covered for children?",
+      "retrieved_chunks": [
+        {"id": "ed1", "text": "The policy covers international school tuition up to EUR 20,000 per child per year."},
+        {"id": "ed2", "text": "School tuition coverage applies to children aged 4 to 18."}
+      ],
+      "answer": "Yes, international school tuition is covered up to EUR 20,000 per child per year for children aged 4 to 18. [chunk:ed1][chunk:ed2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-05",
+      "query": "What household goods shipment volume is covered?",
+      "retrieved_chunks": [
+        {"id": "sh1", "text": "The policy covers a household goods shipment of up to 40 cubic metres by sea freight."},
+        {"id": "sh2", "text": "An additional air-freight shipment of up to 100 kg is covered for immediate-need items."}
+      ],
+      "answer": "A household goods shipment of up to 40 cubic metres by sea freight is covered, plus an additional 100 kg of air freight. [chunk:sh1][chunk:sh2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-06",
+      "query": "How long is temporary accommodation provided?",
+      "retrieved_chunks": [
+        {"id": "ta1", "text": "Serviced temporary accommodation is provided for up to 30 days on arrival."},
+        {"id": "ta2", "text": "Temporary accommodation is a one-bedroom serviced apartment, upgraded to two-bedroom for families."}
+      ],
+      "answer": "Serviced temporary accommodation is provided for up to 30 days on arrival, as a one-bedroom apartment upgraded to two-bedroom for families. [chunk:ta1][chunk:ta2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-07",
+      "query": "What spouse career support is provided?",
+      "retrieved_chunks": [
+        {"id": "sp1", "text": "The policy provides a spousal career support allowance of EUR 5,000 for job-search and accreditation costs."},
+        {"id": "sp2", "text": "The spouse receives CV, networking and job-search coaching for six months."}
+      ],
+      "answer": "The policy provides a spousal career support allowance of EUR 5,000 plus six months of CV, networking and job-search coaching. [chunk:sp1][chunk:sp2]",
+      "notes": "grounded and relevant"
+    },
+    {
+      "id": "T-08",
+      "query": "Is there a cost-of-living allowance?",
+      "retrieved_chunks": [
+        {"id": "cl1", "text": "A cost-of-living allowance (COLA) is paid when the host location index exceeds the home index."},
+        {"id": "cl2", "text": "The cost-of-living allowance is reviewed every six months against the latest index."}
+      ],
+      "answer": "Yes, a cost-of-living allowance is paid when the host location index exceeds the home index, and it is reviewed every six months. [chunk:cl1][chunk:cl2]",
+      "notes": "grounded and relevant"
+    }
+  ]
+}
