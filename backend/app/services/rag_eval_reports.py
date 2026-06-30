@@ -52,6 +52,9 @@ METRIC_SPECS: List[MetricSpec] = [
     # matching accuracy; roadmap_completeness = recall of required roadmap steps.
     MetricSpec("structuring_accuracy", "Structuring accuracy", 0.95),
     MetricSpec("roadmap_completeness", "Roadmap completeness", 0.90),
+    # Answer-path faithfulness (run_answer_grade): grounding_rate of the immigration
+    # Q&A answers (the "remove noise, ensure accuracy" surface).
+    MetricSpec("answer_grounding", "Answer grounding", 0.90),
 ]
 
 _SPEC_BY_KEY: Dict[str, MetricSpec] = {s.key: s for s in METRIC_SPECS}
@@ -134,6 +137,7 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "outcome_accuracy": [0.88, 0.89, 0.91, 0.92, 0.93, 0.94, 0.95, 0.94, 0.95, 0.96, 0.95, 0.94, 0.93],
     "structuring_accuracy": [0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
+    "answer_grounding": [0.90, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.96],
 }
 _MOCK_WEEKS = 13
 

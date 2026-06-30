@@ -62,7 +62,7 @@ def test_mock_is_deterministic_and_three_months():
     b = svc.generate_mock_reports(date(2026, 6, 4))
     assert a == b
     assert set(a) == {"context_precision", "factual_consistency", "outcome_accuracy",
-                      "structuring_accuracy", "roadmap_completeness"}
+                      "structuring_accuracy", "roadmap_completeness", "answer_grounding"}
     for points in a.values():
         assert len(points) == svc._MOCK_WEEKS  # ~3 months of weekly points
     # Last point lands on the requested end date.
@@ -148,6 +148,7 @@ def test_route_returns_all_metrics():
         "outcome_accuracy",
         "structuring_accuracy",
         "roadmap_completeness",
+        "answer_grounding",
     }
     for m in body["metrics"]:
         assert "threshold" in m and "points" in m and "alert" in m
