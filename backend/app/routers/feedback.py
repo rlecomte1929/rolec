@@ -116,6 +116,54 @@ def submit_feedback(
     return {"ok": True, "report_id": report_id}
 
 
+@router.get("/mine")
+def list_my_feedback(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return the calling user's own feedback submissions with ticket status.
+
+    Reporter-scoped: only rows whose ``feedback.user_id`` matches the caller
+    are returned.  Uses a LEFT JOIN on ``feedback_status`` so reports without
+    a triage ticket still appear (status/severity/area/dispatch_status = null).
+
+    Returns at most 50 items ordered newest-first.
+    """
+    caller_id = str(
+        current_user.get("auth_uuid") or current_user.get("id") or ""
+    )
+
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT f.report_id, f.category, f.message, "
+                "fs.status, fs.severity, fs.area, fs.dispatch_status, f.created_at "
+                "FROM feedback f "
+                "LEFT JOIN feedback_status fs "
+                "  ON fs.source_id = f.report_id AND fs.stream = 'product' "
+                "WHERE f.user_id = :caller "
+                "ORDER BY f.created_at DESC "
+                "LIMIT 50"
+            ),
+            {"caller": caller_id},
+        ).fetchall()
+
+    return {
+        "reports": [
+            {
+                "report_id": row[0],
+                "category": row[1],
+                "message_excerpt": (row[2] or "")[:120],
+                "status": row[3],
+                "severity": row[4],
+                "area": row[5],
+                "dispatch_status": row[6],
+                "created_at": row[7],
+            }
+            for row in rows
+        ]
+    }
+
+
 @router.get("/{report_id}/status")
 def get_feedback_status(
     report_id: str,
