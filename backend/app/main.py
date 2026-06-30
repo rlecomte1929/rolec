@@ -7,6 +7,7 @@ from .routers import (
     admin,
     admin_ai_unit_economics,
     admin_corrections,
+    admin_exec_overview,
     admin_rag_eval,
     admin_ocr_shadow,
     admin_prompts,
@@ -183,6 +184,7 @@ def create_app() -> FastAPI:
     # [Parker-G] AI unit-economics admin rollup
     app.include_router(admin_ai_unit_economics.router)
     app.include_router(admin_rag_eval.router)
+    app.include_router(admin_exec_overview.router)  # Executive dashboard — GET /api/admin/exec-overview
     # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API
     app.include_router(conjoint.router)
     app.include_router(admin_corrections.router)  # [AIQ-554] /api/admin/corrections/by-reason
