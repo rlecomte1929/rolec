@@ -1,0 +1,25 @@
+{"_meta":true,"verification_status":"representative","note":"Illustrative labels — human curation required before production use."}
+{"id":"tc-01","text":"There seems to be a data leak between tenants in the reporting module","category":"bug","gold_severity":"critical","gold_area":"isolation"}
+{"id":"tc-02","text":"After cross-company transfer, user data from another company is now visible","category":"bug","gold_severity":"critical","gold_area":"isolation"}
+{"id":"tc-03","text":"The submit button is completely broken and nothing loads","category":"bug","gold_severity":"high","gold_area":"ui"}
+{"id":"tc-04","text":"The modal dialog overlaps with the header and I cannot close it","category":"bug","gold_severity":"high","gold_area":"ui"}
+{"id":"tc-05","text":"The spinner never stops after saving the form","category":"bug","gold_severity":"medium","gold_area":"ui"}
+{"id":"tc-06","text":"The layout is a bit misaligned on mobile devices","category":"other","gold_severity":"low","gold_area":"ui"}
+{"id":"tc-07","text":"Getting a 500 error when trying to load the dashboard","category":"bug","gold_severity":"high","gold_area":"api"}
+{"id":"tc-08","text":"The auth endpoint returns 403 intermittently","category":"bug","gold_severity":"medium","gold_area":"api"}
+{"id":"tc-09","text":"The API response time seems a bit slow on the list endpoint","category":"other","gold_severity":"low","gold_area":"api"}
+{"id":"tc-10","text":"Would like the ability to export reports to CSV","category":"other","gold_severity":"low","gold_area":"feature"}
+{"id":"tc-11","text":"Feature request: add support for multiple language options","category":"other","gold_severity":"low","gold_area":"feature"}
+{"id":"tc-12","text":"The search enhancement I submitted as a bug is not working","category":"bug","gold_severity":"medium","gold_area":"feature"}
+{"id":"tc-13","text":"It's a bit slow sometimes when loading the page","category":"other","gold_severity":"low","gold_area":"other"}
+{"id":"tc-14","text":"General feedback about the onboarding experience, nothing specific","category":"other","gold_severity":"low","gold_area":"other"}
+{"id":"tc-15","text":"Something seems off with the platform behaviour","category":"bug","gold_severity":"medium","gold_area":"other"}
+{"id":"tc-16","text":"The system crashes completely during any document upload","category":"bug","gold_severity":"high","gold_area":"other"}
+{"id":"tc-17","text":"The API request keeps failing with a 500 Internal Server Error","category":"bug","gold_severity":"high","gold_area":"api","known_failure":"keyword 'request' misfires feature before api matches 500/error"}
+{"id":"tc-18","text":"The user interface looks broken after the latest update","category":"bug","gold_severity":"high","gold_area":"ui","known_failure":"'interface' is absent from ui keyword list so classifier falls through to other"}
+{"id":"tc-19","text":"My request to update the employee profile keeps throwing an exception","category":"bug","gold_severity":"high","gold_area":"api","known_failure":"keyword 'request' misfires feature before api matches exception"}
+{"id":"tc-20","text":"Wishlist: add the ability to sort the table by any column","category":"other","gold_severity":"low","gold_area":"feature"}
+{"id":"tc-21","text":"The authentication token is expiring too quickly causing session issues","category":"other","gold_severity":"low","gold_area":"api"}
+{"id":"tc-22","text":"Isolation breach detected — one tenant can see another tenant's reports","category":"bug","gold_severity":"critical","gold_area":"isolation"}
+{"id":"tc-23","text":"The CSS styles for the dark mode toggle are not rendering correctly","category":"other","gold_severity":"low","gold_area":"ui"}
+{"id":"tc-24","text":"We noticed that employee data from company A appears in company B's dashboard","category":"bug","gold_severity":"critical","gold_area":"isolation","known_failure":"no isolation keyword in text so classifier predicts other/medium instead of isolation/critical"}
