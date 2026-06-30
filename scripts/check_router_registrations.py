@@ -50,10 +50,10 @@ identity (``routers.<stem>.<var>``) is listed there is grandfathered for BOTH
 checks. This avoids a separate allowlist file for a category that should drain
 along the same timeline.
 
-Local test results (2026-06-01, with the seeded allowlist):
-  * current main @ a19291d7 (post-#213):                      PASS — 21 allowlisted        [VERIFIED]
-  * pre-#213 main @ 9647cec5 (parent of #213 merge):          FAIL — flags ONLY hr_coordination [VERIFIED]
-  * current main, hr_case_detail include removed (simulated): FAIL — flags ONLY hr_case_detail  [VERIFIED]
+Test coverage lives in ``scripts/tests/test_check_router_registrations.py``.
+Run with ``pytest scripts/tests`` to verify PASS/FAIL behaviour and allowlist
+grandfathering across all cases. The allowlist entry count in the PASS message
+and the test count are always current — no manual update needed here.
 """
 from __future__ import annotations
 
@@ -189,6 +189,12 @@ def _neither_registered_routers(
         either *prod* or *modular* (i.e. it is registered nowhere).
       - None of its identities are in *allowed*.
 
+    Granularity note — this check is **file-granular**, not var-granular: if ANY
+    router var in a file is registered in either entrypoint, the entire file is
+    considered covered and skipped. A second, unregistered var in the same file
+    would not be flagged. No router file currently uses the multi-var pattern, so
+    this is not a live gap — but be aware if that changes.
+
     Returns a list of ``(module_name, routes)`` tuples for each flagged file,
     where *module_name* is ``"routers.<stem>"`` and *routes* is a sorted list of
     ``"METHOD /path"`` strings across all unregistered vars in that file.
@@ -206,7 +212,9 @@ def _neither_registered_routers(
         stem = path.stem
         all_identities = {f"routers.{stem}.{var}" for var in vars_and_routes}
 
-        # Skip if ANY var is registered in either entrypoint
+        # Skip if ANY var is registered in either entrypoint.
+        # NOTE: file-granular — a second unregistered var in the same file is
+        # not flagged. No router file currently uses the multi-var pattern.
         if any(ident in prod or ident in modular for ident in all_identities):
             continue
 
@@ -279,7 +287,10 @@ def main() -> int:
         failed = True
 
     if not failed:
-        n_allow = len(allowed & set(modular))
+        # Count all allowlist entries applied across both checks (check 1:
+        # modular-only; check 2: neither-registered). allowed & set(modular)
+        # would undercount because neither-registered entries are not in modular.
+        n_allow = len(allowed)
         print(
             f"PASS — every modular-app router is registered in backend/main.py "
             f"or grandfathered ({n_allow} allowlisted, pending triage); "
