@@ -1,0 +1,27 @@
+{
+  "corridor": "DE_US",
+  "pathway": "L1B_INTRACOMPANY",
+  "verification_status": "representative",
+  "description": "Seed golden roadmap for a US L1B intracompany transfer. The producer (backend/eval/run_outcome_accuracy.py) ASSEMBLES a roadmap from the deterministic ImmigrationRegimeRouter using `profile` below, then grades it against `expected_steps` + `order`. Step matching is by case-insensitive `match` substring against produced step titles (the router emits task_codes as titles). Synthetic — needs human curation against live USCIS L1B requirements.",
+  "profile": {
+    "nationality": "Germany",
+    "origin_country": "Germany",
+    "destination_country": "United States",
+    "contract_type": "lta"
+  },
+  "expected_steps": [
+    {"key": "support_letter", "match": "l1b_support_letter"},
+    {"key": "petition_prep", "match": "l1b_petition_preparation"},
+    {"key": "petition_filing", "match": "l1b_petition_filing"},
+    {"key": "visa_interview", "match": "l1b_visa_interview"},
+    {"key": "port_of_entry", "match": "l1b_port_of_entry"},
+    {"key": "ssn", "match": "l1b_ssn_application"}
+  ],
+  "order": [
+    ["support_letter", "petition_prep"],
+    ["petition_prep", "petition_filing"],
+    ["petition_filing", "visa_interview"],
+    ["visa_interview", "port_of_entry"],
+    ["port_of_entry", "ssn"]
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "completeness": 1.0,
+  "noise_precision": 1.0,
+  "ordering": 1.0,
+  "outcome_accuracy": 1.0,
+  "n": 1,
+  "per_roadmap": {
+    "completeness": 1.0,
+    "noise_precision": 1.0,
+    "ordering": 1.0,
+    "missing_steps": [],
+    "extra_steps": [],
+    "counts": {
+      "n_expected": 6,
+      "n_present": 6,
+      "n_produced": 6,
+      "n_constraints_applicable": 5
+    }
+  },
+  "assembled_steps": [
+    "l1b_support_letter",
+    "l1b_petition_preparation",
+    "l1b_petition_filing",
+    "l1b_visa_interview",
+    "l1b_port_of_entry",
+    "l1b_ssn_application"
+  ],
+  "corridor": "DE_US",
+  "aggregate": 1.0,
+  "generated_at": "2026-06-30"
+}
