@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "source_ref": "origin/main @ 0f14c760",
+    "generated": "2026-06-30",
+    "method": "static code audit + 3 read-only inventories",
+    "severity_scale": ["P0", "P1", "P2", "P3"],
+    "effort_scale": ["S", "M", "L"],
+    "dimensions": ["1 Observability", "2 Control", "3 Feedback", "4 BugRoutines", "5 HITL", "6 Access&Audit", "7 IA", "8 Blast-radius"]
+  },
+  "counts": {"P1": 14, "P2": 16, "P3": 4, "total": 34},
+  "findings": [
+    {"id": "A-01", "dim": 6, "sev": "P1", "eff": "S", "title": "/admin/countries unguarded (no RequireAdminRoute)", "evidence": "frontend/src/routes.ts WIZARD_ROUTES.ADMIN_COUNTRIES; App.tsx ~387-388", "rec": "Wrap in RequireAdminRoute + guard test"},
+    {"id": "A-02", "dim": 6, "sev": "P1", "eff": "M", "title": "CRON_SECRET grants synthetic full-ADMIN (root bypass)", "evidence": "backend/app/auth_deps.py get_current_user", "rec": "Scope to specific cron routes / per-job tokens; rotate"},
+    {"id": "A-03", "dim": 6, "sev": "P1", "eff": "M", "title": "No in-app admin add/remove (SQL only; no remove fn)", "evidence": "backend/db/users.py add_admin_allowlist; no remove", "rec": "Gated admin-lifecycle endpoints + UI + audit"},
+    {"id": "A-04", "dim": 6, "sev": "P1", "eff": "M", "title": "Fragmented/silent audit logging across admin mutations", "evidence": "admin_catalog/prospects/staging/review_queue/notifications/prompts 0 audit writes", "rec": "Single audit_logs writer for all critical mutations"},
+    {"id": "A-05", "dim": 6, "sev": "P1", "eff": "M", "title": "No platform-wide admin audit-log viewer", "evidence": "only per-case/per-request scoped reads", "rec": "Admin audit browser over audit_logs"},
+    {"id": "O-01", "dim": 1, "sev": "P1", "eff": "M", "title": "RAG-eval dashboard is mock until reports land", "evidence": "services/rag_eval_reports.py source:mock fallback", "rec": "Wire report-only eval workflow output to the dashboard feed"},
+    {"id": "O-02", "dim": 1, "sev": "P1", "eff": "M", "title": "Gate-impact/provenance company-scoped, no fleet view", "evidence": "routers/hr_analytics.py require_admin_or_hr + org filter", "rec": "Admin fleet rollup endpoint + view"},
+    {"id": "C-01", "dim": 2, "sev": "P1", "eff": "M", "title": "AI behavior flags env-only (no admin control)", "evidence": "POLICY_RAG_GROUNDEDNESS_GATE/RERANK, SUPPLIER_LEARNED_WEIGHTS", "rec": "Admin AI-controls panel (D-HITL) with gated toggles + audit"},
+    {"id": "F-01", "dim": 3, "sev": "P1", "eff": "S", "title": "policy_answer_helpfulness has no frontend producer (thumbs inert)", "evidence": "routers/policy_helpfulness.py; no FE caller", "rec": "Wire thumbs UI in policy-assistant answer component"},
+    {"id": "F-02", "dim": 3, "sev": "P1", "eff": "M", "title": "AI feedback streams write-only to ML, no admin browse", "evidence": "ai_human_feedback, policy_answer_helpfulness", "rec": "Admin AI-feedback view (D-Feedback)"},
+    {"id": "B-01", "dim": 4, "sev": "P1", "eff": "L", "title": "No in-app bug->triage->agent dispatch loop", "evidence": "routers/feedback.py submit_feedback inserts row only", "rec": "report->triage->dispatch->status bridge (D-BugRoutine)"},
+    {"id": "H-01", "dim": 5, "sev": "P1", "eff": "M", "title": "Source-reliability recompute auto-mutates trust daily, no approval", "evidence": "services/source_reliability_service.py + reliability-recompute-daily cron", "rec": "Admin diff + approval step or kill-switch"},
+    {"id": "H-02", "dim": 5, "sev": "P1", "eff": "M", "title": "AI-quality levers ungated env flags", "evidence": "same as C-01", "rec": "Gate behind admin control + audit + kill-switch"},
+    {"id": "BR-01", "dim": 8, "sev": "P1", "eff": "M", "title": "Destructive operator actions audit unevenly; blast radius unlabeled", "evidence": "backend/main.py /actions/{purge-cases,override-eligibility,unlock-case}, impersonate", "rec": "Uniform audit + confirm + reversibility + blast-radius labels"},
+
+    {"id": "A-06", "dim": 6, "sev": "P2", "eff": "S", "title": "audit_logs trigger needs id col + action_type CHECK limits", "evidence": "20260411140000_audit_logs.sql", "rec": "App-level writers with new_value.event"},
+    {"id": "A-07", "dim": 6, "sev": "P2", "eff": "S", "title": "Duplicate local admin-check logic", "evidence": "admin_workflow_analytics.py local _require_admin", "rec": "Consolidate on auth_deps.require_admin"},
+    {"id": "O-03", "dim": 1, "sev": "P2", "eff": "S", "title": "Overview System SLA card hard-null", "evidence": "AdminOverviewPage.tsx StatCard", "rec": "Wire real aggregate or remove"},
+    {"id": "O-04", "dim": 1, "sev": "P2", "eff": "M", "title": "Gate-impact sweep + weight-fit CLI-only", "evidence": "backend/scripts/eval_gate_impact.py, fit_supplier_weights.py", "rec": "Read-only admin endpoints"},
+    {"id": "O-05", "dim": 1, "sev": "P2", "eff": "M", "title": "No unified operator health home", "evidence": "signals scattered across rag-quality/ops/errors/feedback", "rec": "Compose operator health home"},
+    {"id": "C-02", "dim": 2, "sev": "P2", "eff": "M", "title": "Supplier weights not readable/editable in-app", "evidence": "recommendations/weights.py; ranking_weights_store CLI-written", "rec": "Admin read + gated override"},
+    {"id": "C-03", "dim": 2, "sev": "P2", "eff": "M", "title": "Eval thresholds hardcoded", "evidence": "rag_eval_reports.py MetricSpec", "rec": "Admin-configurable with guardrails"},
+    {"id": "F-03", "dim": 3, "sev": "P2", "eff": "M", "title": "Beacons + answer audits are admin dead-ends", "evidence": "policy_assistant_analytics, policy_assistant_answer_audits", "rec": "Surface or retire"},
+    {"id": "F-04", "dim": 3, "sev": "P2", "eff": "S", "title": "AdminFeedback reads Supabase directly + buried", "evidence": "components/admin/FeedbackTab.tsx", "rec": "Standardize on backend GET; promote to sidebar"},
+    {"id": "B-02", "dim": 4, "sev": "P2", "eff": "M", "title": "Tickets lack SLA/owner/status for reporter", "evidence": "feedback/errors tabs", "rec": "Ticket lifecycle + reporter notification"},
+    {"id": "B-03", "dim": 4, "sev": "P2", "eff": "S", "title": "External automation invisible from admin", "evidence": ".github/workflows cron + Notion skills", "rec": "Surface routine runs/health in-app"},
+    {"id": "H-03", "dim": 5, "sev": "P2", "eff": "S", "title": "No per-feature AI kill-switch surface", "evidence": "env flags only", "rec": "Kill-switches in AI-controls panel"},
+    {"id": "I-01", "dim": 7, "sev": "P2", "eff": "S", "title": "~20 live pages buried (10/30 in sidebar)", "evidence": "PlatformShellSidebar.tsx 10 items", "rec": "Restructure sidebar/IA"},
+    {"id": "I-02", "dim": 7, "sev": "P2", "eff": "S", "title": "Dead/decoy/duplicate surfaces", "evidence": "3 dead sidebars; AdminResearch/Relocations/Support; dup dashboards; AdminExceptions; legacy routes", "rec": "Remove after rollback-need check"},
+    {"id": "BR-02", "dim": 8, "sev": "P2", "eff": "S", "title": "Impersonation: verify time-box + audit + UI indicator", "evidence": "backend/main.py /impersonate/start; admin_sessions", "rec": "Enforce the three"},
+    {"id": "BR-03", "dim": 8, "sev": "P2", "eff": "M", "title": "Fleet vs company scope not delineated in UI", "evidence": "mixed admin actions", "rec": "Blast-radius labels"},
+
+    {"id": "C-04", "dim": 2, "sev": "P3", "eff": "S", "title": "Model/temp/embeddings env-only", "evidence": "os.environ.get", "rec": "Surface current values read-only"},
+    {"id": "H-04", "dim": 5, "sev": "P3", "eff": "S", "title": "No in-app migration status", "evidence": "supabase/migrations applied out-of-band", "rec": "Optional read-only status"},
+    {"id": "I-03", "dim": 7, "sev": "P3", "eff": "S", "title": "Inconsistent tab layouts", "evidence": "AdminOps/ReviewQueue/Freshness layouts", "rec": "Consolidate via AdminTabLayout (WIP)"},
+    {"id": "I-04", "dim": 7, "sev": "P3", "eff": "S", "title": "-v2 duplicate routes linger", "evidence": "companies-v2, review-queue-v2", "rec": "Collapse aliases"}
+  ]
+}
