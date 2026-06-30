@@ -16,6 +16,8 @@ vi.mock('../../../api/missionControl', () => ({
   retriageWorkItem: vi.fn(),
   patchWorkItem: vi.fn(),
   dispatchWorkItem: vi.fn(),
+  planWorkItem: vi.fn(),
+  approvePlan: vi.fn(),
 }));
 vi.mock('../AdminLayout', () => ({
   AdminLayout: ({ children, headerRight }: { children: React.ReactNode; headerRight?: React.ReactNode }) => (
@@ -23,16 +25,21 @@ vi.mock('../AdminLayout', () => ({
   ),
 }));
 
-import { listWorkItems, syncWorkItems, patchWorkItem, dispatchWorkItem } from '../../../api/missionControl';
+import { listWorkItems, syncWorkItems, patchWorkItem, dispatchWorkItem, planWorkItem, approvePlan } from '../../../api/missionControl';
 import { MissionControlPage } from './MissionControlPage';
 
 const mockList = listWorkItems as unknown as ReturnType<typeof vi.fn>;
 const mockSync = syncWorkItems as unknown as ReturnType<typeof vi.fn>;
 const mockPatch = patchWorkItem as unknown as ReturnType<typeof vi.fn>;
 const mockDispatch = dispatchWorkItem as unknown as ReturnType<typeof vi.fn>;
+const mockPlan = planWorkItem as unknown as ReturnType<typeof vi.fn>;
+const mockApprove = approvePlan as unknown as ReturnType<typeof vi.fn>;
 
 afterEach(cleanup);
-beforeEach(() => { mockList.mockReset(); mockSync.mockReset(); mockPatch.mockReset(); mockDispatch.mockReset(); });
+beforeEach(() => {
+  mockList.mockReset(); mockSync.mockReset(); mockPatch.mockReset();
+  mockDispatch.mockReset(); mockPlan.mockReset(); mockApprove.mockReset();
+});
 
 describe('MissionControlPage', () => {
   it('renders triaged demands from the API', async () => {
@@ -103,5 +110,33 @@ describe('MissionControlPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /execute/i }));
     expect(mockDispatch).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it('Plan button drafts a plan', async () => {
+    mockList.mockResolvedValue({
+      table_ready: true,
+      items: [{ id: '1', source: 'feedback', kind: 'bug', title: 'Crash', status: 'triaged', priority: 'P1', auto_fixable: false }],
+    });
+    mockPlan.mockResolvedValue({ ok: true, plan: { summary: 's', risk: 'low', approved: false } });
+    render(<MissionControlPage />);
+    await screen.findByText('Crash');
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+    await waitFor(() => expect(mockPlan).toHaveBeenCalledWith('1'));
+  });
+
+  it('renders an existing plan and approves it', async () => {
+    mockList.mockResolvedValue({
+      table_ready: true,
+      items: [{
+        id: '1', source: 'feedback', kind: 'bug', title: 'Crash', status: 'planned', priority: 'P1', auto_fixable: false,
+        plan_json: { summary: 'Rename the handler', affected_files: ['a.ts'], risk: 'medium', approved: false },
+      }],
+    });
+    mockApprove.mockResolvedValue({ ok: true, approved: true });
+    render(<MissionControlPage />);
+    expect(await screen.findByTestId('plan')).toBeInTheDocument();
+    expect(screen.getByText(/Rename the handler/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /approve plan/i }));
+    await waitFor(() => expect(mockApprove).toHaveBeenCalledWith('1'));
   });
 });

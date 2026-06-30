@@ -18,9 +18,20 @@ export interface WorkItem {
   complexity?: string | null;
   auto_fixable: boolean;
   triage_json?: { rationale?: string; blocked?: boolean } | null;
+  plan_json?: WorkItemPlan | null;
   dedupe_key?: string | null;
   pr_url?: string | null;
   created_at?: string;
+}
+
+export interface WorkItemPlan {
+  summary?: string;
+  affected_files?: string[];
+  approach?: string;
+  test_plan?: string;
+  risk?: string;
+  confidence?: string;
+  approved?: boolean;
 }
 
 export interface WorkItemsResponse {
@@ -60,4 +71,14 @@ export async function patchWorkItem(
  */
 export async function dispatchWorkItem(id: string): Promise<{ ok: boolean; run_id?: string; pr_url?: string | null }> {
   return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/dispatch`, {});
+}
+
+/** P3 — draft a structured plan for a demand (LLM, PII-masked). */
+export async function planWorkItem(id: string): Promise<{ ok: boolean; plan: WorkItemPlan }> {
+  return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/plan`, {});
+}
+
+/** P3 — mark the drafted plan approved. */
+export async function approvePlan(id: string): Promise<{ ok: boolean; approved: boolean }> {
+  return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/plan/approve`, {});
 }

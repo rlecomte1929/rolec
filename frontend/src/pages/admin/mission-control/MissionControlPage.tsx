@@ -7,6 +7,8 @@ import {
   retriageWorkItem,
   patchWorkItem,
   dispatchWorkItem,
+  planWorkItem,
+  approvePlan,
   type WorkItem,
 } from '../../../api/missionControl';
 
@@ -93,6 +95,27 @@ export const MissionControlPage: React.FC = () => {
     }
   }
 
+  async function onPlan(id: string) {
+    setBusy(true);
+    try {
+      await planWorkItem(id);
+      await load();
+    } catch {
+      setError('Could not draft a plan right now.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onApprovePlan(id: string) {
+    try {
+      await approvePlan(id);
+      await load();
+    } catch {
+      /* best-effort */
+    }
+  }
+
   return (
     <AdminLayout
       title="Mission Control"
@@ -149,6 +172,31 @@ export const MissionControlPage: React.FC = () => {
               </div>
               <p className="text-sm font-medium text-slate-800">{it.title}</p>
               {it.body && <p className="line-clamp-2 text-xs text-slate-500">{it.body}</p>}
+              {it.plan_json && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs" data-testid="plan">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="font-semibold text-navy-800">Plan</span>
+                    {it.plan_json.risk && (
+                      <span className={`rounded-full px-2 py-0.5 ${it.plan_json.risk === 'high' ? 'bg-rose-100 text-rose-700' : it.plan_json.risk === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-accent-50 text-accent-700'}`}>
+                        risk: {it.plan_json.risk}
+                      </span>
+                    )}
+                    {it.plan_json.approved ? (
+                      <span className="ml-auto rounded-full bg-accent-50 px-2 py-0.5 text-accent-700">✓ Approved</span>
+                    ) : (
+                      <button className="ml-auto font-medium text-accent-700 hover:text-accent-800" onClick={() => void onApprovePlan(it.id)}>
+                        Approve plan
+                      </button>
+                    )}
+                  </div>
+                  {it.plan_json.summary && <p className="text-slate-700">{it.plan_json.summary}</p>}
+                  {it.plan_json.affected_files && it.plan_json.affected_files.length > 0 && (
+                    <p className="mt-1 text-slate-500">Files: {it.plan_json.affected_files.join(', ')}</p>
+                  )}
+                  {it.plan_json.approach && <p className="mt-1 text-slate-500"><span className="font-medium">Approach:</span> {it.plan_json.approach}</p>}
+                  {it.plan_json.test_plan && <p className="mt-1 text-slate-500"><span className="font-medium">Tests:</span> {it.plan_json.test_plan}</p>}
+                </div>
+              )}
               <div className="flex items-center gap-3 text-xs text-slate-400">
                 {it.triage_json?.rationale && <span>🧭 {it.triage_json.rationale}</span>}
                 {it.source_url && (
@@ -163,6 +211,9 @@ export const MissionControlPage: React.FC = () => {
                       Execute →
                     </button>
                   )}
+                  <button className="text-slate-500 hover:text-navy-800" onClick={() => void onPlan(it.id)} disabled={busy}>
+                    Plan
+                  </button>
                   <button className="text-slate-500 hover:text-navy-800" onClick={() => void onRetriage(it.id)}>
                     Re-triage
                   </button>
