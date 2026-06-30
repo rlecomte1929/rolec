@@ -4212,6 +4212,91 @@ class MiscMixin:
             "unverified_count": unverified,
         }
 
+    def get_gate_impact_rollup(
+        self,
+        *,
+        min_score: float = 0.5,
+        since: Optional[str] = None,
+        company_id: Optional[str] = None,
+        feature_key: str = "policy_assistant",
+    ) -> Dict[str, Any]:
+        """P1 gate-impact canary: would-be-refused count under the groundedness gate.
+
+        Read-only sibling of :meth:`get_answer_provenance_rollup`. Re-applies the
+        gate predicate from policy_assistant_rag_engine (~L339-348) SQL-side over
+        ALREADY-PERSISTED traces — the verifier writes grounding_verdict /
+        grounding_score on every answer regardless of whether the gate is on, so
+        this estimates the gate's effect WITHOUT flipping the flag or replaying.
+
+        Predicate (would-refuse):
+            answer_kind = 'answer'
+            AND NOT verification_skipped            (verifier errors fail OPEN)
+            AND (grounding_verdict = 'ungrounded'
+                 OR (grounding_score IS NOT NULL AND grounding_score < min_score))
+
+        LEFT-correlates policy_answer_helpfulness (join h.trace_session_id = t.id,
+        per WS-E's helpfulness_dataset_builder) to count would-be-refused answers
+        a real user voted helpful — candidate FALSE refusals. Returns zeros (never
+        raises) when the table/columns are absent.
+        """
+        zero = {
+            "min_score": float(min_score),
+            "n_answers": 0,
+            "n_would_refuse": 0,
+            "would_refuse_rate": 0.0,
+            "n_would_refuse_helpful": 0,
+            "by_verdict": {"ungrounded": 0, "low_score": 0},
+        }
+        params: Dict[str, Any] = {"fk": feature_key, "min_score": float(min_score)}
+        where = ["t.feature_key = :fk"]
+        if company_id:
+            where.append("t.company_id = :cid")
+            params["cid"] = company_id
+        if since:
+            where.append("t.created_at >= :since")
+            params["since"] = since
+        # Reused gate predicate; verification_skipped fails OPEN (never gated).
+        wr = (
+            "t.answer_kind = 'answer' "
+            "AND COALESCE(t.verification_skipped, FALSE) = FALSE "
+            "AND (t.grounding_verdict = 'ungrounded' "
+            "OR (t.grounding_score IS NOT NULL AND t.grounding_score < :min_score))"
+        )
+        sql = (
+            "SELECT "
+            "SUM(CASE WHEN t.answer_kind = 'answer' THEN 1 ELSE 0 END) AS n_answers, "
+            f"SUM(CASE WHEN {wr} THEN 1 ELSE 0 END) AS n_would_refuse, "
+            f"SUM(CASE WHEN ({wr}) AND EXISTS ("
+            "SELECT 1 FROM policy_answer_helpfulness h "
+            "WHERE h.trace_session_id = CAST(t.id AS TEXT) AND h.helpful"
+            ") THEN 1 ELSE 0 END) AS n_would_refuse_helpful, "
+            f"SUM(CASE WHEN ({wr}) AND t.grounding_verdict = 'ungrounded' "
+            "THEN 1 ELSE 0 END) AS wr_ungrounded, "
+            f"SUM(CASE WHEN ({wr}) AND t.grounding_verdict <> 'ungrounded' "
+            "THEN 1 ELSE 0 END) AS wr_low_score "
+            "FROM policy_assistant_traces t WHERE " + " AND ".join(where)
+        )
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(sql), params).mappings().first()
+        except Exception:
+            return dict(zero)
+        if not row:
+            return dict(zero)
+        n_answers = int(row["n_answers"] or 0)
+        n_would_refuse = int(row["n_would_refuse"] or 0)
+        return {
+            "min_score": float(min_score),
+            "n_answers": n_answers,
+            "n_would_refuse": n_would_refuse,
+            "would_refuse_rate": round(n_would_refuse / n_answers, 4) if n_answers else 0.0,
+            "n_would_refuse_helpful": int(row["n_would_refuse_helpful"] or 0),
+            "by_verdict": {
+                "ungrounded": int(row["wr_ungrounded"] or 0),
+                "low_score": int(row["wr_low_score"] or 0),
+            },
+        }
+
     def _parse_json_col(self, d: Dict[str, Any], key: str) -> None:
         if d.get(key) and isinstance(d[key], str):
             try:
