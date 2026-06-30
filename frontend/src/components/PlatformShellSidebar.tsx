@@ -155,6 +155,7 @@ const SECTIONS: NavSection[] = [
     minRole: 'ADMIN',
     items: [
       { id: 'admin-overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
+      { id: 'executive', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'admin-companies', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
       {
         id: 'review-queue',
