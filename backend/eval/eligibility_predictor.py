@@ -14,8 +14,9 @@ derives the outcome from the route and is then graded against the held-out truth
 Outcomes are derived from the router's ``regime_id``; citations are the rule-version
 IDs that actually govern the matched route AND are present in
 ``backend/eval/rule_registry.py`` (so the citation-effectiveness gate is meaningful).
-Routes with no registry-backed rule yet (e.g. France/Portugal work permits) emit no
-citations rather than fabricating one — honest under-coverage rather than a false cite.
+Routes with no registry-backed rule yet emit no citations rather than fabricating one
+— honest under-coverage rather than a false cite. All five seed corridors (incl. the
+France/Portugal work-permit routes) are now registry-backed with representative cites.
 """
 from __future__ import annotations
 
@@ -53,6 +54,10 @@ def _citations_for(regime_id: str, destination_norm: str) -> List[str]:
     if regime_id == "standard_work_permit":
         if destination_norm in {"germany", "de"}:
             return ["DE_AUFENTHG_18B:2020"]  # AufenthG §18b — skilled-worker residence permit
+        if destination_norm in {"france", "fr"}:
+            return ["FR_CESEDA_L421:2024"]  # CESEDA L.421 — "salarié" work/residence permit (representative)
+        if destination_norm in {"portugal", "pt"}:
+            return ["PT_LEI_23_2007_ART88:2007"]  # Lei 23/2007 art. 88 — subordinate-work residence permit (representative)
     return []
 
 
