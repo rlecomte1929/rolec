@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
@@ -57,6 +58,17 @@ log = logging.getLogger(__name__)
 # unaffected.
 _DEFAULT_MIN_SIMILARITY = 0.25
 _TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
+
+# P4: optional lexical second-pass reranker (see policy_rerank.py). Default OFF —
+# when the flag is unset the reranker is never imported and ranking is byte-
+# identical to pre-P4. When ON, the candidate pool is widened before reranking so
+# the second pass can recover relevant chunks that the first pass ranked just
+# outside top_k.
+_RERANK_POOL_FACTOR = 3
+
+
+def _rerank_enabled() -> bool:
+    return os.environ.get("POLICY_RAG_RERANK", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _parse_tier(value: Any) -> Optional[int]:
@@ -90,6 +102,7 @@ def _apply_quality_gates(
     min_similarity_score: float,
     top_k: int,
     now: Optional[datetime] = None,
+    query: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Apply the W2 quality gates to already-fetched chunks:
@@ -121,6 +134,11 @@ def _apply_quality_gates(
             "is_stale": days_old > 180,
         })
     scored.sort(key=lambda c: c["adjusted_score"], reverse=True)
+    # P4: optional lexical second-pass rerank, BETWEEN the sort and the top_k
+    # truncation. OFF path (no query OR flag unset) is byte-identical to pre-P4.
+    if query and _rerank_enabled():
+        from .policy_rerank import rerank_chunks
+        scored = rerank_chunks(query, scored)
     return scored[: max(1, top_k)]
 
 
@@ -164,8 +182,8 @@ def retrieve(
 
     dialect = db.engine.dialect.name
     if dialect == "sqlite":
-        return _retrieve_sqlite(company_id, q_emb, top_k, source_types, min_similarity_score)
-    return _retrieve_postgres(company_id, q_emb, top_k, source_types, min_similarity_score)
+        return _retrieve_sqlite(company_id, q_emb, top_k, source_types, min_similarity_score, query)
+    return _retrieve_postgres(company_id, q_emb, top_k, source_types, min_similarity_score, query)
 
 
 # --- Postgres (pgvector) ---------------------------------------------------
@@ -176,6 +194,7 @@ def _retrieve_postgres(
     top_k: int,
     source_types: Optional[Sequence[str]],
     min_similarity_score: float = _DEFAULT_MIN_SIMILARITY,
+    query: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Uses pgvector's cosine distance operator (<=>). Distance is in
@@ -194,7 +213,10 @@ def _retrieve_postgres(
     except (ValueError, AttributeError, TypeError):
         return []
     where_extra = ""
-    params: Dict[str, Any] = {"co": company_id, "k": int(max(1, min(top_k, 50)))}
+    # P4: widen the candidate pool before reranking, but ONLY when the flag is on
+    # — OFF keeps the original LIMIT min(top_k, 50) exactly.
+    pool_k = top_k * _RERANK_POOL_FACTOR if (query and _rerank_enabled()) else top_k
+    params: Dict[str, Any] = {"co": company_id, "k": int(max(1, min(pool_k, 50)))}
     if source_types:
         # SQLAlchemy doesn't expand list params for arbitrary text(),
         # build the IN clause manually.
@@ -241,7 +263,7 @@ def _retrieve_postgres(
         d["score"] = max(0.0, min(1.0, 1.0 - (dist / 2.0)))
         out.append(d)
     return _apply_quality_gates(
-        out, min_similarity_score=min_similarity_score, top_k=top_k
+        out, min_similarity_score=min_similarity_score, top_k=top_k, query=query
     )
 
 
@@ -253,6 +275,7 @@ def _retrieve_sqlite(
     top_k: int,
     source_types: Optional[Sequence[str]],
     min_similarity_score: float = _DEFAULT_MIN_SIMILARITY,
+    query: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Pulls all chunks for the company, computes cosine similarity in
@@ -303,6 +326,8 @@ def _retrieve_sqlite(
         })
     # W2 quality gates (floor + tier boost + freshness). The dev SQLite schema
     # has no created_at, so freshness is neutral here — acceptable for dev/tests.
+    # P4: sqlite already pulls the full company corpus, so the pool is wide; pass
+    # `query` so the flag-gated rerank can re-order before truncation.
     return _apply_quality_gates(
-        scored, min_similarity_score=min_similarity_score, top_k=min(top_k, 50)
+        scored, min_similarity_score=min_similarity_score, top_k=min(top_k, 50), query=query
     )
