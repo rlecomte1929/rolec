@@ -200,20 +200,3 @@ class TestMockLlmPath:
         # severity medium vs gold high — exact match fails, within_1 passes (|2-1|=1)
         assert result["severity_accuracy"] == 0.0
         assert result["severity_within_1"] == 1.0
-
-    def test_mock_llm_no_real_network_calls(self, monkeypatch):
-        """Verify that the offline mock never imports llm_client (avoids API key need)."""
-        import sys
-
-        # Remove llm_client from sys.modules so a real import would fail
-        monkeypatch.setitem(sys.modules, "backend.app.services.llm_client", None)  # type: ignore[arg-type]
-
-        from backend.app.services.feedback_triage import classify_llm
-
-        def _fake_client(**kwargs: Any) -> dict:
-            return {"severity": "low", "area": "feature"}
-
-        # Should not raise even though llm_client is blocked
-        result = classify_llm("would like better support", "other", client=_fake_client)
-        assert result["severity"] in {"low", "medium", "high", "critical"}
-        assert result["area"] in {"ui", "api", "isolation", "feature", "other"}

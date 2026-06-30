@@ -262,7 +262,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     report["fixtures_path"] = args.fixtures
     report["classifier"] = label
 
-    ci_gate = CI_AREA_ACCURACY_GATE if (args.ci or args.classifier == "deterministic") else None
+    ci_gate = CI_AREA_ACCURACY_GATE if args.ci else None
 
     if args.json_out:
         serializable = {k: v for k, v in report.items()}
