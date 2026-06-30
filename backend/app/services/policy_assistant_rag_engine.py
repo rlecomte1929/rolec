@@ -172,39 +172,34 @@ def _groundedness_gate_enabled() -> bool:
     Truthy values: 1/true/yes/on (case-insensitive). Anything else is OFF.
     DB is queried best-effort; a missing table or any error falls through to default.
     """
+    env_val = os.environ.get("POLICY_RAG_GROUNDEDNESS_GATE")
+    if env_val is not None:
+        return env_val.strip().lower() in ("1", "true", "yes", "on")
     from ..db import SessionLocal  # deferred: avoids import-at-init cost
     from .platform_settings import get_setting as _ps_get
     try:
         with SessionLocal() as _db:
-            val = _ps_get(
-                "policy_rag_groundedness_gate",
-                env_var="POLICY_RAG_GROUNDEDNESS_GATE",
-                default="0",
-                db=_db,
-            )
+            val = _ps_get("policy_rag_groundedness_gate", default="0", db=_db)
     except Exception:
-        val = _ps_get("policy_rag_groundedness_gate", env_var="POLICY_RAG_GROUNDEDNESS_GATE", default="0")
+        val = "0"
     return (val or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _groundedness_min_score() -> float:
     """Minimum acceptable grounding score when the gate is ON (env→DB→default 0.5)."""
+    env_val = os.environ.get("POLICY_RAG_GROUNDEDNESS_MIN_SCORE")
+    if env_val is not None:
+        try:
+            return float(env_val)
+        except (TypeError, ValueError):
+            return DEFAULT_GROUNDEDNESS_MIN_SCORE
     from ..db import SessionLocal
     from .platform_settings import get_setting as _ps_get
     try:
         with SessionLocal() as _db:
-            raw = _ps_get(
-                "policy_rag_groundedness_min_score",
-                env_var="POLICY_RAG_GROUNDEDNESS_MIN_SCORE",
-                default="0.5",
-                db=_db,
-            )
+            raw = _ps_get("policy_rag_groundedness_min_score", default="0.5", db=_db)
     except Exception:
-        raw = _ps_get(
-            "policy_rag_groundedness_min_score",
-            env_var="POLICY_RAG_GROUNDEDNESS_MIN_SCORE",
-            default="0.5",
-        )
+        raw = "0.5"
     try:
         return float(raw or "0.5")
     except (TypeError, ValueError):

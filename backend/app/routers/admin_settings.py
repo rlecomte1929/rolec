@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 
 from ..auth_deps import require_admin
 from ..db import SessionLocal
-from ..services.admin_audit import record_admin_event
 from ..services.platform_settings import set_setting
 
 log = logging.getLogger(__name__)
@@ -45,7 +44,7 @@ DEFAULTS: Dict[str, str] = {
 }
 
 
-def _get_db() -> Generator:
+def _get_db() -> Generator[Session, None, None]:
     """Yield a SQLAlchemy session; commit on success, rollback on error."""
     db = SessionLocal()
     try:
@@ -111,14 +110,13 @@ def set_ai_control(
             detail=f"Unknown key: {body.key!r}. Allowed: {sorted(KNOWN_KEYS)}",
         )
     actor_id = str(user.get("id") or user.get("user_id") or "unknown")
-    set_setting(db, body.key, body.value, actor_id=actor_id)
-    record_admin_event(
+    set_setting(
         db,
+        body.key,
+        body.value,
         actor_id=actor_id,
         event="ai_setting_changed",
-        entity="platform_settings",
-        entity_id=body.key,
-        detail={"key": body.key, "value": body.value, "reason": body.reason},
+        detail={"reason": body.reason},
     )
     return {"key": body.key, "value": body.value, "source": "db"}
 
@@ -136,13 +134,12 @@ def kill_ai_feature(
             detail=f"Unknown feature: {feature!r}. Allowed: {sorted(KNOWN_KEYS)}",
         )
     actor_id = str(user.get("id") or user.get("user_id") or "unknown")
-    set_setting(db, feature, "0", actor_id=actor_id)
-    record_admin_event(
+    set_setting(
         db,
+        feature,
+        "0",
         actor_id=actor_id,
         event="ai_setting_changed",
-        entity="platform_settings",
-        entity_id=feature,
-        detail={"key": feature, "value": "0", "reason": "kill-switch"},
+        detail={"reason": "kill-switch"},
     )
     return {"key": feature, "value": "0", "source": "db"}

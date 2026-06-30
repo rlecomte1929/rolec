@@ -109,7 +109,15 @@ def get_setting(
     return default
 
 
-def set_setting(db: Any, key: str, value: str, *, actor_id: str) -> None:
+def set_setting(
+    db: Any,
+    key: str,
+    value: str,
+    *,
+    actor_id: str,
+    event: str = "setting_changed",
+    detail: Optional[Dict[str, Any]] = None,
+) -> None:
     """Persist a platform setting and write an audit log entry.
 
     The value is serialised as a JSON string so the ``jsonb`` column on Postgres
@@ -121,6 +129,8 @@ def set_setting(db: Any, key: str, value: str, *, actor_id: str) -> None:
         key:      Setting key.
         value:    New value (stored JSON-encoded inside the jsonb column).
         actor_id: Admin user id for the audit log; may be a legacy text id.
+        event:    Audit event name (defaults to ``"setting_changed"``).
+        detail:   Extra fields merged into the audit detail alongside key/value.
     """
     db.execute(
         _UPSERT_SQL,
@@ -130,13 +140,14 @@ def set_setting(db: Any, key: str, value: str, *, actor_id: str) -> None:
             "actor_id": actor_id,
         },
     )
+    merged_detail: Dict[str, Any] = {"key": key, "value": value, **(detail or {})}
     record_admin_event(
         db,
         actor_id=actor_id,
-        event="setting_changed",
+        event=event,
         entity="platform_settings",
         entity_id=key,
-        detail={"key": key, "value": value},
+        detail=merged_detail,
     )
 
 

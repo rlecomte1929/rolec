@@ -158,9 +158,13 @@ def test_set_ai_control_audited(admin_client, db_session, monkeypatch):
     rows = db_session.execute(
         text("SELECT new_value_json FROM audit_logs WHERE entity_type = 'platform_settings'")
     ).all()
-    assert rows, "expected at least one audit_logs row"
-    ai_changed = [r for r in rows if json.loads(r[0]).get("event") == "ai_setting_changed"]
-    assert ai_changed, "expected an ai_setting_changed audit row"
+    events = [json.loads(row[0]).get("event") for row in rows]
+
+    ai_changed = [e for e in events if e == "ai_setting_changed"]
+    assert len(ai_changed) == 1, f"expected exactly 1 ai_setting_changed row, got {len(ai_changed)}"
+
+    setting_changed = [e for e in events if e == "setting_changed"]
+    assert len(setting_changed) == 0, f"expected 0 setting_changed duplicate rows, got {len(setting_changed)}"
 
 
 def test_post_rejects_unknown_key(admin_client):

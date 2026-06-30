@@ -69,13 +69,16 @@ from .policy_rerank import _RERANK_POOL_FACTOR_DEFAULT as _RERANK_POOL_FACTOR
 
 def _rerank_enabled() -> bool:
     """Read the rerank flag at call time (env→DB→default OFF)."""
+    env_val = os.environ.get("POLICY_RAG_RERANK")
+    if env_val is not None:
+        return env_val.strip().lower() in {"1", "true", "yes", "on"}
     from ..db import SessionLocal
     from .platform_settings import get_setting as _ps_get
     try:
         with SessionLocal() as _db:
-            val = _ps_get("policy_rag_rerank", env_var="POLICY_RAG_RERANK", default="0", db=_db)
+            val = _ps_get("policy_rag_rerank", default="0", db=_db)
     except Exception:
-        val = _ps_get("policy_rag_rerank", env_var="POLICY_RAG_RERANK", default="0")
+        val = "0"
     return (val or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
