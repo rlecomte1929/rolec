@@ -250,7 +250,7 @@ def dispatch_work_item(item_id: str, _admin: Dict[str, Any] = Depends(require_ad
 
         result = dispatch_autofix({"id": str(item["id"]), "title": item["title"], "body": item["body"] or ""})
         run_id = str(uuid.uuid4())
-        run_status = "queued" if result.get("ok") else "failed"
+        run_status = "pr_opened" if result.get("pr_url") else ("queued" if result.get("ok") else "failed")
         conn.execute(
             text(
                 """INSERT INTO public.work_item_runs (id, work_item_id, dispatched_by, status, pr_url)

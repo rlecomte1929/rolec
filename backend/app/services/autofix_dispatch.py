@@ -20,7 +20,7 @@ import requests
 log = logging.getLogger(__name__)
 
 
-def dispatch_autofix(work_item: Dict[str, Any], *, timeout: float = 15.0) -> Dict[str, Any]:
+def dispatch_autofix(work_item: Dict[str, Any], *, timeout: float = 120.0) -> Dict[str, Any]:
     base = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if not base or not key:
