@@ -1,8 +1,9 @@
 {
   "_meta": {
     "description": "Golden supplier rankings per (category,corridor) for the offline ranking eval (NDCG@k / MRR / precision@k). ideal_order + graded relevance are the accepted ordering; the eval scores engine output against these.",
-    "verification_status": "representative",
-    "k": 5
+    "verification_status": "attribute_derived",
+    "k": 5,
+    "note": "Independent gold derived from supplier attributes, NOT copied from engine output (see audit/admin/36-ranking-gold-worksheet.md). Banks: criteria-driven — fee_sensitivity=low reduces fee-tier penalties, expat/digital priority=9 upweights those axes, branch_need=medium penalizes zero-branch banks. Movers: service_areas destination-city coverage is the primary differentiator for SG→Tokyo; non-international movers grade 0. Insurance: expat_specialized field added to insurance.json (Cigna/Allianz/Bupa/GeoBlue = true, basis: global expat network, dedicated international health division); others false — wire gives 2.5-pt bonus breaking cluster ties. Insurance was previously non-fixable without the new field (8/10 within 1.2 raw pts); adding expat_specialized is the fix."
   },
   "cases": [
     {
@@ -19,26 +20,26 @@
         "branch_need": "medium"
       },
       "ideal_order": [
-        "b-1",
-        "b-9",
-        "b-10",
         "b-4",
-        "b-2",
+        "b-1",
         "b-5",
         "b-6",
+        "b-2",
+        "b-9",
+        "b-10",
         "b-3",
         "b-7",
         "b-8"
       ],
       "relevance": {
+        "b-4": 3,
         "b-1": 3,
-        "b-9": 2,
-        "b-10": 2,
-        "b-4": 1,
-        "b-2": 1,
-        "b-5": 0,
-        "b-6": 0,
-        "b-3": 0,
+        "b-5": 2,
+        "b-6": 2,
+        "b-2": 2,
+        "b-9": 1,
+        "b-10": 1,
+        "b-3": 1,
         "b-7": 0,
         "b-8": 0
       }
@@ -59,24 +60,24 @@
         "i-4",
         "i-3",
         "i-9",
-        "i-1",
         "i-5",
-        "i-8",
+        "i-1",
         "i-2",
+        "i-8",
         "i-6",
         "i-10",
         "i-7"
       ],
       "relevance": {
         "i-4": 3,
-        "i-3": 2,
+        "i-3": 3,
         "i-9": 2,
-        "i-1": 1,
-        "i-5": 1,
-        "i-8": 0,
-        "i-2": 0,
-        "i-6": 0,
-        "i-10": 0,
+        "i-5": 2,
+        "i-1": 2,
+        "i-2": 1,
+        "i-8": 1,
+        "i-6": 1,
+        "i-10": 1,
         "i-7": 0
       }
     },
@@ -96,27 +97,27 @@
         "people": 2
       },
       "ideal_order": [
-        "m-8",
-        "m-2",
-        "m-6",
         "m-1",
-        "m-3",
+        "m-2",
         "m-4",
+        "m-6",
+        "m-9",
+        "m-8",
+        "m-3",
         "m-5",
         "m-7",
-        "m-9",
         "m-10"
       ],
       "relevance": {
-        "m-8": 3,
+        "m-1": 3,
         "m-2": 2,
+        "m-4": 2,
         "m-6": 2,
-        "m-1": 1,
-        "m-3": 1,
-        "m-4": 0,
+        "m-9": 1,
+        "m-8": 1,
+        "m-3": 0,
         "m-5": 0,
         "m-7": 0,
-        "m-9": 0,
         "m-10": 0
       }
     }
