@@ -75,6 +75,7 @@ from .routers import (
     specialist_review,
     support,
     translation,
+    admin_settings,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -208,6 +209,7 @@ def create_app() -> FastAPI:
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
     app.include_router(policy_canonical.read_router, prefix="/api")
     app.include_router(policy_templates.router)
+    app.include_router(admin_settings.router)  # [Task-4] admin AI-governance controls panel
 
     # [P4-4 / AIQ-1220] Cron HTTP triggers (inline CRON_SECRET auth). Mounted in
     # backend/main.py already; registered here too so the modular app + tests see

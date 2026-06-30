@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
@@ -44,7 +45,11 @@ CREATE TABLE IF NOT EXISTS platform_settings (
 
 @pytest.fixture()
 def db_session():
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     with engine.begin() as conn:
         for stmt in _SCHEMA.strip().split(";"):
             stmt = stmt.strip()

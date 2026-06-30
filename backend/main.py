@@ -234,6 +234,7 @@ from .app.routers import specialist_review as specialist_review_router  # [P1-02
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
 from .app.routers import compliance as compliance_router  # [BL-Compliance.4] /api/compliance
 from .app.routers import policy_analysis as policy_analysis_router  # [AIQ-1219] policy PDF → workflow summary
+from .app.routers import admin_settings as admin_settings_router  # [Task-4] admin AI-governance controls panel
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -14794,6 +14795,7 @@ app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
 # GAP 10: Company branding config
 app.include_router(branding_router.router)
+app.include_router(admin_settings_router.router)  # [Task-4] admin AI-governance controls panel
 # ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented
