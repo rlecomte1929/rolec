@@ -11,9 +11,11 @@ expect.extend(matchers);
 
 vi.mock('../../api/immigrationAnswer', () => ({ askImmigrationQuestion: vi.fn() }));
 vi.mock('../../api/aiFeedback', () => ({ submitAiFeedback: vi.fn() }));
-// The unified panel (Slice 5) imports the policy-query module → api/client → supabase.
-// Mock it so this immigration-only suite doesn't pull the supabase client into jsdom.
+// The unified panel (Slice 5) imports the policy-query + routing modules → api/client
+// → supabase. Mock them so this immigration-only suite stays out of jsdom's supabase
+// client, and route every question to the immigration engine.
 vi.mock('../../api/policyAssistantQuery', () => ({ getPolicyAnswer: vi.fn() }));
+vi.mock('../../api/assistantRoute', () => ({ routeAssistantDomain: vi.fn().mockResolvedValue('immigration') }));
 
 import { askImmigrationQuestion } from '../../api/immigrationAnswer';
 import { submitAiFeedback } from '../../api/aiFeedback';

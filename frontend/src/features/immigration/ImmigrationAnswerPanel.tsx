@@ -12,7 +12,7 @@ import {
   supportStatusBadgeClass,
 } from '../policy/employeePolicyAssistantModel';
 import { submitAiFeedback, type FeedbackVerdict } from '../../api/aiFeedback';
-import { classifyAssistantDomain, type AssistantDomain } from './assistantDomainRouter';
+import { routeAssistantDomain, type AssistantDomain } from '../../api/assistantRoute';
 
 /**
  * Unified relocation assistant (Slice 5 — policy bridge). One question box that
@@ -64,8 +64,19 @@ export function ImmigrationAnswerPanel() {
   async function ask(forced?: AssistantDomain) {
     const q = query.trim();
     if (!q) return;
-    const domain = forced ?? classifyAssistantDomain(q);
     resetAnswers();
+    // Route via the canonical backend classifier; a routing failure is treated as
+    // ambiguous so the user disambiguates rather than getting a silent misroute.
+    let domain: AssistantDomain;
+    if (forced) {
+      domain = forced;
+    } else {
+      try {
+        domain = await routeAssistantDomain(q);
+      } catch {
+        domain = 'ambiguous';
+      }
+    }
 
     if (domain === 'ambiguous') {
       setClarifyFor(q);
