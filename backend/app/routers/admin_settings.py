@@ -34,6 +34,7 @@ KNOWN_KEYS: Dict[str, str] = {
     "policy_rag_groundedness_min_score": "POLICY_RAG_GROUNDEDNESS_MIN_SCORE",
     "policy_rag_rerank": "POLICY_RAG_RERANK",
     "supplier_learned_weights": "SUPPLIER_LEARNED_WEIGHTS",
+    "feedback_llm_triage": "FEEDBACK_LLM_TRIAGE",
 }
 
 DEFAULTS: Dict[str, str] = {
@@ -41,6 +42,7 @@ DEFAULTS: Dict[str, str] = {
     "policy_rag_groundedness_min_score": "0.5",
     "policy_rag_rerank": "0",
     "supplier_learned_weights": "0",
+    "feedback_llm_triage": "0",
 }
 
 

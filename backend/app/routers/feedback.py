@@ -28,7 +28,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
-from ..services.feedback_triage import classify
+from ..services.feedback_triage import classify_best
 from ...database import db
 
 log = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ def submit_feedback(
     # Wrapped in try/except so that any failure (table absent, constraint, etc.)
     # never propagates to the caller.  This is a secondary concern.
     try:
-        labels = classify(message, category)
+        labels = classify_best(message, category)
         now = datetime.utcnow().isoformat()
         with db.engine.begin() as conn:
             conn.execute(
