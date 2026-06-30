@@ -24,7 +24,7 @@ function confidenceBadge(confidence?: string | null): ConfidenceBadge {
   }
 }
 
-export function ImmigrationAnswerPanel() {
+export function ImmigrationAnswerPanel({ caseId }: { caseId?: string | null } = {}) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [nationality, setNationality] = useState('');
@@ -54,6 +54,7 @@ export function ImmigrationAnswerPanel() {
         nationality: nationality.trim().toUpperCase(),
         permit_type: permitType.trim(),
         query: query.trim(),
+        ...(caseId ? { case_id: caseId } : {}),
       });
       setAnswer(res);
     } catch {
