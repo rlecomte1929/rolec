@@ -14,6 +14,7 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    policy_helpfulness,
     ocr,
     requirement_facts,
     benefit_optimizer,
@@ -176,6 +177,8 @@ def create_app() -> FastAPI:
     app.include_router(benefit_optimizer.router)
     # [Parker-E] RLHF-lite human-feedback capture
     app.include_router(ai_feedback.router)
+    # [WS-E] end-user "was this answer helpful?" capture for policy answers
+    app.include_router(policy_helpfulness.router)
     app.include_router(admin_ocr_shadow.router)
     # [Parker-G] AI unit-economics admin rollup
     app.include_router(admin_ai_unit_economics.router)
