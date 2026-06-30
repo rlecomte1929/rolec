@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "language_integration.json"
 
@@ -32,7 +33,7 @@ class LanguageIntegrationPlugin(BasePlugin):
     def score(self, criteria: LanguageIntegrationCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         r = item.get("rating", 4.0) * 20.0
         a = {"high": 100, "medium": 75}.get(item.get("availability_level", "high"), 100)
-        return {"score_raw": r * 0.7 + a * 0.3, "breakdown": {"rating": r, "availability": a},
+        return {"score_raw": r * WEIGHTS["language_integration"]["rating"] + a * WEIGHTS["language_integration"]["availability"], "breakdown": {"rating": r, "availability": a},
                 "summary": f"{item.get('name')} — {item.get('rating')}/5.",
                 "rationale": "Language and cultural integration programs.", "pros": [], "cons": [],
                 "metadata": {"rating": item.get("rating"), "rating_count": item.get("rating_count"),

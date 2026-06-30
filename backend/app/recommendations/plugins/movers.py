@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from .base import BasePlugin
 from ..types import RecommendationTier
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "movers.json"
 
@@ -128,12 +129,13 @@ class MoversPlugin(BasePlugin):
         avail_map = {"high": 100, "medium": 75, "low": 50, "scarce": 25}
         availability_score = avail_map.get(avail, 75)
 
-        w_cap = w.get("cost", 0.2)
-        w_time = w.get("speed", 0.2)
-        w_rel = w.get("reliability", 0.2)
-        w_svc = w.get("services", 0.15)
-        w_rat = w.get("rating", 0.15)
-        w_av = w.get("availability", 0.1)
+        dw = WEIGHTS["movers"]
+        w_cap = w.get("cost", dw["cost"])
+        w_time = w.get("speed", dw["speed"])
+        w_rel = w.get("reliability", dw["reliability"])
+        w_svc = w.get("services", dw["services"])
+        w_rat = w.get("rating", dw["rating"])
+        w_av = w.get("availability", dw["availability"])
 
         score_raw = (
             w_cap * capacity_fit * 0.5 + w_cap * cost_score * 0.5

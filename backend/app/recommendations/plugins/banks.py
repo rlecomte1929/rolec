@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "banks.json"
 
@@ -49,8 +50,10 @@ class BanksPlugin(BasePlugin):
         avail = item.get("availability_level", "high")
         avail_map = {"high": 100, "medium": 75, "low": 50, "scarce": 25}
         avail_score = avail_map.get(avail, 100)
-        score_raw = (lang_score * 0.2 + fee_score * 0.15 + onboarding * 0.1 + digital * 0.15 +
-                     expat * 0.15 + branch_score * 0.1 + rating * 0.1 + avail_score * 0.05)
+        w = WEIGHTS["banks"]
+        score_raw = (lang_score * w["language"] + fee_score * w["fees"] + onboarding * w["onboarding"] +
+                     digital * w["digital"] + expat * w["expat"] + branch_score * w["branch"] +
+                     rating * w["rating"] + avail_score * w["availability"])
         return {
             "score_raw": min(100, score_raw),
             "breakdown": {"language": lang_score, "fees": fee_score, "onboarding": onboarding,

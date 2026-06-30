@@ -1,0 +1,617 @@
+{
+  "_meta": {
+    "description": "Pre-refactor score_raw baseline per (category,item) used to prove the weights externalization (weights.py) is value-preserving. Regenerate by reverting weights.py and re-running the capture if plugin scoring intentionally changes.",
+    "verification_status": "representative",
+    "generated_by": "WS-D weight externalization capture (backend/app/recommendations/plugins/*.score)"
+  },
+  "categories": {
+    "living_areas": {
+      "criteria": {
+        "destination_city": "Singapore"
+      },
+      "scores": [
+        {
+          "item_id": "la-1",
+          "score_raw": 94.05
+        },
+        {
+          "item_id": "la-2",
+          "score_raw": 91.5
+        },
+        {
+          "item_id": "la-3",
+          "score_raw": 89.25
+        },
+        {
+          "item_id": "la-4",
+          "score_raw": 92.7
+        },
+        {
+          "item_id": "la-5",
+          "score_raw": 88.3
+        },
+        {
+          "item_id": "la-6",
+          "score_raw": 95.0
+        },
+        {
+          "item_id": "la-7",
+          "score_raw": 94.8
+        },
+        {
+          "item_id": "la-8",
+          "score_raw": 87.45
+        },
+        {
+          "item_id": "la-9",
+          "score_raw": 92.2
+        },
+        {
+          "item_id": "la-10",
+          "score_raw": 95.5
+        },
+        {
+          "item_id": "la-o1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-o2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-o3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-o4",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-o5",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-sf1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-sf2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-sf3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-sf4",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-sf5",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny4",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny5",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny6",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-ny7",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-mu1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-mu2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-mu3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-mu4",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-mu5",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "la-mu6",
+          "score_raw": 0.0
+        }
+      ]
+    },
+    "movers": {
+      "criteria": {
+        "origin_city": "Singapore",
+        "destination_city": "Tokyo",
+        "move_type": "international",
+        "current_accommodation": {
+          "type": "apartment",
+          "bedrooms": 2,
+          "sqm": 80
+        },
+        "people": 2
+      },
+      "scores": [
+        {
+          "item_id": "m-1",
+          "score_raw": 80.0
+        },
+        {
+          "item_id": "m-2",
+          "score_raw": 81.5
+        },
+        {
+          "item_id": "m-3",
+          "score_raw": 78.078947
+        },
+        {
+          "item_id": "m-4",
+          "score_raw": 78.0
+        },
+        {
+          "item_id": "m-5",
+          "score_raw": 76.947368
+        },
+        {
+          "item_id": "m-6",
+          "score_raw": 81.5
+        },
+        {
+          "item_id": "m-7",
+          "score_raw": 76.684211
+        },
+        {
+          "item_id": "m-8",
+          "score_raw": 82.5
+        },
+        {
+          "item_id": "m-9",
+          "score_raw": 76.5
+        },
+        {
+          "item_id": "m-10",
+          "score_raw": 75.578947
+        }
+      ]
+    },
+    "schools": {
+      "criteria": {
+        "destination_city": "Singapore",
+        "children": [
+          {
+            "age": 8
+          }
+        ]
+      },
+      "scores": [
+        {
+          "item_id": "s-1",
+          "score_raw": 89.8
+        },
+        {
+          "item_id": "s-2",
+          "score_raw": 85.35
+        },
+        {
+          "item_id": "s-3",
+          "score_raw": 93.0
+        },
+        {
+          "item_id": "s-4",
+          "score_raw": 86.6
+        },
+        {
+          "item_id": "s-5",
+          "score_raw": 91.7
+        },
+        {
+          "item_id": "s-6",
+          "score_raw": 88.15
+        },
+        {
+          "item_id": "s-7",
+          "score_raw": 86.2
+        },
+        {
+          "item_id": "s-8",
+          "score_raw": 94.1
+        },
+        {
+          "item_id": "s-9",
+          "score_raw": 88.85
+        },
+        {
+          "item_id": "s-10",
+          "score_raw": 97.3
+        },
+        {
+          "item_id": "s-o1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-o2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-o3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-sf1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-sf2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-sf3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-ny1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-ny2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-ny3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-ny4",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-ny5",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-mu1",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-mu2",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-mu3",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-mu4",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-mu5",
+          "score_raw": 0.0
+        },
+        {
+          "item_id": "s-mu6",
+          "score_raw": 0.0
+        }
+      ]
+    },
+    "banks": {
+      "criteria": {
+        "preferred_languages": [
+          "en"
+        ],
+        "fee_sensitivity": "low",
+        "expat_friendliness_priority": 9,
+        "digital_priority": 9,
+        "branch_need": "medium"
+      },
+      "scores": [
+        {
+          "item_id": "b-1",
+          "score_raw": 94.0
+        },
+        {
+          "item_id": "b-2",
+          "score_raw": 89.8
+        },
+        {
+          "item_id": "b-3",
+          "score_raw": 85.85
+        },
+        {
+          "item_id": "b-4",
+          "score_raw": 90.45
+        },
+        {
+          "item_id": "b-5",
+          "score_raw": 89.25
+        },
+        {
+          "item_id": "b-6",
+          "score_raw": 86.05
+        },
+        {
+          "item_id": "b-7",
+          "score_raw": 83.9
+        },
+        {
+          "item_id": "b-8",
+          "score_raw": 81.2
+        },
+        {
+          "item_id": "b-9",
+          "score_raw": 91.4
+        },
+        {
+          "item_id": "b-10",
+          "score_raw": 91.2
+        }
+      ]
+    },
+    "insurance": {
+      "criteria": {
+        "coverage_types": [
+          "health",
+          "travel"
+        ],
+        "deductible_preference": "medium",
+        "family_coverage": true
+      },
+      "scores": [
+        {
+          "item_id": "i-1",
+          "score_raw": 98.5
+        },
+        {
+          "item_id": "i-2",
+          "score_raw": 98.2
+        },
+        {
+          "item_id": "i-3",
+          "score_raw": 98.8
+        },
+        {
+          "item_id": "i-4",
+          "score_raw": 99.1
+        },
+        {
+          "item_id": "i-5",
+          "score_raw": 98.5
+        },
+        {
+          "item_id": "i-6",
+          "score_raw": 98.2
+        },
+        {
+          "item_id": "i-7",
+          "score_raw": 88.85
+        },
+        {
+          "item_id": "i-8",
+          "score_raw": 98.5
+        },
+        {
+          "item_id": "i-9",
+          "score_raw": 98.8
+        },
+        {
+          "item_id": "i-10",
+          "score_raw": 97.9
+        }
+      ]
+    },
+    "electricity": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "e-1",
+          "score_raw": 95.9
+        },
+        {
+          "item_id": "e-2",
+          "score_raw": 87.35
+        },
+        {
+          "item_id": "e-3",
+          "score_raw": 96.2
+        },
+        {
+          "item_id": "e-4",
+          "score_raw": 87.65
+        },
+        {
+          "item_id": "e-5",
+          "score_raw": 85.35
+        },
+        {
+          "item_id": "e-6",
+          "score_raw": 78.8
+        },
+        {
+          "item_id": "e-7",
+          "score_raw": 72.35
+        },
+        {
+          "item_id": "e-8",
+          "score_raw": 96.5
+        },
+        {
+          "item_id": "e-9",
+          "score_raw": 96.2
+        },
+        {
+          "item_id": "e-10",
+          "score_raw": 87.35
+        }
+      ]
+    },
+    "medical": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "med-1",
+          "score_raw": 97.4
+        },
+        {
+          "item_id": "med-2",
+          "score_raw": 97.4
+        },
+        {
+          "item_id": "med-3",
+          "score_raw": 94.9
+        },
+        {
+          "item_id": "med-4",
+          "score_raw": 97.4
+        },
+        {
+          "item_id": "med-5",
+          "score_raw": 97.2
+        },
+        {
+          "item_id": "med-6",
+          "score_raw": 97.2
+        },
+        {
+          "item_id": "med-7",
+          "score_raw": 91.4
+        },
+        {
+          "item_id": "med-8",
+          "score_raw": 96.6
+        },
+        {
+          "item_id": "med-9",
+          "score_raw": 98.2
+        },
+        {
+          "item_id": "med-10",
+          "score_raw": 97.6
+        }
+      ]
+    },
+    "telecom": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "t-1",
+          "score_raw": 93.0
+        },
+        {
+          "item_id": "t-2",
+          "score_raw": 90.2
+        },
+        {
+          "item_id": "t-3",
+          "score_raw": 88.8
+        }
+      ]
+    },
+    "childcare": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "cc-1",
+          "score_raw": 86.9
+        },
+        {
+          "item_id": "cc-2",
+          "score_raw": 85.5
+        },
+        {
+          "item_id": "cc-3",
+          "score_raw": 91.6
+        }
+      ]
+    },
+    "storage": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "st-1",
+          "score_raw": 91.6
+        },
+        {
+          "item_id": "st-2",
+          "score_raw": 93.0
+        }
+      ]
+    },
+    "transport": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "tr-1",
+          "score_raw": 90.2
+        },
+        {
+          "item_id": "tr-2",
+          "score_raw": 91.6
+        }
+      ]
+    },
+    "language_integration": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "li-1",
+          "score_raw": 94.4
+        },
+        {
+          "item_id": "li-2",
+          "score_raw": 91.6
+        }
+      ]
+    },
+    "legal_admin": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "leg-1",
+          "score_raw": 88.3
+        },
+        {
+          "item_id": "leg-2",
+          "score_raw": 86.9
+        }
+      ]
+    },
+    "tax_finance": {
+      "criteria": {},
+      "scores": [
+        {
+          "item_id": "tf-1",
+          "score_raw": 94.4
+        },
+        {
+          "item_id": "tf-2",
+          "score_raw": 93.0
+        }
+      ]
+    }
+  }
+}

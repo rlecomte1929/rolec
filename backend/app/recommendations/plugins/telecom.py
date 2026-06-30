@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "telecom.json"
 
@@ -31,7 +32,7 @@ class TelecomPlugin(BasePlugin):
     def score(self, criteria: TelecomCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         r = item.get("rating", 4.0) * 20.0
         a = {"high": 100, "medium": 75, "low": 50}.get(item.get("availability_level", "high"), 100)
-        return {"score_raw": r * 0.7 + a * 0.3, "breakdown": {"rating": r, "availability": a},
+        return {"score_raw": r * WEIGHTS["telecom"]["rating"] + a * WEIGHTS["telecom"]["availability"], "breakdown": {"rating": r, "availability": a},
                 "summary": f"{item.get('name')} — {item.get('rating')}/5.",
                 "rationale": "Telecom provider for mobile and broadband.", "pros": [], "cons": [],
                 "metadata": {"rating": item.get("rating"), "rating_count": item.get("rating_count"),

@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "tax_finance.json"
 
@@ -32,7 +33,7 @@ class TaxFinancePlugin(BasePlugin):
     def score(self, criteria: TaxFinanceCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         r = item.get("rating", 4.0) * 20.0
         a = {"high": 100, "medium": 75}.get(item.get("availability_level", "high"), 100)
-        return {"score_raw": r * 0.7 + a * 0.3, "breakdown": {"rating": r, "availability": a},
+        return {"score_raw": r * WEIGHTS["tax_finance"]["rating"] + a * WEIGHTS["tax_finance"]["availability"], "breakdown": {"rating": r, "availability": a},
                 "summary": f"{item.get('name')} — {item.get('rating')}/5.",
                 "rationale": "Tax and financial planning for expats.", "pros": [], "cons": [],
                 "metadata": {"rating": item.get("rating"), "rating_count": item.get("rating_count"),

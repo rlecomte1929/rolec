@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import WEIGHTS
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "insurance.json"
 
@@ -42,7 +43,9 @@ class InsurancePlugin(BasePlugin):
         avail = item.get("availability_level", "high")
         avail_map = {"high": 100, "medium": 75, "low": 50, "scarce": 25}
         avail_score = avail_map.get(avail, 100)
-        score_raw = coverage_score * 0.35 + ded_score * 0.2 + family * 0.2 + rating * 0.15 + avail_score * 0.1
+        w = WEIGHTS["insurance"]
+        score_raw = (coverage_score * w["coverage"] + ded_score * w["deductible"] + family * w["family"] +
+                     rating * w["rating"] + avail_score * w["availability"])
         return {
             "score_raw": min(100, score_raw),
             "breakdown": {"coverage": coverage_score, "deductible": ded_score, "family": family,
