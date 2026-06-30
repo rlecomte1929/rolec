@@ -426,6 +426,11 @@ def answer_policy_question(
             "cost_usd": round(cost, 6),
             "latency_ms": latency_ms,
             "audit_id": audit_id,
+            # trace_session_id — the primary key of the policy_assistant_traces row
+            # written by TraceSession.flush(). The helpfulness endpoint
+            # (POST /api/policy-assistant/helpfulness) uses this to look up the
+            # trace tenant and record the end-user vote.
+            "trace_session_id": tracer.trace_id,
             "prompt_version_id": prompt_version_id,
             "canary_arm": canary_arm,
             "grounding_verdict": grounding_verdict,
