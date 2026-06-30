@@ -9,8 +9,14 @@ Tests cover:
 
 Uses a minimal FastAPI app (NOT backend.main) with the feedback router mounted
 and backend.app.auth_deps.get_current_user overridden.
-The legacy backend.database.db.engine is monkeypatched to an in-memory SQLite
-engine so no real Postgres is required.
+The feedback router's db.engine is monkeypatched to an in-memory SQLite engine
+so no real Postgres is required.
+
+Isolation note: some sibling test modules (e.g. test_e1b_extraction_persist.py)
+replace sys.modules["backend.database"] with the real module at collection time.
+To stay suite-order-independent we patch ``feedback_router_module.db.engine``
+(the exact reference the router holds) rather than ``_db_module.db.engine``
+(which may be a different object after that replacement).
 """
 from __future__ import annotations
 
@@ -28,7 +34,6 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-import backend.database as _db_module  # noqa: E402 — import the module to monkeypatch
 from backend.app.routers import feedback as feedback_router_module  # noqa: E402
 from backend.app.auth_deps import get_current_user  # noqa: E402
 
@@ -83,8 +88,13 @@ def sqlite_engine():
 
 @pytest.fixture()
 def patched_db(sqlite_engine, monkeypatch):
-    """Monkeypatch backend.database.db.engine to the SQLite engine."""
-    monkeypatch.setattr(_db_module.db, "engine", sqlite_engine)
+    """Monkeypatch the feedback router's db.engine to the SQLite engine.
+
+    Patches feedback_router_module.db directly (the reference the router
+    captured at import time) so the fixture is robust to suite-order effects
+    that replace sys.modules["backend.database"] mid-collection.
+    """
+    monkeypatch.setattr(feedback_router_module.db, "engine", sqlite_engine)
     yield sqlite_engine
 
 
@@ -153,7 +163,7 @@ def test_submit_status_is_new(patched_db):
     assert status == "new"
 
 
-def test_submit_still_succeeds_without_feedback_status_table(sqlite_engine, monkeypatch):
+def test_submit_still_succeeds_without_feedback_status_table(monkeypatch):
     """Best-effort: submit returns 201 even when feedback_status table doesn't exist."""
     # Use an engine that has ONLY the feedback table (no feedback_status)
     engine_no_fs = create_engine(
@@ -171,7 +181,8 @@ def test_submit_still_succeeds_without_feedback_status_table(sqlite_engine, monk
             "report_id TEXT, screenshot_data TEXT)"
         ))
 
-    monkeypatch.setattr(_db_module.db, "engine", engine_no_fs)
+    # Patch the router's own db reference (suite-order safe).
+    monkeypatch.setattr(feedback_router_module.db, "engine", engine_no_fs)
     client = _make_client("u-gamma")
     resp = client.post(
         "/api/feedback",
