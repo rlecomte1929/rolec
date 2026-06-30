@@ -1,6 +1,6 @@
 {
   "report": "immigration_corpus_coverage",
-  "generated_at": "2026-06-30T07:04:13.239230+00:00",
+  "generated_at": "2026-06-30T07:07:54.801970+00:00",
   "mode": "offline",
   "disclaimer": "READ-ONLY diagnostic. No synthetic immigration rules are added to the corpus. Uncovered corridors render a generic deterministic seed roadmap (RULE_NOT_FOUND), not corridor-specific authoritative guidance.",
   "summary": {
@@ -39,7 +39,7 @@
       "corridor": "BR_PT",
       "covered": true,
       "status": "covered (corridor-specific roadmap)",
-      "chunk_count": 33,
+      "chunk_count": 18,
       "pathway_types": [
         "cplp_residence",
         "d2_visa",
@@ -146,7 +146,7 @@
       "corridor": "IN_DE",
       "covered": true,
       "status": "covered (corridor-specific roadmap)",
-      "chunk_count": 38,
+      "chunk_count": 19,
       "pathway_types": [
         "blue_card",
         "skilled_worker"
@@ -192,7 +192,7 @@
       "corridor": "US_FR",
       "covered": true,
       "status": "covered (corridor-specific roadmap)",
-      "chunk_count": 38,
+      "chunk_count": 19,
       "pathway_types": [
         "long_stay_visa",
         "passeport_talent"
