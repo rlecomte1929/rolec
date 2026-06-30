@@ -1,8 +1,8 @@
 {
   "_meta": {
     "corridor": "BR_PT",
-    "verification_status": "representative",
-    "note": "Synthetic dossier. Brazilian (non-EU) national relocating to Portugal on a long-term assignment — standard work/residence-permit route. Citation is REPRESENTATIVE (Lei n.º 23/2007 art. 88, subordinate-work residence permit), not an authoritative legal cite. Needs human curation against live Portuguese immigration law.",
+    "verification_status": "route-verified; PT sub-article pending",
+    "note": "Synthetic dossier. Brazilian (non-EU) national relocating to Portugal on a long-term assignment — standard subordinate-work residence permit route. Route + article (Lei n.º 23/2007 art. 88) CONFIRMED by Romain 2026-06-30; Blue Card / CPLP-specific route explicitly NOT selected. Exact sub-article (n.º 1 = with residence visa vs n.º 2 = visa-exempt) and amendment version (DL 37-A/2024 / Lei 40/2024 consolidated text) pending legal sign-off.",
     "source": "WS-B seed corpus (deterministic regime router)"
   },
   "profile": {

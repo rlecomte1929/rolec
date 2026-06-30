@@ -64,10 +64,11 @@ def test_eval_over_seed_corpus_is_non_vacuous_and_passes_gate():
 
 def test_new_fr_pt_rules_effective_on_eval_date():
     """The representative FR/PT rules are in force on the eval reference date."""
-    assert is_effective("FR_CESEDA_L421:2024", EVAL_DATE) is True
+    # FR tag corrected to :2021 (Ord. 2020-1733, in force 2021-05-01) per Romain sign-off.
+    assert is_effective("FR_CESEDA_L421:2021", EVAL_DATE) is True
     assert is_effective("PT_LEI_23_2007_ART88:2007", EVAL_DATE) is True
     # Sanity: both also effective on the literal eval date.
-    assert is_effective("FR_CESEDA_L421:2024", date(2026, 7, 1)) is True
+    assert is_effective("FR_CESEDA_L421:2021", date(2026, 7, 1)) is True
     assert is_effective("PT_LEI_23_2007_ART88:2007", date(2026, 7, 1)) is True
 
 

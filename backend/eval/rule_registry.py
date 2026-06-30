@@ -29,8 +29,12 @@ RULE_EFFECTIVE_WINDOWS: dict = {
     # (verification_status: "representative"). Curate against live law before
     # treating as authoritative.
     # France — CESEDA art. L.421-1 ff., "salarié" work/residence permit.
-    "FR_CESEDA_L421:2024": (date(2024, 1, 1), None),
+    # Route CONFIRMED by Romain (salarié, not Blue Card/Passeport Talent).
+    # Article L.421-1 recodified into force 2021-05-01 per Ord. 2020-1733 (16 Dec 2020).
+    "FR_CESEDA_L421:2021": (date(2021, 5, 1), None),
     # Portugal — Lei n.º 23/2007 art. 88, residence permit for subordinate work.
+    # Route CONFIRMED by Romain (subordinate-work / salarié route, not Blue Card/CPLP).
+    # NOTE: exact sub-article (n.º 1 vs n.º 2) + latest amendment version pending legal sign-off.
     "PT_LEI_23_2007_ART88:2007": (date(2007, 8, 4), None),
 }
 

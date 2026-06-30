@@ -55,7 +55,7 @@ def _citations_for(regime_id: str, destination_norm: str) -> List[str]:
         if destination_norm in {"germany", "de"}:
             return ["DE_AUFENTHG_18B:2020"]  # AufenthG §18b — skilled-worker residence permit
         if destination_norm in {"france", "fr"}:
-            return ["FR_CESEDA_L421:2024"]  # CESEDA L.421 — "salarié" work/residence permit (representative)
+            return ["FR_CESEDA_L421:2021"]  # CESEDA L.421 — "salarié" work/residence permit; in force 2021-05-01 (Ord. 2020-1733)
         if destination_norm in {"portugal", "pt"}:
             return ["PT_LEI_23_2007_ART88:2007"]  # Lei 23/2007 art. 88 — subordinate-work residence permit (representative)
     return []

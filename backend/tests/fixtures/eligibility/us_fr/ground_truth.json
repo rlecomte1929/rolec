@@ -1,8 +1,8 @@
 {
   "_meta": {
     "corridor": "US_FR",
-    "verification_status": "representative",
-    "note": "Synthetic dossier. US national relocating from the United States to France — non-EU national needs a French work/residence permit (standard work-permit route). Citation is REPRESENTATIVE (CESEDA L.421 'salarié' permit), not an authoritative legal cite. Needs human curation against live French immigration law.",
+    "verification_status": "route-verified",
+    "note": "Synthetic dossier. US national relocating from the United States to France — non-EU national needs a French work/residence permit (standard salarié route). Route + article (CESEDA L.421-1, salarié) CONFIRMED by Romain 2026-06-30; effective_from corrected to 2021-05-01 (Ord. 2020-1733). Blue Card / Passeport Talent route explicitly NOT selected. Full legal sign-off (exact sub-article, LTA applicability) still pending counsel.",
     "source": "WS-B seed corpus (deterministic regime router)"
   },
   "profile": {
@@ -13,6 +13,6 @@
   },
   "eligibility_verdict": {
     "outcome_set": ["ELIGIBLE_WORK_PERMIT"],
-    "citations": ["FR_CESEDA_L421:2024"]
+    "citations": ["FR_CESEDA_L421:2021"]
   }
 }
