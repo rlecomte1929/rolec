@@ -35,7 +35,7 @@ python -m backend.scripts.list_representative_fixtures --json # machine list
 
 | Fixture | Gate it feeds | Known gap to fix when curating |
 |---|---|---|
-| `tests/fixtures/eligibility/<corridor>/ground_truth.json` | `run_eligibility_eval` | US_FR & BR_PT have **no citations** — `backend/eval/rule_registry.py` lacks France/Portugal rule versions. Add those rules, then add real citations. |
+| `tests/fixtures/eligibility/<corridor>/ground_truth.json` | `run_eligibility_eval` | All 5 corridors now carry citations. US_FR & BR_PT use **representative** FR/PT rule versions (`FR_CESEDA_L421:2024`, `PT_LEI_23_2007_ART88:2007`) added to `backend/eval/rule_registry.py` — illustrative pointers, not authoritative legal cites. Promote to verified against live French/Portuguese immigration law. |
 | `tests/fixtures/eval/outcome_accuracy/us_l1b_gold.json` | `run_outcome_accuracy` | Single corridor; expand to the 5 seeded corridors with real roadmaps. |
 | `tests/fixtures/rag_eval/hr_policy/{queries,chunks}.jsonl` | `eval_hr_policy_context_precision`, reranker | Bodies are hand-authored for deterministic lexical overlap; replace with real policy text + real expected chunks. |
 | `tests/fixtures/rag_eval/triad_cases.json` | `run_rag_triad` | Replace mock-judge-friendly cases with real (answer, chunks, gold-label) triples. |
