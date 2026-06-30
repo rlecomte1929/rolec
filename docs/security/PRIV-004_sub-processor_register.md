@@ -43,11 +43,34 @@
 ## PII-in-prompts posture (criterion 5)
 
 - A centralised masker exists: `backend/app/services/pii_masker.py` (`mask_pii()`), masking phone, IBAN,
-  passport, SSN/D-number, national ID, email.
-- It is currently wired into `policy_assistant_llm_client.py` only. The general `llm_client.py`
-  (`complete()`/`complete_text()`) paths do **not** mask. The data-minimisation rule added to `CLAUDE.md`
-  makes masking a hard rule for all new LLM calls; retro-fitting the existing general paths is tracked
-  as a follow-up.
+  passport, SSN/D-number, national ID, email, and person names.
+- **The `policy_assistant_llm_client.py` path** masks `user_message` at a single chokepoint
+  (`AnthropicClient.complete()`), so every caller routed through it — Policy Assistant RAG, immigration
+  answers, factual/contradiction verifiers, and the **roadmap generator** — inherits masking. (The
+  roadmap generator is additionally data-minimised by construction: its prompt SUBJECT is built only from
+  ISO country codes + corridor/pathway classification, never names/email/passport.)
+- **The general `llm_client.py` path** (`complete` / `complete_text` / `claude_complete` /
+  `claude_complete_text` + sync bridges) does **not** mask — its docstring states masking is the caller's
+  responsibility. **GAP CLOSED (H1, 2026-06-30):** every one of its call sites is now reviewed and either
+  masks user free-text before building the prompt, or is exempt (no user PII / published-corpus grounding
+  text that must not be masked). Status by call site:
+
+  | Call site | Status | Notes |
+  |---|---|---|
+  | `services/receipt_field_extractor.py` | MASKED | `mask_pii(ocr_text)` before `complete()` |
+  | `services/requirement_fact_extractor.py` | MASKED | `mask_pii(raw)` before `complete_text()` |
+  | `services/policy_query_answering.py` | MASKED | query redacted via `redact_pii_from_query()`→`mask_pii()` upstream; context = published policy chunks |
+  | `routers/support.py` | MASKED (H1) | `mask_pii(subject)` + `mask_pii(content)` — support-ticket free-text |
+  | `routers/analytics_query.py` | MASKED (H1) | `mask_pii(question)` — analyst free-text; aggregate context left intact |
+  | `services/prospect_enrichment_service.py` | MASKED (H1) | `mask_pii(raw_input_notes)` — admin free-text; published web evidence left intact |
+  | `services/catalog_scraper.py` | EXEMPT | prompt = service category + destination city/country codes; no user PII |
+  | `services/policy_canonical_extraction.py` | EXEMPT | user = published corporate policy document text; masking would corrupt extraction grounding |
+  | `services/ocr_passport_extractor.py` | EXEMPT | prompt text is a static instruction; PII is in the image (vision OCR; `mask_pii` is text-only), mirroring the Mistral OCR path above |
+
+- **Regression guard:** `backend/tests/test_llm_client_caller_allowlist.py` enumerates every module that
+  imports a general `llm_client` entry point and fails CI when a new, unreviewed caller appears — forcing
+  a MASKED/EXEMPT classification on each new call site. Caller-level masking is asserted in
+  `backend/tests/test_pii_masking_llm_egress.py`.
 
 ## Actions still requiring human sign-off (AI cannot perform)
 
