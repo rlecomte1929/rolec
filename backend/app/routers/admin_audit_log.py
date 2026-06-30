@@ -53,9 +53,16 @@ def get_audit_log(
         params["actor"] = f"%{actor}%"
 
     if event:
-        # new_value_json is a JSON string; match on substring for portability
-        clauses.append("new_value_json LIKE :event_match")
-        params["event_match"] = f'%"event": "{event}"%'
+        # Use dialect-aware JSON extraction rather than LIKE to avoid spacing sensitivity.
+        # Postgres: new_value_json is jsonb → use ->> operator.
+        # SQLite: new_value_json is TEXT → use json_extract().
+        _engine = getattr(db, "bind", None)
+        _dialect = getattr(getattr(_engine, "dialect", None), "name", "") if _engine else ""
+        if _dialect == "postgresql":
+            clauses.append("new_value_json ->> 'event' = :event_val")
+        else:
+            clauses.append("json_extract(new_value_json, '$.event') = :event_val")
+        params["event_val"] = event
 
     where = " AND ".join(clauses)
     params["limit"] = limit

@@ -215,3 +215,53 @@ def test_patch_non_admin_403(non_admin_client, db_session):
 def test_patch_missing_admin_404(admin_client):
     resp = admin_client.patch("/api/admin/admins/nobody@example.com", json={"enabled": False})
     assert resp.status_code == 404
+
+
+def test_patch_disable_no_email_in_user_dict_fails_closed(db_session):
+    """Disable request where user dict has no 'email' must be blocked (400 fail-closed).
+
+    The actor_id is an opaque non-email string and no 'users' table exists in this
+    SQLite fixture, so identity cannot be resolved.  The guard must reject rather
+    than silently allow the disable (which would bypass the self-disable check).
+    """
+    db_session.execute(text(
+        "INSERT INTO admin_allowlist (email, enabled, created_at) "
+        "VALUES ('target@example.com', 1, '2026-01-01')"
+    ))
+    db_session.commit()
+
+    app = FastAPI()
+    app.include_router(admin_admins.router)
+    # Actor has no 'email' in user dict; actor_id is not an email → identity ambiguous
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "opaque-actor-id-without-email",
+        "is_admin": True,
+    }
+    app.dependency_overrides[admin_admins._get_db] = lambda: db_session
+    client = TestClient(app)
+
+    resp = client.patch("/api/admin/admins/target@example.com", json={"enabled": False})
+    assert resp.status_code == 400, f"Expected 400 (fail-closed), got {resp.status_code}: {resp.text}"
+    assert "identity" in resp.json()["detail"].lower()
+
+
+def test_patch_disable_actor_id_is_email_resolves_and_self_checks(db_session):
+    """If actor_id is itself an email (legacy), resolve it and apply the self-disable guard."""
+    actor_as_email = "self@example.com"
+    db_session.execute(text(
+        f"INSERT INTO admin_allowlist (email, enabled, created_at) VALUES ('{actor_as_email}', 1, '2026-01-01')"
+    ))
+    db_session.commit()
+
+    app = FastAPI()
+    app.include_router(admin_admins.router)
+    # No 'email' in dict, but id IS an email
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": actor_as_email,
+        "is_admin": True,
+    }
+    app.dependency_overrides[admin_admins._get_db] = lambda: db_session
+    client = TestClient(app)
+
+    resp = client.patch(f"/api/admin/admins/{actor_as_email}", json={"enabled": False})
+    assert resp.status_code == 400, "Self-disable via legacy email actor_id must be rejected"

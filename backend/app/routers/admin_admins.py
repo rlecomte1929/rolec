@@ -106,9 +106,31 @@ def patch_admin(
     actor_id = str(user.get("id") or user.get("user_id") or "unknown")
     actor_email = str(user.get("email") or "")
 
-    # Guard: cannot disable yourself
-    if not body.enabled and actor_email.lower() == email_norm:
-        raise HTTPException(status_code=400, detail="Cannot disable your own admin account")
+    # Guard: cannot disable yourself — fail closed when identity is ambiguous
+    if not body.enabled:
+        if not actor_email:
+            # Attempt 1: actor_id is itself an email (legacy identifiers)
+            if "@" in actor_id:
+                actor_email = actor_id.lower()
+            else:
+                # Attempt 2: look up email from users table by actor id
+                try:
+                    row = db.execute(
+                        text("SELECT email FROM users WHERE id = :id LIMIT 1"),
+                        {"id": actor_id},
+                    ).fetchone()
+                    if row and row[0]:
+                        actor_email = str(row[0]).strip().lower()
+                except Exception:
+                    pass  # table absent (SQLite tests) or actor not found
+        # Fail closed: if identity is still unknown, reject rather than allow a silent bypass
+        if not actor_email:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot verify actor identity; disable rejected for safety",
+            )
+        if actor_email.lower() == email_norm:
+            raise HTTPException(status_code=400, detail="Cannot disable your own admin account")
 
     result = db.execute(
         text("UPDATE admin_allowlist SET enabled = :enabled WHERE email = :email"),

@@ -144,3 +144,39 @@ def test_get_item_has_expected_fields(admin_client):
     item = admin_client.get("/api/admin/audit-log").json()["items"][0]
     for f in ("id", "entity_type", "entity_id", "action_type", "new_value", "actor_id", "created_at"):
         assert f in item, f"missing field: {f}"
+
+
+def test_event_filter_against_real_record_admin_event(db_session):
+    """Event filter must work against rows written by record_admin_event.
+
+    This proves the filter is robust to JSON serialisation details (spacing, key
+    ordering) by using the REAL writer rather than a hand-formatted seed string.
+    """
+    from backend.app.services.admin_audit import record_admin_event  # noqa: PLC0415
+
+    unique_event = "task7_m1_real_write_probe"
+    record_admin_event(
+        db_session,
+        actor_id="test-actor-id",
+        event=unique_event,
+        entity="admin_allowlist",
+    )
+    # No explicit flush needed: writes via db.connection() share the same SA transaction.
+
+    app = FastAPI()
+    app.include_router(admin_audit_log.router)
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u-admin-1", "is_admin": True}
+    app.dependency_overrides[admin_audit_log._get_db] = lambda: db_session
+    client = TestClient(app)
+
+    resp = client.get(f"/api/admin/audit-log?event={unique_event}")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert len(items) >= 1, (
+        "event filter returned 0 rows — JSON extraction broken or row not written; "
+        f"all rows: {client.get('/api/admin/audit-log').json()['items']}"
+    )
+    assert any(
+        (item.get("new_value") or {}).get("event") == unique_event
+        for item in items
+    ), f"Matched rows have wrong event field: {items}"
