@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "corridor": "FR_NO",
+    "verification_status": "representative",
+    "note": "Synthetic dossier. EU (France) national relocating to Norway (EEA) on a long-term assignment — EU/EEA free movement. Nationality is expressed as a country name ('France', not the demonym 'French') because ImmigrationRegimeRouter matches nationality against country names. Needs human curation against the live Norwegian EEA registration rules before being treated as authoritative.",
+    "source": "WS-B seed corpus (deterministic regime router)"
+  },
+  "profile": {
+    "nationality": "France",
+    "origin_country": "France",
+    "destination_country": "Norway",
+    "contract_type": "lta"
+  },
+  "eligibility_verdict": {
+    "outcome_set": ["ELIGIBLE_EU_FREE_MOVEMENT"],
+    "citations": ["EU_DIR_2004_38_ART7:2004", "NO_EOS_UTLENDINGS:2010"]
+  }
+}

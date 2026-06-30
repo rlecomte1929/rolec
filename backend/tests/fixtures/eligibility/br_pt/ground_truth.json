@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "corridor": "BR_PT",
+    "verification_status": "representative",
+    "note": "Synthetic dossier. Brazilian (non-EU) national relocating to Portugal on a long-term assignment — standard work/residence-permit route. No Portuguese rule version exists in backend/eval/rule_registry.py yet, so citations are intentionally empty pending registry coverage. Needs human curation.",
+    "source": "WS-B seed corpus (deterministic regime router)"
+  },
+  "profile": {
+    "nationality": "Brazilian",
+    "origin_country": "Brazil",
+    "destination_country": "Portugal",
+    "contract_type": "lta"
+  },
+  "eligibility_verdict": {
+    "outcome_set": ["ELIGIBLE_WORK_PERMIT"],
+    "citations": []
+  }
+}

@@ -135,9 +135,22 @@ def _main() -> int:
     )
     parser.add_argument("--corpus", required=True, help="Directory containing ground_truth.json files.")
     parser.add_argument("--ci", action="store_true", help="Exit 1 if any gate fails.")
+    parser.add_argument(
+        "--predictor",
+        choices=["mock", "real"],
+        default="mock",
+        help="mock = echo ground truth (harness self-test, back-compat default); "
+        "real = derive the verdict from the deterministic immigration regime router.",
+    )
     args = parser.parse_args()
 
-    report = run_eval(args.corpus)
+    predictor = _mock_perfect_predictor
+    if args.predictor == "real":
+        from .eligibility_predictor import predict_eligibility
+
+        predictor = predict_eligibility
+
+    report = run_eval(args.corpus, predictor=predictor)
     print(json.dumps(report, indent=2))
 
     if args.ci:
