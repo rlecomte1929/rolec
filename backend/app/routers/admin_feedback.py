@@ -90,7 +90,11 @@ _OUTER_SQL = """
 SELECT
     base.id, base.stream, base.source_ref, base.text, base.verdict,
     base.user_id, base.company_id, base.created_at,
-    fs.status, fs.owner, fs.resolution
+    fs.status, fs.owner, fs.resolution,
+    CAST(fs.severity        AS TEXT) AS severity,
+    CAST(fs.area            AS TEXT) AS area,
+    CAST(fs.dispatch_status AS TEXT) AS dispatch_status,
+    CAST(fs.dispatch_ref    AS TEXT) AS dispatch_ref
 FROM (
     {union}
 ) AS base
@@ -110,6 +114,7 @@ def _fetch_rows(
     stream: Optional[str],
     status: Optional[str],
     since: Optional[str],
+    dispatched: Optional[bool] = None,
 ) -> List[Dict[str, Any]]:
     filters: List[str] = []
     params: Dict[str, Any] = {}
@@ -122,6 +127,8 @@ def _fetch_rows(
     if since:
         filters.append("AND base.created_at >= :since")
         params["since"] = since
+    if dispatched:
+        filters.append("AND fs.dispatch_status IS NOT NULL")
 
     sql = _OUTER_SQL.format(union=_UNION_SQL, filters="\n".join(filters))
     rows = db.execute(text(sql), params).mappings().all()
@@ -136,11 +143,12 @@ def list_feedback(
     stream: Optional[str] = None,
     status: Optional[str] = None,
     since: Optional[str] = None,
+    dispatched: Optional[bool] = None,
     db: Session = Depends(_get_db),
     _user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """Return unified feedback rows from all streams, LEFT JOIN'd to triage state."""
-    rows = _fetch_rows(db, stream=stream, status=status, since=since)
+    rows = _fetch_rows(db, stream=stream, status=status, since=since, dispatched=dispatched)
     return {"items": rows, "count": len(rows)}
 
 
