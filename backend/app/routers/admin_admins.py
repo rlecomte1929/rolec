@@ -112,12 +112,18 @@ def patch_admin(
 
     # Guard: cannot disable yourself — fail closed when identity is ambiguous
     if not body.enabled:
-        # Guard: never disable the last remaining enabled admin (lockout protection)
-        enabled_count = db.execute(
-            text("SELECT count(*) FROM admin_allowlist WHERE enabled = 1")
-        ).scalar() or 0
-        if int(enabled_count) <= 1:
-            raise HTTPException(status_code=400, detail="Cannot disable the last admin")
+        # Guard: never disable the last remaining enabled admin (lockout protection).
+        # Only applies when the target is a currently-enabled admin — a missing or
+        # already-disabled target falls through to the normal 404 / no-op below.
+        target_enabled = db.execute(
+            text("SELECT enabled FROM admin_allowlist WHERE email = :email"), {"email": email_norm}
+        ).scalar()
+        if target_enabled == 1:
+            enabled_count = db.execute(
+                text("SELECT count(*) FROM admin_allowlist WHERE enabled = 1")
+            ).scalar() or 0
+            if int(enabled_count) <= 1:
+                raise HTTPException(status_code=400, detail="Cannot disable the last admin")
         if not actor_email:
             # Attempt 1: actor_id is itself an email (legacy identifiers)
             if "@" in actor_id:
