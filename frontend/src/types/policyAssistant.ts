@@ -92,6 +92,8 @@ export interface EmployeePolicyAssistantQueryResponse {
   ok: boolean;
   assignment_id: string;
   request_id?: string | null;
+  /** Trace row id for the end-user helpfulness vote control. */
+  trace_session_id?: string | null;
   answer: PolicyAssistantAnswer;
 }
 

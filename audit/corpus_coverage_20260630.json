@@ -1,0 +1,223 @@
+{
+  "report": "immigration_corpus_coverage",
+  "generated_at": "2026-06-30T07:07:54.801970+00:00",
+  "mode": "offline",
+  "disclaimer": "READ-ONLY diagnostic. No synthetic immigration rules are added to the corpus. Uncovered corridors render a generic deterministic seed roadmap (RULE_NOT_FOUND), not corridor-specific authoritative guidance.",
+  "summary": {
+    "total_corridors": 14,
+    "covered_count": 8,
+    "uncovered_count": 6,
+    "covered_corridors": [
+      "BR_PT",
+      "CA_DE",
+      "FR_NO",
+      "IN_DE",
+      "UK_DE",
+      "UK_FR",
+      "US_FR",
+      "US_NL"
+    ],
+    "uncovered_corridors": [
+      "DE_NO",
+      "ES_NL",
+      "FR_CH",
+      "FR_DE",
+      "FR_ES",
+      "FR_NL"
+    ],
+    "registry_corridors_needing_content": [
+      "DE_NO",
+      "ES_NL",
+      "FR_CH",
+      "FR_DE",
+      "FR_ES",
+      "FR_NL"
+    ]
+  },
+  "corridors": [
+    {
+      "corridor": "BR_PT",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 18,
+      "pathway_types": [
+        "cplp_residence",
+        "d2_visa",
+        "d7_visa"
+      ],
+      "in_registry": false,
+      "has_corpus_source": true,
+      "sources": [
+        "corpus/br_pt_corridor.json",
+        "backend/tests/fixtures/rag_eval/corpus/br_pt_corridor.json"
+      ]
+    },
+    {
+      "corridor": "CA_DE",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 19,
+      "pathway_types": [
+        "blue_card",
+        "skilled_worker"
+      ],
+      "in_registry": false,
+      "has_corpus_source": true,
+      "sources": [
+        "corpus/ca_de_corridor.json"
+      ]
+    },
+    {
+      "corridor": "DE_NO",
+      "covered": false,
+      "status": "generic seed (needs content)",
+      "chunk_count": 0,
+      "pathway_types": [],
+      "in_registry": true,
+      "has_corpus_source": false,
+      "sources": []
+    },
+    {
+      "corridor": "ES_NL",
+      "covered": false,
+      "status": "generic seed (needs content)",
+      "chunk_count": 0,
+      "pathway_types": [],
+      "in_registry": true,
+      "has_corpus_source": false,
+      "sources": []
+    },
+    {
+      "corridor": "FR_CH",
+      "covered": false,
+      "status": "generic seed (needs content)",
+      "chunk_count": 0,
+      "pathway_types": [],
+      "in_registry": true,
+      "has_corpus_source": false,
+      "sources": []
+    },
+    {
+      "corridor": "FR_DE",
+      "covered": false,
+      "status": "generic seed (needs content)",
+      "chunk_count": 0,
+      "pathway_types": [],
+      "in_registry": true,
+      "has_corpus_source": false,
+      "sources": []
+    },
+    {
+      "corridor": "FR_ES",
+      "covered": false,
+      "status": "generic seed (needs content)",
+      "chunk_count": 0,
+      "pathway_types": [],
+      "in_registry": true,
+      "has_corpus_source": false,
+      "sources": []
+    },
+    {
+      "corridor": "FR_NL",
+      "covered": false,
+      "status": "generic seed (needs content)",
+      "chunk_count": 0,
+      "pathway_types": [],
+      "in_registry": true,
+      "has_corpus_source": false,
+      "sources": []
+    },
+    {
+      "corridor": "FR_NO",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 24,
+      "pathway_types": [
+        "eu_free_movement",
+        "family_reunification"
+      ],
+      "in_registry": true,
+      "has_corpus_source": true,
+      "sources": [
+        "backend/tests/fixtures/rag_eval/corpus/fr_no_corridor.json"
+      ]
+    },
+    {
+      "corridor": "IN_DE",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 19,
+      "pathway_types": [
+        "blue_card",
+        "skilled_worker"
+      ],
+      "in_registry": true,
+      "has_corpus_source": true,
+      "sources": [
+        "corpus/in_de_corridor.json",
+        "backend/tests/fixtures/rag_eval/corpus/in_de_corridor.json"
+      ]
+    },
+    {
+      "corridor": "UK_DE",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 22,
+      "pathway_types": [
+        "blue_card",
+        "skilled_worker"
+      ],
+      "in_registry": false,
+      "has_corpus_source": true,
+      "sources": [
+        "backend/tests/fixtures/rag_eval/corpus/uk_de_corridor.json"
+      ]
+    },
+    {
+      "corridor": "UK_FR",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 19,
+      "pathway_types": [
+        "long_stay_visa",
+        "passeport_talent"
+      ],
+      "in_registry": false,
+      "has_corpus_source": true,
+      "sources": [
+        "corpus/uk_fr_corridor.json"
+      ]
+    },
+    {
+      "corridor": "US_FR",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 19,
+      "pathway_types": [
+        "long_stay_visa",
+        "passeport_talent"
+      ],
+      "in_registry": false,
+      "has_corpus_source": true,
+      "sources": [
+        "corpus/us_fr_corridor.json",
+        "backend/tests/fixtures/rag_eval/corpus/us_fr_corridor.json"
+      ]
+    },
+    {
+      "corridor": "US_NL",
+      "covered": true,
+      "status": "covered (corridor-specific roadmap)",
+      "chunk_count": 11,
+      "pathway_types": [
+        "eu_blue_card",
+        "highly_skilled_migrant"
+      ],
+      "in_registry": false,
+      "has_corpus_source": true,
+      "sources": [
+        "corpus/us_nl_corridor.json"
+      ]
+    }
+  ]
+}

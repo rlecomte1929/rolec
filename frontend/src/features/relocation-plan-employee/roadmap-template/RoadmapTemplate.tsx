@@ -79,9 +79,9 @@ function StatusIcon({ task }: { task: RelocationPlanPhaseTaskDTO }) {
 
 function OwnerPill({ owner }: { owner: RelocationPlanPhaseTaskDTO['owner'] }) {
   const label = ownerLabel(owner);
-  const tone = owner === 'hr' ? 'bg-indigo-50 text-indigo-600'
+  const tone = owner === 'hr' ? 'bg-sky-50 text-sky-700'
     : owner === 'provider' ? 'bg-slate-100 text-slate-600'
-    : owner === 'joint' ? 'bg-violet-50 text-violet-600'
+    : owner === 'joint' ? 'bg-amber-50 text-amber-700'
     : 'bg-teal-50 text-teal-700';
   return <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${tone}`}>{label}</span>;
 }
