@@ -13,6 +13,7 @@ import {
   adminProspectsAPI,
 } from '../../../api/client';
 import { getRagEvalMetrics, type RagEvalDashboard } from '../../../api/ragEval';
+import { getAiUnitEconomics } from '../../../api/aiUnitEconomics';
 import { AdminOverviewPage } from '../AdminOverviewPage';
 
 vi.mock('../AdminLayout', () => ({
@@ -35,6 +36,8 @@ vi.mock('../../../api/client', () => ({
 
 vi.mock('../../../api/ragEval', () => ({ getRagEvalMetrics: vi.fn() }));
 
+vi.mock('../../../api/aiUnitEconomics', () => ({ getAiUnitEconomics: vi.fn() }));
+
 const mocked = <T,>(fn: T) => fn as T & ReturnType<typeof vi.fn>;
 
 // Module-card sources (AIQ-1329). Helper keeps the three tests focused on the
@@ -47,6 +50,7 @@ const stubModuleSources = (mode: 'values' | 'zeros' | 'reject') => {
     mocked(adminResourcesAPI.getCounts).mockRejectedValue(failure);
     mocked(adminProspectsAPI.list).mockRejectedValue(failure);
     mocked(getRagEvalMetrics).mockRejectedValue(failure);
+    mocked(getAiUnitEconomics).mockRejectedValue(failure);
     return;
   }
   const z = mode === 'zeros';
@@ -62,6 +66,19 @@ const stubModuleSources = (mode: 'values' | 'zeros' | 'reject') => {
       ? [{ alert: { firing: false } }]
       : [{ alert: { firing: false } }, { alert: { firing: false } }, { alert: { firing: true } }],
   } as unknown as RagEvalDashboard);
+  mocked(getAiUnitEconomics).mockResolvedValue({
+    rows: z
+      ? []
+      : [{ customer_id: 'acme', feature_key: 'policy_assistant', n_calls: 18, total_cost_usd: 1.23, total_tokens_in: 100, total_tokens_out: 50, total_co2e_grams: 19 }],
+    totals: {
+      n_calls: z ? 0 : 18,
+      total_cost_usd: z ? 0 : 1.23,
+      total_tokens_in: z ? 0 : 100,
+      total_tokens_out: z ? 0 : 50,
+      total_co2e_grams: z ? 0 : 19,
+    },
+    filters: { customer_id: null, feature_key: null, from: null, to: null },
+  });
 };
 
 const storage = new Map<string, string>();
@@ -118,6 +135,8 @@ describe('AdminOverviewPage metrics', () => {
     expect(within(screen.getByTestId('module-resources')).getAllByText('15').length).toBeGreaterThan(0);
     expect(within(screen.getByTestId('module-prospects')).getAllByText('17').length).toBeGreaterThan(0);
     expect(within(screen.getByTestId('module-rag-quality')).getByText('2/3')).toBeInTheDocument();
+    expect(within(screen.getByTestId('module-ai-unit-economics')).getByText('$1.23')).toBeInTheDocument();
+    expect(within(screen.getByTestId('module-ai-unit-economics')).getByText('18')).toBeInTheDocument();
     // The broken-looking placeholders must be gone.
     expect(screen.queryByText('No aggregate endpoint connected')).not.toBeInTheDocument();
     expect(screen.queryByText(/Open the CMS|Open pipeline|Open dashboard/)).not.toBeInTheDocument();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2, Info } from 'lucide-react';
+import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2, DollarSign, Info } from 'lucide-react';
 import {
   adminAPI,
   suppliersAPI,
@@ -10,6 +10,7 @@ import {
   adminProspectsAPI,
 } from '../../api/client';
 import { getRagEvalMetrics, type RagEvalDashboard } from '../../api/ragEval';
+import { getAiUnitEconomics } from '../../api/aiUnitEconomics';
 import { StatCard } from '../../components/admin/overview/StatCard';
 import { ModuleCard } from '../../components/admin/overview/ModuleCard';
 import { Button } from '../../components/antigravity/Button';
@@ -38,6 +39,9 @@ type OverviewStats = {
   prospectsTotal: number | null;
   ragHealthy: number | null;
   ragTotal: number | null;
+  aiSpendUsd: number | null;
+  aiCalls: number | null;
+  aiCo2eGrams: number | null;
 };
 
 const EMPTY_STATS: OverviewStats = {
@@ -57,6 +61,9 @@ const EMPTY_STATS: OverviewStats = {
   prospectsTotal: null,
   ragHealthy: null,
   ragTotal: null,
+  aiSpendUsd: null,
+  aiCalls: null,
+  aiCo2eGrams: null,
 };
 
 function settledArrayCount<T>(
@@ -100,6 +107,7 @@ export const AdminOverviewPage: React.FC = () => {
         adminResourcesAPI.getCounts(),
         adminProspectsAPI.list({ limit: 1 }), // limit=1: we only read `total`, not rows
         getRagEvalMetrics(),
+        getAiUnitEconomics(),
       ]);
 
       return {
@@ -119,6 +127,9 @@ export const AdminOverviewPage: React.FC = () => {
         prospectsTotal: settledNumber(results[9], (value) => value.total),
         ragHealthy: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.filter((m) => !m.alert.firing).length),
         ragTotal: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.length),
+        aiSpendUsd: settledNumber(results[11], (value) => value.totals?.total_cost_usd),
+        aiCalls: settledNumber(results[11], (value) => value.totals?.n_calls),
+        aiCo2eGrams: settledNumber(results[11], (value) => value.totals?.total_co2e_grams),
       };
     },
     enabled: role === 'ADMIN',
@@ -130,6 +141,9 @@ export const AdminOverviewPage: React.FC = () => {
   // and surface how many thresholds are currently alerting.
   const ragSummary = stats.ragTotal === null ? null : `${stats.ragHealthy ?? 0}/${stats.ragTotal}`;
   const ragAlerting = stats.ragTotal === null ? null : stats.ragTotal - (stats.ragHealthy ?? 0);
+
+  const aiSpendLabel = stats.aiSpendUsd === null ? null : `$${stats.aiSpendUsd.toFixed(2)}`;
+  const aiCo2eLabel = stats.aiCo2eGrams === null ? null : `${stats.aiCo2eGrams.toFixed(1)} g`;
 
   if (role !== 'ADMIN') {
     return (
@@ -253,6 +267,19 @@ export const AdminOverviewPage: React.FC = () => {
           metric={ragSummary}
           loading={loading}
           rows={[{ label: 'Thresholds alerting', value: ragAlerting }]}
+        />
+        <ModuleCard
+          testId="module-ai-unit-economics"
+          to={buildRoute('adminAiUnitEconomics')}
+          icon={<DollarSign className="h-[18px] w-[18px]" aria-hidden="true" />}
+          title="AI economics"
+          subtitle="Cost & carbon per feature"
+          metric={aiSpendLabel}
+          loading={loading}
+          rows={[
+            { label: 'AI calls', value: stats.aiCalls },
+            { label: 'Carbon (CO₂e)', value: aiCo2eLabel },
+          ]}
         />
       </div>
 
