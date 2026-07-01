@@ -365,13 +365,13 @@ Classification rules (apply strictly):
    no jargon, first person plural "we"). Acknowledge the issue, state next steps. Max 120 words.
 
 Return ONLY valid JSON matching this schema (no markdown fences):
-{
+{{
   "issue_category": "<bug|ux_confusion|policy_question|billing|feature_request|other>",
   "root_cause_hypothesis": "<one clear sentence>",
   "fix_difficulty": "<trivial|low|medium|high>",
   "suggested_action": "<auto_fix|notion_task|ai_reply|escalate>",
   "draft_reply": "<plain text reply to send to the user>"
-}
+}}
 """.strip()
 
 VALID_CATEGORIES = {"bug", "ux_confusion", "policy_question", "billing", "feature_request", "other"}
