@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { PublicLayout } from '../components/public';
 import {
   Section,
@@ -15,6 +15,7 @@ import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useDemoBooking } from '../hooks/useDemoBooking';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { emitMarketingEvent, readUtm } from '../analytics';
 import { landingContent } from './landing/landingContent';
 
 export const Landing: React.FC = () => {
@@ -89,6 +90,10 @@ export const Landing: React.FC = () => {
   const { open: openDemoBooking } = useDemoBooking();
   const c = landingContent;
 
+  useEffect(() => {
+    emitMarketingEvent('landing_page_view', readUtm());
+  }, []);
+
   // AIQ-757: `/` renders the marketing homepage for everyone — including
   // authenticated users — to match the other public pages (/platform,
   // /how-it-works, /get-started), which never redirect. The 404.html
@@ -113,10 +118,21 @@ export const Landing: React.FC = () => {
             <>
               {/* SITE-1: primary CTA is now the approved get-started action;
                   'Book a demo' becomes the lower-friction secondary. */}
-              <CTAButton to={buildRoute('access')} variant="primary" size="lg">
-                {c.hero.primaryCta}
-              </CTAButton>
-              <CTAButton onClick={() => openDemoBooking('landing-hero')} variant="outline" size="lg">
+              {/* CTAButton's `to` (Link) variant type-forbids and ignores onClick.
+                  This wrapper is intentionally non-interactive — the real control is
+                  the inner <Link>. We use capture-phase onClickCapture purely to
+                  observe the bubbling click for the fire-and-forget funnel emit; the
+                  Link still navigates via `to` (and keeps cmd/middle-click-to-new-tab). */}
+              <span onClickCapture={() => emitMarketingEvent('landing_cta_click', { cta: 'hero-primary', ...readUtm() })}>
+                <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+                  {c.hero.primaryCta}
+                </CTAButton>
+              </span>
+              <CTAButton
+                onClick={() => { emitMarketingEvent('landing_cta_click', { cta: 'hero-demo', ...readUtm() }); openDemoBooking('landing-hero'); }}
+                variant="outline"
+                size="lg"
+              >
                 {c.hero.secondaryCta}
               </CTAButton>
             </>
@@ -234,7 +250,11 @@ export const Landing: React.FC = () => {
             subtitle={c.finalCta.microCopy}
             variant="surface"
             primaryAction={
-              <CTAButton onClick={() => openDemoBooking('landing-final')} variant="primary" size="lg">
+              <CTAButton
+                onClick={() => { emitMarketingEvent('landing_cta_click', { cta: 'final-demo', ...readUtm() }); openDemoBooking('landing-final'); }}
+                variant="primary"
+                size="lg"
+              >
                 {c.finalCta.options.demo}
               </CTAButton>
             }

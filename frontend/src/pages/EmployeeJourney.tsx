@@ -573,7 +573,7 @@ export const EmployeeJourney: React.FC = () => {
       ? 'Open a case or pick up where you left off.'
       : hasPendingOnly
         ? 'Accept your pending case below, then open it to get started.'
-        : 'Enter the case code from HR to link your case, or wait for HR to match your email.';
+        : 'Enter the case code from HR to link your case. A case HR set up for your verified email links automatically when you sign in.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle} wide>

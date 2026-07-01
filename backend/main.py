@@ -168,8 +168,11 @@ from .app.routers import admin_review_queue as admin_review_queue_router
 from .app.routers import admin_notifications as admin_notifications_router
 from .app.routers import admin_ops_analytics as admin_ops_analytics_router
 from .app.routers import admin_workflow_analytics as admin_workflow_analytics_router
+from .app.routers import admin_marketing_analytics as admin_marketing_analytics_router
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .app.routers import admin_prospects as admin_prospects_router
+from .app.routers import admin_leads as admin_leads_router
+from .app.routers import lead_capture as lead_capture_router  # [audos-P1] public lead-capture (no /api/admin prefix)
 from .app.routers import admin_form_templates as admin_form_templates_router
 from .app.routers import crons as crons_router  # [P4-4]
 from .app.routers import mobility_context as mobility_context_router
@@ -233,6 +236,7 @@ from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
+from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
 from .app.routers import assistant_router as assistant_router_router
@@ -245,6 +249,7 @@ from .app.routers import admin_settings as admin_settings_router  # [Task-4] adm
 from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] unified feedback console
 from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
 from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
+from .app.routers import public_analytics as public_analytics_router  # [audos-P2] public funnel event ingest
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -833,6 +838,7 @@ app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases
 app.include_router(case_rule_updates_router.router)  # AIQ-693 — GET/POST /api/cases/{id}/rule-updates (P2-02e banner)
 app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
+app.include_router(setup_assistant_router.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
 app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
@@ -857,6 +863,7 @@ app.include_router(immigration_forms_router.router)  # IMM-11 — form library +
 app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — immigration document upload
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
+app.include_router(public_analytics_router.router)  # [audos-P2] public POST /api/public/track (no prefix)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(admin_mobility_router.router)
@@ -872,8 +879,11 @@ app.include_router(admin_source_change_review_router.router)
 app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_marketing_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
+app.include_router(admin_leads_router.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD
+app.include_router(lead_capture_router.router)  # [audos-P1] public lead-capture — NO prefix (path baked into route)
 app.include_router(admin_form_templates_router.router, prefix="/api/admin")
 app.include_router(admin_recommendations_debug_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
 app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
@@ -1833,6 +1843,13 @@ def _best_effort_reconcile_employee_assignments(
 ) -> None:
     """Run canonical claim/link reconcile; must not break dashboard or employee routes."""
     try:
+        # Verified-email auto-link: when the signed-in account's email is confirmed and
+        # matches an HR-created pending_claim case, link it without a manual "Accept"
+        # (fixes the "employee not connected" wall). Fails closed → manual accept fallback.
+        try:
+            email_verified = db.is_auth_email_confirmed(email)
+        except Exception:
+            email_verified = False
         reconcile_pending_assignment_claims(
             db,
             user_id=user_id,
@@ -1841,6 +1858,7 @@ def _best_effort_reconcile_employee_assignments(
             role=role,
             request_id=request_id,
             emit_side_effects=True,
+            attach_pending_claim=bool(email_verified),
         )
     except Exception as exc:
         log.warning("%s claim_reconcile skipped error=%s", context, exc)
@@ -2758,6 +2776,22 @@ def admin_update_assignment_status(
             user_id=user.get("id"),
             properties={"new_status": status, "source": "admin"},
         )
+    # Notify the linked employee that their case status changed (previously silent).
+    try:
+        _asn = db.get_assignment_by_id(assignment_id) or {}
+        _emp = (_asn.get("employee_user_id") or "").strip()
+        if _emp:
+            db.create_notification_with_preferences(
+                user_id=_emp,
+                type_="CASE_STATUS_CHANGED",
+                title="Your relocation case was updated",
+                body=f"Your case status is now: {status}.",
+                assignment_id=assignment_id,
+                case_id=_asn.get("case_id"),
+                metadata={"new_status": status},
+            )
+    except Exception as exc:
+        log.warning("status-change employee notification failed assignment_id=%s error=%s", assignment_id, exc)
     return {"ok": True, "status": status}
 
 
@@ -4322,6 +4356,9 @@ def _dispatch_hr_assign_side_effects(
         # in-app notification, so the NotificationBell showed nothing on assign
         # (the MSG-02 sentinel's notification check failed). Best-effort: mirror
         # the HR_FEEDBACK_POSTED pattern — never block the assign on this.
+        # NOTE: gated on employee_user_id by design. A pending_claim assign (no linked
+        # user yet) is instead notified via ASSIGNMENT_LINKED at auto-link/accept time
+        # (assignment_claim_link_service) — see the HR↔employee linkage fix.
         if employee_user_id:
             _notif_kwargs = dict(
                 user_id=employee_user_id,
@@ -5116,6 +5153,19 @@ def send_employee_message(
     )
     if not msg:
         raise HTTPException(status_code=400, detail="Message could not be sent.")
+    _recipient = (assignment.get("hr_user_id") or "").strip()
+    if _recipient:
+        try:
+            db.create_notification_with_preferences(
+                user_id=_recipient,
+                type_="NEW_MESSAGE",
+                title="New message on a relocation case",
+                body=body_txt[:140],
+                assignment_id=assignment["id"],
+                case_id=assignment.get("case_id"),
+            )
+        except Exception as exc:
+            log.warning("NEW_MESSAGE notif (employee→HR) failed assignment_id=%s error=%s", assignment["id"], exc)
     return {"ok": True, "message": msg}
 
 
@@ -6564,6 +6614,19 @@ def send_hr_message(
     )
     if not msg:
         raise HTTPException(status_code=400, detail="Message could not be sent.")
+    _recipient = (assignment.get("employee_user_id") or "").strip()
+    if _recipient:
+        try:
+            db.create_notification_with_preferences(
+                user_id=_recipient,
+                type_="NEW_MESSAGE",
+                title="New message from your HR team",
+                body=body_txt[:140],
+                assignment_id=assignment["id"],
+                case_id=assignment.get("case_id"),
+            )
+        except Exception as exc:
+            log.warning("NEW_MESSAGE notif (HR→employee) failed assignment_id=%s error=%s", assignment["id"], exc)
     return {"ok": True, "message": msg}
 
 

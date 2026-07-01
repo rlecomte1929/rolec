@@ -2038,6 +2038,51 @@ export const adminProspectsAPI = {
     `${API_BASE_URL}/api/admin/prospects/export.csv?status=${encodeURIComponent(status)}`,
 };
 
+// Admin Leads API (admin only) — audos-P1
+export interface LeadRow {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_domain: string | null;
+  source: string;
+  status: string;
+  tags: string[];
+  message: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  created_at: string;
+  updated_at: string;
+  matched_prospect: boolean;
+}
+
+export interface LeadStats {
+  total: number;
+  new_this_week: number;
+  by_status: Record<string, number>;
+}
+
+export const adminLeadsAPI = {
+  list: async (params?: { status?: string; search?: string; limit?: number }) =>
+    api
+      .get('/api/admin/leads', { params: params || {} })
+      .then((r) => r.data as { total: number; leads: LeadRow[] }),
+  get: async (id: string) =>
+    api.get(`/api/admin/leads/${id}`).then((r) => r.data as LeadRow),
+  patch: async (id: string, patch: { status?: string; tags?: string[] }) =>
+    api.patch(`/api/admin/leads/${id}`, patch).then((r) => r.data as LeadRow),
+  stats: async () => api.get('/api/admin/leads/stats').then((r) => r.data as LeadStats),
+};
+
+export const leadCaptureAPI = {
+  submit: async (payload: {
+    email: string; first_name?: string; last_name?: string;
+    company_domain?: string; message?: string; source: string;
+    utm_source?: string; utm_campaign?: string;
+  }) =>
+    api.post('/api/public/lead-capture', payload).then((r) => r.data as { id: string; matched_prospect: boolean }),
+};
+
 // Admin recommendations debug (admin only)
 export const adminRecommendationsAPI = {
   getDebug: async (assignmentId: string, serviceCategory: string) => {
@@ -2424,6 +2469,19 @@ export const adminOpsAnalyticsAPI = {
   getNotificationMetrics: (params?: { days?: number }) =>
     api.get<unknown>('/api/admin/ops/notifications', { params }).then((r) => r.data),
   getBottlenecks: () => api.get<unknown>('/api/admin/ops/bottlenecks').then((r) => r.data),
+};
+
+// Admin Marketing Analytics API (admin-only, pre-signup acquisition funnel)
+export interface MarketingFunnel {
+  period_days: number;
+  events: { landing_page_view: number; landing_cta_click: number; lead_captured: number };
+  rates: { cta_rate_pct: number; capture_rate_pct: number };
+  daily: { date: string; landing_page_view: number; landing_cta_click: number; lead_captured: number }[];
+}
+
+export const adminMarketingAnalyticsAPI = {
+  funnel: async (days = 30) =>
+    api.get('/api/admin/marketing-analytics/funnel', { params: { days } }).then((r) => r.data as MarketingFunnel),
 };
 
 // Admin Collaboration API (admin-only, internal threads)
