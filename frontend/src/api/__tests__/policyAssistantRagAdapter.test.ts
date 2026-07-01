@@ -17,6 +17,7 @@ const ANSWER: RagQueryResponse = {
   model: 'claude',
   cost_usd: 0.0001,
   audit_id: 'audit-123',
+  trace_session_id: 'trace-uuid-9',
 };
 
 const REFUSAL: RagQueryResponse = {
@@ -79,13 +80,18 @@ describe('response wrappers preserve the legacy shape', () => {
     expect(ragResponseToHrResponse(ANSWER, 'pol-1').document_id).toBeNull();
   });
 
-  it('employee wrapper carries assignment_id + request_id', () => {
+  it('employee wrapper carries assignment_id + request_id + trace_session_id', () => {
     const r = ragResponseToEmployeeResponse(ANSWER, 'asg-7');
-    expect(r).toMatchObject({ ok: true, assignment_id: 'asg-7', request_id: 'audit-123' });
+    expect(r).toMatchObject({ ok: true, assignment_id: 'asg-7', request_id: 'audit-123', trace_session_id: 'trace-uuid-9' });
   });
 
   it('tolerates a missing audit_id (request_id → null)', () => {
     const r = ragResponseToEmployeeResponse({ ...ANSWER, audit_id: null }, 'asg-7');
     expect(r.request_id).toBeNull();
+  });
+
+  it('tolerates a missing trace_session_id (trace_session_id → null)', () => {
+    const r = ragResponseToEmployeeResponse({ ...ANSWER, trace_session_id: null }, 'asg-7');
+    expect(r.trace_session_id).toBeNull();
   });
 });
