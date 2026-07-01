@@ -236,8 +236,8 @@ Base.metadata.create_all(bind=engine)
 @pytest.fixture
 def admin_client():
     app.dependency_overrides[auth_deps.get_current_user] = lambda: {
-        "id": "admin-1", "email": "admin@relopass.com", "role": "ADMIN",
-    }
+        "id": "admin-1", "email": "admin@relopass.com", "role": "ADMIN", "is_admin": True,
+    }  # require_admin checks user["is_admin"], not the role field
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -1055,8 +1055,8 @@ from backend.app import auth_deps
 @pytest.fixture
 def admin_client():
     app.dependency_overrides[auth_deps.get_current_user] = lambda: {
-        "id": "admin-1", "email": "admin@relopass.com", "role": "ADMIN",
-    }
+        "id": "admin-1", "email": "admin@relopass.com", "role": "ADMIN", "is_admin": True,
+    }  # require_admin checks user["is_admin"], not the role field
     yield TestClient(app)
     app.dependency_overrides.clear()
 
