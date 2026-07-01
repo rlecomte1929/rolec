@@ -200,6 +200,7 @@ from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be �
 from .app.routers import hr_case_escalation as hr_case_escalation_router  # W2-3 — HR case escalation (dual-layer per CLAUDE.md)
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
+from .app.routers import provider_portal as provider_portal_router  # H2 — external provider portal (dual-layer per CLAUDE.md)
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
@@ -821,6 +822,7 @@ app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoin
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
+app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
 app.include_router(employee_quotes_router.router)
 app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provider ratings
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
