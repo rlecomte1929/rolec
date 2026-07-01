@@ -163,10 +163,15 @@ def _call_sonnet(question: str, context: str) -> str:
     429/5xx retry + structured logging (AIQ-401). Same model/tokens/temperature.
     """
     from ..services.llm_client import claude_complete_text_sync
+    # GDPR Art. 28/44 (H1): the analyst question is user free-text that may carry
+    # PII (e.g. "why did jane.doe@acme.com churn?"). Mask before egress — the
+    # generic llm_client does not mask (CLAUDE.md hard rule). The context block is
+    # platform-side aggregate analytics, not user free-text, so it is left intact.
+    from ..services.pii_masker import mask_pii
     try:
         return claude_complete_text_sync(
             system=SYSTEM_PROMPT,
-            user=f"Context:\n{context}\n\nQuestion: {question}",
+            user=f"Context:\n{context}\n\nQuestion: {mask_pii(question)}",
             model="claude-sonnet-4-6",
             max_tokens=1024,
             temperature=0.2,
