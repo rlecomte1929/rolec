@@ -2766,6 +2766,22 @@ def admin_update_assignment_status(
             user_id=user.get("id"),
             properties={"new_status": status, "source": "admin"},
         )
+    # Notify the linked employee that their case status changed (previously silent).
+    try:
+        _asn = db.get_assignment_by_id(assignment_id) or {}
+        _emp = (_asn.get("employee_user_id") or "").strip()
+        if _emp:
+            db.create_notification_with_preferences(
+                user_id=_emp,
+                type_="CASE_STATUS_CHANGED",
+                title="Your relocation case was updated",
+                body=f"Your case status is now: {status}.",
+                assignment_id=assignment_id,
+                case_id=_asn.get("case_id"),
+                metadata={"new_status": status},
+            )
+    except Exception as exc:
+        log.warning("status-change employee notification failed assignment_id=%s error=%s", assignment_id, exc)
     return {"ok": True, "status": status}
 
 
@@ -4330,9 +4346,21 @@ def _dispatch_hr_assign_side_effects(
         # in-app notification, so the NotificationBell showed nothing on assign
         # (the MSG-02 sentinel's notification check failed). Best-effort: mirror
         # the HR_FEEDBACK_POSTED pattern — never block the assign on this.
-        if employee_user_id:
+        # If the assignment is pending_claim (employee_user_id NULL) but the employee
+        # already has an account for this email, resolve + notify it so a registered
+        # employee is still told a case was set up (register-after is covered by the
+        # ASSIGNMENT_LINKED notification on auto-link/accept).
+        _notify_target = (employee_user_id or "").strip() if employee_user_id else ""
+        if not _notify_target and stored_identifier and "@" in str(stored_identifier):
+            try:
+                _p = db.get_profile_by_email(str(stored_identifier))
+                if _p and _p.get("id"):
+                    _notify_target = str(_p["id"]).strip()
+            except Exception:
+                _notify_target = ""
+        if _notify_target:
             _notif_kwargs = dict(
-                user_id=employee_user_id,
+                user_id=_notify_target,
                 type_="ASSIGNMENT_CREATED",
                 title="Your relocation case is ready",
                 body="HR has assigned you a relocation case. Start your intake in My Case.",
@@ -4349,7 +4377,7 @@ def _dispatch_hr_assign_side_effects(
                     log.warning(
                         "assignment notification skipped assignment_id=%s user_id=%s error=%s",
                         assignment_id,
-                        employee_user_id,
+                        _notify_target,
                         exc2,
                     )
 
@@ -5124,6 +5152,19 @@ def send_employee_message(
     )
     if not msg:
         raise HTTPException(status_code=400, detail="Message could not be sent.")
+    _recipient = (assignment.get("hr_user_id") or "").strip()
+    if _recipient:
+        try:
+            db.create_notification_with_preferences(
+                user_id=_recipient,
+                type_="NEW_MESSAGE",
+                title="New message on a relocation case",
+                body=body_txt[:140],
+                assignment_id=assignment["id"],
+                case_id=assignment.get("case_id"),
+            )
+        except Exception as exc:
+            log.warning("NEW_MESSAGE notif (employee→HR) failed assignment_id=%s error=%s", assignment["id"], exc)
     return {"ok": True, "message": msg}
 
 
@@ -6572,6 +6613,19 @@ def send_hr_message(
     )
     if not msg:
         raise HTTPException(status_code=400, detail="Message could not be sent.")
+    _recipient = (assignment.get("employee_user_id") or "").strip()
+    if _recipient:
+        try:
+            db.create_notification_with_preferences(
+                user_id=_recipient,
+                type_="NEW_MESSAGE",
+                title="New message from your HR team",
+                body=body_txt[:140],
+                assignment_id=assignment["id"],
+                case_id=assignment.get("case_id"),
+            )
+        except Exception as exc:
+            log.warning("NEW_MESSAGE notif (HR→employee) failed assignment_id=%s error=%s", assignment["id"], exc)
     return {"ok": True, "message": msg}
 
 
