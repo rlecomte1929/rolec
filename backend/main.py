@@ -10321,6 +10321,8 @@ def post_policy_assistant_rag_query(
             company_id, request_id,
         )
         raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+    # Echo the request session_id so the FE can key per-answer helpfulness votes.
+    result["session_id"] = session_id
     return result
 
 
