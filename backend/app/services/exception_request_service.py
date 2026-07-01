@@ -140,6 +140,13 @@ class ExceptionRequestService:
                 profile, min_weeks=_STANDARD_PERMIT_MIN_WEEKS,
                 regime_label="Standard Work Permit"
             ))
+        elif regime.regime_id == "blue_card":
+            # Blue Card carries the same timeline risk (qualification recognition +
+            # visa); same min-weeks window as the standard permit.
+            flags.extend(self._check_timeline(
+                profile, min_weeks=_STANDARD_PERMIT_MIN_WEEKS,
+                regime_label="EU Blue Card"
+            ))
 
         # Cost threshold applies to all regimes
         flags.extend(self._check_cost_threshold(profile))

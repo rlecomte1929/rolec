@@ -28,8 +28,8 @@ def test_confidence_ordering_exact_gt_catchall_gt_unknown():
         nationality="Germany", destination_country="United States", contract_type="lta"
     )  # us_l1b
     catch_all = router.detect_regime(
-        nationality="Indian", destination_country="Germany", contract_type="lta"
-    )  # standard_work_permit
+        nationality="Indian", destination_country="Brazil", contract_type="lta"
+    )  # standard_work_permit (Brazil = no corridor-specific regime; Germany would be blue_card)
     unknown = router.detect_regime(nationality="Indian")  # no destination → unknown
 
     assert exact.regime_id == "us_l1b"

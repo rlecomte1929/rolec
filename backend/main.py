@@ -150,6 +150,7 @@ from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-
 from .app.routers import ocr as ocr_router  # [AIQ-1148] general document OCR endpoint
 from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
+from .app.routers import admin_feature_flags as admin_feature_flags_router  # Feature-flag console (dual-layer registration)
 from .app.routers import admin_exec_overview as admin_exec_overview_router  # Executive dashboard (dual-layer registration)
 from .app.routers import admin_work_items as admin_work_items_router  # Mission Control P1 — demands console (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
@@ -808,6 +809,7 @@ app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 —
 app.include_router(ocr_router.router)  # [AIQ-1148] /api/ocr/process — general document OCR
 app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
 app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval/metrics — dual-layer registration
+app.include_router(admin_feature_flags_router.router)  # Feature-flag console — /api/admin/feature-flags — dual-layer registration
 app.include_router(admin_exec_overview_router.router)  # Executive dashboard — /api/admin/exec-overview — dual-layer registration
 app.include_router(admin_work_items_router.router)  # Mission Control P1 — /api/admin/work-items — dual-layer registration
 app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration
