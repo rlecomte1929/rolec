@@ -23,7 +23,7 @@ export interface SetupStatus {
   company_profile_complete: boolean;
   policy_published: boolean;
   cases_count: number;
-  employees_invited: boolean;
+  employees_invited: number;
   first_case_id: string | null;
   next_step: SetupNextStep;
 }
@@ -31,7 +31,7 @@ export interface SetupStatus {
 /** POST /api/hr/setup-assistant/query */
 export interface SetupAssistantAnswer {
   answer: string;
-  next_step: SetupNextStep;
+  next_step: SetupNextStep | null;
   cited_topics: string[];
   error?: boolean;
 }

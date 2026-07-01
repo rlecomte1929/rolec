@@ -12,6 +12,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { SetupAssistantPanel } from '../SetupAssistantPanel';
+import { SetupAssistantDrawer } from '../SetupAssistantDrawer';
 import type { SetupStatus, SetupAssistantAnswer } from '../../../api/setupAssistant';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -38,7 +39,9 @@ function baseStatus(overrides: Partial<SetupStatus> = {}): SetupStatus {
     company_profile_complete: true,
     policy_published: false,
     cases_count: 0,
-    employees_invited: false,
+    // employees_invited is a count (int), not a boolean — the panel treats
+    // > 0 as done. Use 0 for pending, a positive number for done.
+    employees_invited: 0,
     first_case_id: null,
     next_step: { label: 'Publish your first policy', route: '/hr/policy' },
     ...overrides,
@@ -68,7 +71,7 @@ describe('SetupAssistantPanel', () => {
         company_profile_complete: true,
         policy_published: false,
         cases_count: 0,
-        employees_invited: false,
+        employees_invited: 0,
       })
     );
     mockAskSetupAssistant.mockResolvedValue(baseAnswer());
@@ -151,6 +154,37 @@ describe('SetupAssistantPanel', () => {
     expect(screen.queryByTestId('setup-next-step-btn')).not.toBeInTheDocument();
   });
 
+  it('treats employees_invited > 0 (int) as done and 0 as pending', async () => {
+    // employees_invited is an int count from the backend; the panel maps > 0 → done.
+    mockGetSetupStatus.mockResolvedValue(
+      baseStatus({
+        company_profile_complete: true,
+        policy_published: true,
+        cases_count: 1,
+        employees_invited: 2,
+      })
+    );
+    mockAskSetupAssistant.mockResolvedValue(baseAnswer());
+
+    render(<SetupAssistantPanel />);
+
+    // All steps done — no "Pending" badge at all
+    await waitFor(() => expect(screen.getByText('Employee invited')).toBeInTheDocument());
+    expect(screen.queryByText('Pending')).not.toBeInTheDocument();
+
+    cleanup();
+    vi.clearAllMocks();
+
+    // Re-render with 0 employees invited → still pending
+    mockGetSetupStatus.mockResolvedValue(
+      baseStatus({ employees_invited: 0 })
+    );
+    render(<SetupAssistantPanel />);
+    await waitFor(() => expect(screen.getByText('Employee invited')).toBeInTheDocument());
+    // At least one "Pending" badge expected
+    expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
+  });
+
   it('shows an error message when askSetupAssistant rejects', async () => {
     mockGetSetupStatus.mockResolvedValue(baseStatus());
     mockAskSetupAssistant.mockRejectedValue(
@@ -169,5 +203,50 @@ describe('SetupAssistantPanel', () => {
     const errorEl = await screen.findByRole('alert');
     expect(errorEl).toBeInTheDocument();
     expect(errorEl).toHaveTextContent('Network error');
+  });
+});
+
+describe('SetupAssistantDrawer', () => {
+  it('renders nothing when closed', () => {
+    mockGetSetupStatus.mockResolvedValue(baseStatus());
+    render(
+      <SetupAssistantDrawer open={false} onOpenChange={vi.fn()} />
+    );
+    expect(screen.queryByTestId('setup-assistant-drawer')).not.toBeInTheDocument();
+  });
+
+  it('renders a fixed-position dialog panel when open', async () => {
+    mockGetSetupStatus.mockResolvedValue(baseStatus());
+
+    render(
+      <SetupAssistantDrawer open onOpenChange={vi.fn()} />
+    );
+
+    const panel = screen.getByTestId('setup-assistant-drawer');
+    expect(panel).toBeInTheDocument();
+
+    // The panel must have `fixed` in its className so it overlays content
+    // on all breakpoints (not in-flow like the docked column).
+    expect(panel.className).toContain('fixed');
+
+    // z-50 ensures it renders above other content
+    expect(panel.className).toContain('z-50');
+
+    // It must be a dialog with an accessible label
+    expect(panel).toHaveAttribute('role', 'dialog');
+    expect(panel).toHaveAttribute('aria-modal', 'true');
+    expect(panel).toHaveAttribute('aria-labelledby', 'setup-assistant-drawer-title');
+  });
+
+  it('calls onOpenChange(false) when the Close button is clicked', async () => {
+    mockGetSetupStatus.mockResolvedValue(baseStatus());
+    const onOpenChange = vi.fn();
+
+    const user = userEvent.setup();
+    render(<SetupAssistantDrawer open onOpenChange={onOpenChange} />);
+
+    // "Close" is the exact aria-label on the X button; "Close panel" is the backdrop.
+    await user.click(screen.getByRole('button', { name: /^close$/i }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

@@ -53,7 +53,7 @@ function SetupProgressSummary({ status }: { status: SetupStatus }) {
     { label: 'Company profile', done: status.company_profile_complete },
     { label: 'Policy published', done: status.policy_published },
     { label: 'First relocation case', done: status.cases_count > 0 },
-    { label: 'Employee invited', done: status.employees_invited },
+    { label: 'Employee invited', done: status.employees_invited > 0 },
   ];
   const allDone = steps.every((s) => s.done);
 
@@ -171,14 +171,14 @@ function SetupAnswerCard({
             <Button
               type="button"
               onClick={() => {
-                if (answer.next_step.route) {
+                if (answer.next_step?.route) {
                   navigate(answer.next_step.route);
                 }
               }}
               data-testid="setup-next-step-btn"
               className="mt-1"
             >
-              {answer.next_step.label}
+              {answer.next_step?.label}
               <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
             </Button>
           ) : null}
