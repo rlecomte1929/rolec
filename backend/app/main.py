@@ -86,6 +86,7 @@ from .routers import (
     admin_feedback,
     admin_admins,
     admin_audit_log,
+    public_analytics,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -181,6 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(exception_requests.router)
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
+    app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
