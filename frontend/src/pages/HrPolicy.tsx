@@ -18,6 +18,7 @@ import { HrNoCompanyOnboarding, httpStatusOf } from '../features/policy/hrNoComp
 import { PolicyBenefitsSummary } from '../features/policy/PolicyBenefitsSummary';
 import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/HrPolicyBuilderV2Page';
 import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
+import { HrBenefitMixOptimizerPage } from '../features/policy/HrBenefitMixOptimizerPage';
 import { policyConfigMatrixAPI } from '../api/client';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
@@ -71,8 +72,8 @@ export const HrPolicy: React.FC = () => {
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
   // the /hr/settings/policy redirect lands on the correct tab.
-  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa';
-  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa') => {
+  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa' | 'optimize';
+  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa' | 'optimize') => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab);
     setSearchParams(next, { replace: true });
@@ -165,12 +166,15 @@ export const HrPolicy: React.FC = () => {
           <PolicyTabButton active={activeTab === 'qa'} onClick={() => setTab('qa')}>
             Policy Q&amp;A
           </PolicyTabButton>
+          <PolicyTabButton active={activeTab === 'optimize'} onClick={() => setTab('optimize')}>
+            Optimize
+          </PolicyTabButton>
         </div>
       )}
 
       {/* Guided next-step CTA — points HR to the natural next action per tab.
           Does not alter the tab content below. (NAV-POL-1) */}
-      {!adminCompanyId && activeTab !== 'exceptions' && activeTab !== 'qa' && (
+      {!adminCompanyId && activeTab !== 'exceptions' && activeTab !== 'qa' && activeTab !== 'optimize' && (
         <PolicyNextStepCta
           activeTab={activeTab}
           setTab={setTab}
@@ -193,6 +197,8 @@ export const HrPolicy: React.FC = () => {
           ? <HrExceptionsPage embedded />
           : (!adminCompanyId && activeTab === 'qa')
           ? <HrPolicyQaTab />
+          : (!adminCompanyId && activeTab === 'optimize')
+          ? <HrBenefitMixOptimizerPage embedded />
           : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
         }
       </div>
