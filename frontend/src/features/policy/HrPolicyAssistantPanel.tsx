@@ -13,6 +13,7 @@ import {
   isCitationDeepLinkAvailable,
   scrollToPolicyReference,
 } from './policyAssistantCitations';
+import { AnswerFeedback } from '../policy-assistant/AnswerFeedback';
 import {
   deriveSupportStatus,
   supportStatusBadgeClass,
@@ -298,6 +299,7 @@ function HrAnswerResultCard({
             ) : null}
           </>
         )}
+        <AnswerFeedback traceSessionId={answer.trace_session_id} />
       </div>
       )}
     </div>

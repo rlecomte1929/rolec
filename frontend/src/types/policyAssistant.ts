@@ -86,6 +86,9 @@ export interface PolicyAssistantAnswer {
    *  retrieved chunks. Renderers turn `[chunk:<id>]` tokens in
    *  `answer_text` into clickable chips that look these up. */
   cited_chunks?: PolicyAssistantCitedChunk[];
+  /** Trace row id for the end-user helpfulness vote control (👍/👎).
+   *  Populated by the RAG engine; absent on legacy deterministic answers. */
+  trace_session_id?: string | null;
 }
 
 export interface EmployeePolicyAssistantQueryResponse {

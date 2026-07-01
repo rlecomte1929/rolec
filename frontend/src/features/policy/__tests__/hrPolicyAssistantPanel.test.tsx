@@ -23,6 +23,11 @@ vi.mock('../../../api/client', () => ({
   apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+// Avoid the jsdom supabase-import trap — policyHelpfulness → client (axios) → supabase.
+vi.mock('../../../api/policyHelpfulness', () => ({
+  submitHelpfulness: vi.fn().mockResolvedValue(undefined),
+}));
+
 function baseAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): PolicyAssistantAnswer {
   return {
     answer_type: 'draft_published_summary',
@@ -263,5 +268,36 @@ describe('HrPolicyAssistantPanel', () => {
     await user.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/i don't see this in your company's policy\. check with your hr team\./i)).toBeInTheDocument();
     expect(screen.getByText(/no policy answer/i)).toBeInTheDocument();
+  });
+
+  it('renders AnswerFeedback thumbs when answer has trace_session_id', async () => {
+    postPolicyAssistantQuery.mockResolvedValue({
+      ok: true,
+      policy_id: 'pol-1',
+      document_id: null,
+      answer: baseAnswer({ trace_session_id: 'trace-hr-1' }),
+    });
+    const user = userEvent.setup();
+    render(<HrPolicyAssistantPanel policyId="pol-1" />);
+    await user.type(screen.getByPlaceholderText(/employees see for shipment/i), 'Housing allowance?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+    expect(await screen.findByTestId('answer-feedback')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Helpful' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Not helpful' })).toBeInTheDocument();
+  });
+
+  it('does not render AnswerFeedback when answer has no trace_session_id', async () => {
+    postPolicyAssistantQuery.mockResolvedValue({
+      ok: true,
+      policy_id: 'pol-1',
+      document_id: null,
+      answer: baseAnswer({ trace_session_id: null }),
+    });
+    const user = userEvent.setup();
+    render(<HrPolicyAssistantPanel policyId="pol-1" />);
+    await user.type(screen.getByPlaceholderText(/employees see for shipment/i), 'Housing allowance?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+    await screen.findByRole('region', { name: /HR policy answer/i });
+    expect(screen.queryByTestId('answer-feedback')).not.toBeInTheDocument();
   });
 });

@@ -25,6 +25,11 @@ vi.mock('../../../api/client', () => ({
   apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+// Avoid the jsdom supabase-import trap — policyHelpfulness → client (axios) → supabase.
+vi.mock('../../../api/policyHelpfulness', () => ({
+  submitHelpfulness: vi.fn().mockResolvedValue(undefined),
+}));
+
 function entitlementAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): PolicyAssistantAnswer {
   return {
     answer_type: 'entitlement_summary',
@@ -222,5 +227,36 @@ describe('EmployeePolicyAssistantPanel', () => {
     expect(screen.getByText('Previously saved question?')).toBeInTheDocument();
     const card = screen.getByRole('article', { name: /policy q&a/i });
     expect(within(card).getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('renders AnswerFeedback thumbs when answer has trace_session_id', async () => {
+    postPolicyAssistantQuery.mockResolvedValue({
+      ok: true,
+      assignment_id: 'asg-1',
+      request_id: 'r1',
+      answer: entitlementAnswer({ trace_session_id: 'trace-xyz' }),
+    });
+    const user = userEvent.setup();
+    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'Housing?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+    expect(await screen.findByTestId('answer-feedback')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Helpful' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Not helpful' })).toBeInTheDocument();
+  });
+
+  it('does not render AnswerFeedback when answer has no trace_session_id', async () => {
+    postPolicyAssistantQuery.mockResolvedValue({
+      ok: true,
+      assignment_id: 'asg-1',
+      request_id: 'r1',
+      answer: entitlementAnswer({ trace_session_id: null }),
+    });
+    const user = userEvent.setup();
+    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
+    await user.type(screen.getByPlaceholderText(/shipment allowance/i), 'Housing?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+    await screen.findByText(/for your case/i);
+    expect(screen.queryByTestId('answer-feedback')).not.toBeInTheDocument();
   });
 });

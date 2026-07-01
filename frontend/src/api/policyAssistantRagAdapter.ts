@@ -81,6 +81,7 @@ export function ragResponseToAnswer(
       canonical_topic: null,
       detected_intent: null,
       cited_chunks: [],
+      trace_session_id: rag.trace_session_id ?? null,
     };
   }
 
@@ -101,6 +102,7 @@ export function ragResponseToAnswer(
     canonical_topic: null,
     detected_intent: null,
     cited_chunks: citedChunks,
+    trace_session_id: rag.trace_session_id ?? null,
   };
 }
 
