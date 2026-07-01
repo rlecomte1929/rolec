@@ -171,6 +171,8 @@ from .app.routers import admin_workflow_analytics as admin_workflow_analytics_ro
 from .app.routers import admin_marketing_analytics as admin_marketing_analytics_router
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .app.routers import admin_prospects as admin_prospects_router
+from .app.routers import admin_leads as admin_leads_router
+from .app.routers import lead_capture as lead_capture_router  # [audos-P1] public lead-capture (no /api/admin prefix)
 from .app.routers import admin_form_templates as admin_form_templates_router
 from .app.routers import crons as crons_router  # [P4-4]
 from .app.routers import mobility_context as mobility_context_router
@@ -878,6 +880,8 @@ app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_marketing_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
+app.include_router(admin_leads_router.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD
+app.include_router(lead_capture_router.router)  # [audos-P1] public lead-capture — NO prefix (path baked into route)
 app.include_router(admin_form_templates_router.router, prefix="/api/admin")
 app.include_router(admin_recommendations_debug_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
 app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
@@ -1837,6 +1841,13 @@ def _best_effort_reconcile_employee_assignments(
 ) -> None:
     """Run canonical claim/link reconcile; must not break dashboard or employee routes."""
     try:
+        # Verified-email auto-link: when the signed-in account's email is confirmed and
+        # matches an HR-created pending_claim case, link it without a manual "Accept"
+        # (fixes the "employee not connected" wall). Fails closed → manual accept fallback.
+        try:
+            email_verified = db.is_auth_email_confirmed(email)
+        except Exception:
+            email_verified = False
         reconcile_pending_assignment_claims(
             db,
             user_id=user_id,
@@ -1845,6 +1856,7 @@ def _best_effort_reconcile_employee_assignments(
             role=role,
             request_id=request_id,
             emit_side_effects=True,
+            attach_pending_claim=bool(email_verified),
         )
     except Exception as exc:
         log.warning("%s claim_reconcile skipped error=%s", context, exc)
@@ -2762,6 +2774,22 @@ def admin_update_assignment_status(
             user_id=user.get("id"),
             properties={"new_status": status, "source": "admin"},
         )
+    # Notify the linked employee that their case status changed (previously silent).
+    try:
+        _asn = db.get_assignment_by_id(assignment_id) or {}
+        _emp = (_asn.get("employee_user_id") or "").strip()
+        if _emp:
+            db.create_notification_with_preferences(
+                user_id=_emp,
+                type_="CASE_STATUS_CHANGED",
+                title="Your relocation case was updated",
+                body=f"Your case status is now: {status}.",
+                assignment_id=assignment_id,
+                case_id=_asn.get("case_id"),
+                metadata={"new_status": status},
+            )
+    except Exception as exc:
+        log.warning("status-change employee notification failed assignment_id=%s error=%s", assignment_id, exc)
     return {"ok": True, "status": status}
 
 
@@ -4326,6 +4354,9 @@ def _dispatch_hr_assign_side_effects(
         # in-app notification, so the NotificationBell showed nothing on assign
         # (the MSG-02 sentinel's notification check failed). Best-effort: mirror
         # the HR_FEEDBACK_POSTED pattern — never block the assign on this.
+        # NOTE: gated on employee_user_id by design. A pending_claim assign (no linked
+        # user yet) is instead notified via ASSIGNMENT_LINKED at auto-link/accept time
+        # (assignment_claim_link_service) — see the HR↔employee linkage fix.
         if employee_user_id:
             _notif_kwargs = dict(
                 user_id=employee_user_id,
@@ -5120,6 +5151,19 @@ def send_employee_message(
     )
     if not msg:
         raise HTTPException(status_code=400, detail="Message could not be sent.")
+    _recipient = (assignment.get("hr_user_id") or "").strip()
+    if _recipient:
+        try:
+            db.create_notification_with_preferences(
+                user_id=_recipient,
+                type_="NEW_MESSAGE",
+                title="New message on a relocation case",
+                body=body_txt[:140],
+                assignment_id=assignment["id"],
+                case_id=assignment.get("case_id"),
+            )
+        except Exception as exc:
+            log.warning("NEW_MESSAGE notif (employee→HR) failed assignment_id=%s error=%s", assignment["id"], exc)
     return {"ok": True, "message": msg}
 
 
@@ -6568,6 +6612,19 @@ def send_hr_message(
     )
     if not msg:
         raise HTTPException(status_code=400, detail="Message could not be sent.")
+    _recipient = (assignment.get("employee_user_id") or "").strip()
+    if _recipient:
+        try:
+            db.create_notification_with_preferences(
+                user_id=_recipient,
+                type_="NEW_MESSAGE",
+                title="New message from your HR team",
+                body=body_txt[:140],
+                assignment_id=assignment["id"],
+                case_id=assignment.get("case_id"),
+            )
+        except Exception as exc:
+            log.warning("NEW_MESSAGE notif (HR→employee) failed assignment_id=%s error=%s", assignment["id"], exc)
     return {"ok": True, "message": msg}
 
 

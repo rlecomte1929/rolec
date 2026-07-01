@@ -2038,6 +2038,51 @@ export const adminProspectsAPI = {
     `${API_BASE_URL}/api/admin/prospects/export.csv?status=${encodeURIComponent(status)}`,
 };
 
+// Admin Leads API (admin only) — audos-P1
+export interface LeadRow {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_domain: string | null;
+  source: string;
+  status: string;
+  tags: string[];
+  message: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  created_at: string;
+  updated_at: string;
+  matched_prospect: boolean;
+}
+
+export interface LeadStats {
+  total: number;
+  new_this_week: number;
+  by_status: Record<string, number>;
+}
+
+export const adminLeadsAPI = {
+  list: async (params?: { status?: string; search?: string; limit?: number }) =>
+    api
+      .get('/api/admin/leads', { params: params || {} })
+      .then((r) => r.data as { total: number; leads: LeadRow[] }),
+  get: async (id: string) =>
+    api.get(`/api/admin/leads/${id}`).then((r) => r.data as LeadRow),
+  patch: async (id: string, patch: { status?: string; tags?: string[] }) =>
+    api.patch(`/api/admin/leads/${id}`, patch).then((r) => r.data as LeadRow),
+  stats: async () => api.get('/api/admin/leads/stats').then((r) => r.data as LeadStats),
+};
+
+export const leadCaptureAPI = {
+  submit: async (payload: {
+    email: string; first_name?: string; last_name?: string;
+    company_domain?: string; message?: string; source: string;
+    utm_source?: string; utm_campaign?: string;
+  }) =>
+    api.post('/api/public/lead-capture', payload).then((r) => r.data as { id: string; matched_prospect: boolean }),
+};
+
 // Admin recommendations debug (admin only)
 export const adminRecommendationsAPI = {
   getDebug: async (assignmentId: string, serviceCategory: string) => {

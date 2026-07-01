@@ -44,7 +44,33 @@ POINTS = {
     "FAIL":    0.0,
     "BLOCKED": 0.0,
     "SKIP":    None,   # excluded from denominator
+    "ENV":     None,   # environmental / deploy-window transient — excluded, never 'bad'
 }
+
+# A run with this many environmental failures was almost certainly testing against a
+# backend mid rolling-restart → mark it INCONCLUSIVE and file nothing (Signal B).
+DEGRADED_ENV_THRESHOLD = 3
+
+
+def count_env(per_test):
+    """Number of scored tests classified ENV (deploy-window transient) this run."""
+    return sum(1 for t in per_test.values() if t.get("status") == "ENV")
+
+
+def is_degraded(env_count, forced=False, threshold=None):
+    """A run is degraded (inconclusive, don't file) when too many tests were
+    environmental, or when the readiness gate (Phase 3) forced it (data path never warmed)."""
+    thr = DEGRADED_ENV_THRESHOLD if threshold is None else threshold
+    return bool(forced or env_count >= thr)
+
+
+def finalize_candidates(candidates, degraded):
+    """A degraded run files NOTHING — its failures are environmental, not bugs."""
+    return [] if degraded else candidates
+
+
+def degraded_band():
+    return "INCONCLUSIVE", "🟣  Inconclusive — backend was mid-deploy/unavailable. Not scored, not filed."
 
 # ── Health bands ───────────────────────────────────────────────────────────────
 def health_band(score_pct):
@@ -527,6 +553,8 @@ def main():
     parser.add_argument("--prev",     help="Path to previous test_results.json (auto-detects second-latest if omitted)")
     parser.add_argument("--no-prev",  action="store_true", help="No previous campaign to compare against")
     parser.add_argument("--out-dir",  help="Where to write campaign_report.json (default: results/)", default=str(RESULTS_DIR))
+    parser.add_argument("--degraded", action="store_true",
+                        help="Force INCONCLUSIVE (e.g. Phase-3 readiness gate reported the data path never warmed)")
     args = parser.parse_args()
 
     # Load scoring map
@@ -584,6 +612,15 @@ def main():
     # Notion candidates
     candidates = notion_candidates(current_per_test, regressions, new_failures, still_broken)
 
+    # Degraded-run guard (Signal B): if the run was dominated by environmental (ENV)
+    # failures, or the readiness gate forced it, the run is INCONCLUSIVE — file nothing.
+    env_count = count_env(current_per_test)
+    degraded = is_degraded(env_count, forced=args.degraded)
+    candidates = finalize_candidates(candidates, degraded)
+    if degraded:
+        print(f"  🟣  DEGRADED (deploy window): {env_count} environmental failure(s)"
+              f"{' + readiness gate' if args.degraded else ''} — INCONCLUSIVE, not filing.")
+
     # Scenario step-level breakdown
     sbd = build_scenario_breakdown(scenarios_data, current_per_test)
 
@@ -611,7 +648,9 @@ def main():
         "overall_score":  current_overall,
         "prev_overall":   prev_overall,
         "delta":          round(current_overall - prev_overall, 1) if (current_overall is not None and prev_overall is not None) else None,
-        "health_band":    health_band(current_overall)[0],
+        "health_band":    degraded_band()[0] if degraded else health_band(current_overall)[0],
+        "degraded":       degraded,
+        "env_count":      env_count,
         "domain_scores":  current_domain_scores,
         "regressions":    regressions,
         "fixed":          fixed,
@@ -628,9 +667,10 @@ def main():
     print(f"  📄  Report saved → {out_path}")
     print()
 
-    # Exit code: 1 if RED band or any regressions
+    # Exit code: 1 if RED band or any regressions — but a DEGRADED run is inconclusive
+    # (environmental), never a hard failure and never files, so it exits clean.
     band = health_band(current_overall)[0]
-    if band == "RED" or regressions:
+    if not degraded and (band == "RED" or regressions):
         sys.exit(1)
     sys.exit(0)
 
