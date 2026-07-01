@@ -1833,6 +1833,13 @@ def _best_effort_reconcile_employee_assignments(
 ) -> None:
     """Run canonical claim/link reconcile; must not break dashboard or employee routes."""
     try:
+        # Verified-email auto-link: when the signed-in account's email is confirmed and
+        # matches an HR-created pending_claim case, link it without a manual "Accept"
+        # (fixes the "employee not connected" wall). Fails closed → manual accept fallback.
+        try:
+            email_verified = db.is_auth_email_confirmed(email)
+        except Exception:
+            email_verified = False
         reconcile_pending_assignment_claims(
             db,
             user_id=user_id,
@@ -1841,6 +1848,7 @@ def _best_effort_reconcile_employee_assignments(
             role=role,
             request_id=request_id,
             emit_side_effects=True,
+            attach_pending_claim=bool(email_verified),
         )
     except Exception as exc:
         log.warning("%s claim_reconcile skipped error=%s", context, exc)

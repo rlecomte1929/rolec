@@ -139,6 +139,27 @@ class AuthMixin:
         except (OperationalError, ProgrammingError):
             return None
 
+    def is_auth_email_confirmed(self, email: Optional[str]) -> bool:
+        """True iff a Supabase auth user with this email exists AND has confirmed it
+        (email_confirmed_at set). Gate for verified-email auto-link. Fails CLOSED
+        (returns False) on any error — including SQLite tests with no auth schema — so
+        an unverifiable email never auto-links (the employee falls back to manual accept)."""
+        e = (email or "").strip()
+        if not e:
+            return False
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        "SELECT 1 FROM auth.users "
+                        "WHERE LOWER(email) = LOWER(:e) AND email_confirmed_at IS NOT NULL LIMIT 1"
+                    ),
+                    {"e": e},
+                ).fetchone()
+            return bool(row)
+        except Exception:
+            return False
+
     def link_employee_contact_to_auth_user(
         self,
         employee_contact_id: str,
