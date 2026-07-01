@@ -22,7 +22,10 @@ PROFILE = Profile(
     corridor="IN_DE",
     persona="Indian IT professional, no degree — Blue Card experience route to Germany",
     primary_doc="passport",
-    eligibility=["ELIGIBLE_BLUE_CARD_IT_EXPERIENCE"],
+    # The §18g(2) IT-experience route IS an EU Blue Card (a subtype). Include the
+    # generic ELIGIBLE_BLUE_CARD so a profile-only predictor (which can't see the
+    # degree-vs-experience distinction) still scores within the truth set.
+    eligibility=["ELIGIBLE_BLUE_CARD", "ELIGIBLE_BLUE_CARD_IT_EXPERIENCE"],
     given_pool=_FIRST_NAMES,
     surname_pool=_PRIYA_SURNAMES,
     employer_pool=_EMPLOYERS,
