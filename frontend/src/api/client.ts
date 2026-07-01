@@ -2426,6 +2426,19 @@ export const adminOpsAnalyticsAPI = {
   getBottlenecks: () => api.get<unknown>('/api/admin/ops/bottlenecks').then((r) => r.data),
 };
 
+// Admin Marketing Analytics API (admin-only, pre-signup acquisition funnel)
+export interface MarketingFunnel {
+  period_days: number;
+  events: { landing_page_view: number; landing_cta_click: number; lead_captured: number };
+  rates: { cta_rate_pct: number; capture_rate_pct: number };
+  daily: { date: string; landing_page_view: number; landing_cta_click: number; lead_captured: number }[];
+}
+
+export const adminMarketingAnalyticsAPI = {
+  funnel: async (days = 30) =>
+    api.get('/api/admin/marketing-analytics/funnel', { params: { days } }).then((r) => r.data as MarketingFunnel),
+};
+
 // Admin Collaboration API (admin-only, internal threads)
 export const adminCollaborationAPI = {
   getThread: (targetType: string, targetId: string) =>
