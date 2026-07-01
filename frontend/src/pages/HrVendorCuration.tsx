@@ -46,6 +46,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   language_integration: 'Language / Integration',
   legal_admin: 'Legal & Admin',
   tax_finance: 'Tax & Finance',
+  pets: 'Pets',
 };
 
 function formatRelative(iso: string): string {
@@ -79,6 +80,7 @@ const CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: 'language_integration', label: 'Language / Integration' },
   { value: 'legal_admin', label: 'Legal & Admin' },
   { value: 'tax_finance', label: 'Tax & Finance' },
+  { value: 'pets', label: 'Pets' },
 ];
 
 /** Sentinel value for the dropdown's "Request a new destination" option. */

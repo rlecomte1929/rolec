@@ -301,6 +301,38 @@ def _bank() -> List[ServiceQuestionDef]:
             default="medium",
             criteria_key="contract_flexibility",
         ),
+        # Pets — replaces the standalone PetRelocationCard (species / count / needs).
+        ServiceQuestionDef(
+            question_key="pet_species",
+            label="Species",
+            type="select",
+            service_category="pets",
+            options=[
+                QuestionOption(value="dog", label="Dog"),
+                QuestionOption(value="cat", label="Cat"),
+                QuestionOption(value="bird", label="Bird"),
+                QuestionOption(value="other", label="Other"),
+            ],
+            default="dog",
+            criteria_key="species",
+        ),
+        ServiceQuestionDef(
+            question_key="pet_count",
+            label="Number of pets",
+            type="number",
+            service_category="pets",
+            default=1,
+            criteria_key="count",
+        ),
+        ServiceQuestionDef(
+            question_key="pet_specific_needs",
+            label="Specific needs",
+            type="text",
+            service_category="pets",
+            default="",
+            placeholder="e.g. large breed, medical needs, quarantine questions",
+            criteria_key="specific_needs",
+        ),
     ]
 
 
