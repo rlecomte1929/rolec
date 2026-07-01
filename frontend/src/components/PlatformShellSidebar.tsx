@@ -155,6 +155,12 @@ const SECTIONS: NavSection[] = [
     minRole: 'ADMIN',
     items: [
       { id: 'admin-overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
+      { id: 'data-rights', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
+      { id: 'policy-versions', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
+      { id: 'feature-flags', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
+      { id: 'permissions', label: 'Permissions', to: ROUTE_DEFS.adminPermissions.path },
+      { id: 'executive', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
+      { id: 'mission-control', label: 'Mission Control', to: ROUTE_DEFS.adminMissionControl.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'admin-companies', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
       {
         id: 'review-queue',
@@ -181,6 +187,10 @@ const SECTIONS: NavSection[] = [
       },
       { id: 'requirement-facts', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
       { id: 'research-requests', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
+      { id: 'ai-governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
+      { id: 'feedback-console', label: 'Feedback', to: ROUTE_DEFS.adminFeedback.path },
+      { id: 'admin-accounts', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
+      { id: 'audit-log', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
     ],
   },
 ];

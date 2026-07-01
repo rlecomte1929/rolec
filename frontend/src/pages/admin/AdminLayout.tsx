@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useMatch, useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Button } from '../../components/antigravity/Button';
+import { PageHeader } from '../../components/antigravity/PageHeader';
 import { getAuthItem } from '../../utils/demo';
 import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
 import type { AdminCompany } from '../../types';
@@ -66,11 +67,8 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
             )}
           </div>
           <div className="flex items-center gap-3">
-            <Button unstyled aria-label="Download" className="text-slate-400 hover:text-slate-600 transition-colors">
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            </Button>
+            {/* SHELL-1: removed the non-functional Download button + the hard-coded "3"
+               badge (fake UI). */}
             <Button unstyled aria-label="Notifications" className="text-slate-400 hover:text-slate-600 transition-colors">
               <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -81,27 +79,23 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Ask ReloPass AI
-              <span className="bg-white/20 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">3</span>
             </Button>
           </div>
         </header>
 
-        {/* Page content */}
+        {/* Page content — SHELL-1: capped + centered (wider than Employee/HR's 7xl,
+           per the dense admin tables) instead of full-bleed, and the page header now
+           uses the shared <PageHeader> (keeps the Admin "Internal Superuser Console"
+           identity eyebrow). */}
         <main id="main-content" className="flex-1 overflow-y-auto">
-          <div className="px-8 py-7">
+          <div className="px-4 py-6 md:px-8 md:py-7 max-w-[1600px] mx-auto">
             {(title || headerRight) && (
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase mb-1">
-                    ReloPass · Internal Superuser Console
-                  </p>
-                  <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-                  {subtitle && (
-                    <p className="text-sm text-slate-500 mt-1 max-w-2xl">{subtitle}</p>
-                  )}
-                </div>
-                {headerRight && <div className="shrink-0 ml-6">{headerRight}</div>}
-              </div>
+              <PageHeader
+                eyebrow="ReloPass · Internal Superuser Console"
+                title={title ?? ''}
+                subtitle={subtitle}
+                actions={headerRight}
+              />
             )}
             {children}
           </div>

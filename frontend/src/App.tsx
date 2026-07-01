@@ -123,6 +123,13 @@ const CountriesPage = lazy(() => import('./pages/admin/CountriesPage').then((mod
 const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').then((module) => ({ default: module.CountryDetailPage })));
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminRagQualityPage = lazy(() => import('./pages/admin/AdminRagQualityPage').then((module) => ({ default: module.AdminRagQualityPage })));
+const AdminDsarPage = lazy(() => import('./pages/admin/AdminDsarPage').then((module) => ({ default: module.AdminDsarPage })));
+const AdminPolicyVersionsPage = lazy(() => import('./pages/admin/AdminPolicyVersionsPage').then((module) => ({ default: module.AdminPolicyVersionsPage })));
+const AdminFeatureFlagsPage = lazy(() => import('./pages/admin/AdminFeatureFlagsPage').then((module) => ({ default: module.AdminFeatureFlagsPage })));
+const AdminPermissionsPage = lazy(() => import('./pages/admin/AdminPermissionsPage').then((module) => ({ default: module.AdminPermissionsPage })));
+const ExecutiveDashboardPage = lazy(() => import('./pages/admin/executive/ExecutiveDashboardPage').then((module) => ({ default: module.ExecutiveDashboardPage })));
+const MissionControlPage = lazy(() => import('./pages/admin/mission-control/MissionControlPage').then((module) => ({ default: module.MissionControlPage })));
+const AdminAiControlsPage = lazy(() => import('./pages/admin/AdminAiControlsPage').then((module) => ({ default: module.AdminAiControlsPage })));
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
 const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueuePage').then((module) => ({ default: module.AdminCatalogQueuePage })));
@@ -141,6 +148,8 @@ const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((mod
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
 const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
+const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
+const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
 const AdminPrompts = lazy(() => import('./pages/admin/AdminPrompts').then((module) => ({ default: module.AdminPrompts })));
 const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
@@ -384,10 +393,17 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
         {/* [MVG-6B] Employee — immigration document checklist; allowHR so HR can view via timeline link */}
         <Route path={ROUTE_DEFS.employeeCaseImmigrationChecklist.path} element={<RequireEmployeeRoute allowHR><ImmigrationChecklistPage /></RequireEmployeeRoute>} />
-        <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
-        <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
+        <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<RequireAdminRoute><CountriesPage /></RequireAdminRoute>} />
+        <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<RequireAdminRoute><CountryDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminDsar.path} element={<RequireAdminRoute><AdminDsarPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminPolicyVersions.path} element={<RequireAdminRoute><AdminPolicyVersionsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminPermissions.path} element={<RequireAdminRoute><AdminPermissionsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminExecutive.path} element={<RequireAdminRoute><ExecutiveDashboardPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><MissionControlPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAiControls.path} element={<RequireAdminRoute><AdminAiControlsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearchRequests.path} element={<RequireAdminRoute><AdminResearchRequestsPage /></RequireAdminRoute>} />
@@ -420,6 +436,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAuditLog.path} element={<RequireAdminRoute><AdminAuditLogPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPrompts.path} element={<RequireAdminRoute><AdminPrompts /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />

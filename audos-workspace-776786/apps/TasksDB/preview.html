@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReloPass — Relocation Tasks Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #2a93e0;
+      --primary-50: #123642;
+      --primary-600: #2a93e0;
+      --highlight: #38c6de;
+      --highlight-100: rgba(56, 198, 222, 0.18);
+      --highlight-50: rgba(56, 198, 222, 0.1);
+      --page: #0b1620;
+      --card: #142430;
+      --panel: #172935;
+      --muted: #0f1c26;
+      --border: #24384a;
+      --border-strong: #33506a;
+      --text-primary: #eaf2f8;
+      --text-secondary: #a7c2d3;
+      --text-brand: #ffffff;
+      --text-muted: #7f9bad;
+      --text-accent: #38c6de;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --shadow: 0 10px 24px rgba(7, 16, 25, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(135deg, #0b1620, #10212e, #0a2733);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .page-label {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .app-window {
+      max-width: 1180px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      min-height: 820px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+    .app-icon {
+      width: 36px; height: 36px;
+      border-radius: 12px;
+      background: var(--primary-50);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-brand);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .header p { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+    .toggle-group {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .toggle-btn {
+      border: none;
+      background: var(--card);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .toggle-btn.active {
+      background: var(--primary);
+      color: #111827;
+      font-weight: 600;
+    }
+
+    .btn-accent {
+      border: none;
+      background: var(--highlight);
+      color: #111827;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: var(--shadow);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .metric { text-align: center; }
+    .metric .value { font-size: 20px; font-weight: 700; }
+    .metric .label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+    .urgent {
+      padding: 12px 20px;
+      background: rgba(217, 119, 6, 0.12);
+      border-bottom: 1px solid rgba(217, 119, 6, 0.35);
+    }
+
+    .urgent-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #92400e;
+      margin-bottom: 10px;
+    }
+
+    .urgent-badge {
+      background: #fde68a;
+      color: #78350f;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .urgent-cards { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+
+    .urgent-card {
+      flex: 0 0 200px;
+      background: var(--card);
+      border: 1px solid rgba(217, 119, 6, 0.35);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .urgent-card h4 { font-size: 12px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .urgent-card p { font-size: 10px; color: #b45309; font-weight: 600; }
+
+    .cases {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .case-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+
+    .case-chip {
+      flex: 0 0 160px;
+      text-align: left;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--card);
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .case-chip.selected {
+      border-color: var(--primary);
+      background: var(--primary-50);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .case-chip .corridor {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;
+    }
+
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot.risk { background: var(--warning); }
+    .dot.active { background: var(--primary); }
+
+    .code {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 4px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--muted);
+    }
+
+    .case-chip .name { font-size: 12px; font-weight: 600; }
+    .case-chip .counts { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    .filters {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .search {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+    }
+
+    .search input {
+      border: none; background: transparent; outline: none; flex: 1;
+      font-size: 13px; font-family: inherit; color: var(--text-primary);
+    }
+
+    .filter-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .pill {
+      border: 1px solid var(--border);
+      background: var(--muted);
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .pill.active { background: var(--primary); border-color: var(--primary); font-weight: 600; }
+
+    .content { flex: 1; padding: 16px 20px; background: var(--page); overflow: auto; }
+
+    .kanban { display: flex; gap: 14px; min-height: 420px; }
+
+    .column { flex: 1; min-width: 250px; display: flex; flex-direction: column; }
+
+    .column-header {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .column-header.todo { background: var(--muted); }
+    .column-header.progress { background: var(--primary-50); }
+    .column-header.done { background: rgba(22, 163, 74, 0.12); }
+
+    .column-header h3 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-secondary); font-weight: 600;
+    }
+
+    .count-badge {
+      font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--muted);
+    }
+
+    .column-body {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 0 0 12px 12px;
+      background: rgba(15, 28, 38, 0.65);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .task-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 1px 3px rgba(7, 16, 25, 0.35);
+    }
+
+    .task-card.done { opacity: 0.75; }
+
+    .task-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .task-top h4 { font-size: 13px; font-weight: 600; line-height: 1.35; }
+    .task-card.done h4 { text-decoration: line-through; color: var(--text-muted); }
+
+    .priority {
+      font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; height: fit-content;
+    }
+    .priority.high { background: #fee2e2; color: #b91c1c; }
+    .priority.medium { background: #fef3c7; color: #a16207; }
+    .priority.low { background: #dcfce7; color: #15803d; }
+
+    .case-ref {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 500; color: var(--text-brand); margin-bottom: 8px;
+    }
+
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--text-muted); margin-bottom: 10px; }
+
+    .cat {
+      padding: 2px 6px; border-radius: 4px; font-weight: 500;
+    }
+    .cat.immigration { background: var(--primary-50); color: var(--text-brand); }
+    .cat.compliance { background: #fef3c7; color: #92400e; }
+    .cat.logistics { background: var(--highlight-100); color: var(--text-accent); }
+
+    .due { font-size: 11px; }
+    .due.overdue { color: var(--danger); font-weight: 600; }
+    .due.soon { color: var(--warning); font-weight: 600; }
+
+    .list-view { display: none; }
+    .list-view.active { display: block; }
+    .kanban-view.hidden { display: none; }
+
+    .list-table {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .list-head, .list-row {
+      display: grid;
+      grid-template-columns: 1.5fr 1.2fr 0.9fr 0.8fr 0.7fr 0.7fr;
+      gap: 12px;
+      padding: 10px 16px;
+      align-items: center;
+    }
+
+    .list-head {
+      background: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .list-row { border-bottom: 1px solid var(--border); font-size: 12px; }
+    .list-row:last-child { border-bottom: none; }
+    .list-row:hover { background: var(--muted); }
+
+    .status-badge {
+      font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); width: fit-content;
+    }
+    .status-badge.progress { background: var(--primary-50); color: var(--text-brand); border-color: var(--border-strong); }
+    .status-badge.done { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+
+    .footer {
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--muted);
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--text-muted);
+    }
+
+    @media (max-width: 900px) {
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+      .kanban { flex-direction: column; }
+      .list-head, .list-row { grid-template-columns: 1fr 1fr; }
+      .list-head span:nth-child(n+3), .list-row span:nth-child(n+3) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <p class="page-label">Static preview — ReloPass Relocation Tasks app</p>
+
+  <div class="app-window">
+    <header class="header">
+      <div class="header-left">
+        <div class="app-icon">☑</div>
+        <div>
+          <h1>Relocation Tasks</h1>
+          <p>Coordinator workboard — daily tasks linked to active mobility cases</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="btn-board" onclick="showView('board')">▦ Board</button>
+          <button class="toggle-btn" id="btn-list" onclick="showView('list')">☰ List</button>
+        </div>
+        <button class="btn-accent">+ Add task</button>
+      </div>
+    </header>
+
+    <section class="metrics">
+      <div class="metric"><div class="value" style="color:var(--text-secondary)">9</div><div class="label">To do</div></div>
+      <div class="metric"><div class="value" style="color:var(--primary)">8</div><div class="label">In progress</div></div>
+      <div class="metric"><div class="value" style="color:var(--success)">2</div><div class="label">Done</div></div>
+      <div class="metric"><div class="value" style="color:var(--danger)">3</div><div class="label">Overdue</div></div>
+      <div class="metric"><div class="value" style="color:var(--text-brand)">6</div><div class="label">Immigration</div></div>
+      <div class="metric"><div class="value" style="color:var(--text-accent)">13</div><div class="label">Compliance / Logistics</div></div>
+    </section>
+
+    <section class="urgent">
+      <div class="urgent-title">⏱ Needs attention today <span class="urgent-badge">4</span></div>
+      <div class="urgent-cards">
+        <div class="urgent-card"><h4>Chase apostille for dependant birth certificates</h4><p>⚠ 5 Jul 2026 · overdue</p></div>
+        <div class="urgent-card"><h4>Escalate housing budget exception to CFO</h4><p>⚠ 5 Jul 2026 · overdue</p></div>
+        <div class="urgent-card"><h4>Follow up VETASSESS skills assessment</h4><p>⚠ 10 Jul 2026 · 4d left</p></div>
+        <div class="urgent-card"><h4>Apply for UK Global Talent visa</h4><p>⚠ 15 Jul 2026 · High priority</p></div>
+      </div>
+    </section>
+
+    <section class="cases">
+      <div class="section-label">Active cases</div>
+      <div class="case-chips">
+        <button class="case-chip selected"><div class="name">All cases</div><div class="counts">19 tasks</div></button>
+        <button class="case-chip"><div class="corridor"><span class="dot risk"></span><span class="code">NG</span> → <span class="code">NL</span></div><div class="name">Marcus Obi</div><div class="counts">7 open · 8 total</div></button>
+        <button class="case-chip"><div class="corridor"><span class="dot active"></span><span class="code">SG</span> → <span class="code">GB</span></div><div class="name">Sarah Chen</div><div class="counts">3 open · 3 total</div></button>
+        <button class="case-chip"><div class="corridor"><span class="dot risk"></span><span class="code">JP</span> → <span class="code">AU</span></div><div class="name">Yuki Tanaka</div><div class="counts">2 open · 2 total</div></button>
+        <button class="case-chip"><div class="corridor"><span class="dot risk"></span><span class="code">PL</span> → <span class="code">IE</span></div><div class="name">Elena Novak</div><div class="counts">2 open · 2 total</div></button>
+        <button class="case-chip"><div class="corridor"><span class="dot active"></span><span class="code">IN</span> → <span class="code">DE</span></div><div class="name">Priya Sharma</div><div class="counts">2 open · 2 total</div></button>
+      </div>
+    </section>
+
+    <section class="filters">
+      <div class="search"><span>🔍</span><input placeholder="Search task, case, or owner…" /></div>
+      <div class="filter-pills">
+        <button class="pill active">All statuses</button>
+        <button class="pill">To Do</button>
+        <button class="pill">In Progress</button>
+        <button class="pill">Done</button>
+        <button class="pill active">All categories</button>
+        <button class="pill">Immigration</button>
+        <button class="pill">Compliance</button>
+        <button class="pill">Logistics</button>
+      </div>
+    </section>
+
+    <main class="content">
+      <div class="kanban kanban-view" id="board-view">
+        <div class="column">
+          <div class="column-header todo"><h3>To Do</h3><span class="count-badge">9</span></div>
+          <div class="column-body">
+            <article class="task-card">
+              <div class="task-top"><h4>Apply for UK Global Talent visa</h4><span class="priority high">High</span></div>
+              <div class="case-ref"><span class="code">SG</span> ✈ <span class="code">GB</span> Sarah Chen</div>
+              <div class="meta"><span>👤 Thomas Keller</span><span class="cat immigration">Immigration</span></div>
+              <div class="due soon">15 Jul 2026 · 6d left</div>
+            </article>
+            <article class="task-card">
+              <div class="task-top"><h4>File Blue Card EU application</h4><span class="priority medium">Medium</span></div>
+              <div class="case-ref"><span class="code">IN</span> ✈ <span class="code">DE</span> Priya Sharma</div>
+              <div class="meta"><span>👤 Thomas Keller</span><span class="cat immigration">Immigration</span></div>
+              <div class="due">20 Jul 2026</div>
+            </article>
+            <article class="task-card">
+              <div class="task-top"><h4>Schedule household goods survey — Lagos</h4><span class="priority medium">Medium</span></div>
+              <div class="case-ref"><span class="code">NG</span> ✈ <span class="code">NL</span> Marcus Obi</div>
+              <div class="meta"><span>👤 Sirva</span><span class="cat logistics">Logistics</span></div>
+              <div class="due">25 Jul 2026</div>
+            </article>
+          </div>
+        </div>
+        <div class="column">
+          <div class="column-header progress"><h3>In Progress</h3><span class="count-badge">8</span></div>
+          <div class="column-body">
+            <article class="task-card">
+              <div class="task-top"><h4>Submit dependent MVV applications</h4><span class="priority high">High</span></div>
+              <div class="case-ref"><span class="code">NG</span> ✈ <span class="code">NL</span> Marcus Obi</div>
+              <div class="meta"><span>👤 Amara Diallo</span><span class="cat immigration">Immigration</span></div>
+              <div class="due soon">18 Jul 2026 · 9d left</div>
+            </article>
+            <article class="task-card">
+              <div class="task-top"><h4>Chase apostille for dependant birth certificates</h4><span class="priority high">High</span></div>
+              <div class="case-ref"><span class="code">NG</span> ✈ <span class="code">NL</span> Marcus Obi</div>
+              <div class="meta"><span>👤 Employee + Local agent</span><span class="cat immigration">Immigration</span></div>
+              <div class="due overdue">⚠ 5 Jul 2026 · 3d overdue</div>
+            </article>
+            <article class="task-card">
+              <div class="task-top"><h4>Arrange London temporary accommodation — 30 days</h4><span class="priority medium">Medium</span></div>
+              <div class="case-ref"><span class="code">SG</span> ✈ <span class="code">GB</span> Sarah Chen</div>
+              <div class="meta"><span>👤 Crown Relocations</span><span class="cat logistics">Logistics</span></div>
+              <div class="due">30 Jul 2026</div>
+            </article>
+          </div>
+        </div>
+        <div class="column">
+          <div class="column-header done"><h3>Done</h3><span class="count-badge">2</span></div>
+          <div class="column-body">
+            <article class="task-card done">
+              <div class="task-top"><h4>Verify IND recognised sponsor status</h4><span class="priority medium">Medium</span></div>
+              <div class="case-ref"><span class="code">NG</span> ✈ <span class="code">NL</span> Marcus Obi</div>
+              <div class="meta"><span>👤 Fragomen</span><span class="cat compliance">Compliance</span></div>
+              <div class="due">28 May 2026</div>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div class="list-view" id="list-view">
+        <div class="list-table">
+          <div class="list-head">
+            <span>Task</span><span>Case</span><span>Owner</span><span>Due date</span><span>Priority</span><span>Status</span>
+          </div>
+          <div class="list-row">
+            <span>Apply for UK Global Talent visa</span>
+            <span>SG → GB Sarah Chen</span>
+            <span>Thomas Keller</span>
+            <span class="due soon">15 Jul 2026</span>
+            <span class="priority high">High</span>
+            <span class="status-badge">To Do</span>
+          </div>
+          <div class="list-row">
+            <span>Submit dependent MVV applications</span>
+            <span>NG → NL Marcus Obi</span>
+            <span>Amara Diallo</span>
+            <span>18 Jul 2026</span>
+            <span class="priority high">High</span>
+            <span class="status-badge progress">In Progress</span>
+          </div>
+          <div class="list-row">
+            <span>Chase apostille for dependant birth certificates</span>
+            <span>NG → NL Marcus Obi</span>
+            <span>Employee + Local agent</span>
+            <span class="due overdue">5 Jul 2026</span>
+            <span class="priority high">High</span>
+            <span class="status-badge progress">In Progress</span>
+          </div>
+          <div class="list-row">
+            <span>Verify IND recognised sponsor status</span>
+            <span>NG → NL Marcus Obi</span>
+            <span>Fragomen</span>
+            <span>28 May 2026</span>
+            <span class="priority medium">Medium</span>
+            <span class="status-badge done">Done</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span>19 tasks · Immigration, compliance & logistics</span>
+      <span>📅 Sorted by due date</span>
+    </footer>
+  </div>
+
+  <script>
+    function showView(view) {
+      document.getElementById('board-view').classList.toggle('hidden', view !== 'board');
+      document.getElementById('list-view').classList.toggle('active', view === 'list');
+      document.getElementById('btn-board').classList.toggle('active', view === 'board');
+      document.getElementById('btn-list').classList.toggle('active', view === 'list');
+    }
+  </script>
+</body>
+</html>
