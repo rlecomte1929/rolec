@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS public.leads (
     company_domain text,            -- FK-by-value to prospect_candidates.company_domain
     source         text NOT NULL DEFAULT 'marketing_site',  -- marketing_site | manual | referral
     status         text NOT NULL DEFAULT 'new',             -- new|contacted|qualified|converted|lost
-    tags           text[] NOT NULL DEFAULT '{}',
+    tags           jsonb NOT NULL DEFAULT '[]'::jsonb,       -- JSON array; SQLAlchemy generic JSON (jsonb on PG, TEXT on SQLite test env)
     message        text,
     utm_source     text,
     utm_campaign   text,
@@ -108,7 +108,7 @@ git commit -m "feat(leads): [audos-P1] create leads table with RLS (admin-only)"
 **Interfaces:**
 - Produces: `Lead` (ORM, `__tablename__="leads"`); `LeadOut`, `LeadCaptureIn`, `LeadPatchIn`, `LeadStatsOut` (Pydantic).
 
-- [ ] **Step 1: Add the ORM model** to `backend/app/models.py` (mirrors `ProspectCandidate` style — `String` PK, app-generated uuid; note the `ARRAY` import may need adding to the existing `from sqlalchemy import ...` line at the top of the file):
+- [ ] **Step 1: Add the ORM model** to `backend/app/models.py` (mirrors `ProspectCandidate` style — `String` PK, app-generated uuid; add `JSON` to the existing `from sqlalchemy import ...` line at the top of the file. Use the generic `JSON` type — NOT `ARRAY` — so the model works on both Postgres (jsonb) and the SQLite test harness):
 
 ```python
 class Lead(Base):
@@ -126,7 +126,7 @@ class Lead(Base):
     company_domain = Column(String, nullable=True, index=True)
     source = Column(String, nullable=False, default="marketing_site")
     status = Column(String, nullable=False, default="new", index=True)
-    tags = Column(ARRAY(String), nullable=False, default=list)
+    tags = Column(JSON, nullable=False, default=list)  # generic JSON (jsonb on PG, TEXT on SQLite)
     message = Column(Text, nullable=True)
     utm_source = Column(String, nullable=True)
     utm_campaign = Column(String, nullable=True)
@@ -226,8 +226,11 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.app import auth_deps
-from backend.app.db import SessionLocal
+from backend.app.db import Base, SessionLocal, engine
 from backend.app.models import Lead
+
+# The SQLite test harness may not have run init_db(); ensure ORM tables exist.
+Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture
@@ -311,7 +314,6 @@ def _to_out(lead: Lead, matched_domains: set) -> LeadOut:
 @router.get("", response_model=Dict[str, Any])
 def list_leads(
     status: Optional[str] = Query(None),
-    tag: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=500),
     _admin: dict = Depends(require_admin),
@@ -321,8 +323,6 @@ def list_leads(
         q = s.query(Lead)
         if status:
             q = q.filter(Lead.status == status)
-        if tag:
-            q = q.filter(Lead.tags.any(tag))
         if search:
             like = f"%{search.lower()}%"
             q = q.filter(func.lower(Lead.email).like(like))
@@ -433,6 +433,9 @@ os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 
 from fastapi.testclient import TestClient
 from backend.main import app
+from backend.app.db import Base, engine
+
+Base.metadata.create_all(bind=engine)  # ensure leads table exists on SQLite harness
 
 client = TestClient(app)
 
@@ -576,7 +579,7 @@ export interface LeadStats {
 }
 
 export const adminLeadsAPI = {
-  list: async (params?: { status?: string; tag?: string; search?: string; limit?: number }) =>
+  list: async (params?: { status?: string; search?: string; limit?: number }) =>
     api
       .get('/api/admin/leads', { params: params || {} })
       .then((r) => r.data as { total: number; leads: LeadRow[] }),
