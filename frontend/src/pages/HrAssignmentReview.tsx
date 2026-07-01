@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Users, CalendarDays, Flag, ShieldCheck, FolderOpen, MapPin } from 'lucide-react';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
@@ -16,11 +17,35 @@ import { destinationPermitLabel } from './hrAssignmentPermit';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 
+// ── Chip (copied from Roadmap pattern — not imported to keep this self-contained) ──
+
+type ChipTone = 'done' | 'progress' | 'ready' | 'wait' | 'muted';
+
+const TONE_CHIP: Record<ChipTone, string> = {
+  done: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  progress: 'bg-sky-50 text-sky-700 ring-sky-200',
+  ready: 'bg-teal-50 text-teal-700 ring-teal-200',
+  wait: 'bg-amber-50 text-amber-700 ring-amber-200',
+  muted: 'bg-slate-100 text-slate-500 ring-slate-200',
+};
+
+function Chip({ tone, children }: { tone: ChipTone; children: React.ReactNode }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${TONE_CHIP[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ── Intake section wrapper ────────────────────────────────────────────────────
+
 function IntakeSummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card padding="md" className="mb-4">
-      <div className="text-sm font-semibold text-[#0b2b43] mb-2">{title}</div>
-      <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
+      <div className="text-sm font-semibold text-navy-800 mb-2">{title}</div>
+      <div className="text-sm text-slate-600 space-y-1">{children}</div>
     </Card>
   );
 }
@@ -318,35 +343,38 @@ export const HrAssignmentReview: React.FC = () => {
         <Alert variant="error">
           {error}
           {import.meta.env.DEV && selectedCaseId && (
-            <div className="mt-2 text-xs font-mono text-[#6b7280]">
+            <div className="mt-2 text-xs font-mono text-slate-500">
               assignmentId: {selectedCaseId}
             </div>
           )}
         </Alert>
       )}
-      {isLoading && <div className="text-sm text-[#6b7280]">Loading case...</div>}
+      {isLoading && <div className="text-sm text-slate-500">Loading case...</div>}
 
       {!isLoading && assignment && (
         <div className="space-y-6">
-          <div className="bg-[#0b1d33] text-white rounded-xl px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-4 text-xs uppercase tracking-wide text-[#bfdbfe]">
-              <span>Current case</span>
-              <span className="text-white text-sm font-semibold normal-case">
+          {/* Hero: Roadmap-style gradient card (navy→teal) */}
+          <div className="rounded-2xl bg-gradient-to-br from-[#0b2b43] via-[#103e54] to-[#176f6b] px-6 py-5 text-white shadow-lg flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
+                Current case
+              </span>
+              <span className="text-white font-bold">
                 {origin && destination ? `${origin} → ${destination}` : 'Relocation case'}
               </span>
-              <span className="text-[#bfdbfe]">•</span>
-              <span className="flex items-center gap-1 normal-case">
-                <span>👥</span>
+              <span className="text-white/40">•</span>
+              <span className="flex items-center gap-1.5 text-white/80">
+                <Users size={13} />
                 {familyMembers} Family Members
               </span>
-              <span className="text-[#bfdbfe]">•</span>
-              <span className="flex items-center gap-1 normal-case">
-                <span>📅</span>
+              <span className="text-white/40">•</span>
+              <span className="flex items-center gap-1.5 text-white/80">
+                <CalendarDays size={13} />
                 Target: {targetDate}
               </span>
-              <span className="text-[#bfdbfe]">•</span>
-              <span className="flex items-center gap-1 normal-case">
-                <span>🚩</span>
+              <span className="text-white/40">•</span>
+              <span className="flex items-center gap-1.5 text-white/80">
+                <Flag size={13} />
                 {stageLabel}
               </span>
             </div>
@@ -355,8 +383,8 @@ export const HrAssignmentReview: React.FC = () => {
                 Switch Case
               </Button>
               {isSwitchOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-xl border border-[#e2e8f0] bg-white shadow-lg z-20">
-                  <div className="px-4 py-2 text-xs uppercase tracking-wide text-[#6b7280]">
+                <div className="absolute right-0 mt-2 w-72 rounded-xl border border-slate-200 bg-white shadow-lg z-20">
+                  <div className="px-4 py-2 text-xs uppercase tracking-wide text-slate-500">
                     Available cases
                   </div>
                   <div className="max-h-64 overflow-auto">
@@ -364,10 +392,10 @@ export const HrAssignmentReview: React.FC = () => {
                       <Button unstyled
                         key={item.id}
                         onClick={() => handleSelectCase(item.id)}
-                        className="w-full text-left px-4 py-3 hover:bg-[#f8fafc] text-sm text-[#0b2b43]"
+                        className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm text-navy-800"
                       >
                         <div className="font-medium">{item.employeeIdentifier}</div>
-                        <div className="text-xs text-[#6b7280]">Case ID: {item.id}</div>
+                        <div className="text-xs text-slate-500">Case ID: {item.id}</div>
                       </Button>
                     ))}
                   </div>
@@ -379,80 +407,118 @@ export const HrAssignmentReview: React.FC = () => {
           <div className="grid grid-cols-1 xl:grid-cols-[2.1fr,1fr] gap-6">
             <div className="space-y-6">
               <Card padding="lg">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-full bg-[#e2e8f0] flex items-center justify-center text-[#0b2b43] font-semibold overflow-hidden">
-                      {profile?.primaryApplicant?.photoUrl ? (
-                        <img
-                          src={profile.primaryApplicant.photoUrl}
-                          alt={fullName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        initials
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-lg font-semibold text-[#0b2b43] flex items-center gap-2">
-                        {fullName}
-                        <Badge variant="info">Reviewing</Badge>
-                      </div>
-                      <div className="text-sm text-[#6b7280]">{roleTitle}</div>
-                    </div>
+                {/* Employee profile row */}
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="h-14 w-14 rounded-full bg-slate-200 flex items-center justify-center text-navy-800 font-semibold overflow-hidden">
+                    {profile?.primaryApplicant?.photoUrl ? (
+                      <img
+                        src={profile.primaryApplicant.photoUrl}
+                        alt={fullName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      initials
+                    )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="border border-[#d7e3ed] bg-[#f4f7fb] rounded-lg px-3 py-2 text-xs text-[#0b2b43] max-w-xs">
-                      <div className="font-semibold uppercase text-[10px] text-[#5b6b7a] mb-1">AI Insight</div>
-                      <div>Intake form {readiness}% complete · Next: {missingItem}.</div>
-                      <div className="text-[10px] text-[#6b7280] mt-2">
-                        AI-assisted · Based on what we know so far.
-                      </div>
+                  <div>
+                    <div className="text-lg font-semibold text-navy-800 flex items-center gap-2">
+                      {fullName}
+                      <Badge variant="info">Reviewing</Badge>
                     </div>
-                    <div className="border border-[#d7e3ed] bg-[#f4f7fb] rounded-lg px-3 py-2 text-xs text-[#0b2b43] max-w-xs">
-                      <div className="font-semibold uppercase text-[10px] text-[#5b6b7a] mb-1">Compliance status</div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span>{complianceLabel}</span>
-                        {complianceStatus && <Badge variant={complianceBadgeVariant}>{complianceLabel}</Badge>}
-                      </div>
-                      <Button unstyled
-                        className="text-[11px] text-[#0b2b43] mt-2 underline"
-                        onClick={() =>
-                          navigate(`${buildRoute('hrComplianceIndex')}?caseId=${assignment.id}`)
-                        }
-                      >
-                        View details →
-                      </Button>
-                    </div>
+                    <div className="text-sm text-slate-500">{roleTitle}</div>
                   </div>
                 </div>
 
+                {/* AI Insight + Compliance as antigravity Alerts */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Alert variant="info" title="AI Insight">
+                    Intake form {readiness}% complete · Next: {missingItem}.
+                    <div className="text-xs text-slate-500 mt-1">
+                      AI-assisted · Based on what we know so far.
+                    </div>
+                  </Alert>
+                  <Alert
+                    variant={
+                      complianceStatus === 'NON_COMPLIANT' || complianceStatus === 'NEEDS_REVIEW'
+                        ? 'warning'
+                        : 'info'
+                    }
+                    title="Compliance status"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{complianceLabel}</span>
+                      {complianceStatus && (
+                        <Badge variant={complianceBadgeVariant}>{complianceLabel}</Badge>
+                      )}
+                    </div>
+                    <Button unstyled
+                      className="text-[11px] text-navy-800 mt-2 underline block"
+                      onClick={() =>
+                        navigate(`${buildRoute('hrComplianceIndex')}?caseId=${assignment.id}`)
+                      }
+                    >
+                      View details →
+                    </Button>
+                  </Alert>
+                </div>
+
+                {/* Metric cards — icon chip + accent hierarchy */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   <Card padding="md">
-                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Visa checklist</div>
-                    <div className="text-lg font-semibold text-[#0b2b43] mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-accent-500">
+                        <ShieldCheck size={16} />
+                      </span>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Visa checklist
+                      </div>
+                    </div>
+                    <div className="text-lg font-semibold text-navy-800">
                       {visaStepsTotal > 0
                         ? `${visaStepsSatisfied} of ${visaStepsTotal} steps complete`
                         : 'Not started yet'}
                     </div>
                     <div className="mt-3">
-                      <ProgressBar value={visaStepsTotal > 0 ? Math.round((visaStepsSatisfied / visaStepsTotal) * 100) : 0} />
+                      <ProgressBar
+                        value={
+                          visaStepsTotal > 0
+                            ? Math.round((visaStepsSatisfied / visaStepsTotal) * 100)
+                            : 0
+                        }
+                      />
                     </div>
                     {attentionItems.length > 0 && (
-                      <div className="text-xs text-[#b45309] mt-2">Action required</div>
+                      <div className="text-xs text-amber-700 mt-2 font-medium">
+                        Action required
+                      </div>
                     )}
                   </Card>
                   <Card padding="md">
-                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Documents</div>
-                    <div className="text-lg font-semibold text-[#0b2b43] mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-accent-500">
+                        <FolderOpen size={16} />
+                      </span>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Documents
+                      </div>
+                    </div>
+                    <div className="text-lg font-semibold text-navy-800">
                       {docsComplete} of {docsTotal} uploaded
                     </div>
                   </Card>
                   <Card padding="md">
-                    <div className="text-xs uppercase tracking-wide text-[#6b7280]">Path</div>
-                    <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-navy-50 text-navy-800">
+                        <MapPin size={16} />
+                      </span>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Path
+                      </div>
+                    </div>
+                    <div className="text-xl font-semibold text-navy-800">
                       {permitLabel ?? 'To be determined'}
                     </div>
-                    <div className="text-xs text-[#6b7280] mt-1">
+                    <div className="text-xs text-slate-500 mt-1">
                       {permitLabel
                         ? 'Indicative — confirm with the relevant authority.'
                         : destination
@@ -462,96 +528,95 @@ export const HrAssignmentReview: React.FC = () => {
                   </Card>
                 </div>
 
-                <div className="border-b border-[#e2e8f0] mt-6" />
-                <div className="flex flex-wrap gap-6 text-sm text-[#6b7280] mt-3">
-                  {(['timeline', 'intake', 'documents', 'providers', 'messages'] as TabKey[]).map((tab) => (
-                    <Button unstyled
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`capitalize ${
-                        activeTab === tab ? 'text-[#0b2b43] font-semibold' : 'hover:text-[#0b2b43]'
-                      }`}
-                    >
-                      {tab === 'providers' ? 'Services' : tab}
-                    </Button>
-                  ))}
+                {/* Segmented navy-pill tab toggle (Roadmap pattern) */}
+                <div className="mt-6">
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 flex-wrap gap-0.5">
+                    {(['timeline', 'intake', 'documents', 'providers', 'messages'] as TabKey[]).map(
+                      (tab) => (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setActiveTab(tab)}
+                          className={`capitalize rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                            activeTab === tab
+                              ? 'bg-navy-800 text-white font-semibold'
+                              : 'text-slate-500 hover:text-navy-800'
+                          }`}
+                        >
+                          {tab === 'providers' ? 'Services' : tab}
+                        </button>
+                      ),
+                    )}
+                  </div>
                 </div>
               </Card>
 
               {activeTab === 'timeline' && (
                 <div className="space-y-6">
-                  <Card
-                    padding="lg"
-                    className={
-                      attentionItems.length > 0
-                        ? 'border border-[#fde2e2] bg-[#fff5f5]'
-                        : 'border border-[#d1f0e4] bg-[#f3fbf7]'
-                    }
-                  >
-                    <div
-                      className={`flex items-center gap-2 text-sm font-semibold ${
-                        attentionItems.length > 0 ? 'text-[#7a2a2a]' : 'text-[#1f8e8b]'
-                      }`}
-                    >
-                      {attentionItems.length > 0 ? 'Attention Needed' : 'On track'}
-                      <span className="text-xs text-[#6b7280]">
-                        {attentionItems.length > 0 ? 'Action required / Blocking' : 'Nothing blocking right now'}
-                      </span>
-                    </div>
-                    {attentionItems.length === 0 && (
-                      <div className="mt-3 text-sm text-[#4b5563]">
-                        No items are blocking this plan right now.
-                      </div>
-                    )}
-                    <div className="mt-4 space-y-3">
-                      {attentionItems.map((item) => (
-                        <div
-                          key={item}
-                          className="flex items-center justify-between gap-4 border border-[#f4c7c7] bg-white rounded-lg p-3"
-                        >
-                          <div>
-                            <div className="text-sm font-medium text-[#0b2b43]">{item}</div>
-                            <div className="text-xs text-[#6b7280]">
-                              {/* TASK-002: neutral 'Priority' cue rather than a personal-jeopardy
-                                  framing. No fabricated due/overdue date — only real data is shown. */}
-                              <span className="inline-flex items-center gap-1">
-                                <Badge variant="neutral">Priority</Badge>
-                              </span>
+                  {/* Attention/On-track → antigravity Alert; task rows → Card + Chip */}
+                  {attentionItems.length > 0 ? (
+                    <>
+                      <Alert variant="warning" title="Attention Needed">
+                        Action required · {attentionItems.length} item
+                        {attentionItems.length !== 1 ? 's' : ''} blocking
+                      </Alert>
+                      <div className="space-y-3">
+                        {attentionItems.map((item) => (
+                          <Card padding="sm" key={item}>
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <div className="text-sm font-medium text-navy-800">{item}</div>
+                                <div className="mt-1">
+                                  {/* TASK-002: neutral 'Priority' cue rather than a personal-jeopardy
+                                      framing. No fabricated due/overdue date — only real data is shown. */}
+                                  <Chip tone="wait">Priority</Chip>
+                                </div>
+                              </div>
+                              <Button variant="outline" onClick={handleOpenNudge}>
+                                Nudge
+                              </Button>
                             </div>
-                          </div>
-                          <Button variant="outline" onClick={handleOpenNudge}>
-                            Nudge
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <Alert variant="success" title="On track">
+                      No items are blocking this plan right now.
+                    </Alert>
+                  )}
 
                   <Card padding="lg">
-                    <div className="text-sm font-semibold text-[#0b2b43] mb-3">In progress</div>
+                    <div className="text-sm font-semibold text-navy-800 mb-3">In progress</div>
                     <div className="space-y-3">
                       {inProgressItems.length === 0 && (
-                        <div className="text-sm text-[#6b7280]">No tasks in progress.</div>
+                        <div className="text-sm text-slate-500">No tasks in progress.</div>
                       )}
                       {inProgressItems.map((item) => (
-                        <div key={item} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg p-3">
-                          <div className="text-sm text-[#0b2b43]">{item}</div>
-                          <Badge variant="neutral">In review</Badge>
+                        <div
+                          key={item}
+                          className="flex items-center justify-between border border-slate-200 rounded-lg p-3"
+                        >
+                          <div className="text-sm text-navy-800">{item}</div>
+                          <Chip tone="progress">In review</Chip>
                         </div>
                       ))}
                     </div>
                   </Card>
 
                   <Card padding="lg">
-                    <div className="text-sm font-semibold text-[#0b2b43] mb-3">Completed</div>
+                    <div className="text-sm font-semibold text-navy-800 mb-3">Completed</div>
                     <div className="space-y-3">
                       {completedItems.length === 0 && (
-                        <div className="text-sm text-[#6b7280]">Nothing completed yet.</div>
+                        <div className="text-sm text-slate-500">Nothing completed yet.</div>
                       )}
                       {completedItems.map((item) => (
-                        <div key={item} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc] text-[#94a3b8]">
+                        <div
+                          key={item}
+                          className="flex items-center justify-between border border-slate-200 rounded-lg p-3 bg-slate-50 text-slate-500"
+                        >
                           <div className="text-sm">{item}</div>
-                          <Badge variant="success">Done</Badge>
+                          <Chip tone="done">Done</Chip>
                         </div>
                       ))}
                     </div>
@@ -561,7 +626,7 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'intake' && (
                 <div className="space-y-4">
-                  <div className="text-sm font-semibold text-[#0b2b43]">Employee intake responses</div>
+                  <div className="text-sm font-semibold text-navy-800">Employee intake responses</div>
                   {intakeError && <Alert variant="error">{intakeError}</Alert>}
                   {!intakeError && intakeDraft && (
                     <>
@@ -592,21 +657,24 @@ export const HrAssignmentReview: React.FC = () => {
                     </>
                   )}
                   {!intakeError && intakeLoading && (
-                    <div className="text-sm text-[#6b7280]">Loading intake data...</div>
+                    <div className="text-sm text-slate-500">Loading intake data...</div>
                   )}
                   {!intakeError && !intakeLoading && !intakeDraft && (
-                    <div className="text-sm text-[#6b7280]">No intake data available.</div>
+                    <div className="text-sm text-slate-500">No intake data available.</div>
                   )}
                 </div>
               )}
 
               {activeTab === 'documents' && (
                 <Card padding="lg">
-                  <div className="text-sm font-semibold text-[#0b2b43] mb-4">Documents</div>
+                  <div className="text-sm font-semibold text-navy-800 mb-4">Documents</div>
                   <div className="space-y-3">
                     {docsList.map((doc) => (
-                      <div key={doc.label} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg p-3">
-                        <div className="text-sm text-[#0b2b43]">{doc.label}</div>
+                      <div
+                        key={doc.label}
+                        className="flex items-center justify-between border border-slate-200 rounded-lg p-3"
+                      >
+                        <div className="text-sm text-navy-800">{doc.label}</div>
                         <Badge variant={doc.complete ? 'success' : 'warning'}>
                           {doc.complete ? 'Uploaded' : 'Missing'}
                         </Badge>
@@ -618,25 +686,29 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'providers' && (
                 <Card padding="lg">
-                  <div className="text-sm font-semibold text-[#0b2b43] mb-2">Services & provider estimates</div>
-                  <div className="text-xs text-[#6b7280] mb-4">
+                  <div className="text-sm font-semibold text-navy-800 mb-2">
+                    Services & provider estimates
+                  </div>
+                  <div className="text-xs text-slate-500 mb-4">
                     Relocation services and employee-entered estimates, with policy cap comparison for HR.
                   </div>
-                  {assignment?.id ? <HrAssignmentServicesCapPanel assignmentId={assignment.id} /> : null}
+                  {assignment?.id ? (
+                    <HrAssignmentServicesCapPanel assignmentId={assignment.id} />
+                  ) : null}
                 </Card>
               )}
 
               {activeTab === 'messages' && (
                 <Card padding="lg">
-                  <div className="text-sm font-semibold text-[#0b2b43] mb-4">Messages</div>
+                  <div className="text-sm font-semibold text-navy-800 mb-4">Messages</div>
                   <div className="space-y-3">
                     {messages.length === 0 && (
-                      <div className="text-sm text-[#6b7280]">No messages yet.</div>
+                      <div className="text-sm text-slate-500">No messages yet.</div>
                     )}
                     {messages.map((item) => (
-                      <div key={item.id} className="border border-[#e2e8f0] rounded-lg p-3">
-                        <div className="text-xs text-[#6b7280]">{item.timestamp}</div>
-                        <div className="text-sm text-[#0b2b43] mt-1">
+                      <div key={item.id} className="border border-slate-200 rounded-lg p-3">
+                        <div className="text-xs text-slate-500">{item.timestamp}</div>
+                        <div className="text-sm text-navy-800 mt-1">
                           <span className="font-semibold">{item.author}</span>: {item.message}
                         </div>
                       </div>
@@ -647,7 +719,7 @@ export const HrAssignmentReview: React.FC = () => {
                       value={messageInput}
                       onChange={(event) => setMessageInput(event)}
                       placeholder="Write a message..."
-                      className="flex-1 rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-800"
                     />
                     <Button
                       onClick={() => {
@@ -674,13 +746,13 @@ export const HrAssignmentReview: React.FC = () => {
 
             <div className="space-y-4">
               <Card padding="lg">
-                <div className="text-sm font-semibold text-[#0b2b43] mb-3">Provide feedback</div>
+                <div className="text-sm font-semibold text-navy-800 mb-3">Provide feedback</div>
                 <textarea
                   value={hrFeedbackInput}
                   onChange={(e) => setHrFeedbackInput(e.target.value)}
                   placeholder="Add feedback for the employee..."
                   rows={3}
-                  className="w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-800"
                 />
                 {displayedFeedbackError && (
                   <div className="text-xs text-red-600 mt-2">{displayedFeedbackError}</div>
@@ -692,17 +764,17 @@ export const HrAssignmentReview: React.FC = () => {
                 >
                   {hrFeedbackSending ? 'Sending...' : 'Send feedback'}
                 </Button>
-                <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
-                  <div className="text-xs font-medium text-[#6b7280] mb-2">Feedback history</div>
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="text-xs font-medium text-slate-500 mb-2">Feedback history</div>
                   {hrFeedback.length === 0 && (
-                    <div className="text-xs text-[#9ca3af]">No feedback yet.</div>
+                    <div className="text-xs text-slate-500">No feedback yet.</div>
                   )}
                   {hrFeedback.map((f) => (
                     <div key={f.id} className="mb-3 text-sm">
-                      <div className="text-[#6b7280] text-xs">
+                      <div className="text-slate-500 text-xs">
                         {new Date(f.created_at).toLocaleString()}
                       </div>
-                      <div className="text-[#0b2b43] mt-0.5">{f.message}</div>
+                      <div className="text-navy-800 mt-0.5">{f.message}</div>
                     </div>
                   ))}
                 </div>
@@ -711,13 +783,15 @@ export const HrAssignmentReview: React.FC = () => {
               <Card padding="lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-semibold text-[#0b2b43]">ReloPass Assistant</div>
-                    <div className="text-xs text-[#6b7280]">AI Guidance</div>
+                    <div className="text-sm font-semibold text-navy-800">ReloPass Assistant</div>
+                    <div className="text-xs text-slate-500">AI Guidance</div>
                   </div>
-                  <Button unstyled aria-label="More options" className="text-[#94a3b8] hover:text-[#0b2b43]">⋯</Button>
+                  <Button unstyled aria-label="More options" className="text-slate-500 hover:text-navy-800">
+                    ⋯
+                  </Button>
                 </div>
-                <div className="mt-4 space-y-3 text-sm text-[#4b5563]">
-                  <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
+                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
                     {/* TASK-003 (AIQ-1042): count the same `attentionItems` the checklist
                         renders so the assistant can't contradict the visible list. */}
                     {blockerSummaryMessage(attentionItems.length, attentionItems[0])}
@@ -726,10 +800,11 @@ export const HrAssignmentReview: React.FC = () => {
                     Draft urgent reminder for Profile
                   </Button>
                   <Button variant="outline" fullWidth>
-                    What’s blocking {fullName.split(' ')[0]}&apos;s profile completion?
+                    What&apos;s blocking {fullName.split(' ')[0]}&apos;s profile completion?
                   </Button>
                   <Button variant="outline" fullWidth>
-                    What documents are needed for {origin && destination ? `${origin} → ${destination}` : 'this route'}?
+                    What documents are needed for{' '}
+                    {origin && destination ? `${origin} → ${destination}` : 'this route'}?
                   </Button>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -737,11 +812,11 @@ export const HrAssignmentReview: React.FC = () => {
                     value={assistantInput}
                     onChange={(event) => setAssistantInput(event)}
                     placeholder="Ask about this case..."
-                    className="flex-1 rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-800"
                   />
                   <Button variant="outline">Send</Button>
                 </div>
-                <div className="text-[11px] text-[#94a3b8] mt-3">
+                <div className="text-[11px] text-slate-500 mt-3">
                   ReloPass AI can make mistakes. Verify key details.
                 </div>
               </Card>
@@ -757,10 +832,10 @@ export const HrAssignmentReview: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
           <Card padding="lg" className="w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold text-[#0b2b43]">Send nudge</div>
+              <div className="text-sm font-semibold text-navy-800">Send nudge</div>
               <Button unstyled
                 onClick={() => setIsNudgeOpen(false)}
-                className="text-sm text-[#6b7280] hover:text-[#0b2b43]"
+                className="text-sm text-slate-500 hover:text-navy-800"
               >
                 Close
               </Button>
@@ -769,7 +844,7 @@ export const HrAssignmentReview: React.FC = () => {
               value={nudgeMessage}
               onChange={(event) => setNudgeMessage(event.target.value)}
               rows={4}
-              className="w-full border border-[#d1d5db] rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
+              className="w-full border border-slate-200 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-800"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
               <Button variant="outline" onClick={() => setIsNudgeOpen(false)}>
