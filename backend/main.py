@@ -168,6 +168,7 @@ from .app.routers import admin_review_queue as admin_review_queue_router
 from .app.routers import admin_notifications as admin_notifications_router
 from .app.routers import admin_ops_analytics as admin_ops_analytics_router
 from .app.routers import admin_workflow_analytics as admin_workflow_analytics_router
+from .app.routers import admin_marketing_analytics as admin_marketing_analytics_router
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .app.routers import admin_prospects as admin_prospects_router
 from .app.routers import admin_leads as admin_leads_router
@@ -235,6 +236,7 @@ from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
+from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
 from .app.routers import assistant_router as assistant_router_router
@@ -247,6 +249,7 @@ from .app.routers import admin_settings as admin_settings_router  # [Task-4] adm
 from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] unified feedback console
 from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
 from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
+from .app.routers import public_analytics as public_analytics_router  # [audos-P2] public funnel event ingest
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -835,6 +838,7 @@ app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases
 app.include_router(case_rule_updates_router.router)  # AIQ-693 — GET/POST /api/cases/{id}/rule-updates (P2-02e banner)
 app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
+app.include_router(setup_assistant_router.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
 app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
@@ -859,6 +863,7 @@ app.include_router(immigration_forms_router.router)  # IMM-11 — form library +
 app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — immigration document upload
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
+app.include_router(public_analytics_router.router)  # [audos-P2] public POST /api/public/track (no prefix)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(admin_mobility_router.router)
@@ -874,6 +879,7 @@ app.include_router(admin_source_change_review_router.router)
 app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_marketing_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
 app.include_router(admin_leads_router.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD

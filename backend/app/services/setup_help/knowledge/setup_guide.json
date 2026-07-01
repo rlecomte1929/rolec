@@ -1,0 +1,133 @@
+{
+  "version": "2026-07-01",
+  "audience": "HR",
+  "note": "Curated, read-only ReloPass how-to corpus for the in-app Setup & Help Assistant. Every step, route and feature name below reflects the shipped product. The assistant must ground answers ONLY in these topics and must not invent features, steps, or routes.",
+  "topics": [
+    {
+      "id": "company-profile",
+      "title": "Complete your company profile",
+      "applies_when": "First-run HR workspace, or when policy/case pages say your account isn't linked to a company.",
+      "route": "/hr/company-profile",
+      "steps": [
+        "Open Company Profile from the HR menu.",
+        "Fill in your company name, country, and full company address (street, city, postal code).",
+        "Add HQ city, industry, and company size — these help ReloPass pre-fill sensible policy suggestions.",
+        "Save. The profile powers policy defaults and appears on employee-facing case records."
+      ],
+      "gotchas": [
+        "A brand-new HR account may not be linked to a company yet — policy and case pages then show a 'Complete your account setup' notice. Linking is done by your ReloPass admin; contact them if that message persists.",
+        "The company address is required downstream; leaving it blank can block later steps."
+      ]
+    },
+    {
+      "id": "policy-draft-publish",
+      "title": "Draft and publish a relocation policy",
+      "applies_when": "You need employees to see benefits/caps, or a case shows no policy configured.",
+      "route": "/hr/settings/policy",
+      "steps": [
+        "Open the Policy Builder.",
+        "If you don't have a signed-off policy file yet, pick a starter baseline — Conservative, Standard, or Premium — as a starting point you can edit.",
+        "Alternatively, upload your approved company policy document; ReloPass saves it as a draft until you publish.",
+        "Review the benefit table and adjust any numbers or labels.",
+        "When the page shows the draft is ready, choose Publish version to make it live."
+      ],
+      "gotchas": [
+        "Drafts are visible to HR only. Employees see a policy ONLY after you publish a version.",
+        "Every starter number and label is illustrative — change it before or after going live.",
+        "Uploading a document does not go live on its own; you still have to publish that version."
+      ]
+    },
+    {
+      "id": "create-first-case",
+      "title": "Create your first relocation case",
+      "applies_when": "You have no cases yet, or you're onboarding a new relocating employee.",
+      "route": "/hr/command-center",
+      "steps": [
+        "Open the HR Command Center — it lists your case portfolio.",
+        "When there are no cases, use the first-run 'Open your first case' surface (you can accept or edit the suggested destination and working location).",
+        "A case is the record for one employee's move: it holds their timeline, documents, vendor assignments, and compliance status.",
+        "Fill in the basic move details to create the case."
+      ],
+      "gotchas": [
+        "The suggested setup panel pre-fills values from what ReloPass already knows; everything stays editable and you can skip the suggestions."
+      ]
+    },
+    {
+      "id": "invite-employee",
+      "title": "Assign and invite an employee to a case",
+      "applies_when": "A case exists but no employee is attached to it yet.",
+      "route": "/hr/command-center",
+      "steps": [
+        "Open the case from the HR Command Center.",
+        "Assign the employee by their email address — this creates the assignment and an invite for them.",
+        "The employee registers (or logs in) with that email and then claims the case using the invite.",
+        "Once claimed, the case appears in the employee's journey and shows up on your portfolio."
+      ],
+      "gotchas": [
+        "Claiming is NOT automatic on registration. The employee must explicitly claim the case with the invite token; simply signing up does not link them.",
+        "Make sure you assign to the same email the employee registers with."
+      ]
+    },
+    {
+      "id": "employee-next-steps",
+      "title": "What the employee does next",
+      "applies_when": "You've invited an employee and want to guide them, or they ask what to do.",
+      "route": null,
+      "steps": [
+        "The employee registers a ReloPass account with the email you invited.",
+        "They claim their assigned case using the invite you sent.",
+        "They complete intake — origin and destination, move date, purpose, and household details.",
+        "Intake unlocks their services & policy view and a step-by-step relocation roadmap."
+      ],
+      "gotchas": [
+        "Account registration is rate-limited to 5 sign-ups per hour from the same source; if an employee hits this, wait and retry.",
+        "If the employee registered but sees no case, they most likely haven't claimed the invite yet."
+      ]
+    },
+    {
+      "id": "hr-command-center",
+      "title": "Track cases in the HR Command Center",
+      "applies_when": "You want a portfolio view of all active relocations and where attention is needed.",
+      "route": "/hr/command-center",
+      "steps": [
+        "Open the HR Command Center for the portfolio dashboard.",
+        "Review KPI tiles — Active Cases, Action Required, Departing Soon, At Risk, Overdue Tasks, Budget Overruns.",
+        "Filter the Cases table by risk level (green / yellow / red).",
+        "Click any case row to open its detail: tasks progress, SLA status, budget, and next deadline."
+      ],
+      "gotchas": [
+        "Risk badges are Green (on track), Yellow (attention needed), and Red (at risk) — use them to triage which cases to open first."
+      ]
+    },
+    {
+      "id": "policy-dashboard-exceptions",
+      "title": "Monitor policy usage and handle exceptions",
+      "applies_when": "You've published a policy and want to see utilisation or review out-of-policy requests.",
+      "route": "/hr/policy-dashboard",
+      "steps": [
+        "Open the Policy Dashboard to see active-policy status, per-category utilisation, and a compliance table.",
+        "Open the exceptions queue to review requests that fall outside policy caps.",
+        "Approve or reject each exception; your decision is recorded against the case."
+      ],
+      "gotchas": [
+        "The dashboard only reflects a policy once it's published — a draft won't populate utilisation.",
+        "The exceptions queue is also surfaced on the Command Center so you don't miss pending approvals."
+      ]
+    },
+    {
+      "id": "roadmap-and-tasks",
+      "title": "Roadmap and relocation tasks",
+      "applies_when": "You want to understand the employee's step-by-step plan and task checklist.",
+      "route": "/hr/command-center",
+      "steps": [
+        "Each case has a relocation roadmap — an ordered set of steps for the move, with a document count on each step.",
+        "The task checklist tracks the concrete to-dos for the case; progress rolls up as a Tasks Done % on the Command Center.",
+        "As the employee completes intake and uploads documents, roadmap steps and tasks update automatically."
+      ],
+      "gotchas": [
+        "The roadmap is generated from the case's corridor and intake, so it only fills in after the employee completes intake.",
+        "Employees see their own roadmap inside their journey; HR sees roadmap and task progress from the case detail in the Command Center."
+      ]
+    }
+  ]
+}

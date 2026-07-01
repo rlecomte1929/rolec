@@ -119,6 +119,10 @@ backend/app/routers/lead_capture.py:capture_lead
 # PUBLIC (audos-P1): marketing-site lead capture. Rate-limited (10/hour;50/day),
 # write-only INSERT into leads, returns only {id, matched_prospect} — exposes no
 # data back to the caller. company_domain derived server-side. Unauthenticated by design.
+backend/app/routers/public_analytics.py:track_event
+# PUBLIC (audos-P2): marketing funnel event ingest. Rate-limited (120/hour;1000/day),
+# allow-lists event names (landing_page_view/landing_cta_click) and persists only
+# scalar utm/cta keys into analytics_events. No PII, returns {ok:true}. Unauthenticated by design.
 
 # ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
 # The signature check runs in the handler body, so the AST scanner cannot see it.

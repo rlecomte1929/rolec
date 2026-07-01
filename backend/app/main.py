@@ -10,6 +10,7 @@ from .routers import (
     admin_dsar,
     admin_feature_flags,
     admin_exec_overview,
+    admin_marketing_analytics,
     admin_rag_eval,
     admin_ocr_shadow,
     admin_work_items,
@@ -53,6 +54,7 @@ from .routers import (
     outcomes_ingest,
     hr_case_resolve,
     hr_case_escalation,
+    setup_assistant,
     hr_catalog,
     hr_vendor_widgets,
     research_requests,
@@ -88,6 +90,7 @@ from .routers import (
     admin_feedback,
     admin_admins,
     admin_audit_log,
+    public_analytics,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -162,6 +165,7 @@ def create_app() -> FastAPI:
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
     app.include_router(hr_case_escalation.router)  # W2-3 — HR case escalation
+    app.include_router(setup_assistant.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
     # [Parker-J] NLG exec-summary + policy TL;DR routes
     app.include_router(nlg.router)
 
@@ -183,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(exception_requests.router)
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
+    app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
@@ -209,6 +214,7 @@ def create_app() -> FastAPI:
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
+    app.include_router(admin_marketing_analytics.router, prefix="/api/admin")  # [audos-P2] pre-signup funnel
     app.include_router(admin_leads.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD
     app.include_router(lead_capture.router)  # [audos-P1] public lead-capture — NO prefix (path baked into route)
     app.include_router(relocation_routes.router)

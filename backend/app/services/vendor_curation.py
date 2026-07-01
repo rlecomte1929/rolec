@@ -80,7 +80,9 @@ def upsert_master_selection(
 ) -> Dict[str, Any]:
     """HR toggles a master item on/off for their company. Idempotent."""
     now = datetime.utcnow().isoformat()
-    selected_int = 1 if selected else 0
+    # Bind a Python bool, not 1/0 — the `selected` column is a Postgres BOOLEAN and an
+    # int bind raises psycopg2 DatatypeMismatch → 500 (SQLite coerces it, masking the bug).
+    selected_bool = bool(selected)
     with db.engine.begin() as conn:
         existing = conn.execute(
             text(
@@ -98,7 +100,7 @@ def upsert_master_selection(
                     "SET selected = :sel, country = :country, updated_at = :now "
                     "WHERE id = :id"
                 ),
-                {"sel": selected_int, "country": country, "now": now, "id": existing["id"]},
+                {"sel": selected_bool, "country": country, "now": now, "id": existing["id"]},
             )
             row_id = existing["id"]
         else:
@@ -119,7 +121,7 @@ def upsert_master_selection(
                     "city": destination_city,
                     "country": country,
                     "mid": master_item_id,
-                    "sel": selected_int,
+                    "sel": selected_bool,
                     "now": now,
                     "actor": actor_user_id,
                 },
