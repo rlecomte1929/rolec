@@ -246,8 +246,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         {showEmployeeBanner && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
             <span className="mr-2">⏳</span>
-            Your account isn&apos;t linked to a company assignment yet — most features are on hold.
-            Use the <strong>Dashboard</strong> to claim your case, or wait for HR to match your email.
+            Your account isn&apos;t linked to a relocation case yet — most features are on hold.
+            If HR set one up for your email, open the <strong>Dashboard</strong> to accept it (a case for your verified email links automatically).
           </div>
         )}
 

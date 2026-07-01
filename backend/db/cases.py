@@ -3187,6 +3187,26 @@ class CasesMixin:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def list_pending_claim_assignments_for_employee_contact(
+        self, employee_contact_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """pending_claim assignments for a contact (employee_user_id NULL, mode='pending_claim').
+        Used only by the verified-email auto-link path — the normal reconcile query
+        (`list_unassigned_assignments_for_employee_contact`) deliberately excludes these."""
+        if not (employee_contact_id or "").strip():
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                "WHERE employee_contact_id = :ecid AND employee_user_id IS NULL "
+                "AND LOWER(TRIM(COALESCE(employee_link_mode, ''))) = 'pending_claim'",
+                {"ecid": employee_contact_id.strip()},
+                op_name="list_pending_claim_assignments_for_employee_contact",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
     def list_unassigned_assignments_legacy_for_identifiers(
         self, identifiers: List[str], request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
