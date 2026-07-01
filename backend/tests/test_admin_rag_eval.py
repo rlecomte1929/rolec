@@ -61,9 +61,7 @@ def test_mock_is_deterministic_and_three_months():
     a = svc.generate_mock_reports(date(2026, 6, 4))
     b = svc.generate_mock_reports(date(2026, 6, 4))
     assert a == b
-    assert set(a) == {"context_precision", "factual_consistency", "outcome_accuracy",
-                      "structuring_accuracy", "roadmap_completeness", "answer_grounding",
-                      "calibration_score"}
+    assert set(a) == {s.key for s in svc.METRIC_SPECS}
     for points in a.values():
         assert len(points) == svc._MOCK_WEEKS  # ~3 months of weekly points
     # Last point lands on the requested end date.
@@ -143,14 +141,6 @@ def test_route_returns_all_metrics():
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["source"] in ("mock", "live")
-    assert {m["metric"] for m in body["metrics"]} == {
-        "context_precision",
-        "factual_consistency",
-        "outcome_accuracy",
-        "structuring_accuracy",
-        "roadmap_completeness",
-        "answer_grounding",
-        "calibration_score",
-    }
+    assert {m["metric"] for m in body["metrics"]} == {s.key for s in svc.METRIC_SPECS}
     for m in body["metrics"]:
         assert "threshold" in m and "points" in m and "alert" in m

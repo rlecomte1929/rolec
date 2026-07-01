@@ -26,6 +26,7 @@ Returns:
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional
 
@@ -151,6 +152,37 @@ def _build_user_message(
 # --- Output validation -----------------------------------------------------
 
 REFUSAL_TEXT = "I don't see this in your company's policy. Check with your HR team."
+
+
+# --- Groundedness gate (WS-C) ----------------------------------------------
+# By default the verifier is ADVISORY ONLY (records the verdict on the trace and
+# returns the answer regardless — "fails OPEN"). When POLICY_RAG_GROUNDEDNESS_GATE
+# is enabled, an answer the verifier judges `ungrounded` — or whose grounding
+# score falls below POLICY_RAG_GROUNDEDNESS_MIN_SCORE — is replaced with the same
+# canonical refusal the validation-failure path already produces. Verifier errors
+# still fail OPEN (verification_skipped answers are never gated).
+GROUNDEDNESS_GATE_FLAG = "POLICY_RAG_GROUNDEDNESS_GATE"
+GROUNDEDNESS_MIN_SCORE_FLAG = "POLICY_RAG_GROUNDEDNESS_MIN_SCORE"
+DEFAULT_GROUNDEDNESS_MIN_SCORE = 0.5
+
+
+def _groundedness_gate_enabled() -> bool:
+    """Read the gate flag at call time (env, default OFF). Truthy values:
+    1/true/yes/on (case-insensitive). Anything else — including unset — is OFF,
+    preserving the exact current fail-open behavior."""
+    return os.environ.get(GROUNDEDNESS_GATE_FLAG, "").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+
+
+def _groundedness_min_score() -> float:
+    """Minimum acceptable grounding score when the gate is ON. Falls back to the
+    default on an unset or unparseable value."""
+    raw = os.environ.get(GROUNDEDNESS_MIN_SCORE_FLAG, "")
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_GROUNDEDNESS_MIN_SCORE
 
 
 def _validate_answer(
@@ -291,12 +323,40 @@ def answer_policy_question(
         grounding_score: Optional[float] = None
         verification_skipped = False
         grounding_latency_ms = 0
-        if answer_kind == "answer":
+        answer_was_verified = answer_kind == "answer"
+        if answer_was_verified:
             _gv = verify_grounding(answer_text, cited_chunks, client=client)
             grounding_verdict = _gv.get("verdict")
             grounding_score = _gv.get("grounding_score")
             verification_skipped = bool(_gv.get("verification_skipped"))
             grounding_latency_ms = int(_gv.get("latency_ms") or 0)
+
+            # Groundedness GATE (WS-C). Default OFF — when off this branch is
+            # never entered and behavior is byte-identical to the fail-open path
+            # above. When ON, replace an ungrounded / low-score answer with the
+            # canonical refusal (same shape the validation-failure path emits).
+            # verification_skipped (verifier error/timeout) always fails OPEN.
+            if (
+                not verification_skipped
+                and _groundedness_gate_enabled()
+                and (
+                    grounding_verdict == "ungrounded"
+                    or (
+                        grounding_score is not None
+                        and grounding_score < _groundedness_min_score()
+                    )
+                )
+            ):
+                log.warning(
+                    "policy_assistant groundedness gate refused answer company=%s "
+                    "user=%s verdict=%s score=%s min=%s",
+                    company_id, user_id, grounding_verdict, grounding_score,
+                    _groundedness_min_score(),
+                )
+                answer_text = REFUSAL_TEXT
+                answer_kind = "refusal_validation_failed"
+                cited_ids = []
+                cited_chunks = []
 
         cost = estimate_cost_usd(usage, model_used)
         latency_ms = int((time.time() - started) * 1000)
@@ -318,7 +378,7 @@ def answer_policy_question(
             # top-level trace columns (answer_kind always; grounding only when
             # an answer was actually verified — mirrors immigration's step name).
             tracer.record_step("answer_provenance", latency_ms=0, answer_kind=answer_kind)
-            if answer_kind == "answer":
+            if answer_was_verified:
                 tracer.record_step(
                     "grounding_verification",
                     latency_ms=grounding_latency_ms,

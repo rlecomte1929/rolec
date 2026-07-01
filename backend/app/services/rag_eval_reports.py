@@ -57,6 +57,22 @@ METRIC_SPECS: List[MetricSpec] = [
     MetricSpec("answer_grounding", "Answer grounding", 0.90),
     # Confidence calibration (run_calibration_eval): 1 − ECE; is HIGH actually right?
     MetricSpec("calibration_score", "Confidence calibration", 0.90),
+    # WS-C: HR-policy retriever context precision (offline lexical eval —
+    # backend/scripts/eval_hr_policy_context_precision.py). Reports land as
+    # audit/rag_eval/hr_policy_context_precision_*.json; the first committed
+    # report flips this metric from mock to live.
+    MetricSpec("hr_policy_context_precision", "HR policy context precision", 0.50),
+    # P3: real-LLM eval producers surfaced via the eval-llm-reports workflow.
+    # RAG triad (run_rag_triad --judge claude) — thresholds match the runner's
+    # DEFAULT_THRESHOLDS so the dashboard alert line agrees with the gate.
+    MetricSpec("context_relevance", "RAG triad: context relevance", 0.30),
+    MetricSpec("groundedness", "RAG triad: groundedness", 0.30),
+    MetricSpec("answer_relevance", "RAG triad: answer relevance", 0.30),
+    # Grounding-judge calibration (run_judge_calibration --judge verifier) —
+    # Cohen's kappa vs the human gold set; warn band matches the runner (0.60).
+    MetricSpec("judge_calibration_kappa", "Judge calibration (Cohen kappa)", 0.60),
+    # Supplier-ranking pairwise judge agreement (run_ranking_judge --live).
+    MetricSpec("ranking_agreement", "Ranking judge agreement", 0.70),
 ]
 
 _SPEC_BY_KEY: Dict[str, MetricSpec] = {s.key: s for s in METRIC_SPECS}
@@ -141,6 +157,14 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
     "answer_grounding": [0.90, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.96],
     "calibration_score": [0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.94, 0.95, 0.95, 0.95, 0.96, 0.96],
+    "hr_policy_context_precision": [0.52, 0.54, 0.55, 0.57, 0.58, 0.60, 0.60, 0.61, 0.62, 0.61, 0.60, 0.60, 0.60],
+    # P3 real-LLM eval metrics (mock fallback until the eval-llm-reports workflow
+    # lands real reports). Lexical-judge floors sit near the 0.30 triad gate.
+    "context_relevance": [0.41, 0.43, 0.42, 0.45, 0.47, 0.46, 0.48, 0.49, 0.50, 0.49, 0.48, 0.47, 0.46],
+    "groundedness": [0.55, 0.57, 0.58, 0.60, 0.61, 0.62, 0.63, 0.62, 0.63, 0.64, 0.63, 0.62, 0.61],
+    "answer_relevance": [0.38, 0.40, 0.41, 0.42, 0.44, 0.45, 0.46, 0.45, 0.46, 0.47, 0.46, 0.45, 0.44],
+    "judge_calibration_kappa": [0.62, 0.64, 0.65, 0.67, 0.68, 0.70, 0.71, 0.70, 0.72, 0.73, 0.72, 0.71, 0.70],
+    "ranking_agreement": [0.74, 0.75, 0.76, 0.78, 0.79, 0.80, 0.81, 0.80, 0.81, 0.82, 0.81, 0.80, 0.80],
 }
 _MOCK_WEEKS = 13
 

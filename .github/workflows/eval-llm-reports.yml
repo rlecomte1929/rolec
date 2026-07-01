@@ -1,0 +1,91 @@
+name: Eval LLM reports (report-only)
+
+# [P3] Weekly, report-only run of the real-LLM eval producers (the ones the unit
+# tests only ever exercise in mock/offline mode). It runs the live judges, emits
+# dated dashboard reports into audit/rag_eval/, and uploads them as workflow
+# ARTIFACTS — it never commits back and never gates a PR.
+#
+# Gating: like calibration-monthly / cluster-tiering-refresh, the job only runs
+# when `vars.RLS_COVERAGE_DATABASE_URL_SET == 'true'`, so until the repo secrets
+# are configured the schedule is a safe no-op (never fails on a missing secret).
+# Within the job, the LLM producers are additionally guarded on ANTHROPIC_API_KEY
+# being present, and each tolerates failure (thin corpus / API hiccup) so a
+# report-only run is never red.
+
+on:
+  schedule:
+    # 05:00 UTC every Monday.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: eval-llm-reports
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  eval-llm-reports:
+    name: Run real-LLM eval producers
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # No-op unless the read-only DATABASE_URL secret is configured for the repo.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+      PYTHONPATH: .
+      RELOPASS_QUERY_COUNTER_OFF: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Report key availability
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::warning::ANTHROPIC_API_KEY is not set — skipping the live LLM judges; only the offline producers will run."
+          fi
+
+      - name: Offline producers (no LLM)
+        run: |
+          set -euo pipefail
+          DATE="$(date +%Y%m%d)"
+          mkdir -p audit/rag_eval
+          python -m backend.eval.run_outcome_accuracy --out audit/rag_eval \
+            || echo "::warning::outcome_accuracy producer failed"
+          python backend/scripts/eval_hr_policy_context_precision.py \
+            --out "audit/rag_eval/hr_policy_context_precision_${DATE}.json" \
+            || echo "::warning::hr_policy_context_precision producer failed"
+
+      - name: Live LLM producers (guarded on ANTHROPIC_API_KEY)
+        if: ${{ env.ANTHROPIC_API_KEY != '' }}
+        run: |
+          set -uo pipefail
+          mkdir -p audit/rag_eval
+          python -m backend.eval.run_rag_triad --judge claude \
+            --emit-dashboard --out-dir audit/rag_eval \
+            || echo "::warning::run_rag_triad (claude) failed"
+          python -m backend.eval.run_judge_calibration --judge verifier \
+            --emit-dashboard --out-dir audit/rag_eval \
+            || echo "::warning::run_judge_calibration (verifier) failed"
+          python -m backend.eval.run_ranking_judge --live \
+            --emit-dashboard --out-dir audit/rag_eval \
+            || echo "::warning::run_ranking_judge (live) failed"
+
+      - name: Upload eval reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-llm-reports
+          path: audit/rag_eval/*.json
+          if-no-files-found: warn

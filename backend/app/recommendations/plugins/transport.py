@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from .base import BasePlugin
+from ..weights import derive_segment, get_weights
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "transport.json"
 
@@ -32,7 +33,8 @@ class TransportPlugin(BasePlugin):
     def score(self, criteria: TransportCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         r = item.get("rating", 4.0) * 20.0
         a = {"high": 100, "medium": 75}.get(item.get("availability_level", "high"), 100)
-        return {"score_raw": r * 0.7 + a * 0.3, "breakdown": {"rating": r, "availability": a},
+        w = get_weights("transport", segment=derive_segment(criteria))
+        return {"score_raw": r * w["rating"] + a * w["availability"], "breakdown": {"rating": r, "availability": a},
                 "summary": f"{item.get('name')} — {item.get('rating')}/5.",
                 "rationale": "Driving license conversion and transport support.", "pros": [], "cons": [],
                 "metadata": {"rating": item.get("rating"), "rating_count": item.get("rating_count"),

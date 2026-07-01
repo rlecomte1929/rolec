@@ -22,6 +22,16 @@ RULE_EFFECTIVE_WINDOWS: dict = {
     "EU_DIR_2004_38_ART7:2004": (date(2004, 4, 29), None),
     "EU_DIR_2004_38_ART10:2004": (date(2004, 4, 29), None),
     "NO_EOS_UTLENDINGS:2010": (date(2010, 1, 1), None),
+    # REPRESENTATIVE / synthetic immigration rule versions for the France and
+    # Portugal standard work-permit routes (US_FR, BR_PT corridors). These are
+    # illustrative pointers to the governing statutes — NOT authoritative legal
+    # citations — consistent with the content-provenance model
+    # (verification_status: "representative"). Curate against live law before
+    # treating as authoritative.
+    # France — CESEDA art. L.421-1 ff., "salarié" work/residence permit.
+    "FR_CESEDA_L421:2024": (date(2024, 1, 1), None),
+    # Portugal — Lei n.º 23/2007 art. 88, residence permit for subordinate work.
+    "PT_LEI_23_2007_ART88:2007": (date(2007, 8, 4), None),
 }
 
 

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .explanation import build_explanation
 from .registry import get_plugin
+from .weights import derive_segment
 from . import tiering
 from .types import (
     RecommendationExplanation,
@@ -417,11 +418,16 @@ def recommend_debug(
             "tier": str(s.get("tier", "")),
             "company_preferred": s.get("_company_preferred", False),
             "source": item.get("_source", "static"),
+            # [P2] per-factor breakdown so slate logging captures the feature
+            # vector the score was built from (chosen-vs-shown training signal).
+            "breakdown": s.get("breakdown", {}),
         })
 
     criteria_echo = _sanitize_criteria(criteria)
     return {
         "category": category,
+        # [P2] learned-ranking segment key (matches plugin serve-time derivation).
+        "segment": derive_segment(criteria_obj),
         "criteria_echo": criteria_echo,
         "dataset_count": len(dataset),
         "matching_count": len(matching),
