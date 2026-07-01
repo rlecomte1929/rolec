@@ -15,10 +15,14 @@ interface ServiceCardProps {
   onToggle: () => void;
   /** Optional: normalized published policy summary for this service's wizard category. */
   policyHint?: ServicePolicyHint | null;
+  /** Enabled category that isn't yet usable for this employee's destination (Pets,
+   *  until HR curates ≥1 vendor). Rendered disabled with a "Not available yet" badge. */
+  locked?: boolean;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onToggle, policyHint }) => {
-  const disabled = !item.enabled;
+export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onToggle, policyHint, locked = false }) => {
+  const disabled = !item.enabled || locked;
+  const badge = !item.enabled ? 'Coming soon' : locked ? 'Not available yet' : null;
 
   return (
     <div
@@ -50,9 +54,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onTogg
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium text-[#0b2b43]">{item.title}</span>
-          {disabled && (
+          {badge && (
             <span className="shrink-0 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded-full bg-[#e2e8f0] text-[#6b7280]">
-              Coming soon
+              {badge}
             </span>
           )}
         </div>
