@@ -1,0 +1,78 @@
+{
+  "brandName": "ReloPass",
+  "tagline": "Global moves, intelligently managed.",
+  "logoUrl": "https://storage.googleapis.com/audos-images/attachments/776786/5f4a4002-eb6e-44a9-8cbe-c49e65cbe809.png",
+  "palette": {
+    "text": {
+      "brand": "#ffffff",
+      "muted": "#7f9bad",
+      "accent": "#38c6de",
+      "primary": "#eaf2f8",
+      "onPrimary": "#111827",
+      "secondary": "#a7c2d3",
+      "onContrast": "#062028",
+      "onHighlight": "#062028"
+    },
+    "shell": {
+      "icon": "#38c6de",
+      "shadow": "#071019",
+      "dockText": "#111827",
+      "buttonText": "#111827",
+      "shadowStrong": "#041a26",
+      "accentButtonText": "#062028"
+    },
+    "accent": "#38c6de",
+    "primary": "#2a93e0",
+    "contrast": "#38c6de",
+    "semantic": {
+      "danger": "#dc2626",
+      "success": "#16a34a",
+      "warning": "#d97706"
+    },
+    "surfaces": {
+      "card": "#142430",
+      "page": "#0b1620",
+      "muted": "#0f1c26",
+      "panel": "#172935",
+      "border": "#24384a",
+      "pageAlt": "#0f1e2a",
+      "cardHover": "#1a2e3c",
+      "accentSoft": "#123642",
+      "gradientTo": "#0a2733",
+      "gradientVia": "#10212e",
+      "panelStrong": "#1d3242",
+      "borderStrong": "#33506a",
+      "gradientFrom": "#0b1620"
+    },
+    "highlight": "#38c6de",
+    "secondary": "#38c6de",
+    "primaryScale": {
+      "50": "#e9f4fc",
+      "100": "#d3e9fa",
+      "200": "#a9d3f4",
+      "500": "#3a9ee4",
+      "600": "#2a93e0",
+      "700": "#1f7bc0",
+      "900": "#14568a"
+    },
+    "highlightScale": {
+      "50": "#e8fbfd",
+      "100": "#d1f6fa",
+      "200": "#a6ecf3",
+      "500": "#45cfe4",
+      "600": "#38c6de",
+      "700": "#2aa6bd",
+      "900": "#1d7c8e"
+    }
+  },
+  "typography": {
+    "font": "Inter",
+    "weights": [
+      400,
+      700
+    ],
+    "category": "sans-serif"
+  },
+  "heroVideoUrl": "https://storage.googleapis.com/audos-images/generated-videos/openrouter-l90i9EtMD6gCM1CCicN7-1782744970847.mp4",
+  "businessPlan": "## Business Overview\nReloPass\n\n## Customer Profile\nTarget customers identified from business context\n\n### Pain Points\n- Users come to ReloPass because they need to move employees across borders without losing control of compliance, timelines, vendors, or internal approvals. They are trying to replace scattered spreadsheets and manual follow-ups with a clear, automated relocation journey that keeps every case on track. Their bigger goal is to make global mobility feel predictable, auditable, and manageable—even without a large specialist team.\n\n## Key Problems\n- **Users come to ReloPass because they need to move em**: Users come to ReloPass because they need to move employees across borders without losing control of compliance, timelines, vendors, or internal approvals. They are trying to replace scattered spreadsheets and manual follow-ups with a clear, automated relocation journey that keeps every case on track. Their bigger goal is to make global mobility feel predictable, auditable, and manageable—even without a large specialist team.\n\n## Customer Journey\n## 1. USER GOALS\n\nUsers come to ReloPass because they need to move employees across borders without losing control of compliance, timelines, vendors, or internal approvals. They are trying to replace scattered spreadsheets and manual follow-ups with a clear, automated relocation journey that keeps every case on track. Their bigger goal is to make global mobility feel predictable, auditable, and manageable—even without a large specialist team.\n\n---\n\n## 2. QUALIFYING QUESTIONS\n\n**What type of relocation support do you need right now?**  \n1. Plan a new employee relocation  \n2. Track active relocation cases  \n3. Review compliance, policy, or process risks  \n\n**How mature is your current global mobility process?**  \n1. Mostly manual spreadsheets and email  \n2. Some tools, but fragmented across vendors  \n3. Structured process, looking to automate and scale  \n\n---\n\n## 3. JOURNEY NARRATIVE\n\nA typical ReloPass journey starts when an HR or global mobility manager needs clarity on a relocation: who is moving, from where to where, when, under what policy, and with which compliance requirements. The AI agent should begin by understanding the user’s immediate need—planning a new move, checking progress, or reducing risk across existing cases.\n\nFor a new relocation, the agent gathers the employee profile, origin and destination countries, role details, timing, dependents, and company policy preferences. It then helps generate a tailored relocation roadmap with key steps, deadlines, required documents, vendor touchpoints, and compliance checkpoints. For active cases, the agent shifts into command-center mode, surfacing delays, missing information, upcoming deadlines, and recommended next actions.\n\nOver time, the agent learns how the company handles different relocation types, which vendors are used, where delays commonly happen, and which policy decisions recur. This allows it to become more proactive—flagging risks earlier, suggesting policy defaults, reminding teams before bottlenecks occur, and helping HR managers run mobility operations with confidence instead of constant manual oversight.\n\n---\n\n## 4. APP SUPPORT MAP\n\nCreation tools are most useful when the user is starting a new relocation and needs a personalized roadmap, policy decision, checklist, or employee-facing plan. Tracking tools should be recommended when users are managing multiple open cases, deadlines, vendors, or document requirements. Automation becomes most valuable once the user has repeated relocation patterns and wants ReloPass to trigger reminders, approvals, compliance checks, and vendor handoffs without manual coordination.\n\n---\n\n## 5. COMMUNITY OPPORTUNITIES\n\nUsers would benefit from anonymized benchmarks showing how other SMEs handle similar relocations, such as typical timelines, common compliance risks, vendor performance, and policy norms by country pair. ReloPass could harness shared customer experience by turning aggregated case data into practical guidance: “Companies like yours usually start this visa step 60 days earlier” or “This destination often requires extra tax review.”\n\n---\n\n## 6. MONETIZATION HOOK\n\nThe first payment moment should happen when ReloPass turns a messy, high-stakes relocation into a clear, personalized roadmap that exposes risks the user may have missed. The “aha” moment is not simply seeing a dashboard—it is realizing, “This would have taken my team days, and it just found the next steps, deadlines, and compliance gaps in minutes.”\n\nThe free experience should let users create a limited relocation assessment or sample roadmap so they can see the quality of the guidance. The paid boundary should begin when they want to activate the roadmap, track live cases, assign tasks, store documents, automate reminders, or manage multiple employees from the command center.\n\nThe first payment is triggered by confidence and urgency: a real employee move is coming up, and the user needs to avoid mistakes. Ongoing subscription value comes from operational control month after month—case tracking, automated compliance alerts, policy consistency, vendor coordination, audit readiness, and visibility across the entire mobility program. Right before upgrading, the user should see a concrete risk, deadline, or manual workload that ReloPass can immediately resolve.\n\n## AI Tool Suite\n### Move Roadmaps\n**Purpose**: Generate a personalized step-by-step relocation roadmap for each employee move, including policy decisions, deadlines, vendors, documents, immigration, tax, and compliance checkpoints.\n**User Story**: As an HR manager, I want to enter an employee’s relocation details and instantly receive a compliant roadmap so I do not have to build one from spreadsheets and emails.\n\n### Case Command\n**Purpose**: Track active relocation cases from one dashboard so HR teams can manage deadlines, vendors, documents, approvals, and compliance risks without manual follow-ups.\n**User Story**: As a global mobility manager, I want one command center for active relocations so I can spot delays and keep every case moving without chasing spreadsheets.\n\n---\n*Generated on 6/29/2026*\n"
+}
