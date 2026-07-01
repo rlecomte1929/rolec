@@ -14,6 +14,8 @@ from .routers import (
     admin_ocr_shadow,
     admin_work_items,
     admin_prompts,
+    admin_leads,
+    lead_capture,
     admin_source_change_review,
     advisors,
     ai_decisions,
@@ -207,6 +209,8 @@ def create_app() -> FastAPI:
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
+    app.include_router(admin_leads.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD
+    app.include_router(lead_capture.router)  # [audos-P1] public lead-capture — NO prefix (path baked into route)
     app.include_router(relocation_routes.router)
     app.include_router(relocation_routes.api_router)
     app.include_router(relocation_classify_routes.router)
