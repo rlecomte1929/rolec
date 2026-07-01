@@ -44,7 +44,7 @@ export function emitMarketingEvent(event: string, properties?: Record<string, un
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event, properties: properties || {} }),
       keepalive: true,
-    });
+    }).catch(() => {});
   } catch {
     /* best-effort */
   }
