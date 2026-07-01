@@ -8,6 +8,10 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+        // Brand mono (DESIGN.md). Self-hosted via @fontsource/jetbrains-mono in
+        // main.tsx — without this `mono` key, `font-mono` fell back to the default
+        // ui-monospace stack and JetBrains Mono never rendered.
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       colors: {
         marketing: {

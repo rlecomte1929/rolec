@@ -16,8 +16,9 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from ..auth_deps import get_current_user
+from ..auth_deps import get_current_user, require_case_access
 from ..services import immigration_answer_engine, immigration_retriever
+from ..services.immigration_answer_context import build_applicant_context
 from ..services.immigration_source_reconciler import reconcile
 from ..services.immigration_retriever import (
     PathClassification,
@@ -82,6 +83,9 @@ class ImmigrationAnswerBody(BaseModel):
     is_eea: Optional[bool] = None
     query: str
     top_k: int = 8
+    # Slice 3: when present, the answer is tailored to this case's anonymised
+    # applicant context (family situation). Ownership is verified before use.
+    case_id: Optional[str] = None
 
 
 @router.post("/answer")
@@ -96,6 +100,17 @@ def answer_immigration_question(
     sourced ONLY from them. Zero chunks -> refusal_insufficient_context at HTTP
     200 (no LLM call). Every response carries a trace_id.
     """
+    # Slice 3: tailor the answer to the applicant's case context — but only after
+    # verifying the caller owns this case (no cross-case context leak). Best-effort:
+    # a context failure must never block the answer.
+    applicant_context = None
+    if body.case_id:
+        require_case_access(body.case_id, user)
+        try:
+            applicant_context = build_applicant_context(body.case_id)
+        except Exception:
+            applicant_context = None
+
     corridor, profile, classification = _profile_and_classification(body)
     # N9/AIQ-849: multi-source triangulation. Retrieve official (tier-1) and
     # all-tier sets, reconcile by cross-tier embedding agreement, then generate
@@ -117,4 +132,6 @@ def answer_immigration_question(
         "all_stale_warning": all_stale,
         "oldest_fetched_at": min(fetched) if fetched else None,
     }
-    return immigration_answer_engine.generate_immigration_answer(payload, body.query, corridor)
+    return immigration_answer_engine.generate_immigration_answer(
+        payload, body.query, corridor, applicant_context=applicant_context
+    )
