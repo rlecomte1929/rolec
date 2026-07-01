@@ -107,7 +107,7 @@ def post_recommendations_batch(
     if not selected_keys:
         services = db.list_case_services(assignment["id"])
         selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
-    valid_svc = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+    valid_svc = {"housing", "schools", "movers", "banks", "insurances", "electricity", "pets"}
     selected_keys = [k for k in selected_keys if k in valid_svc]
 
     if not selected_keys:

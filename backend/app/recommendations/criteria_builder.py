@@ -25,6 +25,7 @@ SERVICE_KEY_TO_BACKEND: Dict[str, str] = {
     "banks": "banks",
     "insurances": "insurance",
     "electricity": "electricity",
+    "pets": "pets",
 }
 
 
