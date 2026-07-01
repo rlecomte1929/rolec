@@ -53,12 +53,17 @@ CREATE TABLE IF NOT EXISTS policy_answer_helpfulness (
   created_at TEXT
 );
 CREATE TABLE IF NOT EXISTS feedback_status (
-  stream TEXT NOT NULL,
-  source_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'new',
-  owner TEXT,
-  resolution TEXT,
-  updated_at TEXT,
+  stream          TEXT NOT NULL,
+  source_id       TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'new',
+  owner           TEXT,
+  resolution      TEXT,
+  updated_at      TEXT,
+  severity        TEXT,
+  area            TEXT,
+  reporter_id     TEXT,
+  dispatch_ref    TEXT,
+  dispatch_status TEXT,
   PRIMARY KEY (stream, source_id)
 );
 CREATE TABLE IF NOT EXISTS audit_logs (

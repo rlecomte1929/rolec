@@ -1,4 +1,4 @@
-import { apiPost } from './client';
+import { apiGet, apiPost } from './client';
 
 /**
  * Product "Share feedback" widget submission. Routes through the FastAPI backend
@@ -19,4 +19,24 @@ export async function submitProductFeedback(
   input: ProductFeedbackInput,
 ): Promise<{ ok: boolean; report_id: string }> {
   return apiPost<{ ok: boolean; report_id: string }>('/api/feedback', input);
+}
+
+/** One row returned by GET /api/feedback/mine */
+export interface MyReport {
+  report_id: string;
+  category: string;
+  message_excerpt: string;
+  status: string | null;
+  severity: string | null;
+  area: string | null;
+  dispatch_status: string | null;
+  created_at: string;
+}
+
+/**
+ * Fetch the authenticated user's own submitted reports.
+ * GET /api/feedback/mine → { reports: MyReport[] }
+ */
+export async function getMyReports(): Promise<{ reports: MyReport[] }> {
+  return apiGet<{ reports: MyReport[] }>('/api/feedback/mine');
 }

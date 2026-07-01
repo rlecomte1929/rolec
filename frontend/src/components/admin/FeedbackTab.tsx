@@ -3,19 +3,23 @@
  *
  * Reads from /api/admin/feedback (normalized UNION of product/ai_answers/helpfulness).
  * Triage (status/owner/resolution) goes through PATCH — never mutates ML source tables.
+ * Dispatch goes through POST /dispatch — high-risk tickets require an explicit in-UI confirm.
  */
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '../antigravity/Button';
+import { Badge } from '../antigravity/Badge';
 import {
   listFeedback,
   triageFeedback,
+  dispatchTicket,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
 } from '../../api/adminFeedback';
 
 type FilterStatus = TriageStatus | 'all';
+type ActiveMode = FeedbackStream | 'all' | 'dispatched';
 
 const STATUS_CHIP: Record<TriageStatus, string> = {
   new:      'bg-blue-100 text-blue-700 border-blue-200',
@@ -57,22 +61,37 @@ function fmtDate(iso: string): string {
 
 const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness'];
 
+/** A ticket is high-risk if severity is critical OR area is isolation. */
+function isHighRisk(row: UnifiedFeedbackItem): boolean {
+  return row.severity === 'critical' || row.area === 'isolation';
+}
+
 export function FeedbackTab() {
   const [rows, setRows]                   = useState<UnifiedFeedbackItem[]>([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
-  const [activeStream, setActiveStream]   = useState<FeedbackStream | 'all'>('all');
+  const [activeStream, setActiveStream]   = useState<ActiveMode>('all');
   const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all');
   const [savingId, setSavingId]           = useState<string | null>(null);
   const [expanded, setExpanded]           = useState<string | null>(null);
+
+  // Dispatch state
+  const [pendingConfirmId, setPendingConfirmId] = useState<string | null>(null);
+  const [dispatchingId, setDispatchingId]       = useState<string | null>(null);
+  const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const items = await listFeedback(
-        activeStream !== 'all' ? { stream: activeStream } : undefined
-      );
+      let items: UnifiedFeedbackItem[];
+      if (activeStream === 'dispatched') {
+        items = await listFeedback({ dispatched: true });
+      } else {
+        items = await listFeedback(
+          activeStream !== 'all' ? { stream: activeStream } : undefined
+        );
+      }
       setRows(items);
     } catch {
       setError('Failed to load feedback.');
@@ -94,8 +113,40 @@ export function FeedbackTab() {
     setSavingId(null);
   };
 
+  /** Execute the dispatch API call for a given row. */
+  const doDispatch = useCallback(async (row: UnifiedFeedbackItem, confirm?: true) => {
+    setDispatchingId(row.id);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      if (confirm) {
+        await dispatchTicket(row.stream, row.id, true);
+      } else {
+        await dispatchTicket(row.stream, row.id);
+      }
+      setRows((prev) =>
+        prev.map((r) => r.id === row.id ? { ...r, dispatch_status: 'dispatched' } : r)
+      );
+      setPendingConfirmId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Dispatch failed';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setDispatchingId(null);
+    }
+  }, []);
+
+  /** Called when the Dispatch button is clicked. */
+  const handleDispatchClick = (e: React.MouseEvent, row: UnifiedFeedbackItem) => {
+    e.stopPropagation();
+    if (isHighRisk(row)) {
+      setPendingConfirmId(row.id);
+    } else {
+      void doDispatch(row);
+    }
+  };
+
   const displayed = rows.filter((r) => {
-    if (filterStatus !== 'all' && r.status !== filterStatus) return false;
+    if (activeStream !== 'dispatched' && filterStatus !== 'all' && r.status !== filterStatus) return false;
     return true;
   });
 
@@ -127,7 +178,7 @@ export function FeedbackTab() {
     <div className="space-y-4">
       {/* Stream tabs */}
       <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5 bg-gray-50 w-fit">
-        {(['all', ...STREAMS] as const).map((s) => (
+        {(['all', ...STREAMS, 'dispatched'] as ActiveMode[]).map((s) => (
           <Button
             unstyled
             key={s}
@@ -138,11 +189,108 @@ export function FeedbackTab() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {s === 'all' ? 'All streams' : STREAM_LABEL[s]}
+            {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s as FeedbackStream]}
           </Button>
         ))}
       </div>
 
+      {/* ── Dispatched view ── */}
+      {activeStream === 'dispatched' && (
+        <>
+          <div className="flex justify-end">
+            <Button unstyled onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
+              Refresh
+            </Button>
+          </div>
+
+          {displayed.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center rounded-lg border border-gray-200 bg-white">
+              <p className="text-sm font-medium text-gray-600">No dispatched tickets</p>
+              <p className="text-xs text-gray-400 mt-1">Dispatched tickets will appear here once tickets are routed to engineering.</p>
+            </div>
+          )}
+
+          {displayed.length > 0 && (
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="grid grid-cols-[110px_140px_140px_110px_100px_100px_120px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                <div className="px-3 py-2.5">Source ref</div>
+                <div className="px-3 py-2.5">Stream</div>
+                <div className="px-3 py-2.5">Dispatch ref</div>
+                <div className="px-3 py-2.5">Dispatch status</div>
+                <div className="px-3 py-2.5">Severity</div>
+                <div className="px-3 py-2.5">Area</div>
+                <div className="px-3 py-2.5">Date</div>
+              </div>
+              <div className="divide-y divide-gray-100 bg-white">
+                {displayed.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-[110px_140px_140px_110px_100px_100px_120px] items-center py-2.5"
+                  >
+                    <div className="px-3">
+                      <span className="font-mono text-[10.5px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {(row.source_ref ?? row.id).slice(0, 10)}
+                      </span>
+                    </div>
+                    <div className="px-3">
+                      <span className="text-[11px] font-medium text-gray-600">
+                        {STREAM_LABEL[row.stream]}
+                      </span>
+                    </div>
+                    <div className="px-3">
+                      {row.dispatch_ref ? (
+                        <span className="font-mono text-[10.5px] text-[#0b2b43] bg-blue-50 px-1.5 py-0.5 rounded">
+                          {row.dispatch_ref}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">—</span>
+                      )}
+                    </div>
+                    <div className="px-3">
+                      <Badge variant="success" size="sm">
+                        {row.dispatch_status ?? 'dispatched'}
+                      </Badge>
+                    </div>
+                    <div className="px-3">
+                      {row.severity ? (
+                        <Badge
+                          variant={row.severity === 'critical' ? 'error' : 'neutral'}
+                          size="sm"
+                        >
+                          {row.severity}
+                        </Badge>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">—</span>
+                      )}
+                    </div>
+                    <div className="px-3">
+                      {row.area ? (
+                        <Badge
+                          variant={row.area === 'isolation' ? 'error' : 'info'}
+                          size="sm"
+                        >
+                          {row.area}
+                        </Badge>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">—</span>
+                      )}
+                    </div>
+                    <div className="px-3">
+                      <span className="text-[11px] text-gray-400" title={fmtDate(row.created_at)}>
+                        {fmtRelative(row.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Normal (non-dispatched) view ── */}
+      {activeStream !== 'dispatched' && (
+        <>
       {/* Summary bar */}
       <div className="grid grid-cols-4 gap-3">
         {([
@@ -193,26 +341,34 @@ export function FeedbackTab() {
           <p className="text-xs text-gray-400 mt-1">Try a different stream or status filter.</p>
         </div>
       )}
+        </>
+      )}
 
-      {/* Table */}
-      {displayed.length > 0 && (
+      {/* Table — normal (non-dispatched) mode */}
+      {activeStream !== 'dispatched' && displayed.length > 0 && (
         <div className="rounded-lg border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-[100px_110px_1fr_120px_120px_140px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[100px_110px_1fr_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
             <div className="px-3 py-2.5">ID</div>
             <div className="px-3 py-2.5">Stream</div>
             <div className="px-3 py-2.5">Text</div>
+            <div className="px-3 py-2.5">Tags</div>
             <div className="px-3 py-2.5">Verdict</div>
             <div className="px-3 py-2.5">Date</div>
             <div className="px-3 py-2.5">Status</div>
+            <div className="px-3 py-2.5">Dispatch</div>
           </div>
           <div className="divide-y divide-gray-100 bg-white">
             {displayed.map((row) => {
               const isExpanded = expanded === row.id;
               const effectiveStatus: TriageStatus = row.status ?? 'new';
+              const isPendingConfirm = pendingConfirmId === row.id;
+              const isDispatching = dispatchingId === row.id;
+              const dispatchErr = dispatchErrors[row.id];
+              const alreadyDispatched = row.dispatch_status === 'dispatched';
               return (
                 <div key={row.id}>
                   <div
-                    className="grid grid-cols-[100px_110px_1fr_120px_120px_140px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="grid grid-cols-[100px_110px_1fr_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => setExpanded(isExpanded ? null : row.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -237,6 +393,25 @@ export function FeedbackTab() {
                     <div className="px-3 py-2.5">
                       <p className="text-[12px] text-gray-700 truncate">{row.text ?? '—'}</p>
                     </div>
+                    {/* Tags: severity + area badges */}
+                    <div className="px-3 py-2.5 flex flex-wrap gap-1">
+                      {row.severity && (
+                        <Badge
+                          variant={row.severity === 'critical' ? 'error' : 'neutral'}
+                          size="sm"
+                        >
+                          {row.severity}
+                        </Badge>
+                      )}
+                      {row.area && (
+                        <Badge
+                          variant={row.area === 'isolation' ? 'error' : 'info'}
+                          size="sm"
+                        >
+                          {row.area}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="px-3 py-2.5">
                       <span className="text-[11px] text-gray-500">{row.verdict ?? '—'}</span>
                     </div>
@@ -258,7 +433,54 @@ export function FeedbackTab() {
                         ))}
                       </select>
                     </div>
+                    {/* Dispatch column */}
+                    <div className="px-3 py-2.5">
+                      {alreadyDispatched ? (
+                        <Badge variant="success" size="sm">dispatched</Badge>
+                      ) : (
+                        <Button
+                          unstyled
+                          disabled={isDispatching}
+                          onClick={(e) => handleDispatchClick(e, row)}
+                          className="text-[11px] font-medium px-2 py-0.5 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-50"
+                        >
+                          {isDispatching ? '…' : 'Dispatch'}
+                        </Button>
+                      )}
+                      {dispatchErr && (
+                        <p className="text-[10px] text-red-600 mt-0.5">{dispatchErr}</p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* High-risk confirm dialog — inline below the row */}
+                  {isPendingConfirm && (
+                    <div className="bg-red-50 border-t border-red-200 px-4 py-3 space-y-2">
+                      <p className="text-[12px] font-semibold text-red-800">
+                        Confirm dispatch — this ticket is high-risk
+                        {row.severity === 'critical' && ' (critical severity)'}
+                        {row.area === 'isolation' && ' (isolation area)'}
+                        . Are you sure?
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          unstyled
+                          disabled={isDispatching}
+                          onClick={() => void doDispatch(row, true)}
+                          className="text-[11px] font-medium px-3 py-1 rounded bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
+                        >
+                          I understand — dispatch
+                        </Button>
+                        <Button
+                          unstyled
+                          onClick={() => setPendingConfirmId(null)}
+                          className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {isExpanded && (
                     <div className="bg-gray-50 border-t border-gray-100 px-4 py-4 space-y-2">
