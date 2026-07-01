@@ -38,7 +38,9 @@ export interface ImmigrationCaseContext {
   label?: string;
 }
 
-export function ImmigrationAnswerPanel({ caseContext }: { caseContext?: ImmigrationCaseContext } = {}) {
+export function ImmigrationAnswerPanel(
+  { caseId, caseContext }: { caseId?: string | null; caseContext?: ImmigrationCaseContext } = {},
+) {
   const [from, setFrom] = useState(caseContext?.from ?? '');
   const [to, setTo] = useState(caseContext?.to ?? '');
   const [nationality, setNationality] = useState(caseContext?.nationality ?? '');
@@ -71,6 +73,7 @@ export function ImmigrationAnswerPanel({ caseContext }: { caseContext?: Immigrat
         nationality: nationality.trim().toUpperCase(),
         permit_type: permitType.trim(),
         query: query.trim(),
+        ...(caseId ? { case_id: caseId } : {}),
       });
       setAnswer(res);
     } catch {

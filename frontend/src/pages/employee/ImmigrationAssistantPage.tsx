@@ -15,10 +15,11 @@ import { servicesAPI } from '../../api/client';
  *
  * Slice 2: opens with a proactive "your move at a glance" panel (risk flags +
  * checklist) for the employee's own case, above the grounded Q&A.
- * Relocation-assistant MVP: resolve the employee's corridor from THEIR case (via the
- * services context) so the assistant pre-fills "your IN → DE move" instead of making
- * them hand-type From/To. Best-effort — if there's no assignment/corridor, the panel
- * falls back to the manual form.
+ * Slice 3: passes the employee's own case id so answers are tailored to their
+ * anonymised applicant context (family situation) — ownership verified server-side.
+ * MVP: resolve the employee's corridor from THEIR case (via the services context) so
+ * the assistant pre-fills "your IN → DE move" instead of hand-typing From/To.
+ * Best-effort — if there's no assignment/corridor, the panel falls back to the manual form.
  */
 export const ImmigrationAssistantPage: React.FC = () => {
   const { primaryCaseId, assignmentId } = useEmployeeAssignment();
@@ -55,7 +56,7 @@ export const ImmigrationAssistantPage: React.FC = () => {
       <Container maxWidth="xl" className="py-8 space-y-4">
         <MoveAtAGlance caseId={primaryCaseId} />
         {resolved ? (
-          <ImmigrationAnswerPanel caseContext={caseContext} />
+          <ImmigrationAnswerPanel caseId={primaryCaseId} caseContext={caseContext} />
         ) : (
           <p className="text-sm text-slate-400">Loading your move details…</p>
         )}
