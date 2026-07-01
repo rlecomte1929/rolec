@@ -22,6 +22,7 @@ from sqlalchemy.exc import ProgrammingError
 from ..auth_deps import require_admin
 from ..services.autofix_dispatch import dispatch_autofix
 from ..services.work_item_ingest import build_work_items
+from ..services.work_item_planner import build_plan
 from ..services.work_item_triage import classify_demand
 from ...database import db
 
@@ -95,7 +96,7 @@ def list_work_items(
     sql = text(
         f"""
         SELECT id, source, source_url, kind, title, body, reporter_role, company_id,
-               status, priority, complexity, auto_fixable, triage_json, dedupe_key,
+               status, priority, complexity, auto_fixable, triage_json, plan_json, dedupe_key,
                pr_url, created_at
         FROM public.work_items
         WHERE (:status IS NULL OR status = :status)
@@ -292,3 +293,56 @@ def run_callback(item_id: str, body: CallbackBody, request: Request) -> Dict[str
                 {"s": item_status, "pr": body.pr_url, "id": item_id},
             )
     return {"ok": True}
+
+
+# ── P3: planner — draft a structured plan for a demand, then human-approve ────
+
+
+def _as_dict(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return {}
+    return {}
+
+
+@router.post("/{item_id}/plan")
+def plan_work_item(item_id: str, _admin: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    """Draft a structured plan for the demand (LLM, PII-masked). Human reviews next."""
+    with db.engine.begin() as conn:
+        item = conn.execute(
+            text("SELECT title, body, triage_json FROM public.work_items WHERE id = :id"), {"id": item_id}
+        ).mappings().first()
+        if item is None:
+            raise HTTPException(status_code=404, detail="work item not found")
+        plan = build_plan(item["title"] or "", item["body"] or "", _as_dict(item["triage_json"]))
+        conn.execute(
+            text(
+                """UPDATE public.work_items
+                   SET plan_json = CAST(:plan AS jsonb), status = 'planned', updated_at = now()
+                   WHERE id = :id"""
+            ),
+            {"plan": json.dumps(plan), "id": item_id},
+        )
+    return {"ok": True, "plan": plan}
+
+
+@router.post("/{item_id}/plan/approve")
+def approve_plan(item_id: str, _admin: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    """Mark the drafted plan approved (gates future agent dispatch)."""
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT plan_json FROM public.work_items WHERE id = :id"), {"id": item_id}
+        ).mappings().first()
+        if row is None or row["plan_json"] is None:
+            raise HTTPException(status_code=409, detail="no plan to approve — generate one first")
+        plan = _as_dict(row["plan_json"])
+        plan["approved"] = True
+        conn.execute(
+            text("UPDATE public.work_items SET plan_json = CAST(:plan AS jsonb), updated_at = now() WHERE id = :id"),
+            {"plan": json.dumps(plan), "id": item_id},
+        )
+    return {"ok": True, "approved": True}
