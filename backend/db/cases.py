@@ -1173,7 +1173,7 @@ class CasesMixin:
                     "assignment_id": assignment_id,
                     "service_key": item.get("service_key"),
                     "category": item.get("category"),
-                    "selected": 1 if item.get("selected", True) else 0,
+                    "selected": bool(item.get("selected", True)),
                     "estimated_cost": item.get("estimated_cost"),
                     "currency": item.get("currency") or "EUR",
                     "created_at": now,
