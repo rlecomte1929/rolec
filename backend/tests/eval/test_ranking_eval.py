@@ -67,13 +67,22 @@ def test_aggregate_means():
     assert aggregate([]) == {"ndcg": 0.0, "mrr": 0.0, "precision": 0.0}
 
 
-def test_seeded_fixtures_exist_and_are_attribute_derived():
+# Statuses that confirm gold is independently derived (not seeded from engine output).
+# "attribute_derived" = AI-drafted from supplier attributes.
+# "verified"          = attribute_derived + human endorsement.
+# Both are non-vacuous; anything else (missing, "engine_seeded", etc.) must fail.
+_VALID_NON_VACUOUS_STATUSES = {"attribute_derived", "verified"}
+
+
+def test_seeded_fixtures_exist_and_are_non_vacuous():
     """Golden rankings must use independently-derived gold, not engine output."""
     with DEFAULT_FIXTURES.open(encoding="utf-8") as f:
         data = json.load(f)
-    # "attribute_derived" confirms the gold was derived from supplier attributes,
-    # not seeded from engine output (which would make the gate vacuous).
-    assert data["_meta"]["verification_status"] == "attribute_derived"
+    status = data["_meta"].get("verification_status", "")
+    assert status in _VALID_NON_VACUOUS_STATUSES, (
+        f"verification_status={status!r} is missing or vacuous; "
+        f"must be one of {_VALID_NON_VACUOUS_STATUSES}"
+    )
     assert len(data["cases"]) >= 3
 
 

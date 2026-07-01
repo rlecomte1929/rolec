@@ -1,9 +1,10 @@
 {
   "_meta": {
     "description": "Golden supplier rankings per (category,corridor) for the offline ranking eval (NDCG@k / MRR / precision@k). ideal_order + graded relevance are the accepted ordering; the eval scores engine output against these.",
-    "verification_status": "attribute_derived",
+    "verification_status": "verified",
+    "reviewed_by": "romain 2026-07-01",
     "k": 5,
-    "note": "Independent gold derived from supplier attributes, NOT copied from engine output (see audit/admin/36-ranking-gold-worksheet.md). Banks: criteria-driven — fee_sensitivity=low reduces fee-tier penalties, expat/digital priority=9 upweights those axes, branch_need=medium penalizes zero-branch banks. Movers: service_areas destination-city coverage is the primary differentiator for SG→Tokyo; non-international movers grade 0. Insurance: expat_specialized field added to insurance.json (Cigna/Allianz/Bupa/GeoBlue = true, basis: global expat network, dedicated international health division); others false — wire gives 2.5-pt bonus breaking cluster ties. Insurance was previously non-fixable without the new field (8/10 within 1.2 raw pts); adding expat_specialized is the fix."
+    "note": "Independent gold derived from supplier attributes, NOT copied from engine output (see audit/admin/36-ranking-gold-worksheet.md). Romain endorsed the central judgments on 2026-07-01: Banks — branch_need=medium demotes pure-digital banks (Wise/Revolut), Citibank (b-4) is the top pick; Insurance — expat_specialized tier separates Cigna/Allianz/Bupa/GeoBlue from generalists; Movers (international SG→Tokyo) — exact-city match priority, non-international movers hard-floored to grade 0. No ideal_order or relevance grades were changed during promotion. Case 4 (movers SG-SG domestic) is attribute_derived / deferred: local SG specialists (m-3/m-7/m-10) grade 3 because domestic move does NOT justify high-cost international movers; hard-floor does NOT apply (move_type=domestic)."
   },
   "cases": [
     {
@@ -119,6 +120,48 @@
         "m-5": 0,
         "m-7": 0,
         "m-10": 0
+      }
+    },
+    {
+      "category": "movers",
+      "corridor": "SG-SG",
+      "_meta_case_status": "attribute_derived",
+      "_meta_case_note": "Domestic path — hard-floor does NOT apply (move_type=domestic). Local SG specialists (m-3/m-7/m-10) grade 3: exact-fit or ample capacity, low-to-medium cost, high availability. m-5 grade 2 (slightly under capacity, 12m3 vs 15m3 est). Medium-cost international movers (m-8/m-6) grade 2: capable but overkill. High-cost international (m-1/m-2) grade 1. High-cost+low-availability (m-9/m-4) grade 0. Grades derived from supplier attributes independently; NOT copied from engine output.",
+      "criteria": {
+        "destination_country": "SG",
+        "origin_city": "Singapore",
+        "destination_city": "Singapore",
+        "move_type": "domestic",
+        "current_accommodation": {
+          "type": "studio",
+          "bedrooms": 1,
+          "sqm": 40
+        },
+        "people": 1
+      },
+      "ideal_order": [
+        "m-3",
+        "m-7",
+        "m-10",
+        "m-5",
+        "m-8",
+        "m-6",
+        "m-2",
+        "m-1",
+        "m-9",
+        "m-4"
+      ],
+      "relevance": {
+        "m-3": 3,
+        "m-7": 3,
+        "m-10": 3,
+        "m-5": 2,
+        "m-8": 2,
+        "m-6": 2,
+        "m-2": 1,
+        "m-1": 1,
+        "m-9": 0,
+        "m-4": 0
       }
     }
   ]
