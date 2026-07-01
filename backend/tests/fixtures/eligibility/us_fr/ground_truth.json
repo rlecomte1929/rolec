@@ -9,7 +9,8 @@
     "nationality": "American",
     "origin_country": "United States",
     "destination_country": "France",
-    "contract_type": "lta"
+    "contract_type": "lta",
+    "intra_group_transfer": true
   },
   "eligibility_verdict": {
     "outcome_set": ["ELIGIBLE_WORK_PERMIT"],

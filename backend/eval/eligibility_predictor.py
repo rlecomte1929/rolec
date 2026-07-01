@@ -33,6 +33,7 @@ _REGIME_OUTCOME: Dict[str, str] = {
     "japan_coe": "ELIGIBLE_JAPAN_COE",
     "uk_skilled_worker": "ELIGIBLE_UK_SKILLED_WORKER",
     "eu_free_movement": "ELIGIBLE_EU_FREE_MOVEMENT",
+    "blue_card": "ELIGIBLE_BLUE_CARD",
     "standard_work_permit": "ELIGIBLE_WORK_PERMIT",
     "domestic": "NO_IMMIGRATION_REQUIRED",
     "unknown": "INDETERMINATE",
@@ -50,6 +51,11 @@ def _citations_for(regime_id: str, destination_norm: str) -> List[str]:
         cites = ["EU_DIR_2004_38_ART7:2004"]  # Free Movement Directive, Art. 7 (residence > 3 months)
         if destination_norm in {"norway", "no"}:
             cites.append("NO_EOS_UTLENDINGS:2010")  # Norway EEA residence regulations
+        return cites
+    if regime_id == "blue_card":
+        cites = ["EU_DIR_2021_1883"]  # EU Blue Card Directive (recast)
+        if destination_norm in {"germany", "de"}:
+            cites.append("DE_AUFENTHG_18G:2026")  # AufenthG §18g — EU Blue Card (DE)
         return cites
     if regime_id == "standard_work_permit":
         if destination_norm in {"germany", "de"}:
@@ -73,6 +79,7 @@ def predict_eligibility(ground_truth: Dict[str, Any]) -> Dict[str, Any]:
         destination_country=profile.get("destination_country"),
         origin_country=profile.get("origin_country"),
         contract_type=profile.get("contract_type"),
+        intra_group_transfer=bool(profile.get("intra_group_transfer")),
     )
     destination_norm = (profile.get("destination_country") or "").strip().lower()
     outcome = _REGIME_OUTCOME.get(result.regime_id, "INDETERMINATE")
