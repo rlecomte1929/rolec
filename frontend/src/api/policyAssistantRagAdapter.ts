@@ -30,6 +30,9 @@ export interface RagQueryResponse {
   model?: string | null;
   cost_usd?: number | null;
   audit_id?: string | null;
+  /** Primary key of the policy_assistant_traces row. Used by the end-user
+   *  helpfulness control (POST /api/policy-assistant/helpfulness). */
+  trace_session_id?: string | null;
 }
 
 /**
@@ -123,6 +126,7 @@ export function ragResponseToEmployeeResponse(
     ok: true,
     assignment_id: assignmentId,
     request_id: rag.audit_id ?? null,
+    trace_session_id: rag.trace_session_id ?? null,
     answer: ragResponseToAnswer(rag, 'employee'),
   };
 }

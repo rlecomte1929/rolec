@@ -24,6 +24,7 @@ import { ArrowRight, Download, Loader2, MessageSquare, RefreshCcw } from 'lucide
 import { Button } from '../../components/antigravity/Button';
 import { employeeAPI } from '../../api/client';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
+import { AnswerFeedback } from '../policy-assistant/AnswerFeedback';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -52,6 +53,8 @@ export interface AssistantTurn {
   id: string;
   question: string;
   answer: PolicyAssistantAnswer;
+  /** Trace row id for the end-user helpfulness vote. Null when not available. */
+  traceSessionId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +191,9 @@ export function ResponseCard({ turn }: ResponseCardProps) {
           <MessageSquare className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
           Discuss with HR →
         </a>
+
+        {/* End-user helpfulness vote */}
+        <AnswerFeedback traceSessionId={turn.traceSessionId} />
       </div>
     </article>
   );
@@ -231,6 +237,7 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
             id: newTurnId(),
             question: question.trim(),
             answer: res.answer,
+            traceSessionId: res.trace_session_id ?? null,
           },
           ...prev,
         ]);

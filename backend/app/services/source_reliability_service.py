@@ -42,6 +42,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from .. import db as _db
+from .admin_audit import record_admin_event
+from .platform_settings import get_setting
 from .source_reliability_config import (
     LOW_SAMPLE_THRESHOLD as _LOW_SAMPLE_THRESHOLD,
     NEUTRAL_RELIABILITY as _NEUTRAL_SCORE,
@@ -109,11 +111,33 @@ def recompute_reliability_scores(
     """
     Recompute reliability_score / citation_count / rejection_count for every
     immigration_corpus_chunks row from the current feedback + trace data, and
-    write them back. Full recompute (idempotent). Returns a summary dict.
+    write them back (unless gated off). Full recompute (idempotent). Returns a
+    summary dict.
+
+    Gate: ``get_setting("source_reliability_autoapply", default="1")``
+      - ``"1"`` (default): apply as before — scores are written to the DB.
+      - ``"0"``:           propose-only — deltas are computed but NOT persisted;
+                           a ``source_reliability_proposed`` audit event is emitted
+                           instead so an admin can inspect the would-be changes.
+    The gate lookup is best-effort: any failure falls back to ``"1"`` (auto-apply)
+    so the nightly cron is never silently broken by a missing setting table.
     """
     engine = engine or _db.engine
     updated_at = datetime.now(timezone.utc)
 
+    # ── Gate check (isolated connection, best-effort) ─────────────────────────
+    # Use a separate short-lived connection so that a missing ``platform_settings``
+    # table (pre-migration) cannot put the main read transaction in an error state
+    # on Postgres.
+    try:
+        with engine.connect() as _sc:
+            autoapply: str = get_setting(
+                "source_reliability_autoapply", default="1", db=_sc
+            )
+    except Exception:
+        autoapply = "1"
+
+    # ── Read phase ────────────────────────────────────────────────────────────
     with engine.begin() as conn:
         chunk_ids = [str(r[0]) for r in conn.execute(
             text("SELECT id FROM immigration_corpus_chunks")).all()]
@@ -125,6 +149,7 @@ def recompute_reliability_scores(
             {"fk": feature_key},
         ).all()
 
+    # ── Compute deltas ────────────────────────────────────────────────────────
     chunk_set = set(chunk_ids)
     citation: Dict[str, int] = defaultdict(int)
     rejection: Dict[str, int] = defaultdict(int)
@@ -148,6 +173,53 @@ def recompute_reliability_scores(
             "score": reliability_score(cc, rc), "ts": updated_at,
         })
 
+    chunks_with_citations = sum(1 for c in chunk_ids if citation.get(c, 0) > 0)
+
+    # ── Gate: propose-only when autoapply != "1" ──────────────────────────────
+    if autoapply != "1":
+        delta_counts: Dict[str, Any] = {
+            "chunks_would_update": len(updates),
+            "chunks_total": len(chunk_ids),
+            "traces_scanned": len(traces),
+            "rejected_traces": len(rejected_traces),
+            "chunks_with_citations": chunks_with_citations,
+        }
+        log.info(
+            "source_reliability_autoapply=0: propose-only, would update %d chunks %s",
+            len(updates),
+            json.dumps(delta_counts, separators=(",", ":")),
+        )
+        # Emit audit event (best-effort; suppressed on failure).
+        try:
+            with engine.begin() as conn:
+                record_admin_event(
+                    conn,
+                    actor_id="cron",
+                    event="source_reliability_proposed",
+                    entity="immigration_corpus_chunks",
+                    detail={"counts": delta_counts, "updated_at": updated_at.isoformat()},
+                )
+        except Exception:
+            log.debug(
+                "source_reliability_proposed audit write failed (suppressed)",
+                exc_info=True,
+            )
+        summary: Dict[str, Any] = {
+            "chunks_total": len(chunk_ids),
+            "traces_scanned": len(traces),
+            "rejected_traces": len(rejected_traces),
+            "chunks_with_citations": chunks_with_citations,
+            "updated_at": updated_at.isoformat(),
+            "autoapply": "0",
+            "proposed_only": True,
+        }
+        log.info(
+            "recompute_reliability_scores proposed %s",
+            json.dumps(summary, separators=(",", ":")),
+        )
+        return summary
+
+    # ── Apply phase (default: autoapply == "1") ───────────────────────────────
     if updates:
         with engine.begin() as conn:
             conn.execute(
@@ -164,7 +236,7 @@ def recompute_reliability_scores(
         "chunks_total": len(chunk_ids),
         "traces_scanned": len(traces),
         "rejected_traces": len(rejected_traces),
-        "chunks_with_citations": sum(1 for c in chunk_ids if citation.get(c, 0) > 0),
+        "chunks_with_citations": chunks_with_citations,
         "updated_at": updated_at.isoformat(),
     }
     log.info("recompute_reliability_scores %s", json.dumps(summary, separators=(",", ":")))
