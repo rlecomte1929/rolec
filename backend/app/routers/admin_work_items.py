@@ -1,24 +1,26 @@
 """
-Mission Control P1 — the demands console API (admin-only).
+Mission Control demands console API (admin-only).
 
-Reads/writes the canonical `work_items` demand store and runs ingestion + triage.
-No execution here (that's P2 dispatch). All endpoints are admin-gated. The store is
-committed-not-applied until the migration lands out-of-band, so every read fails
-soft (returns empty) on a missing table rather than 500-ing the console.
+P1: reads/writes the canonical `work_items` demand store + ingestion/triage.
+P2: dispatch — launch the existing autofix agent for one agent-eligible demand
+(feature-flagged off by default) + a secret-gated run-status callback. All console
+endpoints are admin-gated; the store fails soft on a missing table.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
 from ..auth_deps import require_admin
+from ..services.autofix_dispatch import dispatch_autofix
 from ..services.work_item_ingest import build_work_items
 from ..services.work_item_triage import classify_demand
 from ...database import db
@@ -26,6 +28,39 @@ from ...database import db
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/work-items", tags=["admin-work-items"])
+
+# Run-status the callback may report → the work_item status it maps to.
+_RUN_TO_ITEM_STATUS = {"merged": "done", "deployed": "done", "failed": "blocked", "reverted": "blocked"}
+
+
+def dispatch_enabled() -> bool:
+    return os.getenv("MISSION_CONTROL_DISPATCH_ENABLED", "").lower() in ("1", "true", "yes", "on")
+
+
+def dispatch_block_reason(auto_fixable: Any, triage_json: Any) -> Optional[str]:
+    """None if the demand may be dispatched to the agent; else a human-readable reason.
+    Mirrors the autofix safety model: only trivial, non-blocklisted demands qualify."""
+    if not auto_fixable:
+        return "not agent-eligible (needs a human plan)"
+    triage = triage_json
+    if isinstance(triage, str):
+        try:
+            triage = json.loads(triage)
+        except ValueError:
+            triage = {}
+    if isinstance(triage, dict) and triage.get("blocked"):
+        return "blocklisted surface — human only"
+    return None
+
+
+def _verify_callback_secret(request: Request) -> None:
+    """Mirror crons._verify_cron_secret: fail-closed shared-secret for the workflow callback."""
+    expected = os.getenv("CRON_SECRET", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="callback not configured")
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if token != expected:
+        raise HTTPException(status_code=401, detail="invalid callback secret")
 
 # Sources we ingest in P1 (feedback widget + support tickets); each maps to a
 # SELECT of recent rows. ai_feedback / contradiction are an extension point.
@@ -183,3 +218,77 @@ def sync_work_items(_admin: Dict[str, Any] = Depends(require_admin)) -> Dict[str
             return {"ok": False, "table_ready": False, "inserted": 0}
         raise
     return {"ok": True, "inserted": inserted, "by_source": by_source}
+
+
+# ── P2: dispatch (launch the agent) + run-status callback ────────────────────
+
+
+class CallbackBody(BaseModel):
+    status: str
+    pr_url: Optional[str] = None
+    github_run_url: Optional[str] = None
+
+
+@router.post("/{item_id}/dispatch")
+def dispatch_work_item(item_id: str, _admin: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    """Launch the autofix agent for one agent-eligible demand (feature-flagged off
+    by default; reuses the existing Supabase edge function → autofix-validate)."""
+    if not dispatch_enabled():
+        raise HTTPException(status_code=503, detail="dispatch is disabled (MISSION_CONTROL_DISPATCH_ENABLED)")
+
+    with db.engine.begin() as conn:
+        item = conn.execute(
+            text("SELECT id, title, body, auto_fixable, triage_json FROM public.work_items WHERE id = :id"),
+            {"id": item_id},
+        ).mappings().first()
+        if item is None:
+            raise HTTPException(status_code=404, detail="work item not found")
+
+        block = dispatch_block_reason(item["auto_fixable"], item["triage_json"])
+        if block is not None:
+            raise HTTPException(status_code=409, detail=block)
+
+        result = dispatch_autofix({"id": str(item["id"]), "title": item["title"], "body": item["body"] or ""})
+        run_id = str(uuid.uuid4())
+        run_status = "pr_opened" if result.get("pr_url") else ("queued" if result.get("ok") else "failed")
+        conn.execute(
+            text(
+                """INSERT INTO public.work_item_runs (id, work_item_id, dispatched_by, status, pr_url)
+                   VALUES (:id, :wid, :by, :status, :pr)"""
+            ),
+            {"id": run_id, "wid": item_id, "by": str(_admin.get("id") or ""), "status": run_status, "pr": result.get("pr_url")},
+        )
+        conn.execute(
+            text(
+                """UPDATE public.work_items
+                   SET status = 'dispatched', last_run_id = :rid, pr_url = COALESCE(:pr, pr_url), updated_at = now()
+                   WHERE id = :id"""
+            ),
+            {"rid": run_id, "pr": result.get("pr_url"), "id": item_id},
+        )
+
+    return {"ok": bool(result.get("ok")), "run_id": run_id, "pr_url": result.get("pr_url"), "result": result}
+
+
+@router.post("/{item_id}/run-callback")
+def run_callback(item_id: str, body: CallbackBody, request: Request) -> Dict[str, Any]:
+    """The autofix workflow reports run progress here (secret-gated, not admin-auth)."""
+    _verify_callback_secret(request)
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                """UPDATE public.work_item_runs
+                   SET status = :status, pr_url = COALESCE(:pr, pr_url),
+                       github_run_url = COALESCE(:run_url, github_run_url), updated_at = now()
+                   WHERE work_item_id = :id
+                     AND id = (SELECT last_run_id FROM public.work_items WHERE id = :id)"""
+            ),
+            {"status": body.status, "pr": body.pr_url, "run_url": body.github_run_url, "id": item_id},
+        )
+        item_status = _RUN_TO_ITEM_STATUS.get(body.status)
+        if item_status:
+            conn.execute(
+                text("UPDATE public.work_items SET status = :s, pr_url = COALESCE(:pr, pr_url), updated_at = now() WHERE id = :id"),
+                {"s": item_status, "pr": body.pr_url, "id": item_id},
+            )
+    return {"ok": True}
