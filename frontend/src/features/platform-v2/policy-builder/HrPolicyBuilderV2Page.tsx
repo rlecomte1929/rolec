@@ -61,19 +61,6 @@ interface Tier {
 interface BenefitDef { k: string; lbl: string; tip: string }
 interface CategoryDef { id: number; key: string; t: string; benefits: BenefitDef[] }
 
-interface MockRule {
-  id: string;
-  category: string;
-  cat_lbl: string;
-  confidence: number;
-  nm: string;
-  val: string;
-  cond: string;
-  assign_to: number[];
-  decision: 'pending' | 'accepted' | 'rejected';
-  flag?: boolean;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CATEGORIES: CategoryDef[] = [
   { id: 1, key: 'pre_assignment', t: 'Pre-assignment support', benefits: [
@@ -341,6 +328,40 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
     if (!pv) throw new Error('Could not create a draft (no policy_version returned).');
     setDraftVersionId(pv);
     return pv;
+  };
+
+  // Re-read the company's config-matrix draft and rebuild the canvas tiers from
+  // it. Used after a document import merges extracted benefits into the draft, so
+  // the canvas reflects the REAL imported rows (notes + field_confidence ride
+  // through). Mirrors the on-mount hydration; non-fatal on error.
+  const reloadFromDraft = async () => {
+    try {
+      const payload = (await policyConfigMatrixAPI.hrGet()) as {
+        policy_version?: string | null;
+        status?: string | null;
+        categories?: unknown;
+      };
+      const { tiers: loaded } = configDraftToCanvasPolicy(payload as never);
+      if (loaded.length === 0) return;
+      const fullTiers: Tier[] = loaded.map((lt, i) => ({
+        id: `loaded-${i}`,
+        name: lt.name,
+        color: TIER_PALETTE[i % TIER_PALETTE.length] ?? '',
+        targeting: lt.targeting,
+        mode: lt.mode,
+        lump: lt.lump,
+        emp: 0,
+        benefits: { ...buildDefaultBenefits(lt.name, lt.mode === 'lump'), ...lt.benefits },
+      }));
+      setTiers(fullTiers);
+      const status = String(payload.status || '');
+      if (status === 'published') setVersion('published');
+      else if (payload.policy_version) setDraftVersionId(payload.policy_version);
+      setSavedAt(Date.now());
+    } catch {
+      // Non-fatal: the import already merged server-side; a reload hiccup just
+      // means the canvas won't refresh until the next load.
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -672,10 +693,11 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       {/* ── Import flow ── */}
       {importOpen && (
         <ImportFlow
-          tiers={tiers.length > 0 ? tiers : tiersForTemplate('standard')}
           onClose={() => setImportOpen(false)}
-          onApply={() => {
-            if (tiers.length === 0) setTiers(tiersForTemplate('standard'));
+          onImported={async () => {
+            // The import already merged the extracted benefits into the draft
+            // server-side; re-hydrate the canvas so HR sees the real rows.
+            await reloadFromDraft();
             setImportOpen(false);
             setSavedAt(Date.now());
           }}
@@ -1146,50 +1168,61 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
 }
 
 // ─── Import Flow ──────────────────────────────────────────────────────────────
-const STAGES = [
-  { lbl: 'Uploading document…',       pct: 10 },
-  { lbl: 'Reading document text…',    pct: 30 },
-  { lbl: 'Identifying policy type…',  pct: 50 },
-  { lbl: 'Extracting benefit rules…', pct: 75 },
-  { lbl: 'Extraction complete — review needed', pct: 95 },
-];
+// Progress stages are driven off the REAL document status returned by
+// GET /api/hr/policy-documents/{id} — not a timer. The assistant-import pipeline
+// advances extracting_text → classified (or failed); LLM value-extraction then
+// moves processing_status to `normalized`. Both happen in one background pass, so
+// `classified`/`normalized` is our "ready to import" signal.
+interface ImportStage { lbl: string; pct: number }
+const STAGE_UPLOADING: ImportStage = { lbl: 'Uploading document…', pct: 15 };
+const STAGE_READING:   ImportStage = { lbl: 'Reading document text…', pct: 45 };
+const STAGE_EXTRACTING: ImportStage = { lbl: 'Extracting benefit rules…', pct: 75 };
+const STAGE_IMPORTING: ImportStage = { lbl: 'Importing into your draft…', pct: 92 };
 
-const MOCK_LOG = [
-  '✓ Document classified as: Assignment Policy',
-  '✓ Policy scope: Long-term assignment + Permanent transfer',
-  '✓ Currency detected: EUR',
-  '✓ Tiers identified: 3 (Manager / Director / VP)',
-  '✓ 24 benefit rules extracted',
-  '✓ 18 conditions parsed',
-  '✓ 6 jurisdiction overrides found',
-];
+const READY_STATUSES = new Set(['classified', 'normalized']);
 
-const MOCK_RULES: MockRule[] = [
-  { id: 'r1', category: 'compensation', cat_lbl: 'Compensation', confidence: 96, nm: 'Host country housing cap', val: '€2,500/mo (Tier: Manager)', cond: 'Long-term assignment only', assign_to: [0], decision: 'pending' },
-  { id: 'r2', category: 'compensation', cat_lbl: 'Compensation', confidence: 94, nm: 'Host country housing cap', val: '€3,800/mo (Tier: Director)', cond: 'Long-term assignment only', assign_to: [1], decision: 'pending' },
-  { id: 'r3', category: 'compensation', cat_lbl: 'Compensation', confidence: 91, nm: 'Mobility premium',         val: '15% of base salary',       cond: 'Director level and above', assign_to: [1,2], decision: 'pending' },
-  { id: 'r4', category: 'relocation',   cat_lbl: 'Relocation',   confidence: 88, nm: 'Relocation allowance',    val: '€8,000 one-time',           cond: 'Assignee + partner',       assign_to: [0,1], decision: 'pending' },
-  { id: 'r5', category: 'family',       cat_lbl: 'Family',       confidence: 87, nm: 'Child education support', val: '€12,000/yr per child',      cond: 'With accompanying dependents only', assign_to: [0,1,2], decision: 'pending' },
-  { id: 'r6', category: 'leave',        cat_lbl: 'Leave',        confidence: 72, nm: 'Home leave trips',        val: '2 trips/year',              cond: 'Long-term assignment', assign_to: [0,1], decision: 'pending', flag: true },
-  { id: 'r7', category: 'tax',          cat_lbl: 'Tax',          confidence: 82, nm: 'Tax equalisation',        val: 'Provided',                  cond: 'Director and above', assign_to: [1,2], decision: 'pending' },
-  { id: 'r8', category: 'relocation',   cat_lbl: 'Relocation',   confidence: 64, nm: 'Temporary living',        val: '€2,800/mo for up to 3 months', cond: 'On arrival', assign_to: [0,1,2], decision: 'pending', flag: true },
-];
-
-interface ImportFlowProps {
-  tiers: Tier[];
-  onClose: () => void;
-  onApply: (rules: MockRule[]) => void;
+function stageForStatus(assistant?: string | null, processing?: string | null): ImportStage {
+  const a = (assistant || '').toLowerCase();
+  const p = (processing || '').toLowerCase();
+  if (READY_STATUSES.has(a) || p === 'normalized') return STAGE_EXTRACTING;
+  return STAGE_READING;
+}
+function isImportReady(assistant?: string | null, processing?: string | null): boolean {
+  return READY_STATUSES.has((assistant || '').toLowerCase()) || (processing || '').toLowerCase() === 'normalized';
+}
+function isImportFailed(assistant?: string | null, processing?: string | null): boolean {
+  return (assistant || '').toLowerCase() === 'failed' || (processing || '').toLowerCase() === 'failed';
 }
 
-function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
-  const [step, setStep]         = useState(1);
-  const [file, setFile]         = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [stageIdx, setStageIdx] = useState(0);
-  const [showLog, setShowLog]   = useState(false);
-  const [rules, setRules]       = useState<MockRule[]>(MOCK_RULES);
-  const [activeMark, setActiveMark] = useState<string | null>(null);
+// Canonical matrix benefit key → human label + category, built from CATEGORIES so
+// the import summary can render the REAL imported keys (import-extraction returns
+// matrix keys, not rich rows).
+const BENEFIT_META: Record<string, { lbl: string; cat: string }> = (() => {
+  const out: Record<string, { lbl: string; cat: string }> = {};
+  CATEGORIES.forEach(c => c.benefits.forEach(b => { out[b.k] = { lbl: b.lbl, cat: c.t }; }));
+  return out;
+})();
+
+const POLL_INTERVAL_MS = 1800;
+const MAX_POLLS = 60; // ~1.8 min ceiling before we surface an honest timeout.
+
+interface ImportFlowProps {
+  onClose: () => void;
+  /** Called after the extraction has been imported into the draft server-side. */
+  onImported: () => void | Promise<void>;
+}
+
+type ImportStep = 'upload' | 'processing' | 'review' | 'error';
+
+export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
+  const [step, setStep]           = useState<ImportStep>('upload');
+  const [file, setFile]           = useState<File | null>(null);
+  const [dragOver, setDragOver]   = useState(false);
+  const [docId, setDocId]         = useState<string | null>(null);
+  const [stage, setStage]         = useState<ImportStage>(STAGE_UPLOADING);
+  const [result, setResult]       = useState<{ imported: string[]; unmapped: string[]; skipped_existing: string[] } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg]   = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fmtSize = (bytes: number) => bytes < 1_000_000
@@ -1203,54 +1236,99 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
     setUploadError(null);
   };
 
+  // Kick off: real upload → capture the returned document id → poll for status.
   const handleStartExtraction = async () => {
     if (!file) return;
-    setStep(2);
-    setStageIdx(0);
+    setUploadError(null);
+    setErrorMsg(null);
+    setStage(STAGE_UPLOADING);
+    setStep('processing');
     try {
-      await policyDocumentsAPI.upload(file);
+      const res = await policyDocumentsAPI.upload(file);
+      const id = res?.document?.id;
+      if (!id) throw new Error('Upload did not return a document id.');
+      setDocId(id);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
       setUploadError(msg);
-      setStep(1);
-      return;
+      setStep('upload');
     }
   };
 
+  // Poll GET /api/hr/policy-documents/{id} until the extraction is ready
+  // (classified/normalized), then import into the draft — or surface an honest
+  // failure/timeout. The progress bar reflects the REAL status, never a timer.
   useEffect(() => {
-    if (step !== 2) return;
-    setStageIdx(0);
-    const ts: ReturnType<typeof setTimeout>[] = [];
-    [1,2,3,4].forEach((_, i) => { ts.push(setTimeout(() => setStageIdx(i + 1), (i + 1) * 1100)); });
-    ts.push(setTimeout(() => setStep(3), 4800));
-    return () => ts.forEach(clearTimeout);
-  }, [step]);
+    if (step !== 'processing' || !docId) return;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const stage = STAGES[stageIdx] ?? STAGES[0] ?? { lbl: '', pct: 0 };
-  const visibleLog = MOCK_LOG.slice(0, Math.min(MOCK_LOG.length, stageIdx + 2));
+    const runImport = async () => {
+      setStage(STAGE_IMPORTING);
+      try {
+        const res = await policyConfigMatrixAPI.hrImportExtraction({ policy_id: docId });
+        if (cancelled) return;
+        setResult({ imported: res.imported ?? [], unmapped: res.unmapped ?? [], skipped_existing: res.skipped_existing ?? [] });
+        setStep('review');
+      } catch (e: unknown) {
+        if (cancelled) return;
+        setErrorMsg(e instanceof Error ? e.message : 'Import failed.');
+        setStep('error');
+      }
+    };
 
-  const accepted = rules.filter(r => r.decision === 'accepted');
-  const rejected = rules.filter(r => r.decision === 'rejected');
-  const pending  = rules.length - accepted.length - rejected.length;
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      try {
+        const { document } = await policyDocumentsAPI.get(docId);
+        if (cancelled) return;
+        const a = document?.assistant_import_status;
+        const p = document?.processing_status;
+        setStage(stageForStatus(a, p));
+        if (isImportFailed(a, p)) {
+          setErrorMsg(document?.extraction_error || 'We could not read this document. Try a different file, or contact support.');
+          setStep('error');
+          return;
+        }
+        if (isImportReady(a, p)) {
+          await runImport();
+          return;
+        }
+        if (attempts >= MAX_POLLS) {
+          setErrorMsg('Extraction is taking longer than expected. Please try again in a moment.');
+          setStep('error');
+          return;
+        }
+        timer = setTimeout(() => { void poll(); }, POLL_INTERVAL_MS);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        setErrorMsg(e instanceof Error ? e.message : 'Could not check extraction status.');
+        setStep('error');
+      }
+    };
+    void poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [step, docId]);
 
-  const setDecision = (id: string, dec: 'pending' | 'accepted' | 'rejected') =>
-    setRules(rs => rs.map(r => r.id === id ? { ...r, decision: dec } : r));
-  const acceptAll      = () => setRules(rs => rs.map(r => r.decision === 'pending' ? { ...r, decision: 'accepted' } : r));
-  const acceptHighConf = () => setRules(rs => rs.map(r => r.decision === 'pending' && r.confidence >= 80 ? { ...r, decision: 'accepted' } : r));
+  const imported = result?.imported ?? [];
+  const unmapped = result?.unmapped ?? [];
+  const skippedExisting = result?.skipped_existing ?? [];
+  // "All skipped" = we found benefits in the doc but they're already in the draft
+  // (a re-import). Distinct from "nothing found" so we don't mislead the user.
+  const allSkipped = step === 'review' && imported.length === 0 && skippedExisting.length > 0;
+  const nothingImported = step === 'review' && imported.length === 0 && skippedExisting.length === 0;
 
-  const toggleTier = (ruleId: string, tIdx: number) =>
-    setRules(rs => rs.map(r => r.id !== ruleId ? r : ({
-      ...r, assign_to: r.assign_to.includes(tIdx) ? r.assign_to.filter(x => x !== tIdx) : [...r.assign_to, tIdx],
-    })));
-
-  const STEPS = ['Upload', 'Processing', 'Review extraction', 'Map to policy'];
+  const STEPS = ['Upload', 'Extract', 'Review'];
+  const stepNum = step === 'upload' ? 1 : step === 'review' ? 3 : 2;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6"
          role="button" tabIndex={-1} aria-label="Close document import"
          onClick={e => { if (e.target === e.currentTarget) onClose(); }}
          onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
           <Upload size={18} className="text-blue-600"/>
@@ -1262,8 +1340,8 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
         <div className="flex items-center px-6 py-3 border-b border-gray-200 gap-0">
           {STEPS.map((lbl, i) => {
             const idx = i + 1;
-            const active = step === idx;
-            const done = step > idx;
+            const active = stepNum === idx;
+            const done = stepNum > idx;
             return (
               <React.Fragment key={lbl}>
                 <div className={`flex items-center gap-2 text-[12px] font-medium ${active ? 'text-blue-600' : done ? 'text-green-600' : 'text-gray-400'}`}>
@@ -1281,7 +1359,7 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
         {/* Body */}
         <div className="flex-1 overflow-hidden">
           {/* Step 1: Upload */}
-          {step === 1 && (
+          {step === 'upload' && (
             <div className="p-6">
               {/* Hidden real file input */}
               <input
@@ -1329,8 +1407,8 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
             </div>
           )}
 
-          {/* Step 2: Processing */}
-          {step === 2 && (
+          {/* Step 2: Processing — progress driven by the REAL document status */}
+          {step === 'processing' && (
             <div className="p-8 flex flex-col items-center gap-6">
               <div className="w-full max-w-lg">
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
@@ -1341,126 +1419,91 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
                   {stage.lbl}
                 </div>
               </div>
-              <Button unstyled onClick={() => setShowLog(s => !s)} className="text-[12px] text-gray-500 hover:text-gray-700">
-                {showLog ? '▼ Hide details' : '▶ Show extraction details'}
-              </Button>
-              {showLog && (
-                <div className="w-full max-w-lg font-mono text-[11px] text-green-400 bg-gray-900 rounded-xl p-4 space-y-1">
-                  {visibleLog.map((l, i) => <div key={i}>{l}</div>)}
-                </div>
-              )}
+              <p className="text-[12px] text-gray-400 max-w-sm text-center">
+                Reading your document and extracting benefit rules. This can take up to a minute for a full policy.
+              </p>
             </div>
           )}
 
-          {/* Step 3: Review */}
-          {step === 3 && (
-            <div className="flex h-full max-h-[55vh]">
-              {/* Doc preview */}
-              <div className="flex-1 overflow-y-auto p-6 border-r border-gray-200">
-                <div className="text-[10.5px] text-gray-400 mb-2 font-mono">Page 4 of 12 · Source</div>
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Section 3.2 — Host country housing</h3>
-                <p className="text-[12.5px] text-gray-600 leading-relaxed mb-4">
-                  The Company shall provide a housing allowance for employees on long-term assignment.{' '}
-                  <mark className={`px-0.5 rounded transition-colors ${activeMark === 'r1' ? 'bg-yellow-300' : 'bg-yellow-100'}`}>Tier 1 (Manager): up to €2,500 per month for furnished housing in the destination city.</mark>{' '}
-                  <mark className={`px-0.5 rounded transition-colors ${activeMark === 'r2' ? 'bg-yellow-300' : 'bg-yellow-100'}`}>Tier 2 (Director): up to €3,800 per month, inclusive of utilities.</mark>{' '}
-                  Housing must be sourced from approved providers or independently with HR sign-off.
-                </p>
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Section 3.5 — Mobility incentive</h3>
-                <p className="text-[12.5px] text-gray-600 leading-relaxed mb-4">
-                  <mark className={`px-0.5 rounded transition-colors ${activeMark === 'r3' ? 'bg-yellow-300' : 'bg-yellow-100'}`}>Employees at Director level and above receive a mobility premium equal to 15% of base salary, paid quarterly for the duration of the assignment.</mark>
-                </p>
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Section 4 — Family support</h3>
-                <p className="text-[12.5px] text-gray-600 leading-relaxed mb-4">
-                  <mark className={`px-0.5 rounded transition-colors ${activeMark === 'r5' ? 'bg-yellow-300' : 'bg-yellow-100'}`}>Employees with accompanying dependents shall be eligible for child education support up to €12,000 per child per academic year</mark>, payable directly to the school or reimbursable on receipts.
-                </p>
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Section 5.1 — Leave</h3>
-                <p className="text-[12.5px] text-gray-600 leading-relaxed">
-                  Long-term assignees are entitled to{' '}
-                  <mark className={`px-0.5 rounded transition-colors ${activeMark === 'r6' ? 'bg-yellow-300' : 'bg-yellow-100'}`}>two return trips per calendar year</mark>{' '}
-                  to their origin country, in economy class.
-                </p>
+          {/* Error — honest failure / timeout state */}
+          {step === 'error' && (
+            <div className="p-8 flex flex-col items-center gap-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle size={22} className="text-red-600"/>
               </div>
-
-              {/* Rules panel */}
-              <div className="w-[360px] flex-shrink-0 flex flex-col">
-                <div className="flex items-center gap-2 p-3 border-b border-gray-200 bg-gray-50 text-[11.5px]">
-                  <span className="text-gray-600 flex-1">
-                    <strong>{rules.length}</strong> rules · <strong className="text-green-600">{accepted.length}</strong> accepted · <strong className="text-red-500">{rejected.length}</strong> rejected · {pending} pending
-                  </span>
-                  <Button unstyled onClick={acceptHighConf} className="text-[11px] px-2 py-1 border border-gray-200 rounded bg-white text-gray-600 hover:bg-gray-50">High-conf</Button>
-                  <Button unstyled onClick={acceptAll} className="text-[11px] px-2 py-1 border border-gray-200 rounded bg-white text-gray-600 hover:bg-gray-50">All</Button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {rules.map(r => {
-                    const conf = r.confidence >= 90 ? 'text-green-600' : r.confidence >= 75 ? 'text-amber-600' : 'text-red-500';
-                    const cardBg = r.decision === 'accepted' ? 'border-green-300 bg-green-50' : r.decision === 'rejected' ? 'border-red-200 bg-red-50 opacity-60' : 'border-gray-200 bg-white';
-                    return (
-                      <div key={r.id} className={`border rounded-xl p-3 transition-all cursor-pointer ${cardBg}`}
-                           onMouseEnter={() => setActiveMark(r.id)} onMouseLeave={() => setActiveMark(null)}>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-[9.5px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded uppercase tracking-wide">{r.cat_lbl}</span>
-                          <span className={`text-[11px] font-semibold ${conf}`}>{r.confidence}%</span>
-                          {r.flag && <span className="text-[10px] text-amber-600 flex items-center gap-0.5"><AlertTriangle size={9}/> Review</span>}
-                        </div>
-                        <div className="text-[12px] font-semibold text-gray-900">{r.nm}</div>
-                        <div className="text-[11.5px] text-gray-600 font-mono">{r.val}</div>
-                        <div className="text-[11px] text-gray-400 mb-2">{r.cond}</div>
-                        <div className="flex gap-1">
-                          <Button unstyled onClick={() => setDecision(r.id, r.decision === 'accepted' ? 'pending' : 'accepted')}
-                            className={`flex-1 py-1 rounded text-[11px] font-semibold border transition-colors ${r.decision === 'accepted' ? 'bg-green-600 text-white border-green-600' : 'border-gray-200 text-gray-600 hover:bg-green-50'}`}>
-                            ✓ Accept
-                          </Button>
-                          <Button unstyled onClick={() => setDecision(r.id, r.decision === 'rejected' ? 'pending' : 'rejected')}
-                            className={`flex-1 py-1 rounded text-[11px] font-semibold border transition-colors ${r.decision === 'rejected' ? 'bg-red-500 text-white border-red-500' : 'border-gray-200 text-gray-600 hover:bg-red-50'}`}>
-                            ✗ Reject
-                          </Button>
-                          <Button unstyled className="px-2 py-1 rounded text-[11px] border border-gray-200 text-gray-600 hover:bg-gray-50">✎</Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <h3 className="text-sm font-semibold text-gray-900">Extraction failed</h3>
+              <p className="text-[13px] text-gray-500 max-w-sm">{errorMsg || 'Something went wrong while reading this document.'}</p>
             </div>
           )}
 
-          {/* Step 4: Map */}
-          {step === 4 && (
+          {/* Step 3: Review — the REAL imported benefit keys from the draft */}
+          {step === 'review' && (
             <div className="p-6 overflow-y-auto max-h-[55vh]">
-              <p className="text-[13px] text-gray-500 mb-4">Assign each accepted rule to one or more tiers. Smart defaults applied based on extracted conditions — adjust freely.</p>
-              {accepted.length === 0 ? (
-                <div className="text-center py-10 text-[13px] text-gray-400">No accepted rules yet. Go back and accept at least one.</div>
-              ) : (
-                <div className="space-y-3">
-                  {accepted.map(r => (
-                    <div key={r.id} className="p-4 border border-gray-200 rounded-xl">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[9.5px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded uppercase tracking-wide">{r.cat_lbl}</span>
+              {(nothingImported || allSkipped) ? (
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Info size={22} className="text-amber-600"/>
+                  </div>
+                  {allSkipped ? (
+                    <>
+                      <h3 className="text-sm font-semibold text-gray-900">Already in your draft</h3>
+                      <p className="text-[13px] text-gray-500 max-w-md">
+                        Your draft already contains all {skippedExisting.length} benefit{skippedExisting.length === 1 ? '' : 's'} we found in this document — nothing new to import.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-sm font-semibold text-gray-900">No benefits could be imported</h3>
+                      <p className="text-[13px] text-gray-500 max-w-md">
+                        We couldn&apos;t map any structured benefits from this document into your policy. You can still build the policy from a template, or try a more detailed policy document.
+                      </p>
+                    </>
+                  )}
+                  {unmapped.length > 0 && (
+                    <div className="mt-2 w-full max-w-md text-left">
+                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Extracted terms with no automatic mapping ({unmapped.length})
                       </div>
-                      <div className="text-[12.5px] font-semibold text-gray-900 mb-0.5">{r.nm}</div>
-                      <div className="text-[11.5px] text-gray-500 mb-3">{r.val} · {r.cond}</div>
-                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Assign to tier(s)</div>
-                      <div className="flex flex-wrap gap-2">
-                        {tiers.map((t, idx) => (
-                          <Button unstyled key={t.id} onClick={() => toggleTier(r.id, idx)}
-                            className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${r.assign_to.includes(idx) ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}
-                            style={r.assign_to.includes(idx) ? { background: t.color, borderColor: t.color } : undefined}>
-                            {t.name}
-                          </Button>
+                      <div className="flex flex-wrap gap-1.5">
+                        {unmapped.map(k => (
+                          <span key={k} className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{k}</span>
                         ))}
                       </div>
-                      {r.assign_to.length === 0 && (
-                        <div className="mt-2 text-[11px] text-red-500">⚠ No tier selected — this rule won&apos;t be applied.</div>
-                      )}
-                    </div>
-                  ))}
-                  {accepted.length > 0 && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-[12.5px] text-blue-700">
-                      About to apply <strong>{accepted.filter(r => r.assign_to.length > 0).length}</strong> rule{accepted.filter(r => r.assign_to.length > 0).length !== 1 ? 's' : ''} across <strong>{new Set(accepted.flatMap(r => r.assign_to)).size}</strong> tier{new Set(accepted.flatMap(r => r.assign_to)).size !== 1 ? 's' : ''}.{' '}
-                      Where a benefit already has a value in the tier, the imported rule will overwrite it.
                     </div>
                   )}
                 </div>
+              ) : (
+                <>
+                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-[12.5px] text-green-700">
+                    <strong>{imported.length}</strong> benefit{imported.length !== 1 ? 's' : ''} imported into your draft. Review and adjust amounts on the canvas before publishing — extracted values start at defaults with the source term captured in each row&apos;s notes.
+                  </div>
+                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100">
+                    {imported.map(k => {
+                      const meta = BENEFIT_META[k];
+                      return (
+                        <div key={k} className="flex items-center gap-3 px-4 py-2.5">
+                          <Check size={14} className="text-green-600 flex-shrink-0"/>
+                          <div className="min-w-0">
+                            <div className="text-[13px] text-gray-800 truncate">{meta?.lbl || k}</div>
+                            {meta?.cat && <div className="text-[11px] text-gray-400">{meta.cat}</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {unmapped.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                        Couldn&apos;t auto-map ({unmapped.length}) — add these manually on the canvas
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {unmapped.map(k => (
+                          <span key={k} className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{k}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1468,34 +1511,28 @@ function ImportFlow({ tiers, onClose, onApply }: ImportFlowProps) {
 
         {/* Footer */}
         <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-200">
-          {step > 1 && step < 4 && (
-            <Button unstyled onClick={() => setStep(s => Math.max(1, s - 1))}
-              className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</Button>
-          )}
-          {step === 1 && <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Cancel</Button>}
+          {step === 'upload' && <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Cancel</Button>}
           <div className="flex-1"/>
-          {step === 1 && (
+          {step === 'upload' && (
             <Button unstyled disabled={!file} onClick={handleStartExtraction}
               className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
               Start extraction →
             </Button>
           )}
-          {step === 2 && <span className="text-[13px] text-gray-400">Processing…</span>}
-          {step === 3 && (
+          {step === 'processing' && <span className="text-[13px] text-gray-400">Processing…</span>}
+          {step === 'error' && (
             <>
-              <Button unstyled onClick={() => { acceptAll(); setStep(4); }}
-                className="text-[13px] text-gray-500 hover:text-gray-700">Skip review — apply all</Button>
-              <Button unstyled disabled={accepted.length === 0} onClick={() => setStep(4)}
-                className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
-                Continue to mapping →
+              <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Close</Button>
+              <Button unstyled onClick={() => { setErrorMsg(null); setDocId(null); setStep('upload'); }}
+                className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900">
+                Try again
               </Button>
             </>
           )}
-          {step === 4 && (
-            <Button unstyled disabled={accepted.filter(r => r.assign_to.length > 0).length === 0}
-              onClick={() => onApply(accepted.filter(r => r.assign_to.length > 0))}
-              className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900 disabled:opacity-40">
-              Apply to canvas →
+          {step === 'review' && (
+            <Button unstyled onClick={() => { void onImported(); }}
+              className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900">
+              {nothingImported ? 'Close' : 'View on canvas →'}
             </Button>
           )}
         </div>

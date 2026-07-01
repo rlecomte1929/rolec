@@ -109,6 +109,12 @@ export interface PolicyDocumentClause {
 export interface PolicyDocument {
   id: string;
   processing_status?: string | null;
+  /**
+   * Assistant-import pipeline status: extracting_text → classified (or failed).
+   * Read alongside `processing_status` (which reaches `normalized` once LLM
+   * value-extraction persists benefits) to know when an upload is ready to import.
+   */
+  assistant_import_status?: string | null;
   filename?: string | null;
   detected_document_type?: string | null;
   detected_policy_scope?: string | null;
