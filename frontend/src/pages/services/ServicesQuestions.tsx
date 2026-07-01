@@ -114,7 +114,7 @@ export const ServicesQuestions: React.FC = () => {
     () =>
       new Set(
         Array.from(selectedServices).filter((k) =>
-          ['housing', 'schools', 'movers', 'banks', 'insurances', 'electricity'].includes(k)
+          ['housing', 'schools', 'movers', 'banks', 'insurances', 'electricity', 'pets'].includes(k)
         )
       ),
     [selectedServices]

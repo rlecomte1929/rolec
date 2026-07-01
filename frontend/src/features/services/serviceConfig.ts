@@ -34,6 +34,9 @@ export interface ServiceItem {
   enabled: boolean;
   /** Backend category key - only for enabled services */
   backendKey?: string;
+  /** Locked in the Select-services grid until HR has curated ≥1 vendor for the
+   *  employee's destination (Pets). Rendered as a disabled "Coming soon" tile. */
+  requiresCuration?: boolean;
 }
 
 /** Services grouped by phase, each group sorted alphabetically by title. */
@@ -42,7 +45,7 @@ export const SERVICE_CONFIG: ServiceItem[] = [
   { key: 'housing', title: 'Housing', description: 'Recommended neighbourhoods and housing options', icon: '🏠', group: 'before', enabled: true, backendKey: 'living_areas' },
   { key: 'movers', title: 'Movers', description: 'International relocation and moving companies', icon: '📦', group: 'before', enabled: true, backendKey: 'movers' },
   { key: 'schools', title: 'Schools / Childcare', description: 'International and local school recommendations', icon: '🎒', group: 'before', enabled: true, backendKey: 'schools' },
-  { key: 'pets', title: 'Pets', description: 'Pet relocation, travel documents, and quarantine requirements', icon: '🐾', group: 'before', enabled: false },
+  { key: 'pets', title: 'Pets', description: 'Pet relocation, travel documents, and quarantine requirements', icon: '🐾', group: 'before', enabled: true, backendKey: 'pets', requiresCuration: true },
   { key: 'temp_accommodation', title: 'Temporary accommodation', description: 'Short-term stays before permanent housing', icon: '🏨', group: 'before', enabled: false },
   { key: 'visa', title: 'Visa & permits', description: 'Immigration and work permit support', icon: '📋', group: 'before', enabled: false },
   // Upon arrival
