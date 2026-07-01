@@ -17,13 +17,17 @@ interface Row {
   mandatory: boolean;
 }
 
+// Satisfaction is on a 0–1 scale: the optimizer's default variance is 0.25·s²
+// and default λ=0.3, so utility = s − 0.075·s² is only positive for small s.
+// Values on a 0–1 scale keep every benefit's utility positive so a real
+// portfolio is selected; a 0–100 scale would make the optimum the empty set.
 const SEED_ROWS: Row[] = [
-  { id: 'temp-housing', label: 'Temporary housing (30d)', category: 'Housing', cost: 3000, satisfaction: 78, mandatory: false },
-  { id: 'home-search', label: 'Home-search assistance', category: 'Housing', cost: 1500, satisfaction: 60, mandatory: false },
-  { id: 'language', label: 'Language training', category: 'Integration', cost: 1200, satisfaction: 66, mandatory: false },
-  { id: 'school-search', label: 'School placement', category: 'Family', cost: 2000, satisfaction: 82, mandatory: false },
-  { id: 'spousal', label: 'Spousal / partner support', category: 'Family', cost: 1800, satisfaction: 55, mandatory: false },
-  { id: 'shipping', label: 'Household goods shipping', category: 'Logistics', cost: 2500, satisfaction: 50, mandatory: false },
+  { id: 'temp-housing', label: 'Temporary housing (30d)', category: 'Housing', cost: 3000, satisfaction: 0.78, mandatory: false },
+  { id: 'home-search', label: 'Home-search assistance', category: 'Housing', cost: 1500, satisfaction: 0.60, mandatory: false },
+  { id: 'language', label: 'Language training', category: 'Integration', cost: 1200, satisfaction: 0.66, mandatory: false },
+  { id: 'school-search', label: 'School placement', category: 'Family', cost: 2000, satisfaction: 0.82, mandatory: false },
+  { id: 'spousal', label: 'Spousal / partner support', category: 'Family', cost: 1800, satisfaction: 0.55, mandatory: false },
+  { id: 'shipping', label: 'Household goods shipping', category: 'Logistics', cost: 2500, satisfaction: 0.50, mandatory: false },
 ];
 
 const INFEASIBILITY_COPY: Record<string, string> = {
@@ -105,7 +109,7 @@ export const HrBenefitMixOptimizerPage: React.FC<Props> = () => {
               type="number"
               min={0}
               value={budget}
-              onChange={(v) => setBudget(Number(v) || 0)}
+              onChange={(v) => setBudget(Math.max(0, Number(v) || 0))}
             />
           </div>
           <div className="w-44">
@@ -163,7 +167,7 @@ export const HrBenefitMixOptimizerPage: React.FC<Props> = () => {
                 <th className="py-2 pr-4">Benefit</th>
                 <th className="py-2 pr-4">Category</th>
                 <th className="py-2 pr-4 text-right">Cost / employee (€)</th>
-                <th className="py-2 pr-4 text-right">Expected satisfaction</th>
+                <th className="py-2 pr-4 text-right">Expected satisfaction (0–1)</th>
                 <th className="py-2 pr-4 text-center">Required</th>
                 <th className="py-2 pr-4" />
               </tr>
@@ -187,17 +191,19 @@ export const HrBenefitMixOptimizerPage: React.FC<Props> = () => {
                         aria-label={`${r.label} cost`}
                         className="w-24 rounded border border-slate-200 px-2 py-1 text-right text-sm"
                         value={r.cost}
-                        onChange={(e) => updateRow(r.id, { cost: Number(e.target.value) || 0 })}
+                        onChange={(e) => updateRow(r.id, { cost: Math.max(0, Number(e.target.value) || 0) })}
                       />
                     </td>
                     <td className="py-2 pr-4 text-right">
                       <input
                         type="number"
                         min={0}
+                        max={1}
+                        step={0.05}
                         aria-label={`${r.label} expected satisfaction`}
                         className="w-20 rounded border border-slate-200 px-2 py-1 text-right text-sm"
                         value={r.satisfaction}
-                        onChange={(e) => updateRow(r.id, { satisfaction: Number(e.target.value) || 0 })}
+                        onChange={(e) => updateRow(r.id, { satisfaction: Math.min(1, Math.max(0, Number(e.target.value) || 0)) })}
                       />
                     </td>
                     <td className="py-2 pr-4 text-center">
