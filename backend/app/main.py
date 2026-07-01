@@ -7,6 +7,7 @@ from .routers import (
     admin,
     admin_ai_unit_economics,
     admin_corrections,
+    admin_dsar,
     admin_feature_flags,
     admin_exec_overview,
     admin_rag_eval,
@@ -196,6 +197,7 @@ def create_app() -> FastAPI:
     # [Parker-G] AI unit-economics admin rollup
     app.include_router(admin_ai_unit_economics.router)
     app.include_router(admin_rag_eval.router)
+    app.include_router(admin_dsar.router)  # GDPR/DSAR desk — /api/admin/erasure-requests
     app.include_router(admin_feature_flags.router)  # Feature-flag console — /api/admin/feature-flags
     app.include_router(admin_exec_overview.router)  # Executive dashboard — GET /api/admin/exec-overview
     app.include_router(admin_work_items.router)  # Mission Control P1 — demands console
