@@ -1,4 +1,48 @@
-import { Page, TestInfo, expect } from '@playwright/test';
+import { Page, TestInfo, APIRequestContext, expect } from '@playwright/test';
+
+const API_BASE = process.env.E2E_API_URL || 'https://api.relopass.com';
+
+/**
+ * Liveness probe used to distinguish an app bug from a deploy-window transient.
+ * Returns false on any non-200 or network error (the backend is unreachable /
+ * mid rolling-restart). Kept tiny + injectable so the B13 tolerance is unit-testable.
+ */
+export async function probeApiHealthy(
+  request: APIRequestContext,
+  opts?: { api?: string; timeoutMs?: number },
+): Promise<boolean> {
+  const api = opts?.api || API_BASE;
+  try {
+    const r = await request.get(`${api}/health`, { timeout: opts?.timeoutMs ?? 5000 });
+    return r.status() === 200;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * API-layer analog of the B13 tolerance: if a request came back a server error
+ * (>=500) AND the backend health probe is failing, annotate the test 'environmental'
+ * so the ingest reclassifies it to a non-filing ENV status. Call it right BEFORE the
+ * reachability assertion. Returns true if it annotated. Assertions stay unchanged —
+ * a real (backend-up) 5xx still fails and files.
+ */
+export async function markEnvironmentalIfDown(
+  info: TestInfo,
+  request: APIRequestContext,
+  status: number,
+): Promise<boolean> {
+  if (status < 500) return false;
+  const healthy = await probeApiHealthy(request);
+  if (!healthy) {
+    info.annotations.push({
+      type: 'environmental',
+      description: `API returned ${status} while backend health probe failed (deploy-window transient)`,
+    });
+    return true;
+  }
+  return false;
+}
 
 /**
  * "Logical page" assertion (master doc §1.2 / UX-LOGICAL): within ≤5s the page
@@ -12,7 +56,18 @@ export interface LogicalVerdict {
   signals: string[];
 }
 
-export async function assertLogicalPage(page: Page, info: TestInfo, label: string): Promise<LogicalVerdict> {
+export interface AssertLogicalPageOpts {
+  /** Injectable health probe (default: probeApiHealthy against E2E_API_URL). Used to
+   *  classify a raw-error page as environmental (backend down) vs a real B13 bug. */
+  probeHealthy?: (request: APIRequestContext) => Promise<boolean>;
+}
+
+export async function assertLogicalPage(
+  page: Page,
+  info: TestInfo,
+  label: string,
+  opts?: AssertLogicalPageOpts,
+): Promise<LogicalVerdict> {
   const signals: string[] = [];
   // give the SPA up to 5s to render real content
   await page.waitForTimeout(500);
@@ -40,11 +95,26 @@ export async function assertLogicalPage(page: Page, info: TestInfo, label: strin
       .catch(() => true);
     if (stillSpinning) signals.push('permanent-spinner(B10)');
   }
-  // raw error / no-retry?
+  // raw error / no-retry? A raw error page is only a real B13 bug if the backend is
+  // actually UP — during a Render rolling-restart (every merge to main) a data fetch
+  // 5xx's and the app renders "Something went wrong" with no retry, which is an
+  // environmental deploy-window transient, NOT an app defect. Probe health to tell them
+  // apart: down → backend-unavailable(env) + an 'environmental' annotation the ingest
+  // reclassifies to a non-filing ENV status; up → a genuine raw-error-no-retry(B13).
   const bodyText = (await page.locator('body').innerText().catch(() => '')) || '';
   if (/something went wrong|unexpected error|failed to fetch|TypeError|500|error boundary/i.test(bodyText)
       && !/try again|retry|reload/i.test(bodyText)) {
-    signals.push('raw-error-no-retry(B13)');
+    const probe = opts?.probeHealthy ?? ((req: APIRequestContext) => probeApiHealthy(req));
+    const healthy = await probe(page.request).catch(() => true); // fail-safe: unknown → treat as bug
+    if (!healthy) {
+      signals.push('backend-unavailable(env)');
+      info.annotations.push({
+        type: 'environmental',
+        description: `backend health probe failed while ${label} showed an error page (deploy-window transient)`,
+      });
+    } else {
+      signals.push('raw-error-no-retry(B13)');
+    }
   }
   // "(Soon)" / Coming soon where an action is expected
   if (/\(soon\)|coming soon/i.test(bodyText)) signals.push('coming-soon-placeholder');
