@@ -350,7 +350,10 @@ def test_17_eligibility_outcomes_match_corridor(corpus) -> None:
         if g["dossier_id"].startswith("FR_NO"):
             assert outcomes == ["ELIGIBLE_EU_FREE_MOVEMENT"], g["dossier_id"]
         elif g["dossier_id"].startswith("IN_DE_NODEG"):
-            assert outcomes == ["ELIGIBLE_BLUE_CARD_IT_EXPERIENCE"], g["dossier_id"]
+            # §18g(2) IT-experience route is a Blue Card subtype → carries both
+            # the generic and the experience-specific outcome.
+            assert "ELIGIBLE_BLUE_CARD_IT_EXPERIENCE" in outcomes, g["dossier_id"]
+            assert "ELIGIBLE_BLUE_CARD" in outcomes, g["dossier_id"]
         else:  # IN_DE generic / family
             assert outcomes == ["ELIGIBLE_BLUE_CARD"], g["dossier_id"]
 
@@ -391,20 +394,15 @@ def test_19_every_dossier_has_eligibility_profile(corpus) -> None:
         assert prof["nationality"] == origin, g["dossier_id"]
 
 
-def test_20_profile_feeds_real_predictor_for_fr_no(corpus) -> None:
-    """The profile block actually drives the real ImmigrationRegimeRouter predictor:
-    FR→NO dossiers route to EU free movement (predicted ⊆ ground-truth outcome set).
-
-    IN→DE is intentionally NOT asserted here: the router has no EU-Blue-Card regime
-    yet, so it returns ELIGIBLE_WORK_PERMIT for IN→DE — a separate router-coverage
-    follow-up, not a corpus defect.
-    """
+def test_20_profile_feeds_real_predictor_whole_corpus(corpus) -> None:
+    """The profile block drives the real ImmigrationRegimeRouter predictor for the
+    ENTIRE corpus: every dossier's predicted outcome is within its ground-truth set.
+    FR→NO → EU free movement; IN→DE → EU Blue Card (incl. the IT-experience subtype)."""
     from backend.eval.eligibility_predictor import predict_eligibility  # noqa: E402
 
     gts, _ = corpus
-    fr_no = [g for g in gts if g["dossier_id"].startswith("FR_NO")]
-    assert fr_no, "no FR_NO dossiers materialized"
-    for g in fr_no:
+    assert len(gts) == 20
+    for g in gts:
         predicted = set(predict_eligibility(g).get("outcome_set", []))
         want = set(g["eligibility_verdict"]["outcome_set"])
         assert predicted and predicted <= want, f"{g['dossier_id']}: predicted {predicted} ⊄ {want}"

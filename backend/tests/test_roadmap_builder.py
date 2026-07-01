@@ -48,7 +48,8 @@ def test_eu_national_intra_eu_move_has_no_visa_track():
 # ── Criterion 2: non-EU national → visa track present ────────────────────────
 
 def test_non_eu_national_into_eu_has_visa_track():
-    # Indian (non-EU) national, Bangalore → Berlin (IN → DE) = standard_work_permit.
+    # Indian (non-EEA) national, Bangalore → Berlin (IN → DE) = blue_card — a
+    # visa/permit regime (not in _NO_VISA_REGIMES), so the visa track is retained.
     roadmap = _case(nationality="IN", origin="IN", dest="DE")
     result = derive_roadmap(roadmap)
     assert _has_visa_track(result)

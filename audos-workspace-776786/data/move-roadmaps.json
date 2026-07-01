@@ -1,0 +1,14 @@
+{
+  "defaultRoadmapId": "roadmap-sarah-chen",
+  "defaultEmployee": {
+    "name": "Sarah Chen",
+    "role": "Senior Product Manager",
+    "origin": "Singapore",
+    "originCode": "SG",
+    "destination": "London",
+    "destinationCode": "UK",
+    "moveDate": "2026-08-15"
+  },
+  "phases": ["pre-move", "in-transit", "post-arrival"],
+  "roadmapCount": 6
+}

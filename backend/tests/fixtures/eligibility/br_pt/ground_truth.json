@@ -9,7 +9,8 @@
     "nationality": "Brazilian",
     "origin_country": "Brazil",
     "destination_country": "Portugal",
-    "contract_type": "lta"
+    "contract_type": "lta",
+    "intra_group_transfer": true
   },
   "eligibility_verdict": {
     "outcome_set": ["ELIGIBLE_WORK_PERMIT"],

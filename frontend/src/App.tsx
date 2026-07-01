@@ -123,6 +123,8 @@ const CountriesPage = lazy(() => import('./pages/admin/CountriesPage').then((mod
 const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').then((module) => ({ default: module.CountryDetailPage })));
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminRagQualityPage = lazy(() => import('./pages/admin/AdminRagQualityPage').then((module) => ({ default: module.AdminRagQualityPage })));
+const AdminPolicyVersionsPage = lazy(() => import('./pages/admin/AdminPolicyVersionsPage').then((module) => ({ default: module.AdminPolicyVersionsPage })));
+const AdminFeatureFlagsPage = lazy(() => import('./pages/admin/AdminFeatureFlagsPage').then((module) => ({ default: module.AdminFeatureFlagsPage })));
 const AdminPermissionsPage = lazy(() => import('./pages/admin/AdminPermissionsPage').then((module) => ({ default: module.AdminPermissionsPage })));
 const ExecutiveDashboardPage = lazy(() => import('./pages/admin/executive/ExecutiveDashboardPage').then((module) => ({ default: module.ExecutiveDashboardPage })));
 const MissionControlPage = lazy(() => import('./pages/admin/mission-control/MissionControlPage').then((module) => ({ default: module.MissionControlPage })));
@@ -394,6 +396,8 @@ function App() {
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<RequireAdminRoute><CountryDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminPolicyVersions.path} element={<RequireAdminRoute><AdminPolicyVersionsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPermissions.path} element={<RequireAdminRoute><AdminPermissionsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminExecutive.path} element={<RequireAdminRoute><ExecutiveDashboardPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><MissionControlPage /></RequireAdminRoute>} />
