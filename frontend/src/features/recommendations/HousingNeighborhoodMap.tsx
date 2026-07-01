@@ -41,10 +41,28 @@ interface Props {
   onSelect?: (itemId: string) => void;
 }
 
+type NearbySchool = NonNullable<RecommendationItem['metadata']['nearby_schools']>[number];
+
 export const HousingNeighborhoodMap: React.FC<Props> = ({ items, office, selectedId, onSelect }) => {
+  const [showSchools, setShowSchools] = React.useState(false);
+
   const points = items
     .map((item) => ({ item, lat: Number(item.metadata?.lat), lng: Number(item.metadata?.lng) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+
+  // Deduped union of curated schools near the recommended neighborhoods
+  // (only populated for school-age cases — the backend gates on that).
+  const schools = React.useMemo(() => {
+    const seen = new Map<string, NearbySchool>();
+    for (const it of items) {
+      for (const s of it.metadata?.nearby_schools ?? []) {
+        if (s && Number.isFinite(s.lat) && Number.isFinite(s.lng) && !seen.has(s.item_id)) {
+          seen.set(s.item_id, s);
+        }
+      }
+    }
+    return Array.from(seen.values());
+  }, [items]);
 
   if (points.length === 0) return null; // no coords → card list is the fallback
 
@@ -53,7 +71,19 @@ export const HousingNeighborhoodMap: React.FC<Props> = ({ items, office, selecte
   if (hasOffice && office) allCoords.push([office.lat, office.lng]);
 
   return (
-    <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4" style={{ height: 360 }}>
+    <div className="rounded-xl overflow-hidden border border-[#e2e8f0] mb-4">
+      {schools.length > 0 && (
+        <div className="flex items-center justify-end px-3 py-2 bg-white border-b border-[#e2e8f0]">
+          <button
+            type="button"
+            onClick={() => setShowSchools((v) => !v)}
+            className="text-xs font-medium text-[#0b2b43] hover:underline"
+          >
+            {showSchools ? 'Hide schools' : `Show schools (${schools.length})`}
+          </button>
+        </div>
+      )}
+      <div style={{ height: 360 }}>
       <MapContainer
         center={allCoords[0]}
         zoom={12}
@@ -107,7 +137,26 @@ export const HousingNeighborhoodMap: React.FC<Props> = ({ items, office, selecte
             </CircleMarker>
           );
         })}
+
+        {showSchools &&
+          schools.map((s) => (
+            <CircleMarker
+              key={`sch-${s.item_id}`}
+              center={[s.lat, s.lng]}
+              radius={6}
+              pathOptions={{ color: '#16a34a', weight: 1.5, fillColor: '#22c55e', fillOpacity: 0.85 }}
+            >
+              <Popup>
+                <strong>{s.name}</strong>
+                {[s.type, s.curriculum].filter(Boolean).length > 0 ? (
+                  <div style={{ fontSize: 12 }}>{[s.type, s.curriculum].filter(Boolean).join(' · ')}</div>
+                ) : null}
+                <div style={{ fontSize: 12 }}>~{s.commute_min} min from nearest area</div>
+              </Popup>
+            </CircleMarker>
+          ))}
       </MapContainer>
+      </div>
     </div>
   );
 };

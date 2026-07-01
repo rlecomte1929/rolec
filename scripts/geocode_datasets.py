@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -23,6 +24,20 @@ from backend.app.recommendations import geo  # noqa: E402
 
 DATASETS_DIR = Path(__file__).resolve().parent.parent / "backend" / "app" / "recommendations" / "datasets"
 FILES = ["living_areas.json", "schools.json"]
+
+# Manual, approximate campus coordinates for seed schools Nominatim can't resolve
+# by name. Approximate-but-in-the-right-area is acceptable here: these feed a
+# best-effort "reachable from neighborhood" proximity join over representative
+# seed data, not authoritative routing.
+_MANUAL_COORDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("Dover Court Preparatory", "Singapore"): (1.3067, 103.7847),
+    ("British International School Oslo", "Oslo"): (59.9139, 10.7360),
+    ("Lycée Français René Cassin", "Oslo"): (59.9210, 10.6800),
+    ("International School of the Peninsula", "San Francisco"): (37.4280, -122.1450),
+    ("British International School of New York", "New York"): (40.7380, -73.9740),
+    ("Avenues: The World School", "New York"): (40.7480, -74.0040),
+    ("St. George's International (Munich)", "Munich"): (48.1500, 11.5550),
+}
 
 
 def _has_coords(row: dict) -> bool:
@@ -37,15 +52,34 @@ def process(path: Path, *, write: bool) -> tuple[int, int, list[str]]:
     for row in rows:
         if _has_coords(row):
             continue
-        query = f"{row.get('name', '')}, {row.get('city', '')}".strip(", ")
-        coord = geo.geocode(query) if write else None
+        name = str(row.get("name", ""))
+        city = str(row.get("city", ""))
+        override = _MANUAL_COORDS.get((name, city))
+        if override and write:
+            row["lat"], row["lng"] = round(override[0], 6), round(override[1], 6)
+            print(f"  ✓ (manual) {name}, {city} -> {row['lat']},{row['lng']}")
+            continue
+        # Try the full name, then a cleaned variant (drop "(ACRONYM)" and colons)
+        # — many international-school names don't resolve verbatim in Nominatim.
+        cleaned = re.sub(r"\s*\([^)]*\)", "", name).replace(":", "").strip()
+        candidates = [f"{name}, {city}"]
+        if cleaned and cleaned != name:
+            candidates.append(f"{cleaned}, {city}")
+        query = candidates[0].strip(", ")
+        coord = None
+        if write:
+            for q in candidates:
+                coord = geo.geocode(q.strip(", "))
+                if coord:
+                    query = q.strip(", ")
+                    break
         if coord:
             row["lat"], row["lng"] = round(coord[0], 6), round(coord[1], 6)
             print(f"  ✓ {query} -> {row['lat']},{row['lng']}")
         else:
-            missing.append(query or row.get("item_id", "?"))
+            missing.append(f"{name}, {city}")
             if write:
-                print(f"  ✗ {query} -> NOT FOUND")
+                print(f"  ✗ {name}, {city} -> NOT FOUND")
     if write:
         path.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     have = sum(1 for r in rows if _has_coords(r))

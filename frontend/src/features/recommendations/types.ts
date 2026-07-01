@@ -41,6 +41,16 @@ export interface RecommendationItem {
     /** Neighborhood coordinates for the housing map (living_areas). */
     lat?: number;
     lng?: number;
+    /** Curated schools reachable from this neighborhood (Phase 3, school-age cases). */
+    nearby_schools?: Array<{
+      item_id: string;
+      name: string;
+      type?: string;
+      curriculum?: string;
+      lat: number;
+      lng: number;
+      commute_min: number;
+    }>;
   };
   explanation?: RecommendationExplanation;
 }

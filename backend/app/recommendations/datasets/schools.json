@@ -203,7 +203,9 @@
     "commute_minutes_estimate": 15,
     "rating": 4.5,
     "rating_count": 89,
-    "confidence": 89
+    "confidence": 89,
+    "lat": 1.3067,
+    "lng": 103.7847
   },
   {
     "item_id": "s-9",
@@ -306,7 +308,9 @@
     "commute_minutes_estimate": 25,
     "rating": 4.7,
     "rating_count": 38,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 59.9139,
+    "lng": 10.736
   },
   {
     "item_id": "s-o3",
@@ -331,7 +335,9 @@
     "commute_minutes_estimate": 18,
     "rating": 4.4,
     "rating_count": 52,
-    "confidence": 85
+    "confidence": 85,
+    "lat": 59.921,
+    "lng": 10.68
   },
   {
     "item_id": "s-sf1",
@@ -356,7 +362,9 @@
     "commute_minutes_estimate": 20,
     "rating": 4.7,
     "rating_count": 62,
-    "confidence": 91
+    "confidence": 91,
+    "lat": 37.428,
+    "lng": -122.145
   },
   {
     "item_id": "s-sf2",
@@ -486,7 +494,9 @@
     "commute_minutes_estimate": 28,
     "rating": 4.6,
     "rating_count": 48,
-    "confidence": 89
+    "confidence": 89,
+    "lat": 40.738,
+    "lng": -73.974
   },
   {
     "item_id": "s-ny4",
@@ -537,7 +547,9 @@
     "commute_minutes_estimate": 18,
     "rating": 4.7,
     "rating_count": 58,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 40.748,
+    "lng": -74.004
   },
   {
     "item_id": "s-mu1",
@@ -561,7 +573,9 @@
     "commute_minutes_estimate": 35,
     "rating": 4.7,
     "rating_count": 84,
-    "confidence": 92
+    "confidence": 92,
+    "lat": 48.175674,
+    "lng": 11.586078
   },
   {
     "item_id": "s-mu2",
@@ -585,7 +599,9 @@
     "commute_minutes_estimate": 30,
     "rating": 4.8,
     "rating_count": 102,
-    "confidence": 93
+    "confidence": 93,
+    "lat": 48.178181,
+    "lng": 11.520667
   },
   {
     "item_id": "s-mu3",
@@ -691,6 +707,8 @@
     "commute_minutes_estimate": 28,
     "rating": 4.5,
     "rating_count": 49,
-    "confidence": 87
+    "confidence": 87,
+    "lat": 48.15,
+    "lng": 11.555
   }
 ]

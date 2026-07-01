@@ -136,6 +136,9 @@ def post_recommendations_batch(
         # Phase 0: single source of office address = the intake-captured value.
         "officeAddress": assignment_ctx.get("workLocation"),
     }
+    # Phase 3: gate the housing schools layer on the case having school-age kids.
+    from .schools_nearby import school_age_from_draft, attach_nearby_schools
+    has_school_age = school_age_from_draft(draft)
 
     answer_rows = db.list_case_service_answers(case_id)
     saved_answers = _flatten_saved_answers(answer_rows)
@@ -172,10 +175,10 @@ def post_recommendations_batch(
             )
             return (backend_key, None)
         try:
-            return (
-                backend_key,
-                recommend(backend_key, criteria, top_n=10, company_id=company_id),
-            )
+            resp = recommend(backend_key, criteria, top_n=10, company_id=company_id)
+            if backend_key == "living_areas" and has_school_age and resp is not None:
+                attach_nearby_schools(resp, (case_context.get("destCity") or ""))
+            return (backend_key, resp)
         except Exception as e:
             log.warning(
                 "request_id=%s category=%s recommendations_batch failed error=%s",

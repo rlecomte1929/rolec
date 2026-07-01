@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Leaflet needs real DOM/canvas — mock react-leaflet so the component's data
@@ -60,5 +60,26 @@ describe('HousingNeighborhoodMap', () => {
       />,
     );
     expect(screen.getAllByTestId('marker')).toHaveLength(1);
+  });
+
+  it('offers a schools toggle and renders school markers only when toggled on', () => {
+    render(
+      <HousingNeighborhoodMap
+        items={[
+          mkItem('a', {
+            lat: 1.3,
+            lng: 103.8,
+            nearby_schools: [{ item_id: 's1', name: 'Sch One', lat: 1.31, lng: 103.81, commute_min: 12 }],
+          }),
+        ]}
+      />,
+    );
+    // one neighborhood marker; school hidden by default
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    const toggle = screen.getByRole('button', { name: /Show schools/ });
+    fireEvent.click(toggle);
+    // neighborhood + school
+    expect(screen.getAllByTestId('marker')).toHaveLength(2);
+    expect(screen.getByText('Sch One')).toBeInTheDocument();
   });
 });
