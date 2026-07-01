@@ -35,3 +35,6 @@ export { Tabs, tabPanelProps } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Pagination } from './Pagination';
 export type { ModalProps } from './Modal';
+// HEADER-1: one shared page-title block (eyebrow + breadcrumb + title/subtitle + actions).
+export { PageHeader } from './PageHeader';
+export type { Crumb } from './PageHeader';
