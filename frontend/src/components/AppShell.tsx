@@ -20,8 +20,7 @@ import { FeedbackWidget } from './FeedbackWidget';
 import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';
 import { PlatformShellSidebar, type SidebarRole } from './PlatformShellSidebar';
 import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
-import { PolicyAssistantDockedShell } from '../features/policy/PolicyAssistantDockedShell';
-import { SetupAssistantPanel } from '../features/setup-help/SetupAssistantPanel';
+import { SetupAssistantDrawer } from '../features/setup-help/SetupAssistantDrawer';
 
 function deriveInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -303,30 +302,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
       <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
 
-      {/* Setup & Help Assistant — HR only. FAB triggers a right-side
-          overlay panel (uses PolicyAssistantDockedShell's mobile path).
-          The docked push-content mode requires a page-level flex host;
-          AppShell uses a fixed overlay as the pragmatic alternative. */}
+      {/* Setup & Help Assistant — HR only. FAB opens a fixed-overlay drawer
+          (SetupAssistantDrawer) that is always above content on all
+          breakpoints: right-side panel on desktop, bottom-sheet on mobile. */}
       {isHrRole ? (
         <>
-          <SetupAssistantFab
-            onClick={() => setSetupAssistantOpen((v) => !v)}
-            isPanelOpen={setupAssistantOpen}
-          />
-          <PolicyAssistantDockedShell
+          {!setupAssistantOpen && (
+            <SetupAssistantFab onClick={() => setSetupAssistantOpen(true)} />
+          )}
+          <SetupAssistantDrawer
             open={setupAssistantOpen}
             onOpenChange={setSetupAssistantOpen}
-            title="Setup & Help"
-            subtitle="Guided help for your ReloPass workspace"
-            titleId="setup-assistant-shell-title"
-            assistant={() => <SetupAssistantPanel variant="embedded" />}
-          >
-            {/* Empty fragment — AppShell renders its main content outside
-                this shell. The mobile bottom-sheet overlay is the desired
-                UX; the lg+ docked column with no sibling content is hidden
-                via the shell's conditional width (0px when closed). */}
-            <></>
-          </PolicyAssistantDockedShell>
+          />
         </>
       ) : null}
     </div>
