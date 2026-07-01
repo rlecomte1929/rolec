@@ -168,3 +168,6 @@ backend/routes/relocation_classify.py:classify_relocation_case
 backend/app/routers/cases.py:start_research
 # DEAD: cases.py router is unwired (AUDIT-B9-cases-6). The live route is
 # cases_write.start_research, which is guarded (SEC-CASES-2 / #314).
+
+# Mission Control P2 run-status callback — shared-secret gated (_verify_callback_secret), mirrors the cron pattern.
+backend/app/routers/admin_work_items.py:run_callback

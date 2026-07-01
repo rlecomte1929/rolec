@@ -13,6 +13,8 @@ export interface ImmigrationAnswerRequest {
   is_eea?: boolean | null;
   query: string;
   top_k?: number;
+  /** Slice 3: tailor the answer to this case's anonymised context (ownership verified server-side). */
+  case_id?: string;
 }
 
 export interface CitedSource {

@@ -151,6 +151,8 @@ from .app.routers import ocr as ocr_router  # [AIQ-1148] general document OCR en
 from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
 from .app.routers import admin_feature_flags as admin_feature_flags_router  # Feature-flag console (dual-layer registration)
+from .app.routers import admin_exec_overview as admin_exec_overview_router  # Executive dashboard (dual-layer registration)
+from .app.routers import admin_work_items as admin_work_items_router  # Mission Control P1 — demands console (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
 from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
 from .app.routers import admin_corrections as admin_corrections_router  # [AIQ-554] correction analytics
@@ -201,6 +203,7 @@ from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be �
 from .app.routers import hr_case_escalation as hr_case_escalation_router  # W2-3 — HR case escalation (dual-layer per CLAUDE.md)
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
+from .app.routers import provider_portal as provider_portal_router  # H2 — external provider portal (dual-layer per CLAUDE.md)
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
@@ -212,6 +215,7 @@ from .app.routers import immigration_intake_profile as immigration_intake_profil
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router
 from .app.routers import immigration_status as immigration_status_router
 from .app.routers import immigration_gdpr as immigration_gdpr_router
+from .app.routers import employee_immigration_snapshot as employee_immigration_snapshot_router
 from .app.routers import gdpr as gdpr_router
 from .app.routers import privacy_consents as privacy_consents_router
 from .app.routers import feedback as feedback_router
@@ -230,11 +234,16 @@ from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
+from .app.routers import assistant_router as assistant_router_router
 from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
 from .app.routers import compliance as compliance_router  # [BL-Compliance.4] /api/compliance
 from .app.routers import policy_analysis as policy_analysis_router  # [AIQ-1219] policy PDF → workflow summary
+from .app.routers import admin_settings as admin_settings_router  # [Task-4] admin AI-governance controls panel
+from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] unified feedback console
+from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
+from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -801,6 +810,8 @@ app.include_router(ocr_router.router)  # [AIQ-1148] /api/ocr/process — general
 app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
 app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval/metrics — dual-layer registration
 app.include_router(admin_feature_flags_router.router)  # Feature-flag console — /api/admin/feature-flags — dual-layer registration
+app.include_router(admin_exec_overview_router.router)  # Executive dashboard — /api/admin/exec-overview — dual-layer registration
+app.include_router(admin_work_items_router.router)  # Mission Control P1 — /api/admin/work-items — dual-layer registration
 app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration
 app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
@@ -822,6 +833,7 @@ app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoin
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
+app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
 app.include_router(employee_quotes_router.router)
 app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provider ratings
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
@@ -833,6 +845,7 @@ app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6]
 app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)
 app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 — milestones, interview-status, immigration cases (8 handlers)
 app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
+app.include_router(employee_immigration_snapshot_router.router)  # relocation-assistant Slice 2 — employee immigration snapshot
 app.include_router(gdpr_router.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
 app.include_router(privacy_consents_router.router)  # PRIV-005 / AIQ-473 — Art. 13 notice acknowledgement
 app.include_router(feedback_router.router)  # product "Share feedback" widget → public.feedback
@@ -14794,8 +14807,13 @@ app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic o
 app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(assistant_router_router.router)  # policy-bridge domain routing — POST /api/assistant/route
 # GAP 10: Company branding config
 app.include_router(branding_router.router)
+app.include_router(admin_settings_router.router)  # [Task-4] admin AI-governance controls panel
+app.include_router(admin_feedback_router.router)  # [Task-6] unified feedback console
+app.include_router(admin_admins_router.router)  # [Task-7] admin lifecycle management
+app.include_router(admin_audit_log_router.router)  # [Task-7] platform audit-log viewer
 # ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented
