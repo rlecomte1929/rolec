@@ -105,21 +105,21 @@ def test_list_admins_non_admin_403(non_admin_client):
 
 
 def test_post_adds_allowlist_row(admin_client, db_session):
-    resp = admin_client.post("/api/admin/admins", json={"email": "new@example.com"})
+    resp = admin_client.post("/api/admin/admins", json={"email": "new@relopass.com"})
     assert resp.status_code == 201
     body = resp.json()
-    assert body["email"] == "new@example.com"
+    assert body["email"] == "new@relopass.com"
     assert body["enabled"] is True
 
     row = db_session.execute(
-        text("SELECT enabled FROM admin_allowlist WHERE email='new@example.com'")
+        text("SELECT enabled FROM admin_allowlist WHERE email='new@relopass.com'")
     ).fetchone()
     assert row is not None
     assert row[0] == 1
 
 
 def test_post_writes_audit_event(admin_client, db_session):
-    admin_client.post("/api/admin/admins", json={"email": "audited@example.com"})
+    admin_client.post("/api/admin/admins", json={"email": "audited@relopass.com"})
     rows = db_session.execute(text("SELECT new_value_json FROM audit_logs")).fetchall()
     events = [json.loads(r[0])["event"] for r in rows if r[0]]
     assert "admin_added" in events
@@ -134,9 +134,10 @@ def test_post_non_admin_403(non_admin_client):
 
 
 def test_patch_disable_makes_allowlist_return_false(admin_client, db_session):
-    # Seed a row
+    # Seed the target + a keeper admin (so disabling isn't blocked as the last admin)
     db_session.execute(text(
-        "INSERT INTO admin_allowlist (email, enabled, created_at) VALUES ('target@example.com', 1, '2026-01-01')"
+        "INSERT INTO admin_allowlist (email, enabled, created_at) VALUES "
+        "('target@example.com', 1, '2026-01-01'), ('keeper@relopass.com', 1, '2026-01-01')"
     ))
     db_session.commit()
 
@@ -169,7 +170,8 @@ def test_patch_enable_makes_allowlist_return_true(admin_client, db_session):
 
 def test_patch_disable_writes_audit_event(admin_client, db_session):
     db_session.execute(text(
-        "INSERT INTO admin_allowlist (email, enabled, created_at) VALUES ('audit2@example.com', 1, '2026-01-01')"
+        "INSERT INTO admin_allowlist (email, enabled, created_at) VALUES "
+        "('audit2@example.com', 1, '2026-01-01'), ('keeper@relopass.com', 1, '2026-01-01')"
     ))
     db_session.commit()
 
@@ -226,7 +228,7 @@ def test_patch_disable_no_email_in_user_dict_fails_closed(db_session):
     """
     db_session.execute(text(
         "INSERT INTO admin_allowlist (email, enabled, created_at) "
-        "VALUES ('target@example.com', 1, '2026-01-01')"
+        "VALUES ('target@example.com', 1, '2026-01-01'), ('keeper@relopass.com', 1, '2026-01-01')"
     ))
     db_session.commit()
 
