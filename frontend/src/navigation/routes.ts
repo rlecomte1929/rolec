@@ -119,8 +119,6 @@ export const ROUTE_DEFS = {
   hrPolicyReality: { path: '/hr/policy-vs-reality', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Aggregate policy utilisation: active-policy tile, compliance table, exception queue, category heatmap (P3-4). */
   hrPolicyDashboard: { path: '/hr/policy-dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** AI Requirements Discovery Engine — corridor requirement graph + timeline + source audit. */
-  hrDiscovery: { path: '/hr/discovery', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Employee rich profile & preferences editor — housing, spouse, children, pets, financial. */
   employeeRichProfile: { path: '/employee/profile', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Employee detailed intake wizard — 6-step move context, household builder, commute map. */
