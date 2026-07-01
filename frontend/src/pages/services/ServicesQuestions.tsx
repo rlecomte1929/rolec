@@ -4,7 +4,6 @@ import { AppShell } from '../../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { DynamicServicesQuestionnaire, validateDynamicAnswers, type DynamicQuestion } from '../../features/services/DynamicServicesQuestionnaire';
-import { PetRelocationCard } from '../../features/services/PetRelocationCard';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
 import { logServicesWorkflow } from '../../features/services/servicesWorkflowInstrumentation';
@@ -411,15 +410,6 @@ export const ServicesQuestions: React.FC = () => {
         answers={answers}
         onChange={onAnswersChange}
         displayCurrency={displayCurrency}
-      />
-
-      {/* AIQ-1001 — pet relocation details, gated on intake has_pets + corridor availability */}
-      <PetRelocationCard
-        assignmentId={assignmentId || null}
-        originCountry={caseContext?.originCountry}
-        destCountry={caseContext?.destCountry}
-        answers={answers}
-        onChange={onAnswersChange}
       />
 
       {!isValid && (

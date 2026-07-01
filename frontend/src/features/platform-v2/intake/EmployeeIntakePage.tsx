@@ -81,9 +81,6 @@ export interface IntakeData {
   passport_country: string;
   passport_expiry: string;
   members: Member[];
-  /** Single yes/no captured in Step 1. Pet DETAILS (species/breed/count/etc.)
-   *  are collected later in service selection — never in this intake wizard. */
-  has_pets: boolean | null;
   job_title: string;
   contract_type: string;
   contract_start: string;
@@ -166,7 +163,6 @@ const INITIAL_DATA: IntakeData = {
   // The employee themselves is always in the household — partner / kids /
   // pets are added via the "Add member" controls on step 3.
   members: [{ id: 'self', kind: 'self' }],
-  has_pets: null,
   job_title: '',
   // Default to the first option so the controlled <select> (which has no
   // empty placeholder, unlike salary_band) reflects committed state — otherwise
@@ -733,7 +729,7 @@ export function EmployeeIntakePage() {
   const toggleMember = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
   const stepValid = (s: number) => {
-    if (s === 1) return !!(data.origin_country && data.origin_city && data.dest_country && data.dest_city && data.target_date && data.purpose) && data.has_pets != null;
+    if (s === 1) return !!(data.origin_country && data.origin_city && data.dest_country && data.dest_city && data.target_date && data.purpose);
     if (s === 2) return !!(data.full_name && data.nationality && data.passport_country && data.passport_expiry);
     if (s === 3) return data.members.length >= 1;
     if (s === 4) return !!(data.job_title && data.contract_start && data.contract_type && data.office_address && data.work_pattern && data.salary_band);
@@ -750,9 +746,8 @@ export function EmployeeIntakePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Pet DETAILS are no longer collected in the intake wizard — only a yes/no
-  // "has_pets" is captured in Step 1 (Journey). Pet relocation details belong to
-  // the service-selection phase, shown only if has_pets + a pet service exists.
+  // Pets are a normal service category now (selected in service selection, HR-curated);
+  // the intake wizard no longer asks a has_pets yes/no.
   // Canonical step list lives in ./intakeSteps so the dashboard derives the same total.
   const STEP_LABELS = INTAKE_STEP_LABELS;
   // EMP-3: decorative emoji step-icons removed (consumer-app register). The numbered
@@ -1036,20 +1031,6 @@ export function EmployeeIntakePage() {
                     <select data-testid="intake-purpose" aria-label="Purpose of relocation" className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
                       <option>Employment</option><option>Study</option><option>Family</option><option>Other</option>
                     </select>
-                  </FieldWrap>
-                  <FieldWrap label="Will you be relocating with pets?" required hint="Just yes or no — if yes, you'll add pet details later when choosing services.">
-                    <div className="flex gap-2">
-                      {([['Yes', true], ['No', false]] as const).map(([lbl, val]) => (
-                        <Button key={lbl} unstyled type="button" data-testid={`intake-has_pets-${lbl.toLowerCase()}`} onClick={() => setField('has_pets', val)}
-                          className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
-                            data.has_pets === val
-                              ? 'bg-accent-600 text-white border-accent-600'
-                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                          }`}>
-                          {lbl}
-                        </Button>
-                      ))}
-                    </div>
                   </FieldWrap>
                 </Grid>
                 {international && (

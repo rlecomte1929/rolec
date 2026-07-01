@@ -9895,6 +9895,31 @@ def get_employee_services_policy_context(
     rc = result.get("resolution_context")
     if isinstance(rc, dict) and rc:
         payload["resolution_context"] = rc
+
+    # Curation-gated availability: does HR have >=1 curated vendor for this destination?
+    # Lets the Select-services grid unlock a locked "requiresCuration" tile (Pets).
+    # Best-effort — never break the policy-context response.
+    try:
+        from .app.services.employee_demand import _has_curation
+        _asn = db.get_assignment_by_id(assignment_id) or {}
+        _emp = (_asn.get("employee_user_id") or "").strip()
+        _company_id = None
+        _host_city = None
+        if _emp:
+            for _row in (db.list_employee_linked_assignment_overview(_emp) or []):
+                if str(_row.get("assignment_id")) == str(assignment_id):
+                    _company_id = _row.get("company_id")
+                    _host_city = _row.get("host_city")
+                    break
+        if _company_id:
+            payload["curated_availability"] = {
+                "pets": bool(_has_curation(_company_id, "pets", _host_city)),
+            }
+    except Exception as exc:
+        log.warning(
+            "curated_availability computation failed request_id=%s assignment_id=%s exc=%s",
+            request_id, assignment_id, exc,
+        )
     return payload
 
 

@@ -27,7 +27,6 @@ const INITIAL = {
   passport_country: '',
   passport_expiry: '',
   members: [{ id: 'self', kind: 'self' }],
-  has_pets: null as boolean | null,
 };
 
 // A saved draft as it would come back from GET …/intake after the user filled
@@ -39,7 +38,6 @@ const SAVED_DRAFT: Record<string, unknown> = {
   dest_city: 'Tokyo',
   target_date: '2026-12-01',
   purpose: 'Study',
-  has_pets: false,
   full_name: 'Élise Moreau',
   email: 'employee@testingapril.com',
   nationality: 'FR',
@@ -57,7 +55,6 @@ describe('intake persistence — mergeIntakeDraft (reload restore)', () => {
     expect(merged.dest_city).toBe('Tokyo');
     expect(merged.target_date).toBe('2026-12-01');
     expect(merged.purpose).toBe('Study'); // non-empty default ('Employment') still restored
-    expect(merged.has_pets).toBe(false); // null default → restored even to falsy `false`
     // Step 2
     expect(merged.full_name).toBe('Élise Moreau');
     expect(merged.email).toBe('employee@testingapril.com');

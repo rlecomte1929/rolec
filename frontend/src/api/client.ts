@@ -2614,6 +2614,9 @@ interface ServicesPolicyContextResponse {
       cap_summary?: string | null;
     }
   >;
+  /** Availability for `requiresCuration` service tiles (e.g. pets): true once HR has
+   *  curated ≥1 vendor for this employee's destination. Absent = treat as locked. */
+  curated_availability?: Record<string, boolean>;
   source?: string;
   policy_surface?: {
     id?: string;

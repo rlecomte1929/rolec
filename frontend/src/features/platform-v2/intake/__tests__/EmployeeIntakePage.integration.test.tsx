@@ -84,7 +84,6 @@ const SAVED_DRAFT = {
   dest_city: 'Berlin',
   target_date: '2026-09-01',
   purpose: 'Employment',
-  has_pets: false,
 };
 
 function mockGetIntakeWithDraft() {
