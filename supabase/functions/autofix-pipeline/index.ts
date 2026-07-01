@@ -349,6 +349,92 @@ If you cannot generate a safe fix: {"fixed_content": null, "diff_summary": "reas
   return { outcome: "fixed", prUrl: pr.html_url, branchName, fixedFile: identified.file_path, reason: fix.diff_summary };
 }
 
+// ─── Mission Control P2: single-demand dispatch (no Notion) ───────────────────
+// Additive — reuses the same helpers + safety gates as processBug, but fixes ONE
+// work_item dispatched from the admin console instead of a Notion bug. The branch
+// keeps the autofix/bug-<hex> shape so autofix-validate.yml runs (E2E → merge →
+// deploy). Leaves the nightly Notion path above completely untouched.
+async function processWorkItem(wi: { id: string; title: string; body: string }, env: Env) {
+  const log = (msg: string) => console.log(`  [wi:${wi.id.slice(0, 8)}] ${msg}`);
+  const { owner, repo } = { owner: env.githubOwner, repo: env.githubRepo };
+
+  // 1. Classify (conservative, same prompt as the nightly path)
+  const classifySystem = `You are a conservative bug-triage AI. Decide if a bug can be safely auto-fixed without human review.
+AUTO-FIXABLE: copy typos, wrong labels, broken links, CSS layout, null-checks, missing static data only.
+NOT AUTO-FIXABLE: auth, tokens, billing, payments, schema, migrations, PII, GDPR, security, unclear root cause.
+Respond ONLY with JSON: {"auto_fixable": true|false, "fix_category": "copy"|"link"|"css"|"null-check"|"static-content"|"not-fixable", "reason": "one sentence"}`;
+  const classification = parseJson(
+    await callClaude(classifySystem, `Bug: ${wi.title}\n\n${wi.body}`, 200, env.anthropicKey),
+    { auto_fixable: false, fix_category: "not-fixable", reason: "parse error" },
+  );
+  if (!classification.auto_fixable) return { outcome: "skipped_classifier", reason: classification.reason };
+
+  // 2. Keyword safety
+  const safety = checkKeywordSafety(`${wi.title}\n${wi.body}`);
+  if (!safety.safe) return { outcome: "skipped_blocklist", reason: `matched keyword "${safety.keyword}"` };
+
+  // 3. Identify file
+  const fileSystem = `You are a ReloPass Next.js/TypeScript codebase expert. Given a bug, return the most likely file path to fix.
+Key dirs: frontend/src/components/, frontend/src/pages/, frontend/src/constants/, frontend/src/styles/, lib/
+Respond ONLY with JSON: {"file_path": "path/to/file.tsx"|null, "reasoning": "one sentence"}`;
+  const identified = parseJson<{ file_path: string | null; reasoning: string }>(
+    await callClaude(fileSystem, `Bug: ${wi.title}\n${wi.body}`, 256, env.anthropicKey),
+    { file_path: null, reasoning: "no file" },
+  );
+  if (!identified.file_path) return { outcome: "skipped_no_file", reason: identified.reasoning };
+
+  // 4. Path safety + dry-run
+  if (isBlockedPath(identified.file_path)) return { outcome: "skipped_blocklist", reason: `blocked path "${identified.file_path}"` };
+  if (env.dryRun) return { outcome: "skipped_dry_run", reason: `[DRY RUN] would fix ${identified.file_path}` };
+
+  // 5. Fetch file
+  const fileData = await ghGet<{ content: string; sha: string; size: number }>(
+    `/repos/${owner}/${repo}/contents/${identified.file_path}?ref=${env.baseBranch}`, env.githubToken,
+  ).catch(() => null);
+  if (!fileData) return { outcome: "skipped_no_file", reason: `not in repo: ${identified.file_path}` };
+  if (fileData.size > 50000) return { outcome: "skipped_no_fix", reason: `file too large: ${fileData.size}` };
+  const fileContent = new TextDecoder().decode(
+    Uint8Array.from(atob(fileData.content.replace(/\n/g, "")), (c) => c.charCodeAt(0)),
+  );
+
+  // 6. Generate minimal fix
+  const maxLen = 12000;
+  const truncated = fileContent.length > maxLen ? fileContent.slice(0, maxLen) + "\n// ... [truncated]" : fileContent;
+  const fixSystem = `You are a ReloPass codebase expert. Make a MINIMAL fix. Only change what is needed. Preserve all existing code.
+Respond ONLY with JSON: {"fixed_content": "...complete corrected file...", "diff_summary": "one sentence: what changed"}
+If you cannot generate a safe fix: {"fixed_content": null, "diff_summary": "reason"}`;
+  const fix = parseJson<{ fixed_content: string | null; diff_summary: string }>(
+    await callClaude(fixSystem, `Bug: ${wi.title}\n${wi.body}\n\nFile ${identified.file_path}:\n\`\`\`\n${truncated}\n\`\`\``, 4096, env.anthropicKey),
+    { fixed_content: null, diff_summary: "fix error" },
+  );
+  if (!fix.fixed_content || fix.fixed_content.trim() === fileContent.trim()) {
+    return { outcome: "skipped_no_fix", reason: fix.diff_summary };
+  }
+
+  // 7. Branch (autofix/bug-<16 hex> from the work_item uuid → validate fires)
+  const baseSha = await ghGet<{ object: { sha: string } }>(
+    `/repos/${owner}/${repo}/git/refs/heads/${env.baseBranch}`, env.githubToken,
+  );
+  const branchName = `autofix/bug-${wi.id.replace(/-/g, "").slice(0, 16)}`;
+  await ghPost(`/repos/${owner}/${repo}/git/refs`, { ref: `refs/heads/${branchName}`, sha: baseSha.object.sha }, env.githubToken);
+
+  // 8. Commit + 9. draft PR
+  const encoded = btoa(unescape(encodeURIComponent(fix.fixed_content)));
+  await ghPut(`/repos/${owner}/${repo}/contents/${identified.file_path}`, {
+    message: `fix: ${wi.title.slice(0, 72)}\n\n${fix.diff_summary}\n\nMission Control work_item: ${wi.id}`,
+    content: encoded, sha: fileData.sha, branch: branchName,
+  }, env.githubToken);
+  const pr = await ghPost<{ html_url: string }>(`/repos/${owner}/${repo}/pulls`, {
+    title: `fix: ${wi.title.slice(0, 72)}`,
+    head: branchName, base: env.baseBranch,
+    body: `## Auto-fix (Mission Control)\n\n**work_item:** ${wi.id}\n**File:** \`${identified.file_path}\`\n**Change:** ${fix.diff_summary}\n\n---\n*Dispatched from the Mission Control console. Requires human review.*`,
+    draft: true,
+  }, env.githubToken);
+
+  log(`✅ PR: ${pr.html_url}`);
+  return { outcome: "fixed", prUrl: pr.html_url, branchName, fixedFile: identified.file_path, reason: fix.diff_summary };
+}
+
 // ─── Edge Function handler ────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -379,6 +465,21 @@ Deno.serve(async (req: Request) => {
   };
 
   const date = new Date().toISOString().slice(0, 10);
+
+  // Mission Control P2 — single-demand dispatch from the admin console. Runs the
+  // one work_item synchronously and returns its PR url (no Notion). Falls through
+  // to the nightly Notion batch when no work_item is supplied.
+  if (body.work_item && body.work_item.id) {
+    const wi = body.work_item;
+    const result = await processWorkItem(
+      { id: String(wi.id), title: String(wi.title ?? ""), body: String(wi.body ?? "") },
+      env,
+    ).catch((err) => ({ outcome: "error", reason: err instanceof Error ? err.message : String(err) }));
+    return Response.json(
+      { ok: result.outcome === "fixed", pr_url: (result as { prUrl?: string }).prUrl ?? null, ...result },
+      { headers: CORS_HEADERS },
+    );
+  }
 
   try {
     // Fetch candidate bugs
