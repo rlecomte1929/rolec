@@ -445,10 +445,15 @@ def _call_triage_model(content: str, subject: Optional[str], user_role: str,
     429/5xx retry + structured logging (AIQ-401). Same model/tokens/temperature.
     """
     from ..services.llm_client import claude_complete_text_sync
+    # GDPR Art. 28/44 (H1): the support subject + ticket body are user free-text
+    # that routinely carry PII (names, emails, phone, passport/ID numbers). Mask
+    # before they cross the Anthropic boundary — llm_client does NOT mask, so the
+    # caller must (CLAUDE.md hard rule). mask_pii is idempotent and behaviour-safe.
+    from ..services.pii_masker import mask_pii
 
     user_message_parts = []
     if subject:
-        user_message_parts.append(f"Subject: {subject}")
+        user_message_parts.append(f"Subject: {mask_pii(subject)}")
     user_message_parts.append(f"User role: {user_role or 'unknown'}")
     if company_id:
         user_message_parts.append(f"Company ID: {company_id}")
@@ -458,7 +463,7 @@ def _call_triage_model(content: str, subject: Optional[str], user_role: str,
             for e in recent_events[:5]
         )
         user_message_parts.append(f"Recent user events: {events_summary}")
-    user_message_parts.append(f"\nTicket content:\n{content[:3000]}")
+    user_message_parts.append(f"\nTicket content:\n{mask_pii(content[:3000])}")
 
     system_prompt = _TRIAGE_SYSTEM.format(domain_context=domain_context)
 
