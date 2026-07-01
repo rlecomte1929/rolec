@@ -9,6 +9,7 @@ from .routers import (
     admin_corrections,
     admin_rag_eval,
     admin_ocr_shadow,
+    admin_work_items,
     admin_prompts,
     admin_source_change_review,
     advisors,
@@ -28,6 +29,7 @@ from .routers import (
     conjoint,
     employee_quotes,
     employee_steps,
+    provider_portal,
     provider_ratings,
     hr_vendor_performance,
     exception_requests,
@@ -49,6 +51,7 @@ from .routers import (
     hr_vendor_widgets,
     research_requests,
     hr_coordination,
+    employee_immigration_snapshot,
     immigration_documents,
     immigration_forms,
     immigration_gdpr,
@@ -75,6 +78,10 @@ from .routers import (
     specialist_review,
     support,
     translation,
+    admin_settings,
+    admin_feedback,
+    admin_admins,
+    admin_audit_log,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -115,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
     app.include_router(ocr.router)  # [AIQ-1148] /api/ocr/process — general document OCR
     app.include_router(employee_quotes.router)
+    app.include_router(provider_portal.router)  # H2 — external provider portal (/api/provider/{tasks,case-summary,profile})
     app.include_router(provider_ratings.router)  # CATALOG-3 employee provider ratings
     app.include_router(hr_vendor_performance.router)  # NAV-SP-2 HR vendor performance dashboard
     app.include_router(employee_steps.router)  # [B11/AIQ-421] /api/employee/steps/4 → quote-request alias
@@ -157,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_intake_interview.router)
     app.include_router(immigration_status.router)
     app.include_router(immigration_gdpr.router)
+    app.include_router(employee_immigration_snapshot.router)  # relocation-assistant Slice 2 — GET /api/employee/cases/{id}/immigration-snapshot
     app.include_router(gdpr.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
     app.include_router(privacy_consents.router)  # PRIV-005 / AIQ-473 — Art. 13 notice acknowledgement
     app.include_router(feedback.router)  # product "Share feedback" widget → public.feedback
@@ -183,6 +192,7 @@ def create_app() -> FastAPI:
     # [Parker-G] AI unit-economics admin rollup
     app.include_router(admin_ai_unit_economics.router)
     app.include_router(admin_rag_eval.router)
+    app.include_router(admin_work_items.router)  # Mission Control P1 — demands console
     # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API
     app.include_router(conjoint.router)
     app.include_router(admin_corrections.router)  # [AIQ-554] /api/admin/corrections/by-reason
@@ -208,6 +218,10 @@ def create_app() -> FastAPI:
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
     app.include_router(policy_canonical.read_router, prefix="/api")
     app.include_router(policy_templates.router)
+    app.include_router(admin_settings.router)  # [Task-4] admin AI-governance controls panel
+    app.include_router(admin_feedback.router)  # [Task-6] unified feedback console
+    app.include_router(admin_admins.router)  # [Task-7] admin lifecycle management
+    app.include_router(admin_audit_log.router)  # [Task-7] platform audit-log viewer
 
     # [P4-4 / AIQ-1220] Cron HTTP triggers (inline CRON_SECRET auth). Mounted in
     # backend/main.py already; registered here too so the modular app + tests see

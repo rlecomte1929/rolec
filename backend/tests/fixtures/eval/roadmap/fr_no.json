@@ -1,0 +1,12 @@
+{
+  "corridor": "FR_NO",
+  "pathway": "EEA_FREE_MOVEMENT",
+  "description": "Expected core steps + ordering for an FR→NO EEA free-movement relocation (EU national). Matched against produced roadmap titles by the case-insensitive `match` substring.",
+  "expected_steps": [
+    {"key": "eea_registration", "match": "eea registration"},
+    {"key": "national_registry", "match": "national registry"}
+  ],
+  "order": [
+    ["eea_registration", "national_registry"]
+  ]
+}
