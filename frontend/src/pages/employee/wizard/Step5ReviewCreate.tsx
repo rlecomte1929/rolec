@@ -424,6 +424,23 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         </div>
       )}
 
+      {requirements?.staWaived && requirements.staWaived.length > 0 && (
+        <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
+          <div className="text-sm font-semibold text-[#0b2b43] mb-1">
+            Waived for this short-term assignment
+          </div>
+          <div className="mb-2">
+            Because this is a short-term assignment (under 12 months), these long-term
+            requirements don&apos;t apply:
+          </div>
+          <ul className="list-disc list-inside space-y-1">
+            {requirements.staWaived.map((title) => (
+              <li key={title}>{title}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-6 space-y-6">
         {Object.entries(grouped).map(([pillar, items]) => (
           <div key={pillar}>

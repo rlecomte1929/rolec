@@ -506,6 +506,7 @@ export interface CaseRequirementsDTO {
   computedAt: string;
   requirements: RequirementItemDTO[];
   sources: SourceRecordDTO[];
+  staWaived?: string[];
 }
 
 export interface RelocationCaseListItem {

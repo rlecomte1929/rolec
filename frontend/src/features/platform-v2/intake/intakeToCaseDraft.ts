@@ -53,6 +53,9 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       // AIQ-1349: STA/LTA/PERMANENT — backend bridges this onto
       // public.cases.assignment_type for duration-aware policy + roadmap.
       assignmentType: data.assignment_type || undefined,
+      // AIQ-1349: optional expected stay length → 22 live duration_threshold rules.
+      expectedDurationMonths:
+        data.expected_duration_months != null ? Number(data.expected_duration_months) : undefined,
     },
   };
 }
