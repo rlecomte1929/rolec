@@ -19,6 +19,9 @@ import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
 import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';
 import { PlatformShellSidebar, type SidebarRole } from './PlatformShellSidebar';
+import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
+import { PolicyAssistantDockedShell } from '../features/policy/PolicyAssistantDockedShell';
+import { SetupAssistantPanel } from '../features/setup-help/SetupAssistantPanel';
 
 function deriveInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -93,7 +96,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   // AIQ-1017: on mobile (<md) the sidebar collapses into a slide-in drawer
   // toggled from the topbar hamburger. Desktop is unchanged (inline sidebar).
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [setupAssistantOpen, setSetupAssistantOpen] = useState(false);
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
+  const isHrRole = role === 'HR';
 
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
   useBrandingConfig();
@@ -297,6 +302,33 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
       </div>
 
       <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
+
+      {/* Setup & Help Assistant — HR only. FAB triggers a right-side
+          overlay panel (uses PolicyAssistantDockedShell's mobile path).
+          The docked push-content mode requires a page-level flex host;
+          AppShell uses a fixed overlay as the pragmatic alternative. */}
+      {isHrRole ? (
+        <>
+          <SetupAssistantFab
+            onClick={() => setSetupAssistantOpen((v) => !v)}
+            isPanelOpen={setupAssistantOpen}
+          />
+          <PolicyAssistantDockedShell
+            open={setupAssistantOpen}
+            onOpenChange={setSetupAssistantOpen}
+            title="Setup & Help"
+            subtitle="Guided help for your ReloPass workspace"
+            titleId="setup-assistant-shell-title"
+            assistant={() => <SetupAssistantPanel variant="embedded" />}
+          >
+            {/* Empty fragment — AppShell renders its main content outside
+                this shell. The mobile bottom-sheet overlay is the desired
+                UX; the lg+ docked column with no sibling content is hidden
+                via the shell's conditional width (0px when closed). */}
+            <></>
+          </PolicyAssistantDockedShell>
+        </>
+      ) : null}
     </div>
   );
 };
