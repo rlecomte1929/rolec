@@ -234,7 +234,8 @@ export default tseslint.config(
       //   trivially fixable and should be drained + re-promoted in the epics) —
       'react/no-unescaped-entities': 'error',
       'react/prop-types': 'warn',
-      'no-constant-binary-expression': 'warn',
+      // Drained to 0 and promoted (frontend-hygiene pass, 2026-06-30) so they can't regress.
+      'no-constant-binary-expression': 'error',
       '@typescript-eslint/no-redundant-type-constituents': 'warn',
       '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
       '@typescript-eslint/require-await': 'warn',
@@ -242,9 +243,9 @@ export default tseslint.config(
       '@typescript-eslint/prefer-promise-reject-errors': 'warn',
       '@typescript-eslint/only-throw-error': 'warn',
       '@typescript-eslint/no-unused-expressions': 'warn',
-      'no-useless-escape': 'warn',
-      'no-empty': 'warn',
-      'prefer-const': 'warn',
+      'no-useless-escape': 'error',
+      'no-empty': 'error',
+      'prefer-const': 'error',
     },
   },
 

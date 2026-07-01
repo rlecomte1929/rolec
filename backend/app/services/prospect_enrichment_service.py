@@ -109,11 +109,18 @@ def _build_user_prompt(
     website_text: str,
     search_text: str,
 ) -> str:
+    # GDPR Art. 28/44 (H1): ADMIN NOTES is admin-typed free-text that may carry a
+    # contact's personal data (name/email/phone). Mask before egress — the generic
+    # llm_client does not mask (CLAUDE.md hard rule). Company name/domain/linkedin
+    # are business firmographics and the website/search blocks are published web
+    # evidence used for grounding, so those are left intact.
+    from .pii_masker import mask_pii
+
     return (
         f"COMPANY NAME: {company_name}\n"
         f"DOMAIN: {domain or '(none)'}\n"
         f"LINKEDIN: {linkedin or '(none)'}\n"
-        f"ADMIN NOTES: {raw_input_notes or '(none)'}\n\n"
+        f"ADMIN NOTES: {mask_pii(raw_input_notes) or '(none)'}\n\n"
         f"=== WEBSITE EVIDENCE ===\n{website_text}\n\n"
         f"=== WEB SEARCH EVIDENCE ===\n{search_text}\n"
     )
