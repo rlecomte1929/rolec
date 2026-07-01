@@ -11,7 +11,7 @@ on:
       projects:
         description: "Playwright projects to run"
         type: string
-        default: "--project=provision --project=core --project=write-flow --project=deep"
+        default: "--project=provision --project=readiness --project=core --project=write-flow --project=deep"
 
 concurrency:
   group: e2e-sentinel-campaign
@@ -74,7 +74,7 @@ jobs:
         env:
           # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input;
           # falls back to the default project set on a push (no dispatch input present)
-          PROJECTS: ${{ github.event.inputs.projects || '--project=provision --project=core --project=write-flow --project=deep' }}
+          PROJECTS: ${{ github.event.inputs.projects || '--project=provision --project=readiness --project=core --project=write-flow --project=deep' }}
         run: |
           # shellcheck disable=SC2086  # PROJECTS is several flags; word-splitting is intended
           npx playwright test $PROJECTS
@@ -82,6 +82,7 @@ jobs:
       # Honest-green gate: if provisioning didn't produce all 3 sessions, the dependent
       # tests SKIP and the scorer would read a VACUOUS 100% GREEN. Fail loudly instead.
       - name: Verify provisioning
+        id: gate
         working-directory: tests/e2e
         run: |
           missing=0
@@ -94,6 +95,16 @@ jobs:
             exit 1
           fi
           echo "provisioning complete (hr_a, emp_a, hr_b)"
+          # Phase 3 readiness marker: if the company data paths never warmed (deploy
+          # window), mark the run degraded so the scorer treats it as INCONCLUSIVE.
+          ready=$(python3 -c "import json,os;p='playwright/.auth/_ready.json';print(json.load(open(p)).get('ready') if os.path.exists(p) else True)" 2>/dev/null || echo True)
+          if [ "$ready" = "False" ]; then
+            echo "readiness: company data paths NOT warm → run is INCONCLUSIVE (degraded)"
+            echo "degraded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "readiness: data paths warm"
+            echo "degraded=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # API smoke layer runs AFTER provisioning so it doesn't eat provision's rate budget.
       - name: API smoke layer
@@ -112,7 +123,7 @@ jobs:
           python3 scripts/ingest_playwright_results.py \
             --pw "tests/e2e/test-artifacts/${RUNID}/_results.json" \
             ${{ env.RELOPASS_E2E_PASSWORD != '' && '--api test_results.json' || '' }}
-          python3 scripts/campaign_scorer.py --no-prev | tee /tmp/score.txt
+          python3 scripts/campaign_scorer.py --no-prev ${{ steps.gate.outputs.degraded == 'true' && '--degraded' || '' }} | tee /tmp/score.txt
 
       - name: Summary
         if: always()

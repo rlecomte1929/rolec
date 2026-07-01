@@ -43,12 +43,16 @@ export default defineConfig({
     // Register fresh is_test personas via API → playwright/.auth/{hr_a,emp_a,hr_b}.json.
     // No passwords typed; data is purgeable via `is_test=true`.
     { name: 'provision', testMatch: /provision\.setup\.ts/, retries: 1 },
+    // Data-path readiness gate: after provisioning, wait for the real company-scoped
+    // endpoints to be non-5xx (deeper than the shallow /health front-door). Writes
+    // playwright/.auth/_ready.json; never hard-fails (drives the scorer --degraded).
+    { name: 'readiness',  testMatch: /readiness\.setup\.ts/, dependencies: ['provision'], retries: 0 },
     // Core browser checks (graceful empty states, no B10/B13) on the fresh accounts.
-    { name: 'core',       testDir: './tests/core',       dependencies: ['provision'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/hr_a.json' } },
+    { name: 'core',       testDir: './tests/core',       dependencies: ['readiness'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/hr_a.json' } },
     // Write-flow lifecycle (create→assign→submit→message→RFQ) on the fresh pair.
-    { name: 'write-flow', testDir: './tests/write-flow', dependencies: ['provision'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/hr_a.json' } },
+    { name: 'write-flow', testDir: './tests/write-flow', dependencies: ['readiness'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/hr_a.json' } },
     // Deep journey: fill wizard → submit → poll roadmap → assert it RENDERS (employee session).
-    { name: 'deep',       testDir: './tests/deep',       dependencies: ['provision'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/emp_a.json' } },
+    { name: 'deep',       testDir: './tests/deep',       dependencies: ['readiness'], use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/emp_a.json' } },
 
     // ════ LOCAL / FULL-DEMO PATH (form login — needs PW_TESTCO / PW_DEMO) ══════
     // Authenticate every demo persona once → playwright/.auth/<persona>.json.
