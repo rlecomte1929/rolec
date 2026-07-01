@@ -4,9 +4,7 @@ emits a `lead_captured` analytics event (bottom of the marketing funnel).
 
 PII: `message` is stored raw for GTM. If a future ticket routes it to an
 LLM for enrichment, it MUST pass mask_pii() first (repo data-minimisation rule)."""
-import logging
 import uuid
-from typing import Any, Dict
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -17,7 +15,6 @@ from ..models import Lead, ProspectCandidate
 from ..services.analytics_service import emit_event
 from ._leads_schemas import LeadCaptureIn
 
-log = logging.getLogger(__name__)
 router = APIRouter(tags=["public-lead-capture"])
 
 

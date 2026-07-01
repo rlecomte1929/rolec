@@ -3,7 +3,7 @@ Modeled on admin_prospects.py (ORM via SessionLocal). Admin-only."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func
@@ -88,6 +88,8 @@ def patch_lead(lead_id: str, body: LeadPatchIn, _admin: dict = Depends(require_a
             lead.tags = body.tags
         s.commit()
         s.refresh(lead)
-        return _to_out(lead, set())
+        domains = {d for (d,) in s.query(ProspectCandidate.company_domain)
+                   .filter(ProspectCandidate.company_domain == lead.company_domain).all()}
+        return _to_out(lead, domains)
     finally:
         s.close()
