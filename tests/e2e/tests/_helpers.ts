@@ -84,6 +84,41 @@ export function testArtifact(info: TestInfo, file: string): string {
   return `test-artifacts/${runid}/${scenario}/${file}`;
 }
 
+/**
+ * Deploy-tolerant request wrapper. Render rolling-restarts (triggered by every merge to
+ * main) briefly return a gateway 502/503/504 from a restarting instance. The campaign's
+ * prod-reachability preconditions (`expect(status).toBeLessThan(500)`) run with Playwright
+ * `retries: 0`, so a single transient gateway error files a false-positive P0 in the Work
+ * Queue (AIQ-1386, AIQ-1394 were both exactly this — a 502 in a merge-deploy window).
+ *
+ * Retry the request only on a gateway status (502/503/504) or a network throw
+ * (ECONNRESET/timeout mid-restart), with linear backoff. A non-gateway response (a real
+ * app 4xx/5xx) is returned immediately so genuine failures are still caught, and a
+ * persistent gateway outage still fails after the retries — the last response is returned
+ * so the caller's `< 500` assertion fails honestly. Typed on the minimal `{ status() }`
+ * shape so it wraps any Playwright request (GET/PATCH/POST) and is unit-testable with a stub.
+ */
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+
+export async function requestWithGatewayRetry<T extends { status(): number }>(
+  send: () => Promise<T>,
+  { retries = 4, backoffMs = 1200 }: { retries?: number; backoffMs?: number } = {},
+): Promise<T> {
+  let last: T | undefined;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      last = await send();
+      if (!GATEWAY_STATUSES.has(last.status())) return last;
+    } catch (err) {
+      if (attempt === retries) throw err;
+    }
+    if (attempt < retries) {
+      await new Promise((r) => setTimeout(r, backoffMs * (attempt + 1)));
+    }
+  }
+  return last as T;
+}
+
 /** Open the persona's first case from the dashboard; returns the caseId or null. */
 export async function openFirstEmployeeCase(page: Page): Promise<string | null> {
   await page.goto('/employee/dashboard');
