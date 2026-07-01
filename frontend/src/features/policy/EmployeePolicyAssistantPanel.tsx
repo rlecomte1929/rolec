@@ -22,6 +22,7 @@ import {
   isCitationDeepLinkAvailable,
   scrollToPolicyReference,
 } from './policyAssistantCitations';
+import { AnswerFeedback } from '../policy-assistant/AnswerFeedback';
 import { formatEvidenceAttribution } from './policyEvidenceFormatting';
 import {
   clearEmployeePolicyAssistantTurns,
@@ -389,6 +390,7 @@ function AnswerResultCard({
             ) : null}
           </>
         )}
+        <AnswerFeedback traceSessionId={answer.trace_session_id} />
       </div>
       )}
     </article>
