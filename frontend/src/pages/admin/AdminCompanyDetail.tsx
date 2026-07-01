@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { Card, Badge, Button } from '../../components/antigravity';
@@ -15,9 +15,12 @@ import type {
 } from '../../types';
 import { AdminLayout } from './AdminLayout';
 
+type CompanyTab = 'overview' | 'users' | 'assignments' | 'policy';
+
 export const AdminCompanyDetail: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const location = useLocation();
+  const [activeTab, setActiveTab] = useState<CompanyTab>('overview');
 
   // location.key in the key preserves the original effect's refetch-on-navigation.
   const detailQuery = useQuery({
@@ -92,8 +95,39 @@ export const AdminCompanyDetail: React.FC = () => {
   const assignCount = counts?.assignments_count ?? assignments.length;
   const policyCount = counts?.policies_count ?? policies.length;
 
+  const tabs: Array<{ key: CompanyTab; label: string; count?: number }> = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'users', label: 'Users', count: hrCount + empCount },
+    { key: 'assignments', label: 'Assignments', count: assignCount },
+    { key: 'policy', label: 'Policy', count: policyCount },
+  ];
+
   return (
     <AdminLayout title="Company Detail" subtitle={company.name}>
+      {/* Tabs */}
+      <div className="mb-5 flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-3">
+        {tabs.map((t) => {
+          const active = activeTab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setActiveTab(t.key)}
+              aria-current={active ? 'page' : undefined}
+              className={
+                active
+                  ? 'rounded-md bg-[#0b2b43] px-3 py-1 text-xs font-medium text-white'
+                  : 'rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }
+            >
+              {t.label}{t.count != null ? ` (${t.count})` : ''}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
       {/* Company summary */}
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -153,7 +187,11 @@ export const AdminCompanyDetail: React.FC = () => {
           </ul>
         </Card>
       )}
+        </>
+      )}
 
+      {activeTab === 'users' && (
+        <>
       {/* HR Users */}
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -231,7 +269,11 @@ export const AdminCompanyDetail: React.FC = () => {
           </div>
         )}
       </Card>
+        </>
+      )}
 
+      {activeTab === 'assignments' && (
+        <>
       {/* Assignments / cases */}
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -276,7 +318,11 @@ export const AdminCompanyDetail: React.FC = () => {
           </div>
         )}
       </Card>
+        </>
+      )}
 
+      {activeTab === 'policy' && (
+        <>
       {/* Policy workspace */}
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -326,6 +372,8 @@ export const AdminCompanyDetail: React.FC = () => {
           </div>
         )}
       </Card>
+        </>
+      )}
 
       {/* Quick actions */}
       <Card padding="lg">
