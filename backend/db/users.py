@@ -1053,6 +1053,28 @@ class UsersMixin:
             ), {"email": email_norm}).fetchone()
         return bool(row and row._mapping.get("enabled") == 1)
 
+    def set_admin_enabled(self, email: str, enabled: bool) -> bool:
+        """Enable or disable an admin allowlist entry. Returns True if a row was updated."""
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return False
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE admin_allowlist SET enabled = :enabled WHERE email = :email"
+            ), {"enabled": 1 if enabled else 0, "email": email_norm})
+            return result.rowcount > 0
+
+    def remove_admin_allowlist(self, email: str) -> bool:
+        """Delete an entry from the admin allowlist. Returns True if a row was deleted."""
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return False
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "DELETE FROM admin_allowlist WHERE email = :email"
+            ), {"email": email_norm})
+            return result.rowcount > 0
+
     def create_hr_user(
         self,
         hr_id: str,
