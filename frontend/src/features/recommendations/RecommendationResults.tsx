@@ -5,6 +5,12 @@ import { createAIDecision } from '../../api/aiDecisions';
 import type { RecommendationItem, RecommendationResponse } from './types';
 import { rateProvider } from './api';
 
+// [Phase 2] Leaflet map is heavy + client-only — lazy-load so it lands in its
+// own chunk and only when the housing (living_areas) tab is viewed.
+const HousingNeighborhoodMap = React.lazy(() =>
+  import('./HousingNeighborhoodMap').then((m) => ({ default: m.HousingNeighborhoodMap })),
+);
+
 const TIER_LABELS: Record<string, string> = {
   best_match: 'Best match',
   good_fit: 'Good fit',
@@ -589,6 +595,29 @@ export const RecommendationResults: React.FC<Props> = ({
               Choose one option per service to build your relocation package. Estimates use your selected currency
               (set on Select services). You can compare costs with your HR policy in the summary.
             </p>
+            {category === 'living_areas' && res.recommendations.length > 0 && (
+              <React.Suspense
+                fallback={
+                  <div className="h-[360px] mb-4 rounded-xl border border-[#e2e8f0] bg-slate-50 flex items-center justify-center text-sm text-[#94a3b8]">
+                    Loading map…
+                  </div>
+                }
+              >
+                <HousingNeighborhoodMap
+                  items={res.recommendations}
+                  office={
+                    typeof res.criteria_echo?.office_lat === 'number' &&
+                    typeof res.criteria_echo?.office_lng === 'number'
+                      ? {
+                          lat: res.criteria_echo.office_lat as number,
+                          lng: res.criteria_echo.office_lng as number,
+                          address: res.criteria_echo.office_address as string | undefined,
+                        }
+                      : null
+                  }
+                />
+              </React.Suspense>
+            )}
             {res.recommendations.length === 0 &&
             (res.criteria_echo as Record<string, unknown> | undefined)?.hr_curation_status === 'hr_pending' ? (
               <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">

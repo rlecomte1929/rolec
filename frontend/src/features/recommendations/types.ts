@@ -38,6 +38,9 @@ export interface RecommendationItem {
     cost_type?: 'monthly' | 'annual' | 'one_time';
     map_query?: string;
     company_preferred?: boolean;
+    /** Neighborhood coordinates for the housing map (living_areas). */
+    lat?: number;
+    lng?: number;
   };
   explanation?: RecommendationExplanation;
 }
