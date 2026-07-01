@@ -115,6 +115,23 @@ describe('ImportFlow — real extraction wiring', () => {
     expect(await screen.findByText('No benefits could be imported')).toBeInTheDocument();
   });
 
+  it('shows "already in your draft" (not "nothing found") when all benefits were skipped as existing', async () => {
+    mocks.upload.mockResolvedValue({ ok: true, document: { id: 'doc-4' } });
+    mocks.getDoc.mockResolvedValue({ document: { id: 'doc-4', assistant_import_status: 'normalized' } });
+    mocks.hrImportExtraction.mockResolvedValue({
+      imported: [],
+      skipped_existing: ['host_housing_cap', 'mobility_premium'],
+      unmapped: [],
+      version_id: 'v4',
+    });
+
+    const { container } = render(<ImportFlow onClose={() => {}} onImported={() => {}} />);
+    selectFileAndStart(container);
+
+    expect(await screen.findByText('Already in your draft')).toBeInTheDocument();
+    expect(screen.queryByText('No benefits could be imported')).not.toBeInTheDocument();
+  });
+
   it('no longer references the fabricated MOCK_RULES / MOCK_LOG', () => {
     const src = readFileSync(
       resolve(process.cwd(), 'src/features/platform-v2/policy-builder/HrPolicyBuilderV2Page.tsx'),

@@ -1220,7 +1220,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
   const [dragOver, setDragOver]   = useState(false);
   const [docId, setDocId]         = useState<string | null>(null);
   const [stage, setStage]         = useState<ImportStage>(STAGE_UPLOADING);
-  const [result, setResult]       = useState<{ imported: string[]; unmapped: string[] } | null>(null);
+  const [result, setResult]       = useState<{ imported: string[]; unmapped: string[]; skipped_existing: string[] } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [errorMsg, setErrorMsg]   = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1269,7 +1269,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
       try {
         const res = await policyConfigMatrixAPI.hrImportExtraction({ policy_id: docId });
         if (cancelled) return;
-        setResult({ imported: res.imported ?? [], unmapped: res.unmapped ?? [] });
+        setResult({ imported: res.imported ?? [], unmapped: res.unmapped ?? [], skipped_existing: res.skipped_existing ?? [] });
         setStep('review');
       } catch (e: unknown) {
         if (cancelled) return;
@@ -1314,7 +1314,11 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
 
   const imported = result?.imported ?? [];
   const unmapped = result?.unmapped ?? [];
-  const nothingImported = step === 'review' && imported.length === 0;
+  const skippedExisting = result?.skipped_existing ?? [];
+  // "All skipped" = we found benefits in the doc but they're already in the draft
+  // (a re-import). Distinct from "nothing found" so we don't mislead the user.
+  const allSkipped = step === 'review' && imported.length === 0 && skippedExisting.length > 0;
+  const nothingImported = step === 'review' && imported.length === 0 && skippedExisting.length === 0;
 
   const STEPS = ['Upload', 'Extract', 'Review'];
   const stepNum = step === 'upload' ? 1 : step === 'review' ? 3 : 2;
@@ -1435,15 +1439,26 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
           {/* Step 3: Review — the REAL imported benefit keys from the draft */}
           {step === 'review' && (
             <div className="p-6 overflow-y-auto max-h-[55vh]">
-              {nothingImported ? (
+              {(nothingImported || allSkipped) ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-center">
                   <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
                     <Info size={22} className="text-amber-600"/>
                   </div>
-                  <h3 className="text-sm font-semibold text-gray-900">No benefits could be imported</h3>
-                  <p className="text-[13px] text-gray-500 max-w-md">
-                    We couldn&apos;t map any structured benefits from this document into your policy. You can still build the policy from a template, or try a more detailed policy document.
-                  </p>
+                  {allSkipped ? (
+                    <>
+                      <h3 className="text-sm font-semibold text-gray-900">Already in your draft</h3>
+                      <p className="text-[13px] text-gray-500 max-w-md">
+                        Your draft already contains all {skippedExisting.length} benefit{skippedExisting.length === 1 ? '' : 's'} we found in this document — nothing new to import.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-sm font-semibold text-gray-900">No benefits could be imported</h3>
+                      <p className="text-[13px] text-gray-500 max-w-md">
+                        We couldn&apos;t map any structured benefits from this document into your policy. You can still build the policy from a template, or try a more detailed policy document.
+                      </p>
+                    </>
+                  )}
                   {unmapped.length > 0 && (
                     <div className="mt-2 w-full max-w-md text-left">
                       <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
