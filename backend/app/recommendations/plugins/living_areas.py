@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from .base import BasePlugin
 from ..types import RecommendationTier
 from ..weights import derive_segment, get_weights
+from .. import geo
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "living_areas.json"
 
@@ -97,6 +98,11 @@ class LivingAreasCriteria(BaseModel):
     budget_monthly: Dict[str, int] = Field(default_factory=lambda: {"min": 2000, "max": 5000})
     bedrooms: int = 2
     sqm_min: int = 65
+    # Employee's real office coordinates (geocoded server-side from the
+    # intake-captured office address). When present alongside a neighborhood's
+    # coords, commute is computed for real instead of read from a static estimate.
+    office_lat: Optional[float] = None
+    office_lng: Optional[float] = None
     commute_work: Optional[Dict[str, Any]] = None
     commute_school: Optional[Dict[str, Any]] = None
     lifestyle_priorities: Optional[Dict[str, int]] = None
@@ -145,7 +151,18 @@ class LivingAreasPlugin(BasePlugin):
         elif rent < b_min:
             budget_match = 90.0
 
+        # Real commute when we have both the office coords and the neighborhood's
+        # coords; otherwise fall back to the static per-row estimate (graceful
+        # per-row/per-city degradation for un-geocoded data).
         commute_mins = item.get("commute_to_work_minutes_estimate", 30)
+        mode = (c.commute_work or {}).get("mode", "transit") if c.commute_work else "transit"
+        if (
+            c.office_lat is not None and c.office_lng is not None
+            and item.get("lat") is not None and item.get("lng") is not None
+        ):
+            est = geo.commute_minutes((c.office_lat, c.office_lng), (item["lat"], item["lng"]), mode)
+            if est is not None:
+                commute_mins = int(round(est))
         max_mins = 45
         if c.commute_work:
             max_mins = c.commute_work.get("max_minutes", 45)
@@ -224,5 +241,8 @@ class LivingAreasPlugin(BasePlugin):
                 "currency": currency,
                 "cost_type": "monthly",
                 "map_query": f"{item.get('name', '')}, {item.get('city', 'Singapore')}",
+                # Coords for the neighborhood map (Phase 2); null until geocoded.
+                "lat": item.get("lat"),
+                "lng": item.get("lng"),
             },
         }
