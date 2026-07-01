@@ -79,6 +79,9 @@ _ALLOWLIST = {
     "backend/app/services/ocr_passport_extractor.py": (
         "EXEMPT", "prompt text is a static extraction instruction; PII lives in the "
                   "image (vision OCR is the inherent purpose; mask_pii is text-only)."),
+    "backend/app/services/feedback_triage.py": (
+        "MASKED", "mask_pii(text) before complete_sync() — user feedback free-text "
+                  "classified into severity/theme; deterministic fallback on masker failure."),
 }
 
 
