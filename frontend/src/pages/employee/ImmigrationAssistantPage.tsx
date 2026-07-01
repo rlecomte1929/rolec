@@ -11,15 +11,10 @@ import { servicesAPI } from '../../api/client';
 
 /**
  * Route: /employee/immigration-assistant
- * Employee-facing grounded immigration Q&A (AIQ-843 backend + AIQ-856 verdict capture).
- *
- * Slice 2: opens with a proactive "your move at a glance" panel (risk flags +
- * checklist) for the employee's own case, above the grounded Q&A.
- * Slice 3: passes the employee's own case id so answers are tailored to their
- * anonymised applicant context (family situation) — ownership verified server-side.
- * MVP: resolve the employee's corridor from THEIR case (via the services context) so
- * the assistant pre-fills "your IN → DE move" instead of hand-typing From/To.
- * Best-effort — if there's no assignment/corridor, the panel falls back to the manual form.
+ * Unified relocation assistant (Slice 5): grounded Q&A spanning immigration ("what
+ * does my move need") and company policy ("what does my company cover"). Also opens
+ * with the proactive "your move at a glance" panel (Slice 2), passes the case id for
+ * anonymised applicant context (Slice 3), and pre-fills the corridor from the case (MVP).
  */
 export const ImmigrationAssistantPage: React.FC = () => {
   const { primaryCaseId, assignmentId } = useEmployeeAssignment();
@@ -52,7 +47,7 @@ export const ImmigrationAssistantPage: React.FC = () => {
   }, [assignmentId]);
 
   return (
-    <AppShell title="Immigration Q&A" subtitle="Grounded, cited answers for your corridor">
+    <AppShell title="Relocation Assistant" subtitle="Grounded answers about your move and your company's benefits">
       <Container maxWidth="xl" className="py-8 space-y-4">
         <MoveAtAGlance caseId={primaryCaseId} />
         {resolved ? (
