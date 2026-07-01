@@ -94,6 +94,9 @@ export interface IntakeData {
    *  duration-aware policy resolution + roadmap. Defaults to LTA (the prior
    *  implicit "full relocation" behaviour) so existing flows are unchanged. */
   assignment_type: string;
+  /** AIQ-1349: optional expected assignment length in months. Feeds
+   *  assignmentContext.expectedDurationMonths → duration_threshold policy rules. */
+  expected_duration_months: number | null;
   commute_mins: number;
   commute_mode: string[];
   consent: boolean;
@@ -177,6 +180,8 @@ const INITIAL_DATA: IntakeData = {
   // AIQ-1349: default LTA = the prior implicit "full relocation" behaviour, so
   // the new control never blocks Continue and existing cases are unaffected.
   assignment_type: 'LTA',
+  // AIQ-1349: optional — left null so it drops from the draft JSON unless set.
+  expected_duration_months: null,
   commute_mins: 30,
   commute_mode: [],
   consent: false,
@@ -1185,6 +1190,15 @@ export function EmployeeIntakePage() {
                         { value: 'LTA', label: 'Long-term (1–5 years)' },
                         { value: 'PERMANENT', label: 'Permanent transfer' },
                       ]} />
+                  </FieldWrap>
+                  {/* AIQ-1349: optional expected length in months →
+                      assignmentContext.expectedDurationMonths for duration_threshold rules. */}
+                  <FieldWrap label="Expected duration (months)"
+                    hint="Optional — helps tailor which requirements apply to your stay.">
+                    <Input unstyled type="number" min={1} className={inputCls()}
+                      value={data.expected_duration_months != null ? String(data.expected_duration_months) : ''}
+                      placeholder="e.g. 18"
+                      onChange={(v) => setField('expected_duration_months', v.trim() === '' ? null : Number(v))} />
                   </FieldWrap>
                 </Grid>
 

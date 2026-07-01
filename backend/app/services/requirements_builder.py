@@ -75,7 +75,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             for item in requirements
         ]
 
-        required_fields, expanded, _ = apply_rules(draft, base_items)
+        required_fields, expanded, flags = apply_rules(draft, base_items)
 
         source_map = {record.id: record for record in sources}
         requirement_dtos: List[RequirementItemDTO] = []
@@ -114,6 +114,10 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             sources=source_dtos,
             disclaimer=IMMIGRATION_DISCLAIMER,  # AIQ-1349: recommend, not liable
             verificationStatus=DEFAULT_VERIFICATION_STATUS,
+            # AIQ-1349: titles of requirements suppressed for a short-term (STA)
+            # assignment, so the UI can explain the shorter list instead of
+            # silently dropping items. Empty for LTA/PERMANENT.
+            staWaived=sorted({t for t in (flags.get("staWaived") or []) if t}),
         )
 
 
