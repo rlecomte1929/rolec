@@ -78,3 +78,20 @@ def test_neighborhoods_dataset_100pct_geocoded():
     missing = [r.get("name") for r in rows
                if not (isinstance(r.get("lat"), (int, float)) and isinstance(r.get("lng"), (int, float)))]
     assert not missing, f"neighborhoods missing coords: {missing}"
+
+
+def test_phase0_office_address_sourced_from_case_and_geocoded(monkeypatch):
+    """Phase 0: the office address comes from the case (intake), not a duplicate
+    question, and is geocoded into office_lat/lng for the plugin."""
+    from backend.app.recommendations import criteria_builder
+
+    monkeypatch.setattr(criteria_builder.geo, "geocode", lambda addr, **k: (1.28, 103.85))
+    out = criteria_builder.build_criteria_for_assignment(
+        assignment_id="a1", case_id="c1", selected_services=["housing"],
+        saved_answers={"budget_min": 2000, "budget_max": 5000, "commute_mins": 45},
+        case_context={"destCity": "Singapore", "officeAddress": "1 Raffles Place, Singapore"},
+    )
+    living = out["living_areas"]
+    assert living["office_address"] == "1 Raffles Place, Singapore"
+    assert living["office_lat"] == 1.28 and living["office_lng"] == 103.85
+    assert living["commute_work"]["address"] == "1 Raffles Place, Singapore"

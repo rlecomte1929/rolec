@@ -127,11 +127,14 @@ def post_recommendations_batch(
         origin_city = getattr(case, "origin_city", None)
         origin_country = getattr(case, "origin_country", None)
     basics = draft.get("relocationBasics") or {}
+    assignment_ctx = draft.get("assignmentContext") or {}
     case_context = {
         "destCity": basics.get("destCity") or dest_city,
         "destCountry": basics.get("destCountry") or dest_country,
         "originCity": basics.get("originCity") or origin_city,
         "originCountry": origin_country or basics.get("originCountry"),
+        # Phase 0: single source of office address = the intake-captured value.
+        "officeAddress": assignment_ctx.get("workLocation"),
     }
 
     answer_rows = db.list_case_service_answers(case_id)

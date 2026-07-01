@@ -81,14 +81,10 @@ def _bank() -> List[ServiceQuestionDef]:
             default=45,
             criteria_key="commute_mins",
         ),
-        ServiceQuestionDef(
-            question_key="office_address",
-            label="Office/work address (optional)",
-            type="text",
-            service_category="housing",
-            placeholder="e.g. nearest landmark, postcode, or address",
-            criteria_key="office_address",
-        ),
+        # [Phase 0] Office address is no longer asked here — it duplicated the
+        # intake wizard's office field. Recommendations now source the office
+        # address from the case's assignmentContext.workLocation (single source),
+        # geocoded server-side for real commute scoring.
         # Schools
         ServiceQuestionDef(
             question_key="child_ages",

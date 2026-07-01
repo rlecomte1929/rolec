@@ -15,6 +15,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from . import geo
+
 log = logging.getLogger(__name__)
 
 # Service key (frontend) -> backend category key
@@ -67,6 +69,13 @@ def _apply_service_shaping(
             }
         for k in ("budget_min", "budget_max", "commute_mins"):
             out.pop(k, None)
+        # Phase 1: geocode the office once (cached) so the plugin computes real
+        # commute from coordinates. Best-effort — silent on failure/offline.
+        office_addr = out.get("office_address")
+        if office_addr:
+            coord = geo.geocode(office_addr)
+            if coord:
+                out["office_lat"], out["office_lng"] = coord[0], coord[1]
 
     elif service_key == "schools":
         child_ages = out.get("child_ages")
@@ -142,6 +151,8 @@ def build_criteria_for_assignment(
     dest_city = (case_context.get("destCity") or case_context.get("destCountry") or "").strip()
     dest_country = (case_context.get("destCountry") or "").strip()
     origin_city = (case_context.get("originCity") or case_context.get("originCountry") or "").strip()
+    # Phase 0: the intake-captured office address is the single source of truth.
+    office_address_case = (case_context.get("officeAddress") or "").strip()
 
     # Question key -> criteria_key mapping (from question_schema.ServiceQuestionDef)
     CRITERIA_MAP: Dict[str, str] = {
@@ -211,6 +222,11 @@ def build_criteria_for_assignment(
                 cap = caps.get("moving") or caps.get("movers")
                 if cap is not None:
                     criteria["_policy_cap_one_time"] = float(cap)
+
+        # Phase 0: prefer the intake office address over the (now-removed)
+        # duplicate free-text question; keep any legacy answer as fallback.
+        if svc_key == "housing" and office_address_case:
+            criteria["office_address"] = office_address_case
 
         criteria = _apply_service_shaping(svc_key, criteria)
         result[backend_key] = criteria
