@@ -24,12 +24,31 @@ function confidenceBadge(confidence?: string | null): ConfidenceBadge {
   }
 }
 
-export function ImmigrationAnswerPanel({ caseId }: { caseId?: string | null } = {}) {
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [nationality, setNationality] = useState('');
-  const [permitType, setPermitType] = useState('');
+/**
+ * Corridor derived from the employee's own case (relocation-assistant MVP). When
+ * present the panel pre-fills the corridor instead of making the employee hand-type
+ * From/To — "answering for YOUR move" — with an Edit affordance to override.
+ */
+export interface ImmigrationCaseContext {
+  from: string;
+  to: string;
+  nationality?: string;
+  permitType?: string;
+  /** Human label, e.g. "IN → DE". Falls back to `from → to`. */
+  label?: string;
+}
+
+export function ImmigrationAnswerPanel(
+  { caseId, caseContext }: { caseId?: string | null; caseContext?: ImmigrationCaseContext } = {},
+) {
+  const [from, setFrom] = useState(caseContext?.from ?? '');
+  const [to, setTo] = useState(caseContext?.to ?? '');
+  const [nationality, setNationality] = useState(caseContext?.nationality ?? '');
+  const [permitType, setPermitType] = useState(caseContext?.permitType ?? '');
   const [query, setQuery] = useState('');
+  // Show the manual corridor form when there's no case context, or the employee
+  // chose to override the auto-detected corridor.
+  const [editingCorridor, setEditingCorridor] = useState(!caseContext);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +106,38 @@ export function ImmigrationAnswerPanel({ caseId }: { caseId?: string | null } = 
             Ask a grounded immigration question for your corridor. Answers are sourced
             only from official guidance and cite where each point comes from.
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Input aria-label="From country" placeholder="From (e.g. IN)" value={from} onChange={(v) => setFrom(v)} />
-            <Input aria-label="To country" placeholder="To (e.g. DE)" value={to} onChange={(v) => setTo(v)} />
-            <Input aria-label="Nationality" placeholder="Nationality (e.g. IN)" value={nationality} onChange={(v) => setNationality(v)} />
-            <Input aria-label="Permit type" placeholder="Permit (e.g. work)" value={permitType} onChange={(v) => setPermitType(v)} />
-          </div>
+          {caseContext && !editingCorridor ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-accent-100 bg-accent-50 px-3 py-2">
+                <p className="text-sm text-slate-700">
+                  Answering for{' '}
+                  <span className="font-semibold text-navy-800">your {caseContext.label ?? `${from} → ${to}`} move</span>
+                  {permitType && <span className="text-slate-500"> · {permitType}</span>}
+                </p>
+                <Button variant="ghost" onClick={() => setEditingCorridor(true)} aria-label="Use a different corridor">
+                  Edit corridor
+                </Button>
+              </div>
+              {/* Corridor comes from your case; confirm the details we don't yet hold. */}
+              {(!caseContext.nationality || !caseContext.permitType) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {!caseContext.nationality && (
+                    <Input aria-label="Nationality" placeholder="Your nationality (e.g. IN)" value={nationality} onChange={(v) => setNationality(v)} />
+                  )}
+                  {!caseContext.permitType && (
+                    <Input aria-label="Permit type" placeholder="Permit (e.g. work)" value={permitType} onChange={(v) => setPermitType(v)} />
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Input aria-label="From country" placeholder="From (e.g. IN)" value={from} onChange={(v) => setFrom(v)} />
+              <Input aria-label="To country" placeholder="To (e.g. DE)" value={to} onChange={(v) => setTo(v)} />
+              <Input aria-label="Nationality" placeholder="Nationality (e.g. IN)" value={nationality} onChange={(v) => setNationality(v)} />
+              <Input aria-label="Permit type" placeholder="Permit (e.g. work)" value={permitType} onChange={(v) => setPermitType(v)} />
+            </div>
+          )}
           <textarea
             aria-label="Your question"
             className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-accent-500"

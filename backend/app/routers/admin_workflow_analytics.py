@@ -7,28 +7,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from ...database import db
-
-
-def _require_admin(authorization: Optional[str] = Header(None)) -> dict:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    token = authorization.replace("Bearer ", "").strip()
-    user = db.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    role = (user.get("role") or "").upper()
-    if role == "ADMIN":
-        return user
-    profile = db.get_profile_record(user.get("id"))
-    if profile and (profile.get("role") or "").upper() == "ADMIN":
-        return user
-    email = (user.get("email") or "").strip().lower()
-    if email.endswith("@relopass.com") and db.is_admin_allowlisted(email):
-        return user
-    raise HTTPException(status_code=403, detail="Admin only")
+from ..auth_deps import require_admin
 
 
 router = APIRouter(prefix="/workflow", tags=["admin-workflow-analytics"])
@@ -56,7 +38,7 @@ def _payload_extra(event: Dict[str, Any]) -> Dict[str, Any]:
 @router.get("/overview")
 def workflow_overview(
     days: int = Query(30, ge=1, le=90),
-    user: Dict[str, Any] = Depends(_require_admin),
+    user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """
     Aggregate workflow metrics from analytics_events.
@@ -122,7 +104,7 @@ def list_workflow_events(
     event_name: Optional[str] = Query(None, description="Filter by event type"),
     days: int = Query(7, ge=1, le=30),
     limit: int = Query(100, ge=1, le=500),
-    user: Dict[str, Any] = Depends(_require_admin),
+    user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """List raw analytics events for debugging or drill-down."""
     since = _default_since(days)
@@ -134,7 +116,7 @@ def list_workflow_events(
 def policy_pipeline_overview(
     days: int = Query(30, ge=1, le=90),
     limit: int = Query(5000, ge=100, le=10000),
-    user: Dict[str, Any] = Depends(_require_admin),
+    user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """Policy upload/classification throughput summary built from analytics_events."""
     since = _default_since(days)

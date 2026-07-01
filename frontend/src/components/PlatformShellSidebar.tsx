@@ -181,6 +181,10 @@ const SECTIONS: NavSection[] = [
       },
       { id: 'requirement-facts', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
       { id: 'research-requests', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
+      { id: 'ai-governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
+      { id: 'feedback-console', label: 'Feedback', to: ROUTE_DEFS.adminFeedback.path },
+      { id: 'admin-accounts', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
+      { id: 'audit-log', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
     ],
   },
 ];
