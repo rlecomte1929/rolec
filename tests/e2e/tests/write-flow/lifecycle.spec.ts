@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
+import { requestWithGatewayRetry } from '../_helpers';
 import fs from 'fs';
 import path from 'path';
 
@@ -57,7 +58,7 @@ test.describe('write-flow lifecycle (TestCompany)', () => {
   });
 
   test('[PER-H1] HR creates a case (POST /api/hr/cases)', async () => {
-    const r = await api.post(`${API}/api/hr/cases`, { headers: { Authorization: `Bearer ${hr}` } });
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/hr/cases`, { headers: { Authorization: `Bearer ${hr}` } }));
     expect(r.status(), await r.text()).toBe(200);
     created.caseId = (await r.json()).caseId;
     expect(created.caseId, 'caseId returned').toBeTruthy();
@@ -65,10 +66,10 @@ test.describe('write-flow lifecycle (TestCompany)', () => {
 
   test('[MSG-02] HR assigns the employee (<5s, no hang — B3)', async ({}, info) => {
     const t0 = Date.now();
-    const r = await api.post(`${API}/api/hr/cases/${created.caseId}/assign`, {
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/hr/cases/${created.caseId}/assign`, {
       headers: { Authorization: `Bearer ${hr}` },
       data: { employeeIdentifier: provisionedEmail('emp_a'), employeeFirstName: TAG, employeeLastName: 'QA' },
-    });
+    }));
     const ms = Date.now() - t0;
     await info.attach('assign', { body: JSON.stringify({ status: r.status(), ms }), contentType: 'application/json' });
     expect(r.status(), await r.text()).toBe(200);
@@ -77,7 +78,7 @@ test.describe('write-flow lifecycle (TestCompany)', () => {
   });
 
   test('[MSG-01] employee submits intake → status + HR notify (AIQ-1342)', async ({}, info) => {
-    const r = await api.post(`${API}/api/employee/assignments/${created.assignmentId}/submit`, { headers: { Authorization: `Bearer ${emp}` } });
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/employee/assignments/${created.assignmentId}/submit`, { headers: { Authorization: `Bearer ${emp}` } }));
     const body = (await r.text()).slice(0, 800);
     await info.attach('submit-resp', { body: JSON.stringify({ status: r.status(), body }), contentType: 'application/json' });
     // a fresh case may be profile-incomplete → 400/422; capture either way (DB-confirm notification post-run)
@@ -85,10 +86,10 @@ test.describe('write-flow lifecycle (TestCompany)', () => {
   });
 
   test('[MSG-03] HR posts a message to the case thread', async ({}, info) => {
-    const r = await api.post(`${API}/api/cases/${created.caseId}/messages`, {
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/cases/${created.caseId}/messages`, {
       headers: { Authorization: `Bearer ${hr}` },
       data: { content: `${TAG} please upload your passport copy.` },
-    });
+    }));
     await info.attach('message-resp', { body: JSON.stringify({ status: r.status() }), contentType: 'application/json' });
     expect([200, 201], await r.text()).toContain(r.status());
     const j = await r.json().catch(() => ({} as { id?: string }));
@@ -96,10 +97,10 @@ test.describe('write-flow lifecycle (TestCompany)', () => {
   });
 
   test('[VND-05/MSG-05] HR sends an RFQ to a real vendor (SIRVA)', async ({}, info) => {
-    const r = await api.post(`${API}/api/hr/rfq-requests`, {
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/hr/rfq-requests`, {
       headers: { Authorization: `Bearer ${hr}` },
       data: { case_id: created.caseId, vendor_id: VENDOR_ID, service_category: 'moving', special_requirements: TAG },
-    });
+    }));
     await info.attach('rfq-resp', { body: JSON.stringify({ status: r.status(), body: (await r.text()).slice(0, 500) }), contentType: 'application/json' });
     const j = await r.json().catch(() => ({} as { rfq_id?: string }));
     if (j.rfq_id) created.rfqId = j.rfq_id;

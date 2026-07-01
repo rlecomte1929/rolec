@@ -1,5 +1,5 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
-import { assertLogicalPage, shot } from '../_helpers';
+import { assertLogicalPage, shot, requestWithGatewayRetry } from '../_helpers';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,13 +48,13 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
   });
 
   test('[DEEP-PROVISION-CASE] HR creates + assigns a case', async () => {
-    const c = await api.post(`${API}/api/hr/cases`, { headers: { Authorization: `Bearer ${hr}` } });
+    const c = await requestWithGatewayRetry(() => api.post(`${API}/api/hr/cases`, { headers: { Authorization: `Bearer ${hr}` } }));
     expect(c.status(), await c.text()).toBe(200);
     state.caseId = (await c.json()).caseId;
-    const a = await api.post(`${API}/api/hr/cases/${state.caseId}/assign`, {
+    const a = await requestWithGatewayRetry(() => api.post(`${API}/api/hr/cases/${state.caseId}/assign`, {
       headers: { Authorization: `Bearer ${hr}` },
       data: { employeeIdentifier: empEmail, employeeFirstName: 'E2E', employeeLastName: 'Deep' },
-    });
+    }));
     expect(a.status(), await a.text()).toBe(200);
     state.assignmentId = (await a.json()).assignmentId;
   });
@@ -70,14 +70,14 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
       services: ['housing', 'immigration', 'tax', 'moving'],
     };
     // The intake is the employee's; fill with the employee token.
-    const r = await api.patch(`${API}/api/cases/${state.caseId}`, { headers: { Authorization: `Bearer ${emp}` }, data: draft });
+    const r = await requestWithGatewayRetry(() => api.patch(`${API}/api/cases/${state.caseId}`, { headers: { Authorization: `Bearer ${emp}` }, data: draft }));
     await info.attach('wizard', { body: JSON.stringify({ status: r.status(), body: (await r.text()).slice(0, 400) }), contentType: 'application/json' });
     expect(r.status(), 'wizard PATCH must not 5xx').toBeLessThan(500);
   });
 
   test('[DEEP-SUBMIT] employee submits → 200 (profile complete)', async ({}, info) => {
     test.skip(!state.assignmentId, 'no assignment');
-    const r = await api.post(`${API}/api/employee/assignments/${state.assignmentId}/submit`, { headers: { Authorization: `Bearer ${emp}` } });
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/employee/assignments/${state.assignmentId}/submit`, { headers: { Authorization: `Bearer ${emp}` } }));
     const body = (await r.text()).slice(0, 600);
     await info.attach('submit', { body: JSON.stringify({ status: r.status(), body }), contentType: 'application/json' });
     state.submitted = r.status() === 200;

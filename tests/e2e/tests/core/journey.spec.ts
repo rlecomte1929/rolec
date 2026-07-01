@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { assertLogicalPage, shot } from '../_helpers';
+import { assertLogicalPage, shot, requestWithGatewayRetry } from '../_helpers';
 import fs from 'fs';
 import path from 'path';
 
@@ -55,8 +55,8 @@ test.describe('core — Employee-A dashboard', () => {
 test.describe('core — isolation + graceful degradation (API)', () => {
   test('[CORE-RLS] HR-A cases list is scoped + admin endpoint denied (403)', async ({ request }, info) => {
     const t = token('hr_a');
-    const cases = await request.get(`${API}/api/hr/cases`, { headers: { Authorization: `Bearer ${t}` } });
-    const admin = await request.get(`${API}/api/admin/companies`, { headers: { Authorization: `Bearer ${t}` } });
+    const cases = await requestWithGatewayRetry(() => request.get(`${API}/api/hr/cases`, { headers: { Authorization: `Bearer ${t}` } }));
+    const admin = await requestWithGatewayRetry(() => request.get(`${API}/api/admin/companies`, { headers: { Authorization: `Bearer ${t}` } }));
     await info.attach('rls', { body: JSON.stringify({ cases: cases.status(), admin: admin.status() }), contentType: 'application/json' });
     expect(cases.status(), 'HR cases list must be reachable (not 5xx)').toBeLessThan(500);
     expect([401, 403, 404], 'HR must be denied the admin companies endpoint').toContain(admin.status());
@@ -64,7 +64,7 @@ test.describe('core — isolation + graceful degradation (API)', () => {
 
   test('[CORE-DEGRADE] fresh HR policy-config degrades gracefully (not 5xx)', async ({ request }, info) => {
     const t = token('hr_a');
-    const r = await request.get(`${API}/api/hr/policy-config`, { headers: { Authorization: `Bearer ${t}` } });
+    const r = await requestWithGatewayRetry(() => request.get(`${API}/api/hr/policy-config`, { headers: { Authorization: `Bearer ${t}` } }));
     await info.attach('policy-config', { body: JSON.stringify({ status: r.status() }), contentType: 'application/json' });
     // A fresh-but-company-linked HR with no published policy must get an empty/onboarding
     // 200 (or a clean 404) — never a 5xx. (Canonical violation: 400 "missing company".)
