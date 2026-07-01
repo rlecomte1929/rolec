@@ -232,6 +232,7 @@ from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
+from .app.routers import assistant_router as assistant_router_router
 from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
@@ -14802,6 +14803,7 @@ app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic o
 app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(assistant_router_router.router)  # policy-bridge domain routing — POST /api/assistant/route
 # GAP 10: Company branding config
 app.include_router(branding_router.router)
 app.include_router(admin_settings_router.router)  # [Task-4] admin AI-governance controls panel

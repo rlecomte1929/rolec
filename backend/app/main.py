@@ -15,6 +15,7 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    assistant_router,
     policy_helpfulness,
     ocr,
     requirement_facts,
@@ -179,6 +180,7 @@ def create_app() -> FastAPI:
     app.include_router(marketplace.router)
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
     app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
     app.include_router(predictions.router)

@@ -52,6 +52,10 @@ METRIC_SPECS: List[MetricSpec] = [
     # matching accuracy; roadmap_completeness = recall of required roadmap steps.
     MetricSpec("structuring_accuracy", "Structuring accuracy", 0.95),
     MetricSpec("roadmap_completeness", "Roadmap completeness", 0.90),
+    # Assistant policy-bridge routing accuracy (emitted by run_routing_eval):
+    # fraction of questions sent to the correct engine (immigration vs policy)
+    # or honestly deferred to the clarifier.
+    MetricSpec("routing_accuracy", "Assistant routing accuracy", 0.90),
     # Answer-path faithfulness (run_answer_grade): grounding_rate of the immigration
     # Q&A answers (the "remove noise, ensure accuracy" surface).
     MetricSpec("answer_grounding", "Answer grounding", 0.90),
@@ -155,6 +159,7 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "outcome_accuracy": [0.88, 0.89, 0.91, 0.92, 0.93, 0.94, 0.95, 0.94, 0.95, 0.96, 0.95, 0.94, 0.93],
     "structuring_accuracy": [0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
+    "routing_accuracy": [0.92, 0.94, 0.94, 0.95, 0.97, 0.97, 0.97, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "answer_grounding": [0.90, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.96],
     "calibration_score": [0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.94, 0.95, 0.95, 0.95, 0.96, 0.96],
     "hr_policy_context_precision": [0.52, 0.54, 0.55, 0.57, 0.58, 0.60, 0.60, 0.61, 0.62, 0.61, 0.60, 0.60, 0.60],
