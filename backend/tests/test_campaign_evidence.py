@@ -79,7 +79,7 @@ def test_skip_excluded_from_denominator():
 def test_scrub_redacts_email_and_token():
     assert "[redacted-email]" in bce._scrub("login as hr@company.test now")
     assert "alice@x.io" not in bce._scrub("alice@x.io")
-    token = "abcdefghijklmnopqrstuvwxyz123456.signaturepart"
+    token = "abcdefghijklmnopqrstuvwxyz123456.signaturepart"  # gitleaks:allow — fake token, tests the scrubber
     assert "[redacted-token]" in bce._scrub(f"Bearer {token}")
 
 
