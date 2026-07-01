@@ -378,18 +378,33 @@ def populate_with_ai(
         )
 
     # L1 short-circuit lives inside populate_destination_catalog itself.
-    rows = catalog_scraper.populate_destination_catalog(
-        category=body.category,
-        destination_city=city,
-        country=country,
-    )
-    # Backfill service-type tags onto any existing vendors that lack them, so a
-    # re-click of "Populate" makes an already-populated category filterable. The
-    # call no-ops (no LLM cost) when every vendor is already tagged or when the
-    # populate above just inserted fresh (already-tagged) rows.
-    backfill = catalog_scraper.backfill_service_types(
-        category=body.category, destination_city=city, country=country,
-    )
+    # Defensive: a scraper/DB failure must degrade to a 200 error status, not a raw 500.
+    try:
+        rows = catalog_scraper.populate_destination_catalog(
+            category=body.category,
+            destination_city=city,
+            country=country,
+        )
+        # Backfill service-type tags onto any existing vendors that lack them, so a
+        # re-click of "Populate" makes an already-populated category filterable. The
+        # call no-ops (no LLM cost) when every vendor is already tagged or when the
+        # populate above just inserted fresh (already-tagged) rows.
+        backfill = catalog_scraper.backfill_service_types(
+            category=body.category, destination_city=city, country=country,
+        )
+    except Exception:
+        logger.exception(
+            "populate-with-ai: category=%s city=%s country=%s failed", body.category, city, country
+        )
+        return {
+            "status": "error",
+            "category": body.category,
+            "destination_city": city,
+            "country": country,
+            "inserted": 0,
+            "service_types_tagged": 0,
+            "quota": quota,
+        }
     return {
         "status": "completed",
         "category": body.category,
@@ -583,44 +598,54 @@ def populate_destination_with_ai(
     scraper_runnable = catalog_scraper._enabled() and bool(os.getenv("OPENAI_API_KEY"))
 
     for cat in categories:
-        # L1 pre-check: if rows already exist, mark as skipped without
-        # touching quota or the scraper at all.
-        from ..services import service_catalog
-        if service_catalog.count_by_category_city(cat, city) > 0:
-            skipped_existing += 1
-            results.append({"category": cat, "status": "skipped_existing", "inserted": 0})
-            continue
+        # Per-category isolation: any unexpected error (a DB hiccup in
+        # count_by_category_city, quota, or the scraper's outer path) must NOT
+        # abort the whole batch and 500 the request — record it and continue.
+        try:
+            # L1 pre-check: if rows already exist, mark as skipped without
+            # touching quota or the scraper at all.
+            from ..services import service_catalog
+            if service_catalog.count_by_category_city(cat, city) > 0:
+                skipped_existing += 1
+                results.append({"category": cat, "status": "skipped_existing", "inserted": 0})
+                continue
 
-        if not scraper_runnable:
-            # Scraper is off (or unconfigured) — don't charge quota for a
-            # call that physically can't happen. The UI shows this state
-            # via the per-category breakdown.
-            results.append({"category": cat, "status": "scraper_disabled", "inserted": 0})
-            continue
+            if not scraper_runnable:
+                # Scraper is off (or unconfigured) — don't charge quota for a
+                # call that physically can't happen. The UI shows this state
+                # via the per-category breakdown.
+                results.append({"category": cat, "status": "scraper_disabled", "inserted": 0})
+                continue
 
-        # L3 — quota gate. We only get here if the scraper actually CAN
-        # call the LLM. If we've burned through the cap mid-loop, remaining
-        # categories return quota_blocked and we stop incrementing.
-        quota = scrape_safety.check_and_increment_quota(company_id)
-        last_quota = quota
-        if not quota["allowed"]:
-            quota_blocked += 1
-            results.append({"category": cat, "status": "quota_blocked", "inserted": 0})
-            continue
+            # L3 — quota gate. We only get here if the scraper actually CAN
+            # call the LLM. If we've burned through the cap mid-loop, remaining
+            # categories return quota_blocked and we stop incrementing.
+            quota = scrape_safety.check_and_increment_quota(company_id)
+            last_quota = quota
+            if not quota["allowed"]:
+                quota_blocked += 1
+                results.append({"category": cat, "status": "quota_blocked", "inserted": 0})
+                continue
 
-        rows = catalog_scraper.populate_destination_catalog(
-            category=cat,
-            destination_city=city,
-            country=country,
-        )
-        if rows:
-            populated += 1
-            total_inserted += len(rows)
-            results.append({"category": cat, "status": "populated", "inserted": len(rows)})
-        else:
-            # Scraper returned 0 (LLM failed, disabled, no API key) — quota was
-            # incremented; treat as failed for clarity.
-            results.append({"category": cat, "status": "scraper_returned_empty", "inserted": 0})
+            rows = catalog_scraper.populate_destination_catalog(
+                category=cat,
+                destination_city=city,
+                country=country,
+            )
+            if rows:
+                populated += 1
+                total_inserted += len(rows)
+                results.append({"category": cat, "status": "populated", "inserted": len(rows)})
+            else:
+                # Scraper returned 0 (LLM failed, disabled, no API key) — quota was
+                # incremented; treat as failed for clarity.
+                results.append({"category": cat, "status": "scraper_returned_empty", "inserted": 0})
+        except Exception:
+            logger.exception(
+                "populate-destination: category=%s city=%s country=%s failed", cat, city, country
+            )
+            results.append({"category": cat, "status": "error", "inserted": 0})
+            continue
 
     if last_quota is None:
         # Every category short-circuited (everything already populated).
@@ -633,10 +658,16 @@ def populate_destination_with_ai(
     # was just freshly populated (fresh rows arrive pre-tagged).
     total_tagged = 0
     for cat in categories:
-        bf = catalog_scraper.backfill_service_types(
-            category=cat, destination_city=city, country=country,
-        )
-        total_tagged += bf.get("tagged", 0)
+        try:
+            bf = catalog_scraper.backfill_service_types(
+                category=cat, destination_city=city, country=country,
+            )
+            total_tagged += bf.get("tagged", 0)
+        except Exception:
+            logger.exception(
+                "populate-destination backfill: category=%s city=%s country=%s failed",
+                cat, city, country,
+            )
 
     return {
         "status": "completed",

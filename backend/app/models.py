@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey
+from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON
 from sqlalchemy.sql import func
 from .db import Base
 
@@ -415,6 +415,29 @@ class ProspectCandidate(Base):
     enriched_at = Column(DateTime, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     reviewed_by = Column(String, nullable=True)
+
+
+class Lead(Base):
+    """Person-level inbound lead (GTM-internal CRM). Fed by the public
+    lead-capture endpoint (marketing-site demo forms) and manual entry.
+    company_domain is an FK-by-value to prospect_candidates.company_domain
+    so inbound leads can be matched against the outbound pipeline."""
+
+    __tablename__ = "leads"
+
+    id = Column(String, primary_key=True, index=True)
+    email = Column(String, nullable=False, index=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    company_domain = Column(String, nullable=True, index=True)
+    source = Column(String, nullable=False, default="marketing_site")
+    status = Column(String, nullable=False, default="new", index=True)
+    tags = Column(JSON, nullable=False, default=list)  # generic JSON (jsonb on PG, TEXT on SQLite)
+    message = Column(Text, nullable=True)
+    utm_source = Column(String, nullable=True)
+    utm_campaign = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class QueryAuditLog(Base):

@@ -3,6 +3,7 @@ import { Input } from '../antigravity/Input';
 import { Button } from '../antigravity/Button';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { submitDemoBooking } from '../../api/demoBooking';
+import { leadCaptureAPI } from '../../api/client';
 import { track } from '../../analytics';
 
 const MAX_CHALLENGE = 500;
@@ -142,6 +143,19 @@ export const BookDemoModal: React.FC = () => {
 
     if (result.ok) {
       track('demo_request_submitted', { source_page: sourcePage, demo_id: result.demoId });
+      try {
+        const usp = new URLSearchParams(window.location.search);
+        void leadCaptureAPI.submit({
+          email: form.email.trim(),
+          first_name: form.firstName.trim() || undefined,
+          message: form.challenge.trim() || undefined,
+          source: 'marketing_site',
+          utm_source: usp.get('utm_source') || undefined,
+          utm_campaign: usp.get('utm_campaign') || undefined,
+        });
+      } catch {
+        /* capture is best-effort; never block the demo request */
+      }
       setState('success');
       setTimeout(() => close(), 3500);
       return;

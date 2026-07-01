@@ -1173,7 +1173,7 @@ class CasesMixin:
                     "assignment_id": assignment_id,
                     "service_key": item.get("service_key"),
                     "category": item.get("category"),
-                    "selected": 1 if item.get("selected", True) else 0,
+                    "selected": bool(item.get("selected", True)),
                     "estimated_cost": item.get("estimated_cost"),
                     "currency": item.get("currency") or "EUR",
                     "created_at": now,
@@ -3183,6 +3183,26 @@ class CasesMixin:
                 "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
                 {"ecid": employee_contact_id.strip()},
                 op_name="list_unassigned_assignments_for_employee_contact",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_pending_claim_assignments_for_employee_contact(
+        self, employee_contact_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """pending_claim assignments for a contact (employee_user_id NULL, mode='pending_claim').
+        Used only by the verified-email auto-link path — the normal reconcile query
+        (`list_unassigned_assignments_for_employee_contact`) deliberately excludes these."""
+        if not (employee_contact_id or "").strip():
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                "WHERE employee_contact_id = :ecid AND employee_user_id IS NULL "
+                "AND LOWER(TRIM(COALESCE(employee_link_mode, ''))) = 'pending_claim'",
+                {"ecid": employee_contact_id.strip()},
+                op_name="list_pending_claim_assignments_for_employee_contact",
                 request_id=request_id,
             ).fetchall()
         return self._rows_to_list(rows)

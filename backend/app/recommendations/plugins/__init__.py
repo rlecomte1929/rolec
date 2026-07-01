@@ -14,6 +14,7 @@ from .transport import TransportPlugin
 from .language_integration import LanguageIntegrationPlugin
 from .legal_admin import LegalAdminPlugin
 from .tax_finance import TaxFinancePlugin
+from .pets import PetsPlugin
 
 __all__ = [
     "BasePlugin",
@@ -31,4 +32,5 @@ __all__ = [
     "LanguageIntegrationPlugin",
     "LegalAdminPlugin",
     "TaxFinancePlugin",
+    "PetsPlugin",
 ]

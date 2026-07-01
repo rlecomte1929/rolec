@@ -134,6 +134,41 @@ class HrCatalogRouterTests(unittest.TestCase):
         self.assertEqual(names, ["BIS Munich", "MIS Munich"])
 
     # ------------------------------------------------------------------
+    # batch resilience: one failing category must not 500 the whole batch
+    # ------------------------------------------------------------------
+    def test_populate_destination_isolates_failing_category(self) -> None:
+        from backend.app.services import catalog_scraper, scrape_safety, service_catalog
+        from backend.app.recommendations import registry
+
+        def _pop(category, destination_city, country):
+            if category == "movers":
+                raise RuntimeError("simulated DB/scraper failure")
+            return [{"id": "x"}]
+
+        with mock.patch.object(registry, "list_categories",
+                               return_value=[{"key": "movers"}, {"key": "banks"}]), \
+             mock.patch.object(scrape_safety, "is_destination_allowlisted", return_value=True), \
+             mock.patch.object(scrape_safety, "check_and_increment_quota",
+                               return_value={"allowed": True, "limit": 10}), \
+             mock.patch.object(catalog_scraper, "_enabled", return_value=True), \
+             mock.patch.object(service_catalog, "count_by_category_city", return_value=0), \
+             mock.patch.object(catalog_scraper, "populate_destination_catalog", side_effect=_pop), \
+             mock.patch.object(catalog_scraper, "backfill_service_types", return_value={"tagged": 0}), \
+             mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test"}):
+            body = hr_catalog_router.PopulateDestinationBody(
+                destination_city="Melbourne", country="Australia"
+            )
+            res = hr_catalog_router.populate_destination_with_ai(
+                body=body, user=_user("HR", str(uuid.uuid4()))
+            )
+
+        # The request completes (no 500) with a per-category breakdown:
+        self.assertEqual(res["status"], "completed")
+        per = {r["category"]: r["status"] for r in res["per_category"]}
+        self.assertEqual(per.get("movers"), "error", "failing category is isolated, not fatal")
+        self.assertEqual(per.get("banks"), "populated", "other categories still succeed")
+
+    # ------------------------------------------------------------------
     # geo-agnostic: city filter MUST NOT hide rows that apply everywhere
     # ------------------------------------------------------------------
     def test_geo_agnostic_category_visible_when_city_supplied(self) -> None:

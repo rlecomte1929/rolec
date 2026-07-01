@@ -175,6 +175,19 @@ def _try_attach_assignment(
             )
         except Exception as exc:
             log.warning("insert_case_event claim_link assignment_id=%s error=%s", aid, exc)
+        # Tell the employee their case is now active (covers the auto-link-after-register
+        # case where no ASSIGNMENT_CREATED notification could be sent at assign time).
+        try:
+            db.create_notification_with_preferences(
+                user_id=user_id,
+                type_="ASSIGNMENT_LINKED",
+                title="Your relocation case is now active",
+                body="Your HR team set up your relocation. Open “My case” to start your intake.",
+                assignment_id=aid,
+                case_id=case_id,
+            )
+        except Exception as exc:
+            log.warning("case-active notification claim_link assignment_id=%s error=%s", aid, exc)
 
 
 def reconcile_pending_assignment_claims(
@@ -186,9 +199,16 @@ def reconcile_pending_assignment_claims(
     role: str,
     request_id: Optional[str] = None,
     emit_side_effects: bool = True,
+    attach_pending_claim: bool = False,
 ) -> ClaimLinkResult:
     """
     Discover pending assignments for this principal, link contacts, attach assignments, mark invites.
+
+    ``attach_pending_claim``: when True (the caller has confirmed the account's email is
+    VERIFIED and matches), also auto-attach ``pending_claim`` assignments for the matched
+    contact — the employee no longer has to click "Accept relocation". When False
+    (default; unverified / not confirmed), pending_claim rows are left untouched and the
+    employee must accept explicitly (the deliberate security gate is preserved).
     """
     r = (role or "").strip().upper()
     if r not in ("EMPLOYEE", "EMPLOYEE_USER"):
@@ -229,7 +249,13 @@ def reconcile_pending_assignment_claims(
         if cid not in result.linked_contact_ids:
             result.linked_contact_ids.append(cid)
 
-        for asn in db.list_unassigned_assignments_for_employee_contact(cid, request_id=request_id):
+        candidates = list(db.list_unassigned_assignments_for_employee_contact(cid, request_id=request_id))
+        # Verified email match → also auto-attach pending_claim rows (no manual accept).
+        if attach_pending_claim:
+            candidates.extend(
+                db.list_pending_claim_assignments_for_employee_contact(cid, request_id=request_id)
+            )
+        for asn in candidates:
             ident = (asn.get("employee_identifier") or "").strip() or next(iter(idents), "")
             _try_attach_assignment(
                 db,
