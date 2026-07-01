@@ -37,6 +37,12 @@ export function ReasonCodeForm({
   errorMessage,
 }: ReasonCodeFormProps): JSX.Element {
   const requiresFreetext = reasonRequiresFreetext(reasonCode);
+  // [AIQ-945] Per-reason guidance on hover. A native <select> can't carry a tooltip
+  // per <option>, so we surface all six reasons + descriptions in one `?` affordance
+  // (the selected reason's description still renders inline below the dropdown).
+  const reasonHelp = REASON_CODES.map(
+    (code) => `${REASON_CODE_LABELS[code]}: ${REASON_CODE_DESCRIPTIONS[code]}`,
+  ).join('\n');
   const labelId = 'resolution-reason-label';
   const dropdownId = 'resolution-reason-code';
   const freetextId = 'resolution-reason-freetext';
@@ -51,9 +57,17 @@ export function ReasonCodeForm({
       <div className="flex flex-col gap-1">
         <label
           htmlFor={dropdownId}
-          className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
         >
           Reason code
+          <span
+            role="img"
+            aria-label="What each reason code means"
+            title={reasonHelp}
+            className="cursor-help rounded-full border border-border px-1 text-[10px] leading-none text-muted-foreground"
+          >
+            ?
+          </span>
         </label>
         <select
           id={dropdownId}

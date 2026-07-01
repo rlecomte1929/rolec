@@ -19,6 +19,10 @@ description = "Intentionally-public values and known false positives"
 # `cm9sZSI6InNlcnZpY2Vfcm9sZSI`) does NOT match and still fails the scan.
 regexes = [
   '''cm9sZSI6ImFub24''',
+  # Fake token literal in backend/tests/test_campaign_evidence.py — exercises the
+  # log scrubber (_scrub redacts bearer tokens); not a real secret. Surgical match
+  # (this exact string only) so real secrets in test files still fail the scan.
+  '''abcdefghijklmnopqrstuvwxyz123456\.signaturepart''',
 ]
 
 # --- Known false-positive paths ------------------------------------------------

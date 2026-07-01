@@ -100,6 +100,14 @@ export function ContradictionPanel({
   // We render however many show up to stay forward-compatible.
   const candidates = contradiction.candidates;
 
+  // [AIQ-945] Disable Resolve until the form is valid (a winner is picked, a
+  // reason_code is chosen, and OTHER has an explanation). validate() stays the
+  // on-submit backstop; the backend 422 is the final guard.
+  const canResolve =
+    Boolean(selectedCandidateId) &&
+    Boolean(reasonCode) &&
+    (!reasonRequiresFreetext(reasonCode) || reasonFreetext.trim().length > 0);
+
   return (
     <article
       aria-labelledby="contradiction-title"
@@ -169,11 +177,11 @@ export function ContradictionPanel({
           onClick={() => {
             void handleResolve();
           }}
-          disabled={resolve.isPending}
+          disabled={resolve.isPending || !canResolve}
           className={cn(
             'inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground',
             'shadow-sm hover:opacity-90 focus-visible:shadow-focus',
-            resolve.isPending && 'opacity-60',
+            (resolve.isPending || !canResolve) && 'opacity-60',
           )}
         >
           {resolve.isPending ? 'Resolving…' : 'Resolve'}

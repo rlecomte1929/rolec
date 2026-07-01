@@ -28,3 +28,26 @@
 routers.ab_tests.router
 routers.pets.router
 routers.support.router
+#
+# Neither-registered routers — in neither entrypoint (new check added in
+# chore/router-guard-neither-entrypoint). The guard would flag these without
+# allowlist entries; they are grandfathered here with explicit justification.
+# This section should DRAIN as held PRs merge and dead code is removed.
+#
+#   routers.provider_portal.router — GET/PATCH /api/provider/... (4 routes).
+#     Live page (ProviderPortal.tsx at /provider/portal) calls these on mount,
+#     shipping a live 404. Fix is in HELD PR #1216 (dual-registration).
+#     TEMP: remove this line once #1216 (provider_portal dual-registration) merges.
+routers.provider_portal.router  # TEMP: remove once #1216 (provider_portal dual-registration) merges
+#
+#   routers.cases.router — dead code. 3,548-line legacy router with 35 routes,
+#     unwired in both entrypoints. Live /api/cases routes are served by
+#     cases_read.py / cases_write.py / cases_admin.py (all dual-registered).
+#     Documented in CLAUDE.md memory: "cases.py router is dead code".
+routers.cases.router  # DEAD CODE: live routes in cases_read/write/admin.py; cases.py is unwired
+#
+#   routers.hr_policies.router — dead code. Uses relocation_policies table (orphan;
+#     no migration on main). The live policy system is policy_config (dual-registered).
+#     Documented in CLAUDE.md memory: "Policy Builder wired to policy_config;
+#     relocation_policies=ORPHAN, legacy hr_policies".
+routers.hr_policies.router  # DEAD CODE: uses orphan relocation_policies table; live system is policy_config
