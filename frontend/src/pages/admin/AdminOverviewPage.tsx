@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2, DollarSign } from 'lucide-react';
+import { ListChecks, LineChart, Shuffle, FileText, Target, Activity, Link2, Building2, DollarSign, Info } from 'lucide-react';
 import {
   adminAPI,
   suppliersAPI,
@@ -182,7 +182,7 @@ export const AdminOverviewPage: React.FC = () => {
       </p>
 
       {/* ── Top stat strip ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <StatCard testId="metric-tenants" label="Tenants" value={stats.companies} sub="All tenant records" loading={loading} />
         <StatCard testId="metric-assignments" label="Assignments" value={stats.assignments} sub="All assignment records" loading={loading} />
         <StatCard
@@ -192,7 +192,6 @@ export const AdminOverviewPage: React.FC = () => {
           sub={metricSummary(stats.reviewUnassigned, 'awaiting assignment')}
           loading={loading}
         />
-        <StatCard testId="metric-sla" label="System SLA (30D)" value={null} sub="No platform aggregate connected" loading={loading} />
       </div>
 
       {/* ── Module grid — row 1 ── */}
@@ -320,8 +319,8 @@ export const AdminOverviewPage: React.FC = () => {
 
       {/* ── Info banner ── */}
       <div className="flex items-start gap-3 rounded-xl bg-slate-50 border border-slate-200 px-5 py-4">
-        <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-sm shrink-0 mt-0.5">
-          ℹ️
+        <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
+          <Info className="h-4 w-4" aria-hidden="true" />
         </div>
         <div>
           <p className="text-sm font-semibold text-slate-800 mb-1">What you see vs. what tenants see</p>

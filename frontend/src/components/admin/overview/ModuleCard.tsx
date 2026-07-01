@@ -15,7 +15,7 @@ interface ModuleCardProps {
   title: string;
   subtitle: string;
   metric: string | number | null;
-  rows: ModuleRow[];
+  rows?: ModuleRow[];
   loading?: boolean;
 }
 
@@ -25,7 +25,7 @@ interface ModuleCardProps {
 // links to the detail page that owns the real number.
 const MUTED_DASH = <span className="text-slate-300">—</span>;
 
-export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtitle, metric, rows, loading }) => (
+export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtitle, metric, rows = [], loading }) => (
   <Link data-testid={testId} to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
     <div className="flex items-start justify-between mb-4">
       <div className="flex items-center gap-2.5">
