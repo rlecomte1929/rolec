@@ -40,6 +40,7 @@ _RAG_RESULT: Dict[str, Any] = {
     "cost_usd": 0.0001,
     "latency_ms": 42,
     "audit_id": "audit-123",
+    "trace_session_id": "trace-uuid-1234",
     "prompt_version_id": None,
     "canary_arm": None,
 }
@@ -86,6 +87,19 @@ class TestRagQueryEndpoint(unittest.TestCase):
             )
         _, kwargs = mock_engine.call_args
         self.assertEqual(kwargs["company_id"], "co-a")
+
+    def test_trace_session_id_present_in_response(self) -> None:
+        """Engine's trace_session_id is surfaced in the response so the frontend
+        helpfulness control (POST /api/policy-assistant/helpfulness) can reference it."""
+        with patch("backend.main.db.get_profile_record", return_value={"company_id": "co-a"}), \
+                patch(_RAG_ENGINE, return_value=_RAG_RESULT):
+            resp = self.client.post(
+                "/api/policy-assistant/rag-query", json={"question": "Housing?"}
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIn("trace_session_id", body)
+        self.assertEqual(body["trace_session_id"], "trace-uuid-1234")
 
     def test_missing_question_is_400(self) -> None:
         with patch("backend.main.db.get_profile_record", return_value={"company_id": "co-a"}):
