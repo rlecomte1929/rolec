@@ -123,6 +123,7 @@ const CountriesPage = lazy(() => import('./pages/admin/CountriesPage').then((mod
 const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').then((module) => ({ default: module.CountryDetailPage })));
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminRagQualityPage = lazy(() => import('./pages/admin/AdminRagQualityPage').then((module) => ({ default: module.AdminRagQualityPage })));
+const MissionControlPage = lazy(() => import('./pages/admin/mission-control/MissionControlPage').then((module) => ({ default: module.MissionControlPage })));
 const AdminAiControlsPage = lazy(() => import('./pages/admin/AdminAiControlsPage').then((module) => ({ default: module.AdminAiControlsPage })));
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
@@ -391,6 +392,7 @@ function App() {
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<RequireAdminRoute><CountryDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><MissionControlPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiControls.path} element={<RequireAdminRoute><AdminAiControlsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />
