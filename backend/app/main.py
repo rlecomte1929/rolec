@@ -54,6 +54,7 @@ from .routers import (
     outcomes_ingest,
     hr_case_resolve,
     hr_case_escalation,
+    setup_assistant,
     hr_catalog,
     hr_vendor_widgets,
     research_requests,
@@ -164,6 +165,7 @@ def create_app() -> FastAPI:
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
     app.include_router(hr_case_escalation.router)  # W2-3 — HR case escalation
+    app.include_router(setup_assistant.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
     # [Parker-J] NLG exec-summary + policy TL;DR routes
     app.include_router(nlg.router)
 

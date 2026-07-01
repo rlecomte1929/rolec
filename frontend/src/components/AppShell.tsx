@@ -19,6 +19,8 @@ import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
 import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';
 import { PlatformShellSidebar, type SidebarRole } from './PlatformShellSidebar';
+import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
+import { SetupAssistantDrawer } from '../features/setup-help/SetupAssistantDrawer';
 
 function deriveInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -93,7 +95,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   // AIQ-1017: on mobile (<md) the sidebar collapses into a slide-in drawer
   // toggled from the topbar hamburger. Desktop is unchanged (inline sidebar).
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [setupAssistantOpen, setSetupAssistantOpen] = useState(false);
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
+  const isHrRole = role === 'HR';
 
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
   useBrandingConfig();
@@ -297,6 +301,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
       </div>
 
       <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
+
+      {/* Setup & Help Assistant — HR only. FAB opens a fixed-overlay drawer
+          (SetupAssistantDrawer) that is always above content on all
+          breakpoints: right-side panel on desktop, bottom-sheet on mobile. */}
+      {isHrRole ? (
+        <>
+          {!setupAssistantOpen && (
+            <SetupAssistantFab onClick={() => setSetupAssistantOpen(true)} />
+          )}
+          <SetupAssistantDrawer
+            open={setupAssistantOpen}
+            onOpenChange={setSetupAssistantOpen}
+          />
+        </>
+      ) : null}
     </div>
   );
 };
