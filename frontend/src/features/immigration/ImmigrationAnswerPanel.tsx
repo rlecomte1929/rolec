@@ -13,6 +13,15 @@ import { submitAiFeedback, type FeedbackVerdict } from '../../api/aiFeedback';
  * ships dormant — RELIABILITY_WEIGHT=0 — so feedback accrues before it affects ranking).
  */
 
+// Guided starters — lower the blank-page barrier on the free-text Q&A (mirrors the
+// policy assistant's question tiles). Clicking one fills the question box.
+const SUGGESTED_QUESTIONS = [
+  'What documents do I need for the visa application?',
+  'How long does the visa process usually take?',
+  'Can my spouse work on a dependent visa?',
+  'What are the salary or qualification requirements?',
+];
+
 type ConfidenceBadge = { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' };
 
 function confidenceBadge(confidence?: string | null): ConfidenceBadge {
@@ -146,6 +155,21 @@ export function ImmigrationAnswerPanel(
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          {!query.trim() && (
+            <div className="flex flex-wrap gap-2" aria-label="Suggested questions">
+              {SUGGESTED_QUESTIONS.map((q) => (
+                <Button
+                  key={q}
+                  unstyled
+                  type="button"
+                  onClick={() => setQuery(q)}
+                  className="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:border-[#0b2b43] hover:text-[#0b2b43]"
+                >
+                  {q}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <Button variant="primary" onClick={() => void ask()} disabled={!canAsk || loading}>
               {loading ? 'Asking…' : 'Ask'}
