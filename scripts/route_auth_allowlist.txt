@@ -115,6 +115,10 @@ backend/app/routers/support.py:create_in_app_ticket
 # PUBLIC: in-app Help form. Employee portal allows anonymous submission
 # (session_id falls back to "anonymous"); write-only INSERT into support_tickets,
 # exposes no data back to the caller. Intentionally unauthenticated by design.
+backend/app/routers/lead_capture.py:capture_lead
+# PUBLIC (audos-P1): marketing-site lead capture. Rate-limited (10/hour;50/day),
+# write-only INSERT into leads, returns only {id, matched_prospect} — exposes no
+# data back to the caller. company_domain derived server-side. Unauthenticated by design.
 
 # ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
 # The signature check runs in the handler body, so the AST scanner cannot see it.
