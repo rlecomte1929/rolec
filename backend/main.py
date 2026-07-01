@@ -233,6 +233,7 @@ from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
+from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
 from .app.routers import assistant_router as assistant_router_router
@@ -833,6 +834,7 @@ app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases
 app.include_router(case_rule_updates_router.router)  # AIQ-693 — GET/POST /api/cases/{id}/rule-updates (P2-02e banner)
 app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
+app.include_router(setup_assistant_router.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
 app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
