@@ -93,6 +93,7 @@ def test_get_returns_all_known_keys(admin_client):
         "policy_rag_groundedness_min_score",
         "policy_rag_rerank",
         "supplier_learned_weights",
+        "feedback_llm_triage",
     }
 
 
