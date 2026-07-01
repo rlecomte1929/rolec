@@ -75,6 +75,10 @@ def add_admin(
     email = body.email.strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="email is required")
+    # Guard: the request-time admin gate only honours @relopass.com allowlist rows
+    # (auth_deps._is_admin_user), so a non-relopass entry would be silently inert.
+    if not email.endswith("@relopass.com"):
+        raise HTTPException(status_code=422, detail="Admin emails must end with @relopass.com")
     actor_id = str(user.get("id") or user.get("user_id") or "unknown")
     now = datetime.utcnow().isoformat()
     db.execute(
@@ -108,6 +112,18 @@ def patch_admin(
 
     # Guard: cannot disable yourself — fail closed when identity is ambiguous
     if not body.enabled:
+        # Guard: never disable the last remaining enabled admin (lockout protection).
+        # Only applies when the target is a currently-enabled admin — a missing or
+        # already-disabled target falls through to the normal 404 / no-op below.
+        target_enabled = db.execute(
+            text("SELECT enabled FROM admin_allowlist WHERE email = :email"), {"email": email_norm}
+        ).scalar()
+        if target_enabled == 1:
+            enabled_count = db.execute(
+                text("SELECT count(*) FROM admin_allowlist WHERE enabled = 1")
+            ).scalar() or 0
+            if int(enabled_count) <= 1:
+                raise HTTPException(status_code=400, detail="Cannot disable the last admin")
         if not actor_email:
             # Attempt 1: actor_id is itself an email (legacy identifiers)
             if "@" in actor_id:

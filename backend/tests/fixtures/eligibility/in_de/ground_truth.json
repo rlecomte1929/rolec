@@ -12,7 +12,12 @@
     "contract_type": "lta"
   },
   "eligibility_verdict": {
-    "outcome_set": ["ELIGIBLE_WORK_PERMIT"],
-    "citations": ["DE_AUFENTHG_18B:2020"]
+    "outcome_set": [
+      "ELIGIBLE_BLUE_CARD"
+    ],
+    "citations": [
+      "EU_DIR_2021_1883",
+      "DE_AUFENTHG_18G:2026"
+    ]
   }
 }

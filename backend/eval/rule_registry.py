@@ -22,16 +22,27 @@ RULE_EFFECTIVE_WINDOWS: dict = {
     "EU_DIR_2004_38_ART7:2004": (date(2004, 4, 29), None),
     "EU_DIR_2004_38_ART10:2004": (date(2004, 4, 29), None),
     "NO_EOS_UTLENDINGS:2010": (date(2010, 1, 1), None),
-    # REPRESENTATIVE / synthetic immigration rule versions for the France and
-    # Portugal standard work-permit routes (US_FR, BR_PT corridors). These are
-    # illustrative pointers to the governing statutes — NOT authoritative legal
-    # citations — consistent with the content-provenance model
-    # (verification_status: "representative"). Curate against live law before
-    # treating as authoritative.
-    # France — CESEDA art. L.421-1 ff., "salarié" work/residence permit.
-    "FR_CESEDA_L421:2024": (date(2024, 1, 1), None),
-    # Portugal — Lei n.º 23/2007 art. 88, residence permit for subordinate work.
-    "PT_LEI_23_2007_ART88:2007": (date(2007, 8, 4), None),
+    # Immigration rule versions for the France and Portugal work-permit routes
+    # (US_FR, BR_PT corridors). Both routes were decided by Romain 2026-07-01;
+    # the governing article numbers were verified against primary sources
+    # (Légifrance for FR; AIMA + Diário da República for PT). Sub-article/route
+    # choice is a product+legal decision, now made.
+    # France — CESEDA art. L.421-26, "salarié détaché ICT" (intra-corporate
+    # transferee, EU Directive 2014/66/EU): multi-year residence card for a
+    # temporary intra-group transfer of a non-EU-resident employee.
+    # ROUTE CONFIRMED by Romain 2026-07-01 (ICT secondment, NOT direct-hire
+    # salarié / Blue Card / Passeport Talent). Article number CONFIRMED against
+    # Légifrance (Article L421-26, en vigueur): recodified into force 2021-05-01
+    # per Ord. 2020-1733 (16 Dec 2020).
+    "FR_CESEDA_L421_26:2021": (date(2021, 5, 1), None),
+    # Portugal — Lei n.º 23/2007 art. 88.º n.º 1, residence permit for subordinate
+    # work where the assignee enters on a residence visa obtained abroad.
+    # ROUTE CONFIRMED by Romain 2026-07-01 (art. 88.º n.º 1 "with residence visa",
+    # NOT the visa-exempt n.º 2 / Blue Card / CPLP route). Sub-article n.º 1
+    # corroborated by AIMA. Version tag :2024 reflects the consolidated text as
+    # amended through DL 37-A/2024 (3 Jun 2024, revoked art. 88 n.º 2/n.º 6) and
+    # Lei 40/2024; n.º 1 itself is longstanding and remains in force.
+    "PT_LEI_23_2007_ART88_1:2024": (date(2024, 6, 3), None),
 }
 
 
