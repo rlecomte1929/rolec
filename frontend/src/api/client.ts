@@ -3423,6 +3423,31 @@ export const policyConfigMatrixAPI = {
     return response.data;
   },
 
+  /**
+   * Import an uploaded policy document's LLM-extracted benefits into the
+   * company's config-matrix draft as `extracted_llm` rows (AIQ-873 bridge).
+   * Body: { policy_id } — the policy_documents id returned by the upload flow.
+   * Existing manual/template/extracted rows are never clobbered. Returns the
+   * imported matrix keys, keys skipped as already-present, and extraction keys
+   * that had no canonical mapping (for manual entry).
+   */
+  hrImportExtraction: async (
+    body: { policy_id: string },
+    companyId?: string
+  ): Promise<{ imported: string[]; skipped_existing: string[]; unmapped: string[]; version_id: string }> => {
+    const response = await api.post<{ imported: string[]; skipped_existing: string[]; unmapped: string[]; version_id: string }>(
+      '/api/hr/policy-config/draft/import-extraction',
+      body,
+      {
+        params: companyId ? { companyId } : {},
+        // Merging the extracted matrix rewrites the draft row set; override the
+        // 12s default per the B13 convention (same as hrPutDraft/hrPublish).
+        timeout: 120_000,
+      },
+    );
+    return response.data;
+  },
+
   adminGet: async (companyId: string): Promise<Record<string, unknown>> => {
     const response = await api.get<Record<string, unknown>>('/api/admin/policy-config', { params: { companyId } });
     return response.data;
