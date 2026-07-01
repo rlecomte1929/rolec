@@ -503,9 +503,15 @@ def test_raw_hallucination_rate_two_cases_half():
 def test_ci_mock_path_unchanged():
     """--ci path (mock) still exits 0 with unchanged gates on the golden set."""
     import subprocess
+    import sys
+    import pathlib
+    # Portable: use the running interpreter + the repo root derived from this
+    # file's location (backend/tests/eval/test_...py -> repo root is parents[3]),
+    # so this works in CI and on any checkout, not just a local worktree path.
+    repo_root = pathlib.Path(__file__).resolve().parents[3]
     result = subprocess.run(
         [
-            "/Users/romainlecomte/Documents/GitHub/rolec/.venv311/bin/python",
+            sys.executable,
             "-m",
             "backend.eval.run_setup_help_eval",
             "--mock",
@@ -513,7 +519,7 @@ def test_ci_mock_path_unchanged():
         ],
         capture_output=True,
         text=True,
-        cwd="/private/tmp/rolec-sh-followup",
+        cwd=str(repo_root),
         env={
             **__import__("os").environ,
             "RELOPASS_DISABLE_RATE_LIMITS": "1",
