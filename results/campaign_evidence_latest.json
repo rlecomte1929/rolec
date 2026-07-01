@@ -1,0 +1,148 @@
+{
+  "schema": "relopass.campaign_evidence/v1",
+  "generated_at": "2026-06-30T07:06:38.039126+00:00",
+  "source_report": "results/test_results_2026-06-29T20-36.json",
+  "scorer_version": "1.1",
+  "health_band": "GREEN",
+  "overall_score_reported": 100.0,
+  "overall_score_recomputed": 100.0,
+  "overall_score_matches": true,
+  "runner_summary": {
+    "total": 65,
+    "pass": 64,
+    "fail": 0,
+    "warn": 0,
+    "skip": 1
+  },
+  "test_totals_by_status": {
+    "PASS": 48,
+    "WARN": 0,
+    "PARTIAL": 0,
+    "FAIL": 0,
+    "BLOCKED": 0,
+    "SKIP": 1
+  },
+  "categories": {
+    "Authentication": {
+      "weight": 4,
+      "counts": {
+        "PASS": 6,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 6,
+      "score_pct": 100.0
+    },
+    "Case Management": {
+      "weight": 4,
+      "counts": {
+        "PASS": 6,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 6,
+      "score_pct": 100.0
+    },
+    "Security & RLS": {
+      "weight": 4,
+      "counts": {
+        "PASS": 11,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 11,
+      "score_pct": 100.0
+    },
+    "Admin Console": {
+      "weight": 1,
+      "counts": {
+        "PASS": 3,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 3,
+      "score_pct": 100.0
+    },
+    "Employee Journey": {
+      "weight": 4,
+      "counts": {
+        "PASS": 2,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 2,
+      "score_pct": 100.0
+    },
+    "Resources": {
+      "weight": 2,
+      "counts": {
+        "PASS": 1,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 1,
+      "score_pct": 100.0
+    },
+    "Suppliers & Vendors": {
+      "weight": 2,
+      "counts": {
+        "PASS": 0,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 1
+      },
+      "scored": 0,
+      "score_pct": null
+    },
+    "Performance": {
+      "weight": 2,
+      "counts": {
+        "PASS": 7,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 7,
+      "score_pct": 100.0
+    },
+    "End-to-End Flows": {
+      "weight": 3,
+      "counts": {
+        "PASS": 12,
+        "WARN": 0,
+        "PARTIAL": 0,
+        "FAIL": 0,
+        "BLOCKED": 0,
+        "SKIP": 0
+      },
+      "scored": 12,
+      "score_pct": 100.0
+    }
+  },
+  "regressions": [],
+  "fixed": [],
+  "new_failures": [],
+  "evidence_sha256": "3abc6c00248bc788960fcfa61e6a647ba0b06de3c765e122e71f3a29f428443d"
+}

@@ -42,13 +42,16 @@ WEIGHTS: Dict[str, Dict[str, float]] = {
         "availability": 0.1,
     },
     # movers.py — fallbacks for criteria.weights (request may override per key).
+    # service_area (0.10) added to score destination-city coverage from service_areas dataset field;
+    # services and rating reduced by 0.05 each to keep the sum at 1.0.
     "movers": {
         "cost": 0.2,
         "speed": 0.2,
         "reliability": 0.2,
-        "services": 0.15,
-        "rating": 0.15,
-        "availability": 0.1,
+        "services": 0.10,
+        "rating": 0.10,
+        "availability": 0.10,
+        "service_area": 0.10,
     },
     # schools.py — fallbacks for criteria.weights (request may override per key).
     "schools": {
@@ -113,13 +116,18 @@ WEIGHTS: Dict[str, Dict[str, float]] = {
 
 
 def _learned_weights_enabled() -> bool:
-    """True only when SUPPLIER_LEARNED_WEIGHTS is explicitly on. Default OFF."""
-    return os.environ.get("SUPPLIER_LEARNED_WEIGHTS", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    """True only when SUPPLIER_LEARNED_WEIGHTS is explicitly on (env→DB→default OFF)."""
+    env_val = os.environ.get("SUPPLIER_LEARNED_WEIGHTS")
+    if env_val is not None:
+        return env_val.strip().lower() in {"1", "true", "yes", "on"}
+    from ..db import SessionLocal
+    from ..services.platform_settings import get_setting as _ps_get
+    try:
+        with SessionLocal() as _db:
+            val = _ps_get("supplier_learned_weights", default="0", db=_db)
+    except Exception:
+        val = "0"
+    return (val or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def derive_segment(criteria: Any) -> Optional[str]:
