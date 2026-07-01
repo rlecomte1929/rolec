@@ -10,6 +10,7 @@ from .routers import (
     admin_dsar,
     admin_feature_flags,
     admin_exec_overview,
+    admin_marketing_analytics,
     admin_rag_eval,
     admin_ocr_shadow,
     admin_work_items,
@@ -209,6 +210,7 @@ def create_app() -> FastAPI:
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
+    app.include_router(admin_marketing_analytics.router, prefix="/api/admin")  # [audos-P2] pre-signup funnel
     app.include_router(relocation_routes.router)
     app.include_router(relocation_routes.api_router)
     app.include_router(relocation_classify_routes.router)
