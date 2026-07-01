@@ -160,5 +160,135 @@ class BriefingPromptMaskingTests(unittest.TestCase):
         self.assertIn("2026-07-01", prompt)
 
 
+class SupportTriageMaskingTests(unittest.TestCase):
+    """routers/support._call_triage_model() masks the ticket subject + body before
+    they reach the generic llm_client (claude_complete_text_sync). The generic
+    client does NOT mask — the caller must (H1)."""
+
+    def test_subject_and_body_masked_before_egress(self):
+        from unittest import mock
+        from backend.app.routers import support
+
+        captured: dict = {}
+
+        def _fake_claude(**kwargs):
+            captured["user"] = kwargs["user"]
+            return '{"issue_category": "other", "fix_difficulty": "medium", ' \
+                   '"suggested_action": "escalate"}'
+
+        # _TRIAGE_SYSTEM carries a literal-brace JSON example, so its .format()
+        # call is incidental to this test — patch it to a benign template so we
+        # isolate the masking of the user message (the subject + ticket body).
+        with mock.patch(
+            "backend.app.services.llm_client.claude_complete_text_sync",
+            _fake_claude,
+        ), mock.patch.object(support, "_TRIAGE_SYSTEM", "{domain_context}"):
+            support._call_triage_model(
+                content="Please help — passport 123456789, email john.doe@acme.com",
+                subject="Issue from +33 6 12 34 56 78",
+                user_role="employee",
+                company_id="c1",
+                recent_events=[],
+                domain_context="ctx",
+            )
+
+        sent = captured["user"]
+        self.assertIn("[REDACTED_PHONE]", sent)
+        self.assertIn("[REDACTED_EMAIL]", sent)
+        for raw in ("john.doe@acme.com", "+33 6 12 34 56 78", "123456789"):
+            self.assertNotIn(raw, sent)
+
+
+class AnalyticsQueryMaskingTests(unittest.TestCase):
+    """routers/analytics_query._call_sonnet() masks the analyst question before it
+    reaches the generic llm_client. The aggregate context block is left intact."""
+
+    def test_question_masked_before_egress(self):
+        from unittest import mock
+        from backend.app.routers import analytics_query
+
+        captured: dict = {}
+
+        def _fake_claude(**kwargs):
+            captured["user"] = kwargs["user"]
+            return "ok"
+
+        with mock.patch(
+            "backend.app.services.llm_client.claude_complete_text_sync",
+            _fake_claude,
+        ):
+            analytics_query._call_sonnet(
+                question="why did jane.doe@acme.com churn?",
+                context="Daily summary: 12 active cases.",
+            )
+
+        sent = captured["user"]
+        self.assertIn("[REDACTED_EMAIL]", sent)
+        self.assertNotIn("jane.doe@acme.com", sent)
+        # Non-PII aggregate context is preserved verbatim.
+        self.assertIn("12 active cases", sent)
+
+
+class ProspectEnrichmentMaskingTests(unittest.TestCase):
+    """prospect_enrichment_service._build_user_prompt() masks the admin-typed notes
+    free-text, while preserving firmographics and published web evidence."""
+
+    def test_admin_notes_masked_evidence_preserved(self):
+        from backend.app.services.prospect_enrichment_service import _build_user_prompt
+
+        prompt = _build_user_prompt(
+            company_name="Acme GmbH",
+            domain="acme.com",
+            linkedin="linkedin.com/company/acme",
+            raw_input_notes="contact is sven@acme.com / +47 911 23 456",
+            website_text="Acme is a 500-person logistics firm.",
+            search_text="Acme raised a Series B in 2025.",
+        )
+        self.assertIn("[REDACTED_EMAIL]", prompt)
+        self.assertIn("[REDACTED_PHONE]", prompt)
+        self.assertNotIn("sven@acme.com", prompt)
+        # Firmographics + published grounding evidence are preserved.
+        self.assertIn("Acme GmbH", prompt)
+        self.assertIn("500-person logistics firm", prompt)
+        self.assertIn("Series B", prompt)
+
+
+class RoadmapGeneratorDataMinimizationTests(unittest.TestCase):
+    """roadmap_generator is data-minimized by construction: the SUBJECT block it
+    sends to the LLM is built only from ISO country codes + corridor/pathway
+    classification — UserProfile structurally cannot carry name/email/passport
+    free-text — and the corpus chunks are published immigration text. The prod
+    egress is additionally masked at the AnthropicClient.complete chokepoint
+    (see AnthropicClientMaskingTests above)."""
+
+    def test_context_message_contains_only_non_personal_subject_fields(self):
+        from backend.app.services.roadmap_generator import _build_context_message
+        from backend.app.services.immigration_retriever import (
+            PathClassification,
+            UserProfile,
+        )
+
+        profile = UserProfile(
+            nationality="IN", origin_country="IN",
+            destination_country="DE", is_eea=False,
+        )
+        classification = PathClassification(pathway_type="work_permit", corridor="IN→DE")
+        chunks = [{"id": "c1", "source_url": "https://example.gov",
+                   "chunk_text": "Published immigration rule text."}]
+
+        msg = _build_context_message(profile, classification, chunks, "IN→DE")
+
+        # Only ISO codes + classification render into the SUBJECT block.
+        self.assertIn("nationality=IN", msg)
+        self.assertIn("destination=DE", msg)
+        self.assertIn("pathway_type=work_permit", msg)
+        # The profile dataclass has no free-text PII field that could leak — this
+        # assertion breaks loudly if someone adds one without a masking review.
+        self.assertEqual(
+            set(UserProfile.__dataclass_fields__),
+            {"nationality", "origin_country", "destination_country", "is_eea"},
+        )
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

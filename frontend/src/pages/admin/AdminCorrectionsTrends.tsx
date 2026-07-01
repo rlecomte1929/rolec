@@ -38,7 +38,7 @@ const SERIES_COLORS = [
   '#b45309', // amber-700
   '#047857', // emerald-700
   '#be123c', // rose-700
-  '#6d28d9', // violet-700
+  '#0f766e', // teal-700 (brand-family; replaces violet-700 — no purple in brand per DESIGN.md)
   '#0369a1', // sky-700
   '#a16207', // yellow-700
   '#4d7c0f', // lime-700

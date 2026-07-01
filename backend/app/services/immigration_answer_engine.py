@@ -231,6 +231,18 @@ def _persist_answer_replay(
         log.debug("replay record persist failed", exc_info=True)
 
 
+# Slice 3: anonymised applicant context is a TAILORING hint only — it tells the
+# model which of the grounded sources matter most for this applicant (e.g. family
+# requirements), but it is explicitly NOT a source. Grounding is unchanged: the N5
+# verifier still runs, so any claim must still be supported + cited from SOURCES.
+_APPLICANT_CONTEXT_TEMPLATE = (
+    "\n\nAPPLICANT CONTEXT (anonymised — use ONLY to decide which of the provided "
+    "SOURCES are most relevant and to surface conditional requirements that apply to "
+    "this applicant; it is NOT a source — never state a fact unless it is grounded in "
+    "and cited from the SOURCES above):\n{ctx}"
+)
+
+
 def generate_immigration_answer(
     chunks_payload: Dict[str, Any],
     query: str,
@@ -238,6 +250,7 @@ def generate_immigration_answer(
     *,
     client: Optional[LlmClient] = None,
     verifier_client: Optional[LlmClient] = None,
+    applicant_context: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate a grounded answer from a retrieve_with_staleness() payload.
@@ -307,6 +320,8 @@ def generate_immigration_answer(
     system = base_prompt + _INJECTION_GUARD + (_STALE_CAVEAT_HINT if all_stale else "")
     if conflict_result["escalations"]:
         system += "\n\n" + CONFLICTING_OFFICIAL_SOURCES_NOTE
+    if applicant_context:
+        system += _APPLICANT_CONTEXT_TEMPLATE.format(ctx=applicant_context)
     user_message = _build_user_message(chunks, query, corridor)
 
     resp = client.complete(LlmRequest(system=system, user_message=user_message, model=requested_model, max_tokens=800))

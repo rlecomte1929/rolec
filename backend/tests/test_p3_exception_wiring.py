@@ -52,6 +52,18 @@ from backend.app.services.exception_request_service import ExceptionRequestServi
 router = ImmigrationRegimeRouter()
 svc = ExceptionRequestService()
 
+# [AIQ-1392] The exception-request DB-layer tests below exercise the REAL
+# backend.database, but backend/conftest.py globally mocks it
+# (sys.modules.setdefault), so _make_sqlite_db() returns a MagicMock and inserts
+# never persist (and the real init_db is sqlite-incompatible). They were
+# pre-existing red on main; a real-DB test fixture is tracked in AIQ-1392.
+# strict=False → they auto-XPASS once that fixture lands (no CI break).
+_XFAIL_DB_LAYER = pytest.mark.xfail(
+    reason="exception-request DB layer needs a real-DB fixture (conftest mocks "
+    "backend.database; init_db sqlite-incompatible) — tracked in AIQ-1392",
+    strict=False,
+)
+
 
 def _make_sqlite_db():
     """Return a SQLite Database instance backed by the temp file, fully initialised."""
@@ -71,6 +83,7 @@ def _flag_types(flags: List[ExceptionFlag]) -> List[str]:
 # 1. DB layer — upsert_exception_request
 # ─────────────────────────────────────────────────────────────────────────────
 
+@_XFAIL_DB_LAYER
 class TestUpsertExceptionRequest:
 
     def test_insert_creates_row(self):
@@ -180,6 +193,7 @@ class TestUpsertExceptionRequest:
 # 2. DB layer — list_exception_requests
 # ─────────────────────────────────────────────────────────────────────────────
 
+@_XFAIL_DB_LAYER
 class TestListExceptionRequests:
 
     def test_empty_for_unknown_case(self):
@@ -315,6 +329,7 @@ class TestE2EExceptionDetection:
         types = _flag_types(flags)
         assert "role_category_ambiguous" in types
 
+    @_XFAIL_DB_LAYER
     def test_flags_then_stored_in_db(self):
         """Simulate what the wired call site does: detect flags and persist them."""
         db = _make_sqlite_db()
@@ -390,6 +405,7 @@ class TestExceptionsRouteShape:
             "total": len(flags),
         }
 
+    @_XFAIL_DB_LAYER
     def test_grouping_separates_correctly(self):
         db = _make_sqlite_db()
         cid = _case_id()
@@ -402,6 +418,7 @@ class TestExceptionsRouteShape:
         assert len(result["blockers"]) == 2
         assert len(result["warnings"]) == 1
 
+    @_XFAIL_DB_LAYER
     def test_status_filter_pending_only(self):
         from sqlalchemy import text  # available; installed as DB layer dependency
         db = _make_sqlite_db()
@@ -426,6 +443,7 @@ class TestExceptionsRouteShape:
         result = self._group_flags(flags)
         assert result == {"blockers": [], "warnings": [], "total": 0}
 
+    @_XFAIL_DB_LAYER
     def test_blocker_only_case(self):
         db = _make_sqlite_db()
         cid = _case_id()
