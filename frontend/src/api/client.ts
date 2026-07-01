@@ -727,9 +727,45 @@ export interface HrDraftCase {
   hr_user_id: string | null;
 }
 
+export interface BenefitCandidateInput {
+  id: string;
+  category: string;
+  cost_per_employee: number;
+  expected_satisfaction: number;
+  variance?: number;
+  mandatory?: boolean;
+}
+export interface OptimizeBenefitMixRequest {
+  budget: number;
+  candidates: BenefitCandidateInput[];
+  mandatory_ids?: string[];
+  category_caps?: Record<string, number>;
+  lambda_risk?: number;
+  min_coverage?: number;
+}
+export interface OptimizeBenefitMixResponse {
+  feasible: boolean;
+  infeasibility_reason: string | null;
+  selected: string[];
+  achieved_utility: number;
+  total_cost: number;
+  lambda_risk: number;
+  shadow_prices: {
+    budget_per_1000: number;
+    category_caps: Record<string, number>;
+    min_coverage: number;
+  };
+}
+
 export const hrAPI = {
   getBacklog: async (): Promise<HrBacklogResponse> => {
     const response = await api.get<HrBacklogResponse>('/api/hr/backlog');
+    return response.data;
+  },
+  /** [Parker-B] Run the Markowitz benefit-mix optimizer for a company. Candidates
+   *  must carry expected_satisfaction (else the endpoint 422s when no prior exists). */
+  optimizeBenefitMix: async (companyId: string, body: OptimizeBenefitMixRequest): Promise<OptimizeBenefitMixResponse> => {
+    const response = await api.post<OptimizeBenefitMixResponse>(`/api/hr/${companyId}/optimize-benefit-mix`, body);
     return response.data;
   },
   createCase: async (): Promise<{ caseId: string }> => {
