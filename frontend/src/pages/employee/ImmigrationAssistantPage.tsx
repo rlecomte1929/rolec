@@ -5,6 +5,7 @@ import {
   ImmigrationAnswerPanel,
   type ImmigrationCaseContext,
 } from '../../features/immigration/ImmigrationAnswerPanel';
+import { MoveAtAGlance } from '../../features/immigration/MoveAtAGlance';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { servicesAPI } from '../../api/client';
 
@@ -12,14 +13,15 @@ import { servicesAPI } from '../../api/client';
  * Route: /employee/immigration-assistant
  * Employee-facing grounded immigration Q&A (AIQ-843 backend + AIQ-856 verdict capture).
  *
+ * Slice 2: opens with a proactive "your move at a glance" panel (risk flags +
+ * checklist) for the employee's own case, above the grounded Q&A.
  * Relocation-assistant MVP: resolve the employee's corridor from THEIR case (via the
  * services context) so the assistant pre-fills "your IN → DE move" instead of making
  * them hand-type From/To. Best-effort — if there's no assignment/corridor, the panel
- * falls back to the manual form. (Corridor codes pass through as-is; ISO-2
- * normalisation for the engine is a fast-follow.)
+ * falls back to the manual form.
  */
 export const ImmigrationAssistantPage: React.FC = () => {
-  const { assignmentId } = useEmployeeAssignment();
+  const { primaryCaseId, assignmentId } = useEmployeeAssignment();
   const [caseContext, setCaseContext] = useState<ImmigrationCaseContext | undefined>(undefined);
   const [resolved, setResolved] = useState(false);
 
@@ -50,7 +52,8 @@ export const ImmigrationAssistantPage: React.FC = () => {
 
   return (
     <AppShell title="Immigration Q&A" subtitle="Grounded, cited answers for your corridor">
-      <Container maxWidth="xl" className="py-8">
+      <Container maxWidth="xl" className="py-8 space-y-4">
+        <MoveAtAGlance caseId={primaryCaseId} />
         {resolved ? (
           <ImmigrationAnswerPanel caseContext={caseContext} />
         ) : (

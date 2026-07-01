@@ -51,6 +51,7 @@ from .routers import (
     hr_vendor_widgets,
     research_requests,
     hr_coordination,
+    employee_immigration_snapshot,
     immigration_documents,
     immigration_forms,
     immigration_gdpr,
@@ -164,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_intake_interview.router)
     app.include_router(immigration_status.router)
     app.include_router(immigration_gdpr.router)
+    app.include_router(employee_immigration_snapshot.router)  # relocation-assistant Slice 2 — GET /api/employee/cases/{id}/immigration-snapshot
     app.include_router(gdpr.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
     app.include_router(privacy_consents.router)  # PRIV-005 / AIQ-473 — Art. 13 notice acknowledgement
     app.include_router(feedback.router)  # product "Share feedback" widget → public.feedback
