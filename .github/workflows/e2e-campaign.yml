@@ -147,6 +147,30 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      # Phase 2 confirm-twice: pull the PREVIOUS campaign's failure state so we only
+      # file a P0 for a test that failed twice in a row (a transient rarely does).
+      # Best-effort: missing state → confirm-twice fails open (files normally).
+      - name: Download previous sentinel state
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p results
+          prev=$(gh run list --workflow=e2e-campaign.yml --branch=main --limit=10 \
+            --json databaseId --jq "[.[]|select((.databaseId|tostring) != env.RUN_ID)][0].databaseId" 2>/dev/null || true)
+          if [ -n "$prev" ] && [ "$prev" != "null" ]; then
+            if gh run download "$prev" -n sentinel-state -D results/ 2>/dev/null && [ -f results/last_failures.json ]; then
+              mv results/last_failures.json results/prev_failures.json
+              echo "loaded prev sentinel state from run $prev"
+            else
+              echo "no sentinel-state artifact on run $prev — confirm-twice fails open"
+            fi
+          else
+            echo "no previous run found — confirm-twice fails open"
+          fi
+
       # Optional: sync P0/P1 failures + regressions into the Notion Work Queue (gated).
       # Deterministic create-or-update, de-duped by test_id — no LLM.
       - name: Sync failures to Notion Work Queue
@@ -156,7 +180,19 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$NOTION_QUEUE_TOKEN" ]; then echo "NOTION_QUEUE_TOKEN not set — skipping"; exit 0; fi
-          python3 scripts/notion_sync_candidates.py --apply
+          python3 scripts/notion_sync_candidates.py --apply \
+            --confirm-twice results/prev_failures.json \
+            --state-out results/last_failures.json
+
+      # Persist THIS run's failure state for the next run's confirm-twice comparison.
+      - name: Upload sentinel state
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-state
+          path: results/last_failures.json
+          retention-days: 14
+          if-no-files-found: warn
 
       # Optional Slack ping (gated). Reads the band line from the scorer output via env.
       - name: Notify Slack
