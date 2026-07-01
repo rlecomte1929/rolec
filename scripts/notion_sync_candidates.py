@@ -67,11 +67,54 @@ def latest_report():
     return files[-1] if files else None
 
 
+# ── Confirm-twice gate ──────────────────────────────────────────────────────────
+# A deploy-window transient is tied to ONE deploy window and rarely fails two
+# consecutive campaign runs; a real bug persists. Only file a candidate if it ALSO
+# failed last run. Fail-open: with no valid previous state, file normally so broken
+# artifact plumbing degrades to today's behaviour rather than masking real bugs.
+def load_prev_ids(path):
+    """Return (set_of_failed_ids, have_prev). have_prev is False on any missing/corrupt
+    state so the caller fails open."""
+    try:
+        if not path or not os.path.exists(path):
+            return set(), False
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        ids = data.get("failed_ids") if isinstance(data, dict) else data
+        return set(ids or []), True
+    except Exception:
+        return set(), False
+
+
+def write_state(path, candidates):
+    """Persist this run's candidate test_ids for next run's confirm-twice comparison."""
+    ids = sorted({c.get("test_id") for c in candidates if c.get("test_id")})
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps({
+        "failed_ids": ids,
+        "written_at": datetime.now(timezone.utc).isoformat(),
+    }, indent=2), encoding="utf-8")
+
+
+def filter_confirmed(candidates, prev_ids, have_prev):
+    """Split candidates into (to_file, held). Without a previous run to compare against
+    (have_prev False), file everything (fail-open). Otherwise file only the ids that
+    also failed last run; hold the rest for next-run confirmation."""
+    if not have_prev:
+        return list(candidates), []
+    to_file = [c for c in candidates if c.get("test_id") in prev_ids]
+    held = [c for c in candidates if c.get("test_id") not in prev_ids]
+    return to_file, held
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--report", default=None, help="campaign_report_*.json (default: latest)")
     ap.add_argument("--run-url", default=os.environ.get("RUN_URL", ""), help="CI run URL for the note")
     ap.add_argument("--apply", action="store_true", help="write to Notion (default: dry-run)")
+    ap.add_argument("--confirm-twice", default=None,
+                    help="path to the previous run's failed_ids state; only file candidates that ALSO failed last run")
+    ap.add_argument("--state-out", default=None,
+                    help="write this run's candidate ids here for next run's confirm-twice comparison")
     args = ap.parse_args()
 
     token = os.environ.get("NOTION_QUEUE_TOKEN")
@@ -83,8 +126,24 @@ def main():
         sys.exit("no campaign_report_*.json found (run campaign_scorer.py first)")
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
     candidates = report.get("notion_candidates", []) or []
+
+    # Phase 2: persist this run's candidate ids for next run's confirm-twice comparison
+    # (before filtering — next run compares against everything that failed THIS run).
+    if args.state_out:
+        write_state(args.state_out, candidates)
+
+    # Phase 2: confirm-twice — only file candidates that also failed the previous run.
+    if args.confirm_twice:
+        prev_ids, have_prev = load_prev_ids(args.confirm_twice)
+        candidates, held = filter_confirmed(candidates, prev_ids, have_prev)
+        if held:
+            print(f"⏳ holding {len(held)} first-seen failure(s) for confirm-twice "
+                  f"(will file if they recur): {', '.join(sorted(c.get('test_id', '?') for c in held))}")
+        elif not have_prev:
+            print("ℹ  no previous run state — confirm-twice fails open (filing normally)")
+
     if not candidates:
-        print("✔ no notion_candidates to sync (clean run)")
+        print("✔ no notion_candidates to sync (clean run, or all held for confirm-twice)")
         return
 
     # discover the title property name (type == 'title') — robust to "Task Title" vs "Name"
