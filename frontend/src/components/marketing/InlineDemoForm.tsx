@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Input } from '../antigravity/Input';
 import { Button } from '../antigravity/Button';
 import { submitDemoBooking } from '../../api/demoBooking';
+import { leadCaptureAPI } from '../../api/client';
 import { track } from '../../analytics';
 import { accessContent } from '../../pages/public/accessContent';
 
@@ -85,6 +86,19 @@ export const InlineDemoForm: React.FC = () => {
         source_page: 'access-page-inline-form',
         demo_id: result.demoId,
       });
+      try {
+        const usp = new URLSearchParams(window.location.search);
+        void leadCaptureAPI.submit({
+          email: form.email.trim(),
+          first_name: form.name.trim() || undefined,
+          message: form.corridor.trim() || undefined,
+          source: 'marketing_site',
+          utm_source: usp.get('utm_source') || undefined,
+          utm_campaign: usp.get('utm_campaign') || undefined,
+        });
+      } catch {
+        /* capture is best-effort; never block the demo request */
+      }
       setState('success');
       setTimeout(() => setShowSuccess(true), 50);
       return;
