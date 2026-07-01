@@ -12,7 +12,7 @@ Field sources:
   - policy_published         → ``db.get_latest_published_policy_config_version``
                                (LIVE config-matrix publish path)
   - cases_count/first_case_id→ ``public.relocation_cases`` filtered by company_id
-  - employees_invited        → ``public.employees`` filtered by company_id
+  - employees_invited        → ``case_assignments`` JOIN ``relocation_cases`` by company_id
 
 Per CLAUDE.md the router is registered in BOTH ``backend/app/main.py`` and
 ``backend/main.py`` (prod entry).
@@ -105,12 +105,24 @@ def _cases(company_id: str) -> Tuple[int, Optional[str]]:
 
 
 def _employees_invited(company_id: str) -> int:
-    """Count invited/assigned employees for the company (``public.employees`` is
-    company-scoped). Pure read; degrades to 0."""
+    """Count distinct employees assigned to the company's relocation cases.
+
+    Joins ``case_assignments`` to ``relocation_cases`` via
+    ``ca.case_id = CAST(rc.id AS TEXT)`` (the FK is stored as text in
+    case_assignments while relocation_cases.id is a UUID column; CAST works on
+    both Postgres and SQLite).  Counting from ``public.employees`` under-counts
+    because invited employees frequently have NULL ``company_id`` on that table.
+    Pure read; degrades to 0.
+    """
     try:
         with db.engine.connect() as conn:
             count = conn.execute(
-                text("SELECT COUNT(*) FROM employees WHERE company_id = :cid"),
+                text(
+                    "SELECT COUNT(DISTINCT COALESCE(ca.employee_user_id, ca.employee_identifier))"
+                    " FROM case_assignments ca"
+                    " JOIN relocation_cases rc ON ca.case_id = CAST(rc.id AS TEXT)"
+                    " WHERE rc.company_id = :cid"
+                ),
                 {"cid": company_id},
             ).scalar()
         return int(count or 0)

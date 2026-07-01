@@ -139,3 +139,123 @@ def test_unauthenticated_is_rejected():
     _clear_overrides()  # no auth override → real require_admin_or_hr runs
     r = TestClient(app).get("/api/hr/setup-status")
     assert r.status_code in (401, 403)
+
+
+# --------------------------------------------------------------------------- #
+# Integration tests for _employees_invited — real SQLite engine, real SQL
+# --------------------------------------------------------------------------- #
+import unittest
+from unittest import mock
+
+from sqlalchemy import create_engine, text as _text
+
+from backend.app.routers import setup_assistant as _sa
+
+# Capture the real function BEFORE _patch_helpers autouse replaces it.
+# Each test restores it in setUp so the SQL actually executes.
+_REAL_EMPLOYEES_INVITED = _sa._employees_invited
+
+# Minimal schema — only the columns _employees_invited actually touches.
+_SCHEMA = """
+CREATE TABLE relocation_cases (
+    id   TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL
+);
+CREATE TABLE case_assignments (
+    id                  TEXT PRIMARY KEY,
+    case_id             TEXT NOT NULL,
+    employee_user_id    TEXT,
+    employee_identifier TEXT
+);
+"""
+
+
+def _make_engine():
+    eng = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    with eng.begin() as conn:
+        for stmt in _SCHEMA.split(";"):
+            if stmt.strip():
+                conn.execute(_text(stmt))
+    return eng
+
+
+class TestEmployeesInvitedHelper(unittest.TestCase):
+    """Direct unit tests on _employees_invited using a SQLite in-memory engine.
+
+    These tests bypass the route layer so they exercise the actual SQL and
+    prove the fix for the under-counting bug (NULL employees.company_id).
+    """
+
+    def setUp(self):
+        self.engine = _make_engine()
+        # The autouse _patch_helpers fixture replaces _sa._employees_invited with
+        # a lambda keyed on _DATA.  Restore the real SQL function before each test
+        # so our assertions actually exercise the query.
+        _sa._employees_invited = _REAL_EMPLOYEES_INVITED
+        self._patcher = mock.patch.object(_sa.db, "engine", self.engine)
+        self._patcher.start()
+
+    def tearDown(self):
+        self._patcher.stop()
+        # Put the lambda back so later pytest-style tests get the autouse fixture.
+        # (monkeypatch will overwrite this again anyway on the next test setup.)
+        _sa._employees_invited = lambda cid: _DATA.get(cid, {}).get("employees", 0)
+
+    def _seed(self, conn, *, case_id, company_id, assign_id, employee_user_id=None, employee_identifier=None):
+        conn.execute(
+            _text("INSERT OR IGNORE INTO relocation_cases (id, company_id) VALUES (:cid, :co)"),
+            {"cid": case_id, "co": company_id},
+        )
+        conn.execute(
+            _text(
+                "INSERT INTO case_assignments (id, case_id, employee_user_id, employee_identifier)"
+                " VALUES (:aid, :cid, :euid, :eid)"
+            ),
+            {"aid": assign_id, "cid": case_id, "euid": employee_user_id, "eid": employee_identifier},
+        )
+
+    # (a) A company with one assignment counts ≥ 1 and next_step advances past "invite employee".
+    def test_assignment_counts_for_company(self):
+        with self.engine.begin() as conn:
+            self._seed(conn, case_id="case-1", company_id="co-A",
+                       assign_id="a1", employee_user_id="emp-uuid-1")
+        result = _sa._employees_invited("co-A")
+        self.assertGreaterEqual(result, 1)
+        # next_step must have advanced past "Invite your first employee"
+        ns = _sa._next_step(
+            profile_complete=True, policy_published=True,
+            cases_count=1, employees_invited=result,
+        )
+        self.assertNotEqual(ns.label, "Invite your first employee")
+        self.assertEqual(ns.label, "You're all set up")
+
+    # (b) Scoping — a second company's assignments/cases do NOT bleed into co-A.
+    def test_scoping_second_company_does_not_count(self):
+        with self.engine.begin() as conn:
+            self._seed(conn, case_id="case-1", company_id="co-A",
+                       assign_id="a1", employee_user_id="emp-uuid-1")
+            # co-B has 5 employees assigned across 2 cases.
+            self._seed(conn, case_id="case-B1", company_id="co-B",
+                       assign_id="b1", employee_user_id="emp-b1")
+            self._seed(conn, case_id="case-B2", company_id="co-B",
+                       assign_id="b2", employee_user_id="emp-b2")
+        self.assertEqual(_sa._employees_invited("co-A"), 1)
+        self.assertEqual(_sa._employees_invited("co-B"), 2)
+
+    # (c) Regression fix: NULL employees.company_id is still counted.
+    # Seed a relocation_cases row for co-A + a case_assignments row referencing it,
+    # with NO matching employees row (i.e. employee has NULL employees.company_id
+    # or simply doesn't exist in the employees table). Must still return ≥ 1.
+    def test_null_employee_company_id_still_counted(self):
+        with self.engine.begin() as conn:
+            self._seed(
+                conn,
+                case_id="case-null-co", company_id="co-A",
+                assign_id="a-null",
+                # employee_user_id is set but there is no row in employees table
+                # with company_id='co-A' — this is the exact prod regression scenario.
+                employee_user_id="emp-no-company-in-employees-table",
+            )
+        result = _sa._employees_invited("co-A")
+        self.assertGreaterEqual(result, 1,
+            "Employee with no employees.company_id row must still be counted via case_assignments")
