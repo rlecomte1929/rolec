@@ -1035,6 +1035,13 @@ export const hrAPI = {
     const response = await api.get<{ id: string; employeeIdentifier: string; destCountry?: string; destCity?: string; status: string; riskStatus: string; budgetLimit?: number; budgetEstimated?: number; expectedStartDate?: string; tasksTotal: number; tasksDone: number; tasksOverdue: number; phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>; events: Array<{ event_type: string; description?: string; created_at: string }> }>(`/api/hr/command-center/cases/${assignmentId}`);
     return response.data;
   },
+  /** [Parker-A] Predicted remaining case duration (Cox model). 404s when the
+   *  PREDICTIONS_ENABLED canary is off or no model has been trained — callers
+   *  should treat 404 as "no prediction" and render nothing. */
+  getCasePredictedDuration: async (caseId: string): Promise<{ median_days: number; p20_days: number; p80_days: number; model_version: string; n_training_cases: number }> => {
+    const response = await api.get<{ median_days: number; p20_days: number; p80_days: number; model_version: string; n_training_cases: number }>(`/api/cases/${caseId}/predicted-duration`);
+    return response.data;
+  },
   /** Provider × Case status matrix for the HR grid view (AIQ-14). */
   getProviderStatusGrid: async (): Promise<ProviderGridResponse> => {
     const response = await api.get<ProviderGridResponse>('/api/hr/provider-status-grid');
