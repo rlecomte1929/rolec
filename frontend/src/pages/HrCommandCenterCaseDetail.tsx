@@ -22,6 +22,7 @@ import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptio
 import { PetRequirementsSection } from '../components/case/PetRequirementsSection';
 import { CaseAuditTimeline } from '../components/case/CaseAuditTimeline';
 import { CaseNotesPanel } from '../components/case/CaseNotesPanel';
+import { CasePredictionCard } from '../components/case/CasePredictionCard';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
 import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
@@ -270,6 +271,10 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               </div>
             )}
           </Card>
+
+          {/* [Parker-A] Predicted time to completion — self-hides until the
+              prediction canary + a trained model are available. */}
+          <CasePredictionCard caseId={detail.id} />
 
           {/* Budget */}
           <Card padding="lg">
