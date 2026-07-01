@@ -157,7 +157,7 @@ def add_custom_vendor(
                 "id, company_id, category, destination_city, country, "
                 "master_item_id, custom_item_json, selected, display_order, "
                 "created_at, updated_at, created_by_user_id) VALUES ("
-                ":id, :co, :cat, :city, :country, NULL, :payload, 1, :order, "
+                ":id, :co, :cat, :city, :country, NULL, :payload, true, :order, "
                 ":now, :now, :actor)"
             ),
             {
