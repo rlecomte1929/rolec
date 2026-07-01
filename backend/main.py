@@ -4346,21 +4346,12 @@ def _dispatch_hr_assign_side_effects(
         # in-app notification, so the NotificationBell showed nothing on assign
         # (the MSG-02 sentinel's notification check failed). Best-effort: mirror
         # the HR_FEEDBACK_POSTED pattern — never block the assign on this.
-        # If the assignment is pending_claim (employee_user_id NULL) but the employee
-        # already has an account for this email, resolve + notify it so a registered
-        # employee is still told a case was set up (register-after is covered by the
-        # ASSIGNMENT_LINKED notification on auto-link/accept).
-        _notify_target = (employee_user_id or "").strip() if employee_user_id else ""
-        if not _notify_target and stored_identifier and "@" in str(stored_identifier):
-            try:
-                _p = db.get_profile_by_email(str(stored_identifier))
-                if _p and _p.get("id"):
-                    _notify_target = str(_p["id"]).strip()
-            except Exception:
-                _notify_target = ""
-        if _notify_target:
+        # NOTE: gated on employee_user_id by design. A pending_claim assign (no linked
+        # user yet) is instead notified via ASSIGNMENT_LINKED at auto-link/accept time
+        # (assignment_claim_link_service) — see the HR↔employee linkage fix.
+        if employee_user_id:
             _notif_kwargs = dict(
-                user_id=_notify_target,
+                user_id=employee_user_id,
                 type_="ASSIGNMENT_CREATED",
                 title="Your relocation case is ready",
                 body="HR has assigned you a relocation case. Start your intake in My Case.",
@@ -4377,7 +4368,7 @@ def _dispatch_hr_assign_side_effects(
                     log.warning(
                         "assignment notification skipped assignment_id=%s user_id=%s error=%s",
                         assignment_id,
-                        _notify_target,
+                        employee_user_id,
                         exc2,
                     )
 
