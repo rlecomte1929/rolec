@@ -11,6 +11,8 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 expect.extend(matchers);
 
 vi.mock('../../api/immigrationAnswer', () => ({ askImmigrationQuestion: vi.fn() }));
+vi.mock('../../api/policyAssistantQuery', () => ({ getPolicyAnswer: vi.fn() }));
+vi.mock('../../api/assistantRoute', () => ({ routeAssistantDomain: vi.fn(() => Promise.resolve('immigration')) }));
 vi.mock('../../api/aiFeedback', () => ({ submitAiFeedback: vi.fn() }));
 
 import { ImmigrationAnswerPanel } from './ImmigrationAnswerPanel';
