@@ -15,8 +15,11 @@ from pathlib import Path
 
 import pytest
 
+from datetime import date
+
 from backend.eval.eligibility_predictor import predict_eligibility
-from backend.eval.run_eligibility_eval import run_eval
+from backend.eval.rule_registry import is_effective
+from backend.eval.run_eligibility_eval import EVAL_DATE, run_eval
 
 _CORPUS = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "eligibility"
 
@@ -54,8 +57,35 @@ def test_eval_over_seed_corpus_is_non_vacuous_and_passes_gate():
     # Gate conditions (mirror run_eligibility_eval._main --ci).
     assert report["outcome_accuracy"] == 1.0
     assert report["citation_effective_ratio"] == 1.0
-    # Non-vacuous: at least some dossiers carry registry-backed citations.
-    assert report["n_has_citation"] >= 1
+    # All five corridors now carry registry-backed citations (US_FR + BR_PT
+    # gained representative FR/PT rule cites).
+    assert report["n_has_citation"] == 5
+
+
+def test_new_fr_pt_rules_effective_on_eval_date():
+    """The FR/PT route rules are in force on the eval reference date."""
+    # FR ICT route (Romain 2026-07-01): CESEDA L.421-26 'salarié détaché ICT',
+    # in force 2021-05-01 (Ord. 2020-1733); article confirmed on Légifrance.
+    assert is_effective("FR_CESEDA_L421_26:2021", EVAL_DATE) is True
+    # PT route (Romain 2026-07-01): Lei 23/2007 art. 88.º n.º 1, consolidated
+    # through DL 37-A/2024.
+    assert is_effective("PT_LEI_23_2007_ART88_1:2024", EVAL_DATE) is True
+    # Sanity: both also effective on the literal eval date.
+    assert is_effective("FR_CESEDA_L421_26:2021", date(2026, 7, 1)) is True
+    assert is_effective("PT_LEI_23_2007_ART88_1:2024", date(2026, 7, 1)) is True
+
+
+def test_every_corridor_has_at_least_one_effective_citation():
+    """All 5 seed corridors emit ≥1 citation, each effective on the eval date."""
+    for gt_path in _corridors():
+        gt = json.loads(gt_path.read_text())
+        pred = predict_eligibility(gt)
+        cites = pred["citations"]
+        assert cites, f"no citations for {gt_path.parent.name}"
+        for c in cites:
+            assert is_effective(c, EVAL_DATE), (
+                f"{c} not effective on {EVAL_DATE} ({gt_path.parent.name})"
+            )
 
 
 def test_mock_predictor_still_default_for_back_compat():

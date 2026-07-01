@@ -1,22 +1,19 @@
 {
   "_meta": {
     "corridor": "BR_PT",
-    "verification_status": "representative",
-    "note": "Synthetic dossier. Brazilian (non-EU) national relocating to Portugal on a long-term assignment — standard work/residence-permit route. No Portuguese rule version exists in backend/eval/rule_registry.py yet, so citations are intentionally empty pending registry coverage. Needs human curation.",
+    "verification_status": "verified",
+    "note": "Synthetic dossier. Brazilian (non-EU) national relocating to Portugal on a long-term assignment, entering on a residence visa obtained abroad. Route DECIDED by Romain 2026-07-01: Lei n.º 23/2007 art. 88.º n.º 1 (residence permit for subordinate professional activity, WITH residence visa) — NOT the visa-exempt n.º 2, Blue Card, or CPLP route. Sub-article n.º 1 corroborated by AIMA; DL 37-A/2024 (3 Jun 2024) revoked art. 88 n.º 2/n.º 6 (manifestação de interesse), leaving n.º 1 as the standard route. Version tag :2024 reflects the consolidated text as amended through DL 37-A/2024 and Lei 40/2024.",
     "source": "WS-B seed corpus (deterministic regime router)"
   },
   "profile": {
     "nationality": "Brazilian",
     "origin_country": "Brazil",
     "destination_country": "Portugal",
-    "contract_type": "lta"
+    "contract_type": "lta",
+    "intra_group_transfer": true
   },
   "eligibility_verdict": {
-    "outcome_set": [
-      "ELIGIBLE_BLUE_CARD"
-    ],
-    "citations": [
-      "EU_DIR_2021_1883"
-    ]
+    "outcome_set": ["ELIGIBLE_WORK_PERMIT"],
+    "citations": ["PT_LEI_23_2007_ART88_1:2024"]
   }
 }

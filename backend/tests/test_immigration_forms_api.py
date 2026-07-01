@@ -1,0 +1,126 @@
+"""
+H4 · API-level tests for immigration HTTP endpoints with no existing app-mounted
+coverage (the campaign API runner has no Immigration coverage):
+
+  GET /api/hr/cases/{case_id}/immigration/available-forms   (immigration_forms.py)
+  GET /api/employee/cases/{case_id}/interview/status         (immigration_status.py)
+
+Both are exercised through the prod app (backend.main) with their service/DB layer
+patched, so no live DB is needed. Mirrors the override pattern in
+test_immigration_intake_consent.py.
+"""
+from __future__ import annotations
+
+import os
+
+os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
+os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
+
+import unittest
+from typing import Any, Dict
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from backend.main import app, UserRole
+from backend.app.auth_deps import (
+    get_current_user,
+    get_org_id_for_hr_user,
+    require_admin_or_hr,
+)
+
+_HR_USER: Dict[str, Any] = {
+    "id": "user-hr-a", "role": UserRole.HR.value,
+    "email": "hr-a@company-a.test", "is_admin": False,
+}
+_EMP_USER: Dict[str, Any] = {
+    "id": "user-emp", "role": "EMPLOYEE", "auth_uuid": "11111111-1111-1111-1111-111111111111",
+    "org_id": "company-a", "email": "emp@company-a.test",
+}
+
+_FORMS_MOD = "backend.app.routers.immigration_forms"
+_STATUS_MOD = "backend.app.routers.immigration_status"
+
+
+class _Form:
+    """Minimal stand-in for a form descriptor with a to_dict()."""
+    def __init__(self, form_id: str, name: str) -> None:
+        self._d = {"form_id": form_id, "name": name}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self._d)
+
+
+class AvailableFormsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        app.dependency_overrides[require_admin_or_hr] = lambda: _HR_USER
+        app.dependency_overrides[get_org_id_for_hr_user] = lambda: "company-a"
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_explicit_corridor_skips_case_lookup(self) -> None:
+        """corridor_to passed explicitly → forms returned without a case lookup."""
+        with patch(f"{_FORMS_MOD}.get_available_forms",
+                   return_value=[_Form("blue_card_fill", "Blue Card")]) as mock_forms, \
+                patch(f"{_FORMS_MOD}._get_case_details") as mock_case:
+            resp = self.client.get(
+                "/api/hr/cases/case-a/immigration/available-forms",
+                params={"corridor_to": "DE", "visa_type": "blue_card"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["corridor_to"], "DE")
+        self.assertEqual(body["visa_type"], "blue_card")
+        self.assertEqual(body["forms"], [{"form_id": "blue_card_fill", "name": "Blue Card"}])
+        mock_case.assert_not_called()
+        mock_forms.assert_called_once_with("DE", "blue_card")
+
+    def test_corridor_derived_from_case_when_omitted(self) -> None:
+        """No corridor_to → derive dest_country from the case details."""
+        with patch(f"{_FORMS_MOD}.get_available_forms", return_value=[]) as mock_forms, \
+                patch(f"{_FORMS_MOD}._get_case_details",
+                      return_value={"dest_country": "NO"}) as mock_case:
+            resp = self.client.get("/api/hr/cases/case-a/immigration/available-forms")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["corridor_to"], "NO")
+        mock_case.assert_called_once()
+        mock_forms.assert_called_once_with("NO", "blue_card")
+
+    def test_corridor_falls_back_to_DE_when_case_missing(self) -> None:
+        """No corridor_to and no case → safe DE default (matches router contract)."""
+        with patch(f"{_FORMS_MOD}.get_available_forms", return_value=[]), \
+                patch(f"{_FORMS_MOD}._get_case_details", return_value=None):
+            resp = self.client.get("/api/hr/cases/case-a/immigration/available-forms")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["corridor_to"], "DE")
+
+
+class EmployeeInterviewStatusTest(unittest.TestCase):
+    def setUp(self) -> None:
+        app.dependency_overrides[get_current_user] = lambda: _EMP_USER
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_consent_required_returns_403(self) -> None:
+        with patch(f"{_STATUS_MOD}._check_consent", return_value=False):
+            resp = self.client.get("/api/employee/cases/case-a/interview/status")
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn("Consent", resp.json()["detail"])
+
+    def test_no_session_returns_empty_progress(self) -> None:
+        with patch(f"{_STATUS_MOD}._check_consent", return_value=True), \
+                patch(f"{_STATUS_MOD}._load_session", return_value=None):
+            resp = self.client.get("/api/employee/cases/case-a/interview/status")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertFalse(body["has_session"])
+        self.assertEqual(body["completion_pct"], 0)
+        self.assertFalse(body["is_complete"])
+
+
+if __name__ == "__main__":
+    unittest.main()

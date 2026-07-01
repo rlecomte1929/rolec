@@ -1,0 +1,36 @@
+{"question": "What documents do I need for my visa application?", "expected_domain": "immigration"}
+{"question": "How long does the work permit take to process?", "expected_domain": "immigration"}
+{"question": "Do I need an apostille on my birth certificate?", "expected_domain": "immigration"}
+{"question": "Where do I register my address after I arrive?", "expected_domain": "immigration"}
+{"question": "What is the Blue Card salary threshold?", "expected_domain": "immigration"}
+{"question": "Do I need a biometric appointment at the embassy?", "expected_domain": "immigration"}
+{"question": "Is my degree recognised for the visa?", "expected_domain": "immigration"}
+{"question": "What is the residence permit renewal process?", "expected_domain": "immigration"}
+{"question": "Which consulate handles my visa?", "expected_domain": "immigration"}
+{"question": "How do I get my passport stamped on arrival?", "expected_domain": "immigration"}
+{"question": "Which immigration documents must be translated?", "expected_domain": "immigration"}
+{"question": "Do I need a registration certificate?", "expected_domain": "immigration"}
+{"question": "What is the visa processing time?", "expected_domain": "immigration"}
+{"question": "Can I enter the country before my permit is approved?", "expected_domain": "immigration"}
+{"question": "Does my company cover temporary housing?", "expected_domain": "policy"}
+{"question": "What is my relocation allowance?", "expected_domain": "policy"}
+{"question": "Will my employer reimburse my flights?", "expected_domain": "policy"}
+{"question": "Am I entitled to school fees for my children?", "expected_domain": "policy"}
+{"question": "Is shipping my household goods covered?", "expected_domain": "policy"}
+{"question": "What is my housing budget?", "expected_domain": "policy"}
+{"question": "Does my company pay for home leave flights?", "expected_domain": "policy"}
+{"question": "Am I covered for spouse support?", "expected_domain": "policy"}
+{"question": "What relocation package am I getting?", "expected_domain": "policy"}
+{"question": "Is temporary accommodation reimbursed?", "expected_domain": "policy"}
+{"question": "Does my employer cover COLA?", "expected_domain": "policy"}
+{"question": "What benefits does my company offer for the move?", "expected_domain": "policy"}
+{"question": "Will the company pay for my visa fees?", "expected_domain": "policy"}
+{"question": "Am I entitled to a settling-in allowance?", "expected_domain": "policy"}
+{"question": "Can you help me with my move?", "expected_domain": "ambiguous"}
+{"question": "What should I do first?", "expected_domain": "ambiguous"}
+{"question": "I have a question about my relocation", "expected_domain": "ambiguous"}
+{"question": "What do I need to know?", "expected_domain": "ambiguous"}
+{"question": "Who can I contact for help?", "expected_domain": "ambiguous"}
+{"question": "What are the next steps?", "expected_domain": "ambiguous"}
+{"question": "Hello, are you there?", "expected_domain": "ambiguous"}
+{"question": "What is the timeline for everything?", "expected_domain": "ambiguous"}

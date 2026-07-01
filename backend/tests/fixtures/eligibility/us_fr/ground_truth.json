@@ -1,22 +1,19 @@
 {
   "_meta": {
     "corridor": "US_FR",
-    "verification_status": "representative",
-    "note": "Synthetic dossier. US national relocating from the United States to France — non-EU national needs a French work/residence permit (standard work-permit route). No French rule version exists in backend/eval/rule_registry.py yet, so citations are intentionally empty pending registry coverage. Needs human curation.",
+    "verification_status": "verified",
+    "note": "Synthetic dossier. US national on a long-term intra-group secondment from the United States to France — non-EU-resident employee temporarily transferred within the same corporate group. Route DECIDED by Romain 2026-07-01: CESEDA art. L.421-26 'salarié détaché ICT' (intra-corporate transferee, EU Directive 2014/66/UE), NOT the direct-hire salarié (L.421-1) / Blue Card / Passeport Talent route. Article number CONFIRMED against Légifrance (Article L421-26, en vigueur; recodified into force 2021-05-01 per Ord. 2020-1733). ICT requires an intra-group transfer with ≥6 months prior group seniority — consistent with this LTA secondment.",
     "source": "WS-B seed corpus (deterministic regime router)"
   },
   "profile": {
     "nationality": "American",
     "origin_country": "United States",
     "destination_country": "France",
-    "contract_type": "lta"
+    "contract_type": "lta",
+    "intra_group_transfer": true
   },
   "eligibility_verdict": {
-    "outcome_set": [
-      "ELIGIBLE_BLUE_CARD"
-    ],
-    "citations": [
-      "EU_DIR_2021_1883"
-    ]
+    "outcome_set": ["ELIGIBLE_WORK_PERMIT"],
+    "citations": ["FR_CESEDA_L421_26:2021"]
   }
 }

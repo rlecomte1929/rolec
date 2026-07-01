@@ -246,6 +246,7 @@ class ImmigrationRegimeRouter:
         destination_country: Optional[str] = None,
         origin_country: Optional[str] = None,
         contract_type: Optional[str] = None,
+        intra_group_transfer: bool = False,
     ) -> ImmigrationRegimeResult:
         """
         Return the best-matching ImmigrationRegimeResult for this route.
@@ -323,7 +324,11 @@ class ImmigrationRegimeRouter:
         # nationals never reach here; and before the catch-all, so non-EEA→EU is a
         # Blue Card rather than a generic work permit. EEA/EFTA destinations
         # (Norway etc.) are NOT EU members → they fall through to the catch-all.
-        if _is_eu_member_destination(destination_country) and not _is_eu_national(nationality):
+        if (
+            _is_eu_member_destination(destination_country)
+            and not _is_eu_national(nationality)
+            and not intra_group_transfer  # intra-group secondments → ICT (catch-all below), not Blue Card
+        ):
             return self._make(
                 regime_id="blue_card",
                 priority="critical",

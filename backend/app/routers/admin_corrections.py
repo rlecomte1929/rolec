@@ -16,13 +16,14 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..auth_deps import require_admin_or_hr
+from ..auth_deps import require_admin, require_admin_or_hr
 from ...database import db
 from ..services.correction_analytics import (
     summarize_by_reason,
     weekly_correction_counts,
     weekly_corrections_by_reason,
 )
+from ..services.corrections_digest import run_corrections_digest
 
 router = APIRouter(prefix="/api/admin/corrections", tags=["admin-corrections"])
 logger = logging.getLogger(__name__)
@@ -101,3 +102,19 @@ def corrections_by_reason(
         "totals_by_reason": summarize_by_reason(rows),
         "total": sum(r["count"] for r in rows),
     }
+
+
+@router.post("/digest/run")
+def run_corrections_digest_endpoint(
+    employer_id: Optional[str] = Query(
+        None, description="Optional: scope the digest to one employer. Omit for all employers."
+    ),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """[AIQ-945] Render + deliver the weekly corrections digest (best-effort Resend).
+
+    Admin-only (the digest aggregates across employers + emails ops). Manual MVP
+    trigger; a scheduler is a Phase-2 follow-up. Never raises — see
+    corrections_digest.run_corrections_digest.
+    """
+    return run_corrections_digest(employer_id=employer_id)
