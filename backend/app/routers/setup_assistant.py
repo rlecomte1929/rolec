@@ -1,20 +1,18 @@
-"""Setup & Help Assistant — read-only HR workspace setup-status endpoint.
+"""Setup & Help Assistant — read-only HR workspace setup-status + query endpoints.
 
-``GET /api/hr/setup-status`` returns the AUTHENTICATED HR user's real setup
-progress, COMPANY-SCOPED from auth (never from a body/param). Read-only: no
-writes, no new tables. This is the assistant's live workspace-state input.
+``GET  /api/hr/setup-status``         — workspace setup progress (T2 state reader).
+``POST /api/hr/setup-assistant/query`` — LLM-grounded HR setup question answering.
 
-Every field reuses an existing query/table (never invents schema):
-  - company_profile_complete → ``db.get_company`` (the company-profile source table)
+Both endpoints are READ-ONLY: no writes, no new tables. The POST endpoint
+computes live workspace state (same as the GET), calls the engine, and returns
+a structured answer grounded in the KB. Company scope comes ONLY from auth.
+
+Field sources:
+  - company_profile_complete → ``db.get_company`` (company-profile source table)
   - policy_published         → ``db.get_latest_published_policy_config_version``
-                               (the LIVE config-matrix publish path, same signal
-                               the HR onboarding-inference engine uses)
+                               (LIVE config-matrix publish path)
   - cases_count/first_case_id→ ``public.relocation_cases`` filtered by company_id
   - employees_invited        → ``public.employees`` filtered by company_id
-
-HR → company resolution is delegated to ``get_org_id_for_hr_user`` →
-``db.get_hr_company_id`` (the established pattern that also resolves LEGACY text
-HR ids via ``hr_users``), matching the policy resolver so it never mis-scopes.
 
 Per CLAUDE.md the router is registered in BOTH ``backend/app/main.py`` and
 ``backend/main.py`` (prod entry).
@@ -22,15 +20,16 @@ Per CLAUDE.md the router is registered in BOTH ``backend/app/main.py`` and
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ...database import db
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ..services.policy_config_matrix_service import CONFIG_KEY
+from ..services.setup_help.setup_help_engine import answer_setup_question
 
 log = logging.getLogger(__name__)
 
@@ -180,4 +179,81 @@ def get_setup_status(
         next_step=_next_step(
             profile_complete, policy_published, cases_count, employees_invited
         ),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# POST /api/hr/setup-assistant/query — LLM-grounded HR setup question
+# --------------------------------------------------------------------------- #
+
+class QueryRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+
+
+class QueryNextStep(BaseModel):
+    label: str
+    route: Optional[str] = None
+
+
+class QueryResponse(BaseModel):
+    answer: str
+    next_step: Optional[QueryNextStep] = None
+    cited_topics: List[str] = Field(default_factory=list)
+    model: str
+    usage: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/setup-assistant/query", response_model=QueryResponse)
+def post_setup_assistant_query(
+    body: QueryRequest,
+    _user=Depends(require_admin_or_hr),
+    company_id: str = Depends(get_org_id_for_hr_user),
+) -> QueryResponse:
+    """Answer an HR setup question grounded in the Setup & Help KB.
+
+    Company scope comes from auth (``get_org_id_for_hr_user``), never from
+    the request body. PII in the question is masked before LLM egress. The
+    engine is READ-ONLY — it guides and reads state; it does not write anything.
+    """
+    # Compute live setup state (same logic as GET /setup-status).
+    if not company_id:
+        status: Dict[str, Any] = {
+            "company_profile_complete": False,
+            "policy_published": False,
+            "cases_count": 0,
+            "employees_invited": 0,
+            "first_case_id": None,
+            "next_step": {"label": "Complete your company profile", "route": "/hr/company-profile"},
+        }
+    else:
+        profile_complete = _company_profile_complete(company_id)
+        policy_published = _policy_published(company_id)
+        cases_count, first_case_id = _cases(company_id)
+        employees_invited = _employees_invited(company_id)
+        ns = _next_step(profile_complete, policy_published, cases_count, employees_invited)
+        status = {
+            "company_profile_complete": profile_complete,
+            "policy_published": policy_published,
+            "cases_count": cases_count,
+            "employees_invited": employees_invited,
+            "first_case_id": first_case_id,
+            "next_step": {"label": ns.label, "route": ns.route},
+        }
+
+    result = answer_setup_question(question=body.question, setup_status=status)
+
+    raw_ns = result.get("next_step")
+    next_step_out: Optional[QueryNextStep] = None
+    if isinstance(raw_ns, dict):
+        next_step_out = QueryNextStep(
+            label=raw_ns.get("label", ""),
+            route=raw_ns.get("route"),
+        )
+
+    return QueryResponse(
+        answer=result["answer"],
+        next_step=next_step_out,
+        cited_topics=result.get("cited_topics", []),
+        model=result.get("model", "unknown"),
+        usage=result.get("usage", {}),
     )
