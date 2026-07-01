@@ -118,7 +118,7 @@
       "id": "roadmap-and-tasks",
       "title": "Roadmap and relocation tasks",
       "applies_when": "You want to understand the employee's step-by-step plan and task checklist.",
-      "route": "/employee/tasks",
+      "route": "/hr/command-center",
       "steps": [
         "Each case has a relocation roadmap — an ordered set of steps for the move, with a document count on each step.",
         "The task checklist tracks the concrete to-dos for the case; progress rolls up as a Tasks Done % on the Command Center.",

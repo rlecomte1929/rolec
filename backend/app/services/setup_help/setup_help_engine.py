@@ -230,35 +230,37 @@ def answer_setup_question(
     if client is None:
         client = get_default_client()
 
-    # ── PII mask BEFORE the question crosses any trust boundary ──────────────
-    masked_question = mask_pii(question or "")
-
-    # ── Build prompts (system = static KB; user = live state + question) ─────
-    # System block: inline constant + KB (static — prompt-cacheable).
-    system_block = _resolve_system_prompt() + "\n\n" + render_for_prompt()
-
-    # User block: compact workspace state + masked question.
-    user_block = (
-        _render_setup_status(setup_status)
-        + "\n\n## HR Question\n"
-        + masked_question
-    )
-
-    req = LlmRequest(
-        system=system_block,
-        user_message=user_block,
-        model=DEFAULT_MODEL,
-        temperature=0.0,
-        max_tokens=600,
-        tools=[_ANSWER_TOOL],
-        tool_choice={"type": "tool", "name": "respond_to_hr"},
-    )
-
-    # ── Call client (fail-safe on any exception) ──────────────────────────────
+    # ── Build prompts + call client (fail-safe on ANY exception) ─────────────
+    # PII is masked BEFORE the question crosses any trust boundary. KB render and
+    # request construction are inside the guard too, so a corrupt/missing KB or a
+    # mask failure degrades gracefully (no LLM call, no 500) instead of leaking or
+    # crashing the request.
     try:
+        masked_question = mask_pii(question or "")
+
+        # System block: inline constant + KB (static — prompt-cacheable).
+        system_block = _resolve_system_prompt() + "\n\n" + render_for_prompt()
+
+        # User block: compact workspace state + masked question.
+        user_block = (
+            _render_setup_status(setup_status)
+            + "\n\n## HR Question\n"
+            + masked_question
+        )
+
+        req = LlmRequest(
+            system=system_block,
+            user_message=user_block,
+            model=DEFAULT_MODEL,
+            temperature=0.0,
+            max_tokens=600,
+            tools=[_ANSWER_TOOL],
+            tool_choice={"type": "tool", "name": "respond_to_hr"},
+        )
+
         resp = client.complete(req)
     except Exception as exc:
-        log.warning("setup_help_engine: client.complete failed: %s", exc, exc_info=True)
+        log.warning("setup_help_engine: build/complete failed: %s", exc, exc_info=True)
         return dict(_GRACEFUL_ERROR)
 
     # ── Parse structured output ───────────────────────────────────────────────
