@@ -12,6 +12,7 @@ import { safeNavigate } from '../navigation/safeNavigate';
 import { blockerSummaryMessage } from '../features/cases/blockerSummaryCopy';
 import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 import { AssignmentDebugPanel } from './AssignmentDebugPanel';
+import { destinationPermitLabel } from './hrAssignmentPermit';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 
@@ -180,27 +181,6 @@ export const HrAssignmentReview: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!assignment) return;
-    const seedMessages: CaseMessage[] = [
-      {
-        id: 'msg-1',
-        author: assignment.employeeIdentifier || 'Employee',
-        role: 'EMPLOYEE',
-        message: 'Started uploading documents. Will complete the profile today.',
-        timestamp: 'Today, 9:45 AM',
-      },
-      {
-        id: 'msg-2',
-        author: 'HR Manager',
-        role: 'HR',
-        message: 'Prioritize passport scans and employment letter when you can.',
-        timestamp: 'Today, 10:05 AM',
-      },
-    ];
-    setMessages(seedMessages);
-  }, [assignment?.id]);
-
   const profile = assignment?.profile;
   const fullName = profile?.primaryApplicant?.fullName || assignment?.employeeIdentifier || 'Employee';
   const initials = fullName
@@ -210,16 +190,30 @@ export const HrAssignmentReview: React.FC = () => {
     .join('')
     .toUpperCase();
   const roleTitle = profile?.primaryApplicant?.employer?.roleTitle || 'Relocation case';
-  const origin = profile?.movePlan?.origin;
-  const destination = profile?.movePlan?.destination;
-  const familyMembers = 1 + (profile?.spouse?.fullName ? 1 : 0) + (profile?.dependents?.length || 0);
-  const targetDate = profile?.movePlan?.targetArrivalDate
-    ? new Date(profile.movePlan.targetArrivalDate).toLocaleDateString('en-US', {
+  // The assignment profile (movePlan) is often empty; fall back to the REAL
+  // relocation case (intake draft, then the assignment's case corridor hints)
+  // so the header/corridor and permit reflect actual data, not a placeholder.
+  const caseBasics = intakeDraft?.relocationBasics;
+  const caseFamily = intakeDraft?.familyMembers;
+  const origin =
+    profile?.movePlan?.origin || caseBasics?.originCountry || assignment?.caseOriginHint || '';
+  const destination =
+    profile?.movePlan?.destination || caseBasics?.destCountry || assignment?.caseDestinationHint || '';
+  const profileFamilyMembers =
+    1 + (profile?.spouse?.fullName ? 1 : 0) + (profile?.dependents?.length || 0);
+  const caseFamilyMembers = caseFamily
+    ? 1 + (caseFamily.spouse?.fullName ? 1 : 0) + (caseFamily.children?.length || 0)
+    : 0;
+  const familyMembers = Math.max(profileFamilyMembers, caseFamilyMembers);
+  const targetArrival = profile?.movePlan?.targetArrivalDate || caseBasics?.targetMoveDate;
+  const targetDate = targetArrival
+    ? new Date(targetArrival).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       })
     : '-';
+  const permitLabel = destinationPermitLabel(destination);
   const stageLabel =
     assignment?.status === 'submitted'
       ? 'Stage: Intake - Profile Review'
@@ -265,12 +259,32 @@ export const HrAssignmentReview: React.FC = () => {
   const attentionItems: string[] = (compliance?.actions ?? []).map((a) =>
     typeof a === 'string' ? a : a.title,
   );
-  const inProgressItems = compliance?.checks?.length
-    ? compliance.checks.filter((check) => check.status === 'NEEDS_REVIEW').map((check) => check.name)
-    : ['Confirm housing budget', 'Verify assignment details'];
-  const completedItems = compliance?.checks?.length
-    ? compliance.checks.filter((check) => check.status === 'COMPLIANT').map((check) => check.name)
-    : ['Case created', 'Employee onboarded'];
+  // Real tasks only — no placeholder fallbacks. An empty list renders an honest
+  // "nothing yet" state instead of inventing work that doesn't exist.
+  const inProgressItems = (compliance?.checks ?? [])
+    .filter((check) => check.status === 'NEEDS_REVIEW')
+    .map((check) => check.name);
+  const completedItems = (compliance?.checks ?? [])
+    .filter((check) => check.status === 'COMPLIANT')
+    .map((check) => check.name);
+
+  // Real compliance signal only. When no review exists, show a neutral note
+  // rather than a fabricated red status.
+  const complianceStatus = compliance?.overallStatus ?? null;
+  const complianceLabel =
+    complianceStatus === 'COMPLIANT'
+      ? 'On track'
+      : complianceStatus === 'NEEDS_REVIEW'
+        ? 'Needs review'
+        : complianceStatus === 'NON_COMPLIANT'
+          ? 'Action required'
+          : 'No compliance review yet';
+  const complianceBadgeVariant: 'success' | 'warning' | 'neutral' =
+    complianceStatus === 'COMPLIANT'
+      ? 'success'
+      : complianceStatus === 'NEEDS_REVIEW' || complianceStatus === 'NON_COMPLIANT'
+        ? 'warning'
+        : 'neutral';
 
   const handleSelectCase = (caseId: string) => {
     setSelectedCaseId(caseId);
@@ -389,16 +403,16 @@ export const HrAssignmentReview: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="border border-[#d7e3ed] bg-[#f4f7fb] rounded-lg px-3 py-2 text-xs text-[#0b2b43] max-w-xs">
                       <div className="font-semibold uppercase text-[10px] text-[#5b6b7a] mb-1">AI Insight</div>
-                      <div>Profile {readiness}% complete · Next: {missingItem}.</div>
+                      <div>Intake form {readiness}% complete · Next: {missingItem}.</div>
                       <div className="text-[10px] text-[#6b7280] mt-2">
                         AI-assisted · Based on what we know so far.
                       </div>
                     </div>
-                    <div className="border border-[#f3d6d6] bg-[#fff5f5] rounded-lg px-3 py-2 text-xs text-[#7a2a2a]">
-                      <div className="font-semibold uppercase text-[10px] text-[#a34b4b] mb-1">Compliance status</div>
+                    <div className="border border-[#d7e3ed] bg-[#f4f7fb] rounded-lg px-3 py-2 text-xs text-[#0b2b43] max-w-xs">
+                      <div className="font-semibold uppercase text-[10px] text-[#5b6b7a] mb-1">Compliance status</div>
                       <div className="flex items-center justify-between gap-2">
-                        <span>Specialist Required</span>
-                        <Badge variant="warning">High Risk</Badge>
+                        <span>{complianceLabel}</span>
+                        {complianceStatus && <Badge variant={complianceBadgeVariant}>{complianceLabel}</Badge>}
                       </div>
                       <Button unstyled
                         className="text-[11px] text-[#0b2b43] mt-2 underline"
@@ -435,8 +449,16 @@ export const HrAssignmentReview: React.FC = () => {
                   </Card>
                   <Card padding="md">
                     <div className="text-xs uppercase tracking-wide text-[#6b7280]">Path</div>
-                    <div className="text-2xl font-semibold text-[#0b2b43] mt-2">L-1B Visa</div>
-                    <div className="text-xs text-[#6b7280] mt-1">Mobility track</div>
+                    <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+                      {permitLabel ?? 'To be determined'}
+                    </div>
+                    <div className="text-xs text-[#6b7280] mt-1">
+                      {permitLabel
+                        ? 'Indicative — confirm with the relevant authority.'
+                        : destination
+                          ? 'No permit mapping for this destination yet.'
+                          : 'Awaiting destination from intake.'}
+                    </div>
                   </Card>
                 </div>
 
@@ -490,15 +512,11 @@ export const HrAssignmentReview: React.FC = () => {
                           <div>
                             <div className="text-sm font-medium text-[#0b2b43]">{item}</div>
                             <div className="text-xs text-[#6b7280]">
-                              {/* TASK-002: dropped the redundant 'EMPLOYEE' tag and softened the
-                                  internal 'HIGH RISK' compliance classification to a neutral
-                                  'Priority' cue, so this employee-dashboard view doesn't read as
-                                  personal jeopardy. (HR's framed compliance status lives in the
-                                  'Compliance status' panel above, with its own context + link.) */}
-                              <span className="inline-flex items-center gap-1 mr-2">
+                              {/* TASK-002: neutral 'Priority' cue rather than a personal-jeopardy
+                                  framing. No fabricated due/overdue date — only real data is shown. */}
+                              <span className="inline-flex items-center gap-1">
                                 <Badge variant="neutral">Priority</Badge>
                               </span>
-                              Overdue by 3 days
                             </div>
                           </div>
                           <Button variant="outline" onClick={handleOpenNudge}>
@@ -512,13 +530,13 @@ export const HrAssignmentReview: React.FC = () => {
                   <Card padding="lg">
                     <div className="text-sm font-semibold text-[#0b2b43] mb-3">In progress</div>
                     <div className="space-y-3">
+                      {inProgressItems.length === 0 && (
+                        <div className="text-sm text-[#6b7280]">No tasks in progress.</div>
+                      )}
                       {inProgressItems.map((item) => (
                         <div key={item} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg p-3">
-                          <div>
-                            <div className="text-sm text-[#0b2b43]">{item}</div>
-                            <div className="text-xs text-[#6b7280]">Owner: HR team</div>
-                          </div>
-                          <Badge variant="neutral">Due tomorrow</Badge>
+                          <div className="text-sm text-[#0b2b43]">{item}</div>
+                          <Badge variant="neutral">In review</Badge>
                         </div>
                       ))}
                     </div>
@@ -527,6 +545,9 @@ export const HrAssignmentReview: React.FC = () => {
                   <Card padding="lg">
                     <div className="text-sm font-semibold text-[#0b2b43] mb-3">Completed</div>
                     <div className="space-y-3">
+                      {completedItems.length === 0 && (
+                        <div className="text-sm text-[#6b7280]">Nothing completed yet.</div>
+                      )}
                       {completedItems.map((item) => (
                         <div key={item} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc] text-[#94a3b8]">
                           <div className="text-sm">{item}</div>
@@ -609,6 +630,9 @@ export const HrAssignmentReview: React.FC = () => {
                 <Card padding="lg">
                   <div className="text-sm font-semibold text-[#0b2b43] mb-4">Messages</div>
                   <div className="space-y-3">
+                    {messages.length === 0 && (
+                      <div className="text-sm text-[#6b7280]">No messages yet.</div>
+                    )}
                     {messages.map((item) => (
                       <div key={item.id} className="border border-[#e2e8f0] rounded-lg p-3">
                         <div className="text-xs text-[#6b7280]">{item.timestamp}</div>
