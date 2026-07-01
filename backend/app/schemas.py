@@ -136,6 +136,9 @@ class CaseRequirementsDTO(BaseModel):
     # AIQ-1349: non-liability disclaimer + provenance level for the guidance.
     disclaimer: str = ""
     verificationStatus: Optional[str] = None
+    # AIQ-1349: requirement titles waived because this is a short-term (STA)
+    # assignment — surfaced so the UI can explain the shorter list.
+    staWaived: List[str] = []
 
 
 class AssignmentType(str, Enum):
