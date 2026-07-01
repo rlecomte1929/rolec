@@ -56,11 +56,10 @@ function policyHintFromCategory(entry: ServicesCategoryEntry | undefined): Servi
 
 const ENABLED_SERVICES = SERVICE_CONFIG.filter((svc) => svc.enabled);
 
-// Locked-until-curated tiles (Pets): no curated pet-vendor data exists yet, so they
-// render disabled with a "Not available yet" badge instead of a selectable-then-empty
-// dead-end. A future employee-scoped availability endpoint will flip these to true per
-// destination once HR has curated at least one vendor.
-const CURATION_AVAILABILITY: Record<string, boolean> = Object.fromEntries(
+// Locked-until-curated tiles (Pets) default to locked; the per-destination
+// `curated_availability` map from the services-policy-context response flips them to
+// available once HR has curated ≥1 vendor for the employee's destination.
+const CURATION_LOCKED_DEFAULT: Record<string, boolean> = Object.fromEntries(
   ENABLED_SERVICES.filter((svc) => svc.requiresCuration).map((svc) => [svc.key, false]),
 );
 
@@ -146,6 +145,12 @@ export const ProvidersPage: React.FC = () => {
 
   const svcPolicy: Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>> | null =
     policyCtxQuery.data ?? null;
+  // requiresCuration tiles (Pets) stay locked by default; unlock per-destination from the
+  // policy-context `curated_availability` map once HR has curated a vendor there.
+  const availabilityByKey = useMemo(
+    () => ({ ...CURATION_LOCKED_DEFAULT, ...(svcPolicy?.curated_availability ?? {}) }),
+    [svcPolicy],
+  );
   const isLoading = servicesQuery.isLoading;
   const load401 =
     (servicesQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
@@ -489,7 +494,7 @@ export const ProvidersPage: React.FC = () => {
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
-              availabilityByKey={CURATION_AVAILABILITY}
+              availabilityByKey={availabilityByKey}
             />
             <ServiceGroupSection
               group="arrival"
@@ -497,7 +502,7 @@ export const ProvidersPage: React.FC = () => {
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
-              availabilityByKey={CURATION_AVAILABILITY}
+              availabilityByKey={availabilityByKey}
             />
             <ServiceGroupSection
               group="settle"
@@ -505,7 +510,7 @@ export const ProvidersPage: React.FC = () => {
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
-              availabilityByKey={CURATION_AVAILABILITY}
+              availabilityByKey={availabilityByKey}
             />
             {/* H-09 (AIQ-1256): non-functional "Coming soon" cards were removed from
                 the selection grid (only enabled, selectable categories render). Point
