@@ -32,3 +32,29 @@ export function registerSuperProperties(properties: Record<string, unknown>): vo
   if (!enabled) return;
   posthog.register(properties);
 }
+
+/** Emit a marketing funnel event to BOTH PostHog and the server-side
+ *  analytics_events sink (which the admin marketing dashboard reads). */
+export function emitMarketingEvent(event: string, properties?: Record<string, unknown>): void {
+  track(event, properties);
+  try {
+    const base = env.apiUrl;
+    void fetch(`${base}/api/public/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, properties: properties || {} }),
+      keepalive: true,
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Read utm_source / utm_campaign from the current URL. */
+export function readUtm(): { utm_source?: string; utm_campaign?: string } {
+  const usp = new URLSearchParams(window.location.search);
+  return {
+    utm_source: usp.get('utm_source') || undefined,
+    utm_campaign: usp.get('utm_campaign') || undefined,
+  };
+}
