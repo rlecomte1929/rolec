@@ -6,6 +6,11 @@ helpers are monkeypatched with a per-company data map so the tests exercise the
 route wiring, the next_step ordering, and — critically — that the company scope
 comes ONLY from auth (``get_org_id_for_hr_user``), never from a param/body, so
 one HR user can never see another company's status.
+
+``cases_count`` / ``first_case_id`` are derived from ``public.relocation_cases``
+(live HR-created cases, not the seed-data-only ``public.cases`` table). The
+``_cases`` helper is monkeypatched here; the real table is verified by the fact
+that the helper queries ``relocation_cases`` (see setup_assistant.py).
 """
 from __future__ import annotations
 
@@ -22,12 +27,14 @@ from backend.app import auth_deps
 from backend.app.routers import setup_assistant
 
 # Per-company synthetic workspace state, keyed by company_id.
+# ``cases`` values represent rows in ``public.relocation_cases`` (live HR-created
+# cases), NOT ``public.cases`` (seed-data only — see setup_assistant._cases).
 _DATA = {
-    # Fresh self-serve signup: no profile, no policy, no cases, no employees.
+    # Fresh self-serve signup: no profile, no policy, no relocation_cases rows, no employees.
     "co-fresh": {"profile": False, "policy": False, "cases": (0, None), "employees": 0},
-    # Advanced: profile + policy done, one case, no employee invited yet.
+    # Advanced: profile + policy done, one relocation_cases row, no employee invited yet.
     "co-advanced": {"profile": True, "policy": True, "cases": (1, "case-abc"), "employees": 0},
-    # A DIFFERENT company whose data must never leak to another caller.
+    # A DIFFERENT company whose relocation_cases rows must never leak to another caller.
     "co-other": {"profile": True, "policy": True, "cases": (7, "case-other"), "employees": 4},
 }
 

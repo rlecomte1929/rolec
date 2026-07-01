@@ -9,7 +9,7 @@ Every field reuses an existing query/table (never invents schema):
   - policy_published         → ``db.get_latest_published_policy_config_version``
                                (the LIVE config-matrix publish path, same signal
                                the HR onboarding-inference engine uses)
-  - cases_count/first_case_id→ ``public.cases`` filtered by company_id
+  - cases_count/first_case_id→ ``public.relocation_cases`` filtered by company_id
   - employees_invited        → ``public.employees`` filtered by company_id
 
 HR → company resolution is delegated to ``get_org_id_for_hr_user`` →
@@ -82,17 +82,18 @@ def _policy_published(company_id: str) -> bool:
 
 
 def _cases(company_id: str) -> Tuple[int, Optional[str]]:
-    """Count ``public.cases`` for the company and return the first (earliest)
-    case id. Pure read; degrades to (0, None)."""
+    """Count ``public.relocation_cases`` for the company and return the first
+    (earliest) case id. Live HR-created cases live in ``relocation_cases``;
+    ``public.cases`` is seed-data only. Pure read; degrades to (0, None)."""
     try:
         with db.engine.connect() as conn:
             count = conn.execute(
-                text("SELECT COUNT(*) FROM cases WHERE company_id = :cid"),
+                text("SELECT COUNT(*) FROM relocation_cases WHERE company_id = :cid"),
                 {"cid": company_id},
             ).scalar()
             first = conn.execute(
                 text(
-                    "SELECT id FROM cases WHERE company_id = :cid "
+                    "SELECT id FROM relocation_cases WHERE company_id = :cid "
                     "ORDER BY created_at ASC LIMIT 1"
                 ),
                 {"cid": company_id},
