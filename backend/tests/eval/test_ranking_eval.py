@@ -67,18 +67,34 @@ def test_aggregate_means():
     assert aggregate([]) == {"ndcg": 0.0, "mrr": 0.0, "precision": 0.0}
 
 
-def test_seeded_fixtures_exist_and_are_marked_synthetic():
+# Statuses that confirm gold is independently derived (not seeded from engine output).
+# "attribute_derived" = AI-drafted from supplier attributes.
+# "verified"          = attribute_derived + human endorsement.
+# Both are non-vacuous; anything else (missing, "engine_seeded", etc.) must fail.
+_VALID_NON_VACUOUS_STATUSES = {"attribute_derived", "verified"}
+
+
+def test_seeded_fixtures_exist_and_are_non_vacuous():
+    """Golden rankings must use independently-derived gold, not engine output."""
     with DEFAULT_FIXTURES.open(encoding="utf-8") as f:
         data = json.load(f)
-    assert data["_meta"]["verification_status"] == "representative"
+    status = data["_meta"].get("verification_status", "")
+    assert status in _VALID_NON_VACUOUS_STATUSES, (
+        f"verification_status={status!r} is missing or vacuous; "
+        f"must be one of {_VALID_NON_VACUOUS_STATUSES}"
+    )
     assert len(data["cases"]) >= 3
 
 
 def test_end_to_end_eval_passes_gate():
-    """The engine reproduces the seeded golden order → metrics at the ceiling."""
+    """The fixed engine scores against the independent gold → NDCG@k >= 0.90 gate."""
     with DEFAULT_FIXTURES.open(encoding="utf-8") as f:
         data = json.load(f)
     report = run_eval(data)
     assert report["n_cases"] >= 3
     assert report["aggregate"]["ndcg"] >= report["ndcg_gate"]
-    assert report["aggregate"]["ndcg"] == pytest.approx(1.0)
+    # Mean NDCG is expected to be ~0.98 (banks ~0.95, insurance/movers 1.0).
+    # Do NOT assert == 1.0: a perfect score would re-introduce vacuity.
+    assert report["aggregate"]["ndcg"] < 1.0 or any(
+        c["ndcg"] < 1.0 for c in report["per_case"]
+    ), "All cases score 1.0 — check that gold was not re-seeded from engine output"

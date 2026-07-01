@@ -201,6 +201,7 @@ from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be �
 from .app.routers import hr_case_escalation as hr_case_escalation_router  # W2-3 — HR case escalation (dual-layer per CLAUDE.md)
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
+from .app.routers import provider_portal as provider_portal_router  # H2 — external provider portal (dual-layer per CLAUDE.md)
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
@@ -235,6 +236,10 @@ from .app.routers import specialist_review as specialist_review_router  # [P1-02
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
 from .app.routers import compliance as compliance_router  # [BL-Compliance.4] /api/compliance
 from .app.routers import policy_analysis as policy_analysis_router  # [AIQ-1219] policy PDF → workflow summary
+from .app.routers import admin_settings as admin_settings_router  # [Task-4] admin AI-governance controls panel
+from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] unified feedback console
+from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
+from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -822,6 +827,7 @@ app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoin
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
+app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
 app.include_router(employee_quotes_router.router)
 app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provider ratings
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
@@ -14796,6 +14802,10 @@ app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
 # GAP 10: Company branding config
 app.include_router(branding_router.router)
+app.include_router(admin_settings_router.router)  # [Task-4] admin AI-governance controls panel
+app.include_router(admin_feedback_router.router)  # [Task-6] unified feedback console
+app.include_router(admin_admins_router.router)  # [Task-7] admin lifecycle management
+app.include_router(admin_audit_log_router.router)  # [Task-7] platform audit-log viewer
 # ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented

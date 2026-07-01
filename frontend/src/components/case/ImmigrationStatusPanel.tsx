@@ -274,7 +274,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
                     {req.document_name}
                   </span>
                   {req.requires_apostille && (
-                    <span className="rounded-full border border-[#a5b4fc] bg-[#eef2ff] px-2 py-0.5 text-xs text-[#4338ca]">
+                    <span className="rounded-full border border-[#cbd5e1] bg-[#f1f5f9] px-2 py-0.5 text-xs text-[#334155]">
                       Apostille
                     </span>
                   )}
