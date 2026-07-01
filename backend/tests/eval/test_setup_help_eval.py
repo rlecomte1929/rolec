@@ -373,3 +373,160 @@ def test_golden_set_has_expected_structure():
             assert mt in real_topics, (
                 f"Case {case['id']}: must_mention_topic {mt!r} not in topic_ids()"
             )
+
+
+# ── Group 4: include_raw parameter + raw_hallucination_rate ─────────────────
+
+
+def test_include_raw_true_captures_pre_filter_values():
+    """include_raw=True: _raw_ keys present with the model's pre-guardrail values.
+
+    The hallucinating client returns /BOGUS route + fake topic.  The engine
+    filters both (grounding guardrail).  With include_raw=True the returned dict
+    must expose the raw proposals so callers can measure real hallucination.
+    """
+    from backend.app.services.setup_help.setup_help_engine import answer_setup_question
+
+    result = answer_setup_question(
+        question="How do I complete my company profile?",
+        setup_status={
+            "company_profile_complete": False,
+            "next_step": {"label": "Complete profile", "route": _REAL_ROUTE},
+        },
+        client=_HallucinatingClient(),
+        include_raw=True,
+    )
+
+    # Raw pre-filter values must capture what the model actually proposed.
+    assert "_raw_next_step_route" in result, "_raw_next_step_route key must be present"
+    assert result["_raw_next_step_route"] == "/BOGUS/hallucinated-route", (
+        f"Expected raw route '/BOGUS/hallucinated-route', got {result['_raw_next_step_route']!r}"
+    )
+    assert "_raw_cited_topics" in result, "_raw_cited_topics key must be present"
+    assert "fake-topic-xyz-not-in-kb" in result["_raw_cited_topics"], (
+        "Expected fake topic in _raw_cited_topics"
+    )
+
+    # Final (post-guardrail) output must NOT contain the hallucinated values.
+    ns = result.get("next_step") or {}
+    final_route = ns.get("route") if isinstance(ns, dict) else None
+    assert final_route != "/BOGUS/hallucinated-route", (
+        "Hallucinated route must not survive into final next_step.route"
+    )
+    assert "fake-topic-xyz-not-in-kb" not in result["cited_topics"], (
+        "Hallucinated topic must not survive into final cited_topics"
+    )
+
+
+def test_include_raw_false_no_raw_keys():
+    """include_raw=False (default): _raw_ keys are absent — shape unchanged."""
+    from backend.app.services.setup_help.setup_help_engine import answer_setup_question
+
+    result = answer_setup_question(
+        question="How do I complete my company profile?",
+        setup_status={"next_step": None},
+        client=_HallucinatingClient(),
+        # include_raw defaults to False
+    )
+
+    assert "_raw_next_step_route" not in result, (
+        "_raw_next_step_route must be absent when include_raw=False"
+    )
+    assert "_raw_cited_topics" not in result, (
+        "_raw_cited_topics must be absent when include_raw=False"
+    )
+
+
+def test_raw_hallucination_rate_two_cases_half():
+    """run_eval with include_raw=True, 1 clean + 1 hallucinated case → rate 0.5."""
+
+    class _MixedRawClient:
+        """Returns valid output for 'profile' questions, hallucinated for others."""
+
+        name = "mixed_raw"
+
+        def complete(self, req: Any) -> Dict[str, Any]:
+            q = req.user_message.lower()
+            if "profile" in q:
+                return {
+                    "text": "",
+                    "tool_use": {
+                        "answer": "Go to the company profile page.",
+                        "next_step": {"label": "Profile", "route": _REAL_ROUTE},
+                        "cited_topics": [_REAL_TOPIC],
+                    },
+                    "model": "mixed_raw",
+                    "stop_reason": "tool_use",
+                    "usage": {},
+                }
+            # Hallucinated — bogus route + fake topic.
+            return {
+                "text": "",
+                "tool_use": {
+                    "answer": "Magic page!",
+                    "next_step": {"label": "Magic", "route": "/BOGUS/hallucinated"},
+                    "cited_topics": ["fake-topic-not-real"],
+                },
+                "model": "mixed_raw",
+                "stop_reason": "tool_use",
+                "usage": {},
+            }
+
+    cases = [
+        # Case 1: clean — client returns a real route/topic.
+        _in_scope_case("rhr-01", _REAL_ROUTE),
+        # Case 2: hallucinated — client returns invalid route+topic (filtered by
+        # engine, but captured as raw hallucination).
+        {
+            "id": "rhr-02",
+            "setup_state": {"next_step": None},
+            "question": "How do I do the mysterious thing?",
+            "expect": {
+                "next_step_route": None,
+                "must_mention_topic": None,
+                "should_refuse": False,
+            },
+        },
+    ]
+
+    report = run_eval(cases, _MixedRawClient(), include_raw=True)
+    assert "raw_hallucination_rate" in report, (
+        "raw_hallucination_rate must be present when include_raw=True"
+    )
+    assert report["raw_hallucination_rate"] == 0.5, (
+        f"Expected 0.5 (1/2 hallucinated), got {report['raw_hallucination_rate']}"
+    )
+    # Grounding is still 1.0 — engine filtered everything.
+    assert report["grounding"] == 1.0
+
+
+def test_ci_mock_path_unchanged():
+    """--ci path (mock) still exits 0 with unchanged gates on the golden set."""
+    import subprocess
+    result = subprocess.run(
+        [
+            "/Users/romainlecomte/Documents/GitHub/rolec/.venv311/bin/python",
+            "-m",
+            "backend.eval.run_setup_help_eval",
+            "--mock",
+            "--ci",
+        ],
+        capture_output=True,
+        text=True,
+        cwd="/private/tmp/rolec-sh-followup",
+        env={
+            **__import__("os").environ,
+            "RELOPASS_DISABLE_RATE_LIMITS": "1",
+            "RELOPASS_QUERY_COUNTER_OFF": "1",
+        },
+    )
+    assert result.returncode == 0, (
+        f"--mock --ci should exit 0 on golden set.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+    assert "CI gate: PASS" in result.stdout, (
+        f"Expected 'CI gate: PASS' in output.\nstdout:\n{result.stdout}"
+    )
+    # raw_hallucination_rate must NOT appear in mock output.
+    assert "raw_hallucination_rate" not in result.stdout, (
+        "raw_hallucination_rate must not appear in mock/CI output"
+    )

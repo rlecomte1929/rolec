@@ -211,6 +211,7 @@ def answer_setup_question(
     question: str,
     setup_status: dict,
     client: Optional[LlmClient] = None,
+    include_raw: bool = False,
 ) -> Dict[str, Any]:
     """Answer an HR setup question grounded in the KB and the current workspace state.
 
@@ -222,6 +223,10 @@ def answer_setup_question(
         question:     Raw question text from the HR user.
         setup_status: Dict matching SetupStatusResponse.dict() from T2.
         client:       LlmClient to use; defaults to get_default_client().
+        include_raw:  When True, include ``_raw_next_step_route`` and
+                      ``_raw_cited_topics`` in the returned dict — the model's
+                      pre-guardrail proposals.  When False (default), these keys
+                      are absent and the return shape is unchanged.
 
     Returns:
         Structured dict (see module docstring). On any client error: graceful
@@ -278,6 +283,13 @@ def answer_setup_question(
     if not answer:
         answer = _GRACEFUL_ERROR["answer"]
 
+    # ── Capture pre-guardrail values (for include_raw callers) ───────────────
+    _raw_ns = parsed.get("next_step")
+    _raw_next_step_route: Optional[str] = (
+        _raw_ns.get("route") if isinstance(_raw_ns, dict) else None
+    )
+    _raw_cited_topics: list = list(parsed.get("cited_topics") or [])
+
     # ── Grounding guardrail: validate next_step.route ────────────────────────
     next_step_out = _validate_and_coerce_next_step(
         raw_next=parsed.get("next_step"),
@@ -289,10 +301,14 @@ def answer_setup_question(
     raw_cited = parsed.get("cited_topics") or []
     cited_out = [t for t in raw_cited if isinstance(t, str) and t in known]
 
-    return {
+    out: Dict[str, Any] = {
         "answer": answer,
         "next_step": next_step_out,
         "cited_topics": cited_out,
         "model": resp.get("model", DEFAULT_MODEL),
         "usage": resp.get("usage", {}),
     }
+    if include_raw:
+        out["_raw_next_step_route"] = _raw_next_step_route
+        out["_raw_cited_topics"] = _raw_cited_topics
+    return out

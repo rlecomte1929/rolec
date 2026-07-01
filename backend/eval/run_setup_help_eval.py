@@ -26,6 +26,7 @@ Usage
     python -m backend.eval.run_setup_help_eval --mock --json
     python -m backend.eval.run_setup_help_eval --mock --ci   # exits 1 on gate fail
     python -m backend.eval.run_setup_help_eval --mock --fixtures /path/to/cases.jsonl
+    python -m backend.eval.run_setup_help_eval --live        # real LLM; report-only
 """
 from __future__ import annotations
 
@@ -46,7 +47,7 @@ for _p in (_REPO_ROOT, _BACKEND_DIR):
 
 from backend.app.services.setup_help.knowledge_base import all_routes, topic_ids
 from backend.app.services.setup_help.setup_help_engine import answer_setup_question
-from backend.app.services.policy_assistant_llm_client import LlmRequest
+from backend.app.services.policy_assistant_llm_client import LlmRequest, get_default_client
 
 DEFAULT_FIXTURES = os.path.join(
     _BACKEND_DIR, "tests", "fixtures", "setup_help", "cases.jsonl"
@@ -250,15 +251,28 @@ def _score_one(case: Dict[str, Any], result: Dict[str, Any]) -> CaseResult:
     )
 
 
-def run_eval(cases: List[Dict[str, Any]], client: Any) -> Dict[str, Any]:
+def run_eval(
+    cases: List[Dict[str, Any]],
+    client: Any,
+    include_raw: bool = False,
+) -> Dict[str, Any]:
     """Score all cases.  Returns a metrics dict with grounding, refusal_correct,
     next_step_accuracy and per-case details.
 
     Args:
-        cases:  List of case dicts (already stripped of _meta lines).
-        client: An LlmClient (real or mock) injected for offline/live runs.
+        cases:       List of case dicts (already stripped of _meta lines).
+        client:      An LlmClient (real or mock) injected for offline/live runs.
+        include_raw: When True, pass include_raw=True to the engine and compute
+                     ``raw_hallucination_rate`` — the fraction of cases where the
+                     model's pre-guardrail output contained an invalid route or
+                     topic.  Always False for mock/CI runs.
     """
+    _real_routes = all_routes()
+    _real_topics = topic_ids()
+
     results: List[CaseResult] = []
+    raw_hallucinations: List[bool] = []  # populated only when include_raw=True
+
     for case in cases:
         if case.get("_meta"):
             continue
@@ -267,6 +281,7 @@ def run_eval(cases: List[Dict[str, Any]], client: Any) -> Dict[str, Any]:
                 question=case["question"],
                 setup_status=case["setup_state"],
                 client=client,
+                include_raw=include_raw,
             )
         except Exception as exc:
             # Treat engine crashes as grounding failures.
@@ -280,6 +295,17 @@ def run_eval(cases: List[Dict[str, Any]], client: Any) -> Dict[str, Any]:
             }
         results.append(_score_one(case, result))
 
+        if include_raw:
+            raw_route = result.get("_raw_next_step_route")
+            raw_topics = result.get("_raw_cited_topics") or []
+            route_hallucinated = (
+                raw_route is not None and raw_route not in _real_routes
+            )
+            topics_hallucinated = any(
+                t not in _real_topics for t in raw_topics if isinstance(t, str)
+            )
+            raw_hallucinations.append(route_hallucinated or topics_hallucinated)
+
     n = len(results)
     oos = [r for r in results if r.is_oos]
     n_oos = len(oos)
@@ -288,7 +314,7 @@ def run_eval(cases: List[Dict[str, Any]], client: Any) -> Dict[str, Any]:
     next_step_accuracy = sum(r.next_step_ok for r in results) / n if n else 0.0
     refusal_correct = sum(r.refusal_ok for r in oos) / n_oos if n_oos else 1.0
 
-    return {
+    out: Dict[str, Any] = {
         "n_cases": n,
         "n_out_of_scope": n_oos,
         "grounding": round(grounding, 4),
@@ -309,11 +335,21 @@ def run_eval(cases: List[Dict[str, Any]], client: Any) -> Dict[str, Any]:
         ],
     }
 
+    if include_raw and raw_hallucinations:
+        n_hallucinated = sum(raw_hallucinations)
+        out["raw_hallucination_rate"] = round(
+            n_hallucinated / len(raw_hallucinations), 4
+        )
+
+    return out
+
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
-def _print_human(report: Dict[str, Any], fixtures_path: str) -> None:
+def _print_human(
+    report: Dict[str, Any], fixtures_path: str, is_live: bool = False
+) -> None:
     ok = "✓"
     fail = "✗"
 
@@ -322,15 +358,21 @@ def _print_human(report: Dict[str, Any], fixtures_path: str) -> None:
         gated = " [GATE]" if gate else ""
         return f"{v:.4f} {symbol}{gated}"
 
+    mode_tag = " (LIVE)" if is_live else ""
     lines = [
         "",
-        "=== T5 Setup & Help Assistant Eval ===",
-        f"Fixtures:          {fixtures_path}",
-        f"Cases:             {report['n_cases']}  (out-of-scope: {report['n_out_of_scope']})",
-        f"grounding:         {_badge(report['grounding'], gate=True)}",
-        f"refusal_correct:   {_badge(report['refusal_correct'], gate=True)}",
-        f"next_step_accuracy:{report['next_step_accuracy']:.4f} (report-only)",
+        f"=== T5 Setup & Help Assistant Eval{mode_tag} ===",
+        f"Fixtures:             {fixtures_path}",
+        f"Cases:                {report['n_cases']}  (out-of-scope: {report['n_out_of_scope']})",
+        f"grounding:            {_badge(report['grounding'], gate=not is_live)}",
+        f"refusal_correct:      {_badge(report['refusal_correct'], gate=not is_live)}",
+        f"next_step_accuracy:   {report['next_step_accuracy']:.4f} (report-only)",
     ]
+
+    if "raw_hallucination_rate" in report:
+        lines.append(
+            f"raw_hallucination_rate:{report['raw_hallucination_rate']:.4f} (report-only)"
+        )
 
     bad = [d for d in report["details"] if d["failures"]]
     if bad:
@@ -338,10 +380,14 @@ def _print_human(report: Dict[str, Any], fixtures_path: str) -> None:
         for d in bad:
             lines.append(f"  - {d['id']}: {'; '.join(d['failures'])}")
 
-    if report["ci_gate_pass"]:
+    if is_live:
+        lines.append("Note: --live is report-only; CI gate does not apply.")
+    elif report["ci_gate_pass"]:
         lines.append(f"CI gate: PASS {ok}")
     else:
-        lines.append(f"CI gate: FAIL {fail}  (grounding=1.0 AND refusal_correct=1.0 required)")
+        lines.append(
+            f"CI gate: FAIL {fail}  (grounding=1.0 AND refusal_correct=1.0 required)"
+        )
 
     lines.append("")
     print("\n".join(lines))
@@ -362,6 +408,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Use the deterministic offline mock client (required for CI).",
     )
     parser.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "Use the real LLM client (requires ANTHROPIC_API_KEY). "
+            "Computes raw_hallucination_rate on pre-guardrail model output. "
+            "Report-only: never CI-gated. Overrides --mock."
+        ),
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         dest="emit_json",
@@ -370,32 +425,52 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--ci",
         action="store_true",
-        help="Exit 1 if grounding < 1.0 OR refusal_correct < 1.0.",
+        help="Exit 1 if grounding < 1.0 OR refusal_correct < 1.0 (mock/CI path only).",
     )
     args = parser.parse_args(argv)
 
-    if not args.mock:
+    # --live overrides --mock; --ci implies mock when --live is absent.
+    is_live = args.live
+    use_mock = args.mock or args.ci
+
+    if is_live:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            print(
+                "ANTHROPIC_API_KEY is not set. "
+                "--live mode requires a real API key. Skipping live eval."
+            )
+            return 0
+        client: Any = get_default_client()
+        include_raw = True
+    elif use_mock:
+        client = SetupHelpMockClient()
+        include_raw = False
+    else:
         print(
-            "ERROR: --mock is required for offline/CI runs. "
-            "Pass --mock to use the deterministic mock client.",
+            "ERROR: --mock (or --ci) is required for offline/CI runs. "
+            "Pass --mock to use the deterministic mock client, "
+            "or --live to call the real LLM.",
             file=sys.stderr,
         )
         return 2
 
-    client = SetupHelpMockClient()
     cases = load_cases(args.fixtures)
-    report = run_eval(cases, client)
+    report = run_eval(cases, client, include_raw=include_raw)
     report["fixtures_path"] = args.fixtures
-    report["client"] = client.name
+    report["client"] = getattr(client, "name", type(client).__name__)
+    if is_live:
+        report["mode"] = "live"
 
     if args.emit_json:
+        # raw_hallucination_rate is already in the report dict when include_raw=True.
+        # For mock runs it is absent, so the JSON shape is unchanged.
         print(json.dumps(report, indent=2))
     else:
-        _print_human(report, args.fixtures)
+        _print_human(report, args.fixtures, is_live=is_live)
 
-    if args.ci and not report["ci_gate_pass"]:
-        if not args.emit_json:
-            pass  # already printed the failure above
+    # CI gate only applies to mock runs; --live is always report-only.
+    if not is_live and args.ci and not report["ci_gate_pass"]:
         return 1
     return 0
 
