@@ -12,6 +12,13 @@ import {
 
 const STATUSES = ['new', 'triaged', 'planned', 'dispatched', 'in_review', 'done', 'wont_do', 'blocked'];
 
+/** Only allow http(s) links in href — source_url comes from ingested user feedback,
+ *  so block javascript:/data: URLs (XSS) before rendering. */
+function safeHref(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  return /^https?:\/\//i.test(url.trim()) ? url : undefined;
+}
+
 function priorityChip(p: string): string {
   const m: Record<string, string> = {
     P0: 'bg-rose-100 text-rose-700', P1: 'bg-amber-100 text-amber-700',
@@ -151,12 +158,12 @@ export const MissionControlPage: React.FC = () => {
               {it.body && <p className="line-clamp-2 text-xs text-slate-500">{it.body}</p>}
               <div className="flex items-center gap-3 text-xs text-slate-400">
                 {it.triage_json?.rationale && <span>🧭 {it.triage_json.rationale}</span>}
-                {it.source_url && (
-                  <a href={it.source_url} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">source</a>
+                {safeHref(it.source_url) && (
+                  <a href={safeHref(it.source_url)} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">source</a>
                 )}
                 <span className="ml-auto flex items-center gap-3">
-                  {it.pr_url && (
-                    <a href={it.pr_url} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">PR ↗</a>
+                  {safeHref(it.pr_url) && (
+                    <a href={safeHref(it.pr_url)} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">PR ↗</a>
                   )}
                   {it.auto_fixable && !it.triage_json?.blocked && (
                     <button className="font-medium text-accent-700 hover:text-accent-800" onClick={() => void onExecute(it)}>
