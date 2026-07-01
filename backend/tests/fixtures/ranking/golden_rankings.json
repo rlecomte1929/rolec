@@ -2,6 +2,8 @@
   "_meta": {
     "description": "Golden supplier rankings per (category,corridor) for the offline ranking eval (NDCG@k / MRR / precision@k). ideal_order + graded relevance are the accepted ordering; the eval scores engine output against these.",
     "verification_status": "verified",
+    "verified_cases": ["banks/SG-SG", "insurance/SG-SG", "movers/SG-JP"],
+    "verified_cases_note": "Top-level 'verified' covers the three Romain-endorsed cases above; the 4th case (movers/SG-SG domestic) is per-case attribute_derived (see its _meta_case_status), not yet human-endorsed.",
     "reviewed_by": "romain 2026-07-01",
     "k": 5,
     "note": "Independent gold derived from supplier attributes, NOT copied from engine output (see audit/admin/36-ranking-gold-worksheet.md). Romain endorsed the central judgments on 2026-07-01: Banks — branch_need=medium demotes pure-digital banks (Wise/Revolut), Citibank (b-4) is the top pick; Insurance — expat_specialized tier separates Cigna/Allianz/Bupa/GeoBlue from generalists; Movers (international SG→Tokyo) — exact-city match priority, non-international movers hard-floored to grade 0. No ideal_order or relevance grades were changed during promotion. Case 4 (movers SG-SG domestic) is attribute_derived / deferred: local SG specialists (m-3/m-7/m-10) grade 3 because domestic move does NOT justify high-cost international movers; hard-floor does NOT apply (move_type=domestic)."
