@@ -14365,7 +14365,25 @@ def get_applicable_employee_policy(
     employee_band = profile.get("primaryApplicant", {}).get("employer", {}).get("jobLevel") or "Band2"
     if "L" in str(employee_band) and "Band" not in str(employee_band):
         employee_band = f"Band{employee_band.replace('L', '')}" if employee_band.replace("L", "").isdigit() else "Band2"
-    assignment_type = "Long-Term"
+    # AIQ-1349: use the case's real assignment type instead of hardcoding
+    # Long-Term. Published HR policies key their assignmentTypes array AND their
+    # per-band benefit keys by the display strings "Short-Term"/"Long-Term"/
+    # "Permanent", so map the normalized STA/LTA/PERMANENT onto those. Fall back
+    # to Long-Term (the prior behavior) when the case has no resolvable type, so
+    # legacy cases (assignment_type NULL) do not shift.
+    from .app.services.policy_resolution import (
+        extract_resolution_context,
+        _normalize_assignment_type,
+    )
+    _case_row = db.get_relocation_case(assignment.get("case_id")) if assignment.get("case_id") else None
+    _case_at = (_case_row or {}).get("assignment_type")
+    if _case_at:
+        _resolved = _normalize_assignment_type(_case_at)
+    else:
+        _resolved = extract_resolution_context(assignment, _case_row, profile, None).get("assignment_type")
+    assignment_type = {"STA": "Short-Term", "LTA": "Long-Term", "PERMANENT": "Permanent"}.get(
+        _resolved, "Long-Term"
+    )
     policy = db.get_published_hr_policy_for_employee(
         employee_band=employee_band,
         assignment_type=assignment_type,
