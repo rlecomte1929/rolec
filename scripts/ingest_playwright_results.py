@@ -40,9 +40,21 @@ PW_STATUS = {
 # worst-wins ranking when an ID appears more than once. PASS must rank ABOVE SKIP:
 # parse_playwright seeds status to SKIP, so if PASS ranked below it a passing spec
 # would never overwrite the seed and would be silently dropped from the score.
-RANK = {"FAIL": 3, "WARN": 2, "PARTIAL": 2, "PASS": 1, "SKIP": 0}
+# ENV (environmental / deploy-window transient) is non-scoring like SKIP but tracked
+# separately; a real PASS or FAIL in another project outranks it.
+RANK = {"FAIL": 3, "WARN": 2, "PARTIAL": 2, "PASS": 1, "ENV": 0, "SKIP": 0}
 
 TAG_RE = re.compile(r"^\s*\[([^\]]+)\]")
+
+
+def _is_environmental(test: dict) -> bool:
+    """True if a Playwright test carries an `environmental` annotation (pushed by the
+    browser/API layer when the backend was mid rolling-restart). Checks both the
+    test-level and per-result annotations (Playwright surfaces both)."""
+    anns = list(test.get("annotations") or [])
+    for r in test.get("results") or []:
+        anns.extend(r.get("annotations") or [])
+    return any((a or {}).get("type") == "environmental" for a in anns)
 
 
 def tag_of(title: str):
@@ -80,6 +92,10 @@ def parse_playwright(pw_path: Path):
             res = (t.get("results") or [{}])
             pw = res[-1].get("status", "skipped")
             s = PW_STATUS.get(pw, "FAIL")
+            # A failure caused by a deploy-window backend outage is environmental, not a
+            # bug: reclassify FAIL -> ENV so the scorer never files a P0 for it.
+            if s == "FAIL" and _is_environmental(t):
+                s = "ENV"
             if RANK[s] >= RANK[status]:
                 status = s
         prev = rows.get(tid)
@@ -89,7 +105,7 @@ def parse_playwright(pw_path: Path):
 
 
 def summarize(results):
-    c = {"total": len(results), "pass": 0, "fail": 0, "warn": 0, "skip": 0}
+    c = {"total": len(results), "pass": 0, "fail": 0, "warn": 0, "skip": 0, "env": 0}
     for r in results:
         s = r.get("status")
         if s == "PASS":
@@ -98,6 +114,8 @@ def summarize(results):
             c["fail"] += 1
         elif s in ("WARN", "PARTIAL"):
             c["warn"] += 1
+        elif s == "ENV":
+            c["env"] += 1
         else:
             c["skip"] += 1
     return c
@@ -135,7 +153,9 @@ def main():
         "results": results,
         **{k: v for k, v in api_meta.items() if v},
     }
-    out["score_pct"] = round(100 * out["summary"]["pass"] / max(1, out["summary"]["total"] - out["summary"]["skip"]))
+    # ENV (deploy-window transients) are non-scoring, like SKIP — exclude from the denominator.
+    _scorable = out["summary"]["total"] - out["summary"]["skip"] - out["summary"].get("env", 0)
+    out["score_pct"] = round(100 * out["summary"]["pass"] / max(1, _scorable))
 
     RESULTS_DIR.mkdir(exist_ok=True)
     out_path = Path(args.out) if args.out else RESULTS_DIR / f"test_results_{ts.strftime('%Y-%m-%dT%H-%M')}.json"
