@@ -20,7 +20,9 @@
     "rating_count": 120,
     "availability_level": "high",
     "next_available_days": 14,
-    "confidence": 92
+    "confidence": 92,
+    "lat": 1.286179,
+    "lng": 103.827225
   },
   {
     "item_id": "la-2",
@@ -43,7 +45,9 @@
     "rating_count": 89,
     "availability_level": "medium",
     "next_available_days": 30,
-    "confidence": 88
+    "confidence": 88,
+    "lat": 1.299679,
+    "lng": 103.908685
   },
   {
     "item_id": "la-3",
@@ -66,7 +70,9 @@
     "rating_count": 156,
     "availability_level": "low",
     "next_available_days": 45,
-    "confidence": 95
+    "confidence": 95,
+    "lat": 1.311722,
+    "lng": 103.79608
   },
   {
     "item_id": "la-4",
@@ -89,7 +95,9 @@
     "rating_count": 67,
     "availability_level": "medium",
     "next_available_days": 21,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 1.298331,
+    "lng": 103.835707
   },
   {
     "item_id": "la-5",
@@ -112,7 +120,9 @@
     "rating_count": 134,
     "availability_level": "low",
     "next_available_days": 60,
-    "confidence": 93
+    "confidence": 93,
+    "lat": 1.327868,
+    "lng": 103.793553
   },
   {
     "item_id": "la-6",
@@ -135,7 +145,9 @@
     "rating_count": 98,
     "availability_level": "high",
     "next_available_days": 10,
-    "confidence": 91
+    "confidence": 91,
+    "lat": 1.326984,
+    "lng": 103.835309
   },
   {
     "item_id": "la-7",
@@ -158,7 +170,9 @@
     "rating_count": 112,
     "availability_level": "high",
     "next_available_days": 7,
-    "confidence": 87
+    "confidence": 87,
+    "lat": 1.351692,
+    "lng": 103.870885
   },
   {
     "item_id": "la-8",
@@ -181,7 +195,9 @@
     "rating_count": 78,
     "availability_level": "scarce",
     "next_available_days": 90,
-    "confidence": 89
+    "confidence": 89,
+    "lat": 1.291286,
+    "lng": 103.837064
   },
   {
     "item_id": "la-9",
@@ -204,7 +220,9 @@
     "rating_count": 95,
     "availability_level": "medium",
     "next_available_days": 25,
-    "confidence": 94
+    "confidence": 94,
+    "lat": 1.307265,
+    "lng": 103.902335
   },
   {
     "item_id": "la-10",
@@ -227,7 +245,9 @@
     "rating_count": 145,
     "availability_level": "high",
     "next_available_days": 12,
-    "confidence": 86
+    "confidence": 86,
+    "lat": 1.335592,
+    "lng": 103.848146
   },
   {
     "item_id": "la-o1",
@@ -250,11 +270,13 @@
     "rating_count": 89,
     "availability_level": "low",
     "next_available_days": 45,
-    "confidence": 88
+    "confidence": 88,
+    "lat": 59.90955,
+    "lng": 10.68822
   },
   {
     "item_id": "la-o2",
-    "name": "Gr\u00fcnerl\u00f8kka",
+    "name": "Grünerløkka",
     "city": "Oslo",
     "avg_rent_2br": 2200,
     "avg_rent_3br": 3400,
@@ -273,11 +295,13 @@
     "rating_count": 112,
     "availability_level": "medium",
     "next_available_days": 30,
-    "confidence": 85
+    "confidence": 85,
+    "lat": 59.925471,
+    "lng": 10.777421
   },
   {
     "item_id": "la-o3",
-    "name": "B\u00e6rum",
+    "name": "Bærum",
     "city": "Oslo",
     "avg_rent_2br": 2800,
     "avg_rent_3br": 4200,
@@ -296,7 +320,9 @@
     "rating_count": 78,
     "availability_level": "medium",
     "next_available_days": 21,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 59.889626,
+    "lng": 10.597554
   },
   {
     "item_id": "la-o4",
@@ -319,7 +345,9 @@
     "rating_count": 95,
     "availability_level": "scarce",
     "next_available_days": 60,
-    "confidence": 87
+    "confidence": 87,
+    "lat": 59.90997,
+    "lng": 10.743309
   },
   {
     "item_id": "la-o5",
@@ -342,7 +370,9 @@
     "rating_count": 67,
     "availability_level": "high",
     "next_available_days": 14,
-    "confidence": 86
+    "confidence": 86,
+    "lat": 59.938273,
+    "lng": 10.765849
   },
   {
     "item_id": "la-sf1",
@@ -365,7 +395,9 @@
     "rating_count": 98,
     "availability_level": "medium",
     "next_available_days": 21,
-    "confidence": 88
+    "confidence": 88,
+    "lat": 37.780893,
+    "lng": -122.400952
   },
   {
     "item_id": "la-sf2",
@@ -388,7 +420,9 @@
     "rating_count": 112,
     "availability_level": "low",
     "next_available_days": 35,
-    "confidence": 85
+    "confidence": 85,
+    "lat": 37.752498,
+    "lng": -122.412826
   },
   {
     "item_id": "la-sf3",
@@ -411,7 +445,9 @@
     "rating_count": 76,
     "availability_level": "scarce",
     "next_available_days": 45,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 37.792717,
+    "lng": -122.435644
   },
   {
     "item_id": "la-sf4",
@@ -434,7 +470,9 @@
     "rating_count": 89,
     "availability_level": "medium",
     "next_available_days": 28,
-    "confidence": 91
+    "confidence": 91,
+    "lat": 37.751591,
+    "lng": -122.432081
   },
   {
     "item_id": "la-sf5",
@@ -457,7 +495,9 @@
     "rating_count": 82,
     "availability_level": "medium",
     "next_available_days": 25,
-    "confidence": 87
+    "confidence": 87,
+    "lat": 37.799793,
+    "lng": -122.435204
   },
   {
     "item_id": "la-ny1",
@@ -480,7 +520,9 @@
     "rating_count": 112,
     "availability_level": "low",
     "next_available_days": 30,
-    "confidence": 88
+    "confidence": 88,
+    "lat": 40.775479,
+    "lng": -73.955023
   },
   {
     "item_id": "la-ny2",
@@ -503,7 +545,9 @@
     "rating_count": 98,
     "availability_level": "medium",
     "next_available_days": 21,
-    "confidence": 87
+    "confidence": 87,
+    "lat": 40.696085,
+    "lng": -73.99503
   },
   {
     "item_id": "la-ny3",
@@ -526,7 +570,9 @@
     "rating_count": 134,
     "availability_level": "high",
     "next_available_days": 14,
-    "confidence": 85
+    "confidence": 85,
+    "lat": 40.714622,
+    "lng": -73.95345
   },
   {
     "item_id": "la-ny4",
@@ -549,7 +595,9 @@
     "rating_count": 76,
     "availability_level": "scarce",
     "next_available_days": 45,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 40.71538,
+    "lng": -74.009306
   },
   {
     "item_id": "la-ny5",
@@ -572,7 +620,9 @@
     "rating_count": 89,
     "availability_level": "medium",
     "next_available_days": 25,
-    "confidence": 91
+    "confidence": 91,
+    "lat": 40.787045,
+    "lng": -73.975416
   },
   {
     "item_id": "la-ny6",
@@ -595,7 +645,9 @@
     "rating_count": 102,
     "availability_level": "high",
     "next_available_days": 10,
-    "confidence": 86
+    "confidence": 86,
+    "lat": 40.772014,
+    "lng": -73.930267
   },
   {
     "item_id": "la-ny7",
@@ -618,7 +670,9 @@
     "rating_count": 95,
     "availability_level": "low",
     "next_available_days": 35,
-    "confidence": 88
+    "confidence": 88,
+    "lat": 40.733584,
+    "lng": -74.002817
   },
   {
     "item_id": "la-mu1",
@@ -641,7 +695,9 @@
     "rating_count": 142,
     "availability_level": "medium",
     "next_available_days": 21,
-    "confidence": 92
+    "confidence": 92,
+    "lat": 48.168926,
+    "lng": 11.58995
   },
   {
     "item_id": "la-mu2",
@@ -664,7 +720,9 @@
     "rating_count": 118,
     "availability_level": "low",
     "next_available_days": 35,
-    "confidence": 90
+    "confidence": 90,
+    "lat": 48.151092,
+    "lng": 11.562418
   },
   {
     "item_id": "la-mu3",
@@ -687,7 +745,9 @@
     "rating_count": 96,
     "availability_level": "medium",
     "next_available_days": 28,
-    "confidence": 88
+    "confidence": 88,
+    "lat": 48.145222,
+    "lng": 11.614977
   },
   {
     "item_id": "la-mu4",
@@ -710,7 +770,9 @@
     "rating_count": 134,
     "availability_level": "high",
     "next_available_days": 14,
-    "confidence": 89
+    "confidence": 89,
+    "lat": 48.132663,
+    "lng": 11.601122
   },
   {
     "item_id": "la-mu5",
@@ -733,7 +795,9 @@
     "rating_count": 87,
     "availability_level": "high",
     "next_available_days": 10,
-    "confidence": 86
+    "confidence": 86,
+    "lat": 48.118012,
+    "lng": 11.539083
   },
   {
     "item_id": "la-mu6",
@@ -756,6 +820,8 @@
     "rating_count": 72,
     "availability_level": "high",
     "next_available_days": 7,
-    "confidence": 84
+    "confidence": 84,
+    "lat": 48.147785,
+    "lng": 11.460701
   }
 ]

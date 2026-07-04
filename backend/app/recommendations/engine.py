@@ -298,6 +298,11 @@ def recommend(
     dest_city = (criteria.get("destination_city") or "").strip()
     office = (criteria.get("office_address") or "").strip()
     criteria_echo["office_address"] = office or _default_office_for_city(dest_city)
+    # Phase 2: surface the geocoded office coords so the neighborhood map can pin
+    # the office without a second client-side geocode.
+    if criteria.get("office_lat") is not None and criteria.get("office_lng") is not None:
+        criteria_echo["office_lat"] = criteria.get("office_lat")
+        criteria_echo["office_lng"] = criteria.get("office_lng")
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     hr_curation_status: Optional[str] = None
