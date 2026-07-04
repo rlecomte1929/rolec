@@ -42,6 +42,12 @@ def _row_to_item(row: Any) -> Dict[str, Any]:
         d["attributes_json"] = {}
     if isinstance(d.get("active"), int):
         d["active"] = bool(d["active"])
+    # id / created_by_user_id are uuid in Postgres → coerce to str so the
+    # CatalogItemRead response_model (str) validates. SQLite returns them as text
+    # already, which is why the SQLite tests never caught the prod 500.
+    for k in ("id", "created_by_user_id"):
+        if d.get(k) is not None:
+            d[k] = str(d[k])
     for k in ("created_at", "updated_at"):
         v = d.get(k)
         if hasattr(v, "isoformat"):
