@@ -212,24 +212,25 @@ def test_submit_isolation_bug_classified_critical(patched_db):
     assert row[1] == "isolation"
 
 
-def test_submit_binds_null_user_id_when_auth_uuid_unresolved(patched_db):
-    """PR-A regression: when auth_uuid can't resolve (legacy non-uuid id, no
-    profile), submit must NOT bind the text id into feedback.user_id — in prod
-    that column is uuid and the text id 500s. user_id is stored NULL; the legacy
-    id is preserved on the text feedback_status.reporter_id for attribution.
-    """
+def _submit_as(user: dict):
     app = FastAPI()
     app.include_router(feedback_router_module.router)
-    app.dependency_overrides[get_current_user] = lambda: {
-        "id": "seed-emp-testingapril",  # legacy non-uuid session id
-        "auth_uuid": None,               # _resolve_auth_uuid safe-degrade → None
-        "is_admin": False,
-    }
+    app.dependency_overrides[get_current_user] = lambda: user
     client = TestClient(app)
-    resp = client.post("/api/feedback", json={"category": "bug", "message": "500 on submit"})
+    resp = client.post("/api/feedback", json={"category": "bug", "message": "probe"})
+    return resp
+
+
+def test_submit_legacy_id_binds_null_user_id(patched_db):
+    """Regression: a legacy/seed session (non-uuid id) must NOT bind its id into
+    feedback.user_id. In prod that column is uuid with FK → auth.users(id); a text
+    id fails the uuid cast and a profiles-derived uuid violates the FK — both 500.
+    So user_id is stored NULL; the legacy id is preserved on the text
+    feedback_status.reporter_id for attribution.
+    """
+    resp = _submit_as({"id": "seed-emp-testingapril", "auth_uuid": None, "is_admin": False})
     assert resp.status_code == 201, resp.text
     rid = resp.json()["report_id"]
-
     with patched_db.connect() as conn:
         user_id = conn.execute(
             text("SELECT user_id FROM feedback WHERE report_id = :rid"), {"rid": rid}
@@ -237,8 +238,23 @@ def test_submit_binds_null_user_id_when_auth_uuid_unresolved(patched_db):
         reporter_id = conn.execute(
             text("SELECT reporter_id FROM feedback_status WHERE source_id = :rid"), {"rid": rid}
         ).scalar()
-    assert user_id is None, f"feedback.user_id must be NULL (uuid col), got {user_id!r}"
-    assert reporter_id == "seed-emp-testingapril", "legacy id must remain on the text reporter_id"
+    assert user_id is None, f"feedback.user_id must be NULL for a legacy id, got {user_id!r}"
+    assert reporter_id == "seed-emp-testingapril", "legacy id must remain on reporter_id"
+
+
+def test_submit_uuid_native_id_binds_user_id(patched_db):
+    """A Supabase-native session's id IS the auth.users uuid → bind it to
+    feedback.user_id (valid FK, preserves attribution for real users).
+    """
+    native = "5669fcbe-0145-4133-ba2d-a4fdc0ad6009"
+    resp = _submit_as({"id": native, "auth_uuid": native, "is_admin": False})
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["report_id"]
+    with patched_db.connect() as conn:
+        user_id = conn.execute(
+            text("SELECT user_id FROM feedback WHERE report_id = :rid"), {"rid": rid}
+        ).scalar()
+    assert user_id == native, f"uuid-native id must be bound to feedback.user_id, got {user_id!r}"
 
 
 # ── Reporter status endpoint tests ───────────────────────────────────────────

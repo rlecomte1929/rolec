@@ -31,7 +31,9 @@ CREATE TABLE feedback (
 );
 """
 
-EMP = {"id": "emp-1", "role": "EMPLOYEE", "email": "e@x.com",
+# Supabase-native session: id IS the auth.users uuid (so it's FK-valid and gets
+# bound to feedback.user_id). Legacy-id → NULL is covered in test_feedback_ticket.py.
+EMP = {"id": "11111111-1111-1111-1111-111111111111", "role": "EMPLOYEE", "email": "e@x.com",
        "auth_uuid": "11111111-1111-1111-1111-111111111111"}
 
 
