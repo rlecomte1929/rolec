@@ -1900,6 +1900,20 @@ export const suppliersAPI = {
     );
     return response.data;
   },
+  approveCapability: async (supplierId: string, capabilityId: string, notes?: string) => {
+    const response = await api.post<unknown>(
+      `/api/suppliers/${supplierId}/capabilities/${capabilityId}/approve`,
+      { notes }
+    );
+    return response.data;
+  },
+  rejectCapability: async (supplierId: string, capabilityId: string, notes: string) => {
+    const response = await api.post<unknown>(
+      `/api/suppliers/${supplierId}/capabilities/${capabilityId}/reject`,
+      { notes }
+    );
+    return response.data;
+  },
   updateScoring: async (supplierId: string, payload: Record<string, unknown>) => {
     const response = await api.patch<unknown>(`/api/suppliers/${supplierId}/scoring`, payload);
     return response.data;

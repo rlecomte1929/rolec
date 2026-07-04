@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Card, Button, Alert } from '../../components/antigravity';
+import { Card, Button, Alert, Badge } from '../../components/antigravity';
 import { suppliersAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
+import { useIsAdmin } from '../../features/admin/useIsAdmin';
 import { AdminLayout } from './AdminLayout';
 
 type Capability = {
@@ -20,6 +21,10 @@ type Capability = {
   corporate_clients: boolean;
   remote_support: boolean;
   notes?: string;
+  platform_vetting_status?: string;
+  vetted_by?: string;
+  vetted_at?: string;
+  vetting_notes?: string;
 };
 
 type Scoring = {
@@ -45,6 +50,9 @@ type SupplierDetail = {
   languages_supported: string[];
   verified: boolean;
   vendor_id?: string;
+  source?: string;
+  source_url?: string;
+  source_reference?: string;
   created_at?: string;
   updated_at?: string;
   capabilities?: Capability[];
@@ -102,6 +110,9 @@ export const AdminSupplierDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SupplierDetail>>({});
   const [addingCapability, setAddingCapability] = useState(false);
+  const [rejectingCapId, setRejectingCapId] = useState<string | null>(null);
+  const [rejectNotes, setRejectNotes] = useState('');
+  const isAdmin = useIsAdmin();
   const [newCap, setNewCap] = useState({
     service_category: 'movers',
     coverage_scope_type: 'country',
@@ -261,6 +272,50 @@ export const AdminSupplierDetail: React.FC = () => {
     [id]
   );
 
+  const approveCapability = useCallback(
+    async (capId: string) => {
+      if (!id) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const updated = await suppliersAPI.approveCapability(id, capId);
+        setSupplier(updated as SupplierDetail);
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+            : (err as Error)?.message;
+        setError(String(msg || 'Failed to approve capability'));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [id]
+  );
+
+  const rejectCapability = useCallback(
+    async (capId: string, notes: string) => {
+      if (!id || !notes.trim()) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const updated = await suppliersAPI.rejectCapability(id, capId, notes.trim());
+        setSupplier(updated as SupplierDetail);
+        setRejectingCapId(null);
+        setRejectNotes('');
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+            : (err as Error)?.message;
+        setError(String(msg || 'Failed to reject capability'));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [id]
+  );
+
   const saveScoring = useCallback(
     async (payload: Record<string, unknown>) => {
       if (!id) return;
@@ -366,6 +421,27 @@ export const AdminSupplierDetail: React.FC = () => {
             <div>
               <dt className="text-[#6b7280]">Phone</dt>
               <dd>{display.contact_phone || <span className="text-[#9ca3af]"> - </span>}</dd>
+            </div>
+            <div>
+              <dt className="text-[#6b7280]">Source</dt>
+              <dd>{display.source || <span className="text-[#9ca3af]"> - </span>}</dd>
+            </div>
+            <div>
+              <dt className="text-[#6b7280]">Source URL</dt>
+              <dd>
+                {display.source_url ? (
+                  <a
+                    href={display.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#0b2b43] underline break-all"
+                  >
+                    {display.source_url}
+                  </a>
+                ) : (
+                  <span className="text-[#9ca3af]"> - </span>
+                )}
+              </dd>
             </div>
           </dl>
           {display.description && (
@@ -644,7 +720,23 @@ export const AdminSupplierDetail: React.FC = () => {
               {supplier.capabilities.map((c) => (
                 <div key={c.id} className="border border-[#e5e7eb] rounded-lg p-4 flex justify-between items-start">
                   <div>
-                    <div className="font-medium text-[#0b2b43]">{c.service_category}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium text-[#0b2b43]">{c.service_category}</div>
+                      <Badge
+                        variant={
+                          c.platform_vetting_status === 'approved'
+                            ? 'success'
+                            : c.platform_vetting_status === 'rejected'
+                              ? 'error'
+                              : c.platform_vetting_status === 'suspended'
+                                ? 'neutral'
+                                : 'warning'
+                        }
+                        size="sm"
+                      >
+                        {c.platform_vetting_status || 'pending'}
+                      </Badge>
+                    </div>
                     <div className="text-sm text-[#6b7280] mt-1">
                       {c.coverage_scope_type}
                       {c.country_code && ` • ${c.country_code}`}
@@ -666,15 +758,74 @@ export const AdminSupplierDetail: React.FC = () => {
                         {c.remote_support && 'Remote'}
                       </div>
                     )}
+                    {c.vetting_notes && (
+                      <div className="mt-2 text-xs text-[#6b7280] italic">Note: {c.vetting_notes}</div>
+                    )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeCapability(c.id)}
-                    disabled={saving}
-                  >
-                    Remove
-                  </Button>
+                  <div className="flex flex-col items-end gap-2 shrink-0 ml-4">
+                    {isAdmin && c.platform_vetting_status !== 'approved' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => approveCapability(c.id)}
+                        disabled={saving}
+                      >
+                        Approve
+                      </Button>
+                    )}
+                    {isAdmin && c.platform_vetting_status !== 'rejected' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setRejectingCapId((prev) => (prev === c.id ? null : c.id))
+                        }
+                        disabled={saving}
+                      >
+                        Reject
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeCapability(c.id)}
+                      disabled={saving}
+                    >
+                      Remove
+                    </Button>
+                    {rejectingCapId === c.id && (
+                      <div className="w-56">
+                        <textarea
+                          value={rejectNotes}
+                          onChange={(e) => setRejectNotes(e.target.value)}
+                          rows={2}
+                          placeholder="Reason for rejection (required)"
+                          className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
+                        />
+                        <div className="flex justify-end gap-2 mt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setRejectingCapId(null);
+                              setRejectNotes('');
+                            }}
+                            disabled={saving}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => rejectCapability(c.id, rejectNotes)}
+                            disabled={saving || !rejectNotes.trim()}
+                          >
+                            Confirm reject
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
