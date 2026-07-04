@@ -184,6 +184,36 @@ class ServiceCatalogTests(unittest.TestCase):
         # Without a city filter, returns total active rows for the category.
         self.assertEqual(service_catalog.count_by_category_city("schools"), 2)
 
+    def test_row_to_item_stringifies_uuid_columns(self) -> None:
+        """id / created_by_user_id are uuid in Postgres; _row_to_item must coerce
+        them to str so the CatalogItemRead (str) response_model validates. Passing
+        uuid.UUID objects mimics the psycopg2 row that 500'd GET /admin/catalog/items.
+        """
+        import uuid as _uuid
+
+        item = service_catalog._row_to_item({
+            "id": _uuid.UUID("11111111-1111-1111-1111-111111111111"),
+            "category": "movers", "city": None, "country": None, "name": "Santa Fe",
+            "attributes_json": None, "source": "seed", "active": 1,
+            "external_id": None, "created_at": "2026-01-01", "updated_at": "2026-01-02",
+            "created_by_user_id": _uuid.UUID("22222222-2222-2222-2222-222222222222"),
+        })
+        self.assertIsInstance(item["id"], str)
+        self.assertEqual(item["id"], "11111111-1111-1111-1111-111111111111")
+        self.assertIsInstance(item["created_by_user_id"], str)
+        self.assertEqual(item["created_by_user_id"], "22222222-2222-2222-2222-222222222222")
+        self.assertEqual(item["attributes_json"], {})  # None → {}
+        self.assertIs(item["active"], True)             # 1 → True
+
+    def test_row_to_item_keeps_null_created_by(self) -> None:
+        """created_by_user_id is Optional — a NULL must stay None, not 'None'."""
+        item = service_catalog._row_to_item({
+            "id": "s-1", "category": "banks", "name": "N26", "attributes_json": {},
+            "source": "seed", "active": True, "created_at": "x", "updated_at": "y",
+            "created_by_user_id": None, "city": None, "country": None, "external_id": None,
+        })
+        self.assertIsNone(item["created_by_user_id"])
+
 
 if __name__ == "__main__":
     unittest.main()
