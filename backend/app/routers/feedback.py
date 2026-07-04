@@ -62,12 +62,17 @@ def submit_feedback(
     category = body.category if body.category in _CATEGORIES else "other"
     report_id = body.report_id or f"{category[:3].upper()}-{uuid.uuid4().hex[:8]}"
     # auth.uid() is NULL on the service-role connection, so set user_id ourselves.
-    # feedback.user_id is a uuid column: bind ONLY a resolved Supabase uuid (or
-    # NULL) — never the legacy text id, which fails the uuid cast and 500s.
-    # _resolve_auth_uuid already returns a real uuid or None (safe degrade); the
-    # legacy text id stays on the text feedback_status.reporter_id for attribution.
-    auth_uuid = current_user.get("auth_uuid")
+    # feedback.user_id is a uuid column with FK → auth.users(id). A Supabase-native
+    # session's id IS the auth.users uuid, so bind it. A legacy/seed session has a
+    # text id whose profiles-derived auth_uuid does NOT match auth.users(id) — binding
+    # that violates the FK (and a raw text id fails the uuid cast). So bind the id only
+    # when it is itself a uuid; otherwise NULL. Attribution stays on the text
+    # feedback_status.reporter_id regardless.
     reporter_id = current_user.get("id")
+    try:
+        auth_user_id = str(uuid.UUID(str(reporter_id)))
+    except (ValueError, TypeError, AttributeError):
+        auth_user_id = None
     screenshot = body.screenshot_data
     if screenshot is not None and len(screenshot) > _MAX_SCREENSHOT:
         screenshot = None  # too large to persist; keep the text feedback
@@ -81,7 +86,7 @@ def submit_feedback(
                 # id / status / created_at use their column defaults.
             ),
             {
-                "uid": str(auth_uuid) if auth_uuid else None,
+                "uid": auth_user_id,
                 "page": body.page_url or "",
                 "cat": category,
                 "msg": message[:_MAX_MESSAGE],
