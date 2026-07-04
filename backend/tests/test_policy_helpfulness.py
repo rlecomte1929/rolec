@@ -166,3 +166,25 @@ def test_auth_required():
         json={"trace_session_id": "trace-A", "helpful": True},
     )
     assert r.status_code in (401, 403), f"expected 401/403, got {r.status_code}"
+
+
+def test_malformed_trace_uuid_is_unknown_not_500():
+    """policy_assistant_traces.id is uuid in Postgres; a non-uuid trace_session_id
+    makes `WHERE id = :tid` raise DataError (→ prod 500). _lookup_trace_company must
+    catch it, roll back the aborted tx, and return None so the caller 404s.
+    """
+    from sqlalchemy.exc import DataError
+
+    class _Sess:
+        def __init__(self):
+            self.rolled_back = False
+
+        def execute(self, *a, **k):
+            raise DataError("invalid input syntax for type uuid", None, None)
+
+        def rollback(self):
+            self.rolled_back = True
+
+    s = _Sess()
+    assert policy_helpfulness_service._lookup_trace_company(s, "not-a-uuid") is None
+    assert s.rolled_back is True, "aborted transaction must be rolled back"
