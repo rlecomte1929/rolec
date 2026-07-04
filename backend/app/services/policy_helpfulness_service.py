@@ -16,6 +16,7 @@ import uuid
 from typing import Any, Dict, Optional
 
 from sqlalchemy import text
+from sqlalchemy.exc import DataError
 
 from ..db import SessionLocal
 
@@ -27,17 +28,28 @@ class UnknownTraceError(Exception):
 
 
 def _lookup_trace_company(s: Any, trace_session_id: str) -> Optional[Dict[str, Any]]:
-    """Return the trace's company (tenant), or None if the trace is unknown."""
-    row = (
-        s.execute(
-            text(
-                "SELECT id, company_id FROM policy_assistant_traces WHERE id = :tid"
-            ),
-            {"tid": trace_session_id},
+    """Return the trace's company (tenant), or None if the trace is unknown.
+
+    ``policy_assistant_traces.id`` is uuid in Postgres, so a malformed (non-uuid)
+    ``trace_session_id`` makes ``WHERE id = :tid`` raise a cast error (a 500) rather
+    than matching no rows. Catch that and treat the trace as unknown → the caller
+    raises UnknownTraceError → the endpoint returns 404, not 500. (SQLite's text id
+    never casts, so this is a no-op there and existing text-id tests are unaffected.)
+    """
+    try:
+        row = (
+            s.execute(
+                text(
+                    "SELECT id, company_id FROM policy_assistant_traces WHERE id = :tid"
+                ),
+                {"tid": trace_session_id},
+            )
+            .mappings()
+            .first()
         )
-        .mappings()
-        .first()
-    )
+    except DataError:
+        s.rollback()  # the bad-uuid cast aborts the tx; clear it before we bail
+        return None
     return dict(row) if row else None
 
 
