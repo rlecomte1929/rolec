@@ -66,6 +66,25 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   dispatch_status TEXT,
   PRIMARY KEY (stream, source_id)
 );
+CREATE TABLE IF NOT EXISTS hr_feedback (
+  id TEXT PRIMARY KEY,
+  assignment_id TEXT,
+  hr_user_id TEXT,
+  employee_user_id TEXT,
+  message TEXT,
+  created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS case_feedback (
+  id TEXT PRIMARY KEY,
+  case_id TEXT,
+  canonical_case_id TEXT,
+  assignment_id TEXT,
+  author_user_id TEXT,
+  author_role TEXT,
+  section TEXT,
+  message TEXT,
+  created_at_ts TEXT
+);
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY,
   entity_type TEXT NOT NULL,
@@ -150,6 +169,49 @@ def test_get_stream_filter(admin_client):
     items = resp.json()["items"]
     assert len(items) >= 1
     assert all(r["stream"] == "helpfulness" for r in items)
+
+
+def test_get_includes_hr_streams(admin_client, db_session):
+    """PR-A: hr_feedback + case_feedback surface as hr_assignment / hr_case streams."""
+    db_session.execute(text(
+        "INSERT INTO hr_feedback (id, assignment_id, hr_user_id, employee_user_id, message, created_at) "
+        "VALUES ('hf-001', 'asg-1', 'hr-1', 'emp-1', 'Please upload your passport', '2026-06-02T09:00:00')"
+    ))
+    db_session.execute(text(
+        "INSERT INTO case_feedback "
+        "(id, case_id, canonical_case_id, assignment_id, author_user_id, author_role, section, message, created_at_ts) "
+        "VALUES ('cf-001', 'case-1', 'canon-1', 'asg-1', 'hr-2', 'HR', 'documents', 'Section looks incomplete', '2026-06-02T10:00:00')"
+    ))
+    db_session.commit()
+
+    items = admin_client.get("/api/admin/feedback").json()["items"]
+    streams = {r["stream"] for r in items}
+    assert {"hr_assignment", "hr_case"} <= streams
+
+    hr_row = next(r for r in items if r["stream"] == "hr_assignment")
+    assert hr_row["text"] == "Please upload your passport"
+    assert hr_row["source_ref"] == "asg-1"
+    assert hr_row["user_id"] == "hr-1"
+
+    case_row = next(r for r in items if r["stream"] == "hr_case")
+    assert case_row["text"] == "Section looks incomplete"
+    assert case_row["verdict"] == "documents"       # section → verdict
+    assert case_row["source_ref"] == "canon-1"       # COALESCE(canonical_case_id, case_id)
+    assert case_row["user_id"] == "hr-2"
+
+
+def test_get_stream_filter_hr_case_coalesces_case_id(admin_client, db_session):
+    """?stream=hr_case returns only case rows; NULL canonical_case_id falls back to case_id."""
+    db_session.execute(text(
+        "INSERT INTO case_feedback "
+        "(id, case_id, assignment_id, author_user_id, author_role, section, message, created_at_ts) "
+        "VALUES ('cf-002', 'case-2', 'asg-2', 'hr-3', 'HR', 'housing', 'Need more detail', '2026-06-02T11:00:00')"
+    ))
+    db_session.commit()
+    items = admin_client.get("/api/admin/feedback?stream=hr_case").json()["items"]
+    assert items and all(r["stream"] == "hr_case" for r in items)
+    row = next(r for r in items if r["id"] == "cf-002")
+    assert row["source_ref"] == "case-2"
 
 
 def test_get_normalized_fields(admin_client):

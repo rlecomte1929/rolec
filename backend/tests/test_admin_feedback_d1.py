@@ -71,6 +71,25 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   dispatch_status TEXT,
   PRIMARY KEY (stream, source_id)
 );
+CREATE TABLE IF NOT EXISTS hr_feedback (
+  id TEXT PRIMARY KEY,
+  assignment_id TEXT,
+  hr_user_id TEXT,
+  employee_user_id TEXT,
+  message TEXT,
+  created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS case_feedback (
+  id TEXT PRIMARY KEY,
+  case_id TEXT,
+  canonical_case_id TEXT,
+  assignment_id TEXT,
+  author_user_id TEXT,
+  author_role TEXT,
+  section TEXT,
+  message TEXT,
+  created_at_ts TEXT
+);
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY,
   entity_type TEXT NOT NULL,

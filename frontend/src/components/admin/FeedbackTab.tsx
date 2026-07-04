@@ -36,9 +36,11 @@ const STATUS_LABEL: Record<TriageStatus, string> = {
 };
 
 const STREAM_LABEL: Record<FeedbackStream, string> = {
-  product:     'Product',
-  ai_answers:  'AI Answers',
-  helpfulness: 'Helpfulness',
+  product:       'Product',
+  ai_answers:    'AI Answers',
+  helpfulness:   'Helpfulness',
+  hr_assignment: 'HR → Employee',
+  hr_case:       'HR Case Notes',
 };
 
 function fmtRelative(iso: string): string {
@@ -59,7 +61,7 @@ function fmtDate(iso: string): string {
   );
 }
 
-const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness'];
+const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness', 'hr_assignment', 'hr_case'];
 
 /** A ticket is high-risk if severity is critical OR area is isolation. */
 function isHighRisk(row: UnifiedFeedbackItem): boolean {

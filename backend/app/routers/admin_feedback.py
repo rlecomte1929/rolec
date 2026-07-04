@@ -43,11 +43,23 @@ def _get_db() -> Generator[Session, None, None]:
 
 # ── SQL helpers ─────────────────────────────────────────────────────────────
 
-# The three stream sub-queries are UNION ALL'd together, then LEFT JOIN'd to
+# The five stream sub-queries are UNION ALL'd together, then LEFT JOIN'd to
 # feedback_status to pick up triage state.  CAST(x AS TEXT) keeps the query
 # compatible with both SQLite (tests) and Postgres (prod).
 
-_UNION_SQL = """
+
+def _union_sql(is_sqlite: bool) -> str:
+    """Build the UNION of every feedback stream.
+
+    ``hr_feedback.created_at`` is stored as TEXT in prod while every other
+    branch is ``timestamptz``. Postgres rejects a UNION that mixes ``text`` and
+    ``timestamptz``, so cast it to ``timestamptz`` on Postgres. On SQLite
+    ``CAST(x AS timestamptz)`` is an unknown type → NUMERIC affinity, which would
+    corrupt the ISO string, so leave the column as-is there (SQLite is loosely
+    typed and only used by tests).
+    """
+    hr_created_at = "hf.created_at" if is_sqlite else "CAST(hf.created_at AS timestamptz)"
+    return f"""
 SELECT
     CAST(f.id        AS TEXT) AS id,
     'product'                 AS stream,
@@ -84,6 +96,32 @@ SELECT
     p.company_id              AS company_id,
     p.created_at
 FROM policy_answer_helpfulness p
+
+UNION ALL
+
+SELECT
+    CAST(hf.id       AS TEXT) AS id,
+    'hr_assignment'           AS stream,
+    hf.assignment_id          AS source_ref,
+    hf.message                AS text,
+    CAST(NULL AS TEXT)        AS verdict,
+    hf.hr_user_id             AS user_id,
+    CAST(NULL AS TEXT)        AS company_id,
+    {hr_created_at}           AS created_at
+FROM hr_feedback hf
+
+UNION ALL
+
+SELECT
+    CAST(cf.id       AS TEXT) AS id,
+    'hr_case'                 AS stream,
+    COALESCE(cf.canonical_case_id, cf.case_id) AS source_ref,
+    cf.message                AS text,
+    cf.section                AS verdict,
+    CAST(cf.author_user_id AS TEXT) AS user_id,
+    CAST(NULL AS TEXT)        AS company_id,
+    cf.created_at_ts          AS created_at
+FROM case_feedback cf
 """
 
 _OUTER_SQL = """
@@ -130,7 +168,8 @@ def _fetch_rows(
     if dispatched:
         filters.append("AND fs.dispatch_status IS NOT NULL")
 
-    sql = _OUTER_SQL.format(union=_UNION_SQL, filters="\n".join(filters))
+    is_sqlite = db.get_bind().dialect.name == "sqlite"
+    sql = _OUTER_SQL.format(union=_union_sql(is_sqlite), filters="\n".join(filters))
     rows = db.execute(text(sql), params).mappings().all()
     return [dict(r) for r in rows]
 
