@@ -78,6 +78,33 @@ def list_suppliers(
     return [_supplier_to_dict(r, session, include_list_summary=True) for r in rows]
 
 
+def list_pending_capabilities(session: Session, *, limit: int = 200) -> List[Dict[str, Any]]:
+    """Cross-supplier queue of capabilities awaiting a vetting decision.
+    Returns the oldest-first flat rows the admin vetting queue renders."""
+    rows = (
+        session.query(SupplierServiceCapability, Supplier)
+        .join(Supplier, Supplier.id == SupplierServiceCapability.supplier_id)
+        .filter(SupplierServiceCapability.platform_vetting_status == "pending")
+        .order_by(SupplierServiceCapability.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "supplier_id": s.id,
+            "supplier_name": s.name,
+            "capability_id": c.id,
+            "service_category": c.service_category,
+            "country_code": c.country_code,
+            "city_name": c.city_name,
+            "source": getattr(s, "source", None),
+            "source_url": getattr(s, "source_url", None),
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
+        for c, s in rows
+    ]
+
+
 def list_supplier_countries(session: Session) -> List[str]:
     """Distinct country codes from supplier capabilities, for admin filter dropdown."""
     from sqlalchemy import distinct
