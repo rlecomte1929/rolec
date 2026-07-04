@@ -22,6 +22,9 @@ vi.mock('../../../../api/client', () => ({
   default: { get: vi.fn(), put: vi.fn(), patch: vi.fn(), post: vi.fn(), delete: vi.fn() },
 }));
 vi.mock('../OriginalPdfDrawer', () => ({ OriginalPdfDrawer: () => null }));
+// FormDocuments mounts its own document-loading effect (via the mocked api
+// client, which returns undefined) — not exercised by these render assertions.
+vi.mock('../FormDocuments', () => ({ FormDocuments: () => null }));
 
 // Imported after the mocks so the mocked modules are in place.
 const { CaseFormCard } = await import('../CaseFormCard');
@@ -60,7 +63,10 @@ function makeForm(overrides: Partial<CaseFormSummary> = {}): CaseFormSummary {
       version: '1.0.0',
       fields_total: 5,
       source_url: 'https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/',
-      source_last_verified: '2026-06-04T10:00:00Z',
+      // Relative to "now" so the source never crosses the staleness window and
+      // flips the card to the StalenessBadge branch (a hardcoded date made this
+      // a time-bomb that started failing 30 days after it was written).
+      source_last_verified: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
       required_documents: [],
       verification_status: 'representative',
     },
