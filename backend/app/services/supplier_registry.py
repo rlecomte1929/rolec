@@ -216,6 +216,9 @@ def search_by_service_destination(
         .join(SupplierServiceCapability, Supplier.id == SupplierServiceCapability.supplier_id)
         .filter(Supplier.status == "active")
         .filter(SupplierServiceCapability.service_category == service_category)
+        # GAP 3: employees must never see an unvetted offering — only surface
+        # capabilities an admin has approved.
+        .filter(SupplierServiceCapability.platform_vetting_status == "approved")
     )
     # Coverage: supplier must serve the destination country (global or country match).
     # When destination_city is set, also allow city-level capability in that country.
