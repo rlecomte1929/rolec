@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -144,6 +145,9 @@ def _supplier_to_dict(
         "languages_supported": _parse_json_array(s.languages_supported),
         "verified": s.verified,
         "vendor_id": s.vendor_id,
+        "source": getattr(s, "source", None),
+        "source_url": getattr(s, "source_url", None),
+        "source_reference": getattr(s, "source_reference", None),
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
     }
@@ -169,6 +173,10 @@ def _supplier_to_dict(
                     "corporate_clients": c.corporate_clients,
                     "remote_support": c.remote_support,
                     "notes": c.notes,
+                    "platform_vetting_status": getattr(c, "platform_vetting_status", None),
+                    "vetted_by": getattr(c, "vetted_by", None),
+                    "vetted_at": c.vetted_at.isoformat() if getattr(c, "vetted_at", None) else None,
+                    "vetting_notes": getattr(c, "vetting_notes", None),
                 }
                 for c in caps
             ]
@@ -290,6 +298,9 @@ def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
         languages_supported=_serialize_json_array(data.get("languages_supported") or []),
         verified=data.get("verified", False),
         vendor_id=data.get("vendor_id"),
+        source=data.get("source", "admin_manual"),
+        source_url=data.get("source_url"),
+        source_reference=data.get("source_reference"),
     )
     session.add(s)
     caps = data.get("capabilities", [])
@@ -309,6 +320,7 @@ def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
             corporate_clients=c.get("corporate_clients", False),
             remote_support=c.get("remote_support", False),
             notes=c.get("notes"),
+            platform_vetting_status=c.get("platform_vetting_status", "pending"),
         )
         session.add(cap)
     scoring = data.get("scoring")
@@ -424,10 +436,60 @@ def add_capability(
         corporate_clients=data.get("corporate_clients", False),
         remote_support=data.get("remote_support", False),
         notes=(data.get("notes") or "").strip() or None,
+        platform_vetting_status=(data.get("platform_vetting_status") or "pending"),
     )
     session.add(cap)
     session.commit()
     return get_supplier(session, supplier_id)
+
+
+def approve_capability(
+    session: Session,
+    capability_id: str,
+    vetted_by_user_id: Optional[str],
+    notes: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Approve a service capability: mark it visible to recommendations and stamp
+    the reviewer. Returns the parent supplier dict, or None if the capability is
+    not found."""
+    cap = (
+        session.query(SupplierServiceCapability)
+        .filter(SupplierServiceCapability.id == capability_id)
+        .first()
+    )
+    if not cap:
+        return None
+    cap.platform_vetting_status = "approved"
+    cap.vetted_by = vetted_by_user_id
+    cap.vetted_at = datetime.now(timezone.utc)
+    cap.vetting_notes = (notes or "").strip() or None
+    session.commit()
+    return get_supplier(session, cap.supplier_id)
+
+
+def reject_capability(
+    session: Session,
+    capability_id: str,
+    vetted_by_user_id: Optional[str],
+    notes: str,
+) -> Optional[Dict[str, Any]]:
+    """Reject a service capability. Notes are mandatory (raises ValueError if
+    blank). Returns the parent supplier dict, or None if not found."""
+    if not (notes or "").strip():
+        raise ValueError("Rejection notes are required")
+    cap = (
+        session.query(SupplierServiceCapability)
+        .filter(SupplierServiceCapability.id == capability_id)
+        .first()
+    )
+    if not cap:
+        return None
+    cap.platform_vetting_status = "rejected"
+    cap.vetted_by = vetted_by_user_id
+    cap.vetted_at = datetime.now(timezone.utc)
+    cap.vetting_notes = notes.strip()
+    session.commit()
+    return get_supplier(session, cap.supplier_id)
 
 
 def update_capability(
