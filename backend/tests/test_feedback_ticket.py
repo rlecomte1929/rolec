@@ -212,6 +212,35 @@ def test_submit_isolation_bug_classified_critical(patched_db):
     assert row[1] == "isolation"
 
 
+def test_submit_binds_null_user_id_when_auth_uuid_unresolved(patched_db):
+    """PR-A regression: when auth_uuid can't resolve (legacy non-uuid id, no
+    profile), submit must NOT bind the text id into feedback.user_id — in prod
+    that column is uuid and the text id 500s. user_id is stored NULL; the legacy
+    id is preserved on the text feedback_status.reporter_id for attribution.
+    """
+    app = FastAPI()
+    app.include_router(feedback_router_module.router)
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "seed-emp-testingapril",  # legacy non-uuid session id
+        "auth_uuid": None,               # _resolve_auth_uuid safe-degrade → None
+        "is_admin": False,
+    }
+    client = TestClient(app)
+    resp = client.post("/api/feedback", json={"category": "bug", "message": "500 on submit"})
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["report_id"]
+
+    with patched_db.connect() as conn:
+        user_id = conn.execute(
+            text("SELECT user_id FROM feedback WHERE report_id = :rid"), {"rid": rid}
+        ).scalar()
+        reporter_id = conn.execute(
+            text("SELECT reporter_id FROM feedback_status WHERE source_id = :rid"), {"rid": rid}
+        ).scalar()
+    assert user_id is None, f"feedback.user_id must be NULL (uuid col), got {user_id!r}"
+    assert reporter_id == "seed-emp-testingapril", "legacy id must remain on the text reporter_id"
+
+
 # ── Reporter status endpoint tests ───────────────────────────────────────────
 
 

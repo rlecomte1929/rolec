@@ -2,7 +2,12 @@ import axios from 'axios';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
-export type FeedbackStream = 'product' | 'ai_answers' | 'helpfulness';
+export type FeedbackStream =
+  | 'product'
+  | 'ai_answers'
+  | 'helpfulness'
+  | 'hr_assignment'
+  | 'hr_case';
 export type TriageStatus = 'new' | 'reviewed' | 'acted_on' | 'closed';
 export type DispatchStatus = 'pending' | 'dispatched' | 'failed';
 
