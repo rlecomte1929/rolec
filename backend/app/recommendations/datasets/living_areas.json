@@ -823,5 +823,130 @@
     "confidence": 84,
     "lat": 48.147785,
     "lng": 11.460701
+  },
+  {
+    "item_id": "la-du1",
+    "name": "Dubai Marina",
+    "city": "Dubai",
+    "avg_rent_2br": 11000,
+    "avg_rent_3br": 16000,
+    "typical_sqm_range": [
+      90,
+      140
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 8,
+      "nightlife": 9,
+      "quiet": 4,
+      "green": 5
+    },
+    "rating": 4.5,
+    "rating_count": 210,
+    "availability_level": "high",
+    "next_available_days": 10,
+    "confidence": 90,
+    "lat": 25.0805,
+    "lng": 55.1403
+  },
+  {
+    "item_id": "la-du2",
+    "name": "Downtown Dubai",
+    "city": "Dubai",
+    "avg_rent_2br": 13000,
+    "avg_rent_3br": 19000,
+    "typical_sqm_range": [
+      95,
+      150
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 4,
+      "green": 6
+    },
+    "rating": 4.6,
+    "rating_count": 260,
+    "availability_level": "medium",
+    "next_available_days": 14,
+    "confidence": 91,
+    "lat": 25.1972,
+    "lng": 55.2744
+  },
+  {
+    "item_id": "la-du3",
+    "name": "Jumeirah",
+    "city": "Dubai",
+    "avg_rent_2br": 12000,
+    "avg_rent_3br": 18000,
+    "typical_sqm_range": [
+      110,
+      180
+    ],
+    "commute_to_work_minutes_estimate": 22,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating": 4.4,
+    "rating_count": 150,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 88,
+    "lat": 25.231,
+    "lng": 55.26
+  },
+  {
+    "item_id": "la-du4",
+    "name": "Arabian Ranches",
+    "city": "Dubai",
+    "avg_rent_2br": 10000,
+    "avg_rent_3br": 14000,
+    "typical_sqm_range": [
+      140,
+      220
+    ],
+    "commute_to_work_minutes_estimate": 30,
+    "tags": {
+      "safety": 9,
+      "nightlife": 3,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating": 4.5,
+    "rating_count": 130,
+    "availability_level": "high",
+    "next_available_days": 18,
+    "confidence": 87,
+    "lat": 25.05,
+    "lng": 55.267
+  },
+  {
+    "item_id": "la-du5",
+    "name": "Dubai Hills Estate",
+    "city": "Dubai",
+    "avg_rent_2br": 11500,
+    "avg_rent_3br": 16500,
+    "typical_sqm_range": [
+      120,
+      190
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 9,
+      "nightlife": 4,
+      "quiet": 8,
+      "green": 9
+    },
+    "rating": 4.6,
+    "rating_count": 175,
+    "availability_level": "high",
+    "next_available_days": 12,
+    "confidence": 89,
+    "lat": 25.1,
+    "lng": 55.244
   }
 ]

@@ -710,5 +710,135 @@
     "confidence": 87,
     "lat": 48.15,
     "lng": 11.555
+  },
+  {
+    "item_id": "s-du1",
+    "name": "GEMS Wellington International School",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 26,
+    "application_deadline": "2025-01-15",
+    "commute_minutes_estimate": 20,
+    "rating": 4.7,
+    "rating_count": 95,
+    "confidence": 93,
+    "lat": 25.118,
+    "lng": 55.2
+  },
+  {
+    "item_id": "s-du2",
+    "name": "Nord Anglia International School Dubai",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 12,
+    "application_deadline": "2025-02-01",
+    "commute_minutes_estimate": 25,
+    "rating": 4.6,
+    "rating_count": 80,
+    "confidence": 92,
+    "lat": 25.05,
+    "lng": 55.24
+  },
+  {
+    "item_id": "s-du3",
+    "name": "Dubai British School",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 10,
+    "application_deadline": "2025-01-20",
+    "commute_minutes_estimate": 22,
+    "rating": 4.5,
+    "rating_count": 70,
+    "confidence": 90,
+    "lat": 25.064,
+    "lng": 55.162
+  },
+  {
+    "item_id": "s-du4",
+    "name": "Jumeirah English Speaking School (JESS)",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 8,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 30,
+    "application_deadline": "2025-01-10",
+    "commute_minutes_estimate": 18,
+    "rating": 4.7,
+    "rating_count": 88,
+    "confidence": 92,
+    "lat": 25.213,
+    "lng": 55.254
+  },
+  {
+    "item_id": "s-du5",
+    "name": "Dubai American Academy",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "american",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 9,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 14,
+    "application_deadline": "2025-02-15",
+    "commute_minutes_estimate": 24,
+    "rating": 4.5,
+    "rating_count": 76,
+    "confidence": 90,
+    "lat": 25.103,
+    "lng": 55.172
   }
 ]
