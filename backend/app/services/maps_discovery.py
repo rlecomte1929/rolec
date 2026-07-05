@@ -18,32 +18,30 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
+from ..config.vendor_discovery import SERVICE_CATEGORY_SEARCH_TERMS, VENDOR_QUALITY_THRESHOLDS
+
 log = logging.getLogger(__name__)
 
-# ReloPass service-category slug → maps search keyword.
-CATEGORY_KEYWORDS: Dict[str, str] = {
-    "movers": "international moving company",
-    "living_areas": "furnished apartments corporate housing",
-    "legal_admin": "immigration lawyer expats",
-    "schools": "international school",
-    "banks": "expat bank account",
-    "insurance": "expat insurance broker",
-    "tax_finance": "expat tax advisor",
-    "medical": "english speaking doctor clinic",
-    "telecom": "mobile phone provider",
-    "childcare": "international daycare nursery",
-    "language_integration": "language school",
-    "storage": "self storage",
-    "transport": "airport transfer service",
-    "electricity": "utilities energy provider",
-}
+# Registry service-category slugs → VEN-01 config keys where they differ
+# (the config uses "housing"; the supplier registry slug is "living_areas").
+_CATEGORY_ALIASES = {"living_areas": "housing"}
+
+
+def _build_query(category: str, city: str) -> str:
+    """Search query for a (category, city), sourced from the VEN-01 config
+    search-term templates. Resolves registry slugs → config keys; falls back to a
+    bare '{city} {category}' query for unknown categories."""
+    slug = (category or "").strip().lower()
+    key = _CATEGORY_ALIASES.get(slug, slug)
+    templates = SERVICE_CATEGORY_SEARCH_TERMS.get(key) or ["{city} " + (category or "")]
+    return templates[0].format(city=city)
 
 
 def _provider() -> str:
     return (os.getenv("DISCOVERY_PROVIDER") or "disabled").strip().lower()
 
 
-_DEFAULT_MAX_RESULTS = 10
+_DEFAULT_MAX_RESULTS = VENDOR_QUALITY_THRESHOLDS["max_candidates_to_fetch"]
 
 
 def _max_results() -> int:
@@ -69,10 +67,6 @@ def provider_status() -> Dict[str, Any]:
     return {"provider": provider, "configured": configured, "max_results": _max_results()}
 
 
-def _keyword_for(category: str) -> str:
-    return CATEGORY_KEYWORDS.get((category or "").strip().lower(), category or "")
-
-
 def search_businesses(
     category: str, city: str, country: str, limit: Optional[int] = None
 ) -> List[Dict[str, Any]]:
@@ -88,41 +82,89 @@ def search_businesses(
     return []
 
 
+# Google Places API (New, v1) — Text Search. Returns websiteUri in one call.
+_PLACES_V1_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+_PLACES_V1_DETAIL_URL = "https://places.googleapis.com/v1/places/{place_id}"
+_PLACES_V1_FIELD_MASK = (
+    "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,"
+    "places.websiteUri,places.rating,places.userRatingCount,places.businessStatus"
+)
+
+
 def _search_google_places(category: str, city: str, country: str, cap: int) -> List[Dict[str, Any]]:
     api_key = os.getenv("GOOGLE_PLACES_API_KEY")
     if not api_key:
         return []
-    query = f"{_keyword_for(category)} in {city}, {country}".strip()
     try:
         import requests  # lazy: keep import cost off the disabled path
-        resp = requests.get(
-            "https://maps.googleapis.com/maps/api/place/textsearch/json",
-            params={"query": query, "key": api_key},
+        resp = requests.post(
+            _PLACES_V1_SEARCH_URL,
+            json={
+                "textQuery": _build_query(category, city),
+                "maxResultCount": min(cap, 20),  # v1 hard limit is 20
+                "languageCode": "en",
+            },
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": _PLACES_V1_FIELD_MASK,
+            },
             timeout=15,
         )
+        resp.raise_for_status()
         data = resp.json() or {}
     except Exception:
         log.exception("google_places discovery failed for %s / %s", category, city)
         return []
     out: List[Dict[str, Any]] = []
-    for r in (data.get("results", []) or [])[:cap]:
+    for p in (data.get("places", []) or [])[:cap]:
         out.append({
-            "name": r.get("name"),
-            "website": None,  # Text Search omits website; enrich via Details if needed
-            "phone": None,
-            "formatted_address": r.get("formatted_address"),
-            "rating": r.get("rating"),
-            "user_ratings_total": r.get("user_ratings_total"),
-            "place_id": r.get("place_id"),
+            "name": (p.get("displayName") or {}).get("text"),
+            "website": p.get("websiteUri"),
+            "phone": p.get("nationalPhoneNumber"),
+            "formatted_address": p.get("formattedAddress"),
+            "rating": p.get("rating"),
+            "user_ratings_total": p.get("userRatingCount"),
+            "business_status": p.get("businessStatus"),
+            "place_id": p.get("id"),
         })
     return out
+
+
+def refresh_vendor_by_place_id(place_id: str) -> Optional[Dict[str, Any]]:
+    """Re-fetch a single vendor's live signals by its stable Google place_id
+    (used by the freshness refresh job). Returns None when disabled or on error."""
+    api_key = os.getenv("GOOGLE_PLACES_API_KEY")
+    if not api_key or not place_id:
+        return None
+    try:
+        import requests
+        resp = requests.get(
+            _PLACES_V1_DETAIL_URL.format(place_id=place_id),
+            headers={
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": "id,rating,userRatingCount,businessStatus",
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+    except Exception:
+        log.warning("google_places refresh failed for place_id=%s", place_id)
+        return None
+    return {
+        "place_id": data.get("id"),
+        "rating": data.get("rating"),
+        "user_ratings_total": data.get("userRatingCount"),
+        "business_status": data.get("businessStatus"),
+    }
 
 
 def _search_apify(category: str, city: str, country: str, cap: int) -> List[Dict[str, Any]]:
     token = os.getenv("APIFY_API_TOKEN")
     if not token:
         return []
-    query = f"{_keyword_for(category)} in {city}, {country}".strip()
+    query = _build_query(category, city)
     try:
         import requests
         resp = requests.post(
