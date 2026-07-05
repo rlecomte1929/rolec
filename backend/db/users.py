@@ -1291,9 +1291,12 @@ class UsersMixin:
         if role and (role or "").strip().lower() not in ("", "all"):
             r = (role or "").strip().upper()
             if r == "HR":
-                clauses.append("(p.role = 'HR' OR EXISTS (SELECT 1 FROM hr_users hu WHERE hu.profile_id = p.id))")
+                # hr_users.profile_id / employees.profile_id are TEXT while profiles.id is
+                # UUID in prod — comparing directly raises "operator does not exist: text =
+                # uuid" (42883). CAST profiles.id to text (harmless on SQLite).
+                clauses.append("(p.role = 'HR' OR EXISTS (SELECT 1 FROM hr_users hu WHERE hu.profile_id = CAST(p.id AS TEXT)))")
             elif r == "EMPLOYEE":
-                clauses.append("(p.role IN ('EMPLOYEE', 'EMPLOYEE_USER') OR EXISTS (SELECT 1 FROM employees e WHERE e.profile_id = p.id))")
+                clauses.append("(p.role IN ('EMPLOYEE', 'EMPLOYEE_USER') OR EXISTS (SELECT 1 FROM employees e WHERE e.profile_id = CAST(p.id AS TEXT)))")
             elif r == "ADMIN":
                 clauses.append("p.role = 'ADMIN'")
             else:
@@ -1337,8 +1340,8 @@ class UsersMixin:
             SELECT p.id, p.role, p.email, p.full_name, p.company_id,
                    'active' AS status,
                    c.name AS company_name,
-                   (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = p.id) AS hr_link_count,
-                   (SELECT COUNT(*) FROM employees e WHERE e.profile_id = p.id) AS employee_link_count
+                   (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = CAST(p.id AS TEXT)) AS hr_link_count,
+                   (SELECT COUNT(*) FROM employees e WHERE e.profile_id = CAST(p.id AS TEXT)) AS employee_link_count
             FROM profiles p
             LEFT JOIN companies c ON c.id = p.company_id
             WHERE 1=1 {where}
