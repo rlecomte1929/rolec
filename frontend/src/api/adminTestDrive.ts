@@ -56,7 +56,9 @@ function toQuery(params?: TestDriveSlice): string {
 }
 
 export async function getTestDriveOverview(params?: TestDriveSlice): Promise<TestDriveOverview> {
-  return apiGet<TestDriveOverview>(`/api/admin/test-drive/overview${toQuery(params)}`);
+  const data = await apiGet<TestDriveOverview>(`/api/admin/test-drive/overview${toQuery(params)}`);
+  // Guarantee the list fields exist so the tab never crashes on a partial payload.
+  return { ...data, pilot_leads: data.pilot_leads ?? [], testimonials: data.testimonials ?? [] };
 }
 
 export function testDriveContactsCsvUrl(params?: TestDriveSlice): string {

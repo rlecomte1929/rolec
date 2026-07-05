@@ -156,7 +156,7 @@ export const AdminAiControlsPage: React.FC = () => {
     setFetchError(null);
     try {
       const data = await getAiControls();
-      setControls(data.controls);
+      setControls(data.controls ?? []);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load controls.');
     } finally {

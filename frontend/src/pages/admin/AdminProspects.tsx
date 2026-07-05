@@ -97,8 +97,8 @@ export const AdminProspects: React.FC = () => {
       const params: { status?: string; limit: number } = { limit: 200 };
       if (statusFilter) params.status = statusFilter;
       const res = await adminProspectsAPI.list(params);
-      setRows(res.prospects);
-      setTotal(res.total);
+      setRows(res.prospects ?? []);
+      setTotal(res.total ?? 0);
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err

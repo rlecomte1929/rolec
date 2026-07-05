@@ -48,7 +48,7 @@ export const MissionControlPage: React.FC = () => {
     setError(null);
     try {
       const res = await listWorkItems();
-      setItems(res.items);
+      setItems(res.items ?? []);
       setTableReady(res.table_ready);
     } catch {
       setError('Could not load demands.');

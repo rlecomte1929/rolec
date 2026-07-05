@@ -4,6 +4,15 @@ import { Input } from "../../components/antigravity/Input";
 import { Card } from "../../components/antigravity/Card";
 import apiClient from "../../api/client";
 
+// Cap the rendered audit payload so full records (which can carry subject PII) aren't
+// shipped verbatim into the admin DOM. The cell is also CSS-truncated for display.
+const MAX_VALUE_CHARS = 140;
+function summarizeAuditValue(value: Record<string, unknown> | null): string {
+  if (value == null) return "—";
+  const s = JSON.stringify(value);
+  return s.length > MAX_VALUE_CHARS ? `${s.slice(0, MAX_VALUE_CHARS)}…` : s;
+}
+
 interface AuditLogEntry {
   id: string;
   entity_type: string;
@@ -46,7 +55,7 @@ export default function AdminAuditLogPage() {
       query.set("limit", String(LIMIT));
       query.set("offset", String(params.offset ?? 0));
       const res = await apiClient.get<AuditLogResponse>(`/api/admin/audit-log?${query}`);
-      setItems(res.data.items);
+      setItems(res.data.items ?? []);
     } catch {
       setError("Failed to load audit log");
     } finally {
@@ -162,9 +171,7 @@ export default function AdminAuditLogPage() {
                       {item.actor_id ?? "—"}
                     </td>
                     <td className="py-1.5 px-3 text-navy-500 max-w-xs truncate">
-                      {item.new_value
-                        ? JSON.stringify(item.new_value)
-                        : "—"}
+                      {summarizeAuditValue(item.new_value)}
                     </td>
                   </tr>
                 ))}
