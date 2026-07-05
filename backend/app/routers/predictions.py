@@ -13,24 +13,27 @@ handler — importing this router never requires lifelines/pandas to be installe
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
+from ..services.feature_flags import resolve_flag_safe
 
 router = APIRouter(prefix="/api/cases", tags=["predictions"])
 logger = logging.getLogger(__name__)
 
 
+# DB feature-flag row → env var (PREDICTIONS_ENABLED) → default OFF. Routing
+# through resolve_flag_safe lets an admin toggle this from /admin/feature-flags
+# without a redeploy; the env var still works as a fallback.
 def _predictions_enabled() -> bool:
-    return os.getenv("PREDICTIONS_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+    return resolve_flag_safe("PREDICTIONS_ENABLED", env_default=False)
 
 
 def _processing_time_enabled() -> bool:
-    return os.getenv("PROCESSING_TIME_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+    return resolve_flag_safe("PROCESSING_TIME_ENABLED", env_default=False)
 
 
 @router.get("/{case_id}/predicted-duration")
