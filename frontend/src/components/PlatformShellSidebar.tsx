@@ -172,6 +172,7 @@ const SECTIONS: NavSection[] = [
 
       // ── Customers (live accounts + sales pipeline) ──
       { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
+      { id: 'admin-assignments', group: 'Customers', label: 'Assignments', hint: 'Per-relocation controls', to: ROUTE_DEFS.adminAssignments.path },
       { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
       { id: 'test-drive', group: 'Customers', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
 

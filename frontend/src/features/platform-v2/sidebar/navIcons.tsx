@@ -24,6 +24,7 @@ import {
   BrainCircuit,
   ClipboardList,
   Star,
+  Plane,
   Gauge,
   Radar,
   FileText,
@@ -82,6 +83,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
 
   // Admin · ReloPass
   'admin-overview': Home,
+  'admin-assignments': Plane,
   executive: Gauge,
   'mission-control': Radar,
   'admin-companies': Building2,
