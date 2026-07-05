@@ -134,6 +134,16 @@ backend/app/routers/test_drive.py:survey
 # (post-test feedback from the same public flow). Campaign gate (404 unless
 # RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit; write-only INSERT into the
 # admin-read RLS table survey_responses; returns only {ok, response_id}.
+backend/app/routers/test_drive.py:record_event
+# PUBLIC (AIQ-1426 / TD-8): funnel-event recorder (invite/click/stage). Intentionally
+# unauthenticated (records /test-drive link clicks + funnel stages). Campaign gate
+# (404 unless RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit + allow-listed event_type
+# + scalar-only metadata; write-only INSERT into the admin-read RLS table funnel_events.
+backend/app/routers/test_drive.py:complete
+# PUBLIC (AIQ-1422 / TD-4): completion marker ("I've completed my test"). Intentionally
+# unauthenticated (self-declared from the public flow). Campaign gate (404 unless
+# RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit; soft state-check + UPDATE of the
+# admin-read RLS table test_sessions; returns {ok, reached, nudge}.
 
 # ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
 # The signature check runs in the handler body, so the AST scanner cannot see it.

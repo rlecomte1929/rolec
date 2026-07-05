@@ -137,6 +137,21 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
 
     // Route through the FastAPI backend (ReloPass session auth) — the prior direct
     // Supabase insert failed for employees without a live Supabase Auth session.
+    // TD-9: if this is an in-flight test-drive session, stamp campaign/corridor/segment
+    // (written to localStorage by TestDrivePage). Absent for normal users → fields omitted.
+    const testDrive: { campaign?: string; corridor_id?: string; tester_segment?: string } = {};
+    try {
+      const raw = localStorage.getItem('relopass_test_drive');
+      if (raw) {
+        const p = JSON.parse(raw) as { campaign?: string; corridor_id?: string; tester_segment?: string };
+        if (p.campaign) testDrive.campaign = p.campaign;
+        if (p.corridor_id) testDrive.corridor_id = p.corridor_id;
+        if (p.tester_segment) testDrive.tester_segment = p.tester_segment;
+      }
+    } catch {
+      /* malformed / storage disabled — ignore */
+    }
+
     try {
       await submitProductFeedback({
         category,
@@ -144,6 +159,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
         page_url:        window.location.pathname,
         report_id:       rid,
         screenshot_data: screenshot ?? null,
+        ...testDrive,
       });
       setState('success');
       setTimeout(() => close(), 3500);
