@@ -18,8 +18,6 @@ import { Landing } from './pages/Landing';
 import { PlatformPage } from './pages/public/PlatformPage';
 import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { GetStartedPage } from './pages/public/GetStartedPage';
-import { TestDrivePage } from './pages/public/TestDrivePage';
-import { TestDriveSurveyPage } from './pages/public/TestDriveSurveyPage';
 import { CompliancePage } from './pages/public/CompliancePage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
@@ -40,6 +38,9 @@ import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { PerfPanel } from './components/PerfPanel';
 import { FeatureFlagProvider } from './lib/feature-flags.tsx';
 
+// TD-3/TD-5: lazy-loaded so the public test-drive pages don't bloat the main entry chunk (bundle-size budget).
+const TestDrivePage = lazy(() => import('./pages/public/TestDrivePage').then((module) => ({ default: module.TestDrivePage })));
+const TestDriveSurveyPage = lazy(() => import('./pages/public/TestDriveSurveyPage').then((module) => ({ default: module.TestDriveSurveyPage })));
 const Journey = lazy(() => import('./pages/Journey').then((module) => ({ default: module.Journey })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const EmployeeJourney = lazy(() => import('./pages/EmployeeJourney').then((module) => ({ default: module.EmployeeJourney })));
