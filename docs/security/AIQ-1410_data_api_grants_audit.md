@@ -97,10 +97,27 @@ applied to prod + ledger-reconciled):
 | `daily_summaries` | RLS admin-only |
 | `pet_import_rules` | public reference data (non-PII), RLS `USING(true)` |
 
-**Still pending (each needs a prior fix — deliberately NOT granted):**
-- `notifications` — only an `is_admin()` policy exists; a grant alone delivers nothing to normal users.
-  Add a per-user SELECT policy first, then grant.
-- `provider_tasks` — not in the `supabase_realtime` publication, so its realtime sub already no-ops; a
-  grant won't restore it. Separate latent bug (add to publication + grant).
-- `supplier_stats` — RLS is OFF; a grant would expose every row to any logged-in user. Enable RLS +
-  policies first, or route the frontend read through the backend.
+### Remaining 3 resolved — 2026-07-05 (AIQ-1417)
+A code-consumer trace (frontend Data-API/realtime vs FastAPI backend) settled the last 3:
+
+- **`provider_tasks` → GRANTED + published** (`20260828000000_provider_tasks_realtime_grant.sql`). The
+  live consumer is an **HR user**: `ProviderCoordinationPanel.tsx:518` (inline channel, `case_id=eq`) →
+  `HrCaseTasksPanel.tsx:454` → `HrCommandCenterCaseDetail`. RLS `provider_tasks_hr_all` already scopes it
+  by company. It was NOT in the `supabase_realtime` publication, so those HR live-updates silently never
+  fired — grant SELECT + add to the publication (mirrors `case_forms`) makes them deliver. Applied to prod
+  + ledger-reconciled.
+- **`notifications` → NO ACTION (backend-routed).** The realtime module `api/notificationsRealtime.ts` has
+  **zero importers** (dead code); the shipped bell reads the FastAPI REST path (`/api/notifications`,
+  service_role), unaffected by Oct-30. No `.from('notifications')` anywhere. A grant would also be *wrong*:
+  the backend writes `notifications.user_id` = ReloPass **profile UUID** (`backend/db/support.py:323-370`),
+  while Supabase mints a separate `auth.users.id` (`supabase_auth_sync.py:191`) — so `user_id = auth.uid()`
+  matches nothing (0/419 prod rows match `auth.users`).
+- **`supplier_stats` → NO ACTION (dead code + matview).** `lib/supplier-scorer.ts:157` (`.from('supplier_stats')`)
+  has **zero importers** (unwired); no backend reads it. It's a **materialized view** (`relkind='m'`) → RLS
+  is impossible, and a grant would expose all 84 supplier-score rows for a path nothing calls. If ever
+  wired, route via the HR-scoped `GET /api/hr/vendor-performance` (`backend/app/routers/hr_vendor_performance.py`).
+
+**Net:** all 9 edge tables now have a documented decision — 6 granted + `provider_tasks` granted/published,
+`notifications` + `supplier_stats` correctly backend-only. (Unused modules noted for a separate dead-code
+cleanup: `api/notificationsRealtime.ts`, `lib/supplier-scorer.ts`, `hooks/useProviderRealtime.ts`,
+`components/providers/ProviderCoordinationPanel.tsx`.)
