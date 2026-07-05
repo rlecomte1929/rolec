@@ -16,11 +16,53 @@ from typing import Any, Dict, List
 
 from ...db import SessionLocal
 from ...models import Supplier
-from .. import maps_discovery, supplier_registry
+from .. import maps_discovery, service_catalog, supplier_registry
 from .accreditation_checker import enrich_with_accreditation
 from .vendor_ranker import filter_and_rank_vendors
 
 logger = logging.getLogger(__name__)
+
+
+def _fetch_rank(service_category: str, city: str, country: str) -> list:
+    """Shared front half: fetch → accreditation → quality gate + rank. Returns
+    the top vendors (or [] when discovery is off/unconfigured or none qualify)."""
+    candidates = maps_discovery.search_businesses(service_category, city, country)
+    if not candidates:
+        logger.info("No discovery results for %s/%s", service_category, city)
+        return []
+    enrich_with_accreditation(candidates, service_category)
+    return filter_and_rank_vendors(candidates)
+
+
+def discover_to_catalog(
+    service_category: str, city: str, country: str
+) -> List[Dict[str, Any]]:
+    """HR-facing write path (VEN-10): fetch → enrich → rank → upsert into the
+    master catalog `service_catalog_items` (source='scraper', quality signals in
+    attributes_json), so the HR curation view populates. Idempotent by
+    (category, external_id=place_id). Returns the top vendors written."""
+    top = _fetch_rank(service_category, city, country)
+    for v in top:
+        service_catalog.upsert_item(
+            category=service_category,
+            name=(v.get("name") or "").strip(),
+            source="scraper",
+            city=city,
+            country=country,
+            external_id=v.get("place_id"),
+            attributes={
+                "rating": v.get("rating"),
+                "review_count": v.get("user_ratings_total"),
+                "business_status": v.get("business_status"),
+                "website": v.get("website"),
+                "phone": v.get("phone"),
+                "accreditation_tags": v.get("accreditation_tags") or [],
+                "place_id": v.get("place_id"),
+                "_provenance": "google_places",
+            },
+        )
+    logger.info("Discovered %d catalog vendors for %s/%s", len(top), service_category, city)
+    return top
 
 
 def discover_and_store_vendors(
@@ -31,14 +73,8 @@ def discover_and_store_vendors(
 ) -> List[Dict[str, Any]]:
     """Full pipeline for one (category, city): fetch → enrich → rank → import to
     suppliers as pending. Returns the vendors imported this run."""
-    candidates = maps_discovery.search_businesses(service_category, destination_city, destination_country)
-    if not candidates:
-        logger.info("No discovery results for %s/%s", service_category, destination_city)
-        return []
-    enrich_with_accreditation(candidates, service_category)
-    top = filter_and_rank_vendors(candidates)
+    top = _fetch_rank(service_category, destination_city, destination_country)
     if not top:
-        logger.info("No vendors passed quality gate for %s/%s", service_category, destination_city)
         return []
 
     iso2 = (destination_country or "").strip().upper()[:2] or None

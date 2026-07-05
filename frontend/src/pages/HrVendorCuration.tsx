@@ -22,6 +22,7 @@ import {
   listAllowlistedDestinations,
   listEmployeeDemand,
   populateDestinationWithAi,
+  discoverVendorsForCity,
   type AllowlistedDestination,
   type CurationRow,
   type DestinationRequest,
@@ -121,6 +122,10 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
   const [populateResult, setPopulateResult] = useState<PopulateDestinationResult | null>(null);
   const [pendingTicket, setPendingTicket] = useState<DestinationRequest | null>(null);
   const [quota, setQuota] = useState<ScrapeQuotaState | null>(null);
+
+  // VEN-12: real-business discovery for this (category, city) when the list is empty.
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
 
   // Phase 2 notifications: employee demand backlog (what employees are waiting on).
   const [demand, setDemand] = useState<EmployeeDemandRow[]>([]);
@@ -222,6 +227,27 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       setLoading(false);
     }
   }, [category, city]);
+
+  // VEN-12: find real, quality-vetted vendors for this (category, city) and
+  // refresh the list so they appear.
+  const handleFetchVendors = useCallback(async () => {
+    if (!city || !country) return;
+    setIsDiscovering(true);
+    setDiscoverError(null);
+    try {
+      const res = await discoverVendorsForCity(category, city, country);
+      if (res.status === 'pending_admin_approval') {
+        setDiscoverError(res.message || 'This destination needs admin approval first.');
+      } else if (!res.count) {
+        setDiscoverError(res.message || 'No verified vendors found for this city yet.');
+      }
+      await load();
+    } catch {
+      setDiscoverError('Could not find vendors right now. Please try again.');
+    } finally {
+      setIsDiscovering(false);
+    }
+  }, [category, city, country, load]);
 
   useEffect(() => {
     void load();
@@ -716,6 +742,17 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                 <>Pick a destination at the top to begin, or add your own preferred vendors below.</>
               )}
             </p>
+            {city && country && (
+              <div className="mt-3">
+                <Button onClick={() => void handleFetchVendors()} disabled={isDiscovering}>
+                  {isDiscovering ? 'Searching…' : `Find verified vendors in ${city}`}
+                </Button>
+                <p className="mt-1.5 text-xs text-[#6b7280]">
+                  Pulls the top-rated, review-verified vendors for this service in {city}.
+                </p>
+                {discoverError && <p className="mt-2 text-sm text-[#b91c1c]">{discoverError}</p>}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -754,6 +791,12 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
             {visibleMasters.map((row) => {
               const selected = effectiveSelected(row);
               const pending = row.master_item_id ? pendingToggles.has(row.master_item_id) : false;
+              const attrs = (row.attributes || {}) as Record<string, unknown>;
+              const rating = typeof attrs.rating === 'number' ? attrs.rating : null;
+              const reviews = typeof attrs.review_count === 'number' ? attrs.review_count : null;
+              const accreditation = Array.isArray(attrs.accreditation_tags)
+                ? (attrs.accreditation_tags as unknown[]).filter((t): t is string => typeof t === 'string')
+                : [];
               return (
                 <li key={row.master_item_id || row.name} className="p-3 flex items-center justify-between gap-3">
                   <label className="flex items-center gap-3 min-w-0 cursor-pointer">
@@ -764,6 +807,19 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                     />
                     <span className="min-w-0">
                       <span className="font-medium text-[#0b2b43]">{row.name}</span>
+                      {rating != null && (
+                        <span className="ml-2 text-xs text-[#6b7280]">
+                          ★ {rating.toFixed(1)}{reviews != null && ` (${reviews})`}
+                        </span>
+                      )}
+                      {accreditation.map((tag) => (
+                        <span
+                          key={tag}
+                          className="ml-1 inline-flex items-center rounded bg-[#eaf5f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#1f8e8b]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
                       {row.source === 'hr_promoted' && (
                         <span className="ml-2 text-xs text-[#94a3b8]">Added by your team</span>
                       )}
