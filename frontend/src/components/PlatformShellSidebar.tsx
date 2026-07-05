@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown } from 'lucide-react';
 import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
 import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
@@ -34,6 +34,9 @@ interface SidebarVisibilityCtx {
 interface SectionItem {
   id: string;
   label: string;
+  /** Optional themed sub-group within a section (Admin only today). A small sub-group
+   *  label renders at each group boundary; items without a group render flat. */
+  group?: string;
   /** Optional one-line hint shown below the label (not shown when collapsed). */
   hint?: string;
   to: string;
@@ -155,51 +158,63 @@ const SECTIONS: NavSection[] = [
   {
     label: 'Admin · ReloPass',
     minRole: 'ADMIN',
+    // Ordered by "what's needed when" and grouped by theme (a sub-group label renders
+    // at each `group` boundary): Overview → Customers → Content → Queues → Platform.
+    // Reorder/regroup only — every id/route/badge is preserved.
     items: [
-      { id: 'admin-overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
-      { id: 'data-rights', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
-      { id: 'policy-versions', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
-      { id: 'feature-flags', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
-      { id: 'permissions', label: 'Permissions', to: ROUTE_DEFS.adminPermissions.path },
-      { id: 'executive', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'mission-control', label: 'Mission Control', to: ROUTE_DEFS.adminMissionControl.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'admin-companies', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
+      // ── Overview (dashboards / at-a-glance) ──
+      { id: 'admin-overview', group: 'Overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
+      { id: 'executive', group: 'Overview', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
+      { id: 'mission-control', group: 'Overview', label: 'Mission Control', to: ROUTE_DEFS.adminMissionControl.path, badge: { kind: 'static', variant: 'new' } },
+      // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
+      // link to the Queue tab of the same page was removed to end the false split).
+      { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
+
+      // ── Customers (live accounts + sales pipeline) ──
+      { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
+      { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
+
+      // ── Content (the CMS admins author / maintain) ──
+      { id: 'resources-cms', group: 'Content', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
+      { id: 'form-templates', group: 'Content', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
+      { id: 'policy-versions', group: 'Content', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
+      { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
+      { id: 'auth-page-design', group: 'Content', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
+
+      // ── Queues (day-to-day work queues) ──
       {
         id: 'review-queue',
+        group: 'Queues',
         label: 'Review queue',
         // AIQ-914: no badge — it was wired to admin.pending_tickets (HR-opened
         // destination requests = the Catalog queue metric, not review-queue items)
         // and carried a stale '24' fallback, so it never matched /admin/review-queue.
-        // No review-queue-item count is exposed to the sidebar; show nothing until
-        // one is (don't add a new endpoint per task scope).
         to: ROUTE_DEFS.adminReviewQueue.path,
       },
-      // 'Ops analytics' lands on /admin/ops; the former 'Workflow analytics'
-      // entry was a second sidebar link to the Queue *tab* of the same page
-      // (reachable via the Ops page tab strip), removed to end the false split.
-      { id: 'ops-analytics', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
-      { id: 'resources-cms', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
-      { id: 'auth-page-design', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
-      { id: 'form-templates', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'prospects', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
       {
         id: 'integrations',
+        group: 'Queues',
         label: 'Catalog queue',
         to: ROUTE_DEFS.adminCatalogQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
       },
       {
         id: 'vetting-queue',
+        group: 'Queues',
         label: 'Vetting queue',
         to: ROUTE_DEFS.adminVettingQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
       },
-      { id: 'requirement-facts', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
-      { id: 'research-requests', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
-      { id: 'ai-governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
-      { id: 'feedback-console', label: 'Feedback', to: ROUTE_DEFS.adminFeedback.path },
-      { id: 'admin-accounts', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
-      { id: 'audit-log', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
+      { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
+      { id: 'feedback-console', group: 'Queues', label: 'Feedback', to: ROUTE_DEFS.adminFeedback.path },
+
+      // ── Platform & governance (config, access, compliance) ──
+      { id: 'feature-flags', group: 'Platform & governance', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
+      { id: 'permissions', group: 'Platform & governance', label: 'Permissions', to: ROUTE_DEFS.adminPermissions.path },
+      { id: 'admin-accounts', group: 'Platform & governance', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
+      { id: 'ai-governance', group: 'Platform & governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
+      { id: 'data-rights', group: 'Platform & governance', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
+      { id: 'audit-log', group: 'Platform & governance', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
     ],
   },
 ];
@@ -229,13 +244,30 @@ const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, va
   );
 };
 
-const SectionHeading: React.FC<{ label: string; count?: number; collapsed: boolean }> = ({ label, count, collapsed }) => {
+const SectionHeading: React.FC<{
+  label: string;
+  count?: number;
+  collapsed: boolean;
+  folded?: boolean;
+  onToggle?: () => void;
+}> = ({ label, count, collapsed, folded, onToggle }) => {
+  // Icon-collapsed sidebar: no fold affordance, just a divider between sections (as before).
   if (collapsed) return <div className="mt-3 mx-2 border-t border-slate-100" aria-hidden="true" />;
   return (
-    <div className="flex items-center gap-1.5 px-3 pt-5 pb-1">
-      <span className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">{label}</span>
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!folded}
+      className="group w-full flex items-center gap-1.5 px-3 pt-5 pb-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+    >
+      {folded ? (
+        <ChevronRight size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600" aria-hidden="true" />
+      ) : (
+        <ChevronDown size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600" aria-hidden="true" />
+      )}
+      <span className="text-[10px] font-semibold tracking-widest text-slate-400 group-hover:text-slate-600 uppercase">{label}</span>
       {count !== undefined && <span className="text-[10px] text-slate-300 font-medium">{count}</span>}
-    </div>
+    </button>
   );
 };
 
@@ -318,6 +350,22 @@ function readCollapsed(): boolean {
   }
 }
 
+// Per-section fold (independent of the whole-sidebar icon-collapse above). Keyed by
+// section label → folded?. Default (absent) = expanded. Persisted + cross-tab synced.
+const FOLD_KEY = 'platform_sidebar_sections_v1';
+
+function readFolded(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(FOLD_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role, companySlot, user }) => {
@@ -340,6 +388,24 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  // Per-section fold state (label → folded?), persisted + cross-tab synced.
+  const [folded, setFolded] = useState<Record<string, boolean>>(() => readFolded());
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+    } catch {
+      /* ignore */
+    }
+  }, [folded]);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === FOLD_KEY) setFolded(readFolded());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const toggleSection = (label: string) => setFolded((f) => ({ ...f, [label]: !f[label] }));
 
   // Notification polling — only what the visible sections need
   const [hrNotif, setHrNotif] = useState<HrNotificationCounts | null>(null);
@@ -510,18 +576,25 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
       {/* Nav */}
       <nav className="flex-1 px-2 pb-4">
-        {visibleSections.map((section) => (
+        {visibleSections.map((section) => {
+          const isFolded = !collapsed && !section.borrowed && Boolean(folded[section.label]);
+          return (
           <React.Fragment key={section.label}>
             {!section.borrowed && (
               <SectionHeading
                 label={section.label}
                 count={section.items.length}
                 collapsed={collapsed}
+                folded={Boolean(folded[section.label])}
+                onToggle={() => toggleSection(section.label)}
               />
             )}
-            {section.items.map((item) => {
+            {!isFolded && section.items.map((item, idx) => {
               const active = isActive(item);
               const to = resolveItemTo(item);
+              // Themed sub-group label at each group boundary (Admin only; items without
+              // a group render flat). Skipped in icon-collapsed mode.
+              const showGroupLabel = !collapsed && !!item.group && item.group !== section.items[idx - 1]?.group;
 
               let badgeVariant: BadgeVariant | undefined;
               let badgeCount: number | undefined;
@@ -537,6 +610,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
               return (
                 <React.Fragment key={item.id}>
+                {showGroupLabel && (
+                  <div className={`px-3 mb-0.5 ${idx > 0 ? 'mt-3 pt-2 border-t border-slate-100' : 'mt-1'}`}>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">{item.group}</span>
+                  </div>
+                )}
                 <Link
                   to={to}
                   title={item.label}
@@ -617,7 +695,8 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
               );
             })}
           </React.Fragment>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User footer */}
