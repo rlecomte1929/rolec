@@ -13,6 +13,10 @@ export interface ProductFeedbackInput {
   page_url: string;
   report_id?: string;
   screenshot_data?: string | null;
+  // TD-9: campaign slice stamped during a test-drive session (else omitted).
+  campaign?: string;
+  corridor_id?: string;
+  tester_segment?: string;
 }
 
 export async function submitProductFeedback(

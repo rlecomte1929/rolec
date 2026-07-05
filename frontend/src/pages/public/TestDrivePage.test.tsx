@@ -4,7 +4,7 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom';
 
 // Mock the network client (also keeps the test off client.ts's supabase import chain).
-vi.mock('../../api/testDrive', () => ({ provisionTestDrive: vi.fn() }));
+vi.mock('../../api/testDrive', () => ({ provisionTestDrive: vi.fn(), recordTestDriveEvent: vi.fn() }));
 // The marketing barrel transitively imports api/supabase, whose createClient throws
 // in jsdom when VITE_SUPABASE_* are unset — neutralise it (known vitest trap).
 vi.mock('../../api/supabase', () => ({ supabase: { functions: { invoke: vi.fn() } } }));

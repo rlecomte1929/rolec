@@ -123,3 +123,23 @@ export async function submitSurvey(input: SurveyInput): Promise<SurveyResult> {
     return { ok: false, error };
   }
 }
+
+// ── TD-8 (AIQ-1426): funnel-event recorder (best-effort) ──────────────────────
+
+export interface TestDriveEventInput {
+  event_type: string;
+  session_id?: string;
+  campaign?: string;
+  corridor_id?: string;
+  tester_segment?: 'internal' | 'prospect';
+  invite_token?: string;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export async function recordTestDriveEvent(input: TestDriveEventInput): Promise<void> {
+  try {
+    await apiPost<{ ok: boolean }>('/api/test-drive/event', input);
+  } catch {
+    /* funnel telemetry is best-effort — never surface to the user */
+  }
+}

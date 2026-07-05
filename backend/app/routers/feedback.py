@@ -46,6 +46,10 @@ class FeedbackBody(BaseModel):
     page_url: Optional[str] = None
     report_id: Optional[str] = None
     screenshot_data: Optional[str] = None
+    # TD-9 (AIQ-1427): campaign slice stamped by the widget during a test-drive session.
+    campaign: Optional[str] = None
+    corridor_id: Optional[str] = None
+    tester_segment: Optional[str] = None
 
 
 @router.post("", status_code=201)
@@ -77,22 +81,33 @@ def submit_feedback(
     if screenshot is not None and len(screenshot) > _MAX_SCREENSHOT:
         screenshot = None  # too large to persist; keep the text feedback
 
+    cols = ["user_id", "page_url", "category", "message", "report_id", "screenshot_data"]
+    vals = [":uid", ":page", ":cat", ":msg", ":rid", ":shot"]
+    params: Dict[str, Any] = {
+        "uid": auth_user_id,
+        "page": body.page_url or "",
+        "cat": category,
+        "msg": message[:_MAX_MESSAGE],
+        "rid": report_id,
+        "shot": screenshot,
+    }
+    # TD-9: stamp campaign/corridor/segment only when the widget supplied them (test-drive
+    # sessions). Omitting them for normal users keeps the original INSERT + existing tests intact.
+    for col, val in (
+        ("campaign", body.campaign),
+        ("corridor_id", body.corridor_id),
+        ("tester_segment", body.tester_segment),
+    ):
+        if val:
+            cols.append(col)
+            vals.append(f":{col}")
+            params[col] = val
+
     with db.engine.begin() as conn:
         conn.execute(
-            text(
-                "INSERT INTO feedback "
-                "(user_id, page_url, category, message, report_id, screenshot_data) "
-                "VALUES (:uid, :page, :cat, :msg, :rid, :shot)"
-                # id / status / created_at use their column defaults.
-            ),
-            {
-                "uid": auth_user_id,
-                "page": body.page_url or "",
-                "cat": category,
-                "msg": message[:_MAX_MESSAGE],
-                "rid": report_id,
-                "shot": screenshot,
-            },
+            # id / status / created_at use their column defaults.
+            text(f"INSERT INTO feedback ({', '.join(cols)}) VALUES ({', '.join(vals)})"),
+            params,
         )
 
     # ── Best-effort: seed a feedback_status ticket for this submission ────────

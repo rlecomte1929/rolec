@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Copy, Check, PlayCircle } from 'lucide-react';
 import { PublicLayout } from '../../components/public';
@@ -7,9 +7,13 @@ import { Card, Alert, Button, Input } from '../../components/antigravity';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import {
   provisionTestDrive,
+  recordTestDriveEvent,
   type ProvisionSuccess,
   type TestDriveCredential,
 } from '../../api/testDrive';
+
+/** localStorage key the FeedbackWidget reads to stamp in-session feedback (TD-9). */
+const TEST_DRIVE_LS_KEY = 'relopass_test_drive';
 import {
   testDriveContent as c,
   TEST_DRIVE_CORRIDORS,
@@ -43,6 +47,17 @@ export const TestDrivePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionSuccess | null>(null);
 
+  // TD-8: record a funnel "click" once on landing (per-invite token / corridor).
+  useEffect(() => {
+    void recordTestDriveEvent({
+      event_type: 'click',
+      corridor_id: corridorId,
+      tester_segment: segment,
+      invite_token: inviteToken || undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (state !== 'idle') return;
@@ -59,6 +74,20 @@ export const TestDrivePage: React.FC = () => {
       invite_token: inviteToken,
     });
     if (res.ok) {
+      // TD-9: stash the campaign slice for the FeedbackWidget to stamp in-session feedback.
+      try {
+        localStorage.setItem(
+          TEST_DRIVE_LS_KEY,
+          JSON.stringify({
+            campaign: res.campaign,
+            corridor_id: res.corridorId,
+            tester_segment: segment,
+            session_id: res.sessionId,
+          }),
+        );
+      } catch {
+        /* private-mode / storage disabled — non-fatal */
+      }
       setResult(res);
     } else {
       setError(res.error);
