@@ -16,10 +16,12 @@ from ..services.audit_log_service import (
 )
 from ..services.supplier_registry import (
     add_capability,
+    approve_capability,
     create_supplier,
     get_supplier,
     list_supplier_countries,
     list_suppliers,
+    reject_capability,
     remove_capability,
     search_by_service_destination,
     set_supplier_status,
@@ -274,6 +276,53 @@ def update_capability_api(
             return s
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{supplier_id}/capabilities/{capability_id}/approve", response_model=Dict[str, Any])
+def approve_capability_api(
+    supplier_id: str,
+    capability_id: str,
+    body: Dict[str, Any] = Body(default={}),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Approve a supplier capability so it can surface in recommendations (admin only)."""
+    with SessionLocal() as session:
+        s = approve_capability(
+            session,
+            capability_id,
+            vetted_by_user_id=user.get("id") or user.get("sub"),
+            notes=(body or {}).get("notes"),
+        )
+        if not s:
+            raise HTTPException(status_code=404, detail="Capability not found")
+    _audit_supplier(user, "capability_approved", ACTION_UPDATE, supplier_id,
+                    extra={"capability_id": capability_id})
+    return s
+
+
+@router.post("/{supplier_id}/capabilities/{capability_id}/reject", response_model=Dict[str, Any])
+def reject_capability_api(
+    supplier_id: str,
+    capability_id: str,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Reject a supplier capability (admin only). `notes` is required."""
+    try:
+        with SessionLocal() as session:
+            s = reject_capability(
+                session,
+                capability_id,
+                vetted_by_user_id=user.get("id") or user.get("sub"),
+                notes=(body or {}).get("notes", ""),
+            )
+            if not s:
+                raise HTTPException(status_code=404, detail="Capability not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    _audit_supplier(user, "capability_rejected", ACTION_UPDATE, supplier_id,
+                    extra={"capability_id": capability_id})
+    return s
 
 
 @router.delete("/{supplier_id}/capabilities/{capability_id}", response_model=Dict[str, Any])

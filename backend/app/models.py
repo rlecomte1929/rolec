@@ -162,6 +162,10 @@ class Supplier(Base):
     languages_supported = Column(Text, nullable=True)  # JSON array as string
     verified = Column(Boolean, nullable=False, default=False)
     vendor_id = Column(String, nullable=True)  # FK to vendors.id for RFQ
+    # Provenance (GAP 1): where this supplier record came from
+    source = Column(String, nullable=False, default="admin_manual")
+    source_url = Column(String, nullable=True)
+    source_reference = Column(String, nullable=True)  # e.g. EuRA member ID, scrape batch
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -182,6 +186,11 @@ class SupplierServiceCapability(Base):
     corporate_clients = Column(Boolean, nullable=False, default=False)
     remote_support = Column(Boolean, nullable=False, default=False)
     notes = Column(Text, nullable=True)
+    # Platform vetting lifecycle (GAP 1)
+    platform_vetting_status = Column(String, nullable=False, default="pending")
+    vetted_by = Column(String, nullable=True)  # user id of the admin who decided
+    vetted_at = Column(DateTime, nullable=True)
+    vetting_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
