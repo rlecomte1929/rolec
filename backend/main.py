@@ -2371,6 +2371,97 @@ def create_person(
     return resp
 
 
+class ProspectOnboardRequest(BaseModel):
+    hr_email: str
+    hr_name: Optional[str] = None
+    reason: Optional[str] = None
+    send_welcome: bool = True
+
+
+@app.post("/api/admin/prospects/{prospect_id}/onboard")
+def onboard_prospect(
+    prospect_id: str,
+    body: ProspectOnboardRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Track B — commercial conversion: turn an APPROVED prospect into a live tenant.
+    Creates the company, seats the primary HR contact (Supabase invite = the welcome),
+    and links the prospect back to the company it became. Idempotent: a prospect already
+    onboarded returns its existing company rather than creating a second one."""
+    hr_email = (body.hr_email or "").strip().lower()
+    if not hr_email or "@" not in hr_email:
+        raise HTTPException(status_code=400, detail="A valid HR contact email is required")
+    # prospect_candidates is owned by the app/ ORM layer, but this orchestration lives in
+    # the legacy layer alongside create_company/create_profile — read/link it via raw SQL.
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT company_name, status, onboarded_company_id, company_domain "
+                    "FROM prospect_candidates WHERE id = :id"
+                ),
+                {"id": prospect_id},
+            ).mappings().first()
+    except SQLAlchemyError as exc:
+        blob = str(getattr(exc, "orig", exc)).lower()
+        # onboarded_company_id column pending the 20260901000000 migration → degrade to 503
+        # (not 500) so the button fails cleanly until the schema is applied out-of-band.
+        if "onboarded_company_id" in blob or "42703" in blob or "no such column" in blob:
+            raise HTTPException(status_code=503, detail="Onboarding is not available yet (pending a schema migration).")
+        raise
+    if not row:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+    if row["onboarded_company_id"]:
+        return {"ok": True, "already_onboarded": True,
+                "company_id": row["onboarded_company_id"], "company_name": row["company_name"]}
+    if (row["status"] or "").lower() != "approved":
+        raise HTTPException(status_code=400, detail="Only approved prospects can be onboarded")
+
+    company_id = str(uuid.uuid4())
+    db.create_company(
+        company_id=company_id,
+        name=row["company_name"],
+        website=row["company_domain"],
+        hr_contact=hr_email,
+    )
+    # Seat the primary HR contact for the new tenant.
+    person_id = str(uuid.uuid4())
+    full_name = (body.hr_name or "").strip() or hr_email.split("@")[0]
+    try:
+        db.create_profile(person_id=person_id, email=hr_email, full_name=full_name, role="HR", company_id=company_id)
+        db.ensure_hr_user_for_profile(person_id, company_id)
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="An account with that HR email already exists")
+
+    # Welcome: Supabase Auth invite (best-effort, never raises, no-ops when unconfigured).
+    invite_sent = False
+    if body.send_welcome:
+        try:
+            from .app.services.supabase_auth_sync import invite_admin_created_user as _invite
+            _app_url = os.environ.get("APP_URL", "https://relopass.com")
+            invite_sent = bool(
+                _invite(hr_email, full_name=full_name, role="HR", redirect_to=f"{_app_url}/auth?mode=login").sent
+            )
+        except Exception:
+            log.exception("onboard_prospect: welcome invite failed prospect=%s", prospect_id)
+
+    # Link the prospect → the company it became.
+    now = datetime.utcnow().isoformat()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE prospect_candidates SET status = 'onboarded', onboarded_company_id = :cid, "
+                "onboarded_at = :now, reviewed_by = :admin, updated_at = :now WHERE id = :id"
+            ),
+            {"cid": company_id, "now": now, "admin": user["id"], "id": prospect_id},
+        )
+    db.log_audit(user["id"], "UPDATE", "prospect_candidate", prospect_id, body.reason, {
+        "event": "prospect_onboarded", "company_id": company_id, "hr_email": hr_email, "invite_sent": invite_sent,
+    })
+    return {"ok": True, "company_id": company_id, "company_name": row["company_name"],
+            "hr_email": hr_email, "invite_sent": invite_sent}
+
+
 def _retry_on_operational_error(fn, max_attempts: int = 3):
     """
     Call fn() up to max_attempts times, retrying on SQLAlchemy OperationalError
