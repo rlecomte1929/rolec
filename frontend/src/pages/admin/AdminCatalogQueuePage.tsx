@@ -20,6 +20,7 @@ import {
 } from '../../api/adminCatalog';
 import type { DestinationRequest } from '../../api/hrCatalog';
 import { AdminLayout } from './AdminLayout';
+import { DiscoverSection } from './DiscoverSection';
 
 const STATUS_TABS: { value: 'pending' | 'approved' | 'rejected'; label: string }[] = [
   { value: 'pending', label: 'Pending' },
@@ -183,6 +184,9 @@ export const AdminCatalogQueuePage: React.FC = () => {
     >
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
+
+      {/* GAP 5: discover real businesses from a maps provider → vetting queue. */}
+      <DiscoverSection />
 
       {/* CATALOG-1: demand-driven worklist — what employees are asking for that
           the catalog can't cover yet. One click allowlists + scrapes it. */}
