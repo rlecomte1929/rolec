@@ -355,6 +355,12 @@ export const AdminCompanies: React.FC = () => {
         </div>
         {loading && companies.length === 0 ? (
           <div className="py-8 text-center text-[#6b7280]">Loading...</div>
+        ) : companiesQuery.isError ? (
+          <div className="py-12 text-center border border-rose-200 rounded-lg bg-rose-50">
+            <div className="text-sm font-medium text-rose-700">Couldn&apos;t load companies</div>
+            <div className="text-xs mt-1 text-rose-600">The request failed — this is a backend/network error, not an empty list.</div>
+            <Button className="mt-4" variant="secondary" onClick={() => void companiesQuery.refetch()}>Retry</Button>
+          </div>
         ) : companies.length === 0 ? (
           <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
             <div className="text-sm font-medium">No companies found</div>
