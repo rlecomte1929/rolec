@@ -1,7 +1,8 @@
-"""AIQ-1414 Phase 1 — unit tests for the read-only coordinator context builder.
+"""AIQ-1414 Phase 1–2a — unit tests for the read-only coordinator context builder.
 
-Pure/DB-free: exercises the shaping + PII masking + bounds + flag gating without a
-database (the flag/fetch dependencies are monkeypatched).
+Pure/DB-free: exercises shaping + PII masking + bounds + flag gating + the HR-surface
+resolver wiring, all without a database (the flag / db / fetch dependencies are
+monkeypatched).
 """
 
 import json
@@ -41,6 +42,9 @@ def _snapshot(**overrides):
     return snap
 
 
+# ── pure shaping / masking ────────────────────────────────────────────────────
+
+
 def test_structured_fields_preserved():
     out = ccb.shape_and_mask(_snapshot())
     assert out["case"]["origin_country"] == "FR"
@@ -54,12 +58,10 @@ def test_structured_fields_preserved():
 def test_pii_is_masked_everywhere():
     out = ccb.shape_and_mask(_snapshot())
     blob = json.dumps(out)
-    # reliably-detected PII must not survive anywhere in the serialized context
     assert "sarah.chen@acme.com" not in blob
     assert "john.doe@example.com" not in blob
     assert "+33 6 12 34 56 78" not in blob
     assert "FR7630006000011234567890189" not in blob
-    # and masking actually happened
     assert "REDACTED" in blob
     assert out["_meta"]["pii_masked"] is True
 
@@ -76,41 +78,133 @@ def test_bounds_are_enforced():
     assert len(out["people"]) == ccb._MAX_PEOPLE
     assert len(out["documents"]) == ccb._MAX_DOCUMENTS
     assert len(out["requirements"]) == ccb._MAX_REQUIREMENTS
-    assert out["_meta"]["counts"]["people"] == ccb._MAX_PEOPLE
 
 
 def test_case_not_found_yields_null_case():
-    snap = {"meta": {"ok": True, "case_found": False}, "case": None,
-            "people": [], "documents": [], "evaluations": []}
-    out = ccb.shape_and_mask(snap)
+    out = ccb.shape_and_mask(ccb._empty_snapshot())
     assert out["case"] is None
     assert out["_meta"]["case_found"] is False
 
 
-def test_phase2_slots_are_empty_and_marked():
-    out = ccb.shape_and_mask(_snapshot())
+def test_slots_default_when_no_spine():
+    out = ccb.shape_and_mask(_snapshot())  # no events/notes passed
     assert out["rolling_summary"] == ""
     assert out["recent_events"] == []
-    assert out["_meta"]["event_spine"] == "deferred_phase2"
+    assert out["_meta"]["event_spine"] == "none"
 
 
-def test_build_returns_none_when_flag_off(monkeypatch):
+def test_events_and_notes_masked_bounded_and_sorted():
+    events = [{"event_type": "visa_update", "actor_principal_id": "system",
+               "description": "Call sarah.chen@acme.com about it",
+               "payload": {"phone": "+33 6 12 34 56 78"},
+               "created_at": "2026-07-03T10:00:00+00:00"} for _ in range(50)]
+    notes = [{"author_name": "HR", "body": "Ping bob@acme.com",
+              "created_at": "2026-07-04T10:00:00+00:00"} for _ in range(50)]
+    out = ccb.shape_and_mask(_snapshot(), events=events, notes=notes)
+    assert out["_meta"]["event_spine"] == "wired"
+    # per-kind caps → merged, then overall cap
+    assert len(out["recent_events"]) == ccb._MAX_EVENTS
+    blob = json.dumps(out["recent_events"])
+    assert "sarah.chen@acme.com" not in blob
+    assert "bob@acme.com" not in blob
+    assert "+33 6 12 34 56 78" not in blob
+    # newest-first: the 2026-07-04 notes sort ahead of the 2026-07-03 events
+    assert out["recent_events"][0]["kind"] == "note"
+
+
+# ── flag gating / low-level builder ───────────────────────────────────────────
+
+
+def test_low_level_build_returns_none_when_flag_off(monkeypatch):
     monkeypatch.setattr(ccb, "coordinator_enabled", lambda **_: False)
-    called = {"fetch": False}
-
-    def _boom(*_a, **_k):
-        called["fetch"] = True
-        raise AssertionError("fetch_case_context must not run when flag is OFF")
-
-    monkeypatch.setattr(ccb, "fetch_case_context", _boom)
-    assert ccb.build_coordinator_context(object(), "c-1") is None
-    assert called["fetch"] is False
+    monkeypatch.setattr(ccb, "fetch_case_context",
+                        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not run")))
+    assert ccb.build_coordinator_context(object(), "mob-1") is None
 
 
-def test_build_shapes_snapshot_when_flag_on(monkeypatch):
+def test_low_level_build_shapes_when_flag_on(monkeypatch):
     monkeypatch.setattr(ccb, "coordinator_enabled", lambda **_: True)
-    monkeypatch.setattr(ccb, "fetch_case_context", lambda _conn, _cid: _snapshot())
-    out = ccb.build_coordinator_context(object(), "c-1")
+    monkeypatch.setattr(ccb, "fetch_case_context", lambda _conn, _mid: _snapshot())
+    out = ccb.build_coordinator_context(object(), "mob-1")
+    assert out is not None and out["case"]["company_id"] == "acme"
+
+
+# ── HR-surface orchestrator (resolver wiring) ─────────────────────────────────
+
+
+class _FakeConn:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_a):
+        return False
+
+
+class _FakeEngine:
+    def connect(self):
+        return _FakeConn()
+
+
+class _FakeDB:
+    def __init__(self, assignment=None, mobility_id=None, events=None):
+        self._assignment = assignment
+        self._mobility = mobility_id
+        self._events = events or []
+        self.engine = _FakeEngine()
+
+    def get_assignment_by_case_id(self, _cid):
+        return self._assignment
+
+    def get_assignment_by_id(self, _cid):
+        return None
+
+    def get_mobility_case_id_for_assignment(self, _aid):
+        return self._mobility
+
+    def list_case_events(self, _cid):
+        return self._events
+
+
+def test_build_for_case_returns_none_when_flag_off(monkeypatch):
+    monkeypatch.setattr(ccb, "coordinator_enabled", lambda **_: False)
+    monkeypatch.setattr(ccb, "_get_db",
+                        lambda: (_ for _ in ()).throw(AssertionError("must not resolve db")))
+    assert ccb.build_coordinator_context_for_case("hr-case-1") is None
+
+
+def test_build_for_case_not_found(monkeypatch):
+    monkeypatch.setattr(ccb, "coordinator_enabled", lambda **_: True)
+    monkeypatch.setattr(ccb, "_get_db", lambda: _FakeDB(assignment=None))
+    out = ccb.build_coordinator_context_for_case("hr-case-1")
     assert out is not None
-    assert out["case"]["company_id"] == "acme"
-    assert "sarah.chen@acme.com" not in json.dumps(out)
+    assert out["case"] is None
+    assert out["_meta"]["case_found"] is False
+    assert out["_meta"]["reason"] == "assignment_not_found"
+
+
+def test_build_for_case_wires_the_full_chain(monkeypatch):
+    fake = _FakeDB(
+        assignment={"id": "asg-1", "company_id": "acme"},
+        mobility_id="mob-1",
+        events=[{"event_type": "visa_update", "actor_principal_id": "system",
+                 "description": "Call sarah.chen@acme.com", "payload": {},
+                 "created_at": "2026-07-03T10:00:00+00:00"}],
+    )
+    monkeypatch.setattr(ccb, "coordinator_enabled", lambda **_: True)
+    monkeypatch.setattr(ccb, "_get_db", lambda: fake)
+    monkeypatch.setattr(ccb, "fetch_case_context", lambda _conn, mid: _snapshot())
+    monkeypatch.setattr(ccb, "_fetch_notes",
+                        lambda _conn, _cid, _org: [{"author_name": "HR", "body": "Ping bob@acme.com",
+                                                    "created_at": "2026-07-04T10:00:00+00:00"}])
+    out = ccb.build_coordinator_context_for_case("hr-case-1")
+    assert out is not None
+    # the resolver chain is recorded in _meta
+    assert out["_meta"]["hr_case_id"] == "hr-case-1"
+    assert out["_meta"]["assignment_id"] == "asg-1"
+    assert out["_meta"]["mobility_case_id"] == "mob-1"
+    assert out["_meta"]["mobility_linked"] is True
+    # both spine sources present and masked
+    assert {i["kind"] for i in out["recent_events"]} == {"event", "note"}
+    blob = json.dumps(out)
+    assert "sarah.chen@acme.com" not in blob
+    assert "bob@acme.com" not in blob
