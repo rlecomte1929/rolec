@@ -42,3 +42,7 @@ the convergence decision, correcting the stale premises in
   (a real HR-UX change — the "Service providers" list would switch from 8 curated
   demo vendors to the 82 real suppliers, and the redesign vocabulary/wildcard
   corridors need a mapping). That is its own scoped effort pending product input.
+
+## Sourcing new suppliers
+Real-business discovery (providers, cost, and how to enable it selectively at
+near-zero baseline cost) is documented in [supplier-discovery.md](supplier-discovery.md).

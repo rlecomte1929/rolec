@@ -43,9 +43,21 @@ def _provider() -> str:
     return (os.getenv("DISCOVERY_PROVIDER") or "disabled").strip().lower()
 
 
+_DEFAULT_MAX_RESULTS = 10
+
+
+def _max_results() -> int:
+    """Hard per-search result cap (cost guardrail). Env-tunable, low default."""
+    try:
+        n = int(os.getenv("DISCOVERY_MAX_RESULTS", str(_DEFAULT_MAX_RESULTS)))
+    except (TypeError, ValueError):
+        n = _DEFAULT_MAX_RESULTS
+    return max(1, min(n, 60))
+
+
 def provider_status() -> Dict[str, Any]:
-    """Read-only indicator for the admin UI — which provider is active and
-    whether its key is configured. Never returns the key itself."""
+    """Read-only indicator for the admin UI — which provider is active, whether its
+    key is configured, and the per-search result cap. Never returns the key itself."""
     provider = _provider()
     if provider == "google_places":
         configured = bool(os.getenv("GOOGLE_PLACES_API_KEY"))
@@ -54,25 +66,29 @@ def provider_status() -> Dict[str, Any]:
     else:
         provider = "disabled"
         configured = False
-    return {"provider": provider, "configured": configured}
+    return {"provider": provider, "configured": configured, "max_results": _max_results()}
 
 
 def _keyword_for(category: str) -> str:
     return CATEGORY_KEYWORDS.get((category or "").strip().lower(), category or "")
 
 
-def search_businesses(category: str, city: str, country: str) -> List[Dict[str, Any]]:
+def search_businesses(
+    category: str, city: str, country: str, limit: Optional[int] = None
+) -> List[Dict[str, Any]]:
     """Return real businesses matching a ReloPass category in a city, via the
-    configured provider. Returns [] when disabled/unconfigured or on error."""
+    configured provider. Results are capped at min(limit, DISCOVERY_MAX_RESULTS) to
+    bound per-search cost. Returns [] when disabled/unconfigured or on error."""
+    cap = _max_results() if limit is None else max(1, min(limit, _max_results()))
     provider = _provider()
     if provider == "google_places":
-        return _search_google_places(category, city, country)
+        return _search_google_places(category, city, country, cap)
     if provider == "apify":
-        return _search_apify(category, city, country)
+        return _search_apify(category, city, country, cap)
     return []
 
 
-def _search_google_places(category: str, city: str, country: str) -> List[Dict[str, Any]]:
+def _search_google_places(category: str, city: str, country: str, cap: int) -> List[Dict[str, Any]]:
     api_key = os.getenv("GOOGLE_PLACES_API_KEY")
     if not api_key:
         return []
@@ -89,7 +105,7 @@ def _search_google_places(category: str, city: str, country: str) -> List[Dict[s
         log.exception("google_places discovery failed for %s / %s", category, city)
         return []
     out: List[Dict[str, Any]] = []
-    for r in data.get("results", []) or []:
+    for r in (data.get("results", []) or [])[:cap]:
         out.append({
             "name": r.get("name"),
             "website": None,  # Text Search omits website; enrich via Details if needed
@@ -102,7 +118,7 @@ def _search_google_places(category: str, city: str, country: str) -> List[Dict[s
     return out
 
 
-def _search_apify(category: str, city: str, country: str) -> List[Dict[str, Any]]:
+def _search_apify(category: str, city: str, country: str, cap: int) -> List[Dict[str, Any]]:
     token = os.getenv("APIFY_API_TOKEN")
     if not token:
         return []
@@ -112,7 +128,7 @@ def _search_apify(category: str, city: str, country: str) -> List[Dict[str, Any]
         resp = requests.post(
             "https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items",
             params={"token": token},
-            json={"searchStringsArray": [query], "maxCrawledPlacesPerSearch": 20},
+            json={"searchStringsArray": [query], "maxCrawledPlacesPerSearch": cap},
             timeout=120,
         )
         items = resp.json() or []
@@ -120,7 +136,7 @@ def _search_apify(category: str, city: str, country: str) -> List[Dict[str, Any]
         log.exception("apify discovery failed for %s / %s", category, city)
         return []
     out: List[Dict[str, Any]] = []
-    for r in items if isinstance(items, list) else []:
+    for r in (items[:cap] if isinstance(items, list) else []):
         out.append({
             "name": r.get("title") or r.get("name"),
             "website": r.get("website"),

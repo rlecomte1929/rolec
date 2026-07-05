@@ -125,6 +125,9 @@ export const getAdminNotificationCounts = (): Promise<AdminNotificationCounts> =
 export interface DiscoveryStatus {
   provider: string;
   configured: boolean;
+  max_results: number;
+  daily_remaining: number;
+  daily_limit: number;
 }
 
 export interface DiscoveryResult {
@@ -145,7 +148,7 @@ export const discoverSuppliers = (
   category: string,
   city: string,
   country: string
-): Promise<{ results: DiscoveryResult[]; total: number; provider: string }> =>
+): Promise<{ results: DiscoveryResult[]; total: number; provider: string; daily_remaining: number }> =>
   apiPost('/api/admin/catalog/discover', { category, city, country });
 
 export const importDiscovered = (payload: {
