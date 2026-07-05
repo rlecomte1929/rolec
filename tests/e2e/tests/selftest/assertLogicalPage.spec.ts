@@ -3,11 +3,12 @@ import { assertLogicalPage } from '../_helpers';
 
 /**
  * Harness contract test for assertLogicalPage's B10 (permanent-spinner) check.
- * No network — uses page.setContent — so it's deterministic. Locks the cold-start
- * tolerance fix: a spinner that CLEARS within the window must NOT be flagged B10,
- * while one that NEVER clears MUST be. Guards against either regression (the old
- * single-5s recheck false-flagged slow cold-start loads; over-loosening would hide
- * a genuinely stuck page).
+ * No network — uses page.setContent + an injected `probeHealthy`/`spinnerClearMs` — so
+ * it's deterministic. Locks two fixes: (a) the cold-start tolerance — a spinner that
+ * CLEARS within the window must NOT be flagged B10, while one that NEVER clears MUST be;
+ * and (b) the deploy-window tolerance (symmetric with B13) — a never-clearing spinner
+ * while the backend is DOWN is environmental (not a bug), but the SAME spinner while the
+ * backend is HEALTHY is still a genuine B10.
  */
 test.describe('assertLogicalPage — B10 cold-start tolerance', () => {
   test('a spinner that clears within the window is NOT flagged B10 (slow ≠ stuck)', async ({ page }, info) => {
@@ -21,9 +22,26 @@ test.describe('assertLogicalPage — B10 cold-start tolerance', () => {
     expect(v.heading).toBe('Services');
   });
 
-  test('a spinner that never clears IS flagged B10 (genuinely stuck)', async ({ page }, info) => {
+  test('a spinner that never clears + backend HEALTHY IS flagged B10 (genuinely stuck)', async ({ page }, info) => {
     await page.setContent('<h1>Services</h1><div class="animate-spin" id="sp">Loading…</div>');
-    const v = await assertLogicalPage(page, info, 'selftest-stuck');
+    const v = await assertLogicalPage(page, info, 'selftest-stuck', {
+      probeHealthy: async () => true,
+      spinnerClearMs: 300,
+    });
     expect(v.signals, `signals: ${v.signals}`).toContain('permanent-spinner(B10)');
+    expect(v.signals, `signals: ${v.signals}`).not.toContain('backend-unavailable(env)');
+    expect(info.annotations.some((a) => a.type === 'environmental')).toBe(false);
+  });
+
+  test('a spinner that never clears + backend DOWN → environmental, NOT B10 (deploy window)', async ({ page }, info) => {
+    await page.setContent('<h1>Services</h1><div class="animate-spin" id="sp">Loading…</div>');
+    const v = await assertLogicalPage(page, info, 'selftest-stuck-down', {
+      probeHealthy: async () => false,
+      spinnerClearMs: 300,
+    });
+    expect(v.signals, `signals: ${v.signals}`).toContain('backend-unavailable(env)');
+    expect(v.signals, `signals: ${v.signals}`).not.toContain('permanent-spinner(B10)');
+    // the environmental annotation must be recorded so the ingest can reclassify FAIL→ENV
+    expect(info.annotations.some((a) => a.type === 'environmental')).toBe(true);
   });
 });
