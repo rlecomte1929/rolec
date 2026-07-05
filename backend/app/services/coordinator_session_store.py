@@ -68,6 +68,30 @@ def _row_to_dict(row: Any) -> Optional[Dict[str, Any]]:
 # ── DB I/O ────────────────────────────────────────────────────────────────────
 
 
+# ── dialect tolerance (Postgres in prod; SQLite for local dev + tests) ─────────
+# The migration is Postgres, but the store must also run on SQLite (dev + the
+# key-free E2E test). Detect from the connection's dialect and branch the three
+# PG-isms: NOW(), FOR UPDATE, and the jsonb cast. A fake conn (unit tests) has no
+# .dialect → treated as Postgres, so those tests keep asserting the PG SQL.
+
+
+def _is_sqlite(conn: Any) -> bool:
+    return getattr(getattr(conn, "dialect", None), "name", "") == "sqlite"
+
+
+def _now(conn: Any) -> str:
+    return "CURRENT_TIMESTAMP" if _is_sqlite(conn) else "NOW()"
+
+
+def _for_update(conn: Any) -> str:
+    return "" if _is_sqlite(conn) else " FOR UPDATE"
+
+
+def _jbind(conn: Any, name: str) -> str:
+    # Postgres needs CAST(:p AS jsonb); SQLite's recent_turns is a TEXT column → bare bind.
+    return f":{name}" if _is_sqlite(conn) else f"CAST(:{name} AS jsonb)"
+
+
 def _select(conn: Any, case_id: str) -> Any:
     return (
         conn.execute(
@@ -106,7 +130,10 @@ def load_for_update(conn: Any, case_id: str) -> Optional[Dict[str, Any]]:
     """Row-locked load for a read-modify-write cycle (``SELECT … FOR UPDATE``)."""
     row = (
         conn.execute(
-            text(f"SELECT {_COLUMNS} FROM ai_coordinator_sessions WHERE case_id = :c FOR UPDATE"),
+            text(
+                f"SELECT {_COLUMNS} FROM ai_coordinator_sessions "
+                f"WHERE case_id = :c{_for_update(conn)}"
+            ),
             {"c": str(case_id)},
         )
         .mappings()
@@ -119,12 +146,13 @@ def save(conn: Any, session: Dict[str, Any]) -> None:
     """Persist the mutable session fields. ``recent_turns`` is bound as a JSON string and
     cast with ``CAST(:rt AS jsonb)`` — never ``:rt::jsonb`` (an unbound ``::jsonb`` cast is
     a Postgres-only 500 that SQLite silently masks)."""
+    now = _now(conn)
     conn.execute(
         text(
             "UPDATE ai_coordinator_sessions SET "
-            "rolling_summary = :rs, recent_turns = CAST(:rt AS jsonb), "
+            f"rolling_summary = :rs, recent_turns = {_jbind(conn, 'rt')}, "
             "last_event_cursor = :lec, model = :m, status = :st, "
-            "last_active_at = NOW(), updated_at = NOW() "
+            f"last_active_at = {now}, updated_at = {now} "
             "WHERE id = :id"
         ),
         {
@@ -142,8 +170,8 @@ def close_session(conn: Any, case_id: str) -> None:
     """Freeze the session (terminal relocation / archived) — stops future folds."""
     conn.execute(
         text(
-            "UPDATE ai_coordinator_sessions SET status = 'closed', updated_at = NOW() "
-            "WHERE case_id = :c"
+            "UPDATE ai_coordinator_sessions SET status = 'closed', "
+            f"updated_at = {_now(conn)} WHERE case_id = :c"
         ),
         {"c": str(case_id)},
     )

@@ -322,3 +322,30 @@ CLAUDE.md hard migration gates (ENABLE RLS + policy + REVOKE anon) and migration
 - `backend/app/services/roadmap_generator.py` — precedent: LLM reads state, persists structured rows
 - Event spine: `case_events` (`20260321000000_case_events_phase1.sql`), `case_notes`
   (`20260701000000_case_notes.sql`), `rce.roadmap_audit_log`
+
+---
+
+## 15. Testing & measurement (built) + Phase-5 pilot runbook
+
+**Local verification (built, key-free, CI-safe):**
+- `backend/tests/test_coordinator_e2e.py` — real `respond` → `coordinator_session_store` round-trip on
+  in-memory SQLite (validates the store's SQLite tolerance + persistence + summary fold + PII masking
+  end-to-end; context/LLM/tracer stubbed).
+- `backend/tests/test_coordinator_cost_pipeline.py` — a coordinator `TraceSession` prices BOTH the
+  reasoning (sonnet-4-6) and the fold (haiku-4-5) calls, and `compute_unit_economics_rollup` aggregates
+  `feature_key='ai_coordinator'` cost.
+- `scripts/measure_coordinator_cost.py` — assembles the real prompt over growing contexts and asserts
+  **boundedness** (a 500-event relocation stays ~capped vs 30 events) + per-relocation cost in range.
+  ESTIMATE mode (char/4) keyless; **REAL mode** (live tokens) when `ANTHROPIC_API_KEY` is set. Estimate
+  baseline: per-turn input ~1.8k–2.4k tok bounded; **≈ $0.5/relocation** (under the $1.20 model).
+
+**Phase-5 production pilot (operator-run, gate #2):**
+1. In a deployed env: apply the migration (`20260829000000_ai_coordinator_sessions.sql`), confirm a live
+   ANTHROPIC key, set `RELOPASS_AI_COORDINATOR_ENABLED=1`.
+2. Run `scripts/verify_coordinator_pilot.py` with `RELOPASS_API_BASE`, `RELOPASS_COORDINATOR_CASE_ID`,
+   `RELOPASS_COORDINATOR_TOKEN` (HR-of-company or the assigned employee), optional `RELOPASS_ADMIN_TOKEN`.
+   It drives N real turns via `POST /api/cases/{id}/coordinator/respond`.
+3. Read the **real** per-relocation cost from the `ai_unit_economics` rollup filtered to
+   `feature_key='ai_coordinator'`; compare to the ~$1.20 model.
+4. If cost + answers look right → **human gate #2** → leave the flag ON for the pilot cohort (or roll out).
+   Rollback is always the flag OFF (table stays inert).

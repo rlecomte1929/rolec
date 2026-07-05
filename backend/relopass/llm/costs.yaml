@@ -26,6 +26,12 @@ claude-fable-5:
   in_per_million: 10.00
   out_per_million: 50.00
 
+# Claude Haiku 4.5 — cheap tier used by the AIQ-1414 coordinator's rolling-summary
+# folds. $1/$5. (Alias, not date-suffixed, so router.usd_cost resolves it.)
+claude-haiku-4-5:
+  in_per_million: 1.00
+  out_per_million: 5.00
+
 gpt-4o:
   in_per_million: 2.50
   out_per_million: 10.00
