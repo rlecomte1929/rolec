@@ -129,6 +129,11 @@ backend/app/routers/test_drive.py:provision
 # identities. Defense in depth: campaign gate (404 unless RELOPASS_TEST_DRIVE_ENABLED,
 # dark by default) + invite-token gate (constant-time vs RELOPASS_TEST_DRIVE_INVITE_TOKEN,
 # 403 incl. when unset — never fails open) + slowapi rate-limit + is_test stamping.
+backend/app/routers/test_drive.py:survey
+# PUBLIC (AIQ-1423 / TD-5): completion-survey submission. Intentionally unauthenticated
+# (post-test feedback from the same public flow). Campaign gate (404 unless
+# RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit; write-only INSERT into the
+# admin-read RLS table survey_responses; returns only {ok, response_id}.
 
 # ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
 # The signature check runs in the handler body, so the AST scanner cannot see it.

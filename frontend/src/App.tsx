@@ -19,6 +19,7 @@ import { PlatformPage } from './pages/public/PlatformPage';
 import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { GetStartedPage } from './pages/public/GetStartedPage';
 import { TestDrivePage } from './pages/public/TestDrivePage';
+import { TestDriveSurveyPage } from './pages/public/TestDriveSurveyPage';
 import { CompliancePage } from './pages/public/CompliancePage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
@@ -270,6 +271,7 @@ function App() {
         <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
         <Route path={ROUTE_DEFS.getStarted.path} element={<GetStartedPage />} />
         <Route path={ROUTE_DEFS.testDrive.path} element={<TestDrivePage />} />
+        <Route path={ROUTE_DEFS.testDriveSurvey.path} element={<TestDriveSurveyPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />
         <Route path={ROUTE_DEFS.privacy.path} element={<PrivacyPage />} />
         <Route path={ROUTE_DEFS.compliance.path} element={<CompliancePage />} />

@@ -9,6 +9,7 @@ export const ROUTE_DEFS = {
   howItWorks: { path: '/how-it-works', roles: ['PUBLIC'] as RouteRole[] },
   getStarted: { path: '/get-started', roles: ['PUBLIC'] as RouteRole[] },
   testDrive: { path: '/test-drive', roles: ['PUBLIC'] as RouteRole[] },
+  testDriveSurvey: { path: '/test-drive/survey', roles: ['PUBLIC'] as RouteRole[] },
   security: { path: '/security', roles: ['PUBLIC'] as RouteRole[] },
   privacy: { path: '/privacy', roles: ['PUBLIC'] as RouteRole[] },
   compliance: { path: '/compliance', roles: ['PUBLIC'] as RouteRole[] },

@@ -72,3 +72,54 @@ export async function provisionTestDrive(input: ProvisionInput): Promise<Provisi
     return { ok: false, error };
   }
 }
+
+// ── TD-5 (AIQ-1423): completion survey ────────────────────────────────────────
+
+export interface SurveyInput {
+  session_id?: string;
+  campaign?: string;
+  corridor_id?: string;
+  tester_segment?: 'internal' | 'prospect';
+  tester_name?: string;
+  tester_email?: string;
+  tester_company_role?: string;
+  tester_sector?: string;
+  q1_overall?: number;
+  q2_friction?: string;
+  q3_problem_fit?: 'yes' | 'somewhat' | 'no';
+  q3_why?: string;
+  q4_change?: string;
+  testimonial?: string;
+  testimonial_consent?: boolean;
+  pilot_interest?: 'yes' | 'maybe' | 'no';
+  pilot_note?: string;
+  referral_name?: string;
+  referral_company_role?: string;
+  referral_contact?: string;
+  referral_consent?: boolean;
+}
+
+export interface SurveySuccess {
+  ok: true;
+  responseId: string;
+}
+
+export type SurveyResult = SurveySuccess | ProvisionFailure;
+
+export async function submitSurvey(input: SurveyInput): Promise<SurveyResult> {
+  try {
+    const data = await apiPost<{ ok: boolean; response_id: string }>(
+      '/api/test-drive/survey',
+      input,
+    );
+    return { ok: true, responseId: data.response_id };
+  } catch (err) {
+    const status = (err as { status?: number })?.status;
+    let error =
+      err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+    if (status === 404) {
+      error = 'This survey isn’t open right now.';
+    }
+    return { ok: false, error };
+  }
+}
