@@ -27,6 +27,9 @@ export const AdminResources: React.FC = () => {
   const view = searchParams.get('view') || 'overview';
   const role = getAuthItem('relopass_role');
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // Distinguish "counts fetch failed" from "genuinely zero" so we don't render
+  // fabricated-looking 0/0/0/0 stat cards when the backend is actually down.
+  const [countsError, setCountsError] = useState(false);
   const [stagingCounts, setStagingCounts] = useState<{ resource_candidates_new?: number; event_candidates_new?: number } | null>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [categories, setCategories] = useState<{ id: string; key: string; label: string }[]>([]);
@@ -43,7 +46,9 @@ export const AdminResources: React.FC = () => {
     if (role !== 'ADMIN') return;
     try {
       const [c, s, cat] = await Promise.all([
-        adminResourcesAPI.getCounts(),
+        adminResourcesAPI.getCounts()
+          .then((r) => { setCountsError(false); return r; })
+          .catch(() => { setCountsError(true); return null; }),
         adminStagingAPI.getDashboard().catch(() => null),
         adminResourcesAPI.listCategories().catch(() => ({ categories: [] })),
       ]);
@@ -205,6 +210,12 @@ export const AdminResources: React.FC = () => {
   return (
     <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
       <div className="space-y-6">
+        {countsError && (
+          <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <span>Couldn&apos;t load resource counts — the figures below may be stale or unavailable.</span>
+            <button type="button" onClick={() => void load()} className="ml-3 shrink-0 rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium hover:bg-rose-100">Retry</button>
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card padding="md" className="bg-green-50">
             <div className="text-xs text-green-700">Resources – Published</div>

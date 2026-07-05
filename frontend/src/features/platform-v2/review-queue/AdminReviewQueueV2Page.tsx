@@ -138,7 +138,7 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
 interface KpiProps {
   label: string;
   value: string | number;
-  sub: string;
+  sub?: string;
   tone?: 'default' | 'success' | 'warning' | 'accent' | 'danger';
 }
 
@@ -164,7 +164,7 @@ function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
       <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${valueColor[tone]}`}>
         {value}
       </div>
-      <div className="mt-1.5 truncate text-[11px] text-slate-500">{sub}</div>
+      {sub && <div className="mt-1.5 truncate text-[11px] text-slate-500">{sub}</div>}
     </div>
   );
 }
@@ -349,30 +349,8 @@ export function AdminReviewQueueV2Page() {
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Review queue</h1>
-            <div className="ml-auto flex items-center gap-2">
-              {/* Stubs — wire to real handlers in a follow-up commit. */}
-              <Button unstyled
-                type="button"
-                onClick={() => alert('Filters drawer — not yet wired')}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                ⏷ Filters
-              </Button>
-              <Button unstyled
-                type="button"
-                onClick={() => alert('Assign batch — not yet wired')}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                ⊕ Assign batch
-              </Button>
-              <Button unstyled
-                type="button"
-                onClick={() => alert('New review item — not yet wired')}
-                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-              >
-                + New review item
-              </Button>
-            </div>
+            {/* Filters / Assign-batch / New-item controls were unwired stubs (alert-only);
+                removed until the handlers exist rather than ship dead buttons. */}
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
             Vendor approvals, policy exceptions, source refreshes, and tenant onboarding all funnel here.
@@ -384,8 +362,8 @@ export function AdminReviewQueueV2Page() {
         <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Kpi label="Open" value={kpis.open} sub={`across ${kpis.categoryCount || 0} categories`} />
           <Kpi label="High priority" value={kpis.highPriority} sub="SLA breach risk" tone="warning" />
-          <Kpi label="Unassigned" value={kpis.unassigned} sub="auto-route after 30m" tone="accent" />
-          <Kpi label="Closed today" value={kpis.closedToday} sub="median 47m" tone="default" />
+          <Kpi label="Unassigned" value={kpis.unassigned} sub="awaiting an owner" tone="accent" />
+          <Kpi label="Closed today" value={kpis.closedToday} tone="default" />
         </div>
 
         {/* Soft banner instead of red error when backend isn't available */}
