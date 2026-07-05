@@ -177,6 +177,7 @@ const SECTIONS: NavSection[] = [
       // (reachable via the Ops page tab strip), removed to end the false split.
       { id: 'ops-analytics', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
       { id: 'resources-cms', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
+      { id: 'auth-page-design', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
       { id: 'form-templates', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'prospects', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
       {

@@ -8,75 +8,8 @@ import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import { supabase } from '../api/supabase';
 import { swallow } from '../lib/errorTracking';
-
-// ── Globe SVG ─────────────────────────────────────────────────────────────────
-
-const GlobeViz: React.FC = () => (
-  <svg viewBox="0 0 940 760" className="w-full h-full" aria-hidden="true">
-    <defs>
-      <style>{`
-        @keyframes drawArc {
-          from { stroke-dashoffset: 1200; opacity: 0.2; }
-          to   { stroke-dashoffset: 0;    opacity: 1; }
-        }
-        @keyframes cityPulse {
-          0%, 100% { r: 3; opacity: 0.9; }
-          50%       { r: 5; opacity: 1; }
-        }
-        .rp-arc {
-          stroke-dasharray: 1200;
-          stroke-dashoffset: 1200;
-          animation: drawArc 2.4s cubic-bezier(0.4,0,0.2,1) forwards;
-          fill: none;
-          stroke-linecap: round;
-        }
-        .rp-arc-gold  { stroke: #e6a817; stroke-width: 2;   animation-delay: 0.2s; }
-        .rp-arc-teal  { stroke: #38bdf8; stroke-width: 1.5; animation-delay: 0.7s; }
-        .rp-arc-blue  { stroke: #60a5fa; stroke-width: 1.5; animation-delay: 1.1s; }
-        .rp-arc-faint { stroke: #93c5fd; stroke-width: 1;   animation-delay: 1.4s; opacity: 0.45; }
-        .rp-city { animation: cityPulse 2.8s ease-in-out infinite; fill: #ffffff; }
-        .rp-lbl  { fill: #cbd5e1; font-size: 11px; font-family: ui-sans-serif,system-ui,sans-serif; }
-        .rp-rlbl { fill: #64748b;  font-size:  9px; font-family: ui-sans-serif,system-ui,sans-serif; }
-      `}</style>
-    </defs>
-
-    {/* Globe circle + halo */}
-    <circle cx="490" cy="420" r="290" fill="none" stroke="rgba(148,163,184,0.10)" strokeWidth="1" />
-    <circle cx="490" cy="420" r="290" fill="none" stroke="rgba(148,163,184,0.04)" strokeWidth="42" />
-    <ellipse cx="490" cy="420" rx="290" ry="80" fill="none" stroke="rgba(148,163,184,0.05)" strokeWidth="1" />
-
-    {/* Arcs */}
-    <path className="rp-arc rp-arc-gold"  d="M 205,278 Q 350,58  502,238" />
-    <path className="rp-arc rp-arc-faint" d="M 185,258 Q 360,46  548,220" />
-    <path className="rp-arc rp-arc-teal"  d="M 502,238 Q 622,292 704,365" />
-    <path className="rp-arc rp-arc-blue"  d="M 704,365 Q 802,420 892,478" />
-    <path className="rp-arc rp-arc-faint" d="M 490,242 Q 510,208 532,197" />
-
-    {/* Route labels */}
-    <text className="rp-rlbl" x="296" y="122">CA → DE</text>
-    <text className="rp-rlbl" x="308" y="142">US → GB</text>
-    <text className="rp-rlbl" x="586" y="250">DE → AE</text>
-    <text className="rp-rlbl" x="792" y="382">AE → SG</text>
-
-    {/* City dots + labels */}
-    <circle className="rp-city" cx="185" cy="262" r="3" style={{ animationDelay: '0.1s' }} />
-    <text className="rp-lbl" x="168" y="254">CA</text>
-    <circle className="rp-city" cx="205" cy="282" r="3" style={{ animationDelay: '0.4s' }} />
-    <text className="rp-lbl" x="190" y="274">US</text>
-    <circle className="rp-city" cx="532" cy="200" r="3" style={{ animationDelay: '0.6s' }} />
-    <text className="rp-lbl" x="536" y="196">NO</text>
-    <circle className="rp-city" cx="548" cy="222" r="3" style={{ animationDelay: '0.8s' }} />
-    <text className="rp-lbl" x="552" y="218">DE</text>
-    <circle className="rp-city" cx="502" cy="240" r="3" style={{ animationDelay: '1.0s' }} />
-    <text className="rp-lbl" x="488" y="232">GB</text>
-    <circle className="rp-city" cx="704" cy="368" r="3" style={{ animationDelay: '1.2s' }} />
-    <text className="rp-lbl" x="710" y="364">AE</text>
-    <circle className="rp-city" cx="892" cy="480" r="3" style={{ animationDelay: '1.6s' }} />
-    <text className="rp-lbl" x="877" y="474">SG</text>
-    <circle className="rp-city" cx="312" cy="602" r="3" style={{ animationDelay: '1.9s' }} />
-    <text className="rp-lbl" x="300" y="594">BR</text>
-  </svg>
-);
+import { GlobeNetwork } from '../components/auth/GlobeNetwork';
+import { useAuthPageConfig } from '../hooks/useAuthPageConfig';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -133,6 +66,7 @@ export const Auth: React.FC = () => {
   const navigate = useNavigate();
   const { login, register } = useAuth();
   const authInFlight = useRef(false);
+  const { config: authPageConfig } = useAuthPageConfig();
 
   // Invite flow
   const [inviteMode, setInviteMode] = useState(false);
@@ -433,7 +367,7 @@ export const Auth: React.FC = () => {
         {/* Globe */}
         <div className="flex-1 relative">
           <div className="absolute inset-0">
-            <GlobeViz />
+            <GlobeNetwork config={authPageConfig} />
           </div>
         </div>
 
