@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API = import.meta.env.VITE_API_URL ?? '';
+import { apiGet, apiPost, apiPatch } from './client';
 
 export type FeedbackStream =
   | 'product'
@@ -43,10 +41,13 @@ export async function listFeedback(params?: {
   /** D1: when true, sends ?dispatched=true — returns only dispatched tickets */
   dispatched?: boolean;
 }): Promise<UnifiedFeedbackItem[]> {
-  const { data } = await axios.get<{ items: UnifiedFeedbackItem[] }>(
-    `${API}/api/admin/feedback`,
-    { params }
-  );
+  const qs = new URLSearchParams();
+  if (params?.stream) qs.set('stream', params.stream);
+  if (params?.status) qs.set('status', params.status);
+  if (params?.since) qs.set('since', params.since);
+  if (params?.dispatched !== undefined) qs.set('dispatched', String(params.dispatched));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const data = await apiGet<{ items: UnifiedFeedbackItem[] }>(`/api/admin/feedback${suffix}`);
   return data.items ?? [];
 }
 
@@ -55,7 +56,7 @@ export async function triageFeedback(
   id: string,
   update: { status: TriageStatus; owner?: string; resolution?: string }
 ): Promise<void> {
-  await axios.patch(`${API}/api/admin/feedback/${stream}/${id}`, update);
+  await apiPatch<unknown>(`/api/admin/feedback/${stream}/${id}`, update);
 }
 
 /**
@@ -72,9 +73,5 @@ export async function dispatchTicket(
   const body: Record<string, unknown> = {};
   if (confirm !== undefined) body.confirm = confirm;
   if (note !== undefined) body.note = note;
-  const { data } = await axios.post<DispatchResult>(
-    `${API}/api/admin/feedback/${stream}/${itemId}/dispatch`,
-    body,
-  );
-  return data;
+  return apiPost<DispatchResult>(`/api/admin/feedback/${stream}/${itemId}/dispatch`, body);
 }
