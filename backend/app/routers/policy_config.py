@@ -285,6 +285,42 @@ def hr_post_policy_config_publish(
         )
 
 
+@hr_policy_config_router.post("/policy-config/generate")
+def hr_post_policy_config_generate(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    AIQ-1415 — Natural-Language Policy Builder. Turn a free-text policy description into a
+    CANDIDATE config-matrix payload (all 31 canonical benefits, covered per the description),
+    for the HR user to preview and explicitly approve. This endpoint is READ-ONLY — it never
+    writes; saving happens via the existing PUT /policy-config/draft after approval.
+
+    Body: { text: str }. Gated behind the per-account `nl_policy_builder` feature flag.
+    Returns: { categories, warnings, generated, covered_count }.
+    """
+    from ..services.feature_flags import is_flag_enabled_for
+    from ..services.nl_policy_builder import generate_policy_config_from_text
+
+    cid = _policy_matrix_company_hr(user, companyId)
+    if not is_flag_enabled_for(cid, "nl_policy_builder"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "feature_disabled",
+                "message": "The natural-language policy builder isn't enabled for your account yet.",
+            },
+        )
+    text = str(body.get("text") or "")
+    if not text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "validation_error", "message": "text is required"},
+        )
+    return generate_policy_config_from_text(text)
+
+
 @hr_policy_config_router.get("/policy-config/templates")
 def hr_get_policy_config_templates(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
