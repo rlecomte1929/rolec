@@ -116,6 +116,44 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Deploy-window hard-gate. The pre-run readiness gate (steps.gate) can't see a Render
+      # rolling-restart that begins DURING the run — that's how a mid-deploy failure (e.g.
+      # [AT1] admin login) gets scored + filed as a false P0 (AIQ-1418 / -1375 / -1386 / -1394 /
+      # -1395). Re-check here and OR the signals; any hit marks the whole run INCONCLUSIVE so the
+      # scorer files nothing. Safe: a real bug re-fails on the next warm run (health 200, no infra
+      # signature → not degraded) and files then — nothing is permanently suppressed.
+      - name: Post-run deploy-window gate
+        id: healthgate
+        env:
+          READINESS_DEGRADED: ${{ steps.gate.outputs.degraded }}
+        run: |
+          reason=""
+          # (a) pre-run readiness already flagged cold data paths
+          if [ "$READINESS_DEGRADED" = "true" ]; then reason="cold-data-paths (readiness)"; fi
+          # (b) post-run /health re-probe — catches a deploy still rolling at test end
+          if [ -z "$reason" ]; then
+            for i in 1 2 3 4 5; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" "$E2E_API_URL/health" || true)
+              echo "post-run /health probe $i → $code"
+              if [ "$code" != "200" ]; then reason="post-run /health=$code"; break; fi
+              sleep 4
+            done
+          fi
+          # (c) retroactive — the API runner recorded a FAILED test with a gateway (502/503/504)
+          #     or network (status 0) response, i.e. the run raced a deploy even if /health has
+          #     since recovered. 4xx / plain 500 are NOT treated as infra (could be real bugs).
+          if [ -z "$reason" ]; then
+            hit=$(python3 scripts/detect_deploy_window.py test_results.json || true)
+            if [ -n "$hit" ]; then reason="infra-signature ($hit)"; fi
+          fi
+          if [ -n "$reason" ]; then
+            echo "::notice::deploy-window detected — run is INCONCLUSIVE, scorer files nothing ($reason)"
+            echo "degraded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend healthy throughout — real failures will file normally"
+            echo "degraded=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Ingest + score
         id: score
         continue-on-error: true   # Phase 1: known-open bugs (RFQ 500 etc.) keep it RED; don't fail the job yet
@@ -123,7 +161,7 @@ jobs:
           python3 scripts/ingest_playwright_results.py \
             --pw "tests/e2e/test-artifacts/${RUNID}/_results.json" \
             ${{ env.RELOPASS_E2E_PASSWORD != '' && '--api test_results.json' || '' }}
-          python3 scripts/campaign_scorer.py --no-prev ${{ steps.gate.outputs.degraded == 'true' && '--degraded' || '' }} | tee /tmp/score.txt
+          python3 scripts/campaign_scorer.py --no-prev ${{ steps.healthgate.outputs.degraded == 'true' && '--degraded' || '' }} | tee /tmp/score.txt
 
       - name: Summary
         if: always()
