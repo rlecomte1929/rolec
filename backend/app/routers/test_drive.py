@@ -189,3 +189,82 @@ def provision(body: ProvisionRequest, request: Request):
         "hr": {"username": hr_username, "email": hr_email, "password": hr_password, "role": "HR"},
         "employee": {"username": emp_username, "email": emp_email, "password": emp_password, "role": "EMPLOYEE"},
     }
+
+
+# ── TD-5 (AIQ-1423): completion survey ────────────────────────────────────────
+# One wide survey_responses row per submission (table + RLS from TD-1). Public and
+# campaign-gated like /provision, but no invite token (it's a post-test submission).
+# tester_name/email + testimonial/referral are the only real PII captured — each
+# carries its own consent flag and is stored only in the admin-read RLS table (never
+# sent to an LLM, so no masking needed). Nothing here is logged.
+_SURVEY_COLUMNS = (
+    "session_id campaign corridor_id tester_segment tester_name tester_email "
+    "tester_company_role tester_sector q1_overall q2_friction q3_problem_fit q3_why "
+    "q4_change testimonial testimonial_consent pilot_interest pilot_note referral_name "
+    "referral_company_role referral_contact referral_consent"
+).split()
+
+
+class SurveyRequest(BaseModel):
+    session_id: Optional[str] = Field(None, max_length=64)
+    campaign: Optional[str] = Field(None, max_length=64)
+    corridor_id: Optional[str] = Field(None, max_length=64)
+    tester_segment: Optional[str] = Field(None, pattern="^(internal|prospect)$")
+    # Lead-in identity (the only real PII; consent-gated below for reuse).
+    tester_name: Optional[str] = Field(None, max_length=200)
+    tester_email: Optional[str] = Field(None, max_length=200)
+    tester_company_role: Optional[str] = Field(None, max_length=200)
+    tester_sector: Optional[str] = Field(None, max_length=200)
+    # Q1–Q4
+    q1_overall: Optional[int] = Field(None, ge=1, le=5)
+    q2_friction: Optional[str] = None
+    q3_problem_fit: Optional[str] = Field(None, pattern="^(yes|somewhat|no)$")
+    q3_why: Optional[str] = None
+    q4_change: Optional[str] = None
+    # Q5 testimonial (+ quote consent), Q6 pilot interest, Q7 referral (+ consent)
+    testimonial: Optional[str] = None
+    testimonial_consent: bool = False
+    pilot_interest: Optional[str] = Field(None, pattern="^(yes|maybe|no)$")
+    pilot_note: Optional[str] = None
+    referral_name: Optional[str] = Field(None, max_length=200)
+    referral_company_role: Optional[str] = Field(None, max_length=200)
+    referral_contact: Optional[str] = Field(None, max_length=300)
+    referral_consent: bool = False
+
+
+@router.post("/survey")
+@limiter.limit(_RATE_LIMIT)
+def survey(body: SurveyRequest, request: Request):
+    """Persist one completion-survey submission into survey_responses.
+
+    404 when the campaign is off. Returns {ok, response_id}. All fields optional
+    (only three questions ask for typing, all optional).
+    """
+    if not _test_drive_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    campaign = (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+    response_id = str(uuid.uuid4())
+    id_expr = ":id" if _IS_SQLITE else "CAST(:id AS uuid)"
+    session_expr = ":session_id" if _IS_SQLITE else "CAST(:session_id AS uuid)"
+
+    params = {c: getattr(body, c) for c in _SURVEY_COLUMNS}
+    params["id"] = response_id
+    params["campaign"] = campaign
+    params["session_id"] = (body.session_id or "").strip() or None
+
+    col_sql = ", ".join(["id", "session_id"] + [c for c in _SURVEY_COLUMNS if c != "session_id"])
+    val_sql = ", ".join(
+        [id_expr, session_expr] + [f":{c}" for c in _SURVEY_COLUMNS if c != "session_id"]
+    )
+    with db.engine.begin() as conn:
+        conn.execute(text(f"INSERT INTO survey_responses ({col_sql}) VALUES ({val_sql})"), params)
+
+    # TODO [TD-6]: on-submit fan-out — notify Romain (email/Slack) of a new submission.
+    # TODO [TD-7]: pipeline — Q7 → prospect_candidates (referred_by = tester),
+    #              Q6 yes/maybe → warm pilot lead, Q5 + consent → quotable testimonial.
+    logger.info(
+        "test_drive_survey response=%s session=%s campaign=%s pilot=%s",
+        response_id, params["session_id"], campaign, body.pilot_interest,
+    )
+    return {"ok": True, "response_id": response_id}

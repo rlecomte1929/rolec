@@ -38,6 +38,9 @@ import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { PerfPanel } from './components/PerfPanel';
 import { FeatureFlagProvider } from './lib/feature-flags.tsx';
 
+// TD-3/TD-5: lazy-loaded so the public test-drive pages don't bloat the main entry chunk (bundle-size budget).
+const TestDrivePage = lazy(() => import('./pages/public/TestDrivePage').then((module) => ({ default: module.TestDrivePage })));
+const TestDriveSurveyPage = lazy(() => import('./pages/public/TestDriveSurveyPage').then((module) => ({ default: module.TestDriveSurveyPage })));
 const Journey = lazy(() => import('./pages/Journey').then((module) => ({ default: module.Journey })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const EmployeeJourney = lazy(() => import('./pages/EmployeeJourney').then((module) => ({ default: module.EmployeeJourney })));
@@ -268,6 +271,8 @@ function App() {
         <Route path="/why-relopass" element={<WhyReloPassPage />} />
         <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
         <Route path={ROUTE_DEFS.getStarted.path} element={<GetStartedPage />} />
+        <Route path={ROUTE_DEFS.testDrive.path} element={<TestDrivePage />} />
+        <Route path={ROUTE_DEFS.testDriveSurvey.path} element={<TestDriveSurveyPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />
         <Route path={ROUTE_DEFS.privacy.path} element={<PrivacyPage />} />
         <Route path={ROUTE_DEFS.compliance.path} element={<CompliancePage />} />
