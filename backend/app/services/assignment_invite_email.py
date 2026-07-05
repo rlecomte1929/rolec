@@ -112,24 +112,32 @@ def _resend_send(
     html: Optional[str] = None,
     request_id: Optional[str] = None,
     context: str = "email",
+    from_addr: Optional[str] = None,
+    reply_to: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     The single Resend delivery path, shared by the HR invite and the admin
     smoke test so both exercise the identical env/provider/POST. Never raises.
 
+    ``from_addr`` overrides ``EMAIL_FROM`` (any address on the verified domain);
+    ``reply_to`` adds a Reply-To header when set. Both default to prior behaviour.
+
     Returns status: no_key (RESEND_API_KEY absent — logged, not sent) | sent |
     failed (Resend non-2xx) | error (exception, suppressed). Includes ``from``.
     """
     resend_key = os.getenv("RESEND_API_KEY", "")
-    from_addr = os.getenv("EMAIL_FROM", "noreply@relopass.com")
+    from_addr = from_addr or os.getenv("EMAIL_FROM", "noreply@relopass.com")
     if not resend_key:
         log.info("%s (no RESEND_API_KEY — logged, not sent): to=%s subject=%r\n\n%s", context, to_email, subject, plain)
         return {"status": "no_key", "from": from_addr}
+    payload: Dict[str, Any] = {"from": from_addr, "to": [to_email], "subject": subject, "text": plain, "html": html}
+    if reply_to:
+        payload["reply_to"] = reply_to
     try:
         resp = http_requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
-            json={"from": from_addr, "to": [to_email], "subject": subject, "text": plain, "html": html},
+            json=payload,
             timeout=10,
         )
         if resp.ok:
