@@ -2,7 +2,10 @@ import { useCallback, useMemo, useState } from 'react';
 import type * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { PlaneTakeoff } from 'lucide-react';
 import { Button } from '../../../components/antigravity/Button';
+import { ConversationalEmptyState } from '../../../components/antigravity';
+import { buildRoute } from '../../../navigation/routes';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import api, { hrAPI } from '../../../api/client';
@@ -371,6 +374,11 @@ export function MobilityControlCenterV2Page() {
   const approvals: ApprovalRow[] = dashboardQuery.data?.approvals ?? [];
   const backendDegraded = dashboardQuery.data?.degraded ?? false;
   const loading = dashboardQuery.isLoading;
+  // AIQ-1411: show the warm onboarding empty state only at TRUE zero (the tenant
+  // has no cases at all) — never during load (a cold query must not render a
+  // false empty; cf. AIQ-1375 cold-start spinner class) and never for a
+  // filtered-but-non-empty result (that keeps the plain table string).
+  const noCasesYet = !loading && cases.length === 0;
 
   // Parker-J: classical data-to-text exec summary (LLM-free, env-flag gated
   // server-side). Dependent on the resolved companyId. Null = provider deferred
@@ -722,21 +730,35 @@ export function MobilityControlCenterV2Page() {
               </div>
             </div>
 
-            <DataTable
-              tableId="hr.mobility-control"
-              columns={columns}
-              rows={filteredCases}
-              rowKey={(r) => r.id}
-              onRowClick={goToCase}
-              ariaLabel="Mobility control cases"
-              emptyState={loading ? 'Loading cases…' : 'No active relocations yet. Cases created on the Assignments page appear here.'}
-              footerSlot={
-                <div className="flex items-center justify-between px-4 py-2 text-[11.5px] text-slate-500">
-                  <span>{filteredCases.length} case{filteredCases.length === 1 ? '' : 's'}</span>
-                  <ResetColumnsLink tableId="hr.mobility-control" />
-                </div>
-              }
-            />
+            {noCasesYet ? (
+              <ConversationalEmptyState
+                icon={PlaneTakeoff}
+                heading="Ready to set up your first relocation?"
+                body="Add your first employee's move and ReloPass builds their roadmap, policy, and supplier options automatically — no blank spreadsheets to fill in."
+                actions={[
+                  { label: 'Add your first relocation', onClick: () => navigate('/employees/new') },
+                  { label: 'Import your team roster', onClick: () => navigate(buildRoute('hrEmployees')) },
+                  { label: 'Set up your relocation policy', onClick: () => navigate(buildRoute('hrPolicy')) },
+                ]}
+                hint="Takes about 2 minutes — you'll add the employee, destination, and move date."
+              />
+            ) : (
+              <DataTable
+                tableId="hr.mobility-control"
+                columns={columns}
+                rows={filteredCases}
+                rowKey={(r) => r.id}
+                onRowClick={goToCase}
+                ariaLabel="Mobility control cases"
+                emptyState={loading ? 'Loading cases…' : 'No active relocations yet. Cases created on the Assignments page appear here.'}
+                footerSlot={
+                  <div className="flex items-center justify-between px-4 py-2 text-[11.5px] text-slate-500">
+                    <span>{filteredCases.length} case{filteredCases.length === 1 ? '' : 's'}</span>
+                    <ResetColumnsLink tableId="hr.mobility-control" />
+                  </div>
+                }
+              />
+            )}
           </div>
 
           {/* Right sidebar */}

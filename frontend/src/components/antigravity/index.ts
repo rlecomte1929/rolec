@@ -23,6 +23,8 @@ export { StepRail } from './StepRail';
 export type { RailStep, StepStatus } from './StepRail';
 export { SegmentedOptionCards } from './SegmentedOptionCards';
 export type { SegmentedOption } from './SegmentedOptionCards';
+export { ConversationalEmptyState } from './ConversationalEmptyState';
+export type { EmptyStateAction } from './ConversationalEmptyState';
 export { AutosaveChip } from './AutosaveChip';
 export { ConfirmFromIntake } from './ConfirmFromIntake';
 export type { ConfirmRow } from './ConfirmFromIntake';
