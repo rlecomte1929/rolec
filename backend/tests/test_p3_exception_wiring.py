@@ -52,22 +52,86 @@ from backend.app.services.exception_request_service import ExceptionRequestServi
 router = ImmigrationRegimeRouter()
 svc = ExceptionRequestService()
 
-# [AIQ-1392] The exception-request DB-layer tests below exercise the REAL
-# backend.database, but backend/conftest.py globally mocks it
-# (sys.modules.setdefault), so _make_sqlite_db() returns a MagicMock and inserts
-# never persist (and the real init_db is sqlite-incompatible). They were
-# pre-existing red on main; a real-DB test fixture is tracked in AIQ-1392.
-# strict=False → they auto-XPASS once that fixture lands (no CI break).
-_XFAIL_DB_LAYER = pytest.mark.xfail(
-    reason="exception-request DB layer needs a real-DB fixture (conftest mocks "
-    "backend.database; init_db sqlite-incompatible) — tracked in AIQ-1392",
-    strict=False,
+# [AIQ-1392] Real-DB fixture for the exception-request DB layer.
+# backend/conftest.py globally mocks backend.database (sys.modules.setdefault) so unit
+# tests don't need a live DB — but that makes _make_sqlite_db() return a MagicMock, so the
+# DB-layer tests below never actually persist. This fixture imports the REAL backend.database
+# once against a temp SQLite file, creates the one standalone table (exception_requests) it
+# needs directly — init_db is neither called nor needed: upsert generates id + timestamps in
+# Python — and swaps that real module into sys.modules only for the duration of a DB-layer
+# test, restoring the conftest mock on teardown so it never leaks to tests that expect it.
+_EXCEPTION_REQUESTS_SQLITE_DDL = """
+CREATE TABLE exception_requests (
+    id                 TEXT PRIMARY KEY,
+    case_id            TEXT NOT NULL,
+    assignment_id      TEXT,
+    exception_type     TEXT NOT NULL,
+    reason             TEXT NOT NULL,
+    severity           TEXT NOT NULL DEFAULT 'warning',
+    status             TEXT NOT NULL DEFAULT 'pending',
+    recommended_action TEXT,
+    resolved_at        TEXT,
+    resolved_by        TEXT,
+    resolution_notes   TEXT,
+    created_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )
+"""
+
+
+_real_db_module = None  # cached real (sqlite-backed) backend.database, loaded under a private name
+_active_real_db = None  # the live real Database while a real_exception_db test runs; else None
+
+
+def _load_real_backend_database():
+    """Load the REAL backend/database.py under a PRIVATE module name (never touching the
+    conftest `backend.database` mock in sys.modules) against the temp-sqlite DATABASE_URL, and
+    create the one standalone table it needs. `init_db` is neither called nor needed — upsert
+    generates id + timestamps in Python. Cached; returns the loaded module."""
+    global _real_db_module
+    if _real_db_module is not None:
+        return _real_db_module
+    import importlib.util
+    from sqlalchemy import text
+
+    os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_FILE}"
+    path = os.path.join(_REPO_ROOT, "backend", "database.py")
+    # Private name → the mock at sys.modules['backend.database'] stays intact for every other
+    # test. __package__='backend' makes database.py's `from .db_config` / `from .db.support`
+    # relative imports resolve to the real (never-mocked) modules.
+    spec = importlib.util.spec_from_file_location("backend._real_database_for_tests", path)
+    mod = importlib.util.module_from_spec(spec)
+    mod.__package__ = "backend"
+    spec.loader.exec_module(mod)  # runs `_engine = create_engine(sqlite)` + `db = Database()`
+    with mod.db.engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS exception_requests"))
+        conn.execute(text(_EXCEPTION_REQUESTS_SQLITE_DDL))
+    _real_db_module = mod
+    return mod
+
+
+@pytest.fixture
+def real_exception_db():
+    """Activate the real sqlite-backed Database for one DB-layer test; restore isolation after.
+    Does NOT modify sys.modules['backend.database'] — `_make_sqlite_db()` reads `_active_real_db`."""
+    global _active_real_db
+    from sqlalchemy import text
+
+    mod = _load_real_backend_database()
+    with mod.db.engine.begin() as conn:
+        conn.execute(text("DELETE FROM exception_requests"))  # per-test isolation
+    _active_real_db = mod.db
+    try:
+        yield mod.db
+    finally:
+        _active_real_db = None
 
 
 def _make_sqlite_db():
-    """Return a SQLite Database instance backed by the temp file, fully initialised."""
-    from backend.database import Database
+    """Return the real SQLite-backed Database (only inside the real_exception_db fixture)."""
+    if _active_real_db is not None:
+        return _active_real_db
+    from backend.database import Database  # fallback: outside the fixture (returns the mock)
     return Database()
 
 
@@ -83,7 +147,7 @@ def _flag_types(flags: List[ExceptionFlag]) -> List[str]:
 # 1. DB layer — upsert_exception_request
 # ─────────────────────────────────────────────────────────────────────────────
 
-@_XFAIL_DB_LAYER
+@pytest.mark.usefixtures("real_exception_db")
 class TestUpsertExceptionRequest:
 
     def test_insert_creates_row(self):
@@ -193,7 +257,7 @@ class TestUpsertExceptionRequest:
 # 2. DB layer — list_exception_requests
 # ─────────────────────────────────────────────────────────────────────────────
 
-@_XFAIL_DB_LAYER
+@pytest.mark.usefixtures("real_exception_db")
 class TestListExceptionRequests:
 
     def test_empty_for_unknown_case(self):
@@ -329,7 +393,7 @@ class TestE2EExceptionDetection:
         types = _flag_types(flags)
         assert "role_category_ambiguous" in types
 
-    @_XFAIL_DB_LAYER
+    @pytest.mark.usefixtures("real_exception_db")
     def test_flags_then_stored_in_db(self):
         """Simulate what the wired call site does: detect flags and persist them."""
         db = _make_sqlite_db()
@@ -358,6 +422,7 @@ class TestE2EExceptionDetection:
         assert "tenure_insufficient" in stored_types
         assert "no_sponsoring_entity" in stored_types
 
+    @pytest.mark.usefixtures("real_exception_db")
     def test_re_running_detection_does_not_duplicate_rows(self):
         """Running detection twice (e.g. timeline called twice) leaves exactly 1 row per type."""
         db = _make_sqlite_db()
@@ -405,7 +470,7 @@ class TestExceptionsRouteShape:
             "total": len(flags),
         }
 
-    @_XFAIL_DB_LAYER
+    @pytest.mark.usefixtures("real_exception_db")
     def test_grouping_separates_correctly(self):
         db = _make_sqlite_db()
         cid = _case_id()
@@ -418,7 +483,7 @@ class TestExceptionsRouteShape:
         assert len(result["blockers"]) == 2
         assert len(result["warnings"]) == 1
 
-    @_XFAIL_DB_LAYER
+    @pytest.mark.usefixtures("real_exception_db")
     def test_status_filter_pending_only(self):
         from sqlalchemy import text  # available; installed as DB layer dependency
         db = _make_sqlite_db()
@@ -436,6 +501,7 @@ class TestExceptionsRouteShape:
         assert pending_result["total"] == 1
         assert pending_result["warnings"][0]["exception_type"] == "cost_threshold"
 
+    @pytest.mark.usefixtures("real_exception_db")
     def test_empty_case_returns_zeros(self):
         db = _make_sqlite_db()
         cid = _case_id()
@@ -443,7 +509,7 @@ class TestExceptionsRouteShape:
         result = self._group_flags(flags)
         assert result == {"blockers": [], "warnings": [], "total": 0}
 
-    @_XFAIL_DB_LAYER
+    @pytest.mark.usefixtures("real_exception_db")
     def test_blocker_only_case(self):
         db = _make_sqlite_db()
         cid = _case_id()
