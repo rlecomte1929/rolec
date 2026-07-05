@@ -85,3 +85,20 @@ def resolve_flag(
         return _resolve(db)
     with SessionLocal() as session:
         return _resolve(session)
+
+
+def resolve_flag_safe(key: str, *, env_default: bool = False) -> bool:
+    """Like `resolve_flag` but never raises: on any DB error, fall back to the
+    same-named env var (then `env_default`).
+
+    For flag checks on request paths that may run without a live DB (e.g. router
+    unit tests that mount the router over a bare app, or a transient DB blip).
+    A DB `feature_flags` row still wins when the DB is reachable — so admins get
+    runtime control — but the check degrades to the pre-existing env behaviour
+    instead of 500-ing when it isn't.
+    """
+    try:
+        return resolve_flag(key, env_default=env_default)
+    except Exception:  # pragma: no cover - defensive DB-unavailable fallback
+        env = os.getenv(key)
+        return _env_truthy(env) if env is not None else bool(env_default)

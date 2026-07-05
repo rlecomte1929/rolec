@@ -21,6 +21,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from ..auth_deps import require_admin
 from ..services.autofix_dispatch import dispatch_autofix
+from ..services.feature_flags import resolve_flag_safe
 from ..services.work_item_ingest import build_work_items
 from ..services.work_item_planner import build_plan
 from ..services.work_item_triage import classify_demand
@@ -34,8 +35,10 @@ router = APIRouter(prefix="/api/admin/work-items", tags=["admin-work-items"])
 _RUN_TO_ITEM_STATUS = {"merged": "done", "deployed": "done", "failed": "blocked", "reverted": "blocked"}
 
 
+# DB feature-flag row → env var (MISSION_CONTROL_DISPATCH_ENABLED) → default OFF.
+# Toggle from /admin/feature-flags without a redeploy; env var stays a fallback.
 def dispatch_enabled() -> bool:
-    return os.getenv("MISSION_CONTROL_DISPATCH_ENABLED", "").lower() in ("1", "true", "yes", "on")
+    return resolve_flag_safe("MISSION_CONTROL_DISPATCH_ENABLED", env_default=False)
 
 
 def dispatch_block_reason(auto_fixable: Any, triage_json: Any) -> Optional[str]:

@@ -4,6 +4,7 @@ Covers the `is_flag_enabled_for` helper truth-table and the single wiring
 seam in `get_case_roadmap`: OFF path is byte-identical; ON + allowlisted
 gains the additive `ai_roadmap_eligible` field.
 """
+import os
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -107,6 +108,55 @@ class RoadmapEndpointGateTests(_DBTest):
         res = self._call("test-acct")
         self.assertIs(res["ai_roadmap_eligible"], True)
         self.assertEqual(res["result"], "OK")
+
+
+class ResolveFlagSafeTest(unittest.TestCase):
+    """`resolve_flag_safe`: DB row wins, else env var, else default; never raises."""
+
+    KEY = "SOME_MIGRATED_TEST_FLAG"
+
+    def tearDown(self) -> None:
+        os.environ.pop(self.KEY, None)
+
+    def _memory_sessionmaker(self):
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
+        models.Base.metadata.create_all(
+            engine,
+            tables=[models.FeatureFlag.__table__, models.FeatureFlagAccount.__table__],
+        )
+        return sessionmaker(bind=engine)
+
+    def test_env_fallback_when_no_db_row(self):
+        Session = self._memory_sessionmaker()
+        with mock.patch.object(feature_flags, "SessionLocal", Session):
+            os.environ[self.KEY] = "true"
+            self.assertTrue(feature_flags.resolve_flag_safe(self.KEY))
+            os.environ[self.KEY] = "false"
+            self.assertFalse(feature_flags.resolve_flag_safe(self.KEY))
+            os.environ.pop(self.KEY, None)
+            self.assertFalse(feature_flags.resolve_flag_safe(self.KEY, env_default=False))
+            self.assertTrue(feature_flags.resolve_flag_safe(self.KEY, env_default=True))
+
+    def test_db_row_wins_over_env(self):
+        Session = self._memory_sessionmaker()
+        with Session() as db:
+            db.add(models.FeatureFlag(key=self.KEY, enabled=True))
+            db.commit()
+        with mock.patch.object(feature_flags, "SessionLocal", Session):
+            os.environ[self.KEY] = "false"  # env OFF, DB ON → DB wins
+            self.assertTrue(feature_flags.resolve_flag_safe(self.KEY))
+
+    def test_exception_falls_back_to_env(self):
+        def _boom():
+            raise RuntimeError("db unavailable")
+
+        with mock.patch.object(feature_flags, "SessionLocal", _boom):
+            os.environ[self.KEY] = "true"
+            self.assertTrue(feature_flags.resolve_flag_safe(self.KEY))
+            os.environ[self.KEY] = "false"
+            self.assertFalse(feature_flags.resolve_flag_safe(self.KEY))
 
 
 if __name__ == "__main__":
