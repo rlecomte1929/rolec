@@ -120,6 +120,7 @@ const SECTIONS: NavSection[] = [
         // (116 in prod). No active-case count is exposed by the notification
         // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
+      { id: 'risk', label: 'Risk', to: ROUTE_DEFS.hrRisk.path, exact: true },
       // NAV-POL-1: surface the existing HrPolicy ?tab= tabs as sidebar sub-items
       // (shown indented while on /hr/policy). Each deep-links to a bookmarkable tab.
       {

@@ -12,6 +12,7 @@ import {
   PenSquare,
   ShieldCheck,
   TriangleAlert,
+  ShieldAlert,
   Home,
   Building2,
   CheckCircle2,
@@ -52,6 +53,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   // HR Operations
   'company-profile': Briefcase,
   'mobility-control': Globe2,
+  risk: ShieldAlert,
   'policy-builder': PenSquare,
   'policy-benefits': ShieldCheck,
   'policy-reality': Activity,
