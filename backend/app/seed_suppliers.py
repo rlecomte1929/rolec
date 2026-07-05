@@ -12,6 +12,9 @@ _CITY_TO_COUNTRY = {
     "Singapore": "SG", "Oslo": "NO", "Hong Kong": "HK", "Tokyo": "JP",
     "Asia-Pacific": "SG", "Asia": "SG", "Europe": "EU", "Global": None,
     "Australia": "AU", "NZ": "NZ", "New York": "US", "San Francisco": "US",
+    # Cities missing here fall back to "US" (living_areas/schools blocks), which
+    # mis-scoped Dubai rows to the US. Map the corridor destinations explicitly.
+    "Dubai": "AE", "Munich": "DE",
 }
 
 
