@@ -47,6 +47,7 @@ export const ROUTE_DEFS = {
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAnalytics: { path: '/hr/analytics', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenter: { path: '/hr/command-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrRisk: { path: '/hr/risk', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenterCase: { path: '/hr/command-center/cases/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrEmployeeDashboard: { path: '/hr/employee-dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCaseSummary: { path: '/hr/cases/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
