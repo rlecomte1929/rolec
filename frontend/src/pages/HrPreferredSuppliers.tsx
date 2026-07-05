@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Input } from '../components/antigravity/Input';
 import { Button } from '../components/antigravity/Button';
 import { Container } from '../components/antigravity';
+import { AppShell } from '../components/AppShell';
 import { hrPreferredSuppliersAPI } from '../api/client';
 import { suppliersAPI } from '../api/client';
 
@@ -124,10 +125,14 @@ export const HrPreferredSuppliers: React.FC = () => {
   };
 
   return (
+    <AppShell
+      section="HR Operations"
+      title="Preferred suppliers"
+      subtitle="Your company's go-to vendors — ranked first for your employees."
+    >
     <Container maxWidth="xl" className="py-8">
       <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-[#0b2b43]">Preferred Suppliers</h1>
+        <div className="flex flex-wrap items-center justify-end gap-4">
           <div className="flex flex-wrap items-center gap-3">
             <select
               value={filterCategory}
@@ -301,5 +306,6 @@ export const HrPreferredSuppliers: React.FC = () => {
         </div>
       )}
     </Container>
+    </AppShell>
   );
 };

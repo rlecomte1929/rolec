@@ -107,6 +107,40 @@ def _supplier_row(sid, name, cap_status):
     }
 
 
+class _FakeQuery:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def select(self, *a, **k):
+        return self
+
+    def eq(self, *a, **k):
+        return self
+
+    def execute(self):
+        return type("R", (), {"data": self._rows})()
+
+
+class _FakeSupabase:
+    """Returns different canned rows per table name."""
+    def __init__(self, by_table):
+        self._by_table = by_table
+
+    def table(self, name):
+        return _FakeQuery(self._by_table.get(name, []))
+
+
+def test_preferred_ids_union_company_and_global(monkeypatch):
+    import backend.app.services.supabase_client as sc
+    fake = _FakeSupabase({
+        "supplier_scoring_metadata": [{"supplier_id": "global-1"}],
+        "company_preferred_suppliers": [{"supplier_id": "company-1"}, {"supplier_id": "company-2"}],
+    })
+    monkeypatch.setattr(sc, "get_supabase_admin_client", lambda: fake)
+    ids = marketplace_router._get_preferred_supplier_ids("c1")
+    assert ids == {"global-1", "company-1", "company-2"}
+
+
 def test_marketplace_hides_unapproved(monkeypatch):
     monkeypatch.setattr(
         marketplace_router.main_db, "get_assignment_by_id",
