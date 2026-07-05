@@ -84,8 +84,11 @@ export async function assertLogicalPage(
   // makes a slow-but-resolving load (a secondary widget, e.g. the command-center's
   // "Loading cases…" or a policy call) still spin past a few seconds — that's slow,
   // not stuck. Poll for it to clear over a generous window; flag only if it persists
-  // the whole time. (Was a single 5s recheck → false B10 flakes on cold-start.)
-  const SPINNER_CLEAR_MS = 15000;
+  // the whole time. (History: 5s → 15s → 30s. 15s still false-flagged /hr/command-center
+  // on cold-start [AIQ-1375]: its company-scoped kpis/cases query plans stay cold even
+  // after the generic DB warm-up [#1170], so the first "Loading cases…" can exceed 15s.
+  // 30s absorbs that; a genuinely stuck spinner never clears, so B10 stays strict.)
+  const SPINNER_CLEAR_MS = 30000;
   const spinner = page.locator('[role="status"], .animate-spin, :text("Loading")');
   if (await spinner.first().isVisible().catch(() => false)) {
     const stillSpinning = await spinner
