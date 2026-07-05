@@ -64,10 +64,11 @@ class TestTestDriveSurvey(unittest.TestCase):
         # one INSERT into survey_responses attempted
         db.engine.begin.assert_called()
         conn = db.engine.begin.return_value.__enter__.return_value
-        conn.execute.assert_called_once()
-        sql = str(conn.execute.call_args.args[0])
-        self.assertIn("survey_responses", sql)
-        bound = conn.execute.call_args.args[1]
+        # The survey INSERT shares the mocked engine with TD-7/TD-8 funnel writes, so
+        # find the survey_responses INSERT among the calls rather than asserting exactly once.
+        survey_calls = [c for c in conn.execute.call_args_list if "survey_responses" in str(c.args[0])]
+        self.assertEqual(len(survey_calls), 1)
+        bound = survey_calls[0].args[1]
         self.assertEqual(bound["tester_sector"], "energy")
         self.assertTrue(bound["testimonial_consent"])
         self.assertEqual(bound["pilot_interest"], "maybe")
