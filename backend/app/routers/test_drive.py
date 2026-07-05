@@ -326,7 +326,21 @@ def survey(body: SurveyRequest, request: Request):
     )
     # TD-7: turn survey answers into pipeline (best-effort; never breaks the survey write).
     _process_survey_pipeline(body, campaign)
-    # TODO [TD-6]: on-submit email fan-out — notify Romain + thank tester (🔴 Red; separate task).
+    # TD-6: email fan-out — notify Romain + thank the tester (best-effort; never breaks the write).
+    try:
+        from ..services.test_drive_emails import send_test_drive_survey_emails
+        send_test_drive_survey_emails(
+            tester_name=body.tester_name, tester_email=body.tester_email, campaign=campaign,
+            corridor_id=body.corridor_id, tester_segment=body.tester_segment,
+            company_role=body.tester_company_role, sector=body.tester_sector,
+            q1_overall=body.q1_overall, q2_friction=body.q2_friction, q3_problem_fit=body.q3_problem_fit,
+            q4_change=body.q4_change, pilot_interest=body.pilot_interest, pilot_note=body.pilot_note,
+            testimonial=body.testimonial, referral_name=body.referral_name,
+            referral_company_role=body.referral_company_role, referral_contact=body.referral_contact,
+            referral_consent=body.referral_consent,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("test_drive survey email fan-out failed (suppressed)")
 
     logger.info(
         "test_drive_survey response=%s session=%s campaign=%s pilot=%s",
