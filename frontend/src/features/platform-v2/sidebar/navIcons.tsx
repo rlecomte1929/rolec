@@ -22,6 +22,7 @@ import {
   Layers,
   BrainCircuit,
   ClipboardList,
+  Star,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -41,6 +42,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   documents: Upload,
   dossier: Files,
   'service-providers': Briefcase,
+  'preferred-suppliers': Star,
   'benefit-comparison': BarChart3,
   inbox: MessageSquare,
 
