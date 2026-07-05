@@ -106,11 +106,14 @@ export function FeedbackTab() {
 
   const updateStatus = async (row: UnifiedFeedbackItem, newStatus: TriageStatus) => {
     setSavingId(row.id);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
     try {
       await triageFeedback(row.stream, row.id, { status: newStatus });
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: newStatus } : r));
     } catch {
-      // silently fail — user can retry via Refresh
+      // Surface the failure per-row (reusing the dispatch-error display) instead of
+      // failing silently — otherwise a failed save looks successful.
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: 'Could not update status — please retry.' }));
     }
     setSavingId(null);
   };

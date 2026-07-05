@@ -68,7 +68,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
         listDemandGaps(),
         listIntakeCorridors(),
       ]);
-      setTickets(t);
+      setTickets(t ?? []);
       setAllowlistState(a);
       setGaps(g);
       setCorridors(c);
@@ -318,7 +318,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
         ) : (
           <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
             {tickets.map((t) => {
-              const onAllowlist = allowlistByDest.has(`${t.city.toLowerCase()}|${t.country.toLowerCase()}`);
+              const onAllowlist = allowlistByDest.has(`${(t.city ?? '').toLowerCase()}|${(t.country ?? '').toLowerCase()}`);
               const saving = resolvingId === t.id;
               return (
                 <li key={t.id} className="p-4">
@@ -336,8 +336,8 @@ export const AdminCatalogQueuePage: React.FC = () => {
                         )}
                       </div>
                       <div className="mt-1 text-xs text-[#6b7280]">
-                        Opened {formatDate(t.created_at)} · by {t.requested_by.slice(0, 8)} ·
-                        company {t.company_id.slice(0, 8)}
+                        Opened {formatDate(t.created_at)} · by {(t.requested_by ?? '—').slice(0, 8)} ·
+                        company {(t.company_id ?? '—').slice(0, 8)}
                       </div>
                       {t.notes && (
                         <p className="mt-2 text-sm text-[#334155] whitespace-pre-line">{t.notes}</p>

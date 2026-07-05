@@ -47,7 +47,7 @@ export async function listFeedback(params?: {
     `${API}/api/admin/feedback`,
     { params }
   );
-  return data.items;
+  return data.items ?? [];
 }
 
 export async function triageFeedback(

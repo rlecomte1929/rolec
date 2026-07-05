@@ -21,7 +21,7 @@ export default function AdminAdminsPage() {
   const fetchAdmins = async () => {
     try {
       const res = await apiClient.get<{ items: AdminEntry[] }>("/api/admin/admins");
-      setAdmins(res.data.items);
+      setAdmins(res.data.items ?? []);
     } catch {
       setError("Failed to load admins");
     } finally {

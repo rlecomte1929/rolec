@@ -186,8 +186,11 @@ export function OpsAnalyticsV2Page() {
 
   const bottleneckSub = useMemo(() => {
     const totalBacklog = bottlenecks?.total_backlog ?? backlog?.total ?? 0;
+    const queueTypeCounts = Object.values(backlog?.by_queue_item_type ?? {});
+    // Math.max() with no args is -Infinity — guard the empty-map case so we never
+    // render "-Infinity% of delays" when total_backlog > 0 but the breakdown is empty.
     const topCount = bottlenecks?.top_backlog_destination?.total
-      ?? (backlog?.by_queue_item_type ? Math.max(...Object.values(backlog.by_queue_item_type)) : 0);
+      ?? (queueTypeCounts.length ? Math.max(...queueTypeCounts) : 0);
     if (!totalBacklog) return 'no backlog';
     const pct = Math.round((topCount / totalBacklog) * 100);
     return `${pct}% of delays`;
