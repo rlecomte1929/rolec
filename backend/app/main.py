@@ -258,6 +258,43 @@ def create_app() -> FastAPI:
     from .routers import crons  # noqa: PLC0415 — local import mirrors auth above
     app.include_router(crons.router)
 
+    # Admin routers that were previously registered ONLY in backend/main.py (prod serves
+    # them, but the modular app + app-mounted test harness returned 404 for them, and they
+    # would 405 after the modular cutover). Mount them here too, mirroring the exact
+    # prefixes used in backend/main.py. Local import mirrors the crons/auth pattern above
+    # to avoid any module-load circular import.
+    from .routers import (  # noqa: PLC0415
+        admin_catalog,
+        admin_mobility,
+        admin_resources,
+        admin_staging,
+        admin_freshness,
+        admin_review_queue,
+        admin_notifications,
+        admin_ops_analytics,
+        admin_workflow_analytics,
+        admin_collaboration,
+        admin_prospects,
+        admin_form_templates,
+    )
+    from .routers.policy_config import admin_policy_config_router  # noqa: PLC0415
+
+    app.include_router(admin_catalog.router)  # prefix baked into routes
+    app.include_router(admin_mobility.router)  # prefix baked into routes
+    app.include_router(admin_resources.router, prefix="/api/admin")
+    app.include_router(admin_staging.router, prefix="/api/admin")
+    app.include_router(admin_freshness.router, prefix="/api/admin")
+    app.include_router(admin_freshness.crawl_router, prefix="/api/admin")
+    app.include_router(admin_freshness.changes_router, prefix="/api/admin")
+    app.include_router(admin_review_queue.router, prefix="/api/admin")
+    app.include_router(admin_notifications.router, prefix="/api/admin")
+    app.include_router(admin_ops_analytics.router, prefix="/api/admin")
+    app.include_router(admin_workflow_analytics.router, prefix="/api/admin")
+    app.include_router(admin_collaboration.router, prefix="/api/admin")
+    app.include_router(admin_prospects.router, prefix="/api/admin")
+    app.include_router(admin_form_templates.router, prefix="/api/admin")
+    app.include_router(admin_policy_config_router)
+
     # ── Month-1 TODO: Tier 4 routers blocked on Month-0 P3 extraction ─────────
     # TODO [AUDIT-C2.3 / Month-0 P3]: add hr_policy_config + employee_policy_config
     # once those routers are extracted from the inline APIRouter objects in backend/main.py.
