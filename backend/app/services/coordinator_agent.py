@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 FEATURE_KEY = "ai_coordinator"
 _REASONING_MODEL = store.MODEL_DEFAULT  # claude-sonnet-4-6
-_FOLD_MODEL = "claude-haiku-4-5-20251001"
+_FOLD_MODEL = "claude-haiku-4-5"  # alias (not date-suffixed) so router.usd_cost / costs.yaml resolves
 _MAX_TOKENS = 700
 _KEEP_AFTER_FOLD = 2
 _CONTEXT_CHAR_CAP = 8000
@@ -131,6 +131,16 @@ def _fold_summary(session: Dict[str, Any]) -> str:
     body = "\n".join(
         f"User: {t.get('user', '')}\nCoordinator: {t.get('assistant', '')}" for t in turns
     )
+    company_id = session.get("company_id")
+    case_id = session.get("case_id")
+    tracer = TraceSession(
+        session_id=str(case_id) if case_id is not None else None,
+        query="coordinator_summary_fold",
+        company_id=company_id,
+        feature_key=FEATURE_KEY,
+        customer_id=company_id,
+    )
+    t0 = time.monotonic()
     try:
         out = get_default_client().complete(
             LlmRequest(
@@ -144,10 +154,22 @@ def _fold_summary(session: Dict[str, Any]) -> str:
                 max_tokens=300,
             )
         )
-        return (out.get("text") or prior).strip()
     except Exception as exc:  # noqa: BLE001
         log.warning("coordinator: summary fold failed: %s", exc)
         return prior
+    latency_ms = int((time.monotonic() - t0) * 1000)
+    usage = out.get("usage") or {}
+    try:  # attribute the fold's cost to the same feature_key (was previously untraced)
+        tracer.record_llm_call(
+            model=out.get("model", _FOLD_MODEL),
+            input_tokens=int(usage.get("input_tokens", 0) or 0),
+            output_tokens=int(usage.get("output_tokens", 0) or 0),
+            latency_ms=latency_ms,
+        )
+        tracer.flush()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("coordinator: fold telemetry failed: %s", exc)
+    return (out.get("text") or prior).strip()
 
 
 def _render(ctx: Dict[str, Any], session: Dict[str, Any], masked_user: str) -> str:
