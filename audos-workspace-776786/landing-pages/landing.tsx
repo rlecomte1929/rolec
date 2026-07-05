@@ -50,7 +50,7 @@ interface Stat {
 
 // === SECTION 2: CONSTANTS AND CONFIGURATION ===
 const WORKSPACE_BRAND_NAME = 'ReloPass';
-const WORKSPACE_TAGLINE = 'Global moves, intelligently managed.';
+const WORKSPACE_TAGLINE = 'Global mobility. Structured.';
 const WORKSPACE_PRIMARY_COLOR = '#2a93e0';
 const WORKSPACE_HIGHLIGHT_COLOR = '#38c6de';
 const WORKSPACE_CONTRAST_COLOR = '#2a93e0';
@@ -77,7 +77,10 @@ const WORKSPACE_HERO_VIDEO_URL = 'https://storage.googleapis.com/audos-images/ge
 
 const CONTACT_EMAIL = 'contact@relopass.com';
 const DEMO_HREF = 'mailto:contact@relopass.com?subject=Book%20a%20demo';
+const CONVERSATION_HREF = 'mailto:contact@relopass.com?subject=How%20our%20relocations%20run%20today';
 const BRAND_PROMISE = 'Every relocation case is visible, compliant, on-time.';
+const POSITIONING_LINE = 'Structure every relocation.';
+const CONVERSATIONAL_CTA = 'Tell us how your relocations run today';
 
 const VISUAL_CONFIG = {
   radius: 'rounded-xl',
@@ -95,13 +98,13 @@ const NAV_LINKS: NavLink[] = [
 ];
 
 const HERO_CONTENT = {
-  eyebrow: 'For global mobility & HR ops teams',
-  title: 'Move employees across borders without losing control.',
+  eyebrow: 'For HR & Global Mobility teams',
+  title: 'Global mobility. Structured.',
   subtitle:
-    'ReloPass replaces scattered spreadsheets and endless vendor emails with one system that keeps every relocation on track — compliance, timelines, and approvals in a single source of truth.',
+    'ReloPass is the coordination layer for cross-border relocation. Every case runs through one system — compliance, timelines, vendors, and approvals in a single source of truth.',
   promise: BRAND_PROMISE,
-  primaryCta: 'Start a relocation case',
-  secondaryCta: 'Request a demo',
+  primaryCta: 'Book a demo',
+  secondaryCta: 'See the platform',
 };
 
 const HERO_STATS: Stat[] = [
@@ -112,9 +115,9 @@ const HERO_STATS: Stat[] = [
 
 const PROBLEM_CONTENT = {
   eyebrow: 'The problem',
-  title: 'Drowning in spreadsheets and vendor emails.',
+  title: 'Relocation still runs on emails and spreadsheets.',
   description:
-    'Global mobility managers and HR ops teams run high-stakes relocations across fragmented tools, chasing manual follow-ups and hoping nothing slips. One missed deadline or overlooked compliance step can derail an entire assignment — and you often don’t see it coming.',
+    'Global Mobility and HR teams coordinate high-stakes moves across inboxes, shared sheets, and disconnected vendor portals. Status lives in threads, deadlines slip unnoticed, and compliance gaps stay invisible until they become problems.',
 };
 
 const PROBLEM_CARDS: ProblemCard[] = [
@@ -144,16 +147,16 @@ const COST_OF_FAILURE: string[] = [
 ];
 
 const SYSTEM_CONTENT = {
-  eyebrow: 'The solution',
-  title: 'Three pillars that keep every move under control.',
+  eyebrow: 'The system',
+  title: 'One system coordinating every relocation.',
   description:
-    'ReloPass turns chaotic, high-stakes relocations into a clear, automated journey — so global mobility feels predictable, auditable, and manageable, even without a large specialist team.',
+    'ReloPass is the coordination layer that sits over your entire mobility program. Every case runs through one structured record — compliance, timelines, vendors, and approvals in a single source of truth.',
 };
 
 const SYSTEM_CAPABILITIES: Capability[] = [
   {
     title: 'Structured relocation roadmaps',
-    description: 'Enter the employee, corridor, and policy — and get a tailored, step-by-step roadmap with deadlines, documents, vendor touchpoints, and required approvals, generated in minutes instead of days.',
+    description: 'Enter the employee, corridor, and policy — ReloPass assembles a step-by-step roadmap with deadlines, documents, vendor touchpoints, and required approvals in minutes instead of days.',
     badge: 'Pillar 01 · Roadmaps',
   },
   {
@@ -163,7 +166,7 @@ const SYSTEM_CAPABILITIES: Capability[] = [
   },
   {
     title: 'Compliance checkpoints',
-    description: 'Immigration, tax, and policy requirements are built into each corridor as checkpoints, flagging risks early and keeping a complete, audit-ready trail behind every case.',
+    description: 'Immigration, tax, and policy requirements are built into each corridor as checkpoints, surfacing risks early and keeping a complete, audit-ready trail behind every case.',
     badge: 'Pillar 03 · Compliance',
   },
 ];
@@ -235,12 +238,12 @@ const PROOF_CONTENT = {
 const PROOF_LOGOS: string[] = ['[Company A]', '[Company B]', '[Company C]', '[Company D]'];
 
 const CTA_CONTENT = {
-  eyebrow: 'Structure every relocation',
-  title: 'Take control of your next cross-border move.',
+  eyebrow: POSITIONING_LINE,
+  title: 'Structure every relocation.',
   description:
-    'Start a relocation case in minutes, or book a 30-minute walkthrough to see how ReloPass keeps compliance, timelines, and approvals in one system.',
-  primaryCta: 'Start a relocation case',
-  secondaryCta: 'Request a demo',
+    'Book a 30-minute walkthrough to see how ReloPass keeps compliance, timelines, vendors, and approvals in one system — or see the platform for yourself.',
+  primaryCta: 'Book a demo',
+  secondaryCta: 'See the platform',
 };
 
 const FOOTER_LINKS: FooterLink[] = [
@@ -248,12 +251,12 @@ const FOOTER_LINKS: FooterLink[] = [
   { label: 'Solution', href: '#system' },
   { label: 'Platform', href: '#product' },
   { label: 'Customers', href: '#proof' },
-  { label: 'Request a demo', href: DEMO_HREF },
+  { label: 'Book a demo', href: DEMO_HREF },
   { label: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
 ];
 
 const FOOTER_CONTENT = {
-  tagline: 'Global moves, intelligently managed. Every relocation, on track.',
+  tagline: 'The coordination layer for cross-border relocation. Every case visible, compliant, on-time.',
   copyright: `© ${new Date().getFullYear()} ${WORKSPACE_BRAND_NAME}. All rights reserved.`,
 };
 
@@ -343,7 +346,7 @@ function Navigation() {
               style={{ backgroundColor: WORKSPACE_HIGHLIGHT_COLOR, color: WORKSPACE_TEXT_ON_HIGHLIGHT, boxShadow: '0 0 0 2px rgba(56,198,222,0.22), 0 10px 30px rgba(56,198,222,0.35)' }}
               data-section="nav-cta"
             >
-              Request a demo
+              Book a demo
             </a>
           </div>
         </nav>
@@ -394,7 +397,7 @@ function HeroSection() {
         </p>
         <div className="reveal-on-scroll flex flex-col items-center justify-center gap-4 sm:flex-row">
           <a
-            href={WORKSPACE_SPACE_URL}
+            href={DEMO_HREF}
             className="inline-block rounded-lg px-8 py-4 font-semibold shadow-md transition duration-300 hover:scale-105"
             style={{
               backgroundColor: WORKSPACE_PRIMARY_COLOR,
@@ -406,7 +409,7 @@ function HeroSection() {
             {HERO_CONTENT.primaryCta}
           </a>
           <a
-            href={DEMO_HREF}
+            href={WORKSPACE_SPACE_URL}
             className="inline-block rounded-lg border px-8 py-4 font-semibold backdrop-blur-md transition duration-300 hover:scale-105 hover:brightness-110"
             data-section="hero-secondary-cta"
             style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_PRIMARY }}
@@ -414,6 +417,15 @@ function HeroSection() {
             {HERO_CONTENT.secondaryCta}
           </a>
         </div>
+
+        <a
+          href={CONVERSATION_HREF}
+          className="reveal-on-scroll mt-5 inline-flex items-center gap-2 text-[15px] font-semibold underline decoration-dotted underline-offset-4 transition hover:opacity-80"
+          data-section="hero-conversational-cta"
+          style={{ color: WORKSPACE_TEXT_SECONDARY }}
+        >
+          {CONVERSATIONAL_CTA} →
+        </a>
 
         <p
           className="reveal-on-scroll mx-auto mt-10 text-[14px] font-semibold uppercase tracking-[0.2em]"
@@ -894,7 +906,7 @@ function FinalCTA() {
         </p>
         <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
           <a
-            href={WORKSPACE_SPACE_URL}
+            href={DEMO_HREF}
             className="inline-flex rounded-lg px-8 py-4 text-lg font-bold shadow-md transition duration-300 hover:scale-105"
             style={{ backgroundColor: WORKSPACE_HIGHLIGHT_COLOR, color: WORKSPACE_TEXT_ON_HIGHLIGHT }}
             data-section="cta-primary"
@@ -902,7 +914,7 @@ function FinalCTA() {
             {CTA_CONTENT.primaryCta}
           </a>
           <a
-            href={DEMO_HREF}
+            href={WORKSPACE_SPACE_URL}
             className="inline-flex rounded-lg border px-8 py-4 text-lg font-semibold transition duration-300 hover:scale-105"
             style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_PRIMARY }}
             data-section="cta-secondary"
@@ -911,7 +923,10 @@ function FinalCTA() {
           </a>
         </div>
         <p className="mt-6 text-sm" data-section="cta-contact" style={{ color: WORKSPACE_TEXT_MUTED }}>
-          Or reach us directly at{' '}
+          <a href={CONVERSATION_HREF} className="font-semibold underline" style={{ color: WORKSPACE_HIGHLIGHT_COLOR }}>
+            {CONVERSATIONAL_CTA}
+          </a>
+          {' '}— or reach us at{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold underline" style={{ color: WORKSPACE_HIGHLIGHT_COLOR }}>
             {CONTACT_EMAIL}
           </a>
