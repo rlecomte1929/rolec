@@ -84,6 +84,14 @@ export const AdminProspects: React.FC = () => {
   const [bulkReenriching, setBulkReenriching] = useState(false);
   const [detailBusy, setDetailBusy] = useState(false);
 
+  // Onboard-as-company modal (Track B)
+  const [onboardOpen, setOnboardOpen] = useState(false);
+  const [onboardEmail, setOnboardEmail] = useState('');
+  const [onboardName, setOnboardName] = useState('');
+  const [onboardWelcome, setOnboardWelcome] = useState(true);
+  const [onboardBusy, setOnboardBusy] = useState(false);
+  const [onboardMsg, setOnboardMsg] = useState<string | null>(null);
+
   const parsedSeeds = useMemo(() => parseSeedText(seedText), [seedText]);
   const failedCount = useMemo(
     () => rows.filter((r) => r.status === 'enrichment_failed').length,
@@ -203,6 +211,44 @@ export const AdminProspects: React.FC = () => {
       setError(String(msg || 'Triage failed'));
     } finally {
       setDetailBusy(false);
+    }
+  };
+
+  const openOnboard = () => {
+    setOnboardEmail('');
+    setOnboardName('');
+    setOnboardWelcome(true);
+    setOnboardMsg(null);
+    setOnboardOpen(true);
+  };
+
+  const doOnboard = async () => {
+    if (!selected) return;
+    const email = onboardEmail.trim().toLowerCase();
+    if (!email || !email.includes('@')) { setOnboardMsg('Enter a valid HR contact email.'); return; }
+    setOnboardBusy(true);
+    setOnboardMsg(null);
+    try {
+      const res = await adminProspectsAPI.onboard(selected.id, {
+        hr_email: email,
+        hr_name: onboardName.trim() || undefined,
+        send_welcome: onboardWelcome,
+      });
+      if (res.already_onboarded) {
+        setOnboardMsg('This prospect was already onboarded.');
+      } else {
+        setOnboardMsg(`Onboarded "${res.company_name}" — HR ${res.hr_email}${res.invite_sent ? ' (welcome invite sent)' : ''}.`);
+      }
+      await load();
+      const refreshed = await adminProspectsAPI.get(selected.id);
+      setSelected(refreshed);
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : (err as Error)?.message;
+      setOnboardMsg(String(msg || 'Onboarding failed.'));
+    } finally {
+      setOnboardBusy(false);
     }
   };
 
@@ -551,6 +597,14 @@ export const AdminProspects: React.FC = () => {
               >
                 Reject
               </Button>
+              {selected.status === 'approved' && (
+                <Button variant="primary" disabled={detailBusy} onClick={openOnboard}>
+                  Onboard as company →
+                </Button>
+              )}
+              {selected.status === 'onboarded' && (
+                <Badge variant="success">onboarded</Badge>
+              )}
               <div className="ml-auto flex gap-2">
                 <Button variant="ghost" disabled={detailBusy} onClick={reenrich}>
                   Re-enrich {enableWebSearch ? '(web search on)' : ''}
@@ -566,6 +620,50 @@ export const AdminProspects: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {onboardOpen && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <Card className="w-[30rem] max-w-full">
+            <div className="p-4 space-y-3">
+              <h3 className="text-lg font-semibold text-[#0b2b43]">Onboard {selected.company_name}</h3>
+              <p className="text-sm text-[#6b7280]">
+                Creates a live company tenant, seats the primary HR contact, and (optionally) emails them a welcome invite.
+              </p>
+              <label className="block text-sm">
+                <span className="text-[#374151]">HR contact email *</span>
+                <input
+                  type="email"
+                  value={onboardEmail}
+                  onChange={(e) => setOnboardEmail(e.target.value)}
+                  placeholder="hr@company.com"
+                  className="mt-1 w-full rounded border border-[#e2e8f0] px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-[#374151]">HR contact name</span>
+                <input
+                  type="text"
+                  value={onboardName}
+                  onChange={(e) => setOnboardName(e.target.value)}
+                  placeholder="Optional"
+                  className="mt-1 w-full rounded border border-[#e2e8f0] px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[#374151]">
+                <input type="checkbox" checked={onboardWelcome} onChange={(e) => setOnboardWelcome(e.target.checked)} />
+                Send a welcome invite email to the HR contact
+              </label>
+              {onboardMsg && <p className="text-sm text-[#6b7280]">{onboardMsg}</p>}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" disabled={onboardBusy} onClick={() => setOnboardOpen(false)}>Close</Button>
+                <Button variant="primary" disabled={onboardBusy || !onboardEmail.includes('@')} onClick={() => void doOnboard()}>
+                  {onboardBusy ? 'Onboarding…' : 'Onboard'}
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </AdminLayout>

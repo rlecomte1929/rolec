@@ -2063,6 +2063,16 @@ export const adminProspectsAPI = {
     api
       .post(`/api/admin/prospects/${prospectId}/triage`, { decision })
       .then((r) => r.data as ProspectRow),
+  // Track B: convert an approved prospect into a live tenant (company + HR seat + welcome).
+  onboard: async (
+    prospectId: string,
+    payload: { hr_email: string; hr_name?: string; reason?: string; send_welcome?: boolean },
+  ): Promise<{ ok: boolean; company_id?: string; company_name?: string; hr_email?: string; invite_sent?: boolean; already_onboarded?: boolean }> =>
+    api
+      .post<{ ok: boolean; company_id?: string; company_name?: string; hr_email?: string; invite_sent?: boolean; already_onboarded?: boolean }>(
+        `/api/admin/prospects/${prospectId}/onboard`, payload,
+      )
+      .then((r) => r.data),
   reenrich: async (prospectId: string, enableWebSearch: boolean) =>
     api
       .post(`/api/admin/prospects/${prospectId}/reenrich`, { enable_web_search: enableWebSearch })

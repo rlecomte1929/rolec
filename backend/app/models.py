@@ -424,6 +424,9 @@ class ProspectCandidate(Base):
     enriched_at = Column(DateTime, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     reviewed_by = Column(String, nullable=True)
+    # Track B: link to the company this prospect was onboarded into (conversion path).
+    onboarded_company_id = Column(String, nullable=True)
+    onboarded_at = Column(DateTime, nullable=True)
 
 
 class Lead(Base):
