@@ -313,3 +313,50 @@ def test_patch_non_admin_returns_403(non_admin_client):
         json={"status": "reviewed"},
     )
     assert resp.status_code == 403
+
+
+# ── Screenshot tests ────────────────────────────────────────────────────────
+
+
+def _seed_screenshot_row(db_session):
+    db_session.execute(text(
+        "INSERT INTO feedback (id, user_id, page_url, category, message, status, created_at, screenshot_data) "
+        "VALUES ('f-shot', 'u-2', '/journey', 'bug', 'has shot', 'new', '2026-06-02T10:00:00', "
+        "'data:image/jpeg;base64,AAAA')"
+    ))
+    db_session.commit()
+
+
+def test_list_flags_has_screenshot(admin_client, db_session):
+    """The list marks product rows with/without a screenshot; other streams are always false."""
+    _seed_screenshot_row(db_session)
+    items = admin_client.get("/api/admin/feedback").json()["items"]
+    by_id = {r["id"]: r for r in items}
+    assert by_id["f-shot"]["has_screenshot"]        # row with screenshot → truthy
+    assert not by_id["f-001"]["has_screenshot"]     # product row without one → falsy
+    assert not by_id["h-001"]["has_screenshot"]     # non-product stream → falsy
+
+
+def test_get_screenshot_returns_data(admin_client, db_session):
+    """GET .../product/{id}/screenshot returns the stored base64 data URL."""
+    _seed_screenshot_row(db_session)
+    resp = admin_client.get("/api/admin/feedback/product/f-shot/screenshot")
+    assert resp.status_code == 200
+    assert resp.json()["screenshot_data"] == "data:image/jpeg;base64,AAAA"
+
+
+def test_get_screenshot_non_product_is_null(admin_client):
+    """Non-product streams never carry a screenshot → null, no DB lookup."""
+    resp = admin_client.get("/api/admin/feedback/helpfulness/p-001/screenshot")
+    assert resp.status_code == 200
+    assert resp.json()["screenshot_data"] is None
+
+
+def test_get_screenshot_missing_returns_404(admin_client):
+    resp = admin_client.get("/api/admin/feedback/product/does-not-exist/screenshot")
+    assert resp.status_code == 404
+
+
+def test_get_screenshot_requires_admin(non_admin_client):
+    resp = non_admin_client.get("/api/admin/feedback/product/f-001/screenshot")
+    assert resp.status_code == 403

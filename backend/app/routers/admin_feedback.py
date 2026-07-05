@@ -68,7 +68,8 @@ SELECT
     f.category                AS verdict,
     CAST(f.user_id   AS TEXT) AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
-    f.created_at
+    f.created_at,
+    CASE WHEN f.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot
 FROM feedback f
 
 UNION ALL
@@ -81,7 +82,8 @@ SELECT
     h.verdict                 AS verdict,
     h.reviewer_user_id        AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
-    h.created_at
+    h.created_at,
+    0                         AS has_screenshot
 FROM ai_human_feedback h
 
 UNION ALL
@@ -94,7 +96,8 @@ SELECT
     CASE WHEN p.helpful THEN 'thumbs_up' ELSE 'thumbs_down' END AS verdict,
     p.user_id                 AS user_id,
     p.company_id              AS company_id,
-    p.created_at
+    p.created_at,
+    0                         AS has_screenshot
 FROM policy_answer_helpfulness p
 
 UNION ALL
@@ -107,7 +110,8 @@ SELECT
     CAST(NULL AS TEXT)        AS verdict,
     hf.hr_user_id             AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
-    {hr_created_at}           AS created_at
+    {hr_created_at}           AS created_at,
+    0                         AS has_screenshot
 FROM hr_feedback hf
 
 UNION ALL
@@ -120,14 +124,15 @@ SELECT
     cf.section                AS verdict,
     CAST(cf.author_user_id AS TEXT) AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
-    cf.created_at_ts          AS created_at
+    cf.created_at_ts          AS created_at,
+    0                         AS has_screenshot
 FROM case_feedback cf
 """
 
 _OUTER_SQL = """
 SELECT
     base.id, base.stream, base.source_ref, base.text, base.verdict,
-    base.user_id, base.company_id, base.created_at,
+    base.user_id, base.company_id, base.created_at, base.has_screenshot,
     fs.status, fs.owner, fs.resolution,
     CAST(fs.severity        AS TEXT) AS severity,
     CAST(fs.area            AS TEXT) AS area,
@@ -189,6 +194,30 @@ def list_feedback(
     """Return unified feedback rows from all streams, LEFT JOIN'd to triage state."""
     rows = _fetch_rows(db, stream=stream, status=status, since=since, dispatched=dispatched)
     return {"items": rows, "count": len(rows)}
+
+
+@router.get("/feedback/{stream}/{item_id}/screenshot")
+def get_feedback_screenshot(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    _user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Return the base64 screenshot data URL for a single feedback item, on demand.
+
+    Only the ``product`` stream (public.feedback) carries screenshots; every other
+    stream returns ``null``. Fetched lazily when the admin expands a row so the list
+    endpoint never has to ship large base64 blobs for 500 rows at once.
+    """
+    if stream != "product":
+        return {"screenshot_data": None}
+    row = db.execute(
+        text("SELECT screenshot_data FROM feedback WHERE CAST(id AS TEXT) = :id"),
+        {"id": item_id},
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"screenshot_data": row[0]}
 
 
 class TriageUpdate(BaseModel):

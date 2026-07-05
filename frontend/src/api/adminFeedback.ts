@@ -26,6 +26,10 @@ export interface UnifiedFeedbackItem {
   area?: string | null;
   dispatch_status?: DispatchStatus | null;
   dispatch_ref?: string | null;
+  /** True when this item has a screenshot attached (product stream only). The
+   *  image itself is fetched lazily via getFeedbackScreenshot to keep the list
+   *  payload small. Serialized as 0/1 by the backend — read via truthiness. */
+  has_screenshot?: boolean;
 }
 
 export interface DispatchResult {
@@ -49,6 +53,21 @@ export async function listFeedback(params?: {
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const data = await apiGet<{ items: UnifiedFeedbackItem[] }>(`/api/admin/feedback${suffix}`);
   return data.items ?? [];
+}
+
+/**
+ * Fetch the base64 screenshot data URL for a single feedback item, on demand.
+ * Only the `product` stream carries screenshots; others resolve to null.
+ * Called lazily when an admin expands a row (keeps the list response small).
+ */
+export async function getFeedbackScreenshot(
+  stream: FeedbackStream,
+  id: string,
+): Promise<string | null> {
+  const data = await apiGet<{ screenshot_data: string | null }>(
+    `/api/admin/feedback/${stream}/${id}/screenshot`,
+  );
+  return data.screenshot_data ?? null;
 }
 
 export async function triageFeedback(

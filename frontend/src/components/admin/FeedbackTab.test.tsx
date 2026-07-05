@@ -11,6 +11,7 @@ vi.mock('../../api/adminFeedback', () => ({
   listFeedback: vi.fn(),
   triageFeedback: vi.fn(),
   dispatchTicket: vi.fn(),
+  getFeedbackScreenshot: vi.fn().mockResolvedValue(null),
 }));
 import type { DispatchResult } from '../../api/adminFeedback';
 import { FeedbackTab } from './FeedbackTab';
