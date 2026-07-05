@@ -58,6 +58,8 @@ export const DiscoverSection: React.FC = () => {
       setError(errMessage(err, 'Discovery failed'));
     } finally {
       setLoading(false);
+      // Refresh the remaining daily-search budget after each attempt.
+      getDiscoveryStatus().then(setStatus).catch(() => {});
     }
   }, [category, city, country]);
 
@@ -82,15 +84,21 @@ export const DiscoverSection: React.FC = () => {
     }
   }, [results, selected, category, city, country, search]);
 
-  const providerBadge = status?.provider === 'disabled' || !status?.configured
-    ? <Badge variant="neutral" size="sm">discovery off</Badge>
-    : <Badge variant="success" size="sm">{status.provider}</Badge>;
+  const isOff = !status?.configured || status?.provider === 'disabled';
+  const noBudget = !!status?.configured && status.daily_remaining <= 0;
 
   return (
     <Card padding="lg" className="mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-[#0b2b43]">Discover suppliers</h2>
-        {providerBadge}
+        <div className="flex items-center gap-2 text-xs text-[#6b7280]">
+          {status && !isOff && (
+            <span>{status.daily_remaining}/{status.daily_limit} searches left today · up to {status.max_results}/search</span>
+          )}
+          {isOff
+            ? <Badge variant="neutral" size="sm">discovery off</Badge>
+            : <Badge variant="success" size="sm">{status!.provider}</Badge>}
+        </div>
       </div>
       {error && <div className="mb-3"><Alert variant="error">{error}</Alert></div>}
       {info && <div className="mb-3"><Alert variant="success">{info}</Alert></div>}
@@ -108,8 +116,8 @@ export const DiscoverSection: React.FC = () => {
         </label>
         <Input label="City" value={city} onChange={setCity} placeholder="Oslo" />
         <Input label="Country" value={country} onChange={setCountry} placeholder="Norway" />
-        <Button variant="secondary" size="sm" onClick={search} disabled={loading || !city.trim() || !country.trim()}>
-          {loading ? 'Searching…' : 'Search'}
+        <Button variant="secondary" size="sm" onClick={search} disabled={loading || noBudget || !city.trim() || !country.trim()}>
+          {loading ? 'Searching…' : noBudget ? 'Daily limit reached' : 'Search'}
         </Button>
       </div>
 

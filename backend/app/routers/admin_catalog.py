@@ -476,11 +476,21 @@ class DiscoverImportBody(BaseModel):
     items: List[DiscoverImportItem]
 
 
+# Quota key for admin-triggered discovery (no company); reuses the per-day
+# catalog_scrape_quota cap so enabling a paid provider can't run away on cost.
+_DISCOVERY_QUOTA_KEY = "admin-discovery"
+
+
 @router.get("/discovery-status")
 def discovery_status(user: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
-    """Read-only indicator of which discovery provider is active (green/grey in UI)."""
-    from ..services import maps_discovery
-    return maps_discovery.provider_status()
+    """Read-only indicator: active provider, whether its key is configured, the
+    per-search result cap, and how many searches remain in today's quota."""
+    from ..services import maps_discovery, scrape_safety
+    status = maps_discovery.provider_status()
+    quota = scrape_safety.get_quota_state(_DISCOVERY_QUOTA_KEY)
+    status["daily_remaining"] = quota["remaining"]
+    status["daily_limit"] = quota["limit"]
+    return status
 
 
 @router.post("/discover")
@@ -489,10 +499,26 @@ def discover_suppliers(
     user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """Search real businesses for a category+destination. Read-only: returns raw
-    results (flagged if already in the catalog); nothing is written until import."""
+    results (flagged if already in the catalog); nothing is written until import.
+    Cost guardrails: allowlist-gated, results capped (DISCOVERY_MAX_RESULTS), and a
+    per-day search quota that is only charged when a provider is actually configured."""
     from ..services import maps_discovery, scrape_safety
     if not scrape_safety.is_destination_allowlisted(body.city, body.country):
         raise HTTPException(status_code=400, detail="Destination is not allowlisted")
+
+    status = maps_discovery.provider_status()
+    if not status["configured"]:
+        # No provider/key → no external call, no cost, no quota consumed.
+        quota = scrape_safety.get_quota_state(_DISCOVERY_QUOTA_KEY)
+        return {"results": [], "total": 0, "provider": status["provider"],
+                "daily_remaining": quota["remaining"]}
+
+    quota = scrape_safety.check_and_increment_quota(_DISCOVERY_QUOTA_KEY)
+    if not quota["allowed"]:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily discovery limit reached ({quota['limit']}/day). Try again tomorrow.",
+        )
     results = maps_discovery.search_businesses(body.category, body.city, body.country)
 
     # Flag rows already present in the Supplier Registry (by name or website domain).
@@ -505,7 +531,8 @@ def discover_suppliers(
     for r in results:
         dom = _domain(r.get("website"))
         r["already_in_catalog"] = (r.get("name") or "").strip().lower() in names or (bool(dom) and dom in domains)
-    return {"results": results, "total": len(results), "provider": maps_discovery.provider_status()["provider"]}
+    return {"results": results, "total": len(results), "provider": status["provider"],
+            "daily_remaining": quota["remaining"]}
 
 
 @router.post("/discover/import")
