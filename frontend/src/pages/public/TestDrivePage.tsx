@@ -166,9 +166,21 @@ export const TestDrivePage: React.FC = () => {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {c.videos.clips.map((clip) => (
               <div key={clip.label}>
-                <div className="aspect-video flex items-center justify-center rounded-xl border border-marketing-border bg-marketing-surface-muted">
-                  <PlayCircle aria-hidden="true" size={40} className="text-marketing-text-muted" />
-                </div>
+                {clip.file ? (
+                  // eslint-disable-next-line jsx-a11y/media-has-caption -- TD-11 v1: silent clip, captions are burned into the frames
+                  <video
+                    controls
+                    preload="metadata"
+                    poster={clip.poster}
+                    className="aspect-video w-full rounded-xl border border-marketing-border bg-black object-cover"
+                  >
+                    <source src={clip.file} type="video/mp4" />
+                  </video>
+                ) : (
+                  <div className="aspect-video flex items-center justify-center rounded-xl border border-marketing-border bg-marketing-surface-muted">
+                    <PlayCircle aria-hidden="true" size={40} className="text-marketing-text-muted" />
+                  </div>
+                )}
                 <p className="mt-3 text-sm font-semibold text-marketing-primary">{clip.label}</p>
                 <p className="mt-1 text-sm text-marketing-text-muted leading-relaxed">
                   {clip.description}

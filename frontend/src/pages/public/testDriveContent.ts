@@ -71,10 +71,12 @@ export const testDriveContent = {
     header: 'Before you start',
     intro:
       'Three short clips. Watch them or skip them — the flow is self-explanatory either way.',
+    // file/poster live in frontend/public/test-drive/ (TD-11). A clip with no `file`
+    // renders the static placeholder (graceful degrade).
     clips: [
-      { label: 'Overview — 60 sec', description: 'What ReloPass coordinates, and why relocation fails in the handoffs.' },
-      { label: 'The HR side — 90 sec', description: 'Configure a case and hand it off.' },
-      { label: 'The employee side — 90 sec', description: 'From intake to roadmap.' },
+      { label: 'Overview — 60 sec', description: 'What ReloPass coordinates, and why relocation fails in the handoffs.', file: '/test-drive/overview.mp4', poster: '/test-drive/overview.jpg' },
+      { label: 'The HR side — 90 sec', description: 'Configure a case and hand it off.', file: '/test-drive/hr-side.mp4', poster: '/test-drive/hr-side.jpg' },
+      { label: 'The employee side — 90 sec', description: 'From intake to roadmap.', file: '/test-drive/employee-side.mp4', poster: '/test-drive/employee-side.jpg' },
     ],
   },
 
