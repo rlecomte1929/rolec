@@ -216,6 +216,8 @@ export const ROUTE_DEFS = {
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
   /** [AIQ-633] Specialist review — admin reviews AI-generated roadmap steps per case */
   adminSpecialistReview: { path: '/admin/specialist-review/:case_id', roles: ['ADMIN'] as RouteRole[] },
+  /** Auth Page Design — live-tune the /auth page's GlobeNetwork canvas (platform-wide, admin-only). */
+  adminAuthPageDesign: { path: '/admin/auth-page-design', roles: ['ADMIN'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;

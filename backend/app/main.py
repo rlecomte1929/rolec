@@ -21,6 +21,7 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    auth_page_config,
     assistant_router,
     policy_helpfulness,
     ocr,
@@ -190,6 +191,8 @@ def create_app() -> FastAPI:
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
+    app.include_router(auth_page_config.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
     app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
