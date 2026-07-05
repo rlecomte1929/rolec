@@ -115,6 +115,7 @@ export const listIntakeCorridors = (limit = 50): Promise<IntakeCorridor[]> =>
 export interface AdminNotificationCounts {
   pending_tickets: number;
   allowlisted_destinations: number;
+  pending_capabilities: number;
 }
 
 export const getAdminNotificationCounts = (): Promise<AdminNotificationCounts> =>

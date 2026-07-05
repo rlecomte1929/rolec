@@ -19,6 +19,7 @@ from ..services.supplier_registry import (
     approve_capability,
     create_supplier,
     get_supplier,
+    list_pending_capabilities,
     list_supplier_countries,
     list_suppliers,
     reject_capability,
@@ -133,6 +134,17 @@ def create_supplier_api(
         return s
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/capabilities/pending", response_model=Dict[str, Any])
+def list_pending_capabilities_api(
+    user: Dict[str, Any] = Depends(require_admin),
+    limit: int = Query(200, ge=1, le=500),
+):
+    """Cross-supplier vetting queue: capabilities awaiting review (oldest first)."""
+    with SessionLocal() as session:
+        items = list_pending_capabilities(session, limit=limit)
+        return {"capabilities": items, "total": len(items)}
 
 
 @router.get("/{supplier_id}", response_model=Dict[str, Any])

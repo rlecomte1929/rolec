@@ -364,6 +364,7 @@ def admin_notification_counts(
     Lightweight summary admin uses for nav badges:
       - pending_tickets: HR-opened destination requests waiting on admin
       - allowlisted_destinations: total approved destinations
+      - pending_capabilities: supplier capabilities awaiting a vetting decision
 
     Computed via COUNT aggregates in a single connection. The earlier version
     fetched up to 500 row payloads from each table just to take len() — wasteful
@@ -381,9 +382,20 @@ def admin_notification_counts(
         allowlist = conn.execute(
             _sql("SELECT COUNT(*) FROM catalog_destination_allowlist")
         ).scalar() or 0
+        try:
+            pending_caps = conn.execute(
+                _sql(
+                    "SELECT COUNT(*) FROM supplier_service_capabilities "
+                    "WHERE platform_vetting_status = 'pending'"
+                )
+            ).scalar() or 0
+        except Exception:
+            # Column ships with the GAP 1 migration; degrade gracefully if not yet applied.
+            pending_caps = 0
     return {
         "pending_tickets": int(pending),
         "allowlisted_destinations": int(allowlist),
+        "pending_capabilities": int(pending_caps),
     }
 
 

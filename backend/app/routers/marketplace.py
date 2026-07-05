@@ -136,7 +136,7 @@ def _fetch_suppliers(dest_country: Optional[str]) -> List[Dict[str, Any]]:
             .select(
                 "id, name, description, website, verified, "
                 "supplier_scoring_metadata(average_rating, review_count, response_sla_hours, preferred_partner), "
-                "supplier_service_capabilities(service_category, country_code, min_budget, max_budget)"
+                "supplier_service_capabilities(service_category, country_code, min_budget, max_budget, platform_vetting_status)"
             )
             .eq("status", "active")
             .execute()
@@ -210,6 +210,14 @@ def get_marketplace(
             scoring = scoring[0] if scoring else {}
 
         capabilities = s.get("supplier_service_capabilities") or []
+        # GAP 3: only approved capabilities may reach an employee. This path
+        # queries Supabase directly and bypasses search_by_service_destination,
+        # so it needs its own vetting gate. Drop the supplier if nothing remains.
+        capabilities = [
+            c for c in capabilities if c.get("platform_vetting_status") == "approved"
+        ]
+        if not capabilities:
+            continue
 
         # Find the best matching capability for this corridor
         best_cap = None
