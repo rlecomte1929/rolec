@@ -13,6 +13,7 @@ import {
   listFeedback,
   triageFeedback,
   dispatchTicket,
+  getFeedbackScreenshot,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
@@ -77,6 +78,10 @@ export function FeedbackTab() {
   const [savingId, setSavingId]           = useState<string | null>(null);
   const [expanded, setExpanded]           = useState<string | null>(null);
 
+  // Lazily-fetched screenshots, cached by row id (a null entry = fetched, none available).
+  const [shots, setShots]                 = useState<Record<string, string | null>>({});
+  const [shotLoadingId, setShotLoadingId] = useState<string | null>(null);
+
   // Dispatch state
   const [pendingConfirmId, setPendingConfirmId] = useState<string | null>(null);
   const [dispatchingId, setDispatchingId]       = useState<string | null>(null);
@@ -103,6 +108,20 @@ export function FeedbackTab() {
   }, [activeStream]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // When a product row with a screenshot is expanded, fetch the image once (lazy).
+  useEffect(() => {
+    if (!expanded || expanded in shots) return;
+    const row = rows.find((r) => r.id === expanded);
+    if (!row || row.stream !== 'product' || !row.has_screenshot) return;
+    let cancelled = false;
+    setShotLoadingId(expanded);
+    getFeedbackScreenshot(row.stream, row.id)
+      .then((data) => { if (!cancelled) setShots((prev) => ({ ...prev, [row.id]: data })); })
+      .catch(() => { if (!cancelled) setShots((prev) => ({ ...prev, [row.id]: null })); })
+      .finally(() => { if (!cancelled) setShotLoadingId((cur) => (cur === row.id ? null : cur)); });
+    return () => { cancelled = true; };
+  }, [expanded, rows, shots]);
 
   const updateStatus = async (row: UnifiedFeedbackItem, newStatus: TriageStatus) => {
     setSavingId(row.id);
@@ -385,10 +404,13 @@ export function FeedbackTab() {
                     tabIndex={0}
                     aria-expanded={isExpanded}
                   >
-                    <div className="px-3 py-2.5">
+                    <div className="px-3 py-2.5 flex items-center gap-1">
                       <span className="font-mono text-[10.5px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                         {(row.source_ref ?? row.id).slice(0, 8)}
                       </span>
+                      {row.has_screenshot && (
+                        <span title="Screenshot attached" aria-label="Screenshot attached" className="text-[11px] leading-none">📷</span>
+                      )}
                     </div>
                     <div className="px-3 py-2.5">
                       <span className="text-[11px] font-medium text-gray-600">
@@ -501,6 +523,24 @@ export function FeedbackTab() {
                         )}
                       </div>
                       <p className="text-sm text-gray-800 whitespace-pre-wrap">{row.text ?? '—'}</p>
+                      {row.stream === 'product' && row.has_screenshot && (
+                        <div className="pt-1">
+                          <p className="text-[10.5px] font-semibold text-gray-500 mb-1">Screenshot</p>
+                          {shots[row.id] ? (
+                            <img
+                              src={shots[row.id]!}
+                              alt="Feedback screenshot"
+                              className="max-w-full max-h-[520px] rounded border border-gray-200 shadow-sm object-contain bg-white"
+                            />
+                          ) : shotLoadingId === row.id ? (
+                            <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                          ) : row.id in shots ? (
+                            <p className="text-[11px] text-gray-400">Screenshot unavailable.</p>
+                          ) : (
+                            <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                          )}
+                        </div>
+                      )}
                       {row.owner && (
                         <p className="text-[10.5px] text-gray-400">Owner: {row.owner}</p>
                       )}
