@@ -8316,6 +8316,23 @@ def _run_policy_value_extraction(
         return False
 
 
+# Valid values for policy_documents.assistant_import_status — MUST stay in sync with
+# the DB CHECK constraint `policy_documents_assistant_import_status_check`. Writing any
+# value outside this set raises a CheckViolation on Postgres (SQLite has no CHECK, so it
+# silently passes in tests — see AIQ-930/E1c, where 'classified' slipped through). Guard
+# with this set rather than a bare literal.
+_POLICY_DOC_ASSISTANT_IMPORT_STATUSES = frozenset(
+    {
+        "uploaded",
+        "extracting_text",
+        "text_ready",
+        "extracting_facts",
+        "ready_for_assistant",
+        "failed",
+    }
+)
+
+
 def _run_policy_document_ingest_background(
     *,
     doc_id: str,
@@ -8354,10 +8371,20 @@ def _run_policy_document_ingest_background(
             raw_text=result.get("raw_text"),
             extraction_error=result.get("extraction_error"),
             extracted_metadata=result.get("extracted_metadata"),
+            # After a successful classify the raw text is extracted and ready; use
+            # the constraint-valid 'text_ready' state. NB: 'classified' is a valid
+            # processing_status but NOT a valid assistant_import_status (see the
+            # policy_documents_assistant_import_status_check CHECK — allowed values
+            # in _POLICY_DOC_ASSISTANT_IMPORT_STATUSES). Writing 'classified' here
+            # raised a CheckViolation on Postgres that aborted the whole update, so
+            # value-extraction (_run_policy_value_extraction below) never ran and no
+            # policy_documents ever reached 'normalized' — the pilot's upload→extract
+            # path was silently broken end-to-end (AIQ-930 / E1c). Keep this in-sync
+            # with the CHECK constraint.
             assistant_import_status=(
                 "failed"
                 if result.get("processing_status") == "failed"
-                else "classified"
+                else "text_ready"
             ),
             processed_at=datetime.utcnow().isoformat(),
             request_id=request_id,
