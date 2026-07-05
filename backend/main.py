@@ -4168,12 +4168,22 @@ def add_hr_preferred_supplier(
     supplier_id = (body.get("supplier_id") or "").strip()
     if not supplier_id:
         raise HTTPException(status_code=400, detail="supplier_id required")
+    service_category = (body.get("service_category") or "").strip() or None
+    notes = (body.get("notes") or "").strip() or None
+    # Validate the supplier exists; flag the preference if it has no admin-approved
+    # capability yet (HR may prefer it, but it isn't platform-vetted for recommendations).
+    vetting = db.get_supplier_vetting_state(supplier_id, service_category)
+    if not vetting.get("exists"):
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    if not vetting.get("has_approved"):
+        marker = "pending_platform_review"
+        notes = f"{notes} [{marker}]" if notes else marker
     rec = db.add_company_preferred_supplier(
         company_id=company_id,
         supplier_id=supplier_id,
-        service_category=(body.get("service_category") or "").strip() or None,
+        service_category=service_category,
         priority_rank=int(body.get("priority_rank", 0) or 0),
-        notes=(body.get("notes") or "").strip() or None,
+        notes=notes,
     )
     return rec
 

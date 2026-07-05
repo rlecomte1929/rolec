@@ -107,7 +107,11 @@ def _get_covered_benefit_keys(assignment_id: str) -> set:
 
 
 def _get_preferred_supplier_ids(company_id: str) -> set:
-    """Return supplier IDs marked as preferred/preferred_partner by HR for this company."""
+    """Return supplier IDs preferred for this company — the union of globally
+    preferred partners (supplier_scoring_metadata.preferred_partner) and this
+    company's own HR-curated picks (company_preferred_suppliers). The sort_key in
+    get_marketplace ranks preferred suppliers first, so both surface at the top."""
+    preferred: set = set()
     try:
         from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
@@ -118,10 +122,25 @@ def _get_preferred_supplier_ids(company_id: str) -> set:
             .execute()
         )
         if result and result.data:
-            return {row["supplier_id"] for row in result.data}
+            preferred.update(row["supplier_id"] for row in result.data)
     except Exception:
-        logger.debug("Could not fetch preferred suppliers for company %s", company_id)
-    return set()
+        logger.debug("Could not fetch global preferred suppliers")
+    if company_id:
+        try:
+            from ..services.supabase_client import get_supabase_admin_client
+            sb = get_supabase_admin_client()
+            cps = (
+                sb.table("company_preferred_suppliers")
+                .select("supplier_id")
+                .eq("company_id", company_id)
+                .eq("status", "active")
+                .execute()
+            )
+            if cps and cps.data:
+                preferred.update(row["supplier_id"] for row in cps.data)
+        except Exception:
+            logger.debug("Could not fetch company preferred suppliers for %s", company_id)
+    return preferred
 
 
 def _fetch_suppliers(dest_country: Optional[str]) -> List[Dict[str, Any]]:

@@ -1529,6 +1529,29 @@ class CompaniesMixin:
             rows = conn.execute(text(sql), params).fetchall()
         return self._rows_to_list(rows)
 
+    def get_supplier_vetting_state(
+        self, supplier_id: str, service_category: Optional[str] = None
+    ) -> Dict[str, bool]:
+        """Whether a supplier exists and has an admin-approved capability (for the
+        given service_category, or any category if omitted). Used to flag an HR
+        preference for a not-yet-vetted supplier."""
+        with self.engine.connect() as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM suppliers WHERE id = :sid LIMIT 1"),
+                {"sid": supplier_id},
+            ).fetchone() is not None
+            cap_sql = (
+                "SELECT 1 FROM supplier_service_capabilities "
+                "WHERE supplier_id = :sid AND platform_vetting_status = 'approved'"
+            )
+            params: Dict[str, Any] = {"sid": supplier_id}
+            if service_category:
+                cap_sql += " AND service_category = :svc"
+                params["svc"] = service_category
+            cap_sql += " LIMIT 1"
+            has_approved = conn.execute(text(cap_sql), params).fetchone() is not None
+        return {"exists": exists, "has_approved": has_approved}
+
     def add_company_preferred_supplier(
         self,
         company_id: str,
@@ -1538,8 +1561,29 @@ class CompaniesMixin:
         notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         now = datetime.utcnow().isoformat()
-        rid = str(uuid.uuid4())
+        # Guard the unique index (company_id, supplier_id, coalesce(service_category,'')):
+        # a re-add would otherwise raise IntegrityError. Update the existing row instead.
         with self.engine.begin() as conn:
+            existing = conn.execute(
+                text(
+                    "SELECT id FROM company_preferred_suppliers "
+                    "WHERE company_id = :cid AND supplier_id = :sid "
+                    "AND coalesce(service_category, '') = coalesce(:svc, '') LIMIT 1"
+                ),
+                {"cid": company_id, "sid": supplier_id, "svc": service_category},
+            ).fetchone()
+            if existing is not None:
+                rid = existing._mapping["id"]
+                conn.execute(
+                    text(
+                        "UPDATE company_preferred_suppliers "
+                        "SET priority_rank = :rank, notes = :notes, status = 'active', updated_at = :now "
+                        "WHERE id = :id"
+                    ),
+                    {"rank": priority_rank, "notes": notes or "", "now": now, "id": rid},
+                )
+                return {"id": rid, "company_id": company_id, "supplier_id": supplier_id}
+            rid = str(uuid.uuid4())
             conn.execute(
                 text("""
                     INSERT INTO company_preferred_suppliers
@@ -1572,7 +1616,7 @@ class CompaniesMixin:
                     text("DELETE FROM company_preferred_suppliers WHERE company_id = :cid AND supplier_id = :sid AND service_category IS NULL"),
                     {"cid": company_id, "sid": supplier_id},
                 )
-                return r.rowcount
+            return r.rowcount
 
     def get_active_canonical_policy_document_for_company(self, company_id: str) -> Optional[Dict[str, Any]]:
         from ..database import _coerce_json_dict, _coerce_json_list  # lazy: avoid import cycle
