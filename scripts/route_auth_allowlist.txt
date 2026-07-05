@@ -123,6 +123,12 @@ backend/app/routers/public_analytics.py:track_event
 # PUBLIC (audos-P2): marketing funnel event ingest. Rate-limited (120/hour;1000/day),
 # allow-lists event names (landing_page_view/landing_cta_click) and persists only
 # scalar utm/cta keys into analytics_events. No PII, returns {ok:true}. Unauthenticated by design.
+backend/app/routers/test_drive.py:provision
+# PUBLIC (AIQ-1420 / TD-2): self-serve test-drive provisioning. Intentionally
+# unauthenticated so campaign prospects can mint their own HR+Employee test
+# identities. Defense in depth: campaign gate (404 unless RELOPASS_TEST_DRIVE_ENABLED,
+# dark by default) + invite-token gate (constant-time vs RELOPASS_TEST_DRIVE_INVITE_TOKEN,
+# 403 incl. when unset — never fails open) + slowapi rate-limit + is_test stamping.
 
 # ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
 # The signature check runs in the handler body, so the AST scanner cannot see it.
