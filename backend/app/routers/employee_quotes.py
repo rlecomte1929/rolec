@@ -163,7 +163,7 @@ def create_quote_request(
                      status, created_at, updated_at)
                 VALUES
                     (:id, :case_id, :emp, :company,
-                     :cats::text[], :notes, :budget,
+                     CAST(:cats AS text[]), :notes, :budget,
                      'pending', :now, :now)
                 """
             ),
