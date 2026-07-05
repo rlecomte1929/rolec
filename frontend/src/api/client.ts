@@ -1605,6 +1605,15 @@ export const adminAPI = {
     });
     return response.data;
   },
+  // Reactivate a stuck relocation case (status-only; never null-overwrites other fields).
+  // `unlocked` reports whether a case actually matched the id.
+  unlockCase: async (payload: { case_id: string; reason: string }): Promise<{ ok: boolean; unlocked: boolean }> => {
+    const response = await api.post<{ ok: boolean; unlocked: boolean }>('/api/admin/actions/unlock-case', {
+      reason: payload.reason,
+      payload: { case_id: payload.case_id },
+    });
+    return response.data;
+  },
   createAssignment: async (payload: {
     company_id: string;
     hr_user_id: string;

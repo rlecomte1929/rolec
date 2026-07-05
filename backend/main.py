@@ -3500,18 +3500,11 @@ def admin_unlock_case(request: AdminReasonRequest, user: Dict[str, Any] = Depend
     _require_reason(request.reason)
     payload = request.payload or {}
     case_id = payload.get("case_id")
-    if case_id:
-        db.upsert_relocation_case(
-            case_id=case_id,
-            company_id=payload.get("company_id"),
-            employee_id=payload.get("employee_id"),
-            status="active",
-            stage=payload.get("stage"),
-            host_country=payload.get("host_country"),
-            home_country=payload.get("home_country"),
-        )
-    db.log_audit(user["id"], "UPDATE", "relocation_case", case_id, request.reason, payload)
-    return {"ok": True}
+    # Status-only reactivation — must NOT null-overwrite the case's company/employee/stage/
+    # countries (which the old blind-UPDATE path did when those fields weren't supplied).
+    unlocked = db.set_relocation_case_status(case_id, "active") > 0 if case_id else False
+    db.log_audit(user["id"], "UPDATE", "relocation_case", case_id, request.reason, {**payload, "unlocked": unlocked})
+    return {"ok": True, "unlocked": unlocked}
 
 
 @app.post("/api/admin/actions/rerun-document")

@@ -590,6 +590,8 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
   const [ovAllowed, setOvAllowed] = useState(true);
   const [ovSaving, setOvSaving] = useState(false);
   const [ovMsg, setOvMsg] = useState<string | null>(null);
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const [unlockMsg, setUnlockMsg] = useState<string | null>(null);
 
   useEffect(() => {
     adminAPI.listCompanies().then((r) => setCompanies(r.companies ?? [])).catch(() => setCompanies([]));
@@ -692,6 +694,22 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
       setOvMsg('Could not record the override — please retry.');
     } finally {
       setOvSaving(false);
+    }
+  };
+
+  const doUnlockCase = async () => {
+    const caseId = detail?.case_pk;
+    if (!reason.trim() || !caseId) return;
+    setUnlockBusy(true);
+    setUnlockMsg(null);
+    try {
+      const res = await adminAPI.unlockCase({ case_id: caseId, reason: reason.trim() });
+      setUnlockMsg(res.unlocked ? 'Case reactivated (status → active).' : 'No matching relocation case was found for that id.');
+      onRefresh();
+    } catch {
+      setUnlockMsg('Could not unlock the case — please retry.');
+    } finally {
+      setUnlockBusy(false);
     }
   };
 
@@ -883,6 +901,15 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
                     </Button>
                   </div>
                   {ovMsg && <p className="text-xs text-[#6b7280]">{ovMsg}</p>}
+                  {detail.case_pk && detail.case_status !== 'active' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={doUnlockCase} disabled={!reason.trim() || unlockBusy}>
+                        {unlockBusy ? 'Unlocking…' : 'Unlock case (reactivate)'}
+                      </Button>
+                      <span className="text-xs text-[#94a3b8]">case status: {detail.case_status ?? '—'}</span>
+                    </div>
+                  )}
+                  {unlockMsg && <p className="text-xs text-[#6b7280]">{unlockMsg}</p>}
                 </div>
               </section>
             </>
