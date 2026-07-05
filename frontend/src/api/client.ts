@@ -3368,6 +3368,19 @@ export const policyConfigMatrixAPI = {
     });
     return response.data;
   },
+  /**
+   * AIQ-1415 — Natural-Language Policy Builder. Read-only: turns a free-text
+   * policy description into a CANDIDATE config-matrix `categories` body for
+   * confirm-before-save. Never persists — saving goes through hrPutDraft after
+   * the HR user approves the preview. An LLM call can exceed the 12s default.
+   */
+  hrGenerate: async (text: string, companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/generate', { text }, {
+      params: companyId ? { companyId } : {},
+      timeout: 120_000,
+    });
+    return response.data;
+  },
   hrPublish: async (body: Record<string, unknown> | undefined, companyId?: string): Promise<Record<string, unknown>> => {
     const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/publish', body ?? {}, {
       params: companyId ? { companyId } : {},
