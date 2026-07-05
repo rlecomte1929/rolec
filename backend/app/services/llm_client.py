@@ -547,3 +547,8 @@ def claude_complete_text_sync(**kwargs) -> str:
 def complete_sync(**kwargs) -> Dict[str, Any]:
     """Synchronous wrapper over :func:`complete` (structured JSON)."""
     return _run_sync(complete(**kwargs))
+
+
+def claude_complete_sync(**kwargs) -> Dict[str, Any]:
+    """Synchronous wrapper over :func:`claude_complete` (Anthropic tool-use JSON)."""
+    return _run_sync(claude_complete(**kwargs))

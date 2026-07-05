@@ -29,3 +29,14 @@ export const isRfqEnabled = (): boolean => isOn(import.meta.env.VITE_ENABLE_RFQ)
  */
 export const isSectionCOverridesEnabled = (): boolean =>
   isOn(import.meta.env.VITE_FEATURE_SECTION_C_OVERRIDES);
+
+/**
+ * AIQ-1415 — Natural-Language Policy Builder. Gates the "Describe" tab on the HR
+ * Policy page where HR types a plain-English description and Claude generates a
+ * config-matrix draft for confirm-before-save. The backend also gates per-account
+ * (the `nl_policy_builder` feature flag), so both must be on to use it.
+ *
+ * Set `VITE_ENABLE_NL_POLICY_BUILDER=true` to surface the tab.
+ */
+export const isNlPolicyBuilderEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_ENABLE_NL_POLICY_BUILDER);

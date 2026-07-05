@@ -20,6 +20,8 @@ import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/Hr
 import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
 import { HrBenefitMixOptimizerPage } from '../features/policy/HrBenefitMixOptimizerPage';
 import { policyConfigMatrixAPI } from '../api/client';
+import { isNlPolicyBuilderEnabled } from '../featureFlags';
+import { DescribePolicyPanel } from '../features/policy-config/DescribePolicyPanel';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -72,8 +74,8 @@ export const HrPolicy: React.FC = () => {
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
   // the /hr/settings/policy redirect lands on the correct tab.
-  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa' | 'optimize';
-  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa' | 'optimize') => {
+  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa' | 'optimize' | 'describe';
+  const setTab = (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa' | 'optimize' | 'describe') => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab);
     setSearchParams(next, { replace: true });
@@ -157,6 +159,11 @@ export const HrPolicy: React.FC = () => {
           <PolicyTabButton active={activeTab === 'builder'} onClick={() => setTab('builder')}>
             Policy builder
           </PolicyTabButton>
+          {isNlPolicyBuilderEnabled() && (
+            <PolicyTabButton active={activeTab === 'describe'} onClick={() => setTab('describe')}>
+              Describe in plain English
+            </PolicyTabButton>
+          )}
           <PolicyTabButton active={activeTab === 'summary'} onClick={() => setTab('summary')}>
             Benefits summary
           </PolicyTabButton>
@@ -174,7 +181,7 @@ export const HrPolicy: React.FC = () => {
 
       {/* Guided next-step CTA — points HR to the natural next action per tab.
           Does not alter the tab content below. (NAV-POL-1) */}
-      {!adminCompanyId && activeTab !== 'exceptions' && activeTab !== 'qa' && activeTab !== 'optimize' && (
+      {!adminCompanyId && activeTab !== 'exceptions' && activeTab !== 'qa' && activeTab !== 'optimize' && activeTab !== 'describe' && (
         <PolicyNextStepCta
           activeTab={activeTab}
           setTab={setTab}
@@ -189,7 +196,9 @@ export const HrPolicy: React.FC = () => {
             <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
           </p>
         )}
-        {(!adminCompanyId && activeTab === 'builder')
+        {(!adminCompanyId && activeTab === 'describe' && isNlPolicyBuilderEnabled())
+          ? <DescribePolicyPanel onSavedGoToBuilder={() => setTab('builder')} />
+          : (!adminCompanyId && activeTab === 'builder')
           ? <HrPolicyBuilderV2Page embedded />
           : (!adminCompanyId && activeTab === 'summary')
           ? <PolicyBenefitsSummary />
