@@ -32,6 +32,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from . import service_catalog
+from .feature_flags import resolve_flag_safe
 from .llm_client import complete_text_sync
 
 log = logging.getLogger(__name__)
@@ -42,9 +43,13 @@ DEFAULT_TIMEOUT_S = float(os.getenv("CATALOG_SCRAPER_TIMEOUT_SECONDS", "45"))
 
 
 def _enabled() -> bool:
-    """Hard gate so the scraper never fires unintentionally in tests / CI."""
-    flag = (os.getenv("CATALOG_SCRAPER_ENABLED") or "").strip().lower()
-    return flag in ("1", "true", "yes")
+    """Hard gate so the scraper never fires unintentionally in tests / CI.
+
+    DB feature-flag row (CATALOG_SCRAPER_ENABLED) → env var → default OFF, so an
+    admin can toggle it from /admin/feature-flags without a redeploy. The env var
+    still works as a fallback; the scraper additionally needs OPENAI_API_KEY set.
+    """
+    return resolve_flag_safe("CATALOG_SCRAPER_ENABLED", env_default=False)
 
 
 def _slug(value: str) -> str:
