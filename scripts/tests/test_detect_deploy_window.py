@@ -1,13 +1,15 @@
 """Tests for scripts/detect_deploy_window.py — the E2E Sentinel deploy-window detector."""
 import json
-import os
 import sys
+from pathlib import Path
 
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
+# scripts/ has no __init__.py, so import the module bare after putting scripts/ on
+# the path — matching the sibling tests (test_campaign_scorer_degraded.py et al.).
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
 
-from scripts.detect_deploy_window import detect  # noqa: E402
+from detect_deploy_window import detect  # noqa: E402
 
 
 def _write(tmp_path, rows):
