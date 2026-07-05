@@ -58,8 +58,12 @@ export interface LogicalVerdict {
 
 export interface AssertLogicalPageOpts {
   /** Injectable health probe (default: probeApiHealthy against E2E_API_URL). Used to
-   *  classify a raw-error page as environmental (backend down) vs a real B13 bug. */
+   *  classify a raw-error page (B13) or a permanent spinner (B10) as environmental
+   *  (backend down) vs a real bug. */
   probeHealthy?: (request: APIRequestContext) => Promise<boolean>;
+  /** Override the permanent-spinner window (default 30000ms). Injectable so the B10
+   *  tolerance is unit-testable without a 30s real wait. */
+  spinnerClearMs?: number;
 }
 
 export async function assertLogicalPage(
@@ -88,7 +92,7 @@ export async function assertLogicalPage(
   // on cold-start [AIQ-1375]: its company-scoped kpis/cases query plans stay cold even
   // after the generic DB warm-up [#1170], so the first "Loading cases…" can exceed 15s.
   // 30s absorbs that; a genuinely stuck spinner never clears, so B10 stays strict.)
-  const SPINNER_CLEAR_MS = 30000;
+  const SPINNER_CLEAR_MS = opts?.spinnerClearMs ?? 30000;
   const spinner = page.locator('[role="status"], .animate-spin, :text("Loading")');
   if (await spinner.first().isVisible().catch(() => false)) {
     const stillSpinning = await spinner
@@ -96,7 +100,25 @@ export async function assertLogicalPage(
       .waitFor({ state: 'hidden', timeout: SPINNER_CLEAR_MS })
       .then(() => false)
       .catch(() => true);
-    if (stillSpinning) signals.push('permanent-spinner(B10)');
+    if (stillSpinning) {
+      // Same deploy-window tolerance as the B13 branch below: a spinner that never clears
+      // is only a real B10 bug if the backend is UP. During a Render rolling-restart (every
+      // merge to main) the data fetch behind the spinner never resolves — an environmental
+      // transient, not a stuck-widget defect. Probe health to tell them apart: down →
+      // backend-unavailable(env) + an 'environmental' annotation the ingest reclassifies to
+      // a non-filing ENV; up → a genuine permanent-spinner(B10).
+      const probe = opts?.probeHealthy ?? ((req: APIRequestContext) => probeApiHealthy(req));
+      const healthy = await probe(page.request).catch(() => true); // fail-safe: unknown → treat as bug
+      if (!healthy) {
+        signals.push('backend-unavailable(env)');
+        info.annotations.push({
+          type: 'environmental',
+          description: `backend health probe failed while ${label} showed a permanent spinner (deploy-window transient)`,
+        });
+      } else {
+        signals.push('permanent-spinner(B10)');
+      }
+    }
   }
   // raw error / no-retry? A raw error page is only a real B13 bug if the backend is
   // actually UP — during a Render rolling-restart (every merge to main) a data fetch
