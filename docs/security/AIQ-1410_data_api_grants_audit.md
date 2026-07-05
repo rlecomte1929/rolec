@@ -79,3 +79,28 @@ would expose all rows to any logged-in user; add RLS first or leave it backend-o
 **Bottom line:** No blanket Oct-30 exposure — ReloPass is backend-routed and the Data-API tables that
 matter are already granted. The draft migration covers the 9 edge tables for a deliberate, reviewed
 decision, not an automatic apply.
+
+## Remediation applied — 2026-07-05
+A per-table re-check against prod (`pg_policies` + `relrowsecurity` + `pg_publication_tables`) confirmed
+that **6 of the Tier-3 tables are live Data-API dependencies with RLS enabled and correctly row-scoped**,
+so they would silently lose Data-API access on Oct-30 without an explicit grant. Because `GRANT SELECT` is
+additive and stays gated by each table's RLS, granting them is safe. Applied via
+`supabase/migrations/20260827000000_data_api_grants_oct30_safe_subset.sql` (rollback-tx validated, then
+applied to prod + ledger-reconciled):
+
+| Granted (`SELECT` → `authenticated`) | Why safe |
+|---|---|
+| `case_forms` | realtime + RLS `case_id → cases(employee/company)` |
+| `profiles` | RLS own / hr-company-scoped / admin |
+| `notification_preferences` | RLS `user_id = auth.uid()` |
+| `policy_documents` | RLS `hr_company_ids() OR is_admin()` |
+| `daily_summaries` | RLS admin-only |
+| `pet_import_rules` | public reference data (non-PII), RLS `USING(true)` |
+
+**Still pending (each needs a prior fix — deliberately NOT granted):**
+- `notifications` — only an `is_admin()` policy exists; a grant alone delivers nothing to normal users.
+  Add a per-user SELECT policy first, then grant.
+- `provider_tasks` — not in the `supabase_realtime` publication, so its realtime sub already no-ops; a
+  grant won't restore it. Separate latent bug (add to publication + grant).
+- `supplier_stats` — RLS is OFF; a grant would expose every row to any logged-in user. Enable RLS +
+  policies first, or route the frontend read through the backend.

@@ -1,5 +1,11 @@
 -- AIQ-1410 — Data-API grants for frontend-referenced tables (Oct-30 2026 deadline)
 --
+-- STATUS 2026-07-05: the reviewed SAFE SUBSET (case_forms, profiles, notification_preferences,
+-- policy_documents, daily_summaries, pet_import_rules) was applied via
+-- 20260827000000_data_api_grants_oct30_safe_subset.sql. This file stays as the
+-- documentation-of-record for all 8 candidate tables; the 3 still commented below
+-- (notifications, provider_tasks, supplier_stats) each need a prior fix — see that file's header.
+--
 -- ⚠️ DRAFT — REVIEW REQUIRED. DO NOT APPLY BLINDLY. ⚠️
 -- The GRANT statements below are intentionally COMMENTED OUT so this file is a
 -- no-op if `supabase db push` runs. Granting anon/authenticated OPENS Data-API
