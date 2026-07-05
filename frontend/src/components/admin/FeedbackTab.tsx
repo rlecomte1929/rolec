@@ -75,6 +75,7 @@ export function FeedbackTab() {
   const [error, setError]                 = useState<string | null>(null);
   const [activeStream, setActiveStream]   = useState<ActiveMode>('all');
   const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all');
+  const [reporterFilter, setReporterFilter] = useState('');
   const [savingId, setSavingId]           = useState<string | null>(null);
   const [expanded, setExpanded]           = useState<string | null>(null);
 
@@ -169,8 +170,13 @@ export function FeedbackTab() {
     }
   };
 
+  const reporterQuery = reporterFilter.trim().toLowerCase();
   const displayed = rows.filter((r) => {
     if (activeStream !== 'dispatched' && filterStatus !== 'all' && r.status !== filterStatus) return false;
+    if (reporterQuery) {
+      const hay = `${r.reporter_name ?? ''} ${r.reporter_email ?? ''}`.toLowerCase();
+      if (!hay.includes(reporterQuery)) return false;
+    }
     return true;
   });
 
@@ -352,6 +358,19 @@ export function FeedbackTab() {
             </Button>
           ))}
         </div>
+        <input
+          type="text"
+          value={reporterFilter}
+          onChange={(e) => setReporterFilter(e.target.value)}
+          placeholder="Filter by reporter…"
+          aria-label="Filter by reporter name or email"
+          className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-48"
+        />
+        {reporterQuery && (
+          <span className="text-[11px] text-gray-400">
+            {displayed.length} match{displayed.length === 1 ? '' : 'es'}
+          </span>
+        )}
         <div className="flex-1" />
         <Button unstyled onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
           Refresh
@@ -514,13 +533,40 @@ export function FeedbackTab() {
                       <div className="flex items-center gap-2 flex-wrap text-[10.5px]">
                         <span className="font-semibold text-gray-600">{STREAM_LABEL[row.stream]}</span>
                         <span className="font-mono text-gray-400">{row.source_ref}</span>
-                        <span className="text-gray-400">{fmtDate(row.created_at)}</span>
-                        {row.user_id && (
-                          <span className="font-mono text-gray-400">user: {row.user_id.slice(0, 12)}…</span>
-                        )}
                         {row.company_id && (
                           <span className="font-mono text-gray-400">co: {row.company_id}</span>
                         )}
+                      </div>
+                      {/* Reporter attribution — who reported this, and exactly when */}
+                      <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                        <span className="text-gray-400">Reported by</span>
+                        {(row.reporter_name || row.reporter_email) ? (
+                          <>
+                            {row.reporter_name && (
+                              <span className="font-medium text-gray-700">{row.reporter_name}</span>
+                            )}
+                            {row.reporter_email && (
+                              <a
+                                href={`mailto:${row.reporter_email}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[#1f8e8b] hover:underline"
+                              >
+                                {row.reporter_email}
+                              </a>
+                            )}
+                            {row.reporter_role && (
+                              <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 font-medium">
+                                {row.reporter_role}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="italic text-gray-400">Unknown reporter</span>
+                        )}
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-500" title={new Date(row.created_at).toLocaleString()}>
+                          {fmtDate(row.created_at)}
+                        </span>
                       </div>
                       <p className="text-sm text-gray-800 whitespace-pre-wrap">{row.text ?? '—'}</p>
                       {row.stream === 'product' && row.has_screenshot && (

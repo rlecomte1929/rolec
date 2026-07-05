@@ -27,7 +27,10 @@ CREATE TABLE feedback (
   status TEXT NOT NULL DEFAULT 'new',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   screenshot_data TEXT,
-  report_id TEXT
+  report_id TEXT,
+  reporter_email TEXT,
+  reporter_name TEXT,
+  reporter_role TEXT
 );
 """
 
@@ -81,6 +84,19 @@ class FeedbackEndpointTests(unittest.TestCase):
             fb.submit_feedback(fb.FeedbackBody(category="bug", message="   ", page_url="/"), _req(), EMP)
         self.assertEqual(ctx.exception.status_code, 422)
         self.assertEqual(len(self._rows()), 0)
+
+    def test_submit_stores_reporter_identity(self):
+        user = {"id": "22222222-2222-2222-2222-222222222222", "role": "HR",
+                "email": "hr@x.com", "name": "Hank HR",
+                "auth_uuid": "22222222-2222-2222-2222-222222222222"}
+        fb.submit_feedback(fb.FeedbackBody(category="idea", message="nice"), _req(), user)
+        with self.engine.begin() as c:
+            r = c.execute(text(
+                "SELECT reporter_email, reporter_name, reporter_role FROM feedback"
+            )).mappings().all()[0]
+        self.assertEqual(r["reporter_email"], "hr@x.com")
+        self.assertEqual(r["reporter_name"], "Hank HR")
+        self.assertEqual(r["reporter_role"], "HR")
 
     def test_oversized_screenshot_dropped_but_text_kept(self):
         big = "x" * (fb._MAX_SCREENSHOT + 1)

@@ -21,6 +21,10 @@ export interface UnifiedFeedbackItem {
   status: TriageStatus | null;
   owner: string | null;
   resolution: string | null;
+  /** Reporter identity — snapshot at submit (product) or resolved from profiles. */
+  reporter_name?: string | null;
+  reporter_email?: string | null;
+  reporter_role?: string | null;
   /** BR-2 / D1: triage classifier + dispatch fields */
   severity?: string | null;
   area?: string | null;

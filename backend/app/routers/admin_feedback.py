@@ -69,7 +69,10 @@ SELECT
     CAST(f.user_id   AS TEXT) AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
     f.created_at,
-    CASE WHEN f.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot
+    CASE WHEN f.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot,
+    f.reporter_name           AS reporter_name,
+    f.reporter_email          AS reporter_email,
+    f.reporter_role           AS reporter_role
 FROM feedback f
 
 UNION ALL
@@ -83,7 +86,10 @@ SELECT
     h.reviewer_user_id        AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
     h.created_at,
-    0                         AS has_screenshot
+    0                         AS has_screenshot,
+    CAST(NULL AS TEXT)        AS reporter_name,
+    CAST(NULL AS TEXT)        AS reporter_email,
+    CAST(NULL AS TEXT)        AS reporter_role
 FROM ai_human_feedback h
 
 UNION ALL
@@ -97,7 +103,10 @@ SELECT
     p.user_id                 AS user_id,
     p.company_id              AS company_id,
     p.created_at,
-    0                         AS has_screenshot
+    0                         AS has_screenshot,
+    CAST(NULL AS TEXT)        AS reporter_name,
+    CAST(NULL AS TEXT)        AS reporter_email,
+    CAST(NULL AS TEXT)        AS reporter_role
 FROM policy_answer_helpfulness p
 
 UNION ALL
@@ -111,7 +120,10 @@ SELECT
     hf.hr_user_id             AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
     {hr_created_at}           AS created_at,
-    0                         AS has_screenshot
+    0                         AS has_screenshot,
+    CAST(NULL AS TEXT)        AS reporter_name,
+    CAST(NULL AS TEXT)        AS reporter_email,
+    CAST(NULL AS TEXT)        AS reporter_role
 FROM hr_feedback hf
 
 UNION ALL
@@ -125,7 +137,10 @@ SELECT
     CAST(cf.author_user_id AS TEXT) AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
     cf.created_at_ts          AS created_at,
-    0                         AS has_screenshot
+    0                         AS has_screenshot,
+    CAST(NULL AS TEXT)        AS reporter_name,
+    CAST(NULL AS TEXT)        AS reporter_email,
+    CAST(NULL AS TEXT)        AS reporter_role
 FROM case_feedback cf
 """
 
@@ -133,6 +148,12 @@ _OUTER_SQL = """
 SELECT
     base.id, base.stream, base.source_ref, base.text, base.verdict,
     base.user_id, base.company_id, base.created_at, base.has_screenshot,
+    -- Reporter identity: product rows carry a snapshot taken at submit time;
+    -- every stream also resolves the raw user_id against profiles as a fallback
+    -- (CAST(pr.id AS TEXT) bridges uuid-vs-text ids, and works on Postgres + SQLite).
+    COALESCE(base.reporter_name,  pr.full_name) AS reporter_name,
+    COALESCE(base.reporter_email, pr.email)     AS reporter_email,
+    COALESCE(base.reporter_role,  pr.role)      AS reporter_role,
     fs.status, fs.owner, fs.resolution,
     CAST(fs.severity        AS TEXT) AS severity,
     CAST(fs.area            AS TEXT) AS area,
@@ -144,6 +165,8 @@ FROM (
 LEFT JOIN feedback_status fs
        ON fs.stream    = base.stream
       AND fs.source_id = base.id
+LEFT JOIN profiles pr
+       ON CAST(pr.id AS TEXT) = base.user_id
 WHERE 1=1
 {filters}
 ORDER BY base.created_at DESC

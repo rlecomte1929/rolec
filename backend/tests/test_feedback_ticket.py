@@ -49,7 +49,10 @@ CREATE TABLE IF NOT EXISTS feedback (
   status       TEXT DEFAULT 'new',
   created_at   TEXT DEFAULT (datetime('now')),
   report_id    TEXT,
-  screenshot_data TEXT
+  screenshot_data TEXT,
+  reporter_email TEXT,
+  reporter_name TEXT,
+  reporter_role TEXT
 );
 CREATE TABLE IF NOT EXISTS feedback_status (
   stream          TEXT NOT NULL,
@@ -178,7 +181,8 @@ def test_submit_still_succeeds_without_feedback_status_table(monkeypatch):
             "user_id TEXT, page_url TEXT, category TEXT DEFAULT 'other',"
             "message TEXT, status TEXT DEFAULT 'new',"
             "created_at TEXT DEFAULT (datetime('now')),"
-            "report_id TEXT, screenshot_data TEXT)"
+            "report_id TEXT, screenshot_data TEXT,"
+            "reporter_email TEXT, reporter_name TEXT, reporter_role TEXT)"
         ))
 
     # Patch the router's own db reference (suite-order safe).
