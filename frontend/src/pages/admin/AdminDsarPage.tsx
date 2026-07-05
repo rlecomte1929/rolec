@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { Alert, Badge, Card } from '../../components/antigravity';
 import { Button } from '../../components/antigravity/Button';
-import { listErasureRequests, exportUserData, eraseUserData, type ErasureRequest } from '../../api/dsar';
+import { listErasureRequests, exportUserData, eraseUserData, patchErasureRequest, type ErasureRequest, type ErasureAction } from '../../api/dsar';
 
 const statusTone = (s: string): 'success' | 'warning' | 'error' | 'neutral' =>
   s === 'completed' ? 'success' : s === 'rejected' ? 'error' : s === 'pending' ? 'warning' : 'neutral';
@@ -26,6 +26,7 @@ export const AdminDsarPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [eraseTarget, setEraseTarget] = useState<ErasureRequest | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [actingId, setActingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true); setError(null);
@@ -48,6 +49,19 @@ export const AdminDsarPage: React.FC = () => {
       downloadJson(data, `dsar-export-${userId}.json`);
     } catch {
       setError('Export failed.');
+    }
+  }
+
+  async function onLifecycle(r: ErasureRequest, action: ErasureAction) {
+    setError(null);
+    setActingId(r.id);
+    try {
+      await patchErasureRequest(r.id, action);
+      await load();
+    } catch {
+      setError(`Could not ${action} the request.`);
+    } finally {
+      setActingId(null);
     }
   }
 
@@ -106,7 +120,22 @@ export const AdminDsarPage: React.FC = () => {
                   <td className="px-4 py-2"><Badge variant={statusTone(r.status)} size="sm">{r.status}</Badge></td>
                   <td className="px-4 py-2 text-slate-400">{r.requested_at ? r.requested_at.slice(0, 10) : '—'}</td>
                   <td className="px-4 py-2 text-slate-400">{r.statutory_due_at ? r.statutory_due_at.slice(0, 10) : '—'}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right whitespace-nowrap">
+                    {r.status === 'pending' && (
+                      <>
+                        <button disabled={actingId === r.id} className="mr-3 text-xs font-medium text-emerald-700 hover:text-emerald-800 disabled:opacity-50" onClick={() => void onLifecycle(r, 'approve')}>
+                          Approve
+                        </button>
+                        <button disabled={actingId === r.id} className="mr-3 text-xs font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50" onClick={() => void onLifecycle(r, 'reject')}>
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {r.status === 'approved' && (
+                      <button disabled={actingId === r.id} className="mr-3 text-xs font-medium text-emerald-700 hover:text-emerald-800 disabled:opacity-50" onClick={() => void onLifecycle(r, 'complete')}>
+                        Mark complete
+                      </button>
+                    )}
                     {r.employee_id && (
                       <>
                         <button className="mr-3 text-xs font-medium text-accent-700 hover:text-accent-800" onClick={() => void onExport(r.employee_id!)}>

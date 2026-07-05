@@ -6,9 +6,11 @@ the missing cross-tenant registry so an admin can see every request in one pane.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
@@ -57,3 +59,54 @@ def list_erasure_requests(
             return {"items": [], "total": 0, "limit": limit, "offset": offset, "table_ready": False}
         raise
     return {"items": [dict(r) for r in rows], "total": int(total), "limit": limit, "offset": offset, "table_ready": True}
+
+
+class ErasurePatch(BaseModel):
+    action: str  # approve | reject | complete
+
+
+# Action → target status. approve/reject stamp reviewer + reviewed_at; complete stamps completed_at.
+_ACTION_STATUS = {"approve": "approved", "reject": "rejected", "complete": "completed"}
+
+
+@router.patch("/erasure-requests/{request_id}")
+def patch_erasure_request(
+    request_id: str,
+    body: ErasurePatch,
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Transition an erasure request through its review lifecycle so the statutory
+    clock can actually be actioned in-registry (the export/erase of the subject's data
+    still runs via the existing /api/users/{id}/data* endpoints)."""
+    new_status = _ACTION_STATUS.get(body.action)
+    if not new_status:
+        raise HTTPException(status_code=400, detail="action must be one of: approve, reject, complete")
+    now = datetime.utcnow().isoformat()
+    sets = ["status = :status"]
+    params: Dict[str, Any] = {"id": request_id, "status": new_status, "now": now, "admin": admin["id"]}
+    if body.action in ("approve", "reject"):
+        sets += ["reviewed_by = :admin", "reviewed_at = :now"]
+    else:  # complete
+        sets += ["completed_at = :now"]
+    try:
+        with db.engine.begin() as conn:
+            res = conn.execute(
+                text(f"UPDATE public.erasure_requests SET {', '.join(sets)} WHERE id = :id"), params
+            )
+            if res.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Erasure request not found")
+            row = conn.execute(
+                text(
+                    """
+                    SELECT id, case_id, employee_id, org_id, status, reason,
+                           requested_at, statutory_due_at, reviewed_by, reviewed_at, completed_at
+                    FROM public.erasure_requests WHERE id = :id
+                    """
+                ),
+                {"id": request_id},
+            ).mappings().first()
+    except (ProgrammingError, OperationalError) as exc:
+        if _missing_table(exc):
+            raise HTTPException(status_code=503, detail="erasure_requests registry not available")
+        raise
+    return {"ok": True, "item": dict(row) if row else None}
