@@ -1742,6 +1742,23 @@ class CasesMixin:
                 "now": now,
             })
 
+    def set_relocation_case_status(self, case_id: str, status: str) -> int:
+        """Status-only transition for a relocation case (e.g. reactivate). Unlike
+        upsert_relocation_case — which UPDATEs every column and null-overwrites
+        company_id/employee_id/stage/countries when called with just a status — this
+        touches ONLY status + updated_at. Returns the number of rows updated (0 when no
+        case matches the id), so callers can report honestly instead of faking success."""
+        now = datetime.utcnow().isoformat()
+        # relocation_cases.id is UUID in prod; cast to text so a string id compares (matches
+        # get_case_by_id). SQLite ids are text already.
+        where = "id = :id" if _is_sqlite else "id::text = :id"
+        with self.engine.begin() as conn:
+            res = conn.execute(
+                text(f"UPDATE relocation_cases SET status = :status, updated_at = :now WHERE {where}"),
+                {"id": case_id, "status": status, "now": now},
+            )
+            return res.rowcount or 0
+
     def create_support_case(
         self,
         support_case_id: str,

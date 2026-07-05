@@ -1087,6 +1087,9 @@ export interface AdminAssignmentDetail extends AdminAssignment {
   employee_profile_company_id?: string;
   hr_profile_company_id?: string;
   company_id?: string;
+  // Resolved relocation-case primary key (rc.id) from the case_assignments →
+  // relocation_cases join; case_status is inherited from AdminAssignment.
+  case_pk?: string | null;
 }
 
 export interface AdminSupportCase {
