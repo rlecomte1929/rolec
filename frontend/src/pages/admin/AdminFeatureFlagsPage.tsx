@@ -3,7 +3,7 @@ import { AdminLayout } from './AdminLayout';
 import { Alert, Badge, Card } from '../../components/antigravity';
 import { Button } from '../../components/antigravity/Button';
 import {
-  listFeatureFlags, upsertFeatureFlag, patchFeatureFlag, addFlagAccount,
+  listFeatureFlags, upsertFeatureFlag, patchFeatureFlag, addFlagAccount, removeFlagAccount,
   type FeatureFlagRow,
 } from '../../api/featureFlags';
 
@@ -61,6 +61,18 @@ export const AdminFeatureFlagsPage: React.FC = () => {
       await load();
     } catch {
       setError('Could not add the account.');
+    }
+  }
+
+  async function onRemoveAccount(key: string) {
+    const account = window.prompt(`Remove an account id from the "${key}" allowlist:`);
+    if (!account) return;
+    setError(null);
+    try {
+      await removeFlagAccount(key, account.trim());
+      await load();
+    } catch {
+      setError('Could not remove the account.');
     }
   }
 
@@ -122,9 +134,14 @@ export const AdminFeatureFlagsPage: React.FC = () => {
                     <button className="mr-3 text-xs font-medium text-accent-700 hover:text-accent-800" onClick={() => void onToggle(row)}>
                       {row.enabled ? 'Disable' : 'Enable'}
                     </button>
-                    <button className="text-xs text-slate-500 hover:text-navy-800" onClick={() => void onAddAccount(row.key)}>
+                    <button className="mr-3 text-xs text-slate-500 hover:text-navy-800" onClick={() => void onAddAccount(row.key)}>
                       + account
                     </button>
+                    {row.account_count > 0 && (
+                      <button className="text-xs text-slate-500 hover:text-navy-800" onClick={() => void onRemoveAccount(row.key)}>
+                        − account
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
