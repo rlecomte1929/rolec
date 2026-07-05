@@ -120,3 +120,38 @@ export interface AdminNotificationCounts {
 
 export const getAdminNotificationCounts = (): Promise<AdminNotificationCounts> =>
   apiGet('/api/admin/catalog/notification-counts');
+
+// GAP 5 — real supplier discovery
+export interface DiscoveryStatus {
+  provider: string;
+  configured: boolean;
+}
+
+export interface DiscoveryResult {
+  name: string;
+  website: string | null;
+  phone: string | null;
+  formatted_address: string | null;
+  rating: number | null;
+  user_ratings_total: number | null;
+  place_id: string | null;
+  already_in_catalog: boolean;
+}
+
+export const getDiscoveryStatus = (): Promise<DiscoveryStatus> =>
+  apiGet('/api/admin/catalog/discovery-status');
+
+export const discoverSuppliers = (
+  category: string,
+  city: string,
+  country: string
+): Promise<{ results: DiscoveryResult[]; total: number; provider: string }> =>
+  apiPost('/api/admin/catalog/discover', { category, city, country });
+
+export const importDiscovered = (payload: {
+  category: string;
+  city: string;
+  country: string;
+  items: Array<{ name: string; website?: string | null; place_id?: string | null; formatted_address?: string | null }>;
+}): Promise<{ created: number; requested: number }> =>
+  apiPost('/api/admin/catalog/discover/import', payload);

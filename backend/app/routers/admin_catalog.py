@@ -427,3 +427,131 @@ def promote_hr_vendors(
         )
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
+
+
+# ---------------------------------------------------------------------------
+# GAP 5 — real supplier discovery (maps provider → Supplier Registry as pending)
+# ---------------------------------------------------------------------------
+
+# Best-effort country name/code → ISO2 for the corridor destinations; unknown
+# countries fall back to a global-scope capability (no country_code required).
+_COUNTRY_ISO2 = {
+    "norway": "NO", "united kingdom": "GB", "united states": "US", "india": "IN",
+    "germany": "DE", "singapore": "SG", "united arab emirates": "AE", "france": "FR",
+    "netherlands": "NL", "spain": "ES",
+}
+
+
+def _iso2(country: Optional[str]) -> Optional[str]:
+    c = (country or "").strip()
+    if len(c) == 2:
+        return c.upper()
+    return _COUNTRY_ISO2.get(c.lower())
+
+
+def _domain(url: Optional[str]) -> str:
+    if not url:
+        return ""
+    u = url.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "")
+    return u.split("/")[0]
+
+
+class DiscoverBody(BaseModel):
+    category: str
+    city: str
+    country: str
+
+
+class DiscoverImportItem(BaseModel):
+    name: str
+    website: Optional[str] = None
+    place_id: Optional[str] = None
+    formatted_address: Optional[str] = None
+
+
+class DiscoverImportBody(BaseModel):
+    category: str
+    city: str
+    country: str
+    items: List[DiscoverImportItem]
+
+
+@router.get("/discovery-status")
+def discovery_status(user: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    """Read-only indicator of which discovery provider is active (green/grey in UI)."""
+    from ..services import maps_discovery
+    return maps_discovery.provider_status()
+
+
+@router.post("/discover")
+def discover_suppliers(
+    body: DiscoverBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Search real businesses for a category+destination. Read-only: returns raw
+    results (flagged if already in the catalog); nothing is written until import."""
+    from ..services import maps_discovery, scrape_safety
+    if not scrape_safety.is_destination_allowlisted(body.city, body.country):
+        raise HTTPException(status_code=400, detail="Destination is not allowlisted")
+    results = maps_discovery.search_businesses(body.category, body.city, body.country)
+
+    # Flag rows already present in the Supplier Registry (by name or website domain).
+    from ..db import SessionLocal
+    from ..models import Supplier
+    with SessionLocal() as session:
+        existing = session.query(Supplier.name, Supplier.website).all()
+    names = {(n or "").strip().lower() for n, _ in existing}
+    domains = {_domain(w) for _, w in existing if w}
+    for r in results:
+        dom = _domain(r.get("website"))
+        r["already_in_catalog"] = (r.get("name") or "").strip().lower() in names or (bool(dom) and dom in domains)
+    return {"results": results, "total": len(results), "provider": maps_discovery.provider_status()["provider"]}
+
+
+@router.post("/discover/import")
+def import_discovered(
+    body: DiscoverImportBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Create suppliers + pending capabilities from selected discovery results.
+    Imported items land in the vetting queue (source=scraper_discovery)."""
+    from ..db import SessionLocal
+    from ..models import Supplier
+    from ..services import supplier_registry
+    iso2 = _iso2(body.country)
+    created = 0
+    with SessionLocal() as session:
+        existing_names = {
+            (n or "").strip().lower() for (n,) in session.query(Supplier.name).all()
+        }
+        for item in body.items:
+            if (item.name or "").strip().lower() in existing_names:
+                continue
+            cap: Dict[str, Any] = {
+                "service_category": body.category,
+                "city_name": body.city,
+                "platform_vetting_status": "pending",
+            }
+            if iso2:
+                cap["coverage_scope_type"] = "city"
+                cap["country_code"] = iso2
+            else:
+                cap["coverage_scope_type"] = "global"
+            source_url = (
+                f"https://www.google.com/maps/place/?q=place_id:{item.place_id}"
+                if item.place_id else None
+            )
+            try:
+                supplier_registry.create_supplier(session, {
+                    "name": item.name,
+                    "website": item.website,
+                    "status": "active",
+                    "source": "scraper_discovery",
+                    "source_url": source_url,
+                    "capabilities": [cap],
+                })
+                existing_names.add((item.name or "").strip().lower())
+                created += 1
+            except ValueError:
+                continue  # skip individual invalid rows, keep importing the rest
+    return {"created": created, "requested": len(body.items)}
