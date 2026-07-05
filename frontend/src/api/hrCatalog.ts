@@ -157,6 +157,34 @@ export const populateDestinationWithAi = (
     country,
   });
 
+// Real-business discovery (Google Places) for one category × city → master catalog.
+export interface DiscoveredVendor {
+  name: string;
+  rating?: number;
+  user_ratings_total?: number;
+  business_status?: string;
+  website?: string;
+  accreditation_tags?: string[];
+}
+
+export interface DiscoverVendorsResult {
+  vendors: DiscoveredVendor[];
+  count: number;
+  status?: 'pending_admin_approval';
+  message?: string;
+}
+
+export const discoverVendorsForCity = (
+  category: string,
+  destinationCity: string,
+  country: string,
+): Promise<DiscoverVendorsResult> =>
+  apiPost('/api/hr/catalog/discover', {
+    category,
+    destination_city: destinationCity,
+    country,
+  });
+
 // ---------------------------------------------------------------------------
 // Phase 2 notifications: employee demand + nav badges
 // ---------------------------------------------------------------------------

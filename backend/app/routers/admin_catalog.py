@@ -481,6 +481,17 @@ class DiscoverImportBody(BaseModel):
 _DISCOVERY_QUOTA_KEY = "admin-discovery"
 
 
+@router.post("/vendors/refresh-stale")
+def refresh_stale_vendors_api(
+    dry_run: bool = Query(False),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Trigger the vendor freshness refresh (VEN-11): re-check discovery-sourced
+    suppliers via Google Places, refresh ratings, suspend permanently-closed ones."""
+    from ..tasks.vendor_freshness_refresh import refresh_stale_vendors
+    return {"status": "ok", "stats": refresh_stale_vendors(dry_run=dry_run)}
+
+
 @router.get("/discovery-status")
 def discovery_status(user: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
     """Read-only indicator: active provider, whether its key is configured, the

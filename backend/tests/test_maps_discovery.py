@@ -43,18 +43,22 @@ def test_google_places_without_key_returns_empty(monkeypatch):
     assert maps_discovery.search_businesses("movers", "Oslo", "Norway") == []
 
 
-def test_keyword_mapping():
-    assert maps_discovery._keyword_for("movers") == "international moving company"
-    assert maps_discovery._keyword_for("legal_admin") == "immigration lawyer expats"
-    # unknown slug falls back to itself
-    assert maps_discovery._keyword_for("weird_cat") == "weird_cat"
+def test_build_query_from_config():
+    # sourced from VEN-01 SERVICE_CATEGORY_SEARCH_TERMS (first template, {city} filled)
+    assert maps_discovery._build_query("movers", "Berlin") == "international removals Berlin"
+    assert maps_discovery._build_query("legal_admin", "Paris") == "immigration lawyer Paris"
+    # registry slug 'living_areas' aliases to config key 'housing'
+    assert maps_discovery._build_query("living_areas", "Paris") == "relocation housing agency Paris"
+    # unknown slug → bare fallback
+    assert maps_discovery._build_query("weird_cat", "Oslo") == "Oslo weird_cat"
 
 
 def test_provider_status_disabled(monkeypatch):
     monkeypatch.setenv("DISCOVERY_PROVIDER", "disabled")
+    monkeypatch.delenv("DISCOVERY_MAX_RESULTS", raising=False)
     st = maps_discovery.provider_status()
     assert st["provider"] == "disabled" and st["configured"] is False
-    assert st["max_results"] == 10  # default cap
+    assert st["max_results"] == 20  # default cap = config max_candidates_to_fetch
 
 
 def test_max_results_env_and_clamp(monkeypatch):
@@ -62,24 +66,54 @@ def test_max_results_env_and_clamp(monkeypatch):
     assert maps_discovery._max_results() == 3
     monkeypatch.setenv("DISCOVERY_MAX_RESULTS", "999")  # clamped to 60
     assert maps_discovery._max_results() == 60
-    monkeypatch.setenv("DISCOVERY_MAX_RESULTS", "junk")  # falls back to default
-    assert maps_discovery._max_results() == 10
+    monkeypatch.setenv("DISCOVERY_MAX_RESULTS", "junk")  # falls back to config default
+    assert maps_discovery._max_results() == 20
 
 
-def test_search_caps_google_places_results(monkeypatch):
-    # google_places path slices results to the cap (5 raw → 3 with cap=3)
+def test_google_places_v1_parses_website_and_caps(monkeypatch):
+    # New Places v1 API: POST → data['places']; returns websiteUri in one call.
     monkeypatch.setenv("DISCOVERY_PROVIDER", "google_places")
     monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
     monkeypatch.setenv("DISCOVERY_MAX_RESULTS", "3")
 
     class _Resp:
+        def raise_for_status(self):
+            return None
+
         def json(self):
-            return {"results": [{"name": f"biz{i}", "place_id": f"p{i}"} for i in range(5)]}
+            return {"places": [
+                {"id": f"p{i}", "displayName": {"text": f"biz{i}"},
+                 "websiteUri": f"https://biz{i}.example", "nationalPhoneNumber": "+1",
+                 "formattedAddress": "Berlin", "rating": 4.5, "userRatingCount": 40,
+                 "businessStatus": "OPERATIONAL"}
+                for i in range(5)
+            ]}
+
+    import requests
+    monkeypatch.setattr(requests, "post", lambda *a, **k: _Resp())
+    out = maps_discovery.search_businesses("movers", "Berlin", "DE")
+    assert len(out) == 3  # capped
+    assert out[0]["website"] == "https://biz0.example"  # v1 returns website
+    assert out[0]["name"] == "biz0" and out[0]["place_id"] == "p0"
+
+
+def test_refresh_vendor_by_place_id(monkeypatch):
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
+
+    class _Resp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"id": "p1", "rating": 4.2, "userRatingCount": 55, "businessStatus": "OPERATIONAL"}
 
     import requests
     monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp())
-    out = maps_discovery.search_businesses("movers", "Oslo", "Norway")
-    assert len(out) == 3
+    r = maps_discovery.refresh_vendor_by_place_id("p1")
+    assert r["rating"] == 4.2 and r["user_ratings_total"] == 55
+    # no key → None
+    monkeypatch.delenv("GOOGLE_PLACES_API_KEY", raising=False)
+    assert maps_discovery.refresh_vendor_by_place_id("p1") is None
 
 
 # ---------------------------------------------------------------------------

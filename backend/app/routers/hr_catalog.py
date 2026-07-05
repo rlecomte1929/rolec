@@ -323,6 +323,65 @@ class PopulateWithAiBody(BaseModel):
     country: str = Field(..., min_length=1)
 
 
+class VendorDiscoverBody(BaseModel):
+    category: str = Field(..., min_length=1)
+    destination_city: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=1)
+
+
+@router.post("/discover")
+def discover_vendors_for_city(
+    body: VendorDiscoverBody,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """HR-triggered vendor discovery (VEN-10): fetch the top verified vendors from
+    the maps provider for (category, city), quality-gate + rank them, and upsert
+    into the master catalog so they appear in this HR team's curation view. Same
+    allowlist + quota safety as populate-with-ai; off by default ($0)."""
+    from ..services import maps_discovery, scrape_safety
+
+    company_id = _caller_company_id(user)
+    actor_id = user["id"]
+    city = body.destination_city.strip()
+    country = body.country.strip()
+
+    # L4 — allowlist gate (off-list opens a ticket instead of spending)
+    if not scrape_safety.is_destination_allowlisted(city, country):
+        ticket = scrape_safety.open_destination_request(
+            city=city, country=country, category=body.category,
+            requested_by_user_id=actor_id, company_id=company_id,
+        )
+        return {
+            "status": "pending_admin_approval", "request": ticket, "vendors": [], "count": 0,
+            "message": (f"{city}, {country} isn't on our supported destinations yet. "
+                        "We've notified our admin team — you'll see it appear here once approved."),
+        }
+
+    # Provider not configured → no external call, no cost, no quota consumed.
+    if not maps_discovery.provider_status()["configured"]:
+        return {"vendors": [], "count": 0, "message": "Vendor discovery isn't enabled yet."}
+
+    # L3 — quota gate (atomic)
+    quota = scrape_safety.check_and_increment_quota(company_id)
+    if not quota["allowed"]:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily discovery limit reached ({quota['limit']}/day). Try again tomorrow.",
+        )
+
+    from ..services.vendor_discovery.orchestrator import discover_to_catalog
+    vendors = discover_to_catalog(body.category, city, country)
+    return {
+        "vendors": vendors,
+        "count": len(vendors),
+        "destination_city": city,
+        "category": body.category,
+        "message": (None if vendors else
+                    f"No verified vendors found for {body.category} in {city}. The city may not "
+                    "have enough reviewed businesses yet."),
+    }
+
+
 @router.post("/populate-with-ai")
 def populate_with_ai(
     body: PopulateWithAiBody,
