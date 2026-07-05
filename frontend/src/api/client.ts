@@ -1585,6 +1585,26 @@ export const adminAPI = {
     const response = await api.patch<{ ok: boolean; status: string }>(`/api/admin/assignments/${assignmentId}/status`, payload);
     return response.data;
   },
+  // Force an eligibility decision for one requirement category on an assignment
+  // (POST /api/admin/actions/override-eligibility — reason required, audit-logged).
+  overrideEligibility: async (payload: {
+    assignment_id: string;
+    category: string;
+    allowed: boolean;
+    reason: string;
+    note?: string;
+  }): Promise<{ ok: boolean }> => {
+    const response = await api.post<{ ok: boolean }>('/api/admin/actions/override-eligibility', {
+      reason: payload.reason,
+      payload: {
+        assignment_id: payload.assignment_id,
+        category: payload.category,
+        allowed: payload.allowed,
+        note: payload.note,
+      },
+    });
+    return response.data;
+  },
   createAssignment: async (payload: {
     company_id: string;
     hr_user_id: string;

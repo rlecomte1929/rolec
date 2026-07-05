@@ -586,6 +586,10 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
   const [fixCompanyId, setFixCompanyId] = useState('');
   const [editStatus, setEditStatus] = useState<string>('');
   const [statusSaving, setStatusSaving] = useState(false);
+  const [ovCategory, setOvCategory] = useState('');
+  const [ovAllowed, setOvAllowed] = useState(true);
+  const [ovSaving, setOvSaving] = useState(false);
+  const [ovMsg, setOvMsg] = useState<string | null>(null);
 
   useEffect(() => {
     adminAPI.listCompanies().then((r) => setCompanies(r.companies ?? [])).catch(() => setCompanies([]));
@@ -667,6 +671,27 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
       onRefresh();
     } finally {
       setStatusSaving(false);
+    }
+  };
+
+  const doOverrideEligibility = async () => {
+    if (!reason.trim() || !ovCategory.trim()) return;
+    setOvSaving(true);
+    setOvMsg(null);
+    try {
+      await adminAPI.overrideEligibility({
+        assignment_id: assignmentId,
+        category: ovCategory.trim(),
+        allowed: ovAllowed,
+        reason: reason.trim(),
+      });
+      setOvMsg(`Eligibility override recorded: ${ovCategory.trim()} → ${ovAllowed ? 'allowed' : 'denied'}.`);
+      setOvCategory('');
+      onRefresh();
+    } catch {
+      setOvMsg('Could not record the override — please retry.');
+    } finally {
+      setOvSaving(false);
     }
   };
 
@@ -840,6 +865,24 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
                       Fix assignment–company linkage
                     </Button>
                   </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <Input unstyled
+                      value={ovCategory}
+                      onChange={setOvCategory}
+                      placeholder="Eligibility category (e.g. visa)"
+                      className="rounded border border-[#e2e8f0] px-3 py-2 text-sm w-56"
+                    />
+                    <Select
+                      value={ovAllowed ? 'allow' : 'deny'}
+                      onChange={(v) => setOvAllowed(v === 'allow')}
+                      options={[{ value: 'allow', label: 'Allow' }, { value: 'deny', label: 'Deny' }]}
+                      placeholder="Decision"
+                    />
+                    <Button size="sm" variant="outline" onClick={doOverrideEligibility} disabled={!reason.trim() || !ovCategory.trim() || ovSaving}>
+                      {ovSaving ? 'Saving…' : 'Override eligibility'}
+                    </Button>
+                  </div>
+                  {ovMsg && <p className="text-xs text-[#6b7280]">{ovMsg}</p>}
                 </div>
               </section>
             </>
