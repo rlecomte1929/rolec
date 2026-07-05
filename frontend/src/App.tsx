@@ -152,6 +152,7 @@ const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((mod
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
 const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
+const AdminTestDrive = lazy(() => import('./pages/admin/AdminTestDrive'));
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
@@ -447,6 +448,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminTestDrive.path} element={<RequireAdminRoute><AdminTestDrive /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAuditLog.path} element={<RequireAdminRoute><AdminAuditLogPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />

@@ -173,6 +173,7 @@ const SECTIONS: NavSection[] = [
       // ── Customers (live accounts + sales pipeline) ──
       { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
       { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
+      { id: 'test-drive', group: 'Customers', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
 
       // ── Content (the CMS admins author / maintain) ──
       { id: 'resources-cms', group: 'Content', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },

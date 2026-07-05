@@ -168,6 +168,7 @@ export const ROUTE_DEFS = {
   adminSupport: { path: '/admin/support', roles: ['ADMIN'] as RouteRole[] },
   adminErrors: { path: '/admin/errors', roles: ['ADMIN'] as RouteRole[] },
   adminFeedback: { path: '/admin/feedback', roles: ['ADMIN'] as RouteRole[] },
+  adminTestDrive: { path: '/admin/test-drive', roles: ['ADMIN'] as RouteRole[] },
   adminAdmins: { path: '/admin/admins', roles: ['ADMIN'] as RouteRole[] },
   adminAuditLog: { path: '/admin/audit-log', roles: ['ADMIN'] as RouteRole[] },
   adminSuppliersNew: { path: '/admin/suppliers/new', roles: ['ADMIN'] as RouteRole[] },
