@@ -71,6 +71,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   'resources-cms': BookOpen,
   prospects: Users,
   integrations: Layers,
+  'vetting-queue': ShieldCheck,
 };
 
 export type NavIconId = keyof typeof NAV_ICONS;

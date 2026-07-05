@@ -1850,6 +1850,12 @@ export const suppliersAPI = {
     const response = await api.get<unknown>(`/api/suppliers/${supplierId}`);
     return response.data;
   },
+  listPendingCapabilities: async () => {
+    const response = await api.get<{ capabilities: unknown[]; total?: number }>(
+      '/api/suppliers/capabilities/pending'
+    );
+    return response.data;
+  },
   search: async (params: {
     service_category: string;
     destination_country?: string;
