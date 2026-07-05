@@ -46,6 +46,7 @@ from .routers import (
     hr_export,
     hr_case_audit,
     hr_case_notes,
+    coordinator,
     hr_case_detail,
     compliance,
     gdpr,
@@ -160,6 +161,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_audit.router)
     # AIQ-1136 / NAV-HR-2-FU: GET/POST /api/hr/cases/{id}/notes — internal case notes.
     app.include_router(hr_case_notes.router)
+    # AIQ-1414 Phase 3: POST /api/cases/{id}/coordinator/respond (flag-gated, dual-registered).
+    app.include_router(coordinator.router)
     # P1-08c/d/e: roadmap as_of reconstruction + legal export + rule-change notifier.
     app.include_router(roadmap_audit.router)
     app.include_router(case_rule_updates.router)  # AIQ-693 — P2-02e rule-update banner read/dismiss
