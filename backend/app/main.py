@@ -81,6 +81,7 @@ from .routers import (
     policy_summary,
     policy_templates,
     predictions,
+    test_drive,
     rag_roadmap,
     relocation_profile,
     roadmap_audit,
@@ -200,6 +201,8 @@ def create_app() -> FastAPI:
     app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
     app.include_router(predictions.router)
+    # [AIQ-1420] TD-2 test-drive self-serve provisioning (canary: RELOPASS_TEST_DRIVE_ENABLED, default off)
+    app.include_router(test_drive.router)
     # [Parker-B] HR benefit-mix optimizer (Markowitz-style)
     app.include_router(benefit_optimizer.router)
     # [Parker-E] RLHF-lite human-feedback capture
