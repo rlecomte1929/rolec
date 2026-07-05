@@ -3229,6 +3229,25 @@ def list_admin_policies(
     return data
 
 
+# NOTE: this literal route MUST be registered before "/api/admin/policies/{policy_id}"
+# below — FastAPI matches in registration order, so if {policy_id} comes first it
+# shadows this and GET /api/admin/policies/templates resolves policy_id="templates",
+# which 500s in db.get_admin_policy_detail (invalid id). Keep templates first.
+@app.get("/api/admin/policies/templates")
+def list_admin_policy_templates(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: list default platform policy templates (empty list if table or data is unavailable)."""
+    try:
+        from .app.services.policy_template_service import PolicyTemplateService
+
+        templates = PolicyTemplateService().build_admin_template_list()  # TPL-3: code-backed
+        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
+        return {"templates": templates}
+    except Exception as e:
+        log.warning("list_admin_policy_templates handler failed (returning empty): %s", e)
+        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {"error": "fallback_empty"})
+        return {"templates": []}
+
+
 @app.get("/api/admin/policies/{policy_id}")
 def get_admin_policy_detail(policy_id: str, user: Dict[str, Any] = Depends(require_admin)):
     """Admin: single policy with company, versions, published version."""
@@ -3289,21 +3308,6 @@ def patch_admin_policy(
     updated = db.get_admin_policy_detail(policy_id)
     db.log_audit(user["id"], "UPDATE", "admin_policy", policy_id, None, payload)
     return updated
-
-
-@app.get("/api/admin/policies/templates")
-def list_admin_policy_templates(user: Dict[str, Any] = Depends(require_admin)):
-    """Admin: list default platform policy templates (empty list if table or data is unavailable)."""
-    try:
-        from .app.services.policy_template_service import PolicyTemplateService
-
-        templates = PolicyTemplateService().build_admin_template_list()  # TPL-3: code-backed
-        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
-        return {"templates": templates}
-    except Exception as e:
-        log.warning("list_admin_policy_templates handler failed (returning empty): %s", e)
-        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {"error": "fallback_empty"})
-        return {"templates": []}
 
 
 @app.post("/api/admin/policies/apply-default-template")

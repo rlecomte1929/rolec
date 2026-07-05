@@ -478,7 +478,10 @@ class DiscoverImportBody(BaseModel):
 
 # Quota key for admin-triggered discovery (no company); reuses the per-day
 # catalog_scrape_quota cap so enabling a paid provider can't run away on cost.
-_DISCOVERY_QUOTA_KEY = "admin-discovery"
+# NOTE: catalog_scrape_quota.company_id is UUID in prod, so this sentinel MUST be a
+# valid UUID — the old "admin-discovery" string raised "invalid input syntax for type
+# uuid" (22P02) → 500 on discovery-status/discover. Fixed nil-ish namespace UUID.
+_DISCOVERY_QUOTA_KEY = "00000000-0000-0000-0000-0000000ad150"
 
 
 @router.post("/vendors/refresh-stale")
