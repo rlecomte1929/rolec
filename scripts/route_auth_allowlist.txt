@@ -179,3 +179,9 @@ backend/app/routers/cases.py:start_research
 
 # Mission Control P2 run-status callback — shared-secret gated (_verify_callback_secret), mirrors the cron pattern.
 backend/app/routers/admin_work_items.py:run_callback
+
+# ── Intentionally public (pre-login) ──────────────────────────────────────────
+backend/app/routers/auth_page_config.py:get_auth_page_config
+# PUBLIC BY DESIGN: the /auth login page reads this decorative GlobeNetwork config
+# BEFORE authentication, so GET has no auth dependency and always returns 200 with
+# defaults. The paired PUT /api/admin/auth-page-config is require_admin-guarded.
