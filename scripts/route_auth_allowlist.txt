@@ -158,6 +158,10 @@ backend/app/routers/crons.py:autopilot_canary
 # CRON (Autopilot P0): _verify_cron_secret(request) inline (503 if unset, 401 on
 # mismatch). Read-only post-deploy diagnostics-replay canary; invoked by the
 # autopilot workflow, not an end user.
+backend/app/routers/crons.py:autopilot_ingest
+# CRON (Autopilot P1): _verify_cron_secret(request) inline. Nightly feedback dedup +
+# auto-dispatch; governor-gated (default OFF), invoked by the autopilot-nightly
+# workflow, not an end user.
 backend/app/routers/crons.py:process_crawl_schedules
 # CRON (P3-02a): _verify_cron_secret(request) inline (503 if unset, 401 on
 # mismatch). Invoked by the crawl-scheduler workflow, not an end user.
