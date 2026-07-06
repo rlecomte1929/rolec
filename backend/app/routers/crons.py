@@ -110,6 +110,26 @@ def autopilot_canary(request: Request, body: CanaryBody) -> Dict[str, Any]:
     return {"dry_run": False, **result.as_dict()}
 
 
+class AutopilotEventBody(BaseModel):
+    event_type: str
+    entity_id: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+
+
+@router.post("/autopilot-event")
+def autopilot_event(request: Request, body: AutopilotEventBody) -> Dict[str, Any]:
+    """[Autopilot P2] Record one autopilot funnel event (fired by the autofix-validate workflow)
+    into public.events, so the metrics dashboard sees the CI-side stages — merged / canary /
+    reverted / task_done — that the backend can't observe on its own."""
+    _verify_cron_secret(request)
+    from ..services import autopilot_events as ev
+
+    if body.event_type not in ev.ALL_EVENTS:
+        raise HTTPException(status_code=422, detail=f"unknown autopilot event_type {body.event_type!r}")
+    ev.emit(body.event_type, entity_id=body.entity_id, properties=body.properties)
+    return {"recorded": True, "event_type": body.event_type}
+
+
 class IngestBody(BaseModel):
     dry_run: bool = False
     lookback_hours: int = 24
