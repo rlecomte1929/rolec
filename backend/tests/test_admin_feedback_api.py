@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   dispatch_ref    TEXT,
   dispatch_status TEXT,
   dispatch_context TEXT,
+  dismissed_at TEXT,
   PRIMARY KEY (stream, source_id)
 );
 CREATE TABLE IF NOT EXISTS hr_feedback (
@@ -412,3 +413,45 @@ def test_unresolvable_reporter_is_null(admin_client):
     r = _row(items, "h-001")  # ai_answers, reviewer_user_id='rev-1' (no profile)
     assert r["reporter_name"] is None
     assert r["reporter_email"] is None
+
+
+# ── Dismiss (soft-hide) + Delete (hard, product only) ────────────────────────
+
+
+def test_dismiss_hides_row_and_include_dismissed_shows_it(admin_client):
+    ids = lambda items: {r["id"] for r in items}
+    assert "f-001" in ids(admin_client.get("/api/admin/feedback").json()["items"])
+
+    resp = admin_client.post("/api/admin/feedback/product/f-001/dismiss", json={"dismissed": True})
+    assert resp.status_code == 200
+
+    # hidden from the default list
+    assert "f-001" not in ids(admin_client.get("/api/admin/feedback").json()["items"])
+    # but present (flagged) when include_dismissed=true
+    items = admin_client.get("/api/admin/feedback?include_dismissed=true").json()["items"]
+    r = _row(items, "f-001")
+    assert r["dismissed"]
+
+    # restore
+    resp = admin_client.post("/api/admin/feedback/product/f-001/dismiss", json={"dismissed": False})
+    assert resp.status_code == 200
+    assert "f-001" in ids(admin_client.get("/api/admin/feedback").json()["items"])
+
+
+def test_delete_product_removes_row(admin_client, db_session):
+    resp = admin_client.delete("/api/admin/feedback/product/f-001")
+    assert resp.status_code == 200
+    remaining = db_session.execute(text("SELECT count(*) FROM feedback WHERE id='f-001'")).scalar()
+    assert remaining == 0
+    assert "f-001" not in {r["id"] for r in admin_client.get("/api/admin/feedback").json()["items"]}
+
+
+def test_delete_non_product_refused(admin_client):
+    # helpfulness stream is ML feedback — must not be hard-deleted
+    resp = admin_client.delete("/api/admin/feedback/helpfulness/p-001")
+    assert resp.status_code == 400
+
+
+def test_dismiss_and_delete_require_admin(non_admin_client):
+    assert non_admin_client.post("/api/admin/feedback/product/f-001/dismiss", json={"dismissed": True}).status_code == 403
+    assert non_admin_client.delete("/api/admin/feedback/product/f-001").status_code == 403

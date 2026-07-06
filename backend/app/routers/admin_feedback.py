@@ -161,7 +161,8 @@ SELECT
     CAST(fs.severity        AS TEXT) AS severity,
     CAST(fs.area            AS TEXT) AS area,
     CAST(fs.dispatch_status AS TEXT) AS dispatch_status,
-    CAST(fs.dispatch_ref    AS TEXT) AS dispatch_ref
+    CAST(fs.dispatch_ref    AS TEXT) AS dispatch_ref,
+    CASE WHEN fs.dismissed_at IS NOT NULL THEN 1 ELSE 0 END AS dismissed
 FROM (
     {union}
 ) AS base
@@ -184,6 +185,7 @@ def _fetch_rows(
     status: Optional[str],
     since: Optional[str],
     dispatched: Optional[bool] = None,
+    include_dismissed: bool = False,
 ) -> List[Dict[str, Any]]:
     filters: List[str] = []
     params: Dict[str, Any] = {}
@@ -198,6 +200,9 @@ def _fetch_rows(
         params["since"] = since
     if dispatched:
         filters.append("AND fs.dispatch_status IS NOT NULL")
+    if not include_dismissed:
+        # Hide soft-dismissed rows by default (IS NULL is cross-DB safe).
+        filters.append("AND fs.dismissed_at IS NULL")
 
     is_sqlite = db.get_bind().dialect.name == "sqlite"
     sql = _OUTER_SQL.format(union=_union_sql(is_sqlite), filters="\n".join(filters))
@@ -214,11 +219,16 @@ def list_feedback(
     status: Optional[str] = None,
     since: Optional[str] = None,
     dispatched: Optional[bool] = None,
+    include_dismissed: Optional[bool] = None,
     db: Session = Depends(_get_db),
     _user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
-    """Return unified feedback rows from all streams, LEFT JOIN'd to triage state."""
-    rows = _fetch_rows(db, stream=stream, status=status, since=since, dispatched=dispatched)
+    """Return unified feedback rows from all streams, LEFT JOIN'd to triage state.
+    Soft-dismissed rows are hidden unless ``include_dismissed=true``."""
+    rows = _fetch_rows(
+        db, stream=stream, status=status, since=since, dispatched=dispatched,
+        include_dismissed=bool(include_dismissed),
+    )
     return {"items": rows, "count": len(rows)}
 
 
@@ -585,3 +595,59 @@ def dispatch_create(
         detail={"stream": stream, "notion_url": url, "title": task.get("title")},
     )
     return {"dispatched": True, "url": url, "dispatch_ref": url}
+
+
+# ── Dismiss (soft-hide, all streams) + Delete (hard, product only) ────────────
+
+
+class DismissBody(BaseModel):
+    dismissed: bool = True
+
+
+@router.post("/feedback/{stream}/{item_id}/dismiss")
+def dismiss_feedback(
+    stream: str,
+    item_id: str,
+    body: DismissBody,
+    db: Session = Depends(_get_db),
+    _user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Soft-dismiss (hide) or restore a feedback row. Never destroys data — works
+    for every stream, including the ML-feedback streams we never hard-delete."""
+    now = datetime.utcnow().isoformat() if body.dismissed else None
+    db.execute(
+        text(
+            "INSERT INTO feedback_status (stream, source_id, status, dismissed_at, updated_at) "
+            "VALUES (:s, :id, 'new', :dat, :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "    dismissed_at = :dat, updated_at = :now"
+        ),
+        {"s": stream, "id": item_id, "dat": now, "now": datetime.utcnow().isoformat()},
+    )
+    return {"ok": True, "dismissed": body.dismissed}
+
+
+@router.delete("/feedback/{stream}/{item_id}")
+def delete_feedback(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    _user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Permanently delete a PRODUCT feedback row (widget bug/idea/other) + its
+    triage state. Refused for other streams — those are ML-feedback source tables
+    that must never be mutated (use dismiss to hide them instead)."""
+    if stream != "product":
+        raise HTTPException(
+            status_code=400,
+            detail="Only product-stream feedback can be deleted; use dismiss for other streams.",
+        )
+    db.execute(
+        text("DELETE FROM feedback WHERE CAST(id AS TEXT) = :id"),
+        {"id": item_id},
+    )
+    db.execute(
+        text("DELETE FROM feedback_status WHERE stream = 'product' AND source_id = :id"),
+        {"id": item_id},
+    )
+    return {"ok": True, "deleted": item_id}

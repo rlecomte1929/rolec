@@ -86,7 +86,7 @@ CREATE TABLE feedback_status (
   stream TEXT NOT NULL, source_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','reviewed','acted_on','closed')),
   owner TEXT, resolution TEXT, updated_at TEXT, severity TEXT, area TEXT,
-  reporter_id TEXT, dispatch_ref TEXT, dispatch_status TEXT, dispatch_context TEXT,
+  reporter_id TEXT, dispatch_ref TEXT, dispatch_status TEXT, dispatch_context TEXT, dismissed_at TEXT,
   PRIMARY KEY (stream, source_id)
 );
 """

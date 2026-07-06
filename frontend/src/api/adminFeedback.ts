@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch, apiPut } from './client';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from './client';
 
 export type FeedbackStream =
   | 'product'
@@ -32,6 +32,8 @@ export interface UnifiedFeedbackItem {
   dispatch_ref?: string | null;
   /** Admin-authored context used to engineer the dispatched task. */
   dispatch_context?: string | null;
+  /** Soft-dismissed (hidden from the default list). Serialized 0/1 — read via truthiness. */
+  dismissed?: boolean;
   /** True when this item has a screenshot attached (product stream only). The
    *  image itself is fetched lazily via getFeedbackScreenshot to keep the list
    *  payload small. Serialized as 0/1 by the backend — read via truthiness. */
@@ -50,17 +52,24 @@ export async function listFeedback(params?: {
   since?: string;
   /** D1: when true, sends ?dispatched=true — returns only dispatched tickets */
   dispatched?: boolean;
+  /** When true, also returns soft-dismissed rows (flagged with dismissed=true). */
+  includeDismissed?: boolean;
 }): Promise<UnifiedFeedbackItem[]> {
   const qs = new URLSearchParams();
   if (params?.stream) qs.set('stream', params.stream);
   if (params?.status) qs.set('status', params.status);
   if (params?.since) qs.set('since', params.since);
   if (params?.dispatched !== undefined) qs.set('dispatched', String(params.dispatched));
+  if (params?.includeDismissed) qs.set('include_dismissed', 'true');
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const data = await apiGet<{ items: UnifiedFeedbackItem[] }>(`/api/admin/feedback${suffix}`);
-  // The backend serializes has_screenshot as 0/1 (integer). Coerce to a real
-  // boolean so JSX `{row.has_screenshot && …}` never renders a stray "0".
-  return (data.items ?? []).map((it) => ({ ...it, has_screenshot: Boolean(it.has_screenshot) }));
+  // has_screenshot / dismissed are serialized 0/1 — coerce to real booleans so JSX
+  // `{row.x && …}` never renders a stray "0".
+  return (data.items ?? []).map((it) => ({
+    ...it,
+    has_screenshot: Boolean(it.has_screenshot),
+    dismissed: Boolean(it.dismissed),
+  }));
 }
 
 /**
@@ -153,4 +162,20 @@ export async function dispatchCreate(
   task: EngineeredTask,
 ): Promise<{ dispatched: boolean; url: string; dispatch_ref: string }> {
   return apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, { task, confirm: true });
+}
+
+// ── Manage: dismiss (hide, reversible) + delete (product only) ────────────────
+
+/** Soft-dismiss (hide) or restore a feedback row. Works for every stream. */
+export async function dismissFeedback(
+  stream: FeedbackStream,
+  itemId: string,
+  dismissed: boolean,
+): Promise<void> {
+  await apiPost<unknown>(`/api/admin/feedback/${stream}/${itemId}/dismiss`, { dismissed });
+}
+
+/** Permanently delete a PRODUCT feedback row (widget bug/idea/other). */
+export async function deleteFeedback(itemId: string): Promise<void> {
+  await apiDelete<unknown>(`/api/admin/feedback/product/${itemId}`);
 }
