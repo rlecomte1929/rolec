@@ -36,7 +36,8 @@ export const HrPreferredSuppliers: React.FC = () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addSupplierId, setAddSupplierId] = useState('');
   const [addServiceCategory, setAddServiceCategory] = useState('');
-  const [addPriorityRank, setAddPriorityRank] = useState(0);
+  // AIQ-1447: priority is a 1–10 rank (1 = highest). Default to a mid rank.
+  const [addPriorityRank, setAddPriorityRank] = useState(5);
   const [addNotes, setAddNotes] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [candidateSuppliers, setCandidateSuppliers] = useState<
@@ -83,7 +84,7 @@ export const HrPreferredSuppliers: React.FC = () => {
     setAddModalOpen(true);
     setAddSupplierId('');
     setAddServiceCategory('');
-    setAddPriorityRank(0);
+    setAddPriorityRank(5);
     setAddNotes('');
     try {
       const res = await suppliersAPI.list({ status: 'active', limit: 200 });
@@ -241,15 +242,26 @@ export const HrPreferredSuppliers: React.FC = () => {
                 <select id="hps-supplier"
                   value={addSupplierId}
                   onChange={(e) => setAddSupplierId(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#e2e8f0] rounded-lg"
+                  disabled={candidateSuppliers.length === 0}
+                  className="w-full px-3 py-2 border border-[#e2e8f0] rounded-lg disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
                 >
-                  <option value="">Select supplier</option>
-                  {candidateSuppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
+                  {candidateSuppliers.length === 0 ? (
+                    // AIQ-1447: clearer empty state than a blank dropdown.
+                    <option value="">No suppliers available — add one in the supplier registry first</option>
+                  ) : (
+                    <>
+                      <option value="">Select supplier</option>
+                      {candidateSuppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
+                {candidateSuppliers.length === 0 && (
+                  <p className="mt-1 text-xs text-[#6b7280]">No suppliers are registered yet for this scope. Add suppliers in the supplier registry, then return here to mark them preferred.</p>
+                )}
               </div>
               <div>
                 <label htmlFor="hps-service-category" className="block text-sm font-medium text-[#4b5563] mb-1">Service category</label>
@@ -267,13 +279,18 @@ export const HrPreferredSuppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label htmlFor="hps-priority-lower-higher" className="block text-sm font-medium text-[#4b5563] mb-1">Priority (lower = higher)</label>
+                <label htmlFor="hps-priority-lower-higher" className="block text-sm font-medium text-[#4b5563] mb-1">Priority (1–10)</label>
                 <Input id="hps-priority-lower-higher" unstyled
                   type="number"
                   value={addPriorityRank}
-                  onChange={(v) => setAddPriorityRank(parseInt(v, 10) || 0)}
+                  onChange={(v) => {
+                    // AIQ-1447: clamp to the valid 1–10 rank range.
+                    const n = parseInt(v, 10);
+                    setAddPriorityRank(Number.isNaN(n) ? 1 : Math.min(10, Math.max(1, n)));
+                  }}
                   className="w-full px-3 py-2 border border-[#e2e8f0] rounded-lg"
                 />
+                <p className="mt-1 text-xs text-[#6b7280]">Rank 1–10, where 1 = highest priority and 10 = lowest. Preferred suppliers are ordered by this rank.</p>
               </div>
               <div>
                 <label htmlFor="hps-notes" className="block text-sm font-medium text-[#4b5563] mb-1">Notes</label>
