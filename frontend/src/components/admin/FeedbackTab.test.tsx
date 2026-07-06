@@ -14,6 +14,8 @@ vi.mock('../../api/adminFeedback', () => ({
   saveDispatchContext: vi.fn().mockResolvedValue(undefined),
   dispatchPreview: vi.fn(),
   dispatchCreate: vi.fn(),
+  dismissFeedback: vi.fn().mockResolvedValue(undefined),
+  deleteFeedback: vi.fn().mockResolvedValue(undefined),
 }));
 import * as feedbackApi from '../../api/adminFeedback';
 import { FeedbackTab } from './FeedbackTab';
@@ -204,16 +206,17 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     expect(screen.getByText('isolation')).toBeTruthy();
   });
 
-  it('the compact Dispatch button expands the row and reveals the required context field', async () => {
+  it('clicking a row opens the dispatch panel with the required context field (no separate button)', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    fireEvent.click(screen.getAllByRole('button', { name: /^dispatch$/i })[0]);
-    // No immediate API call — it just opens the context/dispatch panel.
+    // There is no compact "Dispatch" button anymore — the row itself opens the panel.
+    expect(screen.queryByRole('button', { name: /^dispatch$/i })).toBeNull();
+    fireEvent.click(screen.getByText('Minor UI glitch'));
     expect(feedbackApi.dispatchPreview).not.toHaveBeenCalled();
     expect(await screen.findByPlaceholderText(/detail an engineer needs/i)).toBeTruthy();
   });
 
-  it('generates a preview from context, then creates the Notion task and shows the link', async () => {
+  it('drafts a task from context, then creates the Notion task and shows the link', async () => {
     vi.mocked(feedbackApi.dispatchPreview).mockResolvedValue({
       title: 'Fix roadmap', strategic_objective: 'g', execution_prompt: 'p', expected_output: 'o',
       validation_criteria: 'v', priority: 'P1', complexity: 'Medium',
@@ -224,19 +227,34 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     });
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    fireEvent.click(screen.getAllByRole('button', { name: /^dispatch$/i })[0]);
+    fireEvent.click(screen.getByText('Minor UI glitch'));
 
     const ctx = await screen.findByPlaceholderText(/detail an engineer needs/i);
     fireEvent.change(ctx, { target: { value: 'repro: open /journey, spinner forever' } });
-    fireEvent.click(screen.getByRole('button', { name: /engineer task/i }));
+    fireEvent.click(screen.getByRole('button', { name: /draft task with ai/i }));
     await waitFor(() => expect(feedbackApi.dispatchPreview).toHaveBeenCalled());
 
     const createBtn = await screen.findByRole('button', { name: /create task in notion/i });
     fireEvent.click(createBtn);
     await waitFor(() => expect(feedbackApi.dispatchCreate).toHaveBeenCalled());
-    // row now links to the created Notion task
     const links = await screen.findAllByRole('link', { name: /notion/i });
     expect(links.length).toBeGreaterThan(0);
+  });
+
+  it('dismiss hides the row; delete asks to confirm then removes it', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByText('Minor UI glitch'));
+
+    // Dismiss
+    fireEvent.click(await screen.findByRole('button', { name: /dismiss \(hide\)/i }));
+    await waitFor(() => expect(feedbackApi.dismissFeedback).toHaveBeenCalledWith('product', 'low-risk-1', true));
+
+    // Delete (product) → confirm gate → confirm
+    fireEvent.click(screen.getByText('Critical auth bypass')); // high-risk-1 (product)
+    fireEvent.click(await screen.findByRole('button', { name: /^delete$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /yes, delete/i }));
+    await waitFor(() => expect(feedbackApi.deleteFeedback).toHaveBeenCalledWith('high-risk-1'));
   });
 });
 

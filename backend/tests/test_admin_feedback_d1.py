@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   dispatch_ref    TEXT,
   dispatch_status TEXT,
   dispatch_context TEXT,
+  dismissed_at TEXT,
   PRIMARY KEY (stream, source_id)
 );
 CREATE TABLE IF NOT EXISTS hr_feedback (

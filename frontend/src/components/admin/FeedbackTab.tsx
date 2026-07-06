@@ -17,6 +17,8 @@ import {
   saveDispatchContext,
   dispatchPreview,
   dispatchCreate,
+  dismissFeedback,
+  deleteFeedback,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
@@ -77,6 +79,9 @@ export function FeedbackTab() {
   const [reporterFilter, setReporterFilter] = useState('');
   const [savingId, setSavingId]           = useState<string | null>(null);
   const [expanded, setExpanded]           = useState<string | null>(null);
+  const [showDismissed, setShowDismissed] = useState(false);
+  const [managingId, setManagingId]       = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Lazily-fetched screenshots, cached by row id (a null entry = fetched, none available).
   const [shots, setShots]                 = useState<Record<string, string | null>>({});
@@ -95,21 +100,19 @@ export function FeedbackTab() {
     setLoading(true);
     setError(null);
     try {
-      let items: UnifiedFeedbackItem[];
-      if (activeStream === 'dispatched') {
-        items = await listFeedback({ dispatched: true });
-      } else {
-        items = await listFeedback(
-          activeStream !== 'all' ? { stream: activeStream } : undefined
-        );
-      }
+      const items = await listFeedback({
+        ...(activeStream === 'dispatched'
+          ? { dispatched: true }
+          : activeStream !== 'all' ? { stream: activeStream } : {}),
+        ...(showDismissed ? { includeDismissed: true } : {}),
+      });
       setRows(items);
     } catch {
       setError('Failed to load feedback.');
     } finally {
       setLoading(false);
     }
-  }, [activeStream]);
+  }, [activeStream, showDismissed]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -191,6 +194,33 @@ export function FeedbackTab() {
       setCreatingId(null);
     }
   }, [previewTask]);
+
+  /** Soft-dismiss (hide) or restore a row. */
+  const doDismiss = useCallback(async (row: UnifiedFeedbackItem, dismissed: boolean) => {
+    setManagingId(row.id);
+    try {
+      await dismissFeedback(row.stream, row.id, dismissed);
+      if (dismissed && !showDismissed) {
+        setRows((prev) => prev.filter((r) => r.id !== row.id));
+        setExpanded(null);
+      } else {
+        setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, dismissed } : r));
+      }
+    } catch { /* keep the row; admin can retry */ }
+    finally { setManagingId(null); }
+  }, [showDismissed]);
+
+  /** Permanently delete a product row. */
+  const doDelete = useCallback(async (row: UnifiedFeedbackItem) => {
+    setManagingId(row.id);
+    try {
+      await deleteFeedback(row.id);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setConfirmDeleteId(null);
+      setExpanded(null);
+    } catch { /* keep the row; admin can retry */ }
+    finally { setManagingId(null); }
+  }, []);
 
   const reporterQuery = reporterFilter.trim().toLowerCase();
   const displayed = rows.filter((r) => {
@@ -394,6 +424,15 @@ export function FeedbackTab() {
           </span>
         )}
         <div className="flex-1" />
+        <label className="flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showDismissed}
+            onChange={(e) => setShowDismissed(e.target.checked)}
+            className="accent-[#1f8e8b]"
+          />
+          Show dismissed
+        </label>
         <Button unstyled onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
           Refresh
         </Button>
@@ -499,30 +538,23 @@ export function FeedbackTab() {
                         ))}
                       </select>
                     </div>
-                    {/* Dispatch column */}
+                    {/* Dispatch column — dispatched rows link to Notion; otherwise the
+                        row is clickable to open the dispatch panel (no separate button). */}
                     <div className="px-3 py-2.5">
-                      {alreadyDispatched ? (
-                        row.dispatch_ref && /^https?:\/\//.test(row.dispatch_ref) ? (
-                          <a
-                            href={row.dispatch_ref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[11px] font-medium text-[#1f8e8b] hover:underline"
-                          >
-                            Notion ↗
-                          </a>
-                        ) : (
-                          <Badge variant="success" size="sm">dispatched</Badge>
-                        )
-                      ) : (
-                        <Button
-                          unstyled
-                          onClick={(e) => { e.stopPropagation(); setExpanded(row.id); }}
-                          className="text-[11px] font-medium px-2 py-0.5 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors"
+                      {alreadyDispatched && row.dispatch_ref && /^https?:\/\//.test(row.dispatch_ref) ? (
+                        <a
+                          href={row.dispatch_ref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[11px] font-medium text-[#1f8e8b] hover:underline"
                         >
-                          Dispatch
-                        </Button>
+                          Notion ↗
+                        </a>
+                      ) : alreadyDispatched ? (
+                        <Badge variant="success" size="sm">dispatched</Badge>
+                      ) : (
+                        <span className="text-[11px] text-gray-300">—</span>
                       )}
                     </div>
                   </div>
@@ -677,11 +709,57 @@ export function FeedbackTab() {
                                 onClick={() => void openPreview(row)}
                                 className="text-[11px] font-medium px-3 py-1 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-40"
                               >
-                                {previewLoadingId === row.id ? 'Engineering task…' : 'Dispatch → engineer task'}
+                                {previewLoadingId === row.id ? 'Drafting task…' : 'Draft task with AI'}
                               </Button>
                             )}
                           </div>
                         )}
+                      </div>
+
+                      {/* Admin actions — dismiss (all streams, reversible) + delete (product only) */}
+                      <div className="pt-2 mt-1 border-t border-gray-200 flex items-center gap-3 text-[11px]">
+                        {row.dismissed ? (
+                          <Button
+                            unstyled
+                            disabled={managingId === row.id}
+                            onClick={() => void doDismiss(row, false)}
+                            className="text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+                          >
+                            Restore
+                          </Button>
+                        ) : (
+                          <Button
+                            unstyled
+                            disabled={managingId === row.id}
+                            onClick={() => void doDismiss(row, true)}
+                            className="text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+                          >
+                            Dismiss (hide)
+                          </Button>
+                        )}
+                        {row.stream === 'product' && (
+                          confirmDeleteId === row.id ? (
+                            <span className="flex items-center gap-2">
+                              <span className="text-red-700 font-medium">Delete permanently?</span>
+                              <Button
+                                unstyled
+                                disabled={managingId === row.id}
+                                onClick={() => void doDelete(row)}
+                                className="text-red-700 font-semibold hover:underline disabled:opacity-50"
+                              >
+                                Yes, delete
+                              </Button>
+                              <Button unstyled onClick={() => setConfirmDeleteId(null)} className="text-gray-500 hover:underline">
+                                Cancel
+                              </Button>
+                            </span>
+                          ) : (
+                            <Button unstyled onClick={() => setConfirmDeleteId(row.id)} className="text-red-600 hover:underline">
+                              Delete
+                            </Button>
+                          )
+                        )}
+                        {managingId === row.id && <span className="text-gray-400">…</span>}
                       </div>
                     </div>
                   )}
