@@ -169,6 +169,9 @@ const SECTIONS: NavSection[] = [
       // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
       // link to the Queue tab of the same page was removed to end the false split).
       { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
+      // Feedback & Work surfaced in Overview (moved from Queues) so pilot feedback + the
+      // work board sit alongside the at-a-glance dashboards.
+      { id: 'feedback-console', group: 'Overview', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
 
       // ── Customers (live accounts + sales pipeline) ──
       { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
@@ -181,7 +184,6 @@ const SECTIONS: NavSection[] = [
       { id: 'form-templates', group: 'Content', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'policy-versions', group: 'Content', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
       { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
-      { id: 'auth-page-design', group: 'Content', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
 
       // ── Queues (day-to-day work queues) ──
       {
@@ -208,7 +210,6 @@ const SECTIONS: NavSection[] = [
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
       },
       { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
-      { id: 'feedback-console', group: 'Queues', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
 
       // ── Platform & governance (config, access, compliance) ──
       { id: 'feature-flags', group: 'Platform & governance', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
@@ -217,6 +218,9 @@ const SECTIONS: NavSection[] = [
       { id: 'ai-governance', group: 'Platform & governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
       { id: 'data-rights', group: 'Platform & governance', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
       { id: 'audit-log', group: 'Platform & governance', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
+      // Auth page design lives with platform config (moved from Content) — it governs the
+      // shipped /auth login experience, not authored CMS content.
+      { id: 'auth-page-design', group: 'Platform & governance', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
     ],
   },
 ];
