@@ -167,6 +167,8 @@ export const ROUTE_DEFS = {
   adminRelocations: { path: '/admin/relocations', roles: ['ADMIN'] as RouteRole[] },
   adminSupport: { path: '/admin/support', roles: ['ADMIN'] as RouteRole[] },
   adminErrors: { path: '/admin/errors', roles: ['ADMIN'] as RouteRole[] },
+  // AIQ-1437: ops alias for the existing error dashboard (same AdminErrors page).
+  adminOpsErrors: { path: '/admin/ops/errors', roles: ['ADMIN'] as RouteRole[] },
   adminFeedback: { path: '/admin/feedback', roles: ['ADMIN'] as RouteRole[] },
   adminTestDrive: { path: '/admin/test-drive', roles: ['ADMIN'] as RouteRole[] },
   adminAdmins: { path: '/admin/admins', roles: ['ADMIN'] as RouteRole[] },
