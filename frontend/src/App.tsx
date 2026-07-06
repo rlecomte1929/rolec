@@ -127,6 +127,7 @@ const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').t
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminRagQualityPage = lazy(() => import('./pages/admin/AdminRagQualityPage').then((module) => ({ default: module.AdminRagQualityPage })));
 const AdminAiUnitEconomicsPage = lazy(() => import('./pages/admin/AdminAiUnitEconomicsPage').then((module) => ({ default: module.AdminAiUnitEconomicsPage })));
+const AdminAutopilotMetricsPage = lazy(() => import('./pages/admin/AdminAutopilotMetricsPage').then((module) => ({ default: module.AdminAutopilotMetricsPage })));
 const AdminDsarPage = lazy(() => import('./pages/admin/AdminDsarPage').then((module) => ({ default: module.AdminDsarPage })));
 const AdminPolicyVersionsPage = lazy(() => import('./pages/admin/AdminPolicyVersionsPage').then((module) => ({ default: module.AdminPolicyVersionsPage })));
 const AdminFeatureFlagsPage = lazy(() => import('./pages/admin/AdminFeatureFlagsPage').then((module) => ({ default: module.AdminFeatureFlagsPage })));
@@ -410,6 +411,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiUnitEconomics.path} element={<RequireAdminRoute><AdminAiUnitEconomicsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAutopilotMetrics.path} element={<RequireAdminRoute><AdminAutopilotMetricsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminDsar.path} element={<RequireAdminRoute><AdminDsarPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicyVersions.path} element={<RequireAdminRoute><AdminPolicyVersionsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />

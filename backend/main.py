@@ -151,6 +151,7 @@ from .app.routers import policy_helpfulness as policy_helpfulness_router  # [WS-
 from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
 from .app.routers import ocr as ocr_router  # [AIQ-1148] general document OCR endpoint
 from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
+from .app.routers import admin_autopilot_metrics as admin_autopilot_metrics_router  # Autopilot P4 — dual-layer registration
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
 from .app.routers import admin_dsar as admin_dsar_router  # GDPR/DSAR desk (dual-layer registration)
 from .app.routers import admin_feature_flags as admin_feature_flags_router  # Feature-flag console (dual-layer registration)
@@ -821,6 +822,7 @@ app.include_router(policy_helpfulness_router.router)  # [WS-E] dual-layer regist
 app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
 app.include_router(ocr_router.router)  # [AIQ-1148] /api/ocr/process — general document OCR
 app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
+app.include_router(admin_autopilot_metrics_router.router)  # Autopilot P4 — dual-layer registration
 app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval/metrics — dual-layer registration
 app.include_router(admin_dsar_router.router)  # GDPR/DSAR desk — /api/admin/erasure-requests — dual-layer registration
 app.include_router(admin_feature_flags_router.router)  # Feature-flag console — /api/admin/feature-flags — dual-layer registration

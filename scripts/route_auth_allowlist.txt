@@ -165,6 +165,9 @@ backend/app/routers/crons.py:autopilot_ingest
 backend/app/routers/crons.py:autopilot_event
 # CRON (Autopilot P2): _verify_cron_secret(request) inline. Records a funnel event fired
 # by the autofix-validate workflow (merged/canary/reverted/done); not an end user.
+backend/app/routers/crons.py:autopilot_digest
+# CRON (Autopilot P4): _verify_cron_secret(request) inline. Writes the nightly autopilot
+# funnel+cost summary to daily_summaries; invoked by autopilot-nightly, not an end user.
 backend/app/routers/crons.py:process_crawl_schedules
 # CRON (P3-02a): _verify_cron_secret(request) inline (503 if unset, 401 on
 # mismatch). Invoked by the crawl-scheduler workflow, not an end user.
