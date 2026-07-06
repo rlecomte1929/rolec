@@ -14,18 +14,18 @@ vi.mock('../../../api/missionControl', () => ({
   syncWorkItems: vi.fn(),
   retriageWorkItem: vi.fn(),
   patchWorkItem: vi.fn(),
-  dispatchWorkItem: vi.fn(),
+  dispatchWorkItemToNotion: vi.fn(),
   planWorkItem: vi.fn(),
   approvePlan: vi.fn(),
 }));
 
-import { listWorkItems, syncWorkItems, patchWorkItem, dispatchWorkItem, planWorkItem, approvePlan } from '../../../api/missionControl';
+import { listWorkItems, syncWorkItems, patchWorkItem, dispatchWorkItemToNotion, planWorkItem, approvePlan } from '../../../api/missionControl';
 import { WorkBoard } from './WorkBoard';
 
 const mockList = listWorkItems as unknown as ReturnType<typeof vi.fn>;
 const mockSync = syncWorkItems as unknown as ReturnType<typeof vi.fn>;
 const mockPatch = patchWorkItem as unknown as ReturnType<typeof vi.fn>;
-const mockDispatch = dispatchWorkItem as unknown as ReturnType<typeof vi.fn>;
+const mockDispatch = dispatchWorkItemToNotion as unknown as ReturnType<typeof vi.fn>;
 const mockPlan = planWorkItem as unknown as ReturnType<typeof vi.fn>;
 const mockApprove = approvePlan as unknown as ReturnType<typeof vi.fn>;
 
@@ -74,7 +74,7 @@ describe('WorkBoard', () => {
     await waitFor(() => expect(mockPatch).toHaveBeenCalledWith('1', { status: 'done' }));
   });
 
-  it('shows Execute only for agent-eligible demands and dispatches on confirm', async () => {
+  it('offers Draft task → Notion for every demand and dispatches on confirm', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     mockList.mockResolvedValue({
       table_ready: true,
@@ -83,11 +83,12 @@ describe('WorkBoard', () => {
         { id: 'b', source: 'feedback', kind: 'bug', title: 'Auth bug', status: 'triaged', priority: 'P1', auto_fixable: false },
       ],
     });
-    mockDispatch.mockResolvedValue({ ok: true, run_id: 'r1', pr_url: 'https://github.com/o/r/pull/3' });
+    mockDispatch.mockResolvedValue({ ok: true, url: 'https://notion.so/task-1', dispatch_ref: 'https://notion.so/task-1' });
     render(<WorkBoard />);
     await screen.findByText('Typo fix');
-    const buttons = screen.getAllByRole('button', { name: /execute/i });
-    expect(buttons).toHaveLength(1); // only the agent-eligible demand
+    // Notion dispatch is available on every demand (no agent-eligibility gate).
+    const buttons = screen.getAllByRole('button', { name: /draft task → notion/i });
+    expect(buttons).toHaveLength(2);
     fireEvent.click(buttons[0]);
     await waitFor(() => expect(mockDispatch).toHaveBeenCalledWith('a'));
     confirmSpy.mockRestore();
@@ -101,7 +102,7 @@ describe('WorkBoard', () => {
     });
     render(<WorkBoard />);
     await screen.findByText('Typo');
-    fireEvent.click(screen.getByRole('button', { name: /execute/i }));
+    fireEvent.click(screen.getByRole('button', { name: /draft task → notion/i }));
     expect(mockDispatch).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });

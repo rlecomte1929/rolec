@@ -5,7 +5,7 @@ import {
   syncWorkItems,
   retriageWorkItem,
   patchWorkItem,
-  dispatchWorkItem,
+  dispatchWorkItemToNotion,
   planWorkItem,
   approvePlan,
   type WorkItem,
@@ -47,6 +47,7 @@ export const WorkBoard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dispatchingId, setDispatchingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,14 +97,17 @@ export const WorkBoard: React.FC = () => {
     }
   }
 
-  async function onExecute(it: WorkItem) {
-    if (!window.confirm(`Dispatch the agent to open a fix PR for "${it.title}"?`)) return;
+  async function onDispatchNotion(it: WorkItem) {
+    if (!window.confirm(`Draft an AI Work Queue task in Notion for "${it.title}"?`)) return;
     setError(null);
+    setDispatchingId(it.id);
     try {
-      await dispatchWorkItem(it.id);
+      await dispatchWorkItemToNotion(it.id);
       await load();
     } catch {
-      setError('Dispatch failed — check it is agent-eligible and dispatch is enabled.');
+      setError('Could not create the Notion task — check NOTION_TOKEN is configured.');
+    } finally {
+      setDispatchingId(null);
     }
   }
 
@@ -217,13 +221,17 @@ export const WorkBoard: React.FC = () => {
                 )}
                 <span className="ml-auto flex items-center gap-3">
                   {safeHref(it.pr_url) && (
-                    <a href={safeHref(it.pr_url)} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">PR ↗</a>
+                    <a href={safeHref(it.pr_url)} className="text-accent-700 underline" target="_blank" rel="noopener noreferrer">
+                      {it.pr_url && /notion\./i.test(it.pr_url) ? 'Task ↗' : 'PR ↗'}
+                    </a>
                   )}
-                  {it.auto_fixable && !it.triage_json?.blocked && (
-                    <button className="font-medium text-accent-700 hover:text-accent-800" onClick={() => void onExecute(it)}>
-                      Execute →
-                    </button>
-                  )}
+                  <button
+                    className="font-medium text-accent-700 hover:text-accent-800 disabled:opacity-50"
+                    onClick={() => void onDispatchNotion(it)}
+                    disabled={dispatchingId === it.id}
+                  >
+                    {dispatchingId === it.id ? 'Drafting…' : 'Draft task → Notion'}
+                  </button>
                   <button className="text-slate-500 hover:text-navy-800" onClick={() => void onPlan(it.id)} disabled={busy}>
                     Plan
                   </button>

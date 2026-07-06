@@ -73,6 +73,16 @@ export async function dispatchWorkItem(id: string): Promise<{ ok: boolean; run_i
   return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/dispatch`, {});
 }
 
+/**
+ * Draft a fully-engineered task into the Notion AI Work Queue — the single dispatch
+ * engine shared with the feedback inbox. Runs an LLM + Notion call server-side.
+ */
+export async function dispatchWorkItemToNotion(
+  id: string,
+): Promise<{ ok: boolean; url: string; dispatch_ref: string }> {
+  return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/dispatch-notion`, {});
+}
+
 /** P3 — draft a structured plan for a demand (LLM, PII-masked). */
 export async function planWorkItem(id: string): Promise<{ ok: boolean; plan: WorkItemPlan }> {
   return apiPost(`/api/admin/work-items/${encodeURIComponent(id)}/plan`, {});
