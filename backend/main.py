@@ -254,6 +254,7 @@ from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] uni
 from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
 from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
 from .app.routers import public_analytics as public_analytics_router  # [audos-P2] public funnel event ingest
+from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -15055,6 +15056,7 @@ app.include_router(admin_settings_router.router)  # [Task-4] admin AI-governance
 app.include_router(admin_feedback_router.router)  # [Task-6] unified feedback console
 app.include_router(admin_admins_router.router)  # [Task-7] admin lifecycle management
 app.include_router(admin_audit_log_router.router)  # [Task-7] platform audit-log viewer
+app.include_router(test_drive_router.router)  # TD-2 (AIQ-1420) test-drive provisioning
 # ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented

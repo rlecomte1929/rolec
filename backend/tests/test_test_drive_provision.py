@@ -1,4 +1,4 @@
-"""AIQ-1420 (TD-2) — test-drive provisioning endpoint tests.
+"""AIQ-1420 (TD-2) + AIQ-1441 (TD-13) — test-drive provisioning endpoint tests.
 
 Pins the contract of POST /api/test-drive/provision:
   1. Campaign flag off                → 404 (dark by default)
@@ -7,6 +7,8 @@ Pins the contract of POST /api/test-drive/provision:
      created (HR then EMPLOYEE), company seeded + linked, test_sessions written
   4. Bad tester_segment               → 422 (Pydantic)
   5. Route is registered in BOTH app instances (dual-layer per CLAUDE.md)
+  6. No corridor_id → auto-assigned from locked set (TD-13)
+  7. Explicit corridor_id → honoured verbatim (TD-13)
 
 The db layer is patched at the router module level (no live DB), mirroring
 test_auth_register.py. Supabase sync is patched out so nothing touches the network.
@@ -42,7 +44,6 @@ def _db_mock() -> MagicMock:
 def _body(**overrides):
     body = {
         "first_name": "Alice",
-        "corridor_id": "fr-de",
         "invite_token": "secret-token",
         "tester_segment": "prospect",
     }
@@ -93,7 +94,7 @@ class TestTestDriveProvision(unittest.TestCase):
         self.assertEqual(data["employee"]["role"], "EMPLOYEE")
         self.assertNotEqual(data["hr"]["password"], data["employee"]["password"])
         self.assertTrue(data["hr"]["email"].endswith("@probe.test"))
-        self.assertEqual(data["corridor_id"], "fr-de")
+        self.assertTrue(data["corridor_id"], "corridor_id must be non-empty")
         self.assertTrue(data["session_id"])
         self.assertTrue(data["campaign"])
 
@@ -117,6 +118,27 @@ class TestTestDriveProvision(unittest.TestCase):
                 patch("backend.app.routers.test_drive.db", db):
             resp = self.client.post("/api/test-drive/provision", json=_body(tester_segment="bogus"))
         self.assertEqual(resp.status_code, 422, resp.text)
+
+    def test_no_corridor_auto_assigns(self):
+        """No corridor_id in body → server picks one of the 5 locked corridors."""
+        from backend.app.routers.test_drive import _LOCKED_CORRIDORS
+        db_mock = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db_mock), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body())
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertIn(resp.json()["corridor_id"], _LOCKED_CORRIDORS)
+
+    def test_explicit_corridor_honoured(self):
+        """Explicit corridor_id is passed through unchanged."""
+        db_mock = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db_mock), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(corridor_id="IN_DE"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["corridor_id"], "IN_DE")
 
     def test_route_registered_in_both_apps(self):
         from backend.main import app as prod_app

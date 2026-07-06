@@ -295,6 +295,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_form_templates.router, prefix="/api/admin")
     app.include_router(admin_policy_config_router)
 
+    from .routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
+    app.include_router(test_drive_router.router)
+
     # ── Month-1 TODO: Tier 4 routers blocked on Month-0 P3 extraction ─────────
     # TODO [AUDIT-C2.3 / Month-0 P3]: add hr_policy_config + employee_policy_config
     # once those routers are extracted from the inline APIRouter objects in backend/main.py.
