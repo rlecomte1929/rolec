@@ -120,6 +120,9 @@ def _client(db_session):
 
 def test_context_save_and_preview_requires_it(db_session, monkeypatch):
     client = _client(db_session)
+    # dispatch_preview reads via its own short-lived SessionLocal (not _get_db) so the
+    # DB connection is released before the LLM call — point it at the test engine.
+    monkeypatch.setattr(admin_feedback, "SessionLocal", sessionmaker(bind=db_session.get_bind()))
 
     # preview without context → 400
     resp = client.post("/api/admin/feedback/product/fb-1/dispatch/preview", json={"text": "x", "category": "bug"})

@@ -455,19 +455,30 @@ def dispatch_preview(
     stream: str,
     item_id: str,
     body: PreviewBody,
-    db: Session = Depends(_get_db),
     _user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """Generate (no side effects) an engineered AI Work Queue task for review.
     Context is REQUIRED (400 when empty). Sync route — engineer_task uses the
-    proven synchronous LLM path."""
-    fs = db.execute(
-        text(
-            "SELECT dispatch_context, severity, area FROM feedback_status "
-            "WHERE stream = :s AND source_id = :id"
-        ),
-        {"s": stream, "id": item_id},
-    ).fetchone()
+    proven synchronous LLM path.
+
+    Deliberately does NOT use Depends(_get_db): reads happen in a short-lived
+    session that is CLOSED before the ~15s LLM call. Holding an idle pooled
+    connection through the LLM call gets it dropped by the Supabase pooler → the
+    trailing commit then fails with "SSL connection has been closed" (500).
+    """
+    _db = SessionLocal()
+    try:
+        fs = _db.execute(
+            text(
+                "SELECT dispatch_context, severity, area FROM feedback_status "
+                "WHERE stream = :s AND source_id = :id"
+            ),
+            {"s": stream, "id": item_id},
+        ).fetchone()
+        pf = _load_product_fields(_db, item_id) if stream == "product" else {}
+    finally:
+        _db.close()
+
     dispatch_context = (fs[0] if fs else None) or ""
     if not dispatch_context.strip():
         raise HTTPException(status_code=400, detail="Add context on this item before dispatching.")
@@ -479,14 +490,12 @@ def dispatch_preview(
     page_url = None
     has_screenshot = False
     reporter_name = None
-    if stream == "product":
-        pf = _load_product_fields(db, item_id)
-        if pf:
-            text_val = text_val or pf["message"]
-            category = category or pf["category"]
-            page_url = pf["page_url"]
-            has_screenshot = pf["has_screenshot"]
-            reporter_name = pf["reporter_name"]
+    if pf:
+        text_val = text_val or pf["message"]
+        category = category or pf["category"]
+        page_url = pf["page_url"]
+        has_screenshot = pf["has_screenshot"]
+        reporter_name = pf["reporter_name"]
 
     if not severity or not area:
         cls = classify(text_val, category)
