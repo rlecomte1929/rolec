@@ -678,18 +678,8 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
         <div className="px-3 py-2 border-b border-slate-100">{companySlot}</div>
       )}
 
-      {/* Search */}
-      {!collapsed && (
-        <div className="px-3 py-2 border-b border-slate-100">
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
-            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="text-xs text-slate-400 flex-1">Search cases and providers</span>
-            <kbd className="text-[10px] text-slate-300 border border-slate-200 rounded px-1">⌘K</kbd>
-          </div>
-        </div>
-      )}
+      {/* AIQ-1453: removed the decorative non-functional "Search cases and providers"
+          box (a static span + ⌘K kbd with no input/handler) — it read as a dead-end. */}
 
       {/* Nav */}
       <nav className="flex-1 px-2 pb-4">
