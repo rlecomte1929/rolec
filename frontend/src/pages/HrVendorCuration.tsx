@@ -149,6 +149,16 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
     return destinations.find((d) => destinationKey(d) === selectedDestinationKey) || null;
   }, [destinations, selectedDestinationKey]);
 
+  // AIQ-1444: show the destination dropdown sorted alphabetically by country, then
+  // city (locale-aware) — the raw list came back unordered.
+  const sortedDestinations = useMemo(
+    () =>
+      [...destinations].sort(
+        (a, b) => a.country.localeCompare(b.country) || a.city.localeCompare(b.city),
+      ),
+    [destinations],
+  );
+
   const city = activeDestination?.city || '';
   const country = activeDestination?.country || '';
 
@@ -545,7 +555,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               {destinations.length === 0 && !destinationsLoading && (
                 <option value="">No destinations supported yet</option>
               )}
-              {destinations.map((d) => (
+              {sortedDestinations.map((d) => (
                 <option key={destinationKey(d)} value={destinationKey(d)}>
                   {d.city}, {d.country}
                 </option>
