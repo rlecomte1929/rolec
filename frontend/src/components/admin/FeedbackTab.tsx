@@ -155,6 +155,7 @@ export function FeedbackTab() {
   const [activeStream, setActiveStream]   = useState<ActiveMode>('all');
   const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all');
   const [reporterFilter, setReporterFilter] = useState('');
+  const [messageFilter, setMessageFilter] = useState('');
   const [savingId, setSavingId]           = useState<string | null>(null);
   const [expanded, setExpanded]           = useState<string | null>(null);
   const [showDismissed, setShowDismissed] = useState(false);
@@ -301,11 +302,16 @@ export function FeedbackTab() {
   }, []);
 
   const reporterQuery = reporterFilter.trim().toLowerCase();
+  const messageQuery = messageFilter.trim().toLowerCase();
   const displayed = rows.filter((r) => {
     if (activeStream !== 'dispatched' && filterStatus !== 'all' && r.status !== filterStatus) return false;
     if (reporterQuery) {
       const hay = `${r.reporter_name ?? ''} ${r.reporter_email ?? ''}`.toLowerCase();
       if (!hay.includes(reporterQuery)) return false;
+    }
+    if (messageQuery) {
+      const hay = `${r.text ?? ''} ${r.client_context?.route ?? ''}`.toLowerCase();
+      if (!hay.includes(messageQuery)) return false;
     }
     return true;
   });
@@ -496,7 +502,15 @@ export function FeedbackTab() {
           aria-label="Filter by reporter name or email"
           className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-48"
         />
-        {reporterQuery && (
+        <input
+          type="search"
+          value={messageFilter}
+          onChange={(e) => setMessageFilter(e.target.value)}
+          placeholder="Search message or page…"
+          aria-label="Search feedback message or page route"
+          className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-52"
+        />
+        {(reporterQuery || messageQuery) && (
           <span className="text-[11px] text-gray-400">
             {displayed.length} match{displayed.length === 1 ? '' : 'es'}
           </span>
