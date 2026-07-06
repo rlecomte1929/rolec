@@ -43,6 +43,7 @@ def exclude_test_companies(name_col: str = "name") -> str:
         f"{name_col} NOT IN ({names}) "
         f"AND {name_col} NOT LIKE 'Probe ISO-%' "
         f"AND {name_col} NOT LIKE 'Brand New Co %' "
+        f"AND {name_col} NOT LIKE 'Test Drive %' "
         f"AND {name_col} NOT LIKE '%(Seed)%'))"
     )
 
@@ -64,7 +65,7 @@ def exclude_test_people(email_col: str = "email") -> str:
 # from the Wave-3 onboarding e2e flow — AIQ-1325a). New 'Brand New Co <epoch>'
 # tenants are thus stamped is_test=true at create time, while the read-time
 # exclude_test_companies() LIKE covers rows already in prod.
-_TEST_COMPANY_PREFIXES = ("Probe ISO-", "Probe RLS-", "Brand New Co ")
+_TEST_COMPANY_PREFIXES = ("Probe ISO-", "Probe RLS-", "Brand New Co ", "Test Drive ")
 
 # Synthetic email domains: '@testco.com' (e2e runner + verify_fresh_onboarding) and
 # '@probe.test' (verify_tenant_isolation.py). Kept as exact suffixes so real domains

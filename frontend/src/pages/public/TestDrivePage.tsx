@@ -94,7 +94,7 @@ export const TestDrivePage: React.FC = () => {
       first_name: firstName.trim(),
       ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
       tester_segment: segment,
-      invite_token: inviteToken,
+      invite_token: inviteToken || undefined,
     });
     if (res.ok) {
       setAssignedCorridorId(res.corridorId);
