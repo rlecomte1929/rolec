@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS policy_answer_helpfulness (
 CREATE TABLE IF NOT EXISTS feedback_status (
   stream          TEXT NOT NULL,
   source_id       TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'new',
+  status          TEXT NOT NULL DEFAULT 'new'
+                  CHECK (status IN ('new','reviewed','acted_on','closed')),
   owner           TEXT,
   resolution      TEXT,
   updated_at      TEXT,

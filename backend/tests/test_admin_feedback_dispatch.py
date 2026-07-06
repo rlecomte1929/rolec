@@ -34,7 +34,8 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS feedback_status (
   stream          TEXT NOT NULL,
   source_id       TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'new',
+  status          TEXT NOT NULL DEFAULT 'new'
+                  CHECK (status IN ('new','reviewed','acted_on','closed')),
   owner           TEXT,
   resolution      TEXT,
   updated_at      TEXT,
@@ -144,7 +145,9 @@ def test_dispatch_persists_dispatch_status(db_session):
         )
     ).fetchone()
     assert row is not None
-    assert row[0] == "dispatched"
+    # dispatch must NOT overwrite the triage status (that violates the CHECK); it
+    # only sets dispatch_status. The seeded status ('new') is preserved.
+    assert row[0] == "new"
     assert row[1] == "dispatched"
     assert row[2] == dispatch_ref
 
@@ -265,7 +268,8 @@ def test_dispatch_untriaged_item_upserts_and_dispatches(db_session):
         )
     ).fetchone()
     assert row is not None, "dispatch should create the feedback_status row"
-    assert row[0] == "dispatched"
+    # status must stay within the CHECK set (dispatch state lives in dispatch_status).
+    assert row[0] == "new"
     assert row[1] == "dispatched"
 
 
