@@ -5,6 +5,7 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
@@ -177,7 +178,16 @@ def post_recommendations_batch(
         try:
             resp = recommend(backend_key, criteria, top_n=10, company_id=company_id)
             if backend_key == "living_areas" and has_school_age and resp is not None:
-                attach_nearby_schools(resp, (case_context.get("destCity") or ""))
+                # AIQ-1456: a nearby-schools enrichment failure must NOT drop the whole
+                # housing result — guard it so the base `resp` survives. (This was a
+                # prime cause of "housing selected but only movers shown".)
+                try:
+                    attach_nearby_schools(resp, (case_context.get("destCity") or ""))
+                except Exception as e:
+                    log.warning(
+                        "request_id=%s category=%s attach_nearby_schools failed (kept base result) error=%s",
+                        request_id, backend_key, str(e),
+                    )
             return (backend_key, resp)
         except Exception as e:
             log.warning(
@@ -194,8 +204,16 @@ def post_recommendations_batch(
         }
         for future in as_completed(futures):
             key, rec_result = future.result()
-            if rec_result is not None:
-                results[key] = rec_result
+            # AIQ-1456: render a block for EVERY selected category. A failed/empty run
+            # yields an empty response (the UI shows its "no results / HR finalizing"
+            # placeholder) instead of silently vanishing — so the page always shows as
+            # many recommendation blocks as the employee picked.
+            results[key] = rec_result if rec_result is not None else RecommendationResponse(
+                category=key,
+                generated_at=datetime.now(timezone.utc).isoformat(),
+                criteria_echo={"status": "unavailable"},
+                recommendations=[],
+            )
 
     dur_ms = (time.perf_counter() - start) * 1000
     log.info(

@@ -161,6 +161,42 @@ class ServicesCaseScopingTests(unittest.TestCase):
         resp = self.client.get("/api/services/context")
         self.assertEqual(resp.status_code, 400, resp.text)
 
+    # 6. AIQ-1456: every selected category renders a block — a category whose
+    #    recommend() run fails must still appear (as an empty block), not vanish.
+    def test_batch_includes_every_selected_category_even_when_one_fails(self):
+        from backend.app.recommendations import router as rec_router
+        from backend.app.recommendations.types import RecommendationResponse
+
+        criteria_map = {
+            "living_areas": {"destination_city": "Oslo"},
+            "movers": {"destination_city": "Oslo"},
+        }
+
+        def _fake_recommend(backend_key, criteria, top_n=10, company_id=None):
+            if backend_key == "living_areas":
+                raise RuntimeError("boom: housing plugin failed")
+            return RecommendationResponse(
+                category=backend_key,
+                generated_at="2026-01-01T00:00:00Z",
+                criteria_echo={},
+                recommendations=[],
+            )
+
+        with mock.patch.object(rec_router, "build_criteria_for_assignment", return_value=criteria_map), \
+                mock.patch.object(rec_router, "recommend", side_effect=_fake_recommend):
+            resp = self.client.post(
+                "/api/recommendations/batch",
+                json={"case_id": "case-1", "selected_services": ["housing", "movers"]},
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        results = resp.json()["results"]
+        # Both selected categories present — the failing housing run is NOT dropped.
+        self.assertIn("living_areas", results)
+        self.assertIn("movers", results)
+        # The failed category is an explicit empty block, not missing.
+        self.assertEqual(results["living_areas"]["recommendations"], [])
+        self.assertEqual(results["living_areas"]["criteria_echo"].get("status"), "unavailable")
+
 
 if __name__ == "__main__":
     unittest.main()
