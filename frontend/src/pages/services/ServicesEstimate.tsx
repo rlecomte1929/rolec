@@ -162,7 +162,7 @@ export const ServicesEstimate: React.FC = () => {
           hits a dead end here and bounces. */}
       {assignmentId && (
         <EmployeeNextActionBar
-          status="Estimate ready"
+          status="Service picks saved"
           hint="Your service picks are saved. Your roadmap aggregates all phases — visa, housing, schooling, and more — into one timeline."
           primaryLabel="View my roadmap →"
           onPrimaryClick={() => {
@@ -170,8 +170,6 @@ export const ServicesEstimate: React.FC = () => {
             track('journey_step_completed', { step: 'services_policy', case_id: routeCaseId, persona: 'employee' });
             navigate(buildRoute('employeeCaseRoadmap', { caseId: routeCaseId }));
           }}
-          secondaryLabel="Back to recommendations"
-          secondaryHref={caseStep('caseServicesRecommendations')}
         />
       )}
     </AppShell>
