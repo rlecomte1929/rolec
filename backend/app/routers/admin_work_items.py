@@ -20,8 +20,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
 from ..auth_deps import require_admin
+from ..services import notion_work_queue
 from ..services.autofix_dispatch import dispatch_autofix
 from ..services.feature_flags import resolve_flag_safe
+from ..services.feedback_task_engineer import engineer_task
 from ..services.work_item_ingest import build_work_items
 from ..services.work_item_planner import build_plan
 from ..services.work_item_triage import classify_demand
@@ -296,6 +298,82 @@ def run_callback(item_id: str, body: CallbackBody, request: Request) -> Dict[str
                 {"s": item_status, "pr": body.pr_url, "id": item_id},
             )
     return {"ok": True}
+
+
+# ── Dispatch → Notion AI Work Queue (the single, sanctioned dispatch engine) ──
+
+
+def _plan_context(plan: Dict[str, Any]) -> str:
+    """Fold an existing AI plan into a context string for the task engineer, so the
+    Notion task reuses the plan rather than re-deriving it. Empty when no plan yet."""
+    if not plan:
+        return ""
+    parts = []
+    if plan.get("summary"):
+        parts.append(f"Plan summary: {plan['summary']}")
+    if plan.get("approach"):
+        parts.append(f"Approach: {plan['approach']}")
+    if plan.get("test_plan"):
+        parts.append(f"Test plan: {plan['test_plan']}")
+    files = plan.get("affected_files")
+    if files:
+        parts.append(f"Affected files: {', '.join(files)}")
+    return "\n".join(parts)
+
+
+@router.post("/{item_id}/dispatch-notion")
+def dispatch_work_item_to_notion(item_id: str, _admin: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    """Turn a demand into a fully-engineered AI Work Queue task in Notion — the same
+    engine the feedback inbox uses, so the whole platform has ONE dispatch sink.
+
+    The DB connection is released before the (slow) LLM + Notion calls so the Supabase
+    pooler doesn't drop it mid-request; the result is written back on a fresh connection."""
+    with db.engine.begin() as conn:
+        item = conn.execute(
+            text(
+                "SELECT id, title, body, source_url, kind, priority, triage_json, plan_json "
+                "FROM public.work_items WHERE id = :id"
+            ),
+            {"id": item_id},
+        ).mappings().first()
+        if item is None:
+            raise HTTPException(status_code=404, detail="work item not found")
+        item = dict(item)
+    # connection released — the LLM + Notion calls below can take ~15s.
+
+    admin_context = _plan_context(_as_dict(item.get("plan_json")))
+    try:
+        task = engineer_task(
+            text=item.get("body") or item.get("title") or "",
+            category=item.get("kind") or "task",
+            page_url=item.get("source_url"),
+            severity=item.get("priority"),
+            area=(_as_dict(item.get("triage_json")).get("rationale")),
+            has_screenshot=False,
+            reporter_name=None,
+            admin_context=admin_context,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail=f"Could not draft the task: {exc}") from exc
+
+    try:
+        url = notion_work_queue.create_work_queue_task(
+            task, failure_evidence=item.get("body") or "", context_links=item.get("source_url") or ""
+        )
+    except notion_work_queue.NotionNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except notion_work_queue.NotionApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE public.work_items SET status = 'dispatched', pr_url = :url, updated_at = now() "
+                "WHERE id = :id"
+            ),
+            {"url": url, "id": item_id},
+        )
+    return {"ok": True, "url": url, "dispatch_ref": url}
 
 
 # ── P3: planner — draft a structured plan for a demand, then human-approve ────
