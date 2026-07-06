@@ -26,6 +26,18 @@ const OVERVIEW = {
     tester_sector: 'energy', pilot_interest: 'yes', pilot_note: '', corridor_id: 'GB_US',
     tester_segment: 'prospect', created_at: '2026-07-05',
   }],
+  completions: [
+    {
+      tester_name: 'Alex', tester_email: 'a@x.test', tester_company_role: 'Head of Mobility',
+      tester_sector: 'energy', q1_overall: 5, pilot_interest: 'yes', corridor_id: 'GB_US',
+      tester_segment: 'prospect', created_at: '2026-07-05',
+    },
+    {
+      tester_name: 'Priya', tester_email: 'priya@y.test', tester_company_role: 'HRBP',
+      tester_sector: 'pharma', q1_overall: 4, pilot_interest: 'no', corridor_id: 'GB_US',
+      tester_segment: 'prospect', created_at: '2026-07-04',
+    },
+  ],
   testimonials: [{
     testimonial: 'Coordinates the handoffs that usually break.', tester_name: 'Alex',
     tester_company_role: 'Head of Mobility', corridor_id: 'GB_US', created_at: '2026-07-05',
@@ -49,6 +61,19 @@ describe('TestDriveTab', () => {
     expect(screen.getAllByText(/Head of Mobility/).length).toBeGreaterThan(0); // pilot + testimonial
     expect(screen.getByText(/Pilot leads \(1\)/)).toBeInTheDocument();
     expect(screen.getByText(/Testimonials \(1\)/)).toBeInTheDocument();
+  });
+
+  it('lists every completer with a per-row thank-you mailto', async () => {
+    mockOverview.mockResolvedValue(OVERVIEW);
+    render(<TestDriveTab />);
+
+    expect(await screen.findByText(/Completions \(2\)/)).toBeInTheDocument();
+    // Priya completed but is NOT a pilot lead — she only appears via Completions.
+    expect(screen.getByText('Priya')).toBeInTheDocument();
+    // Every completer with an email gets a thank-you mailto (pilot leads + completions).
+    const links = screen.getAllByRole('link', { name: /Send thank-you/ });
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    expect(links.some((a) => a.getAttribute('href')?.startsWith('mailto:priya@y.test'))).toBe(true);
   });
 
   it('re-fetches when a corridor slice is selected', async () => {

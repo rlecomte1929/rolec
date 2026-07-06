@@ -126,11 +126,24 @@ def test_drive_overview(
             {**params, "consent": True},
         )
 
+    def completions() -> List[Dict[str, Any]]:
+        # TD-12: every surveyed tester (not just pilot leads) — so the dashboard can offer a
+        # one-click thank-you mailto per completed response. Only rows that left a contact
+        # email are actionable, so scope to those.
+        return _rows(
+            "SELECT tester_name, tester_email, tester_company_role, tester_sector, "
+            "q1_overall, pilot_interest, corridor_id, tester_segment, created_at FROM survey_responses"
+            + _where(clauses, "tester_email IS NOT NULL AND tester_email <> ''")
+            + " ORDER BY created_at DESC LIMIT 200",
+            params,
+        )
+
     fn = _safe(funnel, {})
     return {
         "funnel": fn,
         "scorecard": {**_safe(scorecard, {}), "totals": fn},
         "pilot_leads": _safe(pilot_leads, []),
+        "completions": _safe(completions, []),
         "testimonials": _safe(testimonials, []),
         "corridor": corridor,
         "segment": segment,

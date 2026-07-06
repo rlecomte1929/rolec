@@ -53,6 +53,10 @@ class TestAdminTestDrive(unittest.TestCase):
             if "SELECT testimonial" in sql:
                 return [{"testimonial": "great", "tester_name": "Alex", "tester_company_role": "Head",
                          "corridor_id": "GB_US", "created_at": "2026-07-05"}]
+            if "tester_email IS NOT NULL" in sql:  # completions panel (TD-12)
+                return [{"tester_name": "Priya", "tester_email": "priya@y.test", "tester_company_role": "HRBP",
+                         "tester_sector": "pharma", "q1_overall": 4, "pilot_interest": "no", "corridor_id": "GB_US",
+                         "tester_segment": "prospect", "created_at": "2026-07-04"}]
             return []
 
         with patch("backend.app.routers.admin_test_drive._scalar", side_effect=fake_scalar), \
@@ -70,6 +74,11 @@ class TestAdminTestDrive(unittest.TestCase):
         # panels
         self.assertEqual(len(data["pilot_leads"]), 1)
         self.assertEqual(data["testimonials"][0]["testimonial"], "great")
+        # completions panel (TD-12): every surveyed tester with an email, carrying the email
+        self.assertEqual(len(data["completions"]), 1)
+        self.assertEqual(data["completions"][0]["tester_email"], "priya@y.test")
+        completions_sql = [s for s in sql_calls if "tester_email IS NOT NULL" in s]
+        self.assertTrue(completions_sql, "completions query must scope to rows with an email")
         # the testimonials query must filter on consent
         testi_sql = [s for s in sql_calls if "SELECT testimonial" in s]
         self.assertTrue(testi_sql and "testimonial_consent = :consent" in testi_sql[0])

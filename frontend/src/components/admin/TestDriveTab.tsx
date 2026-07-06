@@ -180,17 +180,31 @@ export function TestDriveTab() {
                       <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
                       <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
                       <Badge variant={r.pilot_interest === 'yes' ? 'success' : 'warning'} size="sm">{r.pilot_interest}</Badge>
-                      {r.tester_email ? (
-                        <a
-                          href={thankYouMailto(r.tester_email, r.tester_name)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-gray-900"
-                          title="Open your mail client with a thank-you prefilled to this tester"
-                        >
-                          <Mail size={13} aria-hidden="true" /> Send thank-you
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-gray-300">—</span>
-                      )}
+                      <ThankYouButton email={r.tester_email} name={r.tester_name} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Section>
+
+          {/* Completions — every surveyed tester with a contact email (TD-12) */}
+          <Section title={`Completions (${data.completions.length})`}>
+            {data.completions.length === 0 ? (
+              <EmptyRow text="No completed surveys yet." />
+            ) : (
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="grid grid-cols-[1fr_1.4fr_1fr_70px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Name</span><span>Company / role</span><span>Corridor</span><span>Q1</span><span>Thank-you</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {data.completions.map((r, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_70px_130px] px-3 py-2 text-sm items-center">
+                      <span className="text-gray-900">{r.tester_name || '—'}<span className="block text-[11px] text-gray-400">{r.tester_email}</span></span>
+                      <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
+                      <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
+                      <span className="text-gray-600">{r.q1_overall ?? '—'}</span>
+                      <ThankYouButton email={r.tester_email} name={r.tester_name} />
                     </div>
                   ))}
                 </div>
@@ -248,6 +262,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h3 className="mb-2 text-sm font-semibold text-[#0b2b43]">{title}</h3>
       {children}
     </div>
+  );
+}
+
+// TD-12: one-click thank-you from Romain's own mailbox. Renders a mailto link when the
+// tester left an email, else a dash. Shared by the Pilot leads + Completions tables.
+function ThankYouButton({ email, name }: { email: string | null; name: string | null }) {
+  if (!email) return <span className="text-[11px] text-gray-300">—</span>;
+  return (
+    <a
+      href={thankYouMailto(email, name)}
+      className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-gray-900"
+      title="Open your mail client with a thank-you prefilled to this tester"
+    >
+      <Mail size={13} aria-hidden="true" /> Send thank-you
+    </a>
   );
 }
 
