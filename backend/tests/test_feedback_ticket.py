@@ -134,8 +134,10 @@ def test_submit_prefills_feedback_status(patched_db):
     with patched_db.connect() as conn:
         row = conn.execute(
             text(
-                "SELECT stream, status, severity, area, reporter_id "
-                "FROM feedback_status WHERE source_id = :rid"
+                "SELECT fs.stream, fs.status, fs.severity, fs.area, fs.reporter_id "
+                "FROM feedback f JOIN feedback_status fs "
+                "  ON fs.source_id = CAST(f.id AS TEXT) "
+                "WHERE f.report_id = :rid"
             ),
             {"rid": report_id},
         ).fetchone()
@@ -160,7 +162,10 @@ def test_submit_status_is_new(patched_db):
 
     with patched_db.connect() as conn:
         status = conn.execute(
-            text("SELECT status FROM feedback_status WHERE source_id = :rid"),
+            text(
+                "SELECT fs.status FROM feedback f JOIN feedback_status fs "
+                "  ON fs.source_id = CAST(f.id AS TEXT) WHERE f.report_id = :rid"
+            ),
             {"rid": report_id},
         ).scalar()
     assert status == "new"
@@ -208,7 +213,10 @@ def test_submit_isolation_bug_classified_critical(patched_db):
 
     with patched_db.connect() as conn:
         row = conn.execute(
-            text("SELECT severity, area FROM feedback_status WHERE source_id = :rid"),
+            text(
+                "SELECT fs.severity, fs.area FROM feedback f JOIN feedback_status fs "
+                "  ON fs.source_id = CAST(f.id AS TEXT) WHERE f.report_id = :rid"
+            ),
             {"rid": report_id},
         ).fetchone()
     assert row is not None
@@ -240,7 +248,11 @@ def test_submit_legacy_id_binds_null_user_id(patched_db):
             text("SELECT user_id FROM feedback WHERE report_id = :rid"), {"rid": rid}
         ).scalar()
         reporter_id = conn.execute(
-            text("SELECT reporter_id FROM feedback_status WHERE source_id = :rid"), {"rid": rid}
+            text(
+                "SELECT fs.reporter_id FROM feedback f JOIN feedback_status fs "
+                "  ON fs.source_id = CAST(f.id AS TEXT) WHERE f.report_id = :rid"
+            ),
+            {"rid": rid},
         ).scalar()
     assert user_id is None, f"feedback.user_id must be NULL for a legacy id, got {user_id!r}"
     assert reporter_id == "seed-emp-testingapril", "legacy id must remain on reporter_id"
@@ -265,15 +277,28 @@ def test_submit_uuid_native_id_binds_user_id(patched_db):
 
 
 def _seed_status(engine, *, report_id: str, reporter_id: str, severity: str = "high"):
-    """Helper: insert a feedback_status row directly."""
+    """Helper: insert a feedback row + its feedback_status ticket.
+
+    feedback_status is keyed by the feedback uuid, and the /status endpoint
+    resolves the reporter's report_id → feedback.id → feedback_status, so the
+    seed needs a matching feedback row.
+    """
+    fid = str(uuid.uuid4())
     with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO feedback (id, page_url, category, message, report_id, created_at) "
+                "VALUES (:fid, '/', 'bug', 'seed', :rid, datetime('now'))"
+            ),
+            {"fid": fid, "rid": report_id},
+        )
         conn.execute(
             text(
                 "INSERT INTO feedback_status "
                 "(stream, source_id, status, severity, area, reporter_id, updated_at) "
-                "VALUES ('product', :rid, 'new', :sev, 'api', :rep, datetime('now'))"
+                "VALUES ('product', :fid, 'new', :sev, 'api', :rep, datetime('now'))"
             ),
-            {"rid": report_id, "sev": severity, "rep": reporter_id},
+            {"fid": fid, "sev": severity, "rep": reporter_id},
         )
 
 

@@ -327,7 +327,8 @@ def dispatch_feedback_ticket(
     Side effects: sets dispatch_status/status='dispatched' + dispatch_ref on
     feedback_status, writes a 'ticket_dispatched' audit row.
     """
-    # 1. Load ticket severity/area — 404 if no row exists.
+    # 1. Load existing triage severity/area (may not exist yet — a never-triaged
+    #    item can still be dispatched; the row is created below).
     row = db.execute(
         text(
             "SELECT severity, area FROM feedback_status "
@@ -335,10 +336,7 @@ def dispatch_feedback_ticket(
         ),
         {"stream": stream, "source_id": item_id},
     ).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    severity, area = row[0], row[1]
+    severity, area = (row[0], row[1]) if row is not None else (None, None)
 
     # 2. HITL gate: high-risk tickets require explicit human confirmation.
     is_high_risk = severity == "critical" or area == "isolation"
@@ -348,15 +346,20 @@ def dispatch_feedback_ticket(
             detail="high-risk ticket requires explicit confirm",
         )
 
-    # 3. Dispatch: generate ref, update feedback_status, audit.
+    # 3. Dispatch: generate ref, upsert feedback_status (create the ticket if it
+    #    doesn't exist yet so dispatch never 404s), audit.
     dispatch_ref = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     db.execute(
         text(
-            "UPDATE feedback_status "
-            "SET dispatch_ref = :dispatch_ref, dispatch_status = 'dispatched', "
-            "    status = 'dispatched', updated_at = :now "
-            "WHERE stream = :stream AND source_id = :source_id"
+            "INSERT INTO feedback_status "
+            "(stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
+            "VALUES (:stream, :source_id, 'dispatched', :dispatch_ref, 'dispatched', :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "    dispatch_ref = excluded.dispatch_ref, "
+            "    dispatch_status = 'dispatched', "
+            "    status = 'dispatched', "
+            "    updated_at = excluded.updated_at"
         ),
         {
             "dispatch_ref": dispatch_ref,

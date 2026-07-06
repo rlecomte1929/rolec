@@ -122,13 +122,19 @@ def _seed_status(
     dispatch_status: str | None = None,
 ) -> None:
     with engine.begin() as conn:
+        # feedback_status is keyed by the feedback uuid; resolve it from report_id
+        # (the matching feedback row must be seeded first via _seed_feedback).
+        source_id = conn.execute(
+            text("SELECT CAST(id AS TEXT) FROM feedback WHERE report_id = :rid"),
+            {"rid": report_id},
+        ).scalar()
         conn.execute(
             text(
                 "INSERT INTO feedback_status "
                 "(stream, source_id, status, severity, area, reporter_id, dispatch_status, updated_at) "
-                "VALUES ('product', :rid, 'new', :sev, :area, :rep, :ds, datetime('now'))"
+                "VALUES ('product', :sid, 'new', :sev, :area, :rep, :ds, datetime('now'))"
             ),
-            {"rid": report_id, "sev": severity, "area": area, "rep": reporter_id, "ds": dispatch_status},
+            {"sid": source_id, "sev": severity, "area": area, "rep": reporter_id, "ds": dispatch_status},
         )
 
 
