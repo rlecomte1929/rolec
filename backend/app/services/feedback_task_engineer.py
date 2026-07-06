@@ -1,19 +1,31 @@
 """feedback_task_engineer.py — turn a feedback item + admin context into a
-fully-specified AI Work Queue task via a single Anthropic call (schema-forced).
+fully-specified AI Work Queue task via a single Anthropic call.
 
 Used by the admin Dispatch flow: the engineered task (goal / plan / spec /
 success metrics / verification + Work-Queue classification) is shown to the admin
 for review, then written to the Notion AI Work Queue.
 
-PII in the free text is masked before it leaves the platform (CLAUDE.md
-"Data minimisation — PII in AI prompts").
+Uses the SYNCHRONOUS ``claude_complete_text_sync`` (the same proven path as
+support.py / analytics_query — the async ``claude_complete`` hangs under the
+uvicorn worker event loop) and parses the model's JSON. PII in the free text is
+masked before it leaves the platform (CLAUDE.md "Data minimisation").
 """
 from __future__ import annotations
 
+import json
+import re
 from typing import Any, Dict, Optional
 
-from .llm_client import claude_complete
+from .llm_client import claude_complete_text_sync
 from .pii_masker import mask_pii
+
+_MODEL = "claude-sonnet-4-6"
+
+_TASK_TYPES = (
+    "Frontend Implementation, Backend Implementation, UX Redesign, Database Migration, "
+    "Prompt Engineering, RAG Improvement, Performance Optimization, Research, Competitive Analysis"
+)
+_PRODUCT_AREAS = "Core Product, AI Layer, Integrations, UX, Infrastructure, GTM"
 
 _SYSTEM = (
     "You are a senior engineering task author for ReloPass — a cross-border "
@@ -28,46 +40,22 @@ _SYSTEM = (
     "precise ordered steps.\n"
     "- validation_criteria: explicit, testable pass criteria (how we know it's done).\n"
     "- test_command: concrete command(s) to verify, or '' if none applies.\n"
-    "- Infer priority (P0 highest), complexity, task_type, layer and product_area "
-    "from the content. A data-isolation issue is always P0 and layer=Isolation.\n"
-    "- Reply with valid JSON only, matching the provided schema."
+    "- A data-isolation issue is always priority P0 and layer=Isolation.\n\n"
+    "Reply with a SINGLE JSON object ONLY — no markdown, no prose — with exactly these keys:\n"
+    '{"title": str (<=12 words), "strategic_objective": str, "execution_prompt": str, '
+    '"expected_output": str, "validation_criteria": str, "test_command": str, '
+    '"technical_constraints": str, "files_to_touch": str, "risk_rollback": str, '
+    '"priority": one of ["P0","P1","P2","P3"], '
+    '"complexity": one of ["Trivial","Low","Medium","High","Very High"], '
+    f'"task_type": one of [{_TASK_TYPES}], '
+    '"layer": one of ["UI","API","Isolation","Feature","Infrastructure"], '
+    f'"product_area": one of [{_PRODUCT_AREAS}]}}'
 )
 
-# JSON Schema mirroring the Notion AI Work Queue properties we populate.
-TASK_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "title": {"type": "string", "description": "Concise task title, max 12 words"},
-        "strategic_objective": {"type": "string", "description": "Why this matters — the goal"},
-        "execution_prompt": {"type": "string", "description": "Goal + plan + precise ordered steps"},
-        "expected_output": {"type": "string", "description": "What the agent should produce"},
-        "validation_criteria": {"type": "string", "description": "Explicit, testable pass criteria"},
-        "test_command": {"type": "string", "description": "Command(s) to verify, or ''"},
-        "technical_constraints": {"type": "string"},
-        "files_to_touch": {"type": "string"},
-        "risk_rollback": {"type": "string"},
-        "priority": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
-        "complexity": {"type": "string", "enum": ["Trivial", "Low", "Medium", "High", "Very High"]},
-        "task_type": {
-            "type": "string",
-            "enum": [
-                "Frontend Implementation", "Backend Implementation", "UX Redesign",
-                "Database Migration", "Prompt Engineering", "RAG Improvement",
-                "Performance Optimization", "Research", "Competitive Analysis",
-            ],
-        },
-        "layer": {"type": "string", "enum": ["UI", "API", "Isolation", "Feature", "Infrastructure"]},
-        "product_area": {
-            "type": "string",
-            "enum": ["Core Product", "AI Layer", "Integrations", "UX", "Infrastructure", "GTM"],
-        },
-    },
-    "required": [
-        "title", "strategic_objective", "execution_prompt", "expected_output",
-        "validation_criteria", "priority", "complexity", "task_type", "layer", "product_area",
-    ],
-    "additionalProperties": False,
-}
+_REQUIRED = (
+    "title", "strategic_objective", "execution_prompt", "expected_output",
+    "validation_criteria", "priority", "complexity", "task_type", "layer", "product_area",
+)
 
 
 def status_from_complexity(complexity: Optional[str]) -> str:
@@ -76,7 +64,21 @@ def status_from_complexity(complexity: Optional[str]) -> str:
     return "Needs Decomposition" if complexity in ("High", "Very High") else "Ready for AI"
 
 
-async def engineer_task(
+def _parse_task(raw: str) -> Dict[str, Any]:
+    """Extract the JSON object from the model's reply (tolerant of markdown fences)."""
+    s = (raw or "").strip()
+    s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s).strip()
+    start, end = s.find("{"), s.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError("engineer_task: model did not return a JSON object")
+    task = json.loads(s[start:end + 1])
+    missing = [k for k in _REQUIRED if not task.get(k)]
+    if missing:
+        raise ValueError(f"engineer_task: missing required fields {missing}")
+    return task
+
+
+def engineer_task(
     *,
     text: Optional[str],
     category: str,
@@ -87,8 +89,8 @@ async def engineer_task(
     reporter_name: Optional[str],
     admin_context: str,
 ) -> Dict[str, Any]:
-    """Return an engineered AI-Work-Queue task dict (schema above) + a derived
-    `status`. Raises if the LLM is unavailable (surfaced as a 502 by the caller)."""
+    """Return an engineered AI-Work-Queue task dict + a derived `status`.
+    Raises ValueError/RuntimeError on LLM failure (surfaced as 502 by the caller)."""
     masked_bug = mask_pii(text or "")
     masked_ctx = mask_pii(admin_context or "")
     user = (
@@ -99,6 +101,9 @@ async def engineer_task(
         f"USER MESSAGE:\n{masked_bug or '(none)'}\n\n"
         f"ADMIN CONTEXT (extra detail for the fix):\n{masked_ctx or '(none)'}\n"
     )
-    result = await claude_complete(system=_SYSTEM, user=user, schema=TASK_SCHEMA)
-    result["status"] = status_from_complexity(result.get("complexity"))
-    return result
+    raw = claude_complete_text_sync(
+        system=_SYSTEM, user=user, model=_MODEL, max_tokens=2000, temperature=0.2,
+    )
+    task = _parse_task(raw)
+    task["status"] = status_from_complexity(task.get("complexity"))
+    return task
