@@ -25,6 +25,9 @@ install_pii_log_filter()
 from .observability import configure_observability  # noqa: E402
 configure_observability()
 
+from .app.observability import init_langfuse  # noqa: E402
+init_langfuse()
+
 log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks

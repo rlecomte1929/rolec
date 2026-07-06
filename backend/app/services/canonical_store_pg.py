@@ -38,6 +38,13 @@ from backend.relopass.agents.entity_resolution import (
 
 log = logging.getLogger(__name__)
 
+try:
+    from langfuse import observe as _lf_observe  # type: ignore
+    _observe_pgvector = _lf_observe(name="pgvector_retrieval")
+except Exception:
+    def _observe_pgvector(fn):  # type: ignore[misc]
+        return fn
+
 
 def _canonical_form(p: "ExtractedPerson | CanonicalPerson", *, doc_numbers: Sequence[str]) -> dict:
     return {
@@ -115,6 +122,7 @@ class SupabaseCanonicalStore:
         return [_row_to_canonical(r["canonical_entity_id"], r["canonical_form"]) for r in rows]
 
     # ── Stage 3: pgvector cosine ANN (E-PIPE-5b) ─────────────────────────────
+    @_observe_pgvector
     def ann_search(self, case_id: str, embedding: Sequence[float], top_k: int) -> List[AnnHit]:
         if not embedding:
             return []
@@ -134,7 +142,7 @@ class SupabaseCanonicalStore:
             ),
             {"q": q, "cid": case_id, "k": top_k},
         ).mappings().all()
-        return [
+        hits = [
             AnnHit(
                 canonical_entity_id=str(r["canonical_entity_id"]),
                 cosine_sim=float(r["cosine_sim"]),
@@ -142,6 +150,15 @@ class SupabaseCanonicalStore:
             )
             for r in rows
         ]
+        try:
+            from langfuse import get_client as _lf_get  # type: ignore
+            _lf_get().update_current_span(
+                input={"top_k": top_k, "table": "rce.canonical_entities"},
+                output={"chunk_count": len(hits), "top_score": hits[0].cosine_sim if hits else None},
+            )
+        except Exception:
+            pass
+        return hits
 
     # ── Human override — DEFERRED (rce.corrections wiring) ───────────────────
     def get_override(self, case_id: str, candidate_signature: str) -> Optional[CanonicalPerson]:
