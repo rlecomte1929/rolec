@@ -46,6 +46,9 @@ export const TestDrivePage: React.FC = () => {
   const [state, setState] = useState<SubmitState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionSuccess | null>(null);
+  // A session started in a previous visit (stashed at provision, TD-9) — lets the
+  // "Finish with the survey" button work even after a reload, once a run exists.
+  const [priorSession, setPriorSession] = useState<{ session: string; corridor: string } | null>(null);
 
   // TD-8: record a funnel "click" once on landing (per-invite token / corridor).
   useEffect(() => {
@@ -55,6 +58,22 @@ export const TestDrivePage: React.FC = () => {
       tester_segment: segment,
       invite_token: inviteToken || undefined,
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recover a prior session from localStorage so the survey stays reachable on return.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TEST_DRIVE_LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { session_id?: string; corridor_id?: string };
+        if (parsed?.session_id) {
+          setPriorSession({ session: parsed.session_id, corridor: parsed.corridor_id || corridorId });
+        }
+      }
+    } catch {
+      /* storage unavailable / private mode — no prior session */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,6 +113,14 @@ export const TestDrivePage: React.FC = () => {
     }
     setState('idle');
   };
+
+  // Link to the survey, carrying the run's session for attribution. Available once a
+  // run exists (this visit's result, or a prior visit recovered from localStorage).
+  const surveyLink = result
+    ? `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`
+    : priorSession
+      ? `/test-drive/survey?corridor=${priorSession.corridor}&session=${priorSession.session}`
+      : null;
 
   return (
     <PublicLayout>
@@ -206,7 +233,7 @@ export const TestDrivePage: React.FC = () => {
       {/* Start block — form OR the dual-credential result */}
       <Section spacing="lg" background="muted">
         <FadeIn>
-          <div className="mx-auto max-w-xl">
+          <div className={result ? 'mx-auto max-w-3xl' : 'mx-auto max-w-xl'}>
             {result ? (
               <CredentialResult result={result} />
             ) : (
@@ -276,6 +303,26 @@ export const TestDrivePage: React.FC = () => {
           </div>
         </FadeIn>
       </Section>
+
+      {/* Finish with the survey — dedicated, always-available exit once a run exists */}
+      {surveyLink && (
+        <Section spacing="lg" background="muted">
+          <FadeIn>
+            <div className="mx-auto max-w-2xl text-center">
+              <SectionHeader title={c.wrapUp.header} align="center" narrow />
+              <p className="mt-6 text-marketing-body text-marketing-text leading-relaxed">
+                {c.wrapUp.body}
+              </p>
+              <div className="mt-8">
+                <CTAButton to={surveyLink} variant="primary" size="lg">
+                  {c.wrapUp.button}
+                </CTAButton>
+              </div>
+              <p className="mt-3 text-[11px] text-marketing-text-muted">{c.wrapUp.note}</p>
+            </div>
+          </FadeIn>
+        </Section>
+      )}
     </PublicLayout>
   );
 };
@@ -320,7 +367,7 @@ const CredentialCard: React.FC<{
     <h3 className="text-[17px] font-semibold text-marketing-primary">{title}</h3>
     <p className="mt-1 text-sm text-marketing-text-muted leading-relaxed">{caption}</p>
     <div className="mt-4 space-y-2">
-      <CopyRow label={c.credentials.usernameLabel} value={credential.username} />
+      <CopyRow label={c.credentials.emailLabel} value={credential.email} />
       <CopyRow label={c.credentials.passwordLabel} value={credential.password} />
     </div>
   </Card>

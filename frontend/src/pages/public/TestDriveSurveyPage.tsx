@@ -7,6 +7,10 @@ import { usePageMeta } from '../../hooks/usePageMeta';
 import { submitSurvey, type SurveyInput } from '../../api/testDrive';
 import { testDriveSurveyContent as c } from './testDriveSurveyContent';
 
+// Q1 rating scale — a deliberate red→green semantic diverging palette (rough → smooth).
+// Intentionally outside the navy/teal brand tokens; the colour IS the signal here.
+const RATING_COLORS = ['#bf4a42', '#cf7d38', '#be8f2f', '#6f9e56', '#3f9b6a'];
+
 type ProblemFit = '' | 'yes' | 'somewhat' | 'no';
 type PilotInterest = '' | 'yes' | 'maybe' | 'no';
 
@@ -66,6 +70,7 @@ export const TestDriveSurveyPage: React.FC = () => {
   const [form, setForm] = useState<SurveyForm>(EMPTY);
   const [state, setState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [sectorOther, setSectorOther] = useState(false);
 
   const set = <K extends keyof SurveyForm>(key: K, value: SurveyForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -116,6 +121,9 @@ export const TestDriveSurveyPage: React.FC = () => {
             <p className="mt-4 text-marketing-body text-marketing-text-muted leading-relaxed">
               {c.thankYou.body}
             </p>
+            <p className="mt-6 text-[15px] font-semibold italic text-marketing-primary">
+              {c.signature}
+            </p>
           </div>
         </Section>
       </PublicLayout>
@@ -130,6 +138,10 @@ export const TestDriveSurveyPage: React.FC = () => {
           <p className="mt-4 text-marketing-body text-marketing-text-muted leading-relaxed">
             {c.intro.body}
           </p>
+          <div className="mx-auto mt-5 max-w-lg rounded-lg border border-marketing-accent/30 bg-marketing-accent/10 px-4 py-3 text-left text-[13px] leading-relaxed text-marketing-primary">
+            🔒 {c.privacy}
+            <span className="mt-2 block font-semibold italic">{c.signature}</span>
+          </div>
         </div>
       </Section>
 
@@ -168,34 +180,74 @@ export const TestDriveSurveyPage: React.FC = () => {
                 value={form.tester_company_role}
                 onChange={(v) => set('tester_company_role', v)}
               />
-              <TextField
-                id="s-sector"
-                label={c.aboutYou.sector.label}
-                helper={c.aboutYou.sector.helper}
-                value={form.tester_sector}
-                onChange={(v) => set('tester_sector', v)}
-              />
+              <div>
+                <label htmlFor="s-sector" className="block text-sm font-medium text-marketing-primary">
+                  {c.aboutYou.sector.label}
+                  <span className="ml-1 font-normal text-marketing-text-muted">
+                    — {c.aboutYou.sector.helper}
+                  </span>
+                </label>
+                <select
+                  id="s-sector"
+                  value={sectorOther ? '__other__' : form.tester_sector}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '__other__') {
+                      setSectorOther(true);
+                      set('tester_sector', '');
+                    } else {
+                      setSectorOther(false);
+                      set('tester_sector', v);
+                    }
+                  }}
+                  className={fieldInputClass}
+                >
+                  <option value="">{c.aboutYou.sector.placeholder}</option>
+                  {c.aboutYou.sector.options.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  <option value="__other__">{c.aboutYou.sector.otherLabel}</option>
+                </select>
+                {sectorOther && (
+                  <input
+                    type="text"
+                    aria-label={c.aboutYou.sector.label}
+                    placeholder={c.aboutYou.sector.otherPlaceholder}
+                    value={form.tester_sector}
+                    onChange={(e) => set('tester_sector', e.target.value)}
+                    className={`${fieldInputClass} mt-2`}
+                  />
+                )}
+              </div>
             </fieldset>
 
             {/* Q1 — overall (one tap) */}
             <div>
               <p className="text-sm font-medium text-marketing-primary">{c.q1.label}</p>
               <div className="mt-3 flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    aria-pressed={form.q1_overall === n}
-                    onClick={() => set('q1_overall', n)}
-                    className={`h-10 w-10 rounded-lg border text-sm font-semibold transition-colors ${
-                      form.q1_overall === n
-                        ? 'border-marketing-accent bg-marketing-accent/10 text-marketing-accent'
-                        : 'border-marketing-border text-marketing-text hover:bg-marketing-surface-muted'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const color = RATING_COLORS[n - 1];
+                  const selected = form.q1_overall === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => set('q1_overall', n)}
+                      className="h-11 w-11 rounded-lg text-sm font-bold text-white transition-transform hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-marketing-accent/50"
+                      style={{
+                        backgroundColor: color,
+                        border: `1.5px solid ${color}`,
+                        opacity: selected ? 1 : 0.72,
+                        boxShadow: selected ? `0 5px 14px -4px ${color}80` : 'none',
+                      }}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
               </div>
               <div className="mt-1 flex justify-between text-[11px] text-marketing-text-muted">
                 <span>{c.q1.low}</span>

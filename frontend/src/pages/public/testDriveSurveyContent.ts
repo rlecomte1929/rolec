@@ -11,12 +11,41 @@ export const testDriveSurveyContent = {
       "You've run both sides of a case. Tell us how it went — most of these are one tap. If you already left detailed feedback along the way, keep the written ones short.",
   },
 
+  // Personal confidentiality assurance, shown before any personal data is entered.
+  privacy:
+    "Everything you share here comes to me alone. I treat it as confidential — it's used only to improve ReloPass and to follow up with you, and it's never shared with anyone else.",
+  signature: '— Romain Lecomte',
+
   aboutYou: {
     header: 'About you',
     name: { label: 'Your name' },
     email: { label: 'Your email', helper: 'For follow-up only.' },
     companyRole: { label: 'Company & role', helper: 'Optional; helps me understand whose feedback this is.' },
-    sector: { label: 'Sector / industry', helper: 'Optional; e.g. energy, finance, tech.' },
+    sector: {
+      label: 'Sector / industry',
+      helper: 'Optional; pick the closest.',
+      placeholder: 'Select a sector…',
+      options: [
+        'Energy & utilities',
+        'Financial services',
+        'Technology & software',
+        'Manufacturing & industrial',
+        'Pharmaceuticals & life sciences',
+        'Healthcare',
+        'Consulting & professional services',
+        'Consumer goods & retail',
+        'Automotive',
+        'Aerospace & defence',
+        'Telecommunications',
+        'Construction & engineering',
+        'Logistics & transportation',
+        'Media & entertainment',
+        'Education',
+        'Government & public sector',
+      ],
+      otherLabel: 'Other…',
+      otherPlaceholder: 'Tell us your sector',
+    },
   },
 
   q1: { label: 'Overall, how did running this case feel?', low: '1 = rough', high: '5 = smooth' },

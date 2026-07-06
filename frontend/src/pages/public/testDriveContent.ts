@@ -86,6 +86,16 @@ export const testDriveContent = {
       'The feedback button sits bottom-right the whole time. Good or bad, one sentence is enough — attach a screenshot if it helps. Everything routes straight to Romain.',
   },
 
+  // Dedicated, always-available exit to the survey (TD-5). Rendered on /test-drive
+  // only once a session exists, so testers can stop and give feedback at any point.
+  wrapUp: {
+    header: 'Finish with the survey',
+    body:
+      "Every test ends with a short survey — a few quick questions, about three minutes. It's how your feedback actually reaches me, so I'm counting on you to complete it. Open it anytime: whether you ran the whole case or had to stop early, your answers are just as useful.",
+    button: 'Take the survey',
+    note: 'This carries your session so I know which run the feedback is about.',
+  },
+
   startBlock: {
     header: 'Start the test',
     fieldLabel: 'First name',
@@ -102,7 +112,9 @@ export const testDriveContent = {
       "Two logins, one relocation. Start with the HR account to set up the case, then switch to the employee account to run their side. You'll switch between these as you go.",
     hr: { title: 'HR account', caption: 'Start here — configure the case and hand it off.' },
     employee: { title: 'Employee account', caption: 'Then switch to this — complete intake and reach the roadmap.' },
-    usernameLabel: 'Username',
+    // Testers sign in with the email (login accepts email or username); showing the
+    // email keeps the identifier consistent with the sign-in field.
+    emailLabel: 'Email',
     passwordLabel: 'Password',
     completeCta: "I've completed my test",
   },

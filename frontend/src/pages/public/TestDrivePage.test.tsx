@@ -92,8 +92,9 @@ describe('TestDrivePage', () => {
       tester_segment: 'prospect',
       invite_token: 'invite-xyz',
     });
-    expect(await screen.findByText('HR-alex-1a2b')).toBeInTheDocument();
-    expect(screen.getByText('EMP-alex-1a2b')).toBeInTheDocument();
+    // The card shows the login email (login accepts email or username).
+    expect(await screen.findByText('hr-alex@probe.test')).toBeInTheDocument();
+    expect(screen.getByText('emp-alex@probe.test')).toBeInTheDocument();
   });
 
   it('surfaces the API error and does not show credentials', async () => {
