@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, Optional
 
@@ -33,6 +34,44 @@ _FOLD_MODEL = "claude-haiku-4-5"  # alias (not date-suffixed) so router.usd_cost
 _MAX_TOKENS = 700
 _KEEP_AFTER_FOLD = 2
 _CONTEXT_CHAR_CAP = 8000
+
+# Cost circuit-breaker (Phase 3b): once this ONE relocation's coordinator spend for the
+# current month reaches the cap, routine turns are durably downgraded to Haiku (the cheaper
+# model is written to the session row, so it sticks). Fail-open — the meter never blocks a
+# turn. Env-tunable; <= 0 disables the breaker.
+_MONTHLY_CAP_ENV = "RELOPASS_COORDINATOR_MONTHLY_USD_CAP"
+_DEFAULT_MONTHLY_CAP_USD = 2.0
+
+
+def _monthly_cap_usd() -> float:
+    try:
+        return float(os.getenv(_MONTHLY_CAP_ENV, str(_DEFAULT_MONTHLY_CAP_USD)))
+    except (TypeError, ValueError):
+        return _DEFAULT_MONTHLY_CAP_USD
+
+
+def _breaker_model(case_id: str, current_model: str) -> str:
+    """Return the model to use this turn, downgrading to Haiku once the per-relocation
+    monthly cap is reached. Already-downgraded sessions stay on Haiku. Fail-open."""
+    if current_model == _FOLD_MODEL:
+        return current_model
+    cap = _monthly_cap_usd()
+    if cap <= 0:
+        return current_model
+    try:
+        from .ai_unit_economics import relocation_feature_spend_usd
+
+        spend = relocation_feature_spend_usd(str(case_id), feature_key=FEATURE_KEY)
+    except Exception as exc:  # noqa: BLE001 — meter must never block a turn
+        log.debug("coordinator breaker read failed for %s: %s", case_id, exc)
+        return current_model
+    if spend >= cap:
+        log.info(
+            "coordinator: monthly cap $%.2f reached for %s (spend $%.4f) → downgrade to %s",
+            cap, case_id, spend, _FOLD_MODEL,
+        )
+        return _FOLD_MODEL
+    return current_model
 
 _SYSTEM = (
     "You are ReloPass's Mobility Coordinator — a calm, precise relocation concierge for one "
@@ -63,6 +102,10 @@ def respond(
     masked_user = mask_pii(user_message or "")
     user_content = _render(ctx, session, masked_user)
 
+    # Cost circuit-breaker: pick the effective model (Haiku once this relocation is over cap)
+    # and persist it on the session so the downgrade sticks for subsequent turns.
+    effective_model = _breaker_model(str(case_id), session.get("model") or _REASONING_MODEL)
+
     tracer = TraceSession(
         session_id=str(case_id),
         query=masked_user,
@@ -75,7 +118,7 @@ def respond(
         LlmRequest(
             system=_SYSTEM,
             user_message=user_content,
-            model=session.get("model") or _REASONING_MODEL,
+            model=effective_model,
             max_tokens=_MAX_TOKENS,
         )
     )
@@ -93,8 +136,8 @@ def respond(
         log.warning("coordinator: telemetry failed for %s: %s", case_id, exc)
 
     answer = (result.get("text") or "").strip()
-    _persist_turn(case_id, session, masked_user, answer, ctx, db=db)
-    return {"answer": answer, "case_id": str(case_id), "model": result.get("model", _REASONING_MODEL)}
+    _persist_turn(case_id, session, masked_user, answer, ctx, model=effective_model, db=db)
+    return {"answer": answer, "case_id": str(case_id), "model": result.get("model", effective_model)}
 
 
 def _persist_turn(
@@ -104,14 +147,18 @@ def _persist_turn(
     answer: str,
     ctx: Dict[str, Any],
     *,
+    model: Optional[str] = None,
     db: Any = None,
 ) -> None:
     """Append the (masked) turn and, when the verbatim window overflows, fold older turns
-    into the rolling summary. Best-effort — never fails the response."""
+    into the rolling summary. Best-effort — never fails the response. ``model`` (when the
+    circuit-breaker downgraded this turn) is persisted so the downgrade sticks."""
     mdb = db or store._get_db()
     try:
         with mdb.engine.begin() as conn:
             s = store.load_for_update(conn, str(case_id)) or session
+            if model:
+                s["model"] = model
             store.append_turn(s, masked_user, answer)
             if store.needs_fold(s):
                 s["rolling_summary"] = _fold_summary(s)

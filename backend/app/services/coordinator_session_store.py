@@ -126,6 +126,14 @@ def get_or_create(
         return _row_to_dict(_select(conn, case_id))
 
 
+def get(case_id: str, *, db: Any = None) -> Optional[Dict[str, Any]]:
+    """Side-effect-free read of a coordinator session (unlike ``get_or_create``, never
+    inserts). Powers the read-only GET session endpoint. Returns ``None`` when absent."""
+    mdb = db or _get_db()
+    with mdb.engine.connect() as conn:
+        return _row_to_dict(_select(conn, case_id))
+
+
 def load_for_update(conn: Any, case_id: str) -> Optional[Dict[str, Any]]:
     """Row-locked load for a read-modify-write cycle (``SELECT … FOR UPDATE``)."""
     row = (

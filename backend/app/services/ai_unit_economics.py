@@ -119,3 +119,45 @@ def compute_unit_economics_rollup(
             "to": to_ts,
         },
     }
+
+
+def _current_month_start() -> str:
+    """First day of the current UTC month as a date-only ISO string (``YYYY-MM-01``).
+
+    ``created_at`` is stored as ISO text, so a date-only lower bound compares correctly
+    lexicographically without the ``T``-vs-space format hazard of a full timestamp."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    return f"{now.year:04d}-{now.month:02d}-01"
+
+
+def relocation_feature_spend_usd(
+    session_id: str,
+    *,
+    feature_key: str,
+    month_start_iso: Optional[str] = None,
+    session: Any = None,
+) -> float:
+    """Estimated spend for ONE session (``policy_assistant_traces.session_id``) + feature in
+    the current calendar month. Powers the coordinator per-relocation cost circuit-breaker
+    (the ``compute_unit_economics_rollup`` above groups by customer only, so it can't answer
+    per-relocation). Fail-soft: returns ``0.0`` on any error so the meter never blocks a turn."""
+    ms = month_start_iso or _current_month_start()
+    own = session is None
+    s = session or SessionLocal()
+    try:
+        row = s.execute(
+            text(
+                "SELECT COALESCE(SUM(cost_usd_estimated), 0) FROM policy_assistant_traces "
+                "WHERE session_id = :sid AND feature_key = :fk AND created_at >= :ms"
+            ),
+            {"sid": str(session_id), "fk": feature_key, "ms": ms},
+        ).fetchone()
+        return float((row[0] if row else 0) or 0.0)
+    except Exception:
+        log.debug("relocation_feature_spend_usd query failed", exc_info=True)
+        return 0.0
+    finally:
+        if own:
+            s.close()
