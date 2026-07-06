@@ -32,7 +32,16 @@ CREATE TABLE IF NOT EXISTS feedback (
   status TEXT DEFAULT 'new',
   created_at TEXT,
   report_id TEXT,
-  screenshot_data TEXT
+  screenshot_data TEXT,
+  reporter_email TEXT,
+  reporter_name TEXT,
+  reporter_role TEXT
+);
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  role TEXT
 );
 CREATE TABLE IF NOT EXISTS ai_human_feedback (
   id TEXT PRIMARY KEY,
@@ -111,18 +120,26 @@ def db_session():
             stmt = stmt.strip()
             if stmt:
                 conn.execute(text(stmt))
-        # Seed one row per stream
+        # Seed one row per stream.
+        # Product row carries a stored reporter snapshot (works even when user_id is NULL).
         conn.execute(text(
-            "INSERT INTO feedback (id, user_id, page_url, category, message, status, created_at) "
-            "VALUES ('f-001', 'u-1', '/dashboard', 'bug', 'Button broken', 'new', '2026-06-01T10:00:00')"
+            "INSERT INTO feedback (id, user_id, page_url, category, message, status, created_at, "
+            "reporter_email, reporter_name, reporter_role) "
+            "VALUES ('f-001', 'u-1', '/dashboard', 'bug', 'Button broken', 'new', '2026-06-01T10:00:00', "
+            "'reporter@acme.com', 'Rita Reporter', 'employee')"
         ))
         conn.execute(text(
             "INSERT INTO ai_human_feedback (id, trace_session_id, reviewer_user_id, verdict, comment, created_at) "
             "VALUES ('h-001', 'trace-001', 'rev-1', 'approved', 'Looks good', '2026-06-01T11:00:00')"
         ))
+        # Helpfulness row has no stored reporter → resolved from profiles by user_id.
         conn.execute(text(
             "INSERT INTO policy_answer_helpfulness (id, trace_session_id, company_id, user_id, helpful, comment, created_at) "
             "VALUES ('p-001', 'trace-002', 'co-1', 'emp-1', 1, 'Very helpful', '2026-06-01T12:00:00')"
+        ))
+        conn.execute(text(
+            "INSERT INTO profiles (id, email, full_name, role) "
+            "VALUES ('emp-1', 'emp1@acme.com', 'Ellen Emp', 'employee')"
         ))
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -360,3 +377,36 @@ def test_get_screenshot_missing_returns_404(admin_client):
 def test_get_screenshot_requires_admin(non_admin_client):
     resp = non_admin_client.get("/api/admin/feedback/product/f-001/screenshot")
     assert resp.status_code == 403
+
+
+# ── Reporter identity tests ─────────────────────────────────────────────────
+
+
+def _row(items, row_id):
+    return next(r for r in items if r["id"] == row_id)
+
+
+def test_product_row_uses_stored_reporter(admin_client):
+    """A product row returns its stored reporter snapshot (works even if user_id is unresolvable)."""
+    items = admin_client.get("/api/admin/feedback").json()["items"]
+    r = _row(items, "f-001")
+    assert r["reporter_name"] == "Rita Reporter"
+    assert r["reporter_email"] == "reporter@acme.com"
+    assert r["reporter_role"] == "employee"
+
+
+def test_other_stream_resolves_reporter_from_profiles(admin_client):
+    """A stream row with no stored reporter is resolved via profiles by user_id."""
+    items = admin_client.get("/api/admin/feedback").json()["items"]
+    r = _row(items, "p-001")  # helpfulness, user_id='emp-1'
+    assert r["reporter_name"] == "Ellen Emp"
+    assert r["reporter_email"] == "emp1@acme.com"
+    assert r["reporter_role"] == "employee"
+
+
+def test_unresolvable_reporter_is_null(admin_client):
+    """A row with neither a stored reporter nor a matching profile → null (NULL-safe, no crash)."""
+    items = admin_client.get("/api/admin/feedback").json()["items"]
+    r = _row(items, "h-001")  # ai_answers, reviewer_user_id='rev-1' (no profile)
+    assert r["reporter_name"] is None
+    assert r["reporter_email"] is None

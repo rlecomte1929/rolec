@@ -81,8 +81,22 @@ def submit_feedback(
     if screenshot is not None and len(screenshot) > _MAX_SCREENSHOT:
         screenshot = None  # too large to persist; keep the text feedback
 
-    cols = ["user_id", "page_url", "category", "message", "report_id", "screenshot_data"]
-    vals = [":uid", ":page", ":cat", ":msg", ":rid", ":shot"]
+    # Snapshot the reporter's identity from the authenticated session so the admin
+    # log can show WHO reported this even when user_id is NULL (legacy/HR sessions
+    # with no Supabase-native uuid). current_user comes from the users table
+    # (id/username/email/role/name) via get_current_user.
+    reporter_email = current_user.get("email")
+    reporter_name = current_user.get("name") or current_user.get("full_name")
+    reporter_role = current_user.get("role")
+
+    cols = [
+        "user_id", "page_url", "category", "message", "report_id", "screenshot_data",
+        "reporter_email", "reporter_name", "reporter_role",
+    ]
+    vals = [
+        ":uid", ":page", ":cat", ":msg", ":rid", ":shot",
+        ":r_email", ":r_name", ":r_role",
+    ]
     params: Dict[str, Any] = {
         "uid": auth_user_id,
         "page": body.page_url or "",
@@ -90,6 +104,9 @@ def submit_feedback(
         "msg": message[:_MAX_MESSAGE],
         "rid": report_id,
         "shot": screenshot,
+        "r_email": reporter_email,
+        "r_name": reporter_name,
+        "r_role": reporter_role,
     }
     # TD-9: stamp campaign/corridor/segment only when the widget supplied them (test-drive
     # sessions). Omitting them for normal users keeps the original INSERT + existing tests intact.

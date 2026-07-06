@@ -37,7 +37,16 @@ CREATE TABLE IF NOT EXISTS feedback (
   status TEXT DEFAULT 'new',
   created_at TEXT,
   report_id TEXT,
-  screenshot_data TEXT
+  screenshot_data TEXT,
+  reporter_email TEXT,
+  reporter_name TEXT,
+  reporter_role TEXT
+);
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  role TEXT
 );
 CREATE TABLE IF NOT EXISTS ai_human_feedback (
   id TEXT PRIMARY KEY,
