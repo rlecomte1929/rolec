@@ -67,8 +67,77 @@ const ROLE_RANK: Record<SidebarRole, number> = { EMPLOYEE: 0, HR: 1, ADMIN: 2 };
 
 // ── Section definitions ───────────────────────────────────────────────────────
 // Single source of truth. Routes pulled from ROUTE_DEFS so renames cascade.
+//
+// Section ORDER matters: it's the render order in the sidebar. Admin · ReloPass is
+// first so an admin lands on their own surfaces (Admin overview at the top) rather
+// than the borrowed Employee/HR persona-preview sections, which sit below. A lower
+// persona never sees the Admin section (rank filter), so their order is unchanged.
 
 const SECTIONS: NavSection[] = [
+  {
+    label: 'Admin · ReloPass',
+    minRole: 'ADMIN',
+    // Ordered by "what's needed when" and grouped by theme (a sub-group label renders
+    // at each `group` boundary): Overview → Customers → Content → Queues → Platform.
+    // Reorder/regroup only — every id/route/badge is preserved.
+    items: [
+      // ── Overview (dashboards / at-a-glance) ──
+      { id: 'admin-overview', group: 'Overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
+      { id: 'executive', group: 'Overview', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
+      // Mission Control merged into the 'Feedback & Work' tab (Queues group) on 2026-07-06.
+      // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
+      // link to the Queue tab of the same page was removed to end the false split).
+      { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
+
+      // ── Customers (live accounts + sales pipeline) ──
+      { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
+      { id: 'admin-assignments', group: 'Customers', label: 'Assignments', hint: 'Per-relocation controls', to: ROUTE_DEFS.adminAssignments.path },
+      { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
+      { id: 'test-drive', group: 'Customers', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
+
+      // ── Content (the CMS admins author / maintain) ──
+      { id: 'resources-cms', group: 'Content', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
+      { id: 'form-templates', group: 'Content', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
+      { id: 'policy-versions', group: 'Content', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
+      { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
+      { id: 'auth-page-design', group: 'Content', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
+
+      // ── Queues (day-to-day work queues) ──
+      {
+        id: 'review-queue',
+        group: 'Queues',
+        label: 'Review queue',
+        // AIQ-914: no badge — it was wired to admin.pending_tickets (HR-opened
+        // destination requests = the Catalog queue metric, not review-queue items)
+        // and carried a stale '24' fallback, so it never matched /admin/review-queue.
+        to: ROUTE_DEFS.adminReviewQueue.path,
+      },
+      {
+        id: 'integrations',
+        group: 'Queues',
+        label: 'Catalog queue',
+        to: ROUTE_DEFS.adminCatalogQueue.path,
+        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
+      },
+      {
+        id: 'vetting-queue',
+        group: 'Queues',
+        label: 'Vetting queue',
+        to: ROUTE_DEFS.adminVettingQueue.path,
+        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
+      },
+      { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
+      { id: 'feedback-console', group: 'Queues', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
+
+      // ── Platform & governance (config, access, compliance) ──
+      { id: 'feature-flags', group: 'Platform & governance', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
+      { id: 'permissions', group: 'Platform & governance', label: 'Permissions', to: ROUTE_DEFS.adminPermissions.path },
+      { id: 'admin-accounts', group: 'Platform & governance', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
+      { id: 'ai-governance', group: 'Platform & governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
+      { id: 'data-rights', group: 'Platform & governance', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
+      { id: 'audit-log', group: 'Platform & governance', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
+    ],
+  },
   {
     label: 'Employee',
     minRole: 'EMPLOYEE',
@@ -153,70 +222,6 @@ const SECTIONS: NavSection[] = [
       // NAV-002: HR 'Resources' opens the destination-preview at /hr/resources
       // (pick any destination, no case needed) — the lifestyle guide employees see.
       { id: 'hr-resources-preview', label: 'Resources', to: ROUTE_DEFS.hrResources.path },
-    ],
-  },
-  {
-    label: 'Admin · ReloPass',
-    minRole: 'ADMIN',
-    // Ordered by "what's needed when" and grouped by theme (a sub-group label renders
-    // at each `group` boundary): Overview → Customers → Content → Queues → Platform.
-    // Reorder/regroup only — every id/route/badge is preserved.
-    items: [
-      // ── Overview (dashboards / at-a-glance) ──
-      { id: 'admin-overview', group: 'Overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
-      { id: 'executive', group: 'Overview', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
-      // Mission Control merged into the 'Feedback & Work' tab (Queues group) on 2026-07-06.
-      // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
-      // link to the Queue tab of the same page was removed to end the false split).
-      { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
-
-      // ── Customers (live accounts + sales pipeline) ──
-      { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
-      { id: 'admin-assignments', group: 'Customers', label: 'Assignments', hint: 'Per-relocation controls', to: ROUTE_DEFS.adminAssignments.path },
-      { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
-      { id: 'test-drive', group: 'Customers', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
-
-      // ── Content (the CMS admins author / maintain) ──
-      { id: 'resources-cms', group: 'Content', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
-      { id: 'form-templates', group: 'Content', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'policy-versions', group: 'Content', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
-      { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
-      { id: 'auth-page-design', group: 'Content', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
-
-      // ── Queues (day-to-day work queues) ──
-      {
-        id: 'review-queue',
-        group: 'Queues',
-        label: 'Review queue',
-        // AIQ-914: no badge — it was wired to admin.pending_tickets (HR-opened
-        // destination requests = the Catalog queue metric, not review-queue items)
-        // and carried a stale '24' fallback, so it never matched /admin/review-queue.
-        to: ROUTE_DEFS.adminReviewQueue.path,
-      },
-      {
-        id: 'integrations',
-        group: 'Queues',
-        label: 'Catalog queue',
-        to: ROUTE_DEFS.adminCatalogQueue.path,
-        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
-      },
-      {
-        id: 'vetting-queue',
-        group: 'Queues',
-        label: 'Vetting queue',
-        to: ROUTE_DEFS.adminVettingQueue.path,
-        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
-      },
-      { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
-      { id: 'feedback-console', group: 'Queues', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
-
-      // ── Platform & governance (config, access, compliance) ──
-      { id: 'feature-flags', group: 'Platform & governance', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
-      { id: 'permissions', group: 'Platform & governance', label: 'Permissions', to: ROUTE_DEFS.adminPermissions.path },
-      { id: 'admin-accounts', group: 'Platform & governance', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
-      { id: 'ai-governance', group: 'Platform & governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
-      { id: 'data-rights', group: 'Platform & governance', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
-      { id: 'audit-log', group: 'Platform & governance', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
     ],
   },
 ];
