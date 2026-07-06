@@ -1,11 +1,10 @@
 /**
- * Mission Control P1 — the demands console renders triaged demands, surfaces the
- * store-not-ready state, syncs, and updates status. API + AdminLayout mocked (keeps
- * the admin shell + supabase client out of jsdom).
+ * Work board (formerly "Mission Control") — the demands console renders triaged demands,
+ * surfaces the store-not-ready state, syncs, and updates status. API mocked (keeps the
+ * supabase client out of jsdom). The component is self-contained (no AdminLayout).
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import React from 'react';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 
 expect.extend(matchers);
@@ -19,14 +18,9 @@ vi.mock('../../../api/missionControl', () => ({
   planWorkItem: vi.fn(),
   approvePlan: vi.fn(),
 }));
-vi.mock('../AdminLayout', () => ({
-  AdminLayout: ({ children, headerRight }: { children: React.ReactNode; headerRight?: React.ReactNode }) => (
-    <div>{headerRight}{children}</div>
-  ),
-}));
 
 import { listWorkItems, syncWorkItems, patchWorkItem, dispatchWorkItem, planWorkItem, approvePlan } from '../../../api/missionControl';
-import { MissionControlPage } from './MissionControlPage';
+import { WorkBoard } from './WorkBoard';
 
 const mockList = listWorkItems as unknown as ReturnType<typeof vi.fn>;
 const mockSync = syncWorkItems as unknown as ReturnType<typeof vi.fn>;
@@ -41,13 +35,13 @@ beforeEach(() => {
   mockDispatch.mockReset(); mockPlan.mockReset(); mockApprove.mockReset();
 });
 
-describe('MissionControlPage', () => {
+describe('WorkBoard', () => {
   it('renders triaged demands from the API', async () => {
     mockList.mockResolvedValue({
       table_ready: true,
       items: [{ id: '1', source: 'feedback', kind: 'bug', title: 'Save crashes', body: '500 error', status: 'triaged', priority: 'P1', auto_fixable: false, triage_json: { rationale: 'bug/P1/medium' } }],
     });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     expect(await screen.findByText('Save crashes')).toBeInTheDocument();
     expect(screen.getByText('P1')).toBeInTheDocument();
     expect(screen.getByText('bug')).toBeInTheDocument();
@@ -55,14 +49,14 @@ describe('MissionControlPage', () => {
 
   it('shows the store-not-ready notice when the table is not applied', async () => {
     mockList.mockResolvedValue({ table_ready: false, items: [] });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     expect(await screen.findByTestId('store-not-ready')).toBeInTheDocument();
   });
 
   it('Sync demands calls the API', async () => {
     mockList.mockResolvedValue({ table_ready: true, items: [] });
     mockSync.mockResolvedValue({ ok: true, inserted: 2 });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     await screen.findByTestId('empty');
     fireEvent.click(screen.getByRole('button', { name: /sync demands/i }));
     await waitFor(() => expect(mockSync).toHaveBeenCalled());
@@ -74,7 +68,7 @@ describe('MissionControlPage', () => {
       items: [{ id: '1', source: 'feedback', kind: 'bug', title: 'X', status: 'triaged', priority: 'P2', auto_fixable: false }],
     });
     mockPatch.mockResolvedValue({ ok: true });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     await screen.findByText('X');
     fireEvent.change(screen.getByLabelText('Status for X'), { target: { value: 'done' } });
     await waitFor(() => expect(mockPatch).toHaveBeenCalledWith('1', { status: 'done' }));
@@ -90,7 +84,7 @@ describe('MissionControlPage', () => {
       ],
     });
     mockDispatch.mockResolvedValue({ ok: true, run_id: 'r1', pr_url: 'https://github.com/o/r/pull/3' });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     await screen.findByText('Typo fix');
     const buttons = screen.getAllByRole('button', { name: /execute/i });
     expect(buttons).toHaveLength(1); // only the agent-eligible demand
@@ -105,7 +99,7 @@ describe('MissionControlPage', () => {
       table_ready: true,
       items: [{ id: 'a', source: 'feedback', kind: 'bug', title: 'Typo', status: 'triaged', priority: 'P3', auto_fixable: true, triage_json: { blocked: false } }],
     });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     await screen.findByText('Typo');
     fireEvent.click(screen.getByRole('button', { name: /execute/i }));
     expect(mockDispatch).not.toHaveBeenCalled();
@@ -118,7 +112,7 @@ describe('MissionControlPage', () => {
       items: [{ id: '1', source: 'feedback', kind: 'bug', title: 'Crash', status: 'triaged', priority: 'P1', auto_fixable: false }],
     });
     mockPlan.mockResolvedValue({ ok: true, plan: { summary: 's', risk: 'low', approved: false } });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     await screen.findByText('Crash');
     fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
     await waitFor(() => expect(mockPlan).toHaveBeenCalledWith('1'));
@@ -133,7 +127,7 @@ describe('MissionControlPage', () => {
       }],
     });
     mockApprove.mockResolvedValue({ ok: true, approved: true });
-    render(<MissionControlPage />);
+    render(<WorkBoard />);
     expect(await screen.findByTestId('plan')).toBeInTheDocument();
     expect(screen.getByText(/Rename the handler/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /approve plan/i }));
