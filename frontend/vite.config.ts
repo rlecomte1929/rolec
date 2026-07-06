@@ -1,9 +1,30 @@
+import { execFileSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+
+// Build SHA exposed to the app as __APP_VERSION__ (used by the feedback diagnostics
+// snapshot). Render sets RENDER_GIT_COMMIT at build; fall back to the local git SHA.
+// execFileSync with an argument array (no shell) — command is a static literal anyway.
+function appVersion(): string {
+  const fromRender = process.env.RENDER_GIT_COMMIT
+  if (fromRender) return fromRender.slice(0, 7)
+  try {
+    return (
+      execFileSync('git', ['rev-parse', '--short', 'HEAD'], { stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim() || 'dev'
+    )
+  } catch {
+    return 'dev'
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion()),
+  },
   test: {
     globals: true,
     environment: 'jsdom',

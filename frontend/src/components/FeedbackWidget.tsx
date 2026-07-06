@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { submitProductFeedback, getMyReports } from '../api/productFeedback';
+import { collectDiagnostics } from '../lib/diagnostics';
 import type { MyReport } from '../api/productFeedback';
 import { Button } from './antigravity/Button';
 import { Badge } from './antigravity/Badge';
@@ -159,6 +160,9 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
         page_url:        window.location.pathname,
         report_id:       rid,
         screenshot_data: screenshot ?? null,
+        // Auto-attach diagnostics (page, failing function, recent failed requests,
+        // breadcrumbs, viewport, app version) so triagers get the "what/where failed".
+        client_context:  collectDiagnostics(),
         ...testDrive,
       });
       setState('success');

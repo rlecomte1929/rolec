@@ -6,6 +6,7 @@ sets user_id explicitly. SQLite-shaped feedback table; calls the handler directl
 """
 from __future__ import annotations
 
+import json
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -30,7 +31,8 @@ CREATE TABLE feedback (
   report_id TEXT,
   reporter_email TEXT,
   reporter_name TEXT,
-  reporter_role TEXT
+  reporter_role TEXT,
+  client_context TEXT
 );
 """
 
@@ -97,6 +99,42 @@ class FeedbackEndpointTests(unittest.TestCase):
         self.assertEqual(r["reporter_email"], "hr@x.com")
         self.assertEqual(r["reporter_name"], "Hank HR")
         self.assertEqual(r["reporter_role"], "HR")
+
+    def test_submit_persists_client_context(self):
+        ctx = {
+            "route": "/hr/service-providers",
+            "appVersion": "abc1234",
+            "recentFailedRequests": [
+                {"method": "POST", "path": "/api/hr/company-profile/logo", "status": 502,
+                 "requestId": "req-1", "ts": "t"},
+            ],
+        }
+        fb.submit_feedback(
+            fb.FeedbackBody(category="bug", message="broke", page_url="/x", client_context=ctx),
+            _req(), EMP)
+        with self.engine.begin() as c:
+            raw = c.execute(text("SELECT client_context FROM feedback")).scalar()
+        self.assertIsNotNone(raw)
+        parsed = json.loads(raw)
+        self.assertEqual(parsed["route"], "/hr/service-providers")
+        self.assertEqual(parsed["recentFailedRequests"][0]["status"], 502)
+
+    def test_submit_without_client_context_leaves_it_null(self):
+        fb.submit_feedback(fb.FeedbackBody(category="bug", message="hi", page_url="/x"), _req(), EMP)
+        with self.engine.begin() as c:
+            raw = c.execute(text("SELECT client_context FROM feedback")).scalar()
+        self.assertIsNone(raw)
+
+    def test_oversized_client_context_dropped_but_row_written(self):
+        huge = {"blob": "x" * (fb._MAX_CLIENT_CONTEXT + 100)}
+        res = fb.submit_feedback(
+            fb.FeedbackBody(category="bug", message="keep", page_url="/x", client_context=huge),
+            _req(), EMP)
+        self.assertTrue(res["ok"])
+        with self.engine.begin() as c:
+            row = c.execute(text("SELECT message, client_context FROM feedback")).mappings().all()[0]
+        self.assertEqual(row["message"], "keep")
+        self.assertIsNone(row["client_context"])
 
     def test_oversized_screenshot_dropped_but_text_kept(self):
         big = "x" * (fb._MAX_SCREENSHOT + 1)

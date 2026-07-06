@@ -24,9 +24,87 @@ import {
   type TriageStatus,
   type EngineeredTask,
 } from '../../api/adminFeedback';
+import type { ClientContext } from '../../lib/diagnostics';
 
 type FilterStatus = TriageStatus | 'all';
 type ActiveMode = FeedbackStream | 'all' | 'dispatched';
+
+/** client_context normally arrives as an object (jsonb); tolerate a string just in case. */
+function parseCtx(raw: ClientContext | string | null | undefined): ClientContext | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as ClientContext;
+    } catch {
+      return null;
+    }
+  }
+  return raw;
+}
+
+/** Diagnostics panel — the page + function that failed, for the triager. */
+function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
+  return (
+    <div className="pt-2 mt-1 border-t border-gray-200 space-y-1.5">
+      <p className="text-[10.5px] font-semibold text-gray-500">Diagnostics</p>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-600">
+        {ctx.route && (
+          <span><span className="text-gray-400">Page</span> <span className="font-mono">{ctx.route}</span></span>
+        )}
+        {ctx.appVersion && (
+          <span><span className="text-gray-400">App</span> <span className="font-mono">{ctx.appVersion}</span></span>
+        )}
+        {ctx.viewport && (
+          <span><span className="text-gray-400">Viewport</span> {ctx.viewport}</span>
+        )}
+        {ctx.interactionId && (
+          <span><span className="text-gray-400">Interaction</span> <span className="font-mono">{ctx.interactionId}</span></span>
+        )}
+      </div>
+      {ctx.recentFailedRequests?.length > 0 && (
+        <div className="text-[11px]">
+          <p className="text-gray-400 mb-0.5">Failed requests</p>
+          <ul className="space-y-0.5">
+            {ctx.recentFailedRequests.map((r, i) => (
+              <li key={i} className="font-mono text-gray-700">
+                {r.method} {r.path} →{' '}
+                <span className={r.status >= 500 || r.status === 0 ? 'text-red-600' : 'text-amber-600'}>
+                  {r.status || 'network error'}
+                </span>
+                {r.requestId && <span className="text-gray-400"> · req {r.requestId}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {ctx.recentErrors?.length > 0 && (
+        <div className="text-[11px]">
+          <p className="text-gray-400 mb-0.5">Errors — function that failed</p>
+          <ul className="space-y-1">
+            {ctx.recentErrors.map((e, i) => (
+              <li key={i} className="text-gray-700">
+                <span className="text-red-600">{e.message}</span>
+                {e.failingFrame && (
+                  <span className="block font-mono text-[10px] text-gray-500">{e.failingFrame}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {ctx.breadcrumbs?.length > 0 && (
+        <details className="text-[11px]">
+          <summary className="text-gray-400 cursor-pointer">Recent activity ({ctx.breadcrumbs.length})</summary>
+          <ol className="mt-0.5 space-y-0.5 text-gray-500">
+            {ctx.breadcrumbs.map((b, i) => (
+              <li key={i} className="font-mono text-[10px]">{b.type}: {b.message}</li>
+            ))}
+          </ol>
+        </details>
+      )}
+    </div>
+  );
+}
 
 const STATUS_CHIP: Record<TriageStatus, string> = {
   new:      'bg-blue-100 text-blue-700 border-blue-200',
@@ -617,6 +695,9 @@ export function FeedbackTab() {
                             <p className="text-[11px] text-gray-400">Loading screenshot…</p>
                           )}
                         </div>
+                      )}
+                      {row.stream === 'product' && parseCtx(row.client_context) && (
+                        <DiagnosticsPanel ctx={parseCtx(row.client_context)!} />
                       )}
                       {row.owner && (
                         <p className="text-[10.5px] text-gray-400">Owner: {row.owner}</p>
