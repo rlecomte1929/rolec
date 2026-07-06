@@ -110,6 +110,23 @@ def autopilot_canary(request: Request, body: CanaryBody) -> Dict[str, Any]:
     return {"dry_run": False, **result.as_dict()}
 
 
+class IngestBody(BaseModel):
+    dry_run: bool = False
+    lookback_hours: int = 24
+
+
+@router.post("/autopilot-ingest")
+def autopilot_ingest(request: Request, body: IngestBody) -> Dict[str, Any]:
+    """[Autopilot P1] Nightly feedback → dedup (by error fingerprint) → engineered Notion task.
+    Governor-gated (AUTOPILOT_ENABLED + per-stage flag + monthly-USD cap, all default OFF), capped
+    per night, cost-traced, dry-run capable. A no-op that returns {halted:true} until the flags
+    are on, so scheduling it is safe before go-live."""
+    _verify_cron_secret(request)
+    from ..services.autopilot_ingest import run_ingest
+
+    return run_ingest(dry_run=body.dry_run, lookback_hours=body.lookback_hours)
+
+
 @router.post("/deadline-reminder")
 def deadline_reminder(request: Request) -> Dict[str, Any]:
     """
