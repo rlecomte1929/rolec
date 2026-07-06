@@ -40,3 +40,14 @@ export const isSectionCOverridesEnabled = (): boolean =>
  */
 export const isNlPolicyBuilderEnabled = (): boolean =>
   isOn(import.meta.env.VITE_ENABLE_NL_POLICY_BUILDER);
+
+/**
+ * AIQ-1414 — persistent Mobility Coordinator chat panel on the case pages (HR +
+ * employee). The backend also gates it (`RELOPASS_AI_COORDINATOR_ENABLED`), so both
+ * must be on; the panel also self-hides if the API 404s (defense in depth). Kept OFF
+ * until the coordinator's UI is ready to surface.
+ *
+ * Set `VITE_FEATURE_COORDINATOR=true` to render the panel.
+ */
+export const isCoordinatorEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_FEATURE_COORDINATOR);

@@ -26,6 +26,8 @@ import { CasePredictionCard } from '../components/case/CasePredictionCard';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
 import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
+import { CoordinatorChatPanel } from '../features/coordinator/CoordinatorChatPanel';
+import { isCoordinatorEnabled } from '../featureFlags';
 
 type QuoteRequest = {
   id: string;
@@ -363,6 +365,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
 
         {/* ── NAV-HR-2-FU: internal HR notes on the case ── */}
         <CaseNotesPanel caseId={detail.id} />
+
+        {/* ── AIQ-1414 Phase 4: Mobility Coordinator chat (flag-gated) ── */}
+        {isCoordinatorEnabled() && <CoordinatorChatPanel caseId={detail.id} />}
 
         {/* ── NAV-HR-3: chronological HR-action audit trail (from audit_logs) ── */}
         <CaseAuditTimeline caseId={detail.id} />

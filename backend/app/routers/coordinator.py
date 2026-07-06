@@ -14,7 +14,7 @@ re-resolves the handler's forward-ref annotations against its own globals, which
 PydanticUndefinedAnnotation on the Pydantic body when the future import is present.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from ...rate_limit import limiter
 from ..auth_deps import require_case_access, require_hr_or_employee
 from ..services import coordinator_agent
+from ..services import coordinator_session_store as store
 from ..services.coordinator_context_builder import coordinator_enabled
 
 router = APIRouter(tags=["coordinator"])
@@ -61,3 +62,36 @@ def coordinator_respond(
     if result is None:  # flag flipped between the gate check and the call
         raise HTTPException(status_code=404, detail="Not found")
     return result
+
+
+class SessionResponse(BaseModel):
+    case_id: str
+    rolling_summary: str
+    recent_turns: List[Dict[str, Any]]
+    model: str
+    status: str
+
+
+@router.get("/api/cases/{case_id}/coordinator/session", response_model=SessionResponse)
+def coordinator_session(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> Dict[str, Any]:
+    """Load the case's persisted coordinator session (rolling summary + recent turns) so the
+    UI can render the thread. Read-only, no side effects. Flag-gated (404 when OFF); access
+    via ``require_case_access``. Returns an empty session when none exists yet."""
+    if not coordinator_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    require_case_access(case_id, user)
+    session = store.get(str(case_id))
+    if session is None:
+        return {"case_id": str(case_id), "rolling_summary": "", "recent_turns": [],
+                "model": "", "status": "none"}
+    return {
+        "case_id": str(case_id),
+        "rolling_summary": session.get("rolling_summary") or "",
+        "recent_turns": session.get("recent_turns") or [],
+        "model": session.get("model") or "",
+        "status": session.get("status") or "active",
+    }

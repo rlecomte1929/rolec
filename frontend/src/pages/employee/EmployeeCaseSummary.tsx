@@ -15,6 +15,8 @@ import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextAct
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 import { buildRoute } from '../../navigation/routes';
+import { CoordinatorChatPanel } from '../../features/coordinator/CoordinatorChatPanel';
+import { isCoordinatorEnabled } from '../../featureFlags';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -255,6 +257,13 @@ export const EmployeeCaseSummary: React.FC = () => {
 
       {!isLoading && draft && !hasAnyData && (
         <p className="text-sm text-[#6b7280] mt-4">No intake saved yet. Use Continue editing to complete it.</p>
+      )}
+
+      {/* ── AIQ-1414 Phase 4: Mobility Coordinator chat (flag-gated) ── */}
+      {caseId && isCoordinatorEnabled() && (
+        <div className="mt-6 mb-6">
+          <CoordinatorChatPanel caseId={caseId} />
+        </div>
       )}
 
       {/* M-11 (AIQ-1268): "What to do next" moved BELOW the data so the employee
