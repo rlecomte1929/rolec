@@ -8,6 +8,7 @@ import { Alert, Button, Card } from '../components/antigravity';
 import { RefreshButton } from '../components/RefreshButton';
 import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
+import { track } from '../analytics';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import {
   caseIdForAssignment,
@@ -117,6 +118,12 @@ export const ProvidersPage: React.FC = () => {
     if (!queryAssignmentId || needsPicker || assignmentId !== queryAssignmentId) return;
     setPreferredEmployeeAssignmentId(queryAssignmentId);
   }, [queryAssignmentId, needsPicker, assignmentId]);
+
+  // AIQ-1435: journey funnel — services & policy step reached (once per mount).
+  useEffect(() => {
+    track('journey_step_started', { step: 'services_policy', case_id: pathCaseId, persona: 'employee' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const queryClient = useQueryClient();
   // `services` is form-local (toggled by handleToggle), seeded from the query.
   const [services, setServices] = useState<Record<string, ServiceState>>({});
