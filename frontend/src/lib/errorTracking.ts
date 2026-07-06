@@ -30,17 +30,47 @@ export function addBreadcrumb(entry: Omit<Breadcrumb, 'timestamp'>): void {
   if (breadcrumbs.length > MAX_BREADCRUMBS) breadcrumbs.shift();
 }
 
+/** Read-only copy of the breadcrumb trail (for the feedback diagnostics snapshot). */
+export function getBreadcrumbs(): Breadcrumb[] {
+  return breadcrumbs.map((b) => ({ ...b, message: scrubPii(b.message) }));
+}
+
+// ---------------------------------------------------------------------------
+// Recent-errors ring buffer — last 5 captured errors, so a filed bug report can
+// show the function that actually failed. Populated by reportError() below, even
+// in dev/local where the Edge-Function report is skipped. Module-level.
+// ---------------------------------------------------------------------------
+
+export interface RecentError {
+  message: string;
+  failingFrame: string; // first user-code stack frame = the function that failed
+  fingerprint: string;
+  ts: string;
+}
+
+const MAX_RECENT_ERRORS = 5;
+const recentErrors: RecentError[] = [];
+
+export function getRecentErrors(): RecentError[] {
+  return recentErrors.slice();
+}
+
 // ---------------------------------------------------------------------------
 // Fingerprint — deterministic hash of message + first user-code stack frame
 // ---------------------------------------------------------------------------
 
-function computeFingerprint(message: string, stack: string | null): string {
-  const firstUserFrame =
+/** The first user-code stack frame — i.e. "the function that failed". */
+export function firstUserFrame(stack: string | null): string {
+  return (
     stack
       ?.split('\n')
       .find((line) => line.includes('.tsx') || line.includes('.ts'))
-      ?.trim() ?? '';
-  const input = `${message}::${firstUserFrame}`;
+      ?.trim() ?? ''
+  );
+}
+
+function computeFingerprint(message: string, stack: string | null): string {
+  const input = `${message}::${firstUserFrame(stack)}`;
   // djb2 hash
   let hash = 5381;
   for (let i = 0; i < input.length; i++) {
@@ -96,6 +126,18 @@ export async function reportError(ctx: ErrorContext): Promise<void> {
   // Skip in test / SSR environments
   if (typeof window === 'undefined') return;
 
+  // Record into the recent-errors buffer FIRST — this feeds the feedback diagnostics
+  // snapshot and must capture even in dev/local where the Edge-Function report below is
+  // skipped.
+  const fingerprint = computeFingerprint(ctx.message, ctx.stack);
+  recentErrors.push({
+    message: scrubPii(ctx.message).slice(0, 500),
+    failingFrame: scrubPii(firstUserFrame(ctx.stack)).slice(0, 300),
+    fingerprint,
+    ts: new Date().toISOString(),
+  });
+  if (recentErrors.length > MAX_RECENT_ERRORS) recentErrors.shift();
+
   // Skip localhost in development to avoid noise during coding.
   // Remove this guard if you want to capture local errors too.
   if (
@@ -110,7 +152,6 @@ export async function reportError(ctx: ErrorContext): Promise<void> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   if (!supabaseUrl) return;
 
-  const fingerprint = computeFingerprint(ctx.message, ctx.stack);
   const userId = getAuthItem('relopass_user_id') || null;
 
   const payload = {

@@ -12,6 +12,7 @@ import type {
 import type { NormalizedPolicyResponse, PolicyDocument, PolicyDocumentClause, CompanyPolicySummary } from '../features/policy/types';
 import { logger } from '../lib/logger';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
+import { recordFailedRequest } from './requestLog';
 import { env } from '../config/env';
 import type { IntakeData } from '../features/platform-v2/intake/EmployeeIntakePage';
 import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
@@ -257,6 +258,12 @@ api.interceptors.response.use(
           serverMs: parseServerTiming(serverTiming),
           startedAt: meta.tStart,
         });
+        recordFailedRequest(
+          method,
+          path,
+          status,
+          ((resHeaders?.['x-request-id'] as string | undefined) ?? meta.requestId) || null,
+        );
       }
     } catch (e) {
       swallow(e, 'client: request-perf emit');
@@ -4132,6 +4139,10 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Failed requests are recorded into ./requestLog (a lightweight module) so the feedback
+// diagnostics snapshot can read them without importing this heavy client (which pulls
+// api/supabase and breaks the jsdom test env). This file only writes via recordFailedRequest.
+
 export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string>; requestId?: string; signal?: AbortSignal }): Promise<T> {
   let response: Response;
   const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -4153,6 +4164,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
       },
     });
   } catch {
+    recordFailedRequest('GET', pathOnly, 0, requestId);
     throw new Error('Unable to reach the server. Please check your connection and try again.');
   }
   if (!response.ok) {
@@ -4168,6 +4180,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    recordFailedRequest('GET', pathOnly, response.status, response.headers.get('X-Request-ID') ?? requestId);
     handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
@@ -4212,6 +4225,7 @@ export async function apiPost<T>(
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
+    recordFailedRequest('POST', pathOnly, 0, requestId);
     throw new Error('Unable to reach the server. Please check your connection and try again.');
   }
   if (!response.ok) {
@@ -4227,6 +4241,7 @@ export async function apiPost<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    recordFailedRequest('POST', pathOnly, response.status, response.headers.get('X-Request-ID') ?? requestId);
     handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
@@ -4271,6 +4286,7 @@ export async function apiPatch<T>(
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
+    recordFailedRequest('PATCH', pathOnly, 0, requestId);
     throw new Error('Unable to reach the server. Please check your connection and try again.');
   }
   if (!response.ok) {
@@ -4286,6 +4302,7 @@ export async function apiPatch<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    recordFailedRequest('PATCH', pathOnly, response.status, response.headers.get('X-Request-ID') ?? requestId);
     handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
@@ -4330,6 +4347,7 @@ export async function apiPut<T>(
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
+    recordFailedRequest('PUT', pathOnly, 0, requestId);
     throw new Error('Unable to reach the server. Please check your connection and try again.');
   }
   if (!response.ok) {
@@ -4345,6 +4363,7 @@ export async function apiPut<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    recordFailedRequest('PUT', pathOnly, response.status, response.headers.get('X-Request-ID') ?? requestId);
     handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }

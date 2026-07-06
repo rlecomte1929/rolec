@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from './client';
+import type { ClientContext } from '../lib/diagnostics';
 
 /**
  * Product "Share feedback" widget submission. Routes through the FastAPI backend
@@ -17,6 +18,9 @@ export interface ProductFeedbackInput {
   campaign?: string;
   corridor_id?: string;
   tester_segment?: string;
+  // Diagnostics snapshot (page, failing function, recent failed requests, breadcrumbs,
+  // viewport, app version) auto-attached by the widget for the admin Diagnostics panel.
+  client_context?: ClientContext;
 }
 
 export async function submitProductFeedback(

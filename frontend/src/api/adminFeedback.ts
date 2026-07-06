@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from './client';
+import type { ClientContext } from '../lib/diagnostics';
 
 export type FeedbackStream =
   | 'product'
@@ -38,6 +39,10 @@ export interface UnifiedFeedbackItem {
    *  image itself is fetched lazily via getFeedbackScreenshot to keep the list
    *  payload small. Serialized as 0/1 by the backend — read via truthiness. */
   has_screenshot?: boolean;
+  /** Diagnostics snapshot captured by the widget at submit (product stream only):
+   *  page/route, failing function, recent failed requests + correlation id, breadcrumbs,
+   *  viewport, app version. Null for other streams / older rows. */
+  client_context?: ClientContext | null;
 }
 
 export interface DispatchResult {
