@@ -371,7 +371,7 @@ export function FeedbackTab() {
       {/* Table — normal (non-dispatched) mode */}
       {activeStream !== 'dispatched' && displayed.length > 0 && (
         <div className="rounded-lg border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-[100px_110px_1fr_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
             <div className="px-3 py-2.5">ID</div>
             <div className="px-3 py-2.5">Stream</div>
             <div className="px-3 py-2.5">Text</div>
@@ -392,7 +392,7 @@ export function FeedbackTab() {
               return (
                 <div key={row.id}>
                   <div
-                    className="grid grid-cols-[100px_110px_1fr_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="grid grid-cols-[100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => setExpanded(isExpanded ? null : row.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -417,7 +417,7 @@ export function FeedbackTab() {
                         {STREAM_LABEL[row.stream]}
                       </span>
                     </div>
-                    <div className="px-3 py-2.5">
+                    <div className="px-3 py-2.5 min-w-0">
                       <p className="text-[12px] text-gray-700 truncate">{row.text ?? '—'}</p>
                     </div>
                     {/* Tags: severity + area badges */}
