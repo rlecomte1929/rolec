@@ -18,6 +18,7 @@ if _REPO_ROOT not in sys.path:
 from backend.db.test_data_filter import (  # noqa: E402
     exclude_test_companies,
     exclude_test_people,
+    looks_like_test_company,
     strip_verify_prefix,
 )
 
@@ -32,7 +33,7 @@ class TestDataFilterTests(unittest.TestCase):
               ('Acme GmbH'), ('Globex'), ('Testing April'),
               ('Other Corp'), ('Test Co (Seed)'), ('Test company'),
               ('Other Corp (Seed)'), ('Probe ISO-A'), ('Probe ISO-B'),
-              ('Brand New Co 1782553314571'), (NULL);
+              ('Brand New Co 1782553314571'), ('Test Drive Romain a1b2'), (NULL);
             CREATE TABLE people (email TEXT);
             INSERT INTO people (email) VALUES
               ('real.person@acme.com'), ('hr@testcompany.com'),
@@ -55,7 +56,7 @@ class TestDataFilterTests(unittest.TestCase):
         # every synthetic name gone (incl. Wave-3 'Brand New Co <epoch>' — AIQ-1325a)
         for bad in ("Other Corp", "Test Co (Seed)", "Test company",
                     "Other Corp (Seed)", "Probe ISO-A", "Probe ISO-B",
-                    "Brand New Co 1782553314571"):
+                    "Brand New Co 1782553314571", "Test Drive Romain a1b2"):
             self.assertNotIn(bad, names)
 
     def test_people_filter_excludes_only_testco_domain(self):
@@ -68,6 +69,13 @@ class TestDataFilterTests(unittest.TestCase):
         for bad in ("emp_run_123@testco.com", "hr_run_9@testco.com",
                     "emp_uxfix_1@testco.com", "emp_f17_20260613@testco.com"):
             self.assertNotIn(bad, emails)
+
+    def test_test_drive_company_flagged_at_write_time(self):
+        # Test-drive provisioning creates 'Test Drive <name> <suffix>' companies; these
+        # must be auto-stamped is_test=true so they don't pollute admin surfaces.
+        self.assertTrue(looks_like_test_company("Test Drive Romain a1b2"))
+        # Guard: a real tenant that merely contains the word 'Drive' is not caught.
+        self.assertFalse(looks_like_test_company("Drive Logistics GmbH"))
 
     def test_real_testcompany_demo_not_caught(self):
         # Guard: the demo domain @testcompany.com must survive (zero overlap with @testco.com).

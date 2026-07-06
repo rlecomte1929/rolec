@@ -101,6 +101,28 @@ describe('TestDrivePage', () => {
     expect(screen.getByText('emp-alex@probe.test')).toBeInTheDocument();
   });
 
+  it('provisions from a bare /test-drive URL (no token) with invite_token undefined', async () => {
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 's2',
+      corridorId: 'FR_NO',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-r-1a2b', email: 'hr-r@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-r-1a2b', email: 'emp-r@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    renderAt('');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith({
+      first_name: 'Romain',
+      tester_segment: 'prospect',
+      invite_token: undefined,
+    });
+  });
+
   it('surfaces the API error and does not show credentials', async () => {
     mockProvision.mockResolvedValue({ ok: false, error: 'This invite link is invalid or has expired.' });
     renderAt('?corridor=FR_NO');

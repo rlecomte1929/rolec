@@ -2,13 +2,15 @@
 
 Pins the contract of POST /api/test-drive/provision:
   1. Campaign flag off                → 404 (dark by default)
-  2. Flag on, missing/wrong token     → 403
+  2. Flag on + wrong token supplied   → 403 (token validated only when supplied)
+  2b. Flag on + no token supplied     → 200 (public self-serve; token is optional)
   3. Flag on + valid token + input    → 200, two credential sets, both accounts
      created (HR then EMPLOYEE), company seeded + linked, test_sessions written
   4. Bad tester_segment               → 422 (Pydantic)
   5. Route is registered in BOTH app instances (dual-layer per CLAUDE.md)
   6. No corridor_id → auto-assigned from locked set (TD-13)
   7. Explicit corridor_id → honoured verbatim (TD-13)
+  8. Unknown corridor_id → coerced to auto-assign (whitelist against locked set)
 
 The db layer is patched at the router module level (no live DB), mirroring
 test_auth_register.py. Supabase sync is patched out so nothing touches the network.
@@ -68,14 +70,26 @@ class TestTestDriveProvision(unittest.TestCase):
         self.assertEqual(resp.status_code, 403, resp.text)
         db.create_user.assert_not_called()
 
-    def test_missing_token_secret_returns_403(self):
-        """If the server has no campaign secret configured, always 403 (never open)."""
+    def test_no_token_supplied_is_open(self):
+        """Token is optional: omitting it provisions even when a secret is configured."""
+        from backend.app.routers.test_drive import _LOCKED_CORRIDORS
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(invite_token=None))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertIn(resp.json()["corridor_id"], _LOCKED_CORRIDORS)
+
+    def test_no_token_and_no_secret_is_open(self):
+        """No configured secret + no supplied token → still open (public self-serve)."""
         db = _db_mock()
         env = {"RELOPASS_TEST_DRIVE_ENABLED": "1", "RELOPASS_TEST_DRIVE_INVITE_TOKEN": ""}
         with patch.dict(os.environ, env, clear=False), \
-                patch("backend.app.routers.test_drive.db", db):
-            resp = self.client.post("/api/test-drive/provision", json=_body())
-        self.assertEqual(resp.status_code, 403, resp.text)
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(invite_token=None))
+        self.assertEqual(resp.status_code, 200, resp.text)
 
     def test_happy_path_provisions_pair(self):
         db = _db_mock()
@@ -139,6 +153,17 @@ class TestTestDriveProvision(unittest.TestCase):
             resp = self.client.post("/api/test-drive/provision", json=_body(corridor_id="IN_DE"))
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(resp.json()["corridor_id"], "IN_DE")
+
+    def test_unknown_corridor_coerced_to_autoassign(self):
+        """A corridor_id not in the locked set is ignored and auto-assigned instead."""
+        from backend.app.routers.test_drive import _LOCKED_CORRIDORS
+        db_mock = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db_mock), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(corridor_id="'; DROP--"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertIn(resp.json()["corridor_id"], _LOCKED_CORRIDORS)
 
     def test_route_registered_in_both_apps(self):
         from backend.main import app as prod_app

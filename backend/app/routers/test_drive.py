@@ -152,7 +152,7 @@ def _assign_corridor(campaign: str) -> str:
 class ProvisionRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=40)
     corridor_id: Optional[str] = Field(None, max_length=64)
-    invite_token: str = Field(..., min_length=1)
+    invite_token: Optional[str] = Field(None, max_length=200)
     tester_segment: str = Field("prospect", pattern="^(internal|prospect)$")
     campaign: Optional[str] = Field(None, max_length=64)
 
@@ -177,22 +177,29 @@ def provision(body: ProvisionRequest, request: Request):
     """Provision a paired HR + Employee test identity for the self-serve flow.
 
     Returns both credential sets (username + email + plaintext one-time password)
-    plus the ``test_sessions`` id. 404 when the campaign is off, 403 on a bad
-    invite token.
+    plus the ``test_sessions`` id. 404 when the campaign is off; 403 only when a
+    token is supplied that doesn't match the configured campaign secret (a missing
+    token is allowed — public self-serve).
     """
     # 1) Campaign gate — dark by default.
     if not _test_drive_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
-    # 2) Invite-token gate — constant-time compare against the campaign secret.
+    # 2) Invite token is now optional (public self-serve). If the campaign has a token
+    #    configured AND the caller supplies one, it must still match — keeps existing
+    #    invite links meaningful and rejects a wrong/stale token. A missing token is OK.
     expected_token = os.getenv("RELOPASS_TEST_DRIVE_INVITE_TOKEN") or ""
-    if not expected_token or not secrets.compare_digest(body.invite_token, expected_token):
+    supplied_token = (body.invite_token or "").strip()
+    if supplied_token and expected_token and not secrets.compare_digest(supplied_token, expected_token):
         raise HTTPException(status_code=403, detail="Invalid or missing invite token")
 
     first_name = body.first_name.strip()
     slug = _slugify(first_name)
     campaign = (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
-    resolved_corridor = (body.corridor_id or "").strip() or _assign_corridor(campaign)
+    # Whitelist the corridor: honour an explicit valid one, otherwise auto-assign. This
+    # blocks free-text corridor_id injection now that the endpoint is public.
+    requested_corridor = (body.corridor_id or "").strip()
+    resolved_corridor = requested_corridor if requested_corridor in _LOCKED_CORRIDORS else _assign_corridor(campaign)
 
     # Passwords are independent of the collision retry, so hash once (pbkdf2 is costly).
     hr_password = secrets.token_urlsafe(9)
