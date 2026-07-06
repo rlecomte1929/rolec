@@ -39,6 +39,7 @@ import {
   Scale,
   Fingerprint,
   ScrollText,
+  Rocket,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -84,6 +85,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   // Admin · ReloPass
   'admin-overview': Home,
   'admin-assignments': Plane,
+  'test-drive': Rocket,
   executive: Gauge,
   'mission-control': Radar,
   'admin-companies': Building2,
