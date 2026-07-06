@@ -11,7 +11,11 @@ Dual-registered in backend/main.py AND backend/app/main.py (CLAUDE.md rule).
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional
@@ -604,6 +608,138 @@ def dispatch_create(
         detail={"stream": stream, "notion_url": url, "title": task.get("title")},
     )
     return {"dispatched": True, "url": url, "dispatch_ref": url}
+
+
+# ── Trigger fix (skill handoff) + Auto-attempt (autofix pipeline) ─────────────
+# Once a row is dispatched (feedback_status.dispatch_ref = Notion URL), an admin can
+# MANUALLY launch a fix. Gated by FEEDBACK_FIX_TRIGGER_ENABLED (404 when off).
+
+
+def _fix_trigger_enabled() -> bool:
+    return os.getenv("FEEDBACK_FIX_TRIGGER_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _require_fix_enabled() -> None:
+    if not _fix_trigger_enabled():
+        raise HTTPException(status_code=404, detail="Feedback fix-trigger is not enabled.")
+
+
+def _dispatched_page_id(db: Session, stream: str, item_id: str) -> str:
+    """Resolve the Notion page id for a dispatched row, or 409 if not dispatched."""
+    row = db.execute(
+        text(
+            "SELECT dispatch_ref, dispatch_status FROM feedback_status "
+            "WHERE stream = :s AND source_id = :id"
+        ),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    ref = row[0] if row else None
+    status = row[1] if row else None
+    if status != "dispatched" or not ref or not str(ref).startswith("http"):
+        raise HTTPException(
+            status_code=409,
+            detail="Dispatch this feedback to the AI Work Queue before triggering a fix.",
+        )
+    page_id = notion_work_queue.page_id_from_ref(ref)
+    if not page_id:
+        raise HTTPException(status_code=422, detail="Could not resolve the Notion page id for this task.")
+    return page_id
+
+
+def _invoke_autofix_pipeline(notion_task_id: str) -> Dict[str, Any]:
+    base = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not base or not key:
+        raise HTTPException(status_code=503, detail="Autofix pipeline is not configured.")
+    req = urllib.request.Request(
+        f"{base.rstrip('/')}/functions/v1/autofix-pipeline",
+        data=json.dumps({"notion_task_id": notion_task_id}).encode("utf-8"),
+        method="POST",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return {"pipeline": json.loads(resp.read())}
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:300]
+        raise HTTPException(status_code=502, detail=f"Autofix pipeline returned {exc.code}: {detail}")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Autofix pipeline unreachable: {exc}") from exc
+
+
+@router.post("/feedback/{stream}/{item_id}/fix", dependencies=[Depends(_require_fix_enabled)])
+def trigger_fix(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Mark the dispatched task 'Ready for AI' and return the exact skill command to
+    run in Claude Code. No code executes here — it hands off to /relopass-dev-queue."""
+    page_id = _dispatched_page_id(db, stream, item_id)
+    try:
+        meta = notion_work_queue.get_task_meta(page_id)
+        notion_work_queue.set_task_status(
+            page_id, "Ready for AI", notes="Fix triggered from the admin Feedback console."
+        )
+    except notion_work_queue.NotionNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except notion_work_queue.NotionApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    aiq = meta.get("aiq_id") or ""
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="ticket_fix_triggered",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "aiq_id": aiq, "page_id": page_id},
+    )
+    return {
+        "triggered": True,
+        "skill": "relopass-dev-queue",
+        "command": f"/relopass-dev-queue {aiq}".strip(),
+        "routes_to": "relopass-fix-ui-bug / relopass-fix-api-bug / relopass-fix-isolation-bug (by Layer)",
+        "aiq_id": meta.get("aiq_id"),
+        "url": meta.get("url"),
+    }
+
+
+@router.post("/feedback/{stream}/{item_id}/auto-attempt", dependencies=[Depends(_require_fix_enabled)])
+def auto_attempt(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Fire the autofix pipeline for this one task — Trivial/Low + non-Red only."""
+    page_id = _dispatched_page_id(db, stream, item_id)
+    try:
+        meta = notion_work_queue.get_task_meta(page_id)
+    except notion_work_queue.NotionNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except notion_work_queue.NotionApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    complexity = (meta.get("complexity") or "").strip().lower()
+    tier = (meta.get("autonomy_tier") or "").lower()
+    if "red" in tier or complexity not in ("trivial", "low"):
+        raise HTTPException(
+            status_code=422,
+            detail="Auto-attempt is only allowed for Trivial/Low, non-Red tasks. Use Trigger fix instead.",
+        )
+
+    result = _invoke_autofix_pipeline(page_id)
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="ticket_auto_attempt",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "page_id": page_id},
+    )
+    return {"status": "dispatched", "url": meta.get("url"), **result}
 
 
 # ── Dismiss (soft-hide, all streams) + Delete (hard, product only) ────────────

@@ -51,3 +51,15 @@ export const isNlPolicyBuilderEnabled = (): boolean =>
  */
 export const isCoordinatorEnabled = (): boolean =>
   isOn(import.meta.env.VITE_FEATURE_COORDINATOR);
+
+/**
+ * Feedback "Trigger fix" / "Auto-attempt" actions on a dispatched feedback row
+ * (admin Feedback console). Once a row is dispatched to the Notion AI Work Queue,
+ * these let an admin manually flip it to "Ready for AI" (with the /relopass-dev-queue
+ * command) or fire the autofix pipeline. The backend also gates it
+ * (`FEEDBACK_FIX_TRIGGER_ENABLED`), so both must be on.
+ *
+ * Set `VITE_FEATURE_FEEDBACK_FIX=true` to surface the buttons.
+ */
+export const isTriggerFixEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_FEATURE_FEEDBACK_FIX);

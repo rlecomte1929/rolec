@@ -142,6 +142,26 @@ async function fetchReadyBugs(token: string, dbId: string, max: number) {
   }).filter((t: { title: string }) => t.title.length > 0);
 }
 
+// Fetch a single Work Queue task by page id — the on-demand path used when an admin
+// clicks "Auto-attempt" in the Feedback console (bypasses the Ready-for-AI batch filter).
+async function fetchTaskById(token: string, pageId: string) {
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`Notion page fetch failed: ${res.status}`);
+  const page = await res.json();
+  const props = (page.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const title = ((props["fable"]?.title ?? props["Task Title"]?.title ?? props["title"]?.title ?? []) as Array<{ plain_text: string }>)
+    .map((t) => t.plain_text).join("");
+  const desc = ((props["Expected Output"]?.rich_text ?? props["Description"]?.rich_text ?? []) as Array<{ plain_text: string }>)
+    .map((t) => t.plain_text).join("");
+  return { notionId: page.id as string, title, description: desc, notionUrl: page.url as string };
+}
+
 async function updateNotionTask(id: string, status: string, notes: string, token: string) {
   await fetch(`https://api.notion.com/v1/pages/${id}`, {
     method: "PATCH",
@@ -457,6 +477,10 @@ Deno.serve(async (req: Request) => {
   const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
   const dryRun = body.dry_run === true || Deno.env.get("DRY_RUN") === "true";
   const maxBugs = parseInt(body.max_bugs ?? Deno.env.get("MAX_BUGS") ?? "5", 10);
+  // Single-task mode: fix exactly this Work Queue task instead of the Ready-for-AI batch.
+  const singleTaskId = typeof body.notion_task_id === "string" && body.notion_task_id
+    ? body.notion_task_id
+    : null;
 
   const env: Env = {
     anthropicKey, githubToken, githubOwner, githubRepo, notionToken, notionDbId,
@@ -482,9 +506,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Fetch candidate bugs
-    const bugs = await fetchReadyBugs(notionToken, notionDbId, maxBugs);
-    console.log(`autofix-pipeline: ${date}: fetched ${bugs.length} candidate bugs`);
+    // Fetch candidate bugs — single task (on-demand) or the Ready-for-AI batch (cron).
+    const bugs = singleTaskId
+      ? [await fetchTaskById(notionToken, singleTaskId)].filter((t) => t.title.length > 0)
+      : await fetchReadyBugs(notionToken, notionDbId, maxBugs);
+    console.log(`autofix-pipeline: ${date}: ${singleTaskId ? `single-task ${singleTaskId}` : "batch"} → ${bugs.length} candidate(s)`);
 
     const results = [];
     for (const bug of bugs) {
