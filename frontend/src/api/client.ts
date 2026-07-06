@@ -2550,6 +2550,42 @@ export const adminNotificationsAPI = {
 };
 
 // Admin Ops Analytics API (admin-only)
+export interface WorkflowFunnelStage {
+  stage: string;
+  label: string;
+  count: number;
+  /** null for the first stage (no previous to convert from). */
+  conversion_from_prev_pct: number | null;
+  conversion_from_start_pct: number;
+}
+export interface WorkflowFunnelResponse {
+  period_days: number;
+  since: string;
+  stages: WorkflowFunnelStage[];
+}
+export interface AssistantTopicRow {
+  topic: string;
+  asked: number;
+  supported: number;
+  unsupported: number;
+  refusal: number;
+  support_rate_pct: number;
+  refusal_rate_pct: number;
+}
+export interface AssistantTopicsResponse {
+  period_days: number;
+  since: string;
+  overall: {
+    asked: number;
+    supported: number;
+    unsupported: number;
+    refusal: number;
+    support_rate_pct: number;
+    refusal_rate_pct: number;
+  };
+  topics: AssistantTopicRow[];
+}
+
 export const adminOpsAnalyticsAPI = {
   getSlaOverview: (params?: { country_code?: string; days?: number }) =>
     api.get<unknown>('/api/admin/ops/sla/overview', { params }).then((r) => r.data),
@@ -2571,6 +2607,12 @@ export const adminOpsAnalyticsAPI = {
   getNotificationMetrics: (params?: { days?: number }) =>
     api.get<unknown>('/api/admin/ops/notifications', { params }).then((r) => r.data),
   getBottlenecks: () => api.get<unknown>('/api/admin/ops/bottlenecks').then((r) => r.data),
+  /** AIQ-1439: workflow conversion funnel (per-stage counts + conversion %). */
+  getWorkflowFunnel: (params?: { days?: number }) =>
+    api.get<WorkflowFunnelResponse>('/api/admin/workflow/funnel', { params }).then((r) => r.data),
+  /** AIQ-1438: policy-assistant questions ranked by canonical topic. */
+  getAssistantTopics: (params?: { days?: number; limit?: number }) =>
+    api.get<AssistantTopicsResponse>('/api/admin/workflow/assistant-topics', { params }).then((r) => r.data),
 };
 
 // Admin Marketing Analytics API (admin-only, pre-signup acquisition funnel)

@@ -204,6 +204,8 @@ export const ROUTE_DEFS = {
   adminOps: { path: '/admin/ops', roles: ['ADMIN'] as RouteRole[] },
   adminOpsSla: { path: '/admin/ops/sla', roles: ['ADMIN'] as RouteRole[] },
   adminOpsQueue: { path: '/admin/ops/queue', roles: ['ADMIN'] as RouteRole[] },
+  adminWorkflowFunnel: { path: '/admin/workflow/funnel', roles: ['ADMIN'] as RouteRole[] },
+  adminAiQuestions: { path: '/admin/ai/questions', roles: ['ADMIN'] as RouteRole[] },
   adminOpsReviewers: { path: '/admin/ops/reviewers', roles: ['ADMIN'] as RouteRole[] },
   adminOpsDestinations: { path: '/admin/ops/destinations', roles: ['ADMIN'] as RouteRole[] },
   adminOpsNotifications: { path: '/admin/ops/notifications', roles: ['ADMIN'] as RouteRole[] },
