@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.2 · **Last verified:** 2026-06-09 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.3 · **Last verified:** 2026-07-06 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -19,15 +19,24 @@
 | **Anthropic** | LLM — Policy Assistant, roadmap, entity resolution | **US** | DPA (Commercial Terms) + SCCs | ⬜ Confirm Commercial plan | `anthropic==0.39.0`; `llm_client.py`, `policy_assistant_llm_client.py`, `roadmap_generator.py` |
 | **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
-| **PostHog** | Product analytics | **US host by default** (`us.i.posthog.com`) | EU Cloud option or SCCs | ⬜ Conditional — see note | `frontend/src/analytics.ts` (`posthog-js`) |
+| **PostHog** | Product analytics **+ session replay** | **US host by default** (`us.i.posthog.com`) | EU Cloud option or SCCs | ⬜ Conditional — see note | `frontend/src/analytics.ts` (`posthog-js`) |
 
-## Notes & corrections (v1.1 → v1.2)
+## Notes & corrections (v1.1 → v1.3)
 
 - **PostHog added.** `frontend/src/analytics.ts` initialises `posthog-js` against `https://us.i.posthog.com`
   by default. It is **gated on `VITE_POSTHOG_KEY`**, which is not present in `.env.example`, so it is
   most likely disabled in production today. **Before enabling it for EU users:** either point
   `VITE_POSTHOG_HOST` at PostHog EU Cloud (`https://eu.i.posthog.com`) or sign the PostHog DPA + SCCs,
   and disable `autocapture` of PII. Until enabled it ships in the bundle but transmits nothing.
+- **PostHog session replay enabled (v1.3, AIQ-1434).** `frontend/src/analytics.ts` now sets
+  `session_recording: { maskAllInputs: true }`. Input values (passwords, tokens, PII typed into fields)
+  are masked, **but rendered on-screen text is NOT** — displayed names, emails, addresses and case
+  details are captured in the replay DOM and transmitted to PostHog. This materially **widens the personal-data
+  surface** sent to a US sub-processor beyond behavioural events. Consequence: the EU-Cloud-or-signed-DPA+SCCs
+  requirement above is now a **hard gate** before relying on recordings for EU users in production, and
+  `maskTextSelector` should be added if displayed PII text must also be masked. Recordings remain inert
+  wherever `VITE_POSTHOG_KEY` is unset. **Owner decision still pending** — do not treat recordings as
+  compliant-for-prod until the DPA/EU-residency posture is confirmed.
 - **Anthropic re-listed as a live sub-processor.** The v1.1 register treated Anthropic as replaced by
   OpenAI; the codebase now uses **both**. Anthropic powers the Policy Assistant and several internal
   AI features. DPA is auto-incorporated on Anthropic Commercial Terms — confirm the account is on the
