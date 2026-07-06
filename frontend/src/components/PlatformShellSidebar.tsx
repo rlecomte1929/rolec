@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, LogOut, Pencil } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, LogOut, Pencil, Check, RotateCcw } from 'lucide-react';
 import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
 import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { authAPI } from '../api/client';
@@ -13,11 +13,11 @@ import { swallow } from '../lib/errorTracking';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
-import { AdminSidebarLayoutEditor } from './AdminSidebarLayoutEditor';
+import { SidebarLayoutEditor } from './SidebarLayoutEditor';
 import {
-  readAdminLayout,
-  writeAdminLayout,
-  clearAdminLayout,
+  readSidebarLayouts,
+  writeSectionLayout,
+  clearSidebarLayouts,
   reconcileAdminLayout,
   applyAdminLayout,
   type AdminLayoutEntry,
@@ -74,9 +74,6 @@ interface NotifContext {
 }
 
 const ROLE_RANK: Record<SidebarRole, number> = { EMPLOYEE: 0, HR: 1, ADMIN: 2 };
-
-// The Admin nav section is the one an admin can reorder/regroup/rename (see adminSidebarLayout).
-const ADMIN_SECTION_LABEL = 'Admin · ReloPass';
 
 // ── Section definitions ───────────────────────────────────────────────────────
 // Single source of truth. Routes pulled from ROUTE_DEFS so renames cascade.
@@ -450,28 +447,28 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     }
   };
 
-  // Admin sidebar customisation (admin-only): reorder tabs, move them between sub-groups,
-  // and rename groups. Persisted per browser; reconciled against code so it survives new
-  // or removed tabs. Non-admins never see the editor and the code order is used verbatim.
-  const adminCodeItems = useMemo(
-    () => SECTIONS.find((s) => s.label === ADMIN_SECTION_LABEL)?.items ?? [],
+  // Sidebar customisation: reorder tabs, move them between sub-groups, and rename groups
+  // — for EVERY section (Admin, Employee, HR), not just Admin. Persisted per browser and
+  // per section; reconciled against code so it survives new/removed tabs. No override for
+  // a section → its code order is used verbatim.
+  const sectionLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        SECTIONS.map((s) => [s.label, Object.fromEntries(s.items.map((i) => [i.id, i.label]))]),
+      ) as Record<string, Record<string, string>>,
     [],
   );
-  const adminLabels = useMemo(
-    () => Object.fromEntries(adminCodeItems.map((i) => [i.id, i.label])),
-    [adminCodeItems],
-  );
-  const [adminLayout, setAdminLayout] = useState<AdminLayoutEntry[]>(() =>
-    reconcileAdminLayout(adminCodeItems, readAdminLayout()),
+  const [layoutOverrides, setLayoutOverrides] = useState<Record<string, AdminLayoutEntry[]>>(
+    () => readSidebarLayouts(),
   );
   const [editingLayout, setEditingLayout] = useState(false);
-  const updateAdminLayout = (next: AdminLayoutEntry[]) => {
-    setAdminLayout(next);
-    writeAdminLayout(next);
+  const updateSectionLayout = (sectionLabel: string, next: AdminLayoutEntry[]) => {
+    setLayoutOverrides((prev) => ({ ...prev, [sectionLabel]: next }));
+    writeSectionLayout(sectionLabel, next);
   };
-  const resetAdminLayout = () => {
-    clearAdminLayout();
-    setAdminLayout(reconcileAdminLayout(adminCodeItems, null));
+  const resetLayout = () => {
+    clearSidebarLayouts();
+    setLayoutOverrides({});
   };
 
   // Persist + cross-tab sync
@@ -595,10 +592,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   };
 
   const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount, assignmentsLoading };
-  // Apply the admin's custom layout (order/group/rename) to the Admin section only.
-  const effectiveSections = SECTIONS.map((s) =>
-    s.label === ADMIN_SECTION_LABEL ? { ...s, items: applyAdminLayout(s.items, adminLayout) } : s,
-  );
+  // Apply each section's custom layout (order / group / rename) to the live nav.
+  const effectiveSections = SECTIONS.map((s) => ({
+    ...s,
+    items: applyAdminLayout(s.items, reconcileAdminLayout(s.items, layoutOverrides[s.label] ?? null)),
+  }));
   const visibleSections = effectiveSections
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
     .map((s) => {
@@ -684,23 +682,61 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
       {/* Nav */}
       <nav className="flex-1 px-2 pb-4">
-        {role === 'ADMIN' && !collapsed && editingLayout ? (
-          <AdminSidebarLayoutEditor
-            layout={adminLayout}
-            labels={adminLabels}
-            onChange={updateAdminLayout}
-            onDone={() => setEditingLayout(false)}
-            onReset={resetAdminLayout}
-          />
+        {!collapsed && editingLayout ? (
+          <div className="pb-2">
+            {/* One Done/Reset header for the whole sidebar; every visible section below
+                becomes independently draggable. */}
+            <div className="flex items-center justify-between px-2 pt-3 pb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Edit layout</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  unstyled
+                  type="button"
+                  onClick={resetLayout}
+                  title="Reset all sections to default"
+                  className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <RotateCcw size={12} /> Reset
+                </Button>
+                <Button
+                  unstyled
+                  type="button"
+                  onClick={() => setEditingLayout(false)}
+                  title="Done editing"
+                  className="flex items-center gap-1 rounded bg-[#0b2b43] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0d3456]"
+                >
+                  <Check size={12} /> Done
+                </Button>
+              </div>
+            </div>
+            <p className="px-2 pb-1 text-[10px] leading-tight text-slate-400">
+              Drag tabs to reorder or move them between sub-groups. Click a group name to rename it.
+            </p>
+            {visibleSections
+              .filter((section) => !section.borrowed)
+              .map((section) => {
+                const codeItems = SECTIONS.find((s) => s.label === section.label)?.items ?? [];
+                const layout = reconcileAdminLayout(codeItems, layoutOverrides[section.label] ?? null);
+                return (
+                  <SidebarLayoutEditor
+                    key={section.label}
+                    sectionTitle={section.label}
+                    layout={layout}
+                    labels={sectionLabels[section.label] ?? {}}
+                    onChange={(next) => updateSectionLayout(section.label, next)}
+                  />
+                );
+              })}
+          </div>
         ) : (
           <>
-            {role === 'ADMIN' && !collapsed && (
+            {!collapsed && (
               <div className="flex justify-end px-1 pt-2">
                 <Button
                   unstyled
                   type="button"
                   onClick={() => setEditingLayout(true)}
-                  title="Customise the admin sidebar"
+                  title="Customise the sidebar"
                   className="flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
                   <Pencil size={11} /> Edit layout

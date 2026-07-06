@@ -1,8 +1,9 @@
 /**
- * adminSidebarLayout — per-admin customisation of the Admin sidebar section.
+ * sidebarLayout — per-user customisation of the platform sidebar sections.
  *
- * Lets an admin reorder tabs, move them between sub-groups, and rename groups. The
- * override is stored in localStorage (per browser), mirroring the existing
+ * Lets a user reorder tabs, move them between sub-groups, and rename groups — for
+ * EVERY section (Admin · ReloPass, Employee, HR Operations), not just Admin. The
+ * override is stored in localStorage per section (per browser), mirroring the existing
  * `platform_sidebar_collapsed` / `platform_sidebar_sections_v1` pattern in
  * PlatformShellSidebar. It is reconciled against the code-defined items on every load
  * so it survives tabs being added/removed in code.
@@ -10,43 +11,70 @@
  * Model: an ordered list of { id, group }. Order drives both position and (via the
  * existing group-boundary renderer) the sub-group headings. Groups are kept contiguous
  * by the editor (each dragged item adopts its new neighbour's group), so a group is
- * always a single run — which is what makes rename map cleanly.
+ * always a single run — which is what makes rename map cleanly. Sections without code
+ * groups (Employee, HR) simply carry an empty group and reorder as one run.
  */
 
 export type AdminLayoutEntry = { id: string; group: string };
 
-const LAYOUT_KEY = 'admin_sidebar_layout_v1';
+// One store for all sections: { [sectionLabel]: AdminLayoutEntry[] }. Bumped to _v2
+// when the model went from a single admin array to a per-section map.
+const LAYOUT_KEY = 'sidebar_layout_v2';
 
-export function readAdminLayout(): AdminLayoutEntry[] | null {
-  if (typeof window === 'undefined') return null;
+type LayoutStore = Record<string, AdminLayoutEntry[]>;
+
+function isEntry(e: unknown): e is AdminLayoutEntry {
+  return (
+    !!e &&
+    typeof e === 'object' &&
+    typeof (e as { id?: unknown }).id === 'string' &&
+    typeof (e as { group?: unknown }).group === 'string'
+  );
+}
+
+function readStore(): LayoutStore {
+  if (typeof window === 'undefined') return {};
   try {
     const raw = window.localStorage.getItem(LAYOUT_KEY);
-    if (!raw) return null;
+    if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const entries = parsed.filter(
-      (e): e is AdminLayoutEntry =>
-        !!e &&
-        typeof e === 'object' &&
-        typeof (e as { id?: unknown }).id === 'string' &&
-        typeof (e as { group?: unknown }).group === 'string',
-    );
-    return entries.length ? entries : null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: LayoutStore = {};
+    for (const [section, entries] of Object.entries(parsed as Record<string, unknown>)) {
+      if (Array.isArray(entries)) {
+        const clean = entries.filter(isEntry);
+        if (clean.length) out[section] = clean;
+      }
+    }
+    return out;
   } catch {
-    return null;
+    return {};
   }
 }
 
-export function writeAdminLayout(entries: AdminLayoutEntry[]): void {
+function writeStore(store: LayoutStore): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(entries));
+    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(store));
   } catch {
     /* ignore */
   }
 }
 
-export function clearAdminLayout(): void {
+/** Read every section's stored override, keyed by section label. */
+export function readSidebarLayouts(): LayoutStore {
+  return readStore();
+}
+
+/** Persist one section's override (leaves the other sections untouched). */
+export function writeSectionLayout(section: string, entries: AdminLayoutEntry[]): void {
+  const store = readStore();
+  store[section] = entries;
+  writeStore(store);
+}
+
+/** Clear every section's override (reset the whole sidebar to code order). */
+export function clearSidebarLayouts(): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.removeItem(LAYOUT_KEY);

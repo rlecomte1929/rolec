@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   reconcileAdminLayout,
   applyAdminLayout,
-  readAdminLayout,
-  writeAdminLayout,
-  clearAdminLayout,
+  readSidebarLayouts,
+  writeSectionLayout,
+  clearSidebarLayouts,
   type AdminLayoutEntry,
 } from '../adminSidebarLayout';
 
@@ -76,20 +76,23 @@ describe('storage round-trip', () => {
         },
       });
     }
-    clearAdminLayout();
+    clearSidebarLayouts();
   });
 
-  it('reads back what was written and clears', () => {
-    expect(readAdminLayout()).toBeNull();
-    const entries: AdminLayoutEntry[] = [{ id: 'a', group: 'Overview' }];
-    writeAdminLayout(entries);
-    expect(readAdminLayout()).toEqual(entries);
-    clearAdminLayout();
-    expect(readAdminLayout()).toBeNull();
+  it('reads back what was written per section and clears', () => {
+    expect(readSidebarLayouts()).toEqual({});
+    const admin: AdminLayoutEntry[] = [{ id: 'a', group: 'Overview' }];
+    const employee: AdminLayoutEntry[] = [{ id: 'x', group: '' }];
+    writeSectionLayout('Admin · ReloPass', admin);
+    writeSectionLayout('Employee', employee);
+    // both sections coexist in one store; writing one leaves the other intact
+    expect(readSidebarLayouts()).toEqual({ 'Admin · ReloPass': admin, Employee: employee });
+    clearSidebarLayouts();
+    expect(readSidebarLayouts()).toEqual({});
   });
 
-  it('returns null for malformed stored JSON', () => {
-    window.localStorage.setItem('admin_sidebar_layout_v1', '{not json');
-    expect(readAdminLayout()).toBeNull();
+  it('returns an empty store for malformed stored JSON', () => {
+    window.localStorage.setItem('sidebar_layout_v2', '{not json');
+    expect(readSidebarLayouts()).toEqual({});
   });
 });

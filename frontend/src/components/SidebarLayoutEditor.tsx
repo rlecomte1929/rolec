@@ -1,10 +1,12 @@
 /**
- * AdminSidebarLayoutEditor — in-sidebar editor for the Admin nav layout.
+ * SidebarLayoutEditor — in-sidebar editor for ONE nav section's layout.
  *
- * Rendered in place of the nav when an admin enters "Edit layout" mode. Drag a tab to
- * reorder it or move it into another section (it adopts the section it's dropped into);
- * click a section name to rename it. Changes are lifted to the parent via onChange, which
- * persists to localStorage. See adminSidebarLayout.ts for the model.
+ * Rendered per visible section when the user enters "Edit layout" mode (all sections,
+ * not just Admin). Drag a tab to reorder it or move it into another sub-group within
+ * the same section (it adopts the group it's dropped into); click a group name to
+ * rename it. Changes are lifted to the parent via onChange, which persists to
+ * localStorage. The Done/Reset controls live once at the sidebar level. See
+ * adminSidebarLayout.ts for the model.
  */
 
 import React, { useLayoutEffect, useRef, useState } from 'react';
@@ -26,8 +28,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { GripVertical, Check, RotateCcw } from 'lucide-react';
-import { Button } from './antigravity/Button';
+import { GripVertical } from 'lucide-react';
 import type { AdminLayoutEntry } from './adminSidebarLayout';
 
 const SortableRow: React.FC<{ id: string; label: string }> = ({ id, label }) => {
@@ -57,13 +58,13 @@ const SortableRow: React.FC<{ id: string; label: string }> = ({ id, label }) => 
   );
 };
 
-export const AdminSidebarLayoutEditor: React.FC<{
+export const SidebarLayoutEditor: React.FC<{
+  /** Section heading shown above the draggable rows (omitted for borrowed sections). */
+  sectionTitle?: string;
   layout: AdminLayoutEntry[];
   labels: Record<string, string>;
   onChange: (next: AdminLayoutEntry[]) => void;
-  onDone: () => void;
-  onReset: () => void;
-}> = ({ layout, labels, onChange, onDone, onReset }) => {
+}> = ({ sectionTitle, layout, labels, onChange }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -100,33 +101,12 @@ export const AdminSidebarLayoutEditor: React.FC<{
   };
 
   return (
-    <div className="px-2 pb-4">
-      <div className="flex items-center justify-between px-1 pt-3 pb-1">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Edit layout</span>
-        <div className="flex items-center gap-1">
-          <Button
-            unstyled
-            type="button"
-            onClick={onReset}
-            title="Reset to default"
-            className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <RotateCcw size={12} /> Reset
-          </Button>
-          <Button
-            unstyled
-            type="button"
-            onClick={onDone}
-            title="Done editing"
-            className="flex items-center gap-1 rounded bg-[#0b2b43] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#0d3456]"
-          >
-            <Check size={12} /> Done
-          </Button>
+    <div className="px-2 pb-2">
+      {sectionTitle && (
+        <div className="px-1 pt-3 pb-1">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{sectionTitle}</span>
         </div>
-      </div>
-      <p className="px-1 pb-2 text-[10px] leading-tight text-slate-400">
-        Drag tabs to reorder or move them between sections. Click a section name to rename it.
-      </p>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -179,4 +159,4 @@ export const AdminSidebarLayoutEditor: React.FC<{
   );
 };
 
-export default AdminSidebarLayoutEditor;
+export default SidebarLayoutEditor;
