@@ -1,19 +1,19 @@
 # autofix-validate.yml — DEV-LOOP-2D
 # ─────────────────────────────────────────────────────────────────────────────
 # Runs on every push to autofix/* branches.
-# On E2E pass  → squash-merges to main, deploys to Vercel production.
+# On E2E pass  → squash-merges to main (Render then auto-deploys both services on the push).
 # On E2E fail  → leaves branch open, updates Notion task to 'Human Review'.
-# On deploy fail → triggers automatic revert commit on main.
+# Post-merge   → confirms the merged SHA is live (poll /health for RENDER_GIT_COMMIT), then runs
+#                a read-only prod canary. Canary FAIL on a confirmed-live deploy → auto-revert +
+#                Human Review. Deploy unconfirmed → Human Review, NO revert. Canary PASS → Done.
 #
 # Secrets required (Settings → Secrets):
-#   VERCEL_TOKEN      — Vercel personal access token
 #   NOTION_API_KEY    — Notion integration secret
+#   CRON_SECRET       — bearer for POST /api/crons/autopilot-canary
 #   GH_PAT            — GitHub PAT with repo + pull_requests scope (for squash-merge)
 #
 # Variables required (Settings → Variables):
 #   RELOPASS_STAGING_URL  — Staging URL for E2E smoke tests
-#   VERCEL_ORG_ID         — Vercel org ID
-#   VERCEL_PROJECT_ID     — Vercel project ID
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Autofix Validate & Deploy
@@ -228,24 +228,44 @@ jobs:
             core.setOutput('merged', 'true');
             core.info(`Squash-merged: ${result.data.sha}`);
 
-      # Deploy to Vercel production
-      - name: Deploy to Vercel production
-        id: deploy
-        run: |
-          cd frontend
-          npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          DEPLOY_URL=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | grep -oP 'https://[^\s]+\.vercel\.app' | tail -1)
-          echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
-          echo "Deployed to: $DEPLOY_URL"
+      # Prod is deployed by Render's own auto-deploy-on-merge (no Vercel). We can't poll the
+      # Render API from CI (no RENDER_API_KEY secret), so we confirm the deploy by polling
+      # /health for the merged SHA — the backend exposes it from RENDER_GIT_COMMIT — then run
+      # the read-only prod canary. Outputs: deployed (SHA confirmed live) + passed (canary ok).
+      - name: Wait for Render deploy + prod canary
+        id: canary
         env:
-          VERCEL_ORG_ID:     ${{ vars.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+          deployed=false
+          for i in $(seq 1 30); do   # up to 30 × 20s = 10 min for Render to go live
+            commit=$(curl -sf "$API_BASE/health" | python3 -c "import sys,json;print(json.load(sys.stdin).get('commit',''))" 2>/dev/null || echo "")
+            echo "poll $i: live=$commit want=$MERGE_SHA"
+            [ "$commit" = "$MERGE_SHA" ] && { deployed=true; break; }
+            sleep 20
+          done
+          echo "deployed=$deployed" >> "$GITHUB_OUTPUT"
+          if [ "$deployed" != true ]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            echo "Render deploy of ${MERGE_SHA:0:7} not confirmed within timeout — handing to human (NO revert)."
+            exit 0
+          fi
+          resp=$(curl -sf -X POST "$API_BASE/api/crons/autopilot-canary" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+            -d '{"failing_requests":[]}' 2>/dev/null || echo '{"passed":false}')
+          echo "canary: $resp"
+          passed=$(echo "$resp" | python3 -c "import sys,json;print(str(json.load(sys.stdin).get('passed',False)).lower())" 2>/dev/null || echo false)
+          echo "passed=$passed" >> "$GITHUB_OUTPUT"
         continue-on-error: true
 
-      # Rollback: if deploy failed, revert the squash commit on main
-      - name: Rollback on deploy failure
-        if: steps.deploy.outcome == 'failure' && steps.merge.outputs.merged == 'true'
+      # Rollback ONLY when the deploy was confirmed live but the prod canary FAILED. We never
+      # revert on an unconfirmed deploy — that would revert good code just because /health
+      # hadn't surfaced the SHA yet; those go to Human Review instead.
+      - name: Rollback on failed canary
+        if: steps.canary.outputs.deployed == 'true' && steps.canary.outputs.passed != 'true' && steps.merge.outputs.merged == 'true'
         uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
@@ -268,7 +288,7 @@ jobs:
             // Create revert commit (restores parent tree)
             const revertCommit = await github.rest.git.createCommit({
               owner, repo,
-              message: `revert: autofix deploy failed — reverting ${mergeSha.slice(0, 7)}\n\nRevert of "${commit.data.message.split('\n')[0]}" due to Vercel deploy failure.`,
+              message: `revert: autofix canary failed — reverting ${mergeSha.slice(0, 7)}\n\nRevert of "${commit.data.message.split('\n')[0]}" due to a failed post-deploy prod canary.`,
               tree: parent.data.tree.sha,
               parents: [mergeSha],
             });
@@ -282,49 +302,48 @@ jobs:
 
             core.warning(`Rolled back: main now at ${revertCommit.data.sha}`);
 
-      # Update Notion on success
-      - name: Update Notion → Done
-        if: steps.deploy.outcome == 'success'
+      # Update Notion on success — canary passed → Done + Final Validation Result = Passed.
+      - name: Update Notion → Done (canary passed)
+        if: steps.canary.outputs.passed == 'true'
+        env:
+          NOTION_URL: ${{ needs.validate.outputs.notion_url }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
         run: |
-          NOTION_URL="${{ needs.validate.outputs.notion_url }}"
           if [ -z "$NOTION_URL" ]; then exit 0; fi
-          # Extract page ID from Notion URL
           PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
           if [ -z "$PAGE_ID" ]; then exit 0; fi
+          export NOTE="Auto-fix merged + deployed to Render; post-deploy prod canary PASSED. Merge SHA: ${MERGE_SHA:0:7}"
           curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
             -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
             -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"properties\": {
-                \"Status\": {\"select\": {\"name\": \"Done\"}},
-                \"Execution Notes\": {\"rich_text\": [{\"type\": \"text\", \"text\": {\"content\": \"Auto-fix merged and deployed. Deploy URL: ${{ steps.deploy.outputs.deploy_url }}. Merge SHA: ${{ steps.merge.outputs.merge_sha }}\"}}]}
-              }
-            }"
+            -d "$(python3 -c "import json,os;print(json.dumps({'properties':{'Status':{'select':{'name':'Done'}},'Final Validation Result':{'select':{'name':'Passed'}},'Execution Notes':{'rich_text':[{'type':'text','text':{'content':os.environ['NOTE']}}]}}}))")"
 
-      # Update Notion on deploy failure (after rollback)
-      - name: Update Notion → Human Review (deploy failed)
-        if: steps.deploy.outcome == 'failure'
+      # Canary failed OR deploy unconfirmed → Human Review + Final Validation Result = Failed.
+      - name: Update Notion → Human Review (canary not passed)
+        if: steps.canary.outputs.passed != 'true'
+        env:
+          NOTION_URL: ${{ needs.validate.outputs.notion_url }}
+          DEPLOYED: ${{ steps.canary.outputs.deployed }}
         run: |
-          NOTION_URL="${{ needs.validate.outputs.notion_url }}"
           if [ -z "$NOTION_URL" ]; then exit 0; fi
           PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
           if [ -z "$PAGE_ID" ]; then exit 0; fi
+          if [ "$DEPLOYED" = "true" ]; then
+            export NOTE="E2E passed but the post-deploy prod canary FAILED. Merge was auto-reverted on main. Manual review required."
+          else
+            export NOTE="E2E passed and merged, but the Render deploy could not be confirmed in time. NOT reverted — verify prod manually."
+          fi
           curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
             -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
             -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"properties\": {
-                \"Status\": {\"select\": {\"name\": \"Human Review\"}},
-                \"Execution Notes\": {\"rich_text\": [{\"type\": \"text\", \"text\": {\"content\": \"E2E passed but Vercel deploy FAILED. Merge was auto-reverted. Manual review required.\"}}]}
-              }
-            }"
+            -d "$(python3 -c "import json,os;print(json.dumps({'properties':{'Status':{'select':{'name':'Human Review'}},'Final Validation Result':{'select':{'name':'Failed'}},'Execution Notes':{'rich_text':[{'type':'text','text':{'content':os.environ['NOTE']}}]}}}))")"
 
-      - name: Fail workflow if deploy failed
-        if: steps.deploy.outcome == 'failure'
+      - name: Fail workflow if canary did not pass
+        if: steps.canary.outputs.passed != 'true'
         run: |
-          echo "Vercel deploy failed — changes have been reverted on main"
+          echo "Post-deploy prod canary did not pass — reverted if the deploy was confirmed; otherwise left for human review."
           exit 1
 
   # ── Notify on E2E Failure ────────────────────────────────────────────────────
