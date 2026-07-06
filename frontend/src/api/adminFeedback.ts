@@ -56,7 +56,9 @@ export async function listFeedback(params?: {
   if (params?.dispatched !== undefined) qs.set('dispatched', String(params.dispatched));
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const data = await apiGet<{ items: UnifiedFeedbackItem[] }>(`/api/admin/feedback${suffix}`);
-  return data.items ?? [];
+  // The backend serializes has_screenshot as 0/1 (integer). Coerce to a real
+  // boolean so JSX `{row.has_screenshot && …}` never renders a stray "0".
+  return (data.items ?? []).map((it) => ({ ...it, has_screenshot: Boolean(it.has_screenshot) }));
 }
 
 /**
