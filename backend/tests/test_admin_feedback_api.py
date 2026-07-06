@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   reporter_id     TEXT,
   dispatch_ref    TEXT,
   dispatch_status TEXT,
+  dispatch_context TEXT,
   PRIMARY KEY (stream, source_id)
 );
 CREATE TABLE IF NOT EXISTS hr_feedback (

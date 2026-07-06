@@ -24,6 +24,9 @@ from sqlalchemy.orm import Session
 from ..auth_deps import require_admin
 from ..db import SessionLocal
 from ..services.admin_audit import record_admin_event
+from ..services.feedback_triage import classify
+from ..services.feedback_task_engineer import engineer_task
+from ..services import notion_work_queue
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin-feedback"])
@@ -154,7 +157,7 @@ SELECT
     COALESCE(base.reporter_name,  pr.full_name) AS reporter_name,
     COALESCE(base.reporter_email, pr.email)     AS reporter_email,
     COALESCE(base.reporter_role,  pr.role)      AS reporter_role,
-    fs.status, fs.owner, fs.resolution,
+    fs.status, fs.owner, fs.resolution, fs.dispatch_context,
     CAST(fs.severity        AS TEXT) AS severity,
     CAST(fs.area            AS TEXT) AS area,
     CAST(fs.dispatch_status AS TEXT) AS dispatch_status,
@@ -389,3 +392,182 @@ def dispatch_feedback_ticket(
     )
 
     return {"dispatched": True, "dispatch_ref": dispatch_ref, "status": "dispatched"}
+
+
+# ── Dispatch → AI Work Queue (context → engineered task → Notion) ─────────────
+
+
+class ContextBody(BaseModel):
+    context: str = ""
+
+
+@router.put("/feedback/{stream}/{item_id}/context")
+def set_dispatch_context(
+    stream: str,
+    item_id: str,
+    body: ContextBody,
+    db: Session = Depends(_get_db),
+    _user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Save the admin's per-item dispatch context (upserts feedback_status)."""
+    now = datetime.utcnow().isoformat()
+    db.execute(
+        text(
+            "INSERT INTO feedback_status (stream, source_id, status, dispatch_context, updated_at) "
+            "VALUES (:s, :id, 'new', :ctx, :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "    dispatch_context = excluded.dispatch_context, updated_at = excluded.updated_at"
+        ),
+        {"s": stream, "id": item_id, "ctx": body.context, "now": now},
+    )
+    return {"ok": True, "context": body.context}
+
+
+class PreviewBody(BaseModel):
+    text: Optional[str] = None
+    category: str = "bug"
+
+
+def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
+    """Enrich a product-stream item from public.feedback (page_url/screenshot/reporter/report_id)."""
+    row = db.execute(
+        text(
+            "SELECT message, category, page_url, "
+            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id "
+            "FROM feedback WHERE CAST(id AS TEXT) = :id"
+        ),
+        {"id": item_id},
+    ).fetchone()
+    if not row:
+        return {}
+    return {
+        "message": row[0] or "",
+        "category": row[1] or "bug",
+        "page_url": row[2],
+        "has_screenshot": bool(row[3]),
+        "reporter_name": row[4],
+        "report_id": row[5],
+    }
+
+
+@router.post("/feedback/{stream}/{item_id}/dispatch/preview")
+async def dispatch_preview(
+    stream: str,
+    item_id: str,
+    body: PreviewBody,
+    db: Session = Depends(_get_db),
+    _user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Generate (no side effects) an engineered AI Work Queue task for review.
+    Context is REQUIRED (400 when empty)."""
+    fs = db.execute(
+        text(
+            "SELECT dispatch_context, severity, area FROM feedback_status "
+            "WHERE stream = :s AND source_id = :id"
+        ),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    dispatch_context = (fs[0] if fs else None) or ""
+    if not dispatch_context.strip():
+        raise HTTPException(status_code=400, detail="Add context on this item before dispatching.")
+    severity = fs[1] if fs else None
+    area = fs[2] if fs else None
+
+    text_val = body.text or ""
+    category = body.category or "bug"
+    page_url = None
+    has_screenshot = False
+    reporter_name = None
+    if stream == "product":
+        pf = _load_product_fields(db, item_id)
+        if pf:
+            text_val = text_val or pf["message"]
+            category = category or pf["category"]
+            page_url = pf["page_url"]
+            has_screenshot = pf["has_screenshot"]
+            reporter_name = pf["reporter_name"]
+
+    if not severity or not area:
+        cls = classify(text_val, category)
+        severity = severity or cls["severity"]
+        area = area or cls["area"]
+
+    task = await engineer_task(
+        text=text_val,
+        category=category,
+        page_url=page_url,
+        severity=severity,
+        area=area,
+        has_screenshot=has_screenshot,
+        reporter_name=reporter_name,
+        admin_context=dispatch_context,
+    )
+    return {"task": task}
+
+
+class CreateTaskBody(BaseModel):
+    task: Dict[str, Any]
+    confirm: bool = True
+
+
+@router.post("/feedback/{stream}/{item_id}/dispatch/create")
+def dispatch_create(
+    stream: str,
+    item_id: str,
+    body: CreateTaskBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Create the AI Work Queue Notion page from the (admin-reviewed) task, mark the
+    item dispatched with the Notion URL as dispatch_ref, and audit."""
+    task = body.task or {}
+    if not task.get("title"):
+        raise HTTPException(status_code=400, detail="Task title is required.")
+
+    report_id = item_id
+    message = page_url = ""
+    reporter_name = None
+    if stream == "product":
+        pf = _load_product_fields(db, item_id)
+        if pf:
+            report_id = pf["report_id"] or item_id
+            message = pf["message"]
+            page_url = pf["page_url"] or ""
+            reporter_name = pf["reporter_name"]
+
+    failure_evidence = (
+        f"Reported via the feedback widget (stream={stream}). "
+        f"Page: {page_url or '?'} · Reporter: {reporter_name or '?'} · Ref: {report_id}.\n\n"
+        f"Original message:\n{message or '(see admin console)'}"
+    )
+    context_links = f"https://relopass.com/admin/feedback  (report_id={report_id})"
+
+    try:
+        url = notion_work_queue.create_work_queue_task(
+            task, failure_evidence=failure_evidence, context_links=context_links
+        )
+    except notion_work_queue.NotionNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except notion_work_queue.NotionApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    now = datetime.utcnow().isoformat()
+    db.execute(
+        text(
+            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
+            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "    dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
+            "    updated_at = excluded.updated_at"
+        ),
+        {"s": stream, "id": item_id, "ref": url, "now": now},
+    )
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="ticket_dispatched",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "notion_url": url, "title": task.get("title")},
+    )
+    return {"dispatched": True, "url": url, "dispatch_ref": url}
