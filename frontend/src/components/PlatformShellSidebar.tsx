@@ -244,6 +244,12 @@ const SECTIONS: NavSection[] = [
   },
 ];
 
+// Items pinned to the very top of the sidebar, above every section (so the Inbox sits
+// above Admin · ReloPass, independent of any section). They're rendered standalone and
+// filtered out of their section so they never appear twice or inside the layout editor.
+const PINNED_TOP_IDS = new Set<string>(['inbox']);
+const INBOX_ITEM = SECTIONS.flatMap((s) => s.items).find((i) => i.id === 'inbox');
+
 // ── Sub-pieces ────────────────────────────────────────────────────────────────
 
 const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, variant = 'count' }) => {
@@ -615,6 +621,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
         // items (Inbox) float at the top rather than under a misleading "Employee" label.
         borrowed,
         items: s.items.filter((item) => {
+          if (PINNED_TOP_IDS.has(item.id)) return false; // rendered standalone at the top
           if (item.hidden?.(visibilityCtx)) return false;
           if (borrowed) return Boolean(item.toByRole?.[role]);
           return true;
@@ -686,6 +693,36 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
       {/* Nav */}
       <nav className="flex-1 px-2 pb-4">
+        {/* Inbox pinned above every section (incl. Admin · ReloPass), independent of any
+            section and of the layout editor. */}
+        {INBOX_ITEM && (
+          <div className="pt-2">
+            <Link
+              to={resolveItemTo(INBOX_ITEM)}
+              title="Inbox"
+              className={`group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
+                collapsed ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
+              } ${
+                isActive(INBOX_ITEM)
+                  ? 'bg-[#0b2b43]/8 text-[#0b2b43] font-medium'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <NavIcon
+                id="inbox"
+                size={15}
+                className={`shrink-0 ${isActive(INBOX_ITEM) ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}`}
+              />
+              {!collapsed && <span className="min-w-0 flex-1 truncate">Inbox</span>}
+              {collapsed && (
+                <span className="pointer-events-none absolute left-full top-1/2 z-40 ml-2 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11.5px] font-medium text-white opacity-0 shadow-lg transition-all group-hover:translate-x-0 group-hover:opacity-100">
+                  Inbox
+                </span>
+              )}
+            </Link>
+            {!collapsed && <div className="mt-2 mx-1 border-t border-slate-100" aria-hidden="true" />}
+          </div>
+        )}
         {role === 'ADMIN' && !collapsed && editingLayout ? (
           <div className="pb-2">
             {/* One Done/Reset header for the whole sidebar; every visible section below
@@ -721,7 +758,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
               {visibleSections
                 .filter((section) => !section.borrowed)
                 .map((section) => {
-                  const codeItems = SECTIONS.find((s) => s.label === section.label)?.items ?? [];
+                  const codeItems =
+                    SECTIONS.find((s) => s.label === section.label)?.items.filter(
+                      (i) => !PINNED_TOP_IDS.has(i.id),
+                    ) ?? [];
                   const layout = reconcileAdminLayout(codeItems, layoutOverrides[section.label] ?? null);
                   return (
                     <SidebarLayoutEditor
