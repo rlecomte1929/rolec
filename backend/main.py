@@ -954,6 +954,9 @@ def health_check():
         "status": "ok",
         "service": "ReloPass API",
         "version": "1.0.0",
+        # Render injects RENDER_GIT_COMMIT per deploy; the autopilot canary polls this to
+        # confirm a merged fix is actually live before validating it. "unknown" off-Render.
+        "commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
