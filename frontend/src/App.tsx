@@ -132,7 +132,6 @@ const AdminPolicyVersionsPage = lazy(() => import('./pages/admin/AdminPolicyVers
 const AdminFeatureFlagsPage = lazy(() => import('./pages/admin/AdminFeatureFlagsPage').then((module) => ({ default: module.AdminFeatureFlagsPage })));
 const AdminPermissionsPage = lazy(() => import('./pages/admin/AdminPermissionsPage').then((module) => ({ default: module.AdminPermissionsPage })));
 const ExecutiveDashboardPage = lazy(() => import('./pages/admin/executive/ExecutiveDashboardPage').then((module) => ({ default: module.ExecutiveDashboardPage })));
-const MissionControlPage = lazy(() => import('./pages/admin/mission-control/MissionControlPage').then((module) => ({ default: module.MissionControlPage })));
 const AdminAiControlsPage = lazy(() => import('./pages/admin/AdminAiControlsPage').then((module) => ({ default: module.AdminAiControlsPage })));
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
@@ -414,7 +413,9 @@ function App() {
         <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPermissions.path} element={<RequireAdminRoute><AdminPermissionsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminExecutive.path} element={<RequireAdminRoute><ExecutiveDashboardPage /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><MissionControlPage /></RequireAdminRoute>} />
+        {/* Mission Control merged into the "Feedback & Work" tab (2026-07-06). Redirect
+            the old route to the work-board sub-view so existing links keep working. */}
+        <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><Navigate to={`${ROUTE_DEFS.adminFeedback.path}?view=work`} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiControls.path} element={<RequireAdminRoute><AdminAiControlsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />

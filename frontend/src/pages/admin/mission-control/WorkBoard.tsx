@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AdminLayout } from '../AdminLayout';
 import { Button, Card } from '../../../components/antigravity';
 import {
   listWorkItems,
@@ -36,7 +35,13 @@ function kindChip(k: string): string {
   return m[k] ?? 'bg-slate-100 text-slate-600';
 }
 
-export const MissionControlPage: React.FC = () => {
+/**
+ * The triaged work board (formerly the "Mission Control" page): every bug, idea and
+ * quality signal ingested from feedback + support, ranked by priority, with an AI plan
+ * and agent dispatch. Rendered as a sub-view of the merged "Feedback & Work" tab, so it
+ * is self-contained (its own Sync header, no AdminLayout wrapper).
+ */
+export const WorkBoard: React.FC = () => {
   const [items, setItems] = useState<WorkItem[]>([]);
   const [tableReady, setTableReady] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -124,15 +129,16 @@ export const MissionControlPage: React.FC = () => {
   }
 
   return (
-    <AdminLayout
-      title="Mission Control"
-      subtitle="Every bug, idea and quality signal — unified, triaged, and ranked. Execution comes next."
-      headerRight={
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          Every bug, idea and quality signal — unified, triaged, and ranked.
+        </p>
         <Button variant="primary" onClick={() => void onSync()} disabled={busy}>
           {busy ? 'Syncing…' : 'Sync demands'}
         </Button>
-      }
-    >
+      </div>
+
       {!tableReady && (
         <Card>
           <p className="p-2 text-sm text-amber-700" data-testid="store-not-ready">
@@ -230,6 +236,6 @@ export const MissionControlPage: React.FC = () => {
           </Card>
         ))}
       </div>
-    </AdminLayout>
+    </div>
   );
 };

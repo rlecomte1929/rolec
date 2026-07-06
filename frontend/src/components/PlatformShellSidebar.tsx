@@ -165,7 +165,7 @@ const SECTIONS: NavSection[] = [
       // ── Overview (dashboards / at-a-glance) ──
       { id: 'admin-overview', group: 'Overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
       { id: 'executive', group: 'Overview', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'mission-control', group: 'Overview', label: 'Mission Control', to: ROUTE_DEFS.adminMissionControl.path, badge: { kind: 'static', variant: 'new' } },
+      // Mission Control merged into the 'Feedback & Work' tab (Queues group) on 2026-07-06.
       // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
       // link to the Queue tab of the same page was removed to end the false split).
       { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
@@ -208,7 +208,7 @@ const SECTIONS: NavSection[] = [
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
       },
       { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
-      { id: 'feedback-console', group: 'Queues', label: 'Feedback', to: ROUTE_DEFS.adminFeedback.path },
+      { id: 'feedback-console', group: 'Queues', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
 
       // ── Platform & governance (config, access, compliance) ──
       { id: 'feature-flags', group: 'Platform & governance', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
