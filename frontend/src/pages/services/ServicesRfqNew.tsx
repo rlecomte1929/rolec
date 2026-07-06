@@ -10,6 +10,7 @@ import { RfqWorkflowDiagram } from '../../features/services/RfqWorkflowDiagram';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { track } from '../../analytics';
 
 const SERVICE_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -86,6 +87,11 @@ export const ServicesRfqNew: React.FC = () => {
         notes: combinedNotes,
       });
       setSent(true);
+      // AIQ-1436: one rfq_created per shortlisted vendor (mirrors the backend
+      // canonical event name; the RFQ is a batch submit over the shortlist).
+      shortlisted.forEach(({ service, vendor }) => {
+        track('rfq_created', { supplier_id: vendor.item_id, service_category: service, case_id: assignmentId });
+      });
     } catch (e) {
       setSendError((e as Error).message ?? 'Failed to send. Please try again.');
     } finally {

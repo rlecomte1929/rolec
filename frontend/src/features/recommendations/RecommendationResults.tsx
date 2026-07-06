@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Badge, Button, Alert } from '../../components/antigravity';
 import { formatEstimationFromUsd } from '../services/servicesCurrency';
 import { createAIDecision } from '../../api/aiDecisions';
+import { track } from '../../analytics';
 import type { RecommendationItem, RecommendationResponse } from './types';
 import { rateProvider } from './api';
 
@@ -299,7 +300,13 @@ function RecCard({
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Button unstyled
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => {
+              // AIQ-1436: fire supplier_viewed only when opening the details (not on collapse).
+              if (!expanded) {
+                track('supplier_viewed', { supplier_id: item.item_id, service_category: category, case_id: caseId });
+              }
+              setExpanded(!expanded);
+            }}
             className="text-sm text-[#0b2b43] hover:underline"
           >
             {expanded ? 'Hide details' : 'Why this? ▼'}
@@ -519,6 +526,8 @@ export const RecommendationResults: React.FC<Props> = ({
     if (rank === 0) {
       togglePackage(category, item.item_id);
       logDecision(category, item, 0, null);
+      // AIQ-1436: supplier_selected on committing the top-match pick.
+      track('supplier_selected', { supplier_id: item.item_id, service_category: category, case_id: caseId });
       return;
     }
     setPendingPick({ category, item, rank });
@@ -532,6 +541,8 @@ export const RecommendationResults: React.FC<Props> = ({
       // intent is reflected immediately even if the audit log POST is slow.
       togglePackage(pendingPick.category, pendingPick.item.item_id);
       logDecision(pendingPick.category, pendingPick.item, pendingPick.rank, reason);
+      // AIQ-1436: supplier_selected on confirming a lower-ranked (override) pick.
+      track('supplier_selected', { supplier_id: pendingPick.item.item_id, service_category: pendingPick.category, case_id: caseId });
       setPendingPick(null);
     } finally {
       setPendingSubmitting(false);
