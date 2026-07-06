@@ -9,7 +9,10 @@ the window overflows).
 Gated behind ``RELOPASS_AI_COORDINATOR_ENABLED`` (default OFF) — ``respond`` returns
 ``None`` when disabled, so the whole path is inert in production until the human gate.
 Reasoning model = ``claude-sonnet-4-6``; summary folds use ``claude-haiku-4-5``.
-Structured tool actions (flag a milestone, draft a message) are a Phase-3 follow-up.
+Phase 3b adds a cost circuit-breaker, a per-relocation rate limit (router), and
+``tool_use`` structured actions — the coordinator can flag a risk or leave a note, which
+are persisted to the ``case_events`` spine (best-effort; a failed action never breaks the
+answer).
 """
 
 from __future__ import annotations
@@ -73,6 +76,90 @@ def _breaker_model(case_id: str, current_model: str) -> str:
         return _FOLD_MODEL
     return current_model
 
+
+# ── Phase 3b: tool_use structured actions ─────────────────────────────────────
+# One dispatcher tool (the client returns a tool_use block's `.input` but NOT the tool
+# name, so the ``action`` enum carries the discriminator). Both actions append to the
+# case_events spine, which the case timeline + the coordinator's own context already read.
+_ACTION_EVENT_TYPES = {
+    "flag_risk": "coordinator.risk_flagged",
+    "add_note": "coordinator.note_added",
+}
+
+_TOOLS = [
+    {
+        "name": "record_coordinator_action",
+        "description": (
+            "Record a structured action on THIS relocation case. Call this ONLY when the "
+            "user explicitly asks you to flag a risk or leave a note for HR — otherwise just "
+            "answer normally without calling any tool."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["flag_risk", "add_note"],
+                    "description": "flag_risk: record a risk for HR to review. add_note: leave a short note on the case.",
+                },
+                "detail": {
+                    "type": "string",
+                    "description": "The risk description or note body — one or two concise sentences.",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "description": "Only for flag_risk: how urgent the risk is.",
+                },
+            },
+            "required": ["action", "detail"],
+        },
+    }
+]
+_TOOL_CHOICE = {"type": "auto"}
+
+
+def _assignment_id_of(ctx: Dict[str, Any]) -> Optional[str]:
+    meta = ctx.get("_meta") or {}
+    return meta.get("assignment_id") or (ctx.get("case") or {}).get("assignment_id")
+
+
+def _dispatch_action(
+    case_id: str,
+    ctx: Dict[str, Any],
+    employee_id: Optional[str],
+    action: Dict[str, Any],
+    *,
+    db: Any = None,
+) -> Optional[str]:
+    """Persist a structured coordinator action to the ``case_events`` spine and return a
+    short confirmation to append to the answer. Best-effort — never raises (a failed action
+    must not break the turn). The detail is masked before it is persisted."""
+    try:
+        kind = str((action or {}).get("action") or "").strip()
+        event_type = _ACTION_EVENT_TYPES.get(kind)
+        detail = mask_pii(str((action or {}).get("detail") or "").strip())
+        if not event_type or not detail:
+            return None
+        payload: Dict[str, Any] = {"detail": detail, "source": "ai_coordinator"}
+        severity = (action or {}).get("severity")
+        if kind == "flag_risk" and severity:
+            payload["severity"] = str(severity)
+        mdb = db or store._get_db()
+        mdb.insert_case_event(
+            case_id=str(case_id),
+            assignment_id=_assignment_id_of(ctx),
+            actor_principal_id=employee_id or "ai_coordinator",
+            event_type=event_type,
+            payload=payload,
+        )
+        if kind == "flag_risk":
+            return f"⚠️ I’ve flagged a risk on this case for HR: {detail}"
+        return f"\U0001f4dd I’ve added a note to this case: {detail}"
+    except Exception as exc:  # noqa: BLE001 — actions are best-effort
+        log.warning("coordinator: action dispatch failed for %s: %s", case_id, exc)
+        return None
+
 _SYSTEM = (
     "You are ReloPass's Mobility Coordinator — a calm, precise relocation concierge for one "
     "employee's move. You are given the current, authoritative case state (already anonymised), "
@@ -120,6 +207,8 @@ def respond(
             user_message=user_content,
             model=effective_model,
             max_tokens=_MAX_TOKENS,
+            tools=_TOOLS,
+            tool_choice=_TOOL_CHOICE,
         )
     )
     latency_ms = int((time.monotonic() - t0) * 1000)
@@ -136,6 +225,12 @@ def respond(
         log.warning("coordinator: telemetry failed for %s: %s", case_id, exc)
 
     answer = (result.get("text") or "").strip()
+    action = result.get("tool_use")
+    if action:
+        confirmation = _dispatch_action(str(case_id), ctx, employee_id, action, db=db)
+        if confirmation:
+            answer = (answer + ("\n\n" if answer else "") + confirmation).strip()
+
     _persist_turn(case_id, session, masked_user, answer, ctx, model=effective_model, db=db)
     return {"answer": answer, "case_id": str(case_id), "model": result.get("model", effective_model)}
 
