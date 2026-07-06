@@ -61,9 +61,13 @@ describe('TestDrivePage', () => {
     expect(screen.getByText(/early coverage/i)).toBeInTheDocument();
   });
 
-  it('falls back to the default corridor for an unknown token', () => {
+  it('hides corridor label when ?corridor= is unknown (shown only after server assigns)', () => {
     renderAt('?corridor=ZZ_ZZ&token=t');
-    expect(screen.getAllByText(/Paris → Oslo/).length).toBeGreaterThan(0);
+    // Unknown corridor → assignedCorridorId null until provision → no corridor section
+    expect(screen.queryByText(/Paris → Oslo/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /Run one relocation, end to end/i }),
+    ).toBeInTheDocument();
   });
 
   it('provisions with the corridor + invite token from the URL and shows both credential sets', async () => {
