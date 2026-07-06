@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS feedback (
   screenshot_data TEXT,
   reporter_email TEXT,
   reporter_name TEXT,
-  reporter_role TEXT
+  reporter_role TEXT,
+  client_context TEXT
 );
 CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY,

@@ -18,6 +18,7 @@ D-BugRoutine Slice-1 additions:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -38,6 +39,7 @@ router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 _CATEGORIES = {"bug", "idea", "other"}
 _MAX_MESSAGE = 2000
 _MAX_SCREENSHOT = 5_000_000  # ~5MB of base64; drop oversized rather than 500
+_MAX_CLIENT_CONTEXT = 32_000  # serialized jsonb diagnostics; drop oversized rather than 500
 
 
 class FeedbackBody(BaseModel):
@@ -50,6 +52,10 @@ class FeedbackBody(BaseModel):
     campaign: Optional[str] = None
     corridor_id: Optional[str] = None
     tester_segment: Optional[str] = None
+    # Diagnostics snapshot captured by the widget (page/route, failing function, recent
+    # failed requests + correlation id, breadcrumbs, viewport, app version). PII-scrubbed
+    # client-side; stored in feedback.client_context (jsonb) for the admin Diagnostics panel.
+    client_context: Optional[Dict[str, Any]] = None
 
 
 @router.post("", status_code=201)
@@ -125,6 +131,21 @@ def submit_feedback(
             cols.append(col)
             vals.append(f":{col}")
             params[col] = val
+
+    # Diagnostics snapshot → feedback.client_context (jsonb on PG, TEXT in the SQLite test
+    # schema). Serialize + size-cap; DROP (not truncate) if oversized/unserializable so a
+    # bad context never fails the whole submit. CAST(:ctx AS jsonb) — never `:ctx::jsonb`,
+    # which binds as an unnamed param on some drivers and 500s (see repo notes).
+    if body.client_context is not None:
+        try:
+            ctx_json: Optional[str] = json.dumps(body.client_context, default=str)
+        except (TypeError, ValueError):
+            ctx_json = None
+        if ctx_json is not None and len(ctx_json) <= _MAX_CLIENT_CONTEXT:
+            is_pg = db.engine.dialect.name == "postgresql"
+            cols.append("client_context")
+            vals.append("CAST(:ctx AS jsonb)" if is_pg else ":ctx")
+            params["ctx"] = ctx_json
 
     with db.engine.begin() as conn:
         conn.execute(

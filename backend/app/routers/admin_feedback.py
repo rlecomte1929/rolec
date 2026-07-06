@@ -62,6 +62,9 @@ def _union_sql(is_sqlite: bool) -> str:
     typed and only used by tests).
     """
     hr_created_at = "hf.created_at" if is_sqlite else "CAST(hf.created_at AS timestamptz)"
+    # client_context is jsonb (prod) / TEXT (sqlite test schema) and only exists on the
+    # product feedback table; the other streams union a dialect-correct typed NULL.
+    null_ctx = "CAST(NULL AS TEXT)" if is_sqlite else "CAST(NULL AS jsonb)"
     return f"""
 SELECT
     CAST(f.id        AS TEXT) AS id,
@@ -75,7 +78,8 @@ SELECT
     CASE WHEN f.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot,
     f.reporter_name           AS reporter_name,
     f.reporter_email          AS reporter_email,
-    f.reporter_role           AS reporter_role
+    f.reporter_role           AS reporter_role,
+    f.client_context          AS client_context
 FROM feedback f
 
 UNION ALL
@@ -92,7 +96,8 @@ SELECT
     0                         AS has_screenshot,
     CAST(NULL AS TEXT)        AS reporter_name,
     CAST(NULL AS TEXT)        AS reporter_email,
-    CAST(NULL AS TEXT)        AS reporter_role
+    CAST(NULL AS TEXT)        AS reporter_role,
+    {null_ctx}                AS client_context
 FROM ai_human_feedback h
 
 UNION ALL
@@ -109,7 +114,8 @@ SELECT
     0                         AS has_screenshot,
     CAST(NULL AS TEXT)        AS reporter_name,
     CAST(NULL AS TEXT)        AS reporter_email,
-    CAST(NULL AS TEXT)        AS reporter_role
+    CAST(NULL AS TEXT)        AS reporter_role,
+    {null_ctx}                AS client_context
 FROM policy_answer_helpfulness p
 
 UNION ALL
@@ -126,7 +132,8 @@ SELECT
     0                         AS has_screenshot,
     CAST(NULL AS TEXT)        AS reporter_name,
     CAST(NULL AS TEXT)        AS reporter_email,
-    CAST(NULL AS TEXT)        AS reporter_role
+    CAST(NULL AS TEXT)        AS reporter_role,
+    {null_ctx}                AS client_context
 FROM hr_feedback hf
 
 UNION ALL
@@ -143,7 +150,8 @@ SELECT
     0                         AS has_screenshot,
     CAST(NULL AS TEXT)        AS reporter_name,
     CAST(NULL AS TEXT)        AS reporter_email,
-    CAST(NULL AS TEXT)        AS reporter_role
+    CAST(NULL AS TEXT)        AS reporter_role,
+    {null_ctx}                AS client_context
 FROM case_feedback cf
 """
 
@@ -151,6 +159,7 @@ _OUTER_SQL = """
 SELECT
     base.id, base.stream, base.source_ref, base.text, base.verdict,
     base.user_id, base.company_id, base.created_at, base.has_screenshot,
+    base.client_context,
     -- Reporter identity: product rows carry a snapshot taken at submit time;
     -- every stream also resolves the raw user_id against profiles as a fallback
     -- (CAST(pr.id AS TEXT) bridges uuid-vs-text ids, and works on Postgres + SQLite).
