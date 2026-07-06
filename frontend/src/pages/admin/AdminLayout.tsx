@@ -8,6 +8,8 @@ import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompany
 import type { AdminCompany } from '../../types';
 import { PlatformShellSidebar } from '../../components/PlatformShellSidebar';
 import { FeedbackWidget } from '../../components/FeedbackWidget';
+import { authAPI } from '../../api/client';
+import { buildRoute } from '../../navigation/routes';
 
 interface Props {
   title?: string;
@@ -81,6 +83,10 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
               </svg>
               Ask ReloPass AI
             </Button>
+            {/* AIQ-1442: top-right account menu with Sign out — mirrors the employee/HR
+               AppShell logout so admins have a consistent top-right exit path here, not
+               only in the sidebar footer. */}
+            <AdminAccountMenu name={userName} initials={deriveInitials(userName)} />
           </div>
         </header>
 
@@ -107,6 +113,85 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
           report bugs / ideas from inside the console. Submits to the same feedback stream
           the "Feedback & Work" tab reads. */}
       <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
+    </div>
+  );
+};
+
+// ── Account menu (top-right sign-out) ─────────────────────────────────────────
+// AIQ-1442: gives admins the same top-right logout affordance the employee/HR shell
+// (AppShell) already has. Reuses the canonical logout path — authAPI.logout() then a
+// hard redirect to the login page — identical to AppShell's LogoutButton and the
+// sidebar footer's handleSignOut, so there is one source of truth for sign-out.
+const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, initials }) => {
+  const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickAnywhere = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('click', onClickAnywhere);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', onClickAnywhere);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await authAPI.logout();
+      window.location.replace(buildRoute('login'));
+    } catch {
+      setSigningOut(false);
+    }
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <Button unstyled
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account menu"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 pl-1 pr-1.5 py-1 rounded-lg hover:bg-slate-50 transition-colors"
+      >
+        <div className="w-7 h-7 rounded-full bg-[#0b2b43] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+          {initials}
+        </div>
+        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </Button>
+
+      {open && (
+        <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
+          <div className="border-b border-slate-100 px-3 py-2">
+            <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
+            <p className="text-[11px] text-slate-400">Admin · superuser</p>
+          </div>
+          <Button unstyled
+            type="button"
+            role="menuitem"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

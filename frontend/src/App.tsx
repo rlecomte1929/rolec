@@ -448,6 +448,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminAssignments.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
+        {/* AIQ-1437: /admin/ops/errors surfaces the same admin error dashboard. */}
+        <Route path={ROUTE_DEFS.adminOpsErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminTestDrive.path} element={<RequireAdminRoute><AdminTestDrive /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />

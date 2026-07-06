@@ -7,6 +7,7 @@ import { Input } from '../../../components/antigravity/Input';
 import { useGeocodedAddress } from '../../../components/geocode';
 import { patchCase } from '../../../api/cases';
 import { employeeAPI } from '../../../api/client';
+import { track } from '../../../analytics';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidatedParams';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
@@ -598,6 +599,10 @@ export function EmployeeIntakePage() {
   const routeCaseId = useValidatedParams(caseParamsSchema)?.caseId;
   // Stable case ID for the duration of this intake session.
   const caseIdRef = useRef<string>(routeCaseId ?? crypto.randomUUID());
+  // AIQ-1435: journey funnel — mark the intake step reached (once per mount).
+  useEffect(() => {
+    track('journey_step_started', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
+  }, []);
   // Latest assignment id captured in a ref so the debounced autosave
   // (set up inside `setField`'s closure) always posts to the *current*
   // linked assignment, even if it resolves after the wizard mounts.
@@ -1318,6 +1323,8 @@ export function EmployeeIntakePage() {
                           TOTAL_STEPS,
                         ).catch(() => undefined);
                       }
+                      // AIQ-1435: journey funnel — intake completed on successful submit.
+                      track('journey_step_completed', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
                       // B5: land on the roadmap the submit just unlocked, not a
                       // dashboard that can momentarily read as "intake not started".
                       navigate(
