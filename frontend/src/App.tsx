@@ -64,6 +64,7 @@ const CasePlanToRoadmapRedirect = lazy(() => import('./pages/employee/CasePlanTo
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 // [P1-5] Dossier & Forms list view
 const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierPage').then((module) => ({ default: module.EmployeeDossierPage })));
+const FormEditorPage = lazy(() => import('./pages/employee/FormEditorPage').then((module) => ({ default: module.FormEditorPage })));
 // Employee document vault (case-scoped + assignment fallback)
 const EmployeeDocumentsPage = lazy(() => import('./pages/employee/EmployeeDocumentsPage').then((module) => ({ default: module.EmployeeDocumentsPage })));
 // [P1-6] Case roadmap page
@@ -399,6 +400,10 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
+        {/* AIQ-1449: wire the form editor route. CaseFormCard's "Open form" navigates to
+            employeeCaseFormEditor, but no <Route> rendered it — so it fell through to the
+            catch-all redirect ("lands on an unrelated page"). FormEditorPage prefills. */}
+        <Route path={ROUTE_DEFS.employeeCaseFormEditor.path} element={<RequireEmployeeRoute><FormEditorPage /></RequireEmployeeRoute>} />
         {/* Employee document vault — case-scoped + bare /employee/documents (assignment fallback) */}
         <Route path={ROUTE_DEFS.employeeCaseDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
