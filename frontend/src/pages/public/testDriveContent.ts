@@ -74,9 +74,9 @@ export const testDriveContent = {
     // file/poster live in frontend/public/test-drive/ (TD-11). A clip with no `file`
     // renders the static placeholder (graceful degrade).
     clips: [
-      { label: 'Overview — 60 sec', description: 'What ReloPass coordinates, and why relocation fails in the handoffs.', file: '/test-drive/overview.mp4', poster: '/test-drive/overview.jpg' },
-      { label: 'The HR side — 90 sec', description: 'Configure a case and hand it off.', file: '/test-drive/hr-side.mp4', poster: '/test-drive/hr-side.jpg' },
-      { label: 'The employee side — 90 sec', description: 'From intake to roadmap.', file: '/test-drive/employee-side.mp4', poster: '/test-drive/employee-side.jpg' },
+      { label: 'Getting started — 40 sec', description: 'Enter your name, get your two logins, and where to sign in.', file: '/test-drive/start.mp4', poster: '/test-drive/start.jpg' },
+      { label: 'The HR side — 65 sec', description: 'Open a case and hand it to the employee.', file: '/test-drive/hr.mp4', poster: '/test-drive/hr.jpg' },
+      { label: 'The employee side — 95 sec', description: 'Sign in, complete intake, and reach the roadmap.', file: '/test-drive/employee.mp4', poster: '/test-drive/employee.jpg' },
     ],
   },
 
