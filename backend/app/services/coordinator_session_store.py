@@ -174,6 +174,18 @@ def save(conn: Any, session: Dict[str, Any]) -> None:
     )
 
 
+def set_event_cursor(conn: Any, case_id: str, cursor: Optional[str]) -> None:
+    """Advance the proactive high-water mark (``last_event_cursor``) without touching the
+    conversation. Used by the proactive scan so the same events aren't re-notified."""
+    conn.execute(
+        text(
+            "UPDATE ai_coordinator_sessions SET last_event_cursor = :lec, "
+            f"updated_at = {_now(conn)} WHERE case_id = :c"
+        ),
+        {"lec": cursor, "c": str(case_id)},
+    )
+
+
 def close_session(conn: Any, case_id: str) -> None:
     """Freeze the session (terminal relocation / archived) — stops future folds."""
     conn.execute(

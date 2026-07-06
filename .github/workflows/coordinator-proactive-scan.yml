@@ -1,0 +1,57 @@
+name: Coordinator proactive scan
+
+# [AIQ-1414 Phase 3b] Calls POST /api/crons/coordinator-proactive-scan daily. For each
+# active Mobility Coordinator session, delivers one in-session proactive update when new
+# notify-worthy case_events landed, and closes sessions whose case is terminal.
+#
+# Gated behind `vars.COORDINATOR_PROACTIVE_CRON_ENABLED` so this is a no-op until the
+# secrets/vars are configured. The API side is ALSO gated by the
+# RELOPASS_AI_COORDINATOR_ENABLED feature flag, so both must be on. Required config:
+#   vars.COORDINATOR_PROACTIVE_CRON_ENABLED = 'true'
+#   vars.COORDINATOR_PROACTIVE_API_BASE     = https://api.relopass.com
+#   secrets.CRON_SECRET                     = (reused — same value the API checks)
+
+on:
+  schedule:
+    # 05:00 UTC every day (after the case-health scan at 04:30).
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: coordinator-proactive-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  coordinator-proactive-scan:
+    name: Daily coordinator proactive scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.COORDINATOR_PROACTIVE_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.COORDINATOR_PROACTIVE_API_BASE }}   # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/coordinator-proactive-scan
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/coordinator-proactive-scan")
+          echo "$response"
+          {
+            echo "## Coordinator proactive scan run"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

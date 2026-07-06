@@ -205,6 +205,24 @@ def case_health_scan(request: Request) -> Dict[str, Any]:
     return {"ok": True, **result}
 
 
+@router.post("/coordinator-proactive-scan")
+def coordinator_proactive_scan(request: Request) -> Dict[str, Any]:
+    """
+    [AIQ-1414 Phase 3b] Proactive Mobility Coordinator scan. For each active coordinator
+    session, delivers one in-session proactive update when new notify-worthy case_events
+    landed since the session's cursor, and closes sessions whose case is terminal.
+    Breaker-aware (skips relocations over their monthly cap). Inert while
+    RELOPASS_AI_COORDINATOR_ENABLED is OFF. Daily via
+    `.github/workflows/coordinator-proactive-scan.yml`, gated behind the
+    `COORDINATOR_PROACTIVE_CRON_ENABLED` repo var. Idempotent (cursor-advanced).
+    """
+    _verify_cron_secret(request)
+    log.info("coordinator_proactive_scan cron triggered")
+    from ..services.coordinator_proactive_service import run_coordinator_proactive_scan
+
+    return run_coordinator_proactive_scan()
+
+
 @router.post("/hr-mobility-briefing")
 def hr_mobility_briefing_cron(
     request: Request,
