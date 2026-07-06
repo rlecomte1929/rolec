@@ -9,7 +9,7 @@ import { apiPost } from './client';
 
 export interface ProvisionInput {
   first_name: string;
-  corridor_id: string;
+  corridor_id?: string;
   tester_segment: 'internal' | 'prospect';
   invite_token: string;
   campaign?: string;
