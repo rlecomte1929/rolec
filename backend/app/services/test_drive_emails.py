@@ -1,15 +1,18 @@
-"""Test-Drive campaign email fan-out (AIQ-1424 / TD-6).
+"""Test-Drive campaign email fan-out (AIQ-1424 / TD-6; AIQ-1433 / TD-12).
 
-On survey submit: (1) notify Romain of a completion with the pitch-relevant details,
-(2) send the tester a warm thank-you "from Romain". Reuses the shared Resend path
-(`assignment_invite_email._resend_send`) — no new provider. Never raises; dry-runs to
-status 'logged' when RESEND_API_KEY is unset.
+On survey submit: send exactly ONE Resend email — notify Romain of the completion with
+the pitch-relevant details. Reuses the shared Resend path (`assignment_invite_email.
+_resend_send`) — no new provider. Never raises; dry-runs to status 'logged' when
+RESEND_API_KEY is unset.
+
+The tester thank-you is no longer auto-sent by the platform (TD-12). Instead the notify
+email and the /admin/test-drive dashboard each expose a client-side ``mailto:`` deep link
+that opens Romain's own mail client with the thank-you prefilled — so it genuinely comes
+from his mailbox, and Resend usage drops 2 → 1 per completion.
 
 Addresses (Resend authenticates by the verified relopass.com domain — no mailbox access):
   * notify → RELOPASS_TEST_DRIVE_NOTIFY_EMAIL (default romain.lecomte@relopass.com),
     reply-to = the tester (so a reply reaches them directly).
-  * thank-you → the tester, from "Romain Lecomte <romain.lecomte@relopass.com>",
-    reply-to = Romain (so tester replies reach him).
 
 Referral PII is included in the notify email ONLY when the tester consented (referral_consent).
 """
@@ -19,21 +22,17 @@ import logging
 import os
 from html import escape as _esc
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 from .assignment_invite_email import _resend_send
 
 log = logging.getLogger(__name__)
 
 _DEFAULT_NOTIFY = "romain.lecomte@relopass.com"
-_DEFAULT_FROM = "Romain Lecomte <romain.lecomte@relopass.com>"
 
 
 def _notify_email() -> str:
     return os.getenv("RELOPASS_TEST_DRIVE_NOTIFY_EMAIL", _DEFAULT_NOTIFY)
-
-
-def _td_from() -> str:
-    return os.getenv("RELOPASS_TEST_DRIVE_FROM", _DEFAULT_FROM)
 
 
 def _lines_to_html(lines: List[str]) -> str:
@@ -106,28 +105,51 @@ def render_notify_email(
         else:
             lines += ["", "── Referral ──", "Referral given, consent not granted — do not contact."]
 
+    # TD-12: one-click thank-you from Romain's own mailbox (client-side mailto, no Resend send).
+    mailto = _thank_you_mailto(tester_email, tester_name)
+    if mailto:
+        lines += ["", "── Thank-you (one click) ──", "Send the tester a thank-you from your own mailbox:"]
+
     plain = "\n".join(lines)
-    return subject, plain, _lines_to_html(lines)
+    html = _lines_to_html(lines)
+    if mailto:
+        plain += f"\n{mailto}"  # raw mailto stays clickable in plain-text clients
+        who_label = tester_name or "the tester"
+        html += (
+            f"<div style='margin-top:12px'><a href='{_esc(mailto)}' "
+            "style='display:inline-block;background:#0b2b43;color:#fff;text-decoration:none;"
+            "font-family:sans-serif;font-weight:600;font-size:13px;border-radius:8px;padding:10px 18px'>"
+            f"Send thank-you to {_esc(who_label)}</a></div>"
+        )
+    return subject, plain, html
 
 
-def render_thank_you_email(
-    *,
-    tester_name: Optional[str] = None,
-    pilot_interest: Optional[str] = None,
-) -> "tuple[str, str, str]":
+# TD-12: the tester thank-you is now a client-side mailto (opened from Romain's mailbox),
+# not a Resend send. This copy is the single source of truth for that prefill — the
+# frontend button (TestDriveTab.tsx `thankYouMailto`) mirrors it and must stay in sync.
+_THANK_YOU_SUBJECT = "Thank you — that really helps"
+
+
+def _thank_you_copy(tester_name: Optional[str] = None) -> "tuple[str, str]":
+    """Prefilled thank-you (subject, plain body). Kept short — long mailto bodies get
+    truncated by some mail clients."""
     who = tester_name or "there"
-    subject = "Thanks for test-driving ReloPass"
-    lines: List[str] = [
-        f"Hi {who},",
-        "",
-        "Thanks for running a full relocation on ReloPass — genuinely useful.",
-        "I'll act on what you flagged.",
-    ]
-    if pilot_interest in ("yes", "maybe"):
-        lines += ["", "You mentioned possible interest in a pilot — I'll follow up personally, shortly."]
-    lines += ["", "— Romain", "Romain Lecomte · ReloPass"]
-    plain = "\n".join(lines)
-    return subject, plain, _lines_to_html(lines)
+    body = (
+        f"Hi {who},\n\n"
+        "Thanks for test-driving ReloPass — running a full relocation and telling me where "
+        "it held and where it broke is genuinely useful. I'll act on what you flagged.\n\n"
+        "— Romain"
+    )
+    return _THANK_YOU_SUBJECT, body
+
+
+def _thank_you_mailto(tester_email: Optional[str], tester_name: Optional[str] = None) -> str:
+    """``mailto:`` deep link that opens the sender's mail client with the thank-you
+    prefilled. Empty string when there is no valid address."""
+    if not tester_email or "@" not in tester_email:
+        return ""
+    subject, body = _thank_you_copy(tester_name)
+    return f"mailto:{tester_email}?subject={quote(subject)}&body={quote(body)}"
 
 
 def _status(res: Dict[str, Any]) -> str:
@@ -156,10 +178,13 @@ def send_test_drive_survey_emails(
     referral_contact: Optional[str] = None,
     referral_consent: bool = False,
 ) -> Dict[str, str]:
-    """Fire both composers best-effort. Returns {notify, thank_you} statuses. Never raises."""
+    """Send the single notify email best-effort. Returns {notify, thank_you} statuses.
+    Never raises. TD-12: the tester thank-you is no longer a Resend send — it's a
+    client-side mailto in the notify email + admin dashboard — so 'thank_you' is always
+    'skipped' here (kept for a stable return shape; the caller ignores it)."""
     out: Dict[str, str] = {}
 
-    # 1) Notify Romain — reply-to the tester.
+    # 1) Notify Romain — reply-to the tester. This is the ONLY Resend send (TD-12).
     try:
         subject, plain, html = render_notify_email(
             tester_name=tester_name, tester_email=tester_email, campaign=campaign, corridor_id=corridor_id,
@@ -178,19 +203,8 @@ def send_test_drive_survey_emails(
         log.warning("test-drive notify email failed (suppressed)")
         out["notify"] = "error"
 
-    # 2) Thank the tester — from Romain, reply-to Romain.
-    if tester_email and "@" in tester_email:
-        try:
-            subject, plain, html = render_thank_you_email(tester_name=tester_name, pilot_interest=pilot_interest)
-            res = _resend_send(
-                to_email=tester_email, subject=subject, plain=plain, html=html,
-                from_addr=_td_from(), reply_to=_notify_email(), context="test-drive thank-you",
-            )
-            out["thank_you"] = _status(res)
-        except Exception:  # noqa: BLE001
-            log.warning("test-drive thank-you email failed (suppressed)")
-            out["thank_you"] = "error"
-    else:
-        out["thank_you"] = "skipped"
+    # 2) Tester thank-you is now a client-side mailto (see render_notify_email / the
+    #    admin dashboard) — no Resend send here. Kept as 'skipped' for a stable contract.
+    out["thank_you"] = "skipped"
 
     return out
