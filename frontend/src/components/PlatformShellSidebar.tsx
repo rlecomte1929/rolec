@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, LogOut } from 'lucide-react';
 import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
 import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
+import { authAPI } from '../api/client';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api/adminCatalog';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
@@ -372,11 +373,65 @@ function readFolded(): Record<string, boolean> {
   }
 }
 
+// Sidebar scroll position. The whole page tree (incl. this sidebar) remounts on every
+// route change, so without this the <aside> resets to scrollTop=0 on each navigation and
+// the user loses their place in a long nav. sessionStorage (per-tab, ephemeral) is the
+// right scope — it should not persist across a full browser restart like the fold state.
+const SCROLL_KEY = 'platform_sidebar_scroll';
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role, companySlot, user }) => {
   const location = useLocation();
+  const asideRef = useRef<HTMLElement | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
+
+  // Restore the sidebar scroll position before paint (the aside remounts on navigation).
+  useLayoutEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    try {
+      const raw = window.sessionStorage.getItem(SCROLL_KEY);
+      const top = raw ? Number(raw) : 0;
+      if (Number.isFinite(top) && top > 0) el.scrollTop = top;
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const handleSidebarScroll = () => {
+    const el = asideRef.current;
+    if (!el) return;
+    try {
+      window.sessionStorage.setItem(SCROLL_KEY, String(el.scrollTop));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Footer account menu (name / role / sign out). Shared by every persona shell, so this
+  // is the single standard sign-out across employee, HR and admin.
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const accountRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [accountOpen]);
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await authAPI.logout();
+      // Mirror AppShell's LogoutButton: land on the login page, not the marketing home.
+      window.location.replace(buildRoute('login'));
+    } catch {
+      setSigningOut(false);
+    }
+  };
 
   // Persist + cross-tab sync
   useEffect(() => {
@@ -523,6 +578,8 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
   return (
     <aside
+      ref={asideRef}
+      onScroll={handleSidebarScroll}
       aria-label="Platform navigation"
       className={`${collapsed ? 'w-[64px]' : 'w-[240px]'} shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-y-auto transition-[width] duration-200 ease-out`}
     >
@@ -706,7 +763,32 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-3 border-t border-slate-100">
+      <div ref={accountRef} className="relative px-3 py-3 border-t border-slate-100">
+        {/* Account popover — name / role / sign out. Rendered above the footer since it
+            sits at the bottom of the sidebar. */}
+        {accountOpen && !collapsed && (
+          <div
+            role="menu"
+            aria-label="Account"
+            className="absolute bottom-full left-3 right-3 mb-2 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          >
+            <div className="px-2 py-1.5">
+              <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.role ?? role.toLowerCase()}</p>
+            </div>
+            <div className="my-1 border-t border-slate-100" />
+            <Button unstyled
+              type="button"
+              role="menuitem"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
+            >
+              <LogOut size={13} className="shrink-0" />
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </Button>
+          </div>
+        )}
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
           <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
             {user?.initials ?? 'RP'}
@@ -717,8 +799,15 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
                 <p className="text-[10px] text-slate-400 truncate">{user?.role ?? role.toLowerCase()}</p>
               </div>
-              <Button unstyled aria-label="Account menu" className="text-slate-400 hover:text-slate-600 shrink-0">
-                <ChevronRight size={14} />
+              <Button unstyled
+                type="button"
+                aria-label="Account menu"
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
+                onClick={() => setAccountOpen((o) => !o)}
+                className="text-slate-400 hover:text-slate-600 shrink-0"
+              >
+                {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </Button>
             </>
           )}
