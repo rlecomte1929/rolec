@@ -82,6 +82,9 @@ _ALLOWLIST = {
     "backend/app/services/feedback_triage.py": (
         "MASKED", "mask_pii(text) before complete_sync() — user feedback free-text "
                   "classified into severity/theme; deterministic fallback on masker failure."),
+    "backend/app/services/feedback_task_engineer.py": (
+        "MASKED", "mask_pii(bug text) + mask_pii(admin context) before claude_complete() — "
+                  "engineers a Work Queue task from feedback; both free-text inputs masked."),
 }
 
 
