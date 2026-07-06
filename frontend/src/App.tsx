@@ -149,6 +149,8 @@ const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) =
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
+const AdminWorkflowFunnelPage = lazy(() => import('./pages/admin/AdminWorkflowFunnelPage').then((module) => ({ default: module.AdminWorkflowFunnelPage })));
+const AdminAssistantAnalyticsPage = lazy(() => import('./pages/admin/AdminAssistantAnalyticsPage').then((module) => ({ default: module.AdminAssistantAnalyticsPage })));
 const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
 const AdminTestDrive = lazy(() => import('./pages/admin/AdminTestDrive'));
@@ -450,6 +452,10 @@ function App() {
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
         {/* AIQ-1437: /admin/ops/errors surfaces the same admin error dashboard. */}
         <Route path={ROUTE_DEFS.adminOpsErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
+        {/* AIQ-1439: workflow conversion funnel. */}
+        <Route path={ROUTE_DEFS.adminWorkflowFunnel.path} element={<RequireAdminRoute><AdminWorkflowFunnelPage /></RequireAdminRoute>} />
+        {/* AIQ-1438: policy-assistant question analytics. */}
+        <Route path={ROUTE_DEFS.adminAiQuestions.path} element={<RequireAdminRoute><AdminAssistantAnalyticsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminTestDrive.path} element={<RequireAdminRoute><AdminTestDrive /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />

@@ -174,6 +174,45 @@ class AuditMixin:
             log.debug("count_analytics_events_by_name failed: %s", e)
             return {}
 
+    def count_assistant_events_by_topic(
+        self, since: Optional[str] = None, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Count policy-assistant events grouped by canonical topic + event_name (AIQ-1438).
+
+        The assistant telemetry never stores raw question text (PII-by-design) — only a
+        coarse ``payload_json.extra.canonical_topic`` enum — so "top questions" is served
+        at topic granularity. Returns rows ``[{topic, event_name, cnt}]`` (topic may be
+        None when an event carries no canonical_topic). Degrades to ``[]`` on any error.
+        """
+        try:
+            # Dialect-aware JSON extraction. payload_json is a TEXT column even on
+            # Postgres (events are stored as json.dumps strings), so PG needs a ::jsonb
+            # cast before the -> / ->> operators; SQLite reads TEXT via json_extract.
+            if self.engine.dialect.name == "postgresql":
+                topic_expr = "payload_json::jsonb -> 'extra' ->> 'canonical_topic'"
+            else:
+                topic_expr = "json_extract(payload_json, '$.extra.canonical_topic')"
+            sql = (
+                f"SELECT {topic_expr} AS topic, event_name, COUNT(*) as cnt "
+                "FROM analytics_events "
+                "WHERE event_name IN ("
+                "'assistant_question_asked','assistant_question_supported',"
+                "'assistant_question_unsupported','assistant_refusal_shown')"
+            )
+            params: Dict[str, Any] = {}
+            if since:
+                sql += " AND created_at >= :since"
+                params["since"] = since
+            sql += f" GROUP BY {topic_expr}, event_name"
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="count_assistant_events_by_topic", request_id=request_id
+                ).fetchall()
+            return [{"topic": r[0], "event_name": r[1], "cnt": r[2]} for r in rows]
+        except Exception as e:
+            log.debug("count_assistant_events_by_topic failed: %s", e)
+            return []
+
     def list_trace_events(self, case_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Prefers canonical_case_id, falls back to case_id."""
         cid = self.coalesce_case_lookup_id(case_id)
