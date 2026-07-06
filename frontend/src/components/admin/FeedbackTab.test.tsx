@@ -10,12 +10,13 @@ import type { UnifiedFeedbackItem } from '../../api/adminFeedback';
 vi.mock('../../api/adminFeedback', () => ({
   listFeedback: vi.fn(),
   triageFeedback: vi.fn(),
-  dispatchTicket: vi.fn(),
   getFeedbackScreenshot: vi.fn().mockResolvedValue(null),
+  saveDispatchContext: vi.fn().mockResolvedValue(undefined),
+  dispatchPreview: vi.fn(),
+  dispatchCreate: vi.fn(),
 }));
-import type { DispatchResult } from '../../api/adminFeedback';
-import { FeedbackTab } from './FeedbackTab';
 import * as feedbackApi from '../../api/adminFeedback';
+import { FeedbackTab } from './FeedbackTab';
 
 const MOCK_ITEMS: UnifiedFeedbackItem[] = [
   {
@@ -102,12 +103,6 @@ describe('FeedbackTab', () => {
 
 // ── BR-3: dispatch + badges ────────────────────────────────────────────────
 
-const DISPATCH_RESULT: DispatchResult = {
-  dispatched: true,
-  dispatch_ref: 'DR-TEST-001',
-  status: 'dispatched',
-};
-
 const MOCK_DISPATCH_ITEMS: UnifiedFeedbackItem[] = [
   {
     id: 'low-risk-1',
@@ -188,7 +183,6 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     vi.clearAllMocks();
     vi.mocked(feedbackApi.listFeedback).mockResolvedValue(MOCK_DISPATCH_ITEMS);
     vi.mocked(feedbackApi.triageFeedback).mockResolvedValue(undefined);
-    vi.mocked(feedbackApi.dispatchTicket).mockResolvedValue(DISPATCH_RESULT);
   });
 
   it('renders severity badges for each row that has severity', async () => {
@@ -210,74 +204,39 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     expect(screen.getByText('isolation')).toBeTruthy();
   });
 
-  it('clicking Dispatch on a low-risk row calls dispatchTicket without confirm', async () => {
+  it('the compact Dispatch button expands the row and reveals the required context field', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    // first Dispatch button corresponds to low-risk-1
-    const dispatchBtns = screen.getAllByRole('button', { name: /^dispatch$/i });
-    fireEvent.click(dispatchBtns[0]);
-    await waitFor(() =>
-      expect(feedbackApi.dispatchTicket).toHaveBeenCalledWith('product', 'low-risk-1')
-    );
-    // confirm was NOT set
-    const calls = vi.mocked(feedbackApi.dispatchTicket).mock.calls;
-    expect(calls[0]).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: /^dispatch$/i })[0]);
+    // No immediate API call — it just opens the context/dispatch panel.
+    expect(feedbackApi.dispatchPreview).not.toHaveBeenCalled();
+    expect(await screen.findByPlaceholderText(/detail an engineer needs/i)).toBeTruthy();
   });
 
-  it('clicking Dispatch on a critical-severity row does NOT call API immediately', async () => {
+  it('generates a preview from context, then creates the Notion task and shows the link', async () => {
+    vi.mocked(feedbackApi.dispatchPreview).mockResolvedValue({
+      title: 'Fix roadmap', strategic_objective: 'g', execution_prompt: 'p', expected_output: 'o',
+      validation_criteria: 'v', priority: 'P1', complexity: 'Medium',
+      task_type: 'Backend Implementation', layer: 'API', product_area: 'Core Product', status: 'Ready for AI',
+    });
+    vi.mocked(feedbackApi.dispatchCreate).mockResolvedValue({
+      dispatched: true, url: 'https://notion.so/task-1', dispatch_ref: 'https://notion.so/task-1',
+    });
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    // second Dispatch button → high-risk-1 (critical)
-    const dispatchBtns = screen.getAllByRole('button', { name: /^dispatch$/i });
-    fireEvent.click(dispatchBtns[1]);
-    expect(feedbackApi.dispatchTicket).not.toHaveBeenCalled();
-    // confirm step must appear
-    expect(screen.getByText(/confirm dispatch/i)).toBeTruthy();
-  });
+    fireEvent.click(screen.getAllByRole('button', { name: /^dispatch$/i })[0]);
 
-  it('clicking Dispatch on an isolation-area row does NOT call API immediately', async () => {
-    renderTab();
-    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    // third Dispatch button → isolation-risk-1
-    const dispatchBtns = screen.getAllByRole('button', { name: /^dispatch$/i });
-    fireEvent.click(dispatchBtns[2]);
-    expect(feedbackApi.dispatchTicket).not.toHaveBeenCalled();
-    expect(screen.getByText(/confirm dispatch/i)).toBeTruthy();
-  });
+    const ctx = await screen.findByPlaceholderText(/detail an engineer needs/i);
+    fireEvent.change(ctx, { target: { value: 'repro: open /journey, spinner forever' } });
+    fireEvent.click(screen.getByRole('button', { name: /engineer task/i }));
+    await waitFor(() => expect(feedbackApi.dispatchPreview).toHaveBeenCalled());
 
-  it('confirming a high-risk dispatch calls dispatchTicket with confirm:true', async () => {
-    renderTab();
-    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    const dispatchBtns = screen.getAllByRole('button', { name: /^dispatch$/i });
-    // open confirm for high-risk-1
-    fireEvent.click(dispatchBtns[1]);
-    // click the confirm button
-    const confirmBtn = screen.getByRole('button', { name: /i understand/i });
-    fireEvent.click(confirmBtn);
-    await waitFor(() =>
-      expect(feedbackApi.dispatchTicket).toHaveBeenCalledWith('product', 'high-risk-1', true)
-    );
-  });
-
-  it('shows dispatched badge for already-dispatched rows (no Dispatch button)', async () => {
-    renderTab();
-    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    expect(screen.getByText('dispatched')).toBeTruthy();
-    // Only 3 Dispatch buttons (not 4, since already-dispatched-1 has no button)
-    const dispatchBtns = screen.getAllByRole('button', { name: /^dispatch$/i });
-    expect(dispatchBtns).toHaveLength(3);
-  });
-
-  it('reflects dispatched state in the row after a successful low-risk dispatch', async () => {
-    renderTab();
-    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    const dispatchBtns = screen.getAllByRole('button', { name: /^dispatch$/i });
-    fireEvent.click(dispatchBtns[0]);
-    await waitFor(() => expect(feedbackApi.dispatchTicket).toHaveBeenCalled());
-    // dispatch_status row for low-risk-1 should now show 'dispatched'
-    // (2 'dispatched' texts now: already-dispatched-1 + newly dispatched low-risk-1)
-    const dispatched = await screen.findAllByText('dispatched');
-    expect(dispatched.length).toBeGreaterThanOrEqual(2);
+    const createBtn = await screen.findByRole('button', { name: /create task in notion/i });
+    fireEvent.click(createBtn);
+    await waitFor(() => expect(feedbackApi.dispatchCreate).toHaveBeenCalled());
+    // row now links to the created Notion task
+    const links = await screen.findAllByRole('link', { name: /notion/i });
+    expect(links.length).toBeGreaterThan(0);
   });
 });
 
@@ -333,11 +292,6 @@ describe('FeedbackTab — Dispatched view (D2)', () => {
     vi.clearAllMocks();
     vi.mocked(feedbackApi.listFeedback).mockResolvedValue(DISPATCHED_VIEW_ITEMS);
     vi.mocked(feedbackApi.triageFeedback).mockResolvedValue(undefined);
-    vi.mocked(feedbackApi.dispatchTicket).mockResolvedValue({
-      dispatched: true,
-      dispatch_ref: 'DR-000',
-      status: 'dispatched',
-    });
   });
 
   it('has a "Dispatched" tab in the stream tab bar', async () => {

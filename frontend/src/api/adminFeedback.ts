@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch } from './client';
+import { apiGet, apiPost, apiPatch, apiPut } from './client';
 
 export type FeedbackStream =
   | 'product'
@@ -30,6 +30,8 @@ export interface UnifiedFeedbackItem {
   area?: string | null;
   dispatch_status?: DispatchStatus | null;
   dispatch_ref?: string | null;
+  /** Admin-authored context used to engineer the dispatched task. */
+  dispatch_context?: string | null;
   /** True when this item has a screenshot attached (product stream only). The
    *  image itself is fetched lazily via getFeedbackScreenshot to keep the list
    *  payload small. Serialized as 0/1 by the backend — read via truthiness. */
@@ -99,4 +101,56 @@ export async function dispatchTicket(
   if (confirm !== undefined) body.confirm = confirm;
   if (note !== undefined) body.note = note;
   return apiPost<DispatchResult>(`/api/admin/feedback/${stream}/${itemId}/dispatch`, body);
+}
+
+// ── Dispatch → AI Work Queue (context → engineered task → Notion) ─────────────
+
+/** The engineered task an admin reviews/edits before it becomes a Notion page. */
+export interface EngineeredTask {
+  title: string;
+  strategic_objective: string;
+  execution_prompt: string;
+  expected_output: string;
+  validation_criteria: string;
+  test_command?: string;
+  technical_constraints?: string;
+  files_to_touch?: string;
+  risk_rollback?: string;
+  priority: string;
+  complexity: string;
+  task_type: string;
+  layer: string;
+  product_area: string;
+  status: string;
+}
+
+/** Save the admin's per-item dispatch context (required before dispatch). */
+export async function saveDispatchContext(
+  stream: FeedbackStream,
+  itemId: string,
+  context: string,
+): Promise<void> {
+  await apiPut<unknown>(`/api/admin/feedback/${stream}/${itemId}/context`, { context });
+}
+
+/** Generate (no side effects) an engineered AI Work Queue task for review. */
+export async function dispatchPreview(
+  stream: FeedbackStream,
+  itemId: string,
+  input: { text?: string | null; category?: string },
+): Promise<EngineeredTask> {
+  const data = await apiPost<{ task: EngineeredTask }>(
+    `/api/admin/feedback/${stream}/${itemId}/dispatch/preview`,
+    { text: input.text ?? '', category: input.category ?? 'bug' },
+  );
+  return data.task;
+}
+
+/** Create the Notion AI Work Queue page from the reviewed task; returns its URL. */
+export async function dispatchCreate(
+  stream: FeedbackStream,
+  itemId: string,
+  task: EngineeredTask,
+): Promise<{ dispatched: boolean; url: string; dispatch_ref: string }> {
+  return apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, { task, confirm: true });
 }

@@ -3,7 +3,8 @@
  *
  * Reads from /api/admin/feedback (normalized UNION of product/ai_answers/helpfulness).
  * Triage (status/owner/resolution) goes through PATCH — never mutates ML source tables.
- * Dispatch goes through POST /dispatch — high-risk tickets require an explicit in-UI confirm.
+ * Dispatch: the admin adds context, /dispatch/preview engineers a task (reviewed inline),
+ * then /dispatch/create writes it to the Notion AI Work Queue and links back.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -12,11 +13,14 @@ import { Badge } from '../antigravity/Badge';
 import {
   listFeedback,
   triageFeedback,
-  dispatchTicket,
   getFeedbackScreenshot,
+  saveDispatchContext,
+  dispatchPreview,
+  dispatchCreate,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
+  type EngineeredTask,
 } from '../../api/adminFeedback';
 
 type FilterStatus = TriageStatus | 'all';
@@ -64,11 +68,6 @@ function fmtDate(iso: string): string {
 
 const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness', 'hr_assignment', 'hr_case'];
 
-/** A ticket is high-risk if severity is critical OR area is isolation. */
-function isHighRisk(row: UnifiedFeedbackItem): boolean {
-  return row.severity === 'critical' || row.area === 'isolation';
-}
-
 export function FeedbackTab() {
   const [rows, setRows]                   = useState<UnifiedFeedbackItem[]>([]);
   const [loading, setLoading]             = useState(true);
@@ -83,9 +82,13 @@ export function FeedbackTab() {
   const [shots, setShots]                 = useState<Record<string, string | null>>({});
   const [shotLoadingId, setShotLoadingId] = useState<string | null>(null);
 
-  // Dispatch state
-  const [pendingConfirmId, setPendingConfirmId] = useState<string | null>(null);
-  const [dispatchingId, setDispatchingId]       = useState<string | null>(null);
+  // Dispatch → AI Work Queue
+  const [contextDrafts, setContextDrafts]       = useState<Record<string, string>>({});
+  const [savingContextId, setSavingContextId]   = useState<string | null>(null);
+  const [previewFor, setPreviewFor]             = useState<string | null>(null);
+  const [previewTask, setPreviewTask]           = useState<EngineeredTask | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const [creatingId, setCreatingId]             = useState<string | null>(null);
   const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -138,37 +141,56 @@ export function FeedbackTab() {
     setSavingId(null);
   };
 
-  /** Execute the dispatch API call for a given row. */
-  const doDispatch = useCallback(async (row: UnifiedFeedbackItem, confirm?: true) => {
-    setDispatchingId(row.id);
-    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+  const ctxValue = (row: UnifiedFeedbackItem) =>
+    contextDrafts[row.id] ?? row.dispatch_context ?? '';
+
+  /** Persist the admin's per-item context (on blur). */
+  const saveContext = useCallback(async (row: UnifiedFeedbackItem, value: string) => {
+    if ((row.dispatch_context ?? '') === value) return; // no change
+    setSavingContextId(row.id);
     try {
-      if (confirm) {
-        await dispatchTicket(row.stream, row.id, true);
-      } else {
-        await dispatchTicket(row.stream, row.id);
-      }
-      setRows((prev) =>
-        prev.map((r) => r.id === row.id ? { ...r, dispatch_status: 'dispatched' } : r)
-      );
-      setPendingConfirmId(null);
+      await saveDispatchContext(row.stream, row.id, value);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, dispatch_context: value } : r));
+    } catch { /* keep the draft; error surfaced on dispatch */ }
+    finally { setSavingContextId(null); }
+  }, []);
+
+  /** Generate the engineered task for review (no side effects). */
+  const openPreview = useCallback(async (row: UnifiedFeedbackItem) => {
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    setPreviewLoadingId(row.id);
+    setPreviewFor(row.id);
+    setPreviewTask(null);
+    try {
+      const task = await dispatchPreview(row.stream, row.id, { text: row.text, category: row.verdict ?? 'bug' });
+      setPreviewTask(task);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Dispatch failed';
+      const msg = err instanceof Error ? err.message : 'Could not generate the task.';
       setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+      setPreviewFor(null);
     } finally {
-      setDispatchingId(null);
+      setPreviewLoadingId(null);
     }
   }, []);
 
-  /** Called when the Dispatch button is clicked. */
-  const handleDispatchClick = (e: React.MouseEvent, row: UnifiedFeedbackItem) => {
-    e.stopPropagation();
-    if (isHighRisk(row)) {
-      setPendingConfirmId(row.id);
-    } else {
-      void doDispatch(row);
+  /** Create the Notion Work Queue page from the reviewed task. */
+  const createTask = useCallback(async (row: UnifiedFeedbackItem) => {
+    if (!previewTask) return;
+    setCreatingId(row.id);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      const res = await dispatchCreate(row.stream, row.id, previewTask);
+      setRows((prev) => prev.map((r) => r.id === row.id
+        ? { ...r, dispatch_status: 'dispatched', dispatch_ref: res.url } : r));
+      setPreviewFor(null);
+      setPreviewTask(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not create the Notion task.';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setCreatingId(null);
     }
-  };
+  }, [previewTask]);
 
   const reporterQuery = reporterFilter.trim().toLowerCase();
   const displayed = rows.filter((r) => {
@@ -219,7 +241,7 @@ export function FeedbackTab() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s as FeedbackStream]}
+            {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s]}
           </Button>
         ))}
       </div>
@@ -353,7 +375,7 @@ export function FeedbackTab() {
               {f === 'all' ? 'All status' : STATUS_LABEL[f]}
               {' '}
               <span className="opacity-50">
-                {f === 'all' ? counts.all : counts[f as TriageStatus]}
+                {f === 'all' ? counts.all : counts[f]}
               </span>
             </Button>
           ))}
@@ -404,8 +426,6 @@ export function FeedbackTab() {
             {displayed.map((row) => {
               const isExpanded = expanded === row.id;
               const effectiveStatus: TriageStatus = row.status ?? 'new';
-              const isPendingConfirm = pendingConfirmId === row.id;
-              const isDispatching = dispatchingId === row.id;
               const dispatchErr = dispatchErrors[row.id];
               const alreadyDispatched = row.dispatch_status === 'dispatched';
               return (
@@ -482,51 +502,30 @@ export function FeedbackTab() {
                     {/* Dispatch column */}
                     <div className="px-3 py-2.5">
                       {alreadyDispatched ? (
-                        <Badge variant="success" size="sm">dispatched</Badge>
+                        row.dispatch_ref && /^https?:\/\//.test(row.dispatch_ref) ? (
+                          <a
+                            href={row.dispatch_ref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] font-medium text-[#1f8e8b] hover:underline"
+                          >
+                            Notion ↗
+                          </a>
+                        ) : (
+                          <Badge variant="success" size="sm">dispatched</Badge>
+                        )
                       ) : (
                         <Button
                           unstyled
-                          disabled={isDispatching}
-                          onClick={(e) => handleDispatchClick(e, row)}
-                          className="text-[11px] font-medium px-2 py-0.5 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-50"
+                          onClick={(e) => { e.stopPropagation(); setExpanded(row.id); }}
+                          className="text-[11px] font-medium px-2 py-0.5 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors"
                         >
-                          {isDispatching ? '…' : 'Dispatch'}
+                          Dispatch
                         </Button>
-                      )}
-                      {dispatchErr && (
-                        <p className="text-[10px] text-red-600 mt-0.5">{dispatchErr}</p>
                       )}
                     </div>
                   </div>
-
-                  {/* High-risk confirm dialog — inline below the row */}
-                  {isPendingConfirm && (
-                    <div className="bg-red-50 border-t border-red-200 px-4 py-3 space-y-2">
-                      <p className="text-[12px] font-semibold text-red-800">
-                        Confirm dispatch — this ticket is high-risk
-                        {row.severity === 'critical' && ' (critical severity)'}
-                        {row.area === 'isolation' && ' (isolation area)'}
-                        . Are you sure?
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          unstyled
-                          disabled={isDispatching}
-                          onClick={() => void doDispatch(row, true)}
-                          className="text-[11px] font-medium px-3 py-1 rounded bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
-                        >
-                          I understand — dispatch
-                        </Button>
-                        <Button
-                          unstyled
-                          onClick={() => setPendingConfirmId(null)}
-                          className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
 
                   {isExpanded && (
                     <div className="bg-gray-50 border-t border-gray-100 px-4 py-4 space-y-2">
@@ -593,6 +592,97 @@ export function FeedbackTab() {
                       {row.resolution && (
                         <p className="text-[10.5px] text-gray-400">Resolution: {row.resolution}</p>
                       )}
+
+                      {/* Dispatch → AI Work Queue */}
+                      <div className="pt-2 mt-1 border-t border-gray-200">
+                        {alreadyDispatched && row.dispatch_ref && /^https?:\/\//.test(row.dispatch_ref) ? (
+                          <p className="text-[11px] text-gray-600">
+                            Dispatched to the AI Work Queue ·{' '}
+                            <a
+                              href={row.dispatch_ref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#1f8e8b] hover:underline font-medium"
+                            >
+                              open task in Notion ↗
+                            </a>
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-[10.5px] font-semibold text-gray-500">Dispatch to AI Work Queue</p>
+                            <span className="block text-[10.5px] text-gray-400">
+                              Context (required — repro steps, expected behaviour, constraints)
+                            </span>
+                            <textarea
+                              value={ctxValue(row)}
+                              onChange={(e) => setContextDrafts((p) => ({ ...p, [row.id]: e.target.value }))}
+                              onBlur={(e) => void saveContext(row, e.target.value)}
+                              placeholder="Add the detail an engineer needs to fix this…"
+                              rows={3}
+                              className="w-full text-[12px] rounded border border-gray-200 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+                            />
+                            {savingContextId === row.id && <p className="text-[10px] text-gray-400">Saving…</p>}
+                            {dispatchErr && <p className="text-[11px] text-red-600">{dispatchErr}</p>}
+
+                            {previewFor === row.id && previewTask ? (
+                              <div className="rounded border border-gray-200 bg-white p-3 space-y-2">
+                                <p className="text-[10.5px] font-semibold text-gray-500">Review the engineered task</p>
+                                {([
+                                  ['Title', 'title'],
+                                  ['Goal (strategic objective)', 'strategic_objective'],
+                                  ['Plan / execution prompt', 'execution_prompt'],
+                                  ['Expected output', 'expected_output'],
+                                  ['Validation criteria (success)', 'validation_criteria'],
+                                  ['Verify (test command)', 'test_command'],
+                                ] as const).map(([label, key]) => (
+                                  <div key={key}>
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400">{label}</span>
+                                    <textarea
+                                      value={(previewTask[key]) ?? ''}
+                                      onChange={(e) => setPreviewTask((t) => (t ? { ...t, [key]: e.target.value } : t))}
+                                      rows={key === 'title' ? 1 : 2}
+                                      className="w-full text-[12px] rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+                                    />
+                                  </div>
+                                ))}
+                                <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                                  <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">Priority: {previewTask.priority}</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">Complexity: {previewTask.complexity}</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">{previewTask.task_type}</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">{previewTask.layer}</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">{previewTask.status}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    unstyled
+                                    disabled={creatingId === row.id}
+                                    onClick={() => void createTask(row)}
+                                    className="text-[11px] font-medium px-3 py-1 rounded bg-[#0b2b43] text-white hover:bg-[#0b3b5c] disabled:opacity-50"
+                                  >
+                                    {creatingId === row.id ? 'Creating…' : 'Create task in Notion'}
+                                  </Button>
+                                  <Button
+                                    unstyled
+                                    onClick={() => { setPreviewFor(null); setPreviewTask(null); }}
+                                    className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button
+                                unstyled
+                                disabled={!ctxValue(row).trim() || previewLoadingId === row.id}
+                                onClick={() => void openPreview(row)}
+                                className="text-[11px] font-medium px-3 py-1 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-40"
+                              >
+                                {previewLoadingId === row.id ? 'Engineering task…' : 'Dispatch → engineer task'}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
