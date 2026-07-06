@@ -38,6 +38,7 @@ import os
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
@@ -64,6 +65,49 @@ def _verify_cron_secret(request: Request) -> None:
     token = auth.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid cron secret")
+
+
+class CanaryBody(BaseModel):
+    failing_requests: Optional[list] = None
+    client_context: Optional[Dict[str, Any]] = None
+    base_url: Optional[str] = None
+    health_path: str = "/health"
+    auth_token: Optional[str] = None
+    dry_run: bool = False
+
+
+@router.post("/autopilot-canary")
+def autopilot_canary(request: Request, body: CanaryBody) -> Dict[str, Any]:
+    """[Autopilot P0] Post-deploy diagnostics-replay canary. Read-only: replays only the
+    idempotent (GET/HEAD) failing requests recorded in a feedback item's client_context and
+    reports whether the signal is resolved. Not yet wired into auto-merge (that is Phase 2,
+    which will call notion_work_queue.set_validation_result with the outcome)."""
+    _verify_cron_secret(request)
+    from ..services import autopilot_canary as canary
+
+    reqs = body.failing_requests
+    if reqs is None:
+        reqs = canary.failing_requests_from_context(body.client_context)
+
+    if body.dry_run:
+        base = (body.base_url or canary.prod_base_url()).rstrip("/")
+        return {
+            "dry_run": True,
+            "base_url": base,
+            "health_path": body.health_path,
+            "would_replay": [
+                {"method": (r.get("method") or "GET").upper(), "path": r.get("path"), "was": r.get("status")}
+                for r in reqs
+            ],
+        }
+
+    result = canary.run_canary(
+        failing_requests=reqs,
+        base_url=body.base_url,
+        health_path=body.health_path,
+        auth_token=body.auth_token,
+    )
+    return {"dry_run": False, **result.as_dict()}
 
 
 @router.post("/deadline-reminder")
