@@ -169,6 +169,37 @@ export async function dispatchCreate(
   return apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, { task, confirm: true });
 }
 
+// ── Trigger fix (skill handoff) + Auto-attempt (autofix pipeline) ─────────────
+
+/** Result of Trigger fix — the exact skill command to run in Claude Code. */
+export interface FixTriggerResult {
+  triggered: boolean;
+  skill: string;
+  command: string;
+  routes_to: string;
+  aiq_id: string | null;
+  url: string | null;
+}
+
+/**
+ * Mark a dispatched task 'Ready for AI' and return the /relopass-dev-queue command.
+ * The button hands off to the skill; it does not run any code itself.
+ */
+export async function triggerFix(
+  stream: FeedbackStream,
+  itemId: string,
+): Promise<FixTriggerResult> {
+  return apiPost<FixTriggerResult>(`/api/admin/feedback/${stream}/${itemId}/fix`, {});
+}
+
+/** Fire the autofix pipeline for this one dispatched task (Trivial/Low, non-Red only). */
+export async function autoAttempt(
+  stream: FeedbackStream,
+  itemId: string,
+): Promise<{ status: string; url: string | null }> {
+  return apiPost(`/api/admin/feedback/${stream}/${itemId}/auto-attempt`, {});
+}
+
 // ── Manage: dismiss (hide, reversible) + delete (product only) ────────────────
 
 /** Soft-dismiss (hide) or restore a feedback row. Works for every stream. */

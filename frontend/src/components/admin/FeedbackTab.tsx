@@ -19,11 +19,15 @@ import {
   dispatchCreate,
   dismissFeedback,
   deleteFeedback,
+  triggerFix,
+  autoAttempt,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
   type EngineeredTask,
+  type FixTriggerResult,
 } from '../../api/adminFeedback';
+import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
 
 type FilterStatus = TriageStatus | 'all';
@@ -40,6 +44,36 @@ function parseCtx(raw: ClientContext | string | null | undefined): ClientContext
     }
   }
   return raw;
+}
+
+/** Highlighted callout naming the exact skill + command to run in Claude Code. */
+function FixSkillCallout({ result }: { result: FixTriggerResult }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(result.command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable — the text is selectable */ }
+  };
+  return (
+    <div className="rounded-lg border border-[#6ec0bd] bg-[#ebf7f6] px-3 py-2 space-y-1.5">
+      <p className="text-[10.5px] font-semibold text-[#105d5b] uppercase tracking-wide">Run in Claude Code</p>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 text-[12px] font-mono text-[#0b2b43] bg-white border border-[#a4d8d6] rounded px-2 py-1 truncate">
+          {result.command}
+        </code>
+        <Button
+          unstyled
+          onClick={() => void copy()}
+          className="shrink-0 text-[11px] font-medium px-2 py-1 rounded border border-[#6ec0bd] text-[#105d5b] hover:bg-[#d2eceb]"
+        >
+          {copied ? 'Copied ✓' : 'Copy'}
+        </Button>
+      </div>
+      <p className="text-[10px] text-gray-500">Routes to {result.routes_to}</p>
+    </div>
+  );
 }
 
 /** Diagnostics panel — the page + function that failed, for the triager. */
@@ -174,6 +208,10 @@ export function FeedbackTab() {
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [creatingId, setCreatingId]             = useState<string | null>(null);
   const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
+  // Trigger fix / Auto-attempt (on dispatched rows).
+  const [triggerResults, setTriggerResults]     = useState<Record<string, FixTriggerResult>>({});
+  const [fixBusyId, setFixBusyId]               = useState<string | null>(null);
+  const fixEnabled = isTriggerFixEnabled();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -273,6 +311,36 @@ export function FeedbackTab() {
       setCreatingId(null);
     }
   }, [previewTask]);
+
+  /** Trigger fix — flip the dispatched task to "Ready for AI" + surface the skill command. */
+  const runTriggerFix = useCallback(async (row: UnifiedFeedbackItem) => {
+    setFixBusyId(`${row.id}:fix`);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      const res = await triggerFix(row.stream, row.id);
+      setTriggerResults((prev) => ({ ...prev, [row.id]: res }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not trigger the fix.';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setFixBusyId(null);
+    }
+  }, []);
+
+  /** Auto-attempt — fire the autofix pipeline for this task (Trivial/Low, non-Red only). */
+  const runAutoAttempt = useCallback(async (row: UnifiedFeedbackItem) => {
+    setFixBusyId(`${row.id}:auto`);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      await autoAttempt(row.stream, row.id);
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: 'Auto-attempt dispatched — a draft PR will appear shortly.' }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not start the auto-attempt.';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setFixBusyId(null);
+    }
+  }, []);
 
   /** Soft-dismiss (hide) or restore a row. */
   const doDismiss = useCallback(async (row: UnifiedFeedbackItem, dismissed: boolean) => {
@@ -559,6 +627,7 @@ export function FeedbackTab() {
               const effectiveStatus: TriageStatus = row.status ?? 'new';
               const dispatchErr = dispatchErrors[row.id];
               const alreadyDispatched = row.dispatch_status === 'dispatched';
+              const triggerResult = triggerResults[row.id];
               return (
                 <div key={row.id}>
                   <div
@@ -723,17 +792,46 @@ export function FeedbackTab() {
                       {/* Dispatch → AI Work Queue */}
                       <div className="pt-2 mt-1 border-t border-gray-200">
                         {alreadyDispatched && row.dispatch_ref && /^https?:\/\//.test(row.dispatch_ref) ? (
-                          <p className="text-[11px] text-gray-600">
-                            Dispatched to the AI Work Queue ·{' '}
-                            <a
-                              href={row.dispatch_ref}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#1f8e8b] hover:underline font-medium"
-                            >
-                              open task in Notion ↗
-                            </a>
-                          </p>
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-gray-600">
+                              Dispatched to the AI Work Queue ·{' '}
+                              <a
+                                href={row.dispatch_ref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#1f8e8b] hover:underline font-medium"
+                              >
+                                open task in Notion ↗
+                              </a>
+                            </p>
+
+                            {/* Launch a fix — manual, per-task */}
+                            {fixEnabled && (
+                              <>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Button
+                                    unstyled
+                                    disabled={fixBusyId === `${row.id}:fix`}
+                                    onClick={() => void runTriggerFix(row)}
+                                    className="text-[11px] font-medium px-3 py-1 rounded bg-[#0b2b43] text-white hover:bg-[#0b3b5c] disabled:opacity-50"
+                                  >
+                                    {fixBusyId === `${row.id}:fix` ? 'Triggering…' : 'Trigger fix'}
+                                  </Button>
+                                  <Button
+                                    unstyled
+                                    disabled={fixBusyId === `${row.id}:auto`}
+                                    onClick={() => void runAutoAttempt(row)}
+                                    title="Fires the autofix pipeline — Trivial/Low, non-Red tasks only"
+                                    className="text-[11px] font-medium px-3 py-1 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-40"
+                                  >
+                                    {fixBusyId === `${row.id}:auto` ? 'Dispatching…' : 'Auto-attempt'}
+                                  </Button>
+                                </div>
+                                {triggerResult && <FixSkillCallout result={triggerResult} />}
+                                {dispatchErr && <p className="text-[11px] text-gray-600">{dispatchErr}</p>}
+                              </>
+                            )}
+                          </div>
                         ) : (
                           <div className="space-y-2">
                             <p className="text-[10.5px] font-semibold text-gray-500">Dispatch to AI Work Queue</p>
