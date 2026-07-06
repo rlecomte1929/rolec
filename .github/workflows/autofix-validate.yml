@@ -165,13 +165,45 @@ jobs:
           echo "E2E tests failed (exit code ${{ steps.e2e.outputs.exit_code }})"
           exit 1
 
+  # ── Per-night merge cap (autopilot governance) ───────────────────────────────
+  # Counts autofix PRs already merged today and blocks the auto-merge job once the
+  # nightly cap is hit (var AUTOPILOT_MAX_MERGES_PER_NIGHT, default 15). Keeps CI/Render
+  # build fanout bounded even if many fixes queue up.
+  merge-gate:
+    name: Nightly merge cap
+    needs: [validate]
+    if: success()
+    runs-on: ubuntu-latest
+    outputs:
+      allowed: ${{ steps.cap.outputs.allowed }}
+    steps:
+      - name: Count today's autofix merges
+        id: cap
+        uses: actions/github-script@v9
+        env:
+          CAP: ${{ vars.AUTOPILOT_MAX_MERGES_PER_NIGHT }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const cap = parseInt(process.env.CAP || '15', 10);
+            const today = new Date().toISOString().slice(0, 10);
+            const { owner, repo } = context.repo;
+            const q = `repo:${owner}/${repo} is:pr is:merged merged:>=${today} autofix in:title`;
+            const res = await github.rest.search.issuesAndPullRequests({ q, per_page: 1 });
+            const merged = res.data.total_count;
+            const allowed = merged < cap;
+            core.info(`autofix merges today=${merged} cap=${cap} allowed=${allowed}`);
+            core.setOutput('allowed', allowed ? 'true' : 'false');
+
   # ── Auto-merge and Deploy ────────────────────────────────────────────────────
   auto-merge:
     name: Squash-merge & Deploy
-    needs: [validate]
+    needs: [validate, merge-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: success()
+    # Skip when the nightly merge cap is hit, or when AUTOPILOT_BATCH_MERGE is on (then the
+    # draft PR is left for a human/batch merge instead of auto-merging per-fix).
+    if: success() && needs.merge-gate.outputs.allowed == 'true' && vars.AUTOPILOT_BATCH_MERGE != 'true'
 
     steps:
       - uses: actions/checkout@v4
@@ -339,6 +371,22 @@ jobs:
             -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
             -H "Content-Type: application/json" \
             -d "$(python3 -c "import json,os;print(json.dumps({'properties':{'Status':{'select':{'name':'Human Review'}},'Final Validation Result':{'select':{'name':'Failed'}},'Execution Notes':{'rich_text':[{'type':'text','text':{'content':os.environ['NOTE']}}]}}}))")"
+
+      # Record CI-side funnel events so the autopilot metrics dashboard sees merged/done/reverted.
+      - name: Emit autopilot funnel event
+        if: always() && steps.merge.outputs.merged == 'true'
+        env:
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PASSED: ${{ steps.canary.outputs.passed }}
+          NOTION_ID: ${{ needs.validate.outputs.notion_id }}
+        run: |
+          set -uo pipefail
+          emit() { curl -s -o /dev/null -X POST "$API_BASE/api/crons/autopilot-event" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+            -d "{\"event_type\":\"$1\",\"entity_id\":\"$NOTION_ID\"}" || true; }
+          emit "autopilot.merged"
+          if [ "$PASSED" = "true" ]; then emit "autopilot.task_done"; else emit "autopilot.reverted"; fi
 
       - name: Fail workflow if canary did not pass
         if: steps.canary.outputs.passed != 'true'

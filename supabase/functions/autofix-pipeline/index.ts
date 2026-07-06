@@ -334,11 +334,23 @@ If you cannot generate a safe fix: {"fixed_content": null, "diff_summary": "reas
     return { outcome: "skipped_no_fix", reason };
   }
 
-  // 7. Create branch
+  // 7. Open-PR dedup — skip if an open autofix PR already exists for this task, so the same
+  // bug never fans out into a second PR → CI run → deploy. (The branch-create below would 422
+  // on an existing branch anyway; this makes the skip explicit + cheap.)
+  const branchName = `autofix/bug-${bug.notionId.replace(/-/g, "").slice(0, 16)}`;
+  const openPrs = await ghGet<Array<{ html_url: string }>>(
+    `/repos/${owner}/${repo}/pulls?state=open&head=${owner}:${branchName}`, env.githubToken
+  );
+  if (Array.isArray(openPrs) && openPrs.length > 0) {
+    const reason = `Skipped: open autofix PR already exists (${openPrs[0].html_url})`;
+    log(reason);
+    return { outcome: "skipped_duplicate_pr", reason };
+  }
+
+  // 8. Create branch
   const baseSha = await ghGet<{ object: { sha: string } }>(
     `/repos/${owner}/${repo}/git/refs/heads/${env.baseBranch}`, env.githubToken
   );
-  const branchName = `autofix/bug-${bug.notionId.replace(/-/g, "").slice(0, 16)}`;
   await ghPost(`/repos/${owner}/${repo}/git/refs`,
     { ref: `refs/heads/${branchName}`, sha: baseSha.object.sha }, env.githubToken);
 
@@ -431,11 +443,21 @@ If you cannot generate a safe fix: {"fixed_content": null, "diff_summary": "reas
     return { outcome: "skipped_no_fix", reason: fix.diff_summary };
   }
 
-  // 7. Branch (autofix/bug-<16 hex> from the work_item uuid → validate fires)
+  // 7. Open-PR dedup — skip if an open autofix PR already exists for this work_item.
+  const branchName = `autofix/bug-${wi.id.replace(/-/g, "").slice(0, 16)}`;
+  const openPrs = await ghGet<Array<{ html_url: string }>>(
+    `/repos/${owner}/${repo}/pulls?state=open&head=${owner}:${branchName}`, env.githubToken,
+  );
+  if (Array.isArray(openPrs) && openPrs.length > 0) {
+    const reason = `Skipped: open autofix PR already exists (${openPrs[0].html_url})`;
+    log(reason);
+    return { outcome: "skipped_duplicate_pr", reason };
+  }
+
+  // 8. Branch (autofix/bug-<16 hex> from the work_item uuid → validate fires)
   const baseSha = await ghGet<{ object: { sha: string } }>(
     `/repos/${owner}/${repo}/git/refs/heads/${env.baseBranch}`, env.githubToken,
   );
-  const branchName = `autofix/bug-${wi.id.replace(/-/g, "").slice(0, 16)}`;
   await ghPost(`/repos/${owner}/${repo}/git/refs`, { ref: `refs/heads/${branchName}`, sha: baseSha.object.sha }, env.githubToken);
 
   // 8. Commit + 9. draft PR
@@ -471,6 +493,16 @@ Deno.serve(async (req: Request) => {
     return Response.json(
       { ok: false, error: "Missing required environment variables" },
       { status: 500, headers: CORS_HEADERS },
+    );
+  }
+
+  // Autopilot governance gate: the fix lane is OFF until AUTOPILOT_FIX_ENABLED=true in the
+  // Supabase vault. Brings the daily auto-merge-to-prod pipeline under the kill-switch
+  // (default OFF) — nothing auto-ships until an operator enables it.
+  if (Deno.env.get("AUTOPILOT_FIX_ENABLED") !== "true") {
+    return Response.json(
+      { ok: true, halted: true, reason: "AUTOPILOT_FIX_ENABLED off" },
+      { headers: CORS_HEADERS },
     );
   }
 
