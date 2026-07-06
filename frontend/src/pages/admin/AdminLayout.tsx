@@ -7,6 +7,7 @@ import { getAuthItem } from '../../utils/demo';
 import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
 import type { AdminCompany } from '../../types';
 import { PlatformShellSidebar } from '../../components/PlatformShellSidebar';
+import { FeedbackWidget } from '../../components/FeedbackWidget';
 
 interface Props {
   title?: string;
@@ -101,6 +102,11 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
           </div>
         </main>
       </div>
+
+      {/* Floating feedback widget — same one employee/HR get via AppShell, so admins can
+          report bugs / ideas from inside the console. Submits to the same feedback stream
+          the "Feedback & Work" tab reads. */}
+      <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
     </div>
   );
 };
