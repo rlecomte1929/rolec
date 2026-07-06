@@ -65,6 +65,11 @@ def submit_feedback(
 
     category = body.category if body.category in _CATEGORIES else "other"
     report_id = body.report_id or f"{category[:3].upper()}-{uuid.uuid4().hex[:8]}"
+    # Generate the row id ourselves (instead of the DB default) so the feedback_status
+    # ticket can be keyed by it — the SAME id the admin console + its triage/dispatch
+    # use. This gives one canonical feedback_status key (the feedback uuid) shared by
+    # the reporter endpoints (/mine, /{report_id}/status) and the admin console.
+    feedback_id = str(uuid.uuid4())
     # auth.uid() is NULL on the service-role connection, so set user_id ourselves.
     # feedback.user_id is a uuid column with FK → auth.users(id). A Supabase-native
     # session's id IS the auth.users uuid, so bind it. A legacy/seed session has a
@@ -90,14 +95,15 @@ def submit_feedback(
     reporter_role = current_user.get("role")
 
     cols = [
-        "user_id", "page_url", "category", "message", "report_id", "screenshot_data",
+        "id", "user_id", "page_url", "category", "message", "report_id", "screenshot_data",
         "reporter_email", "reporter_name", "reporter_role",
     ]
     vals = [
-        ":uid", ":page", ":cat", ":msg", ":rid", ":shot",
+        ":fid", ":uid", ":page", ":cat", ":msg", ":rid", ":shot",
         ":r_email", ":r_name", ":r_role",
     ]
     params: Dict[str, Any] = {
+        "fid": feedback_id,
         "uid": auth_user_id,
         "page": body.page_url or "",
         "cat": category,
@@ -142,7 +148,7 @@ def submit_feedback(
                     "ON CONFLICT (stream, source_id) DO NOTHING"
                 ),
                 {
-                    "source_id": report_id,
+                    "source_id": feedback_id,
                     "severity": labels["severity"],
                     "area": labels["area"],
                     "reporter_id": str(reporter_id) if reporter_id else None,
@@ -181,7 +187,7 @@ def list_my_feedback(
                 "fs.status, fs.severity, fs.area, fs.dispatch_status, f.created_at "
                 "FROM feedback f "
                 "LEFT JOIN feedback_status fs "
-                "  ON fs.source_id = f.report_id AND fs.stream = 'product' "
+                "  ON fs.source_id = CAST(f.id AS TEXT) AND fs.stream = 'product' "
                 "WHERE f.user_id = :caller "
                 "ORDER BY f.created_at DESC "
                 "LIMIT 50"
@@ -223,11 +229,15 @@ def get_feedback_status(
     )
 
     with db.engine.connect() as conn:
+        # feedback_status is keyed by the feedback uuid; resolve the reporter's
+        # human report_id to that id via the feedback row.
         row = conn.execute(
             text(
-                "SELECT status, severity, area, dispatch_status, reporter_id "
-                "FROM feedback_status "
-                "WHERE stream = 'product' AND source_id = :rid"
+                "SELECT fs.status, fs.severity, fs.area, fs.dispatch_status, fs.reporter_id "
+                "FROM feedback f "
+                "JOIN feedback_status fs "
+                "  ON fs.source_id = CAST(f.id AS TEXT) AND fs.stream = 'product' "
+                "WHERE f.report_id = :rid"
             ),
             {"rid": report_id},
         ).fetchone()

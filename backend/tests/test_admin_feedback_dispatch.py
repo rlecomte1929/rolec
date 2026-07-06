@@ -252,11 +252,21 @@ def test_dispatch_isolation_with_confirm_200(db_session):
     assert resp.json()["dispatched"] is True
 
 
-def test_dispatch_missing_ticket_404(db_session):
-    """Non-existent ticket → 404."""
+def test_dispatch_untriaged_item_upserts_and_dispatches(db_session):
+    """A never-triaged item dispatches (no 404): it upserts a dispatched feedback_status row."""
     client = _make_client(db_session)
-    resp = client.post("/api/admin/feedback/product/no-such-ticket/dispatch", json={})
-    assert resp.status_code == 404
+    resp = client.post("/api/admin/feedback/product/brand-new-item/dispatch", json={})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["dispatched"] is True
+    row = db_session.execute(
+        text(
+            "SELECT status, dispatch_status FROM feedback_status "
+            "WHERE stream = 'product' AND source_id = 'brand-new-item'"
+        )
+    ).fetchone()
+    assert row is not None, "dispatch should create the feedback_status row"
+    assert row[0] == "dispatched"
+    assert row[1] == "dispatched"
 
 
 def test_dispatch_non_admin_403(db_session):
