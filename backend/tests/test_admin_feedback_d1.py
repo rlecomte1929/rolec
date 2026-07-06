@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS policy_answer_helpfulness (
 CREATE TABLE IF NOT EXISTS feedback_status (
   stream          TEXT NOT NULL,
   source_id       TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'new',
+  status          TEXT NOT NULL DEFAULT 'new'
+                  CHECK (status IN ('new','reviewed','acted_on','closed')),
   owner           TEXT,
   resolution      TEXT,
   updated_at      TEXT,
@@ -158,7 +159,7 @@ def test_d1_ticket_fields_present_when_triaged_and_dispatched(db_session):
     db_session.execute(text(
         "INSERT INTO feedback_status "
         "(stream, source_id, status, owner, resolution, severity, area, dispatch_status, dispatch_ref, updated_at) "
-        "VALUES ('product', 'f-001', 'dispatched', 'alice', 'Dispatched to routine', "
+        "VALUES ('product', 'f-001', 'acted_on', 'alice', 'Dispatched to routine', "
         "'high', 'ui', 'dispatched', 'ref-abc-123', '2026-06-01T14:00:00')"
     ))
     db_session.commit()
@@ -199,7 +200,7 @@ def test_d1_dispatched_filter_returns_only_dispatched(db_session):
     db_session.execute(text(
         "INSERT INTO feedback_status "
         "(stream, source_id, status, severity, dispatch_status, dispatch_ref, updated_at) "
-        "VALUES ('product', 'f-001', 'dispatched', 'medium', 'dispatched', 'ref-xyz', '2026-06-01T14:00:00')"
+        "VALUES ('product', 'f-001', 'acted_on', 'medium', 'dispatched', 'ref-xyz', '2026-06-01T14:00:00')"
     ))
     # f-002: triaged but NOT dispatched (dispatch_status NULL)
     db_session.execute(text(
@@ -224,7 +225,7 @@ def test_d1_no_dispatched_filter_returns_all(db_session):
     db_session.execute(text(
         "INSERT INTO feedback_status "
         "(stream, source_id, status, dispatch_status, updated_at) "
-        "VALUES ('product', 'f-001', 'dispatched', 'dispatched', '2026-06-01T14:00:00')"
+        "VALUES ('product', 'f-001', 'acted_on', 'dispatched', '2026-06-01T14:00:00')"
     ))
     db_session.commit()
 

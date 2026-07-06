@@ -348,17 +348,20 @@ def dispatch_feedback_ticket(
 
     # 3. Dispatch: generate ref, upsert feedback_status (create the ticket if it
     #    doesn't exist yet so dispatch never 404s), audit.
+    #    Dispatch state lives in dispatch_status — NOT in status. status has a CHECK
+    #    (new/reviewed/acted_on/closed); writing 'dispatched' there violates it (500).
+    #    On insert use the valid default 'new'; on conflict leave the triage status
+    #    untouched and only flip dispatch_status/dispatch_ref.
     dispatch_ref = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     db.execute(
         text(
             "INSERT INTO feedback_status "
             "(stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
-            "VALUES (:stream, :source_id, 'dispatched', :dispatch_ref, 'dispatched', :now) "
+            "VALUES (:stream, :source_id, 'new', :dispatch_ref, 'dispatched', :now) "
             "ON CONFLICT (stream, source_id) DO UPDATE SET "
             "    dispatch_ref = excluded.dispatch_ref, "
             "    dispatch_status = 'dispatched', "
-            "    status = 'dispatched', "
             "    updated_at = excluded.updated_at"
         ),
         {
