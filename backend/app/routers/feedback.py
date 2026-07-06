@@ -52,6 +52,36 @@ class FeedbackBody(BaseModel):
     tester_segment: Optional[str] = None
 
 
+def _resolve_auth_user_id(reporter_id: Any) -> Optional[str]:
+    """Resolve the caller's id to a value safe for feedback.user_id (uuid FK → auth.users(id)).
+
+    A Supabase-native session's id IS an auth.users uuid, so bind it. But a legacy/seed
+    session can have a uuid-FORMAT id that is NOT a row in auth.users; binding that
+    violates feedback_user_id_fkey and 500s the whole submit (surfaced as the widget's
+    "Failed to send"). So bind the uuid only when it actually EXISTS in auth.users,
+    otherwise NULL — reporter identity is still captured in reporter_email/name/role and
+    feedback_status.reporter_id.
+    """
+    try:
+        candidate = str(uuid.UUID(str(reporter_id)))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    # The FK (and the auth schema) only exist on Postgres. On SQLite (tests) there is
+    # nothing to violate, so keep the historical behaviour and bind the uuid. If the
+    # existence probe fails for any reason, fall back to NULL rather than block feedback.
+    if db.engine.dialect.name != "postgresql":
+        return candidate
+    try:
+        with db.engine.begin() as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM auth.users WHERE id = :uid LIMIT 1"),
+                {"uid": candidate},
+            ).first()
+        return candidate if exists else None
+    except Exception:
+        return None
+
+
 @router.post("", status_code=201)
 def submit_feedback(
     body: FeedbackBody,
@@ -71,17 +101,12 @@ def submit_feedback(
     # the reporter endpoints (/mine, /{report_id}/status) and the admin console.
     feedback_id = str(uuid.uuid4())
     # auth.uid() is NULL on the service-role connection, so set user_id ourselves.
-    # feedback.user_id is a uuid column with FK → auth.users(id). A Supabase-native
-    # session's id IS the auth.users uuid, so bind it. A legacy/seed session has a
-    # text id whose profiles-derived auth_uuid does NOT match auth.users(id) — binding
-    # that violates the FK (and a raw text id fails the uuid cast). So bind the id only
-    # when it is itself a uuid; otherwise NULL. Attribution stays on the text
-    # feedback_status.reporter_id regardless.
-    reporter_id = current_user.get("id")
-    try:
-        auth_user_id = str(uuid.UUID(str(reporter_id)))
-    except (ValueError, TypeError, AttributeError):
-        auth_user_id = None
+    # feedback.user_id is a uuid FK → auth.users(id); bind the caller's id only when it
+    # is a uuid that EXISTS in auth.users (a legacy/seed session can have a uuid-format
+    # id that is not an auth user — binding it violates the FK and 500s the submit).
+    # Otherwise NULL; attribution stays on reporter_email/name/role + feedback_status.
+    reporter_id = current_user.get("id")  # kept: feedback_status pre-fill binds it as reporter_id
+    auth_user_id = _resolve_auth_user_id(reporter_id)
     screenshot = body.screenshot_data
     if screenshot is not None and len(screenshot) > _MAX_SCREENSHOT:
         screenshot = None  # too large to persist; keep the text feedback

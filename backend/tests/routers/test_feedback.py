@@ -108,5 +108,49 @@ class FeedbackEndpointTests(unittest.TestCase):
         self.assertEqual(rows[0]["message"], "keep me")
 
 
+class _FakeConn:
+    def __init__(self, row):
+        self._row = row
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, *a, **k):
+        return SimpleNamespace(first=lambda: self._row)
+
+
+class _FakePgEngine:
+    """Minimal engine that reports the postgres dialect and returns a canned auth.users
+    lookup row, so we can exercise _resolve_auth_user_id's existence-check branch (which
+    the SQLite test DB can't — it has no auth.users)."""
+
+    def __init__(self, exists_row):
+        self.dialect = SimpleNamespace(name="postgresql")
+        self._row = exists_row
+
+    def begin(self):
+        return _FakeConn(self._row)
+
+
+class ResolveAuthUserIdTests(unittest.TestCase):
+    UUID = "33333333-3333-3333-3333-333333333333"
+
+    def test_non_uuid_returns_none(self):
+        self.assertIsNone(fb._resolve_auth_user_id("legacy-text-id"))
+        self.assertIsNone(fb._resolve_auth_user_id(None))
+
+    def test_pg_uuid_present_in_auth_users_is_bound(self):
+        with mock.patch.object(fb.db, "engine", _FakePgEngine(exists_row=(1,))):
+            self.assertEqual(fb._resolve_auth_user_id(self.UUID), self.UUID)
+
+    def test_pg_uuid_absent_from_auth_users_is_nulled(self):
+        # The bug: a uuid-format id that is NOT an auth user must NULL out (not FK-violate).
+        with mock.patch.object(fb.db, "engine", _FakePgEngine(exists_row=None)):
+            self.assertIsNone(fb._resolve_auth_user_id(self.UUID))
+
+
 if __name__ == "__main__":
     unittest.main()
