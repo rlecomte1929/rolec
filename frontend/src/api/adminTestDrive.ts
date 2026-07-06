@@ -32,10 +32,24 @@ export interface Testimonial {
   created_at: string | null;
 }
 
+/** TD-12 — every surveyed tester with a contact email, for the per-completer thank-you. */
+export interface Completion {
+  tester_name: string | null;
+  tester_email: string | null;
+  tester_company_role: string | null;
+  tester_sector: string | null;
+  q1_overall: number | null;
+  pilot_interest: string | null;
+  corridor_id: string | null;
+  tester_segment: string | null;
+  created_at: string | null;
+}
+
 export interface TestDriveOverview {
   funnel: TestDriveFunnel;
   scorecard: { avg_overall: number | null; problem_fit: Record<string, number>; totals: TestDriveFunnel };
   pilot_leads: PilotLead[];
+  completions: Completion[];
   testimonials: Testimonial[];
   corridor: string | null;
   segment: string | null;
@@ -58,7 +72,12 @@ function toQuery(params?: TestDriveSlice): string {
 export async function getTestDriveOverview(params?: TestDriveSlice): Promise<TestDriveOverview> {
   const data = await apiGet<TestDriveOverview>(`/api/admin/test-drive/overview${toQuery(params)}`);
   // Guarantee the list fields exist so the tab never crashes on a partial payload.
-  return { ...data, pilot_leads: data.pilot_leads ?? [], testimonials: data.testimonials ?? [] };
+  return {
+    ...data,
+    pilot_leads: data.pilot_leads ?? [],
+    completions: data.completions ?? [],
+    testimonials: data.testimonials ?? [],
+  };
 }
 
 export function testDriveContactsCsvUrl(params?: TestDriveSlice): string {
