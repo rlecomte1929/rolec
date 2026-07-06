@@ -44,3 +44,14 @@ jobs:
             -d "{\"dry_run\": $DRY_RUN}")
           echo "HTTP $code"; cat /tmp/out.json; echo
           [ "$code" = "200" ] || { echo "autopilot-ingest failed"; exit 1; }
+
+      - name: Write nightly digest
+        if: always()
+        env:
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+          curl -s -X POST "$API_BASE/api/crons/autopilot-digest" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" -d '{}' | tee /tmp/digest.json || true
+          echo

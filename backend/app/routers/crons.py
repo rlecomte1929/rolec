@@ -147,6 +147,18 @@ def autopilot_ingest(request: Request, body: IngestBody) -> Dict[str, Any]:
     return run_ingest(dry_run=body.dry_run, lookback_hours=body.lookback_hours)
 
 
+@router.post("/autopilot-digest")
+def autopilot_digest(request: Request) -> Dict[str, Any]:
+    """[Autopilot P4] Write today's autopilot funnel+cost summary to daily_summaries. Fail-soft;
+    invoked by the autopilot-nightly workflow after the ingest step."""
+    _verify_cron_secret(request)
+    from datetime import date
+
+    from ..services.autopilot_metrics import write_daily_digest
+
+    return write_daily_digest(day=date.today().isoformat())
+
+
 @router.post("/deadline-reminder")
 def deadline_reminder(request: Request) -> Dict[str, Any]:
     """
