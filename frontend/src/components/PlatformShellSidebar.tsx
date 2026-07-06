@@ -1,6 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, LogOut } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, LogOut, Pencil } from 'lucide-react';
 import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
 import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { authAPI } from '../api/client';
@@ -13,6 +13,15 @@ import { swallow } from '../lib/errorTracking';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
+import { AdminSidebarLayoutEditor } from './AdminSidebarLayoutEditor';
+import {
+  readAdminLayout,
+  writeAdminLayout,
+  clearAdminLayout,
+  reconcileAdminLayout,
+  applyAdminLayout,
+  type AdminLayoutEntry,
+} from './adminSidebarLayout';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -65,6 +74,9 @@ interface NotifContext {
 }
 
 const ROLE_RANK: Record<SidebarRole, number> = { EMPLOYEE: 0, HR: 1, ADMIN: 2 };
+
+// The Admin nav section is the one an admin can reorder/regroup/rename (see adminSidebarLayout).
+const ADMIN_SECTION_LABEL = 'Admin · ReloPass';
 
 // ── Section definitions ───────────────────────────────────────────────────────
 // Single source of truth. Routes pulled from ROUTE_DEFS so renames cascade.
@@ -433,6 +445,30 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     }
   };
 
+  // Admin sidebar customisation (admin-only): reorder tabs, move them between sub-groups,
+  // and rename groups. Persisted per browser; reconciled against code so it survives new
+  // or removed tabs. Non-admins never see the editor and the code order is used verbatim.
+  const adminCodeItems = useMemo(
+    () => SECTIONS.find((s) => s.label === ADMIN_SECTION_LABEL)?.items ?? [],
+    [],
+  );
+  const adminLabels = useMemo(
+    () => Object.fromEntries(adminCodeItems.map((i) => [i.id, i.label])),
+    [adminCodeItems],
+  );
+  const [adminLayout, setAdminLayout] = useState<AdminLayoutEntry[]>(() =>
+    reconcileAdminLayout(adminCodeItems, readAdminLayout()),
+  );
+  const [editingLayout, setEditingLayout] = useState(false);
+  const updateAdminLayout = (next: AdminLayoutEntry[]) => {
+    setAdminLayout(next);
+    writeAdminLayout(next);
+  };
+  const resetAdminLayout = () => {
+    clearAdminLayout();
+    setAdminLayout(reconcileAdminLayout(adminCodeItems, null));
+  };
+
   // Persist + cross-tab sync
   useEffect(() => {
     try {
@@ -554,7 +590,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   };
 
   const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount, assignmentsLoading };
-  const visibleSections = SECTIONS
+  // Apply the admin's custom layout (order/group/rename) to the Admin section only.
+  const effectiveSections = SECTIONS.map((s) =>
+    s.label === ADMIN_SECTION_LABEL ? { ...s, items: applyAdminLayout(s.items, adminLayout) } : s,
+  );
+  const visibleSections = effectiveSections
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
     .map((s) => {
       // A higher-role user (e.g. HR) inherits lower-persona sections via the rank
@@ -639,7 +679,30 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
       {/* Nav */}
       <nav className="flex-1 px-2 pb-4">
-        {visibleSections.map((section) => {
+        {role === 'ADMIN' && !collapsed && editingLayout ? (
+          <AdminSidebarLayoutEditor
+            layout={adminLayout}
+            labels={adminLabels}
+            onChange={updateAdminLayout}
+            onDone={() => setEditingLayout(false)}
+            onReset={resetAdminLayout}
+          />
+        ) : (
+          <>
+            {role === 'ADMIN' && !collapsed && (
+              <div className="flex justify-end px-1 pt-2">
+                <Button
+                  unstyled
+                  type="button"
+                  onClick={() => setEditingLayout(true)}
+                  title="Customise the admin sidebar"
+                  className="flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <Pencil size={11} /> Edit layout
+                </Button>
+              </div>
+            )}
+            {visibleSections.map((section) => {
           const isFolded = !collapsed && !section.borrowed && Boolean(folded[section.label]);
           return (
           <React.Fragment key={section.label}>
@@ -760,6 +823,8 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
           </React.Fragment>
           );
         })}
+          </>
+        )}
       </nav>
 
       {/* User footer */}
