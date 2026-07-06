@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from backend.app.routers import admin_feedback
 from backend.app.auth_deps import get_current_user
 from backend.app.services import notion_work_queue
-from backend.app.services.feedback_task_engineer import status_from_complexity
+from backend.app.services.feedback_task_engineer import status_from_complexity, _parse_task
 
 
 # ── Pure unit tests ──────────────────────────────────────────────────────────
@@ -24,6 +24,23 @@ def test_status_from_complexity():
     assert status_from_complexity("High") == "Needs Decomposition"
     assert status_from_complexity("Very High") == "Needs Decomposition"
     assert status_from_complexity(None) == "Ready for AI"
+
+
+_MIN_TASK = ('{"title":"t","strategic_objective":"g","execution_prompt":"p","expected_output":"o",'
+             '"validation_criteria":"v","priority":"P1","complexity":"Low","task_type":"Backend Implementation",'
+             '"layer":"API","product_area":"Core Product"}')
+
+
+def test_parse_task_strips_markdown_fences():
+    got = _parse_task("```json\n" + _MIN_TASK + "\n```")
+    assert got["title"] == "t"
+    assert got["priority"] == "P1"
+
+
+def test_parse_task_raises_on_missing_fields():
+    import pytest as _pytest
+    with _pytest.raises(ValueError):
+        _parse_task('{"title":"only a title"}')
 
 
 def test_build_properties_maps_fields():
@@ -112,8 +129,8 @@ def test_context_save_and_preview_requires_it(db_session, monkeypatch):
     resp = client.put("/api/admin/feedback/product/fb-1/context", json={"context": "repro: open /journey, roadmap spinner forever"})
     assert resp.status_code == 200
 
-    # preview now works (mock the LLM)
-    async def _fake_engineer(**kwargs):
+    # preview now works (mock the LLM — engineer_task is synchronous)
+    def _fake_engineer(**kwargs):
         assert "repro" in kwargs["admin_context"]
         return {"title": "Fix roadmap", "complexity": "Medium", "status": "Ready for AI",
                 "execution_prompt": "do it", "priority": "P1"}

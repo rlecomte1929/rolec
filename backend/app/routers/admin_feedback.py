@@ -451,7 +451,7 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
 
 
 @router.post("/feedback/{stream}/{item_id}/dispatch/preview")
-async def dispatch_preview(
+def dispatch_preview(
     stream: str,
     item_id: str,
     body: PreviewBody,
@@ -459,7 +459,8 @@ async def dispatch_preview(
     _user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
     """Generate (no side effects) an engineered AI Work Queue task for review.
-    Context is REQUIRED (400 when empty)."""
+    Context is REQUIRED (400 when empty). Sync route — engineer_task uses the
+    proven synchronous LLM path."""
     fs = db.execute(
         text(
             "SELECT dispatch_context, severity, area FROM feedback_status "
@@ -492,16 +493,20 @@ async def dispatch_preview(
         severity = severity or cls["severity"]
         area = area or cls["area"]
 
-    task = await engineer_task(
-        text=text_val,
-        category=category,
-        page_url=page_url,
-        severity=severity,
-        area=area,
-        has_screenshot=has_screenshot,
-        reporter_name=reporter_name,
-        admin_context=dispatch_context,
-    )
+    try:
+        task = engineer_task(
+            text=text_val,
+            category=category,
+            page_url=page_url,
+            severity=severity,
+            area=area,
+            has_screenshot=has_screenshot,
+            reporter_name=reporter_name,
+            admin_context=dispatch_context,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
+        log.warning("dispatch_preview engineer_task failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Could not engineer the task: {exc}") from exc
     return {"task": task}
 
 
