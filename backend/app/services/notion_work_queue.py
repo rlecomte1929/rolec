@@ -16,8 +16,16 @@ from typing import Any, Dict, Optional
 
 _NOTION_PAGES_API = "https://api.notion.com/v1/pages"
 _NOTION_VERSION = "2022-06-28"
-_DEFAULT_DB = "7adc643a-c448-4a1a-ba80-e27e417f42d6"  # AI Work Queue
+# AI Work Queue. NOTE (DB-id reconciliation): this database id `7adc643a…` and the
+# `75d7ed78…` the autofix Edge Function uses as NOTION_DATABASE_ID are the SAME database —
+# `75d7ed78…` is this database's data-source/collection id. Page-create (parent.database_id
+# = 7adc643a…) and the edge fn's /databases/75d7ed78…/query both resolve to one queue, so
+# tasks the backend dispatches ARE the tasks the pipeline fixes. Keep both ids pointing here.
+_DEFAULT_DB = "7adc643a-c448-4a1a-ba80-e27e417f42d6"
 _MAX_CHUNK = 1900  # Notion caps a single text object at 2000 chars
+
+# Final Validation Result select options (must match the Notion DB exactly).
+VALIDATION_RESULTS = ("Pending", "Passed", "Partial", "Failed")
 
 
 class NotionNotConfigured(RuntimeError):
@@ -185,6 +193,18 @@ def get_task_meta(page_id: str) -> Dict[str, Optional[str]]:
 def set_task_status(page_id: str, status: str, notes: Optional[str] = None) -> None:
     """Flip a Work Queue page's Status (optionally appending an Execution Note)."""
     props: Dict[str, Any] = {"Status": _select(status)}
+    if notes:
+        props["Execution Notes"] = _rich(notes)
+    _notion_api("PATCH", f"{_NOTION_PAGES_API}/{page_id}", {"properties": props})
+
+
+def set_validation_result(page_id: str, result: str, notes: Optional[str] = None) -> None:
+    """Write the `Final Validation Result` select (Pending/Passed/Partial/Failed) and,
+    optionally, append validation evidence to `Execution Notes`. Used by the post-deploy
+    canary to record whether the recorded diagnostic signal was resolved before Done."""
+    if result not in VALIDATION_RESULTS:
+        raise ValueError(f"invalid Final Validation Result {result!r}; expected one of {VALIDATION_RESULTS}")
+    props: Dict[str, Any] = {"Final Validation Result": _select(result)}
     if notes:
         props["Execution Notes"] = _rich(notes)
     _notion_api("PATCH", f"{_NOTION_PAGES_API}/{page_id}", {"properties": props})

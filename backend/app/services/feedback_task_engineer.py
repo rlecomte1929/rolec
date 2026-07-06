@@ -57,6 +57,17 @@ _REQUIRED = (
     "validation_criteria", "priority", "complexity", "task_type", "layer", "product_area",
 )
 
+# Belt-and-suspenders against mask_pii's fail-open (it returns raw text on internal
+# error). Mirrors the residue guard in feedback_triage.classify_llm: after masking,
+# redact anything that still looks like an email or a long digit run before it reaches
+# the LLM. Cheap, idempotent, never raises.
+_PII_RESIDUE = re.compile(r"\S+@\S+\.\S+|\d{7,}")
+
+
+def _scrub(text: Optional[str]) -> str:
+    """mask_pii + a residue sweep, so raw email/long-digit sequences never reach the prompt."""
+    return _PII_RESIDUE.sub("[REDACTED]", mask_pii(text or ""))
+
 
 def status_from_complexity(complexity: Optional[str]) -> str:
     """High/Very High tasks land as 'Needs Decomposition'; everything else is
@@ -91,12 +102,13 @@ def engineer_task(
 ) -> Dict[str, Any]:
     """Return an engineered AI-Work-Queue task dict + a derived `status`.
     Raises ValueError/RuntimeError on LLM failure (surfaced as 502 by the caller)."""
-    masked_bug = mask_pii(text or "")
-    masked_ctx = mask_pii(admin_context or "")
+    masked_bug = _scrub(text)
+    masked_ctx = _scrub(admin_context)
+    masked_reporter = _scrub(reporter_name) if reporter_name else ""
     user = (
         f"FEEDBACK ({category}) reported on page {page_url or '?'}"
         f"{' [screenshot attached]' if has_screenshot else ''}"
-        f"{f' by {reporter_name}' if reporter_name else ''}.\n"
+        f"{f' by {masked_reporter}' if masked_reporter else ''}.\n"
         f"Auto-classified: severity={severity or '?'}, area={area or '?'}.\n\n"
         f"USER MESSAGE:\n{masked_bug or '(none)'}\n\n"
         f"ADMIN CONTEXT (extra detail for the fix):\n{masked_ctx or '(none)'}\n"
