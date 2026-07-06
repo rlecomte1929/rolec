@@ -99,6 +99,103 @@ def workflow_overview(
     }
 
 
+@router.get("/funnel")
+def workflow_funnel(
+    days: int = Query(30, ge=1, le=90),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Workflow conversion funnel (AIQ-1439): per-stage counts + stage-to-stage and
+    from-start conversion, computed from the same analytics_events counts as /overview."""
+    since = _default_since(days)
+    counts = db.count_analytics_events_by_name(since=since)
+    stages = [
+        ("case_created", "Case created"),
+        ("services_selected", "Services selected"),
+        ("recommendations_generated", "Recommendations generated"),
+        ("supplier_selected", "Supplier selected"),
+        ("rfq_created", "RFQ created"),
+        ("quote_accepted", "Quote accepted"),
+    ]
+    first = counts.get(stages[0][0], 0)
+    out: List[Dict[str, Any]] = []
+    prev: Optional[int] = None
+    for key, label in stages:
+        n = counts.get(key, 0)
+        out.append({
+            "stage": key,
+            "label": label,
+            "count": n,
+            # None for the first stage (no previous to convert from).
+            "conversion_from_prev_pct": (round(n / prev * 100, 1) if prev else 0.0) if prev is not None else None,
+            "conversion_from_start_pct": round(n / first * 100, 1) if first else 0.0,
+        })
+        prev = n
+    return {"period_days": days, "since": since, "stages": out}
+
+
+@router.get("/assistant-topics")
+def assistant_topics(
+    days: int = Query(7, ge=1, le=90),
+    limit: int = Query(20, ge=1, le=100),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Policy-assistant questions ranked by canonical topic (AIQ-1438).
+
+    Raw question text is never stored (PII-by-design), so ranking is at topic
+    granularity. Per topic: asked / supported / unsupported / refusal counts + support
+    and refusal rates. Also returns period-wide ``overall`` rates so the UI has a
+    reliable headline even if support/refusal events aren't topic-tagged.
+    """
+    since = _default_since(days)
+    rows = db.count_assistant_events_by_topic(since=since)
+
+    by_topic: Dict[str, Dict[str, int]] = {}
+    for r in rows:
+        topic = r.get("topic") or "(uncategorised)"
+        bucket = by_topic.setdefault(topic, {"asked": 0, "supported": 0, "unsupported": 0, "refusal": 0})
+        name = r.get("event_name")
+        n = int(r.get("cnt") or 0)
+        if name == "assistant_question_asked":
+            bucket["asked"] += n
+        elif name == "assistant_question_supported":
+            bucket["supported"] += n
+        elif name == "assistant_question_unsupported":
+            bucket["unsupported"] += n
+        elif name == "assistant_refusal_shown":
+            bucket["refusal"] += n
+
+    topics: List[Dict[str, Any]] = []
+    for topic, b in by_topic.items():
+        denom = b["supported"] + b["unsupported"]
+        topics.append({
+            "topic": topic,
+            "asked": b["asked"],
+            "supported": b["supported"],
+            "unsupported": b["unsupported"],
+            "refusal": b["refusal"],
+            "support_rate_pct": round(b["supported"] / denom * 100, 1) if denom else 0.0,
+            "refusal_rate_pct": round(b["refusal"] / b["asked"] * 100, 1) if b["asked"] else 0.0,
+        })
+    # Rank by asked frequency, then by total activity as a tiebreak.
+    topics.sort(key=lambda t: (t["asked"], t["supported"] + t["unsupported"] + t["refusal"]), reverse=True)
+
+    counts = db.count_analytics_events_by_name(since=since)
+    asked_total = counts.get("assistant_question_asked", 0)
+    sup_total = counts.get("assistant_question_supported", 0)
+    unsup_total = counts.get("assistant_question_unsupported", 0)
+    ref_total = counts.get("assistant_refusal_shown", 0)
+    sup_denom = sup_total + unsup_total
+    overall = {
+        "asked": asked_total,
+        "supported": sup_total,
+        "unsupported": unsup_total,
+        "refusal": ref_total,
+        "support_rate_pct": round(sup_total / sup_denom * 100, 1) if sup_denom else 0.0,
+        "refusal_rate_pct": round(ref_total / asked_total * 100, 1) if asked_total else 0.0,
+    }
+    return {"period_days": days, "since": since, "overall": overall, "topics": topics[:limit]}
+
+
 @router.get("/events")
 def list_workflow_events(
     event_name: Optional[str] = Query(None, description="Filter by event type"),
