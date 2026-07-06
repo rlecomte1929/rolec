@@ -6,6 +6,7 @@
  * CSV export. Mirrors FeedbackTab's load-hook + grid-table conventions.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Mail } from 'lucide-react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
 import { getAuthItem } from '../../utils/demo';
@@ -17,6 +18,19 @@ import {
 import { TEST_DRIVE_CORRIDORS } from '../../pages/public/testDriveContent';
 
 const CORRIDOR_IDS = Object.keys(TEST_DRIVE_CORRIDORS);
+
+// TD-12: one-click thank-you from Romain's own mailbox (client-side mailto — no platform send).
+// Copy must stay in sync with backend test_drive_emails._thank_you_copy.
+const THANK_YOU_SUBJECT = 'Thank you — that really helps';
+function thankYouMailto(email: string, name: string | null): string {
+  const who = name || 'there';
+  const body =
+    `Hi ${who},\n\n` +
+    'Thanks for test-driving ReloPass — running a full relocation and telling me where ' +
+    "it held and where it broke is genuinely useful. I'll act on what you flagged.\n\n" +
+    '— Romain';
+  return `mailto:${email}?subject=${encodeURIComponent(THANK_YOU_SUBJECT)}&body=${encodeURIComponent(body)}`;
+}
 
 function corridorLabel(id: string | null): string {
   if (!id) return '—';
@@ -156,16 +170,27 @@ export function TestDriveTab() {
               <EmptyRow text="No pilot interest yet." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <div className="grid grid-cols-[1fr_1.4fr_1fr_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
-                  <span>Name</span><span>Company / role</span><span>Corridor</span><span>Interest</span>
+                <div className="grid grid-cols-[1fr_1.4fr_1fr_90px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Name</span><span>Company / role</span><span>Corridor</span><span>Interest</span><span>Thank-you</span>
                 </div>
                 <div className="divide-y divide-gray-100">
                   {data.pilot_leads.map((r, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_90px] px-3 py-2 text-sm items-center">
+                    <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_90px_130px] px-3 py-2 text-sm items-center">
                       <span className="text-gray-900">{r.tester_name || '—'}<span className="block text-[11px] text-gray-400">{r.tester_email}</span></span>
                       <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
                       <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
                       <Badge variant={r.pilot_interest === 'yes' ? 'success' : 'warning'} size="sm">{r.pilot_interest}</Badge>
+                      {r.tester_email ? (
+                        <a
+                          href={thankYouMailto(r.tester_email, r.tester_name)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-gray-900"
+                          title="Open your mail client with a thank-you prefilled to this tester"
+                        >
+                          <Mail size={13} aria-hidden="true" /> Send thank-you
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-gray-300">—</span>
+                      )}
                     </div>
                   ))}
                 </div>
