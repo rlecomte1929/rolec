@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
@@ -98,12 +99,18 @@ function destinationKey(d: { city: string; country: string }): string {
  * /hr/vendor-curation route is unchanged.
  */
 export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const [category, setCategory] = useState<string>('schools');
+  // AIQ-1444 pt3: start with no service type chosen so the Admin master-vendors
+  // section stays hidden until HR explicitly picks a category.
+  const [category, setCategory] = useState<string>('');
   // Destinations come from the admin allowlist — HR can't type free-form.
   const [destinations, setDestinations] = useState<AllowlistedDestination[]>([]);
   const [destinationsLoading, setDestinationsLoading] = useState(false);
   // Selected destination key ("city|country"). Empty until user picks one.
   const [selectedDestinationKey, setSelectedDestinationKey] = useState<string>('');
+  // AIQ-1444 pt2: country is picked first, then a dependent city dropdown resolves
+  // the destination. Kept in sync with the active destination (below) so programmatic
+  // selections (approval flow, edit-row) keep the country dropdown correct.
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [rows, setRows] = useState<CurationRow[]>([]);
   // Track unsaved master toggles: master_item_id -> next selected.
   const [pendingToggles, setPendingToggles] = useState<Map<string, boolean>>(new Map());
@@ -158,6 +165,33 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       ),
     [destinations],
   );
+
+  // AIQ-1444 pt2: distinct countries (A-Z) for the country dropdown, and the
+  // cities (A-Z) available under the currently-selected country for the dependent
+  // city dropdown.
+  const countryOptions = useMemo(
+    () =>
+      Array.from(new Set(destinations.map((d) => d.country))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [destinations],
+  );
+
+  const citiesForCountry = useMemo(
+    () =>
+      selectedCountry
+        ? sortedDestinations.filter((d) => d.country === selectedCountry)
+        : [],
+    [sortedDestinations, selectedCountry],
+  );
+
+  // Keep the country dropdown aligned when the destination is set programmatically
+  // (approval flow, edit-row) rather than via the country dropdown itself.
+  useEffect(() => {
+    if (activeDestination && activeDestination.country !== selectedCountry) {
+      setSelectedCountry(activeDestination.country);
+    }
+  }, [activeDestination, selectedCountry]);
 
   const city = activeDestination?.city || '';
   const country = activeDestination?.country || '';
@@ -220,7 +254,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
   }, [reloadDemand]);
 
   const load = useCallback(async () => {
-    if (!city) {
+    if (!city || !category) {
       setRows([]);
       return;
     }
@@ -276,6 +310,16 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       return;
     }
     setSelectedDestinationKey(value);
+  };
+
+  // AIQ-1444 pt2: picking a country resets the dependent city selection.
+  const onPickCountry = (value: string) => {
+    if (value === REQUEST_NEW_VALUE) {
+      setRequestModalOpen(true);
+      return;
+    }
+    setSelectedCountry(value);
+    setSelectedDestinationKey('');
   };
 
   const populateAllForDestination = async () => {
@@ -545,19 +589,18 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       <Card padding="lg" className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="block">
-            <span className="text-sm font-medium text-[#0b2b43]">Destination</span>
+            <span className="text-sm font-medium text-[#0b2b43]">Country</span>
             <select
+              aria-label="Destination country"
               className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
-              value={selectedDestinationKey}
-              onChange={(e) => onPickDestination(e.target.value)}
+              value={selectedCountry}
+              onChange={(e) => onPickCountry(e.target.value)}
               disabled={destinationsLoading}
             >
-              {destinations.length === 0 && !destinationsLoading && (
-                <option value="">No destinations supported yet</option>
-              )}
-              {sortedDestinations.map((d) => (
-                <option key={destinationKey(d)} value={destinationKey(d)}>
-                  {d.city}, {d.country}
+              <option value="">Select a country…</option>
+              {countryOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
                 </option>
               ))}
               <option value={REQUEST_NEW_VALUE}>+ Request a new destination…</option>
@@ -567,12 +610,33 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
             </p>
           </label>
           <label className="block">
+            <span className="text-sm font-medium text-[#0b2b43]">City</span>
+            <select
+              aria-label="Destination city"
+              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+              value={selectedDestinationKey}
+              onChange={(e) => onPickDestination(e.target.value)}
+              disabled={destinationsLoading || !selectedCountry}
+            >
+              <option value="">
+                {selectedCountry ? 'Select a city…' : 'Select a country first'}
+              </option>
+              {citiesForCountry.map((d) => (
+                <option key={destinationKey(d)} value={destinationKey(d)}>
+                  {d.city}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Service category</span>
             <select
+              aria-label="Service category"
               className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
+              <option value="">Select a service type…</option>
               {CATEGORY_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -598,10 +662,25 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           </div>
         </div>
         {quota && (
-          <p className="mt-3 text-xs text-[#64748b]">
-            AI catalog quota today: <strong className="text-[#0b2b43]">{quota.used}/{quota.limit}</strong> used
-            ({quota.remaining} remaining; resets at midnight UTC). Each service category that
-            actually calls the AI counts as 1 — already-populated categories don&apos;t.
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-[#64748b]">
+            <Info
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#94a3b8]"
+              aria-hidden="true"
+            />
+            <span
+              title={
+                'Each AI catalog search spends 1 quota unit to find real, review-verified '
+                + 'vendors for one service category in your selected destination. Those vendors '
+                + 'appear in the Admin master-vendors list below, where you tick the ones to show '
+                + 'your employees. Already-populated categories are reused and cost nothing. '
+                + 'Quota resets daily at midnight UTC.'
+              }
+            >
+              AI catalog searches used today:{' '}
+              <strong className="text-[#0b2b43]">{quota.used} / {quota.limit}</strong>{' '}
+              ({quota.remaining} left). Each search adds real vendors for one service category
+              to your list below — hover the ⓘ for details.
+            </span>
           </p>
         )}
         {populateResult && populateResult.status === 'completed' && (
@@ -705,6 +784,15 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
 
+      {/* AIQ-1444 pt3: the Admin master-vendors section only appears once HR has
+          picked a service type — otherwise a placeholder prompts the selection. */}
+      {!category ? (
+        <Card padding="lg" className="mb-6">
+          <p className="text-sm text-[#4b5563]">
+            Select a service type above to view and curate the available vendors.
+          </p>
+        </Card>
+      ) : (
       <Card
         padding="lg"
         className={`mb-6 transition-shadow ${
@@ -848,6 +936,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           </>
         )}
       </Card>
+      )}
 
       <Card padding="lg">
         <h2 className="text-lg font-semibold text-[#0b2b43]">Your own preferred vendors</h2>
