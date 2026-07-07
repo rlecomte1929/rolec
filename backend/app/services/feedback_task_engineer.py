@@ -69,6 +69,31 @@ def _scrub(text: Optional[str]) -> str:
     return _PII_RESIDUE.sub("[REDACTED]", mask_pii(text or ""))
 
 
+def format_diagnostics(client_context: Any) -> str:
+    """Compact reproduction signal from a feedback item's client_context.
+    Empty-safe: returns '' for None / {} / unparseable input. Not yet PII-masked —
+    engineer_task re-scrubs it before the prompt."""
+    ctx = client_context
+    if isinstance(ctx, str):
+        try:
+            ctx = json.loads(ctx)
+        except Exception:  # noqa: BLE001
+            return ""
+    if not isinstance(ctx, dict) or not ctx:
+        return ""
+    lines = []
+    errs = ctx.get("recentErrors") or []
+    if errs:
+        e0 = errs[0] or {}
+        lines.append(f"Top error: {e0.get('message', '?')} (fingerprint {e0.get('fingerprint', '?')})")
+    for r in (ctx.get("recentFailedRequests") or [])[:3]:
+        lines.append(f"Failed request: {r.get('status', '?')} {r.get('path', '?')}")
+    fn = ctx.get("failingFunction") or ctx.get("failing_function")
+    if fn:
+        lines.append(f"Failing function: {fn}")
+    return "\n".join(lines)
+
+
 def status_from_complexity(complexity: Optional[str]) -> str:
     """High/Very High tasks land as 'Needs Decomposition'; everything else is
     'Ready for AI'. (Admin chose: AI decides status by complexity.)"""
@@ -99,12 +124,14 @@ def engineer_task(
     has_screenshot: bool,
     reporter_name: Optional[str],
     admin_context: str,
+    diagnostics: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return an engineered AI-Work-Queue task dict + a derived `status`.
     Raises ValueError/RuntimeError on LLM failure (surfaced as 502 by the caller)."""
     masked_bug = _scrub(text)
     masked_ctx = _scrub(admin_context)
     masked_reporter = _scrub(reporter_name) if reporter_name else ""
+    masked_diag = _scrub(diagnostics) if diagnostics else ""
     user = (
         f"FEEDBACK ({category}) reported on page {page_url or '?'}"
         f"{' [screenshot attached]' if has_screenshot else ''}"
@@ -112,6 +139,7 @@ def engineer_task(
         f"Auto-classified: severity={severity or '?'}, area={area or '?'}.\n\n"
         f"USER MESSAGE:\n{masked_bug or '(none)'}\n\n"
         f"ADMIN CONTEXT (extra detail for the fix):\n{masked_ctx or '(none)'}\n"
+        f"\nREPRODUCTION SIGNAL (auto-captured diagnostics):\n{masked_diag or '(none)'}\n"
     )
     raw = claude_complete_text_sync(
         system=_SYSTEM, user=user, model=_MODEL, max_tokens=2000, temperature=0.2,

@@ -456,7 +456,8 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
     row = db.execute(
         text(
             "SELECT message, category, page_url, "
-            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id "
+            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id, "
+            "client_context "
             "FROM feedback WHERE CAST(id AS TEXT) = :id"
         ),
         {"id": item_id},
@@ -470,6 +471,7 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
         "has_screenshot": bool(row[3]),
         "reporter_name": row[4],
         "report_id": row[5],
+        "client_context": row[6],
     }
 
 
@@ -520,6 +522,9 @@ def dispatch_preview(
         has_screenshot = pf["has_screenshot"]
         reporter_name = pf["reporter_name"]
 
+    from ..services.feedback_task_engineer import format_diagnostics
+    diagnostics = format_diagnostics(pf["client_context"]) if pf else ""
+
     if not severity or not area:
         cls = classify(text_val, category)
         severity = severity or cls["severity"]
@@ -535,6 +540,7 @@ def dispatch_preview(
             has_screenshot=has_screenshot,
             reporter_name=reporter_name,
             admin_context=dispatch_context,
+            diagnostics=diagnostics,
         )
     except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
         log.warning("dispatch_preview engineer_task failed: %s", exc)

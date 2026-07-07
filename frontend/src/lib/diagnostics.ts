@@ -24,6 +24,14 @@ import { getCurrentInteractionId } from '../perf/perf';
 // below so it degrades to 'unknown' under vitest where the define does not run.
 declare const __APP_VERSION__: string;
 
+// PostHog, if loaded, exposes this on window. Typed narrowly (no `any`) so an
+// optional third-party global doesn't widen the rest of the file's type-safety.
+declare global {
+  interface Window {
+    posthog?: { get_distinct_id?: () => string };
+  }
+}
+
 export interface ClientContext {
   route: string;
   appVersion: string;
@@ -33,6 +41,7 @@ export interface ClientContext {
   breadcrumbs: { type: string; message: string; timestamp: string }[];
   recentErrors: RecentError[];
   recentFailedRequests: FailedRequest[];
+  posthog_id: string | null;
 }
 
 /** Best-effort, never throws — diagnostics must never block a feedback submit. */
@@ -59,5 +68,6 @@ export function collectDiagnostics(): ClientContext {
       () => getRecentFailedRequests().map((r) => ({ ...r, path: scrubPii(r.path) })),
       [],
     ),
+    posthog_id: safe(() => window.posthog?.get_distinct_id?.() ?? null, null),
   };
 }

@@ -26,7 +26,7 @@ from . import autopilot_events as ev
 from . import notion_work_queue as nwq
 from .ai_trace_logger import TraceSession
 from .autopilot_governor import gate, nightly_cap, stage_feature_key
-from .feedback_task_engineer import engineer_task, status_from_complexity
+from .feedback_task_engineer import engineer_task, status_from_complexity, format_diagnostics
 from .feedback_triage import classify
 
 log = logging.getLogger(__name__)
@@ -153,6 +153,7 @@ def _dispatch_one(session: Any, rep: Dict[str, Any], size: int, *, dry_run: bool
             text=rep.get("message"), category=rep.get("category") or "bug",
             page_url=rep.get("page_url"), severity=cls.get("severity"), area=cls.get("area"),
             has_screenshot=False, reporter_name=rep.get("reporter_name"), admin_context=admin_context,
+            diagnostics=format_diagnostics(rep.get("client_context")),
         )
     finally:
         tracer.record_llm_call(
