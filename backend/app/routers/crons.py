@@ -127,6 +127,15 @@ def autopilot_event(request: Request, body: AutopilotEventBody) -> Dict[str, Any
     if body.event_type not in ev.ALL_EVENTS:
         raise HTTPException(status_code=422, detail=f"unknown autopilot event_type {body.event_type!r}")
     ev.emit(body.event_type, entity_id=body.entity_id, properties=body.properties)
+
+    from ..services.feedback_status_bridge import advance_status_for_event
+    from ..db import SessionLocal
+    _s = SessionLocal()
+    try:
+        advance_status_for_event(_s, body.event_type, body.entity_id)
+    finally:
+        _s.close()
+
     return {"recorded": True, "event_type": body.event_type}
 
 

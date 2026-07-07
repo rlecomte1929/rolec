@@ -8,7 +8,11 @@ export type FeedbackStream =
   | 'hr_assignment'
   | 'hr_case';
 export type TriageStatus = 'new' | 'reviewed' | 'acted_on' | 'closed';
-export type DispatchStatus = 'pending' | 'dispatched' | 'failed';
+export type DispatchStatus =
+  | 'new' | 'triaged' | 'spec_drafted' | 'dispatched' | 'in_progress'
+  | 'in_review' | 'deployed' | 'done' | 'verify_failed' | 'dismissed' | 'wont_fix'
+  | 'pending' | 'failed'; // legacy, tolerated on read
+export type AutonomyTier = 'green' | 'yellow' | 'red';
 
 export interface UnifiedFeedbackItem {
   id: string;
@@ -31,6 +35,8 @@ export interface UnifiedFeedbackItem {
   area?: string | null;
   dispatch_status?: DispatchStatus | null;
   dispatch_ref?: string | null;
+  /** Manual-lane risk tier computed at dispatch (Task 2) — drives the ProgressStrip badge. */
+  autonomy_tier?: AutonomyTier | null;
   /** Admin-authored context used to engineer the dispatched task. */
   dispatch_context?: string | null;
   /** Soft-dismissed (hidden from the default list). Serialized 0/1 — read via truthiness. */
@@ -98,6 +104,22 @@ export async function triageFeedback(
   update: { status: TriageStatus; owner?: string; resolution?: string }
 ): Promise<void> {
   await apiPatch<unknown>(`/api/admin/feedback/${stream}/${id}`, update);
+}
+
+/**
+ * Manually advance (or reject) a feedback item's pipeline `dispatch_status`.
+ * The backend validates the transition against the state machine — 409 on an
+ * illegal transition, 422 on an unknown target state.
+ */
+export async function advanceState(
+  stream: FeedbackStream,
+  id: string,
+  target: DispatchStatus,
+): Promise<{ ok: boolean; dispatch_status: DispatchStatus }> {
+  return apiPatch<{ ok: boolean; dispatch_status: DispatchStatus }>(
+    `/api/admin/feedback/${stream}/${id}/state`,
+    { target },
+  );
 }
 
 /**

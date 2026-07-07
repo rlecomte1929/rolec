@@ -80,13 +80,16 @@ _SCHEMA = """
 CREATE TABLE feedback (
   id TEXT PRIMARY KEY, user_id TEXT, page_url TEXT, category TEXT, message TEXT,
   status TEXT, created_at TEXT, report_id TEXT, screenshot_data TEXT,
-  reporter_email TEXT, reporter_name TEXT, reporter_role TEXT
+  reporter_email TEXT, reporter_name TEXT, reporter_role TEXT, client_context TEXT
 );
 CREATE TABLE feedback_status (
   stream TEXT NOT NULL, source_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','reviewed','acted_on','closed')),
   owner TEXT, resolution TEXT, updated_at TEXT, severity TEXT, area TEXT,
   reporter_id TEXT, dispatch_ref TEXT, dispatch_status TEXT, dispatch_context TEXT, dismissed_at TEXT,
+  notion_task_id TEXT, autonomy_tier TEXT, spec_drafted_at TEXT, dispatched_at TEXT,
+  triaged_at TEXT, in_progress_at TEXT, deployed_at TEXT, done_at TEXT,
+  pr_url TEXT, pr_number INTEGER, branch_name TEXT,
   PRIMARY KEY (stream, source_id)
 );
 """

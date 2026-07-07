@@ -69,10 +69,59 @@ def _scrub(text: Optional[str]) -> str:
     return _PII_RESIDUE.sub("[REDACTED]", mask_pii(text or ""))
 
 
+def format_diagnostics(client_context: Any) -> str:
+    """Compact reproduction signal from a feedback item's client_context.
+    Empty-safe: returns '' for None / {} / unparseable input. Not yet PII-masked —
+    engineer_task re-scrubs it before the prompt."""
+    ctx = client_context
+    if isinstance(ctx, str):
+        try:
+            ctx = json.loads(ctx)
+        except Exception:  # noqa: BLE001
+            return ""
+    if not isinstance(ctx, dict) or not ctx:
+        return ""
+    lines = []
+    errs = ctx.get("recentErrors") or []
+    if errs:
+        e0 = errs[0] or {}
+        lines.append(f"Top error: {e0.get('message', '?')} (fingerprint {e0.get('fingerprint', '?')})")
+    for r in (ctx.get("recentFailedRequests") or [])[:3]:
+        lines.append(f"Failed request: {r.get('status', '?')} {r.get('path', '?')}")
+    fn = ctx.get("failingFunction") or ctx.get("failing_function")
+    if fn:
+        lines.append(f"Failing function: {fn}")
+    return "\n".join(lines)
+
+
 def status_from_complexity(complexity: Optional[str]) -> str:
     """High/Very High tasks land as 'Needs Decomposition'; everything else is
     'Ready for AI'. (Admin chose: AI decides status by complexity.)"""
     return "Needs Decomposition" if complexity in ("High", "Very High") else "Ready for AI"
+
+
+_TIER_LABELS = {
+    "green": "🟢 Green — auto",
+    "yellow": "🟡 Yellow — self-validate + sample",
+    "red": "🔴 Red — full human gate",
+}
+_RED_KEYWORDS = ("auth", "login", "password", "billing", "payment", "invoic",
+                 "security", "rls", "permission", "migration", "isolation", "secret", "token")
+
+
+def compute_autonomy_tier(*, task_type: Optional[str], complexity: Optional[str],
+                          layer: Optional[str], product_area: Optional[str],
+                          area: Optional[str] = None, files_to_touch: Optional[str] = None) -> str:
+    """Deterministic risk tier. Red on any sensitive signal; green only for low-risk
+    UI copy; yellow otherwise (default-safe)."""
+    blob = " ".join(str(x or "").lower() for x in (area, product_area, files_to_touch, task_type))
+    if layer == "Isolation" or task_type == "Database Migration" or any(k in blob for k in _RED_KEYWORDS):
+        return "red"
+    if (complexity in ("Trivial", "Low") and layer == "UI"
+            and task_type in ("Frontend Implementation", "UX Redesign")
+            and product_area in ("UX", "Core Product", "GTM")):
+        return "green"
+    return "yellow"
 
 
 def _parse_task(raw: str) -> Dict[str, Any]:
@@ -99,12 +148,14 @@ def engineer_task(
     has_screenshot: bool,
     reporter_name: Optional[str],
     admin_context: str,
+    diagnostics: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return an engineered AI-Work-Queue task dict + a derived `status`.
     Raises ValueError/RuntimeError on LLM failure (surfaced as 502 by the caller)."""
     masked_bug = _scrub(text)
     masked_ctx = _scrub(admin_context)
     masked_reporter = _scrub(reporter_name) if reporter_name else ""
+    masked_diag = _scrub(diagnostics) if diagnostics else ""
     user = (
         f"FEEDBACK ({category}) reported on page {page_url or '?'}"
         f"{' [screenshot attached]' if has_screenshot else ''}"
@@ -112,10 +163,16 @@ def engineer_task(
         f"Auto-classified: severity={severity or '?'}, area={area or '?'}.\n\n"
         f"USER MESSAGE:\n{masked_bug or '(none)'}\n\n"
         f"ADMIN CONTEXT (extra detail for the fix):\n{masked_ctx or '(none)'}\n"
+        f"\nREPRODUCTION SIGNAL (auto-captured diagnostics):\n{masked_diag or '(none)'}\n"
     )
     raw = claude_complete_text_sync(
         system=_SYSTEM, user=user, model=_MODEL, max_tokens=2000, temperature=0.2,
     )
     task = _parse_task(raw)
     task["status"] = status_from_complexity(task.get("complexity"))
+    task["autonomy_tier"] = compute_autonomy_tier(
+        task_type=task.get("task_type"), complexity=task.get("complexity"),
+        layer=task.get("layer"), product_area=task.get("product_area"),
+        area=area, files_to_touch=task.get("files_to_touch"),
+    )
     return task

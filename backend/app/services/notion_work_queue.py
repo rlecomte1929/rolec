@@ -14,6 +14,8 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
 
+from .feedback_task_engineer import _TIER_LABELS
+
 _NOTION_PAGES_API = "https://api.notion.com/v1/pages"
 _NOTION_VERSION = "2022-06-28"
 # AI Work Queue. NOTE (DB-id reconciliation): this database id `7adc643a…` and the
@@ -72,6 +74,7 @@ def build_properties(task: Dict[str, Any], *, failure_evidence: str, context_lin
         "Product Area": _select(task.get("product_area")),
         "Status": _select(task.get("status") or "Ready for AI"),
         "Definition of Ready": _select("Vetted — ready"),
+        "Autonomy Tier": _select(_TIER_LABELS.get(task.get("autonomy_tier"))),
     }
 
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 import uuid
@@ -175,6 +176,7 @@ SELECT
     CAST(fs.area            AS TEXT) AS area,
     CAST(fs.dispatch_status AS TEXT) AS dispatch_status,
     CAST(fs.dispatch_ref    AS TEXT) AS dispatch_ref,
+    CAST(fs.autonomy_tier   AS TEXT) AS autonomy_tier,
     CASE WHEN fs.dismissed_at IS NOT NULL THEN 1 ELSE 0 END AS dismissed
 FROM (
     {union}
@@ -328,6 +330,57 @@ def triage_feedback(
     return {"stream": stream, "id": item_id, "status": body.status}
 
 
+class StateBody(BaseModel):
+    target: str
+
+
+@router.patch("/feedback/{stream}/{item_id}/state")
+def set_state(
+    stream: str,
+    item_id: str,
+    body: StateBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Manually advance (or reject) a feedback item's pipeline `dispatch_status`,
+    validated against the state machine in `feedback_state_machine.py`."""
+    from ..services.feedback_state_machine import ALLOWED_TRANSITIONS, timestamp_column, validate_transition
+
+    if body.target not in ALLOWED_TRANSITIONS:
+        raise HTTPException(status_code=422, detail=f"unknown state {body.target!r}")
+
+    row = db.execute(
+        text("SELECT dispatch_status FROM feedback_status WHERE stream=:s AND source_id=:id"),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    current = row[0] if row else None
+    if not validate_transition(current, body.target):
+        raise HTTPException(status_code=409, detail=f"illegal transition {current} → {body.target}")
+
+    now = datetime.utcnow().isoformat()
+    ts_col = timestamp_column(body.target)
+    set_ts = f", {ts_col} = :now" if ts_col else ""
+    db.execute(
+        text(
+            f"INSERT INTO feedback_status (stream, source_id, status, dispatch_status, updated_at"
+            f"{(', ' + ts_col) if ts_col else ''}) "
+            f"VALUES (:s, :id, 'new', :t, :now{', :now' if ts_col else ''}) "
+            f"ON CONFLICT (stream, source_id) DO UPDATE SET dispatch_status = :t, updated_at = :now{set_ts}"
+        ),
+        {"s": stream, "id": item_id, "t": body.target, "now": now},
+    )
+
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="feedback_state_changed",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "from": current, "to": body.target},
+    )
+    return {"ok": True, "dispatch_status": body.target}
+
+
 # ── Dispatch endpoint ─────────────────────────────────────────────────────────
 
 
@@ -456,7 +509,8 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
     row = db.execute(
         text(
             "SELECT message, category, page_url, "
-            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id "
+            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id, "
+            "client_context "
             "FROM feedback WHERE CAST(id AS TEXT) = :id"
         ),
         {"id": item_id},
@@ -470,6 +524,7 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
         "has_screenshot": bool(row[3]),
         "reporter_name": row[4],
         "report_id": row[5],
+        "client_context": row[6],
     }
 
 
@@ -520,6 +575,9 @@ def dispatch_preview(
         has_screenshot = pf["has_screenshot"]
         reporter_name = pf["reporter_name"]
 
+    from ..services.feedback_task_engineer import format_diagnostics
+    diagnostics = format_diagnostics(pf["client_context"]) if pf else ""
+
     if not severity or not area:
         cls = classify(text_val, category)
         severity = severity or cls["severity"]
@@ -535,10 +593,28 @@ def dispatch_preview(
             has_screenshot=has_screenshot,
             reporter_name=reporter_name,
             admin_context=dispatch_context,
+            diagnostics=diagnostics,
         )
     except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
         log.warning("dispatch_preview engineer_task failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"Could not engineer the task: {exc}") from exc
+
+    _db2 = SessionLocal()
+    try:
+        _db2.execute(
+            text(
+                "INSERT INTO feedback_status (stream, source_id, status, dispatch_status, spec_drafted_at, updated_at) "
+                "VALUES (:s, :id, 'new', 'spec_drafted', :now, :now) "
+                "ON CONFLICT (stream, source_id) DO UPDATE SET "
+                "  dispatch_status = 'spec_drafted', spec_drafted_at = COALESCE(feedback_status.spec_drafted_at, :now), "
+                "  updated_at = :now"
+            ),
+            {"s": stream, "id": item_id, "now": datetime.utcnow().isoformat()},
+        )
+        _db2.commit()
+    finally:
+        _db2.close()
+
     return {"task": task}
 
 
@@ -589,15 +665,20 @@ def dispatch_create(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     now = datetime.utcnow().isoformat()
+    page_id = notion_work_queue.page_id_from_ref(url) or ""
+    notion_task_id = re.sub(r"[^0-9a-f]", "", page_id.lower())  # dashless-lower 32hex join key
+    tier = task.get("autonomy_tier") or None
     db.execute(
         text(
-            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
-            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now) "
+            "INSERT INTO feedback_status "
+            "(stream, source_id, status, dispatch_ref, dispatch_status, dispatched_at, notion_task_id, autonomy_tier, updated_at) "
+            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now, :ntid, :tier, :now) "
             "ON CONFLICT (stream, source_id) DO UPDATE SET "
-            "    dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
-            "    updated_at = excluded.updated_at"
+            "  dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
+            "  dispatched_at = :now, notion_task_id = excluded.notion_task_id, "
+            "  autonomy_tier = excluded.autonomy_tier, updated_at = :now"
         ),
-        {"s": stream, "id": item_id, "ref": url, "now": now},
+        {"s": stream, "id": item_id, "ref": url, "now": now, "ntid": notion_task_id, "tier": tier},
     )
     record_admin_event(
         db,
