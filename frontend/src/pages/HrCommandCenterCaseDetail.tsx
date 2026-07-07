@@ -61,6 +61,9 @@ function corridorLabel(destCity?: string, destCountry?: string): string {
 
 type CaseDetail = {
   id: string;
+  /** AIQ-1479: relocation case id (distinct from the assignment PK `id`); used to key the
+   *  immigration panel's case-scoped reads. */
+  caseId?: string | null;
   employeeIdentifier: string;
   destCountry?: string;
   destCity?: string;
@@ -184,8 +187,11 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   return (
     <AppShell
       section="Case detail"
+      // AIQ-1479: give the page a navigable parent crumb back to the command center and a
+      // subtitle that says what this page is for (the reporter was "lost" arriving here).
+      parent={{ label: 'Mobility command center', href: buildRoute('hrCommandCenter') }}
       title={detail.employeeIdentifier}
-      subtitle={corridorLabel(detail.destCity, detail.destCountry)}
+      subtitle={`${corridorLabel(detail.destCity, detail.destCountry)} · Everything for this case — immigration advisors & status, vendors, policy exceptions and notes.`}
     >
       <div className="space-y-6">
         {/* BRAND-4: the case leads with identity — employee name/email (H1) +
@@ -338,6 +344,13 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
         <HrCaseTasksPanel caseId={detail.id} />
 
+        {/* ── GAP 4 / AIQ-1479: Immigration advisors first — the actionable "contacts +
+            ratings" section is the most useful thing here, so it leads the immigration
+            cluster (was below the status panel). ── */}
+        <AdvisorsPanel
+          destinationCountry={detail.destCountry}
+        />
+
         {/* ── IMM-13: Immigration status panel ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">
           <div className="flex items-center justify-between mb-4">
@@ -347,7 +360,11 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             </div>
           </div>
           <ImmigrationStatusPanel
-            caseId={detail.id}
+            // AIQ-1479: pass the relocation case id (the command-center detail returns both
+            // the assignment PK `id` and the relocation `caseId`). The immigration endpoints
+            // key on the relocation case id; passing the assignment PK made them fail to
+            // resolve → spurious "empty / error" state. Fall back to id when caseId is absent.
+            caseId={detail.caseId ?? detail.id}
             moveDate={detail.expectedStartDate ?? null}
             onFindVendor={(ctx) => {
               // move_date isn't part of the immigration profile — source it from the case
@@ -360,11 +377,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             }}
           />
         </Card>
-
-        {/* ── GAP 4: Immigration advisors matched to corridor ── */}
-        <AdvisorsPanel
-          destinationCountry={detail.destCountry}
-        />
 
         {/* ── AIQ-160-E: Pet import requirements for destination country ── */}
         <PetRequirementsSection
