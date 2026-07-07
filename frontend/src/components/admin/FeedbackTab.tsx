@@ -322,8 +322,9 @@ export function FeedbackTab() {
     setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
     try {
       const res = await dispatchCreate(row.stream, row.id, previewTask);
+      const notionUrl = res.notion_url ?? res.url;
       setRows((prev) => prev.map((r) => r.id === row.id
-        ? { ...r, dispatch_status: 'dispatched', dispatch_ref: res.url } : r));
+        ? { ...r, dispatch_status: 'dispatched', dispatch_ref: notionUrl } : r));
       setPreviewFor(null);
       setPreviewTask(null);
     } catch (err) {
@@ -918,7 +919,7 @@ export function FeedbackTab() {
                                     onClick={() => void createTask(row)}
                                     className="text-[11px] font-medium px-3 py-1 rounded bg-[#0b2b43] text-white hover:bg-[#0b3b5c] disabled:opacity-50"
                                   >
-                                    {creatingId === row.id ? 'Creating…' : 'Create task in Notion'}
+                                    {creatingId === row.id ? 'Creating task…' : 'Create Notion task'}
                                   </Button>
                                   <Button
                                     unstyled

@@ -251,7 +251,7 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     fireEvent.click(screen.getByRole('button', { name: /draft task with ai/i }));
     await waitFor(() => expect(feedbackApi.dispatchPreview).toHaveBeenCalled());
 
-    const createBtn = await screen.findByRole('button', { name: /create task in notion/i });
+    const createBtn = await screen.findByRole('button', { name: /create notion task/i });
     fireEvent.click(createBtn);
     await waitFor(() => expect(feedbackApi.dispatchCreate).toHaveBeenCalled());
     const links = await screen.findAllByRole('link', { name: /notion/i });

@@ -176,6 +176,34 @@ def test_create_dispatches_via_notion(db_session, monkeypatch):
     assert row[2] == "https://notion.so/work-queue-page-123"
 
 
+def test_create_is_idempotent_when_already_dispatched(db_session, monkeypatch):
+    client = _client(db_session)
+    # fb-1 was already dispatched — feedback_status carries a Notion URL.
+    db_session.execute(text(
+        "INSERT INTO feedback_status (stream, source_id, status, dispatch_status, dispatch_ref) "
+        "VALUES ('product', 'fb-1', 'new', 'dispatched', 'https://notion.so/existing-page-999')"
+    ))
+    db_session.commit()
+
+    calls = {"n": 0}
+
+    def _fake_create(task, *, failure_evidence, context_links):
+        calls["n"] += 1
+        return "https://notion.so/should-not-be-created"
+    monkeypatch.setattr(admin_feedback.notion_work_queue, "create_work_queue_task", _fake_create)
+
+    resp = client.post(
+        "/api/admin/feedback/product/fb-1/dispatch/create",
+        json={"task": {"title": "Fix roadmap", "priority": "P1", "status": "Ready for AI"}, "confirm": True},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["already_exists"] is True
+    assert body["notion_url"] == "https://notion.so/existing-page-999"
+    # No second Notion task was created.
+    assert calls["n"] == 0
+
+
 def test_create_surfaces_notion_not_configured(db_session, monkeypatch):
     client = _client(db_session)
 
