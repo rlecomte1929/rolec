@@ -368,6 +368,15 @@ def set_state(
         ),
         {"s": stream, "id": item_id, "t": body.target, "now": now},
     )
+
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="feedback_state_changed",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "from": current, "to": body.target},
+    )
     return {"ok": True, "dispatch_status": body.target}
 
 
