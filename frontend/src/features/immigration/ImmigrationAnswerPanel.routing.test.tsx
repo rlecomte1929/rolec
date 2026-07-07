@@ -30,12 +30,8 @@ beforeEach(() => { mockImm.mockReset(); mockPol.mockReset(); mockRoute.mockReset
 function setQuestion(v: string) {
   fireEvent.change(screen.getByLabelText('Your question'), { target: { value: v } });
 }
-function fillCorridor() {
-  fireEvent.change(screen.getByLabelText('From country'), { target: { value: 'IN' } });
-  fireEvent.change(screen.getByLabelText('To country'), { target: { value: 'DE' } });
-  fireEvent.change(screen.getByLabelText('Nationality'), { target: { value: 'IN' } });
-  fireEvent.change(screen.getByLabelText('Permit type'), { target: { value: 'blue_card' } });
-}
+// AIQ-1476: corridor + nationality pre-fill from the case; provide it via caseContext.
+const CASE_CTX = { from: 'IN', to: 'DE', nationalities: ['IN'] } as const;
 
 describe('ImmigrationAnswerPanel — unified routing (policy bridge)', () => {
   it('routes a policy-classified question to the policy engine and renders it', async () => {
@@ -57,8 +53,7 @@ describe('ImmigrationAnswerPanel — unified routing (policy bridge)', () => {
   it('routes an immigration-classified question to the immigration engine', async () => {
     mockRoute.mockResolvedValue('immigration');
     mockImm.mockResolvedValue({ answer_text: 'You need a passport.', answer_kind: 'answer', cited_sources: [], trace_id: 't' });
-    render(<ImmigrationAnswerPanel />);
-    fillCorridor();
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
     setQuestion('What documents do I need for my visa?');
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => expect(mockImm).toHaveBeenCalledTimes(1));
@@ -94,7 +89,7 @@ describe('ImmigrationAnswerPanel — unified routing (policy bridge)', () => {
     render(<ImmigrationAnswerPanel />);
     setQuestion('What documents do I need for my visa?'); // corridor left blank
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
-    expect(await screen.findByText(/Add your corridor/)).toBeInTheDocument();
+    expect(await screen.findByText(/Add your move corridor/)).toBeInTheDocument();
     expect(mockImm).not.toHaveBeenCalled();
   });
 });

@@ -43,12 +43,11 @@ describe('ImmigrationAnswerPanel — personalized corridor (MVP)', () => {
     expect(screen.getByLabelText('From country')).toBeInTheDocument();
   });
 
-  it('sends the case-derived corridor in the request (no hand-typing)', async () => {
+  it('sends the case-derived corridor + nationality in the request (no hand-typing)', async () => {
     mockAsk.mockResolvedValue({ answer_text: 'ok', answer_kind: 'answer', cited_sources: [], trace_id: 't1' });
-    render(<ImmigrationAnswerPanel caseContext={{ from: 'IN', to: 'DE' }} />);
-    // corridor is pre-filled from the case; the user only confirms nationality + permit + asks.
-    fireEvent.change(screen.getByLabelText('Nationality'), { target: { value: 'IN' } });
-    fireEvent.change(screen.getByLabelText('Permit type'), { target: { value: 'Blue Card' } });
+    // AIQ-1476: corridor AND nationality now pre-fill from the case; permit type is
+    // optional (assistant determines it). The user only types the question.
+    render(<ImmigrationAnswerPanel caseContext={{ from: 'IN', to: 'DE', nationalities: ['IN'] }} />);
     fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'What documents do I need?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => expect(mockAsk).toHaveBeenCalledTimes(1));
@@ -56,7 +55,6 @@ describe('ImmigrationAnswerPanel — personalized corridor (MVP)', () => {
       corridor_from: 'IN',
       corridor_to: 'DE',
       nationality: 'IN',
-      permit_type: 'Blue Card',
       query: 'What documents do I need?',
     });
   });
