@@ -7,7 +7,7 @@ import {
 } from '../../features/immigration/ImmigrationAnswerPanel';
 import { MoveAtAGlance } from '../../features/immigration/MoveAtAGlance';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
-import { servicesAPI } from '../../api/client';
+import api, { servicesAPI } from '../../api/client';
 
 /**
  * Route: /employee/immigration-assistant
@@ -29,11 +29,28 @@ export const ImmigrationAssistantPage: React.FC = () => {
     }
     void (async () => {
       try {
-        const ctx = await servicesAPI.getServicesContext(assignmentId);
+        // AIQ-1476: resolve the corridor AND the employee's nationality from intake
+        // (already persisted + consent-gated) so the assistant doesn't ask the employee
+        // to re-type what they gave in the intake form.
+        const [ctx, nationalities] = await Promise.all([
+          servicesAPI.getServicesContext(assignmentId),
+          primaryCaseId
+            ? api
+                .get<{ profile: { nationality?: string | null; second_nationality?: string | null } | null }>(
+                  `/api/employee/cases/${primaryCaseId}/profile`,
+                )
+                .then((r) =>
+                  [r.data.profile?.nationality, r.data.profile?.second_nationality]
+                    .map((n) => (n ?? '').trim())
+                    .filter(Boolean),
+                )
+                .catch(() => [] as string[])
+            : Promise.resolve([] as string[]),
+        ]);
         const from = ctx.case_context?.originCountry?.trim();
         const to = ctx.case_context?.destCountry?.trim();
         if (active && from && to) {
-          setCaseContext({ from, to, label: `${from} → ${to}` });
+          setCaseContext({ from, to, label: `${from} → ${to}`, nationalities });
         }
       } catch {
         // best-effort: fall back to the manual corridor form
@@ -44,7 +61,7 @@ export const ImmigrationAssistantPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [assignmentId]);
+  }, [assignmentId, primaryCaseId]);
 
   return (
     <AppShell title="Relocation Assistant" subtitle="Grounded answers about your move and your company's benefits">
