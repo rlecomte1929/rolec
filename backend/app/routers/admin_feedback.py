@@ -176,6 +176,7 @@ SELECT
     CAST(fs.area            AS TEXT) AS area,
     CAST(fs.dispatch_status AS TEXT) AS dispatch_status,
     CAST(fs.dispatch_ref    AS TEXT) AS dispatch_ref,
+    CAST(fs.autonomy_tier   AS TEXT) AS autonomy_tier,
     CASE WHEN fs.dismissed_at IS NOT NULL THEN 1 ELSE 0 END AS dismissed
 FROM (
     {union}

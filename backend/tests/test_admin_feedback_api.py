@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   dispatch_ref    TEXT,
   dispatch_status TEXT,
   dispatch_context TEXT,
+  autonomy_tier   TEXT,
   dismissed_at TEXT,
   PRIMARY KEY (stream, source_id)
 );
@@ -263,6 +264,24 @@ def test_get_left_joins_feedback_status(admin_client, db_session):
     item2 = resp2.json()["items"][0]
     assert item2["status"] == "reviewed"
     assert item2["owner"] == "alice"
+
+
+def test_get_returns_autonomy_tier(admin_client, db_session):
+    """A dispatched item's persisted autonomy_tier is surfaced in the list response."""
+    resp = admin_client.get("/api/admin/feedback?stream=product")
+    assert resp.status_code == 200
+    item = resp.json()["items"][0]
+    # No triage/dispatch yet — autonomy_tier should be None (no row in feedback_status)
+    assert item["autonomy_tier"] is None
+
+    db_session.execute(text(
+        "INSERT INTO feedback_status (stream, source_id, status, dispatch_status, autonomy_tier, updated_at) "
+        "VALUES ('product', 'f-001', 'acted_on', 'dispatched', 'yellow', '2026-06-01T13:00:00')"
+    ))
+    db_session.commit()
+    resp2 = admin_client.get("/api/admin/feedback?stream=product")
+    item2 = resp2.json()["items"][0]
+    assert item2["autonomy_tier"] == "yellow"
 
 
 def test_get_non_admin_returns_403(non_admin_client):
