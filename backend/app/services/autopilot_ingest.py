@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -166,14 +167,20 @@ def _dispatch_one(session: Any, rep: Dict[str, Any], size: int, *, dry_run: bool
 
     url = nwq.create_work_queue_task(task, failure_evidence=failure_evidence, context_links=context_links)
     now = datetime.utcnow().isoformat()
+    page_id = nwq.page_id_from_ref(url) or ""
+    notion_task_id = re.sub(r"[^0-9a-f]", "", page_id.lower())  # dashless-lower 32hex join key
+    tier = task.get("autonomy_tier") or None
     session.execute(
         text(
-            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
-            "VALUES ('product', :id, 'new', :ref, 'dispatched', :now) "
+            "INSERT INTO feedback_status "
+            "(stream, source_id, status, dispatch_ref, dispatch_status, dispatched_at, notion_task_id, autonomy_tier, updated_at) "
+            "VALUES ('product', :id, 'new', :ref, 'dispatched', :now, :ntid, :tier, :now) "
             "ON CONFLICT (stream, source_id) DO UPDATE SET "
-            "  dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', updated_at = excluded.updated_at"
+            "  dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
+            "  dispatched_at = :now, notion_task_id = excluded.notion_task_id, "
+            "  autonomy_tier = excluded.autonomy_tier, updated_at = :now"
         ),
-        {"id": rep["id"], "ref": url, "now": now},
+        {"id": rep["id"], "ref": url, "now": now, "ntid": notion_task_id, "tier": tier},
     )
     ev.emit(ev.TASK_DISPATCHED, entity_id=rep["id"],
             properties={"cluster_size": size, "complexity": task.get("complexity"),

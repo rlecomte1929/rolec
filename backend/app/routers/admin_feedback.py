@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 import uuid
@@ -545,6 +546,23 @@ def dispatch_preview(
     except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
         log.warning("dispatch_preview engineer_task failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"Could not engineer the task: {exc}") from exc
+
+    _db2 = SessionLocal()
+    try:
+        _db2.execute(
+            text(
+                "INSERT INTO feedback_status (stream, source_id, status, dispatch_status, spec_drafted_at, updated_at) "
+                "VALUES (:s, :id, 'new', 'spec_drafted', :now, :now) "
+                "ON CONFLICT (stream, source_id) DO UPDATE SET "
+                "  dispatch_status = 'spec_drafted', spec_drafted_at = COALESCE(feedback_status.spec_drafted_at, :now), "
+                "  updated_at = :now"
+            ),
+            {"s": stream, "id": item_id, "now": datetime.utcnow().isoformat()},
+        )
+        _db2.commit()
+    finally:
+        _db2.close()
+
     return {"task": task}
 
 
@@ -595,15 +613,20 @@ def dispatch_create(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     now = datetime.utcnow().isoformat()
+    page_id = notion_work_queue.page_id_from_ref(url) or ""
+    notion_task_id = re.sub(r"[^0-9a-f]", "", page_id.lower())  # dashless-lower 32hex join key
+    tier = task.get("autonomy_tier") or None
     db.execute(
         text(
-            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
-            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now) "
+            "INSERT INTO feedback_status "
+            "(stream, source_id, status, dispatch_ref, dispatch_status, dispatched_at, notion_task_id, autonomy_tier, updated_at) "
+            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now, :ntid, :tier, :now) "
             "ON CONFLICT (stream, source_id) DO UPDATE SET "
-            "    dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
-            "    updated_at = excluded.updated_at"
+            "  dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
+            "  dispatched_at = :now, notion_task_id = excluded.notion_task_id, "
+            "  autonomy_tier = excluded.autonomy_tier, updated_at = :now"
         ),
-        {"s": stream, "id": item_id, "ref": url, "now": now},
+        {"s": stream, "id": item_id, "ref": url, "now": now, "ntid": notion_task_id, "tier": tier},
     )
     record_admin_event(
         db,
