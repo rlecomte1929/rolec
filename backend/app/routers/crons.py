@@ -156,6 +156,22 @@ def autopilot_ingest(request: Request, body: IngestBody) -> Dict[str, Any]:
     return run_ingest(dry_run=body.dry_run, lookback_hours=body.lookback_hours)
 
 
+class NotionSyncBody(BaseModel):
+    dry_run: bool = False
+
+
+@router.post("/feedback-notion-sync")
+def feedback_notion_sync(request: Request, body: NotionSyncBody) -> Dict[str, Any]:
+    """Poll Notion for each dispatched feedback item's Work Queue Status and advance
+    feedback_status to match, so completed work reads Done (green) in the admin console
+    instead of staying stuck at 'dispatched'. Read-only against Notion; only writes
+    feedback_status. dry_run reports the diff without writing. Cron-secret gated."""
+    _verify_cron_secret(request)
+    from ..services.feedback_notion_sync import sync_dispatched_statuses
+
+    return sync_dispatched_statuses(dry_run=body.dry_run)
+
+
 @router.post("/autopilot-digest")
 def autopilot_digest(request: Request) -> Dict[str, Any]:
     """[Autopilot P4] Write today's autopilot funnel+cost summary to daily_summaries. Fail-soft;
