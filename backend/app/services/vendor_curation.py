@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -25,6 +26,24 @@ from sqlalchemy import text
 from ...database import db
 
 log = logging.getLogger(__name__)
+
+
+def _canon_city(value: Optional[str]) -> str:
+    """Canonicalise a city string for matching HR-curated rows to an employee's case.
+
+    AIQ-1457: HR writes ``destination_city`` from the destination *picker* string
+    (e.g. "Zürich") while the employee read passes the *intake-captured* case city
+    (e.g. "Zurich") — separately-sourced strings that diverge by case, surrounding
+    whitespace, or diacritics. A raw ``=`` comparison then returns zero rows and the
+    employee wrongly sees "HR is finalizing providers." Normalise both sides to a
+    lowercase, whitespace-trimmed, diacritic-stripped key so equivalent cities match.
+    Cross-DB safe (pure Python — SQL ``LOWER`` does not strip diacritics on SQLite/PG).
+    """
+    if not value:
+        return ""
+    decomposed = unicodedata.normalize("NFKD", str(value))
+    without_marks = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return " ".join(without_marks.split()).lower()
 
 
 def _row_to_dict(row: Any) -> Dict[str, Any]:
@@ -53,19 +72,30 @@ def list_curation(
     category: str,
     destination_city: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """All curation rows for the (company, category, city)."""
+    """All curation rows for the (company, category, city).
+
+    AIQ-1457: the ``destination_city`` filter is applied in Python via ``_canon_city``
+    rather than a raw SQL ``=`` so casing/whitespace/diacritic differences between HR's
+    picker city and the employee's intake city don't hide curated vendors. City-scoped
+    rows match when their canonical city equals the requested one; city-agnostic rows
+    (``destination_city IS NULL``) always match.
+    """
     sql = (
         "SELECT * FROM company_vendor_selections "
-        "WHERE company_id = :co AND category = :cat"
+        "WHERE company_id = :co AND category = :cat "
+        "ORDER BY display_order ASC, created_at ASC"
     )
     params: Dict[str, Any] = {"co": company_id, "cat": category}
-    if destination_city is not None:
-        sql += " AND (destination_city = :city OR destination_city IS NULL)"
-        params["city"] = destination_city
-    sql += " ORDER BY display_order ASC, created_at ASC"
     with db.engine.begin() as conn:
-        rows = conn.execute(text(sql), params).mappings().all()
-    return [_row_to_dict(r) for r in rows]
+        rows = [_row_to_dict(r) for r in conn.execute(text(sql), params).mappings().all()]
+    if destination_city is None:
+        return rows
+    want = _canon_city(destination_city)
+    return [
+        r
+        for r in rows
+        if not r.get("destination_city") or _canon_city(r.get("destination_city")) == want
+    ]
 
 
 def upsert_master_selection(
