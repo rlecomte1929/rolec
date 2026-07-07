@@ -641,14 +641,23 @@ def dispatch_create(
     if not task.get("title"):
         raise HTTPException(status_code=400, detail="Task title is required.")
 
-    # Idempotency: if this item was already dispatched (dispatch_ref set to a URL), do NOT
-    # create a second Notion task — return the existing one. Guards against double-submits,
-    # client retries, and races from spawning duplicate Work Queue pages.
+    # ── Idempotency + pre-flight sentinel ────────────────────────────────────────
+    # Root cause of the duplicate-Notion-task bug (AIQ-1465/1466): if the client
+    # disconnects while Notion is in-flight, _get_db rolls back the DB write so
+    # dispatch_ref stays NULL.  A retry then passes the old idempotency check and
+    # creates a second task.
+    #
+    # Fix: write 'PENDING' to dispatch_ref BEFORE calling Notion, committed
+    # immediately, so any concurrent or retried call sees it and gets a 409.
+    # A PENDING older than 2 minutes is considered orphaned (server crash / Render
+    # restart) and is silently overwritten so the admin can retry.
     existing = db.execute(
-        text("SELECT dispatch_ref FROM feedback_status WHERE stream = :s AND source_id = :id"),
+        text("SELECT dispatch_ref, updated_at FROM feedback_status WHERE stream = :s AND source_id = :id"),
         {"s": stream, "id": item_id},
     ).fetchone()
     existing_ref = existing[0] if existing else None
+    existing_updated_at = existing[1] if existing else None
+
     if existing_ref and str(existing_ref).startswith("http"):
         return {
             "dispatched": True,
@@ -657,6 +666,59 @@ def dispatch_create(
             "url": existing_ref,
             "dispatch_ref": existing_ref,
         }
+
+    _PENDING_STALE_SECS = 120
+    now_dt = datetime.utcnow()
+    now = now_dt.isoformat()
+
+    if existing_ref == "PENDING":
+        stale = True
+        if existing_updated_at:
+            try:
+                age = (now_dt - datetime.fromisoformat(str(existing_updated_at))).total_seconds()
+                stale = age >= _PENDING_STALE_SECS
+            except Exception:  # noqa: BLE001
+                stale = True
+        if not stale:
+            raise HTTPException(
+                status_code=409,
+                detail="Dispatch already in progress — please wait a moment and try again.",
+            )
+        # stale PENDING: fall through and overwrite
+
+    # Atomically claim the dispatch slot.  Only writes PENDING when dispatch_ref IS NULL
+    # or is an existing (stale) PENDING; returns 0 rows when a real URL is already set.
+    claim = db.execute(
+        text(
+            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, updated_at) "
+            "VALUES (:s, :id, 'new', 'PENDING', :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "  dispatch_ref = 'PENDING', updated_at = :now "
+            "WHERE feedback_status.dispatch_ref IS NULL OR feedback_status.dispatch_ref = 'PENDING' "
+            "RETURNING dispatch_ref"
+        ),
+        {"s": stream, "id": item_id, "now": now},
+    ).fetchone()
+    if claim is None:
+        fresh = db.execute(
+            text("SELECT dispatch_ref FROM feedback_status WHERE stream = :s AND source_id = :id"),
+            {"s": stream, "id": item_id},
+        ).fetchone()
+        ref = fresh[0] if fresh else None
+        if ref and str(ref).startswith("http"):
+            db.commit()
+            return {
+                "dispatched": True,
+                "already_exists": True,
+                "notion_url": ref,
+                "url": ref,
+                "dispatch_ref": ref,
+            }
+        raise HTTPException(status_code=409, detail="Concurrent dispatch in progress — please retry.")
+
+    # Commit sentinel immediately so concurrent requests see it before Notion is called.
+    db.commit()
+    # ── end sentinel block ────────────────────────────────────────────────────────
 
     report_id = item_id
     message = page_url = ""
@@ -676,16 +738,30 @@ def dispatch_create(
     )
     context_links = f"https://relopass.com/admin/feedback  (report_id={report_id})"
 
+    def _clear_pending() -> None:
+        """Roll the sentinel back on Notion failure so the admin can retry."""
+        try:
+            db.execute(
+                text(
+                    "UPDATE feedback_status SET dispatch_ref = NULL, updated_at = :now "
+                    "WHERE stream = :s AND source_id = :id AND dispatch_ref = 'PENDING'"
+                ),
+                {"s": stream, "id": item_id, "now": now},
+            )
+            db.commit()
+        except Exception:  # noqa: BLE001
+            log.warning("dispatch_create: could not clear PENDING sentinel for %s/%s", stream, item_id)
+
     try:
         url = notion_work_queue.create_work_queue_task(
             task, failure_evidence=failure_evidence, context_links=context_links
         )
     except notion_work_queue.NotionNotConfigured as exc:
+        _clear_pending()
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except notion_work_queue.NotionApiError as exc:
+        _clear_pending()
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    now = datetime.utcnow().isoformat()
     page_id = notion_work_queue.page_id_from_ref(url) or ""
     notion_task_id = re.sub(r"[^0-9a-f]", "", page_id.lower())  # dashless-lower 32hex join key
     tier = task.get("autonomy_tier") or None
