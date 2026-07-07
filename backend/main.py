@@ -255,6 +255,7 @@ from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] uni
 from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
 from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
 from .app.routers import public_analytics as public_analytics_router  # [audos-P2] public funnel event ingest
+from .app.routers import public_corridor as public_corridor_router  # [audos] public corridor requirements read model
 from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
@@ -875,6 +876,7 @@ app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — 
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
 app.include_router(public_analytics_router.router)  # [audos-P2] public POST /api/public/track (no prefix)
+app.include_router(public_corridor_router.router)  # [audos] public GET /api/public/corridor-requirements
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(admin_mobility_router.router)

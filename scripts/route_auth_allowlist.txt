@@ -119,6 +119,11 @@ backend/app/routers/lead_capture.py:capture_lead
 # PUBLIC (audos-P1): marketing-site lead capture. Rate-limited (10/hour;50/day),
 # write-only INSERT into leads, returns only {id, matched_prospect} — exposes no
 # data back to the caller. company_domain derived server-side. Unauthenticated by design.
+backend/app/routers/public_corridor.py:corridor_requirements
+# PUBLIC (audos): generic corridor requirements read model for an anonymous demo/landing.
+# Rate-limited (60/hour;600/day), no auth, no case/user data, no PII — returns only generic
+# statutory/immigration requirements the deterministic engine produces for a destination +
+# assignment type. Wildcard CORS (credential-free). See public_corridor.py docstring.
 backend/app/routers/public_analytics.py:track_event
 # PUBLIC (audos-P2): marketing funnel event ingest. Rate-limited (120/hour;1000/day),
 # allow-lists event names (landing_page_view/landing_cta_click) and persists only
