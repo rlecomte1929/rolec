@@ -27,6 +27,7 @@ _META = {
     "c898d1ef15ab07f1d3": {"status": "Done", "aiq_id": "AIQ-1454"},
     "c59729cefca38baf93": {"status": "AI in Progress", "aiq_id": "AIQ-1455"},
     "a187fd53c5f9c97b": {"status": "Ready for AI", "aiq_id": "AIQ-9999"},  # unmapped → no change
+    "e39578c7b404563c15": {"status": "Archived", "aiq_id": "AIQ-1450"},   # dedup dup → done
 }
 
 
@@ -48,6 +49,7 @@ def session():
             "('product','fb-done','new','https://app.notion.com/p/x-395887c64d4881c898d1ef15ab07f1d3','dispatched'),"
             "('product','fb-prog','new','https://app.notion.com/p/y-395887c64d4881c59729cefca38baf93','dispatched'),"
             "('product','fb-ready','new','https://app.notion.com/p/z-395887c64d488101a187fd53c5f9c97b','dispatched'),"
+            "('product','fb-arch','new','https://app.notion.com/p/a-395887c64d4881e39578c7b404563c15','dispatched'),"
             "('product','fb-term','closed','https://app.notion.com/p/w-395887c64d4881c898d1ef15ab07f1d3','done'),"
             "('product','fb-none','new',NULL,NULL)"
         ))
@@ -60,8 +62,9 @@ def test_dry_run_reports_without_writing(session, monkeypatch):
     monkeypatch.setattr(nwq, "get_task_meta", _fake_get_task_meta)
     res = sync.sync_dispatched_statuses(dry_run=True, session=session)
     assert res["dry_run"] is True
-    assert res["changed"] == 2  # fb-done→done, fb-prog→in_progress (ready=unmapped, term/none skipped)
-    assert {c["source_id"]: c["to"] for c in res["changes"]} == {"fb-done": "done", "fb-prog": "in_progress"}
+    assert res["changed"] == 3  # fb-done→done, fb-prog→in_progress, fb-arch→done (ready unmapped; term/none skipped)
+    assert {c["source_id"]: c["to"] for c in res["changes"]} == {
+        "fb-done": "done", "fb-prog": "in_progress", "fb-arch": "done"}
     # nothing written
     assert session.execute(text("SELECT dispatch_status FROM feedback_status WHERE source_id='fb-done'")).fetchone()[0] == "dispatched"
 
@@ -69,11 +72,13 @@ def test_dry_run_reports_without_writing(session, monkeypatch):
 def test_apply_advances_done_and_in_progress(session, monkeypatch):
     monkeypatch.setattr(nwq, "get_task_meta", _fake_get_task_meta)
     res = sync.sync_dispatched_statuses(dry_run=False, session=session)
-    assert res["changed"] == 2
+    assert res["changed"] == 3
     done = session.execute(text("SELECT dispatch_status, status, done_at FROM feedback_status WHERE source_id='fb-done'")).fetchone()
     assert done[0] == "done" and done[1] == "closed" and done[2] is not None  # green + triage closed + timestamp
     prog = session.execute(text("SELECT dispatch_status, status, in_progress_at FROM feedback_status WHERE source_id='fb-prog'")).fetchone()
     assert prog[0] == "in_progress" and prog[1] == "new" and prog[2] is not None
+    arch = session.execute(text("SELECT dispatch_status, status, done_at FROM feedback_status WHERE source_id='fb-arch'")).fetchone()
+    assert arch[0] == "done" and arch[1] == "closed" and arch[2] is not None  # archived dup → done (green)
     # unmapped, terminal, and undispatched rows are untouched
     assert session.execute(text("SELECT dispatch_status FROM feedback_status WHERE source_id='fb-ready'")).fetchone()[0] == "dispatched"
     assert session.execute(text("SELECT dispatch_status FROM feedback_status WHERE source_id='fb-term'")).fetchone()[0] == "done"

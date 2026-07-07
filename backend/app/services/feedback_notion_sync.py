@@ -42,7 +42,10 @@ _STATUS_MAP: Dict[str, Tuple[str, Optional[str], Optional[str]]] = {
     "Validation": ("in_review", None, None),
     "Blocked": ("verify_failed", None, None),
     "Rejected": ("wont_fix", "closed", None),
-    "Archived": ("dismissed", "closed", None),
+    # In this workspace a task is Archived when its work has shipped under a canonical /
+    # dedup sibling (the dispatch + autopilot flows archive duplicates), so archived ==
+    # handled/shipped → done (green), not dismissed.
+    "Archived": ("done", "closed", "done_at"),
 }
 
 _TERMINAL = ("done", "dismissed", "wont_fix")
