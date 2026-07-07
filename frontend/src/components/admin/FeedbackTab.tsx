@@ -306,7 +306,8 @@ export function FeedbackTab() {
       const task = await dispatchPreview(row.stream, row.id, { text: row.text, category: row.verdict ?? 'bug' });
       setPreviewTask(task);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not generate the task.';
+      // Surface the real reason (LLM failure/timeout → backend detail, else axios message).
+      const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Failed to generate spec';
       setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
       setPreviewFor(null);
     } finally {
@@ -810,10 +811,10 @@ export function FeedbackTab() {
                         <p className="text-[10.5px] text-gray-400">Resolution: {row.resolution}</p>
                       )}
 
-                      {/* Pipeline state — stepper + valid next-action button(s). Shows its
-                          own error (e.g. a 409 illegal transition) since the shared
-                          dispatchErr slot below isn't always rendered (only inside the
-                          fix-enabled / not-yet-dispatched branches). */}
+                      {/* Pipeline state — stepper + valid next-action button(s). This is the
+                          SINGLE per-row error slot (dispatchErr) for state transitions AND
+                          dispatch/preview/fix actions: it always renders for an expanded row,
+                          so we do NOT duplicate it inside the conditional dispatch branches below. */}
                       <div className="pt-2 mt-1 border-t border-gray-200 space-y-1">
                         <ProgressStrip
                           status={row.dispatch_status ?? 'new'}
@@ -863,7 +864,6 @@ export function FeedbackTab() {
                                   </Button>
                                 </div>
                                 {triggerResult && <FixSkillCallout result={triggerResult} />}
-                                {dispatchErr && <p className="text-[11px] text-gray-600">{dispatchErr}</p>}
                               </>
                             )}
                           </div>
@@ -882,7 +882,6 @@ export function FeedbackTab() {
                               className="w-full text-[12px] rounded border border-gray-200 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
                             />
                             {savingContextId === row.id && <p className="text-[10px] text-gray-400">Saving…</p>}
-                            {dispatchErr && <p className="text-[11px] text-red-600">{dispatchErr}</p>}
 
                             {previewFor === row.id && previewTask ? (
                               <div className="rounded border border-gray-200 bg-white p-3 space-y-2">
