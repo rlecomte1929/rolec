@@ -4509,15 +4509,19 @@ def _dispatch_hr_assign_side_effects(
             f"Once logged in, go to My Case to start your intake.\n"
         )
         try:
-            db.create_message(
-                message_id=str(uuid.uuid4()),
-                assignment_id=assignment_id,
-                hr_user_id=hr_user_id,
-                employee_identifier=stored_identifier,
-                subject="Your relocation case is ready",
-                body=message_body,
-                status="draft",
-            )
+            # AIQ-1455: only write when no thread-starter exists yet — the canonical
+            # post-creation hook (ensure_welcome_message_for_assignment) may already have
+            # written one for this assignment. Guards against a duplicate inbox message.
+            if not db.list_messages_by_assignment(assignment_id):
+                db.create_message(
+                    message_id=str(uuid.uuid4()),
+                    assignment_id=assignment_id,
+                    hr_user_id=hr_user_id,
+                    employee_identifier=stored_identifier,
+                    subject="Your relocation case is ready",
+                    body=message_body,
+                    status="draft",
+                )
         except Exception as exc:
             log.warning(
                 "create_message skipped assignment_id=%s case_id=%s error=%s",
