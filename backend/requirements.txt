@@ -50,8 +50,8 @@ anthropic==0.39.0
 langsmith>=0.1.147
 # [AIQ-571] AI observability — Langfuse EU Cloud, the committed eval/trace substrate
 # (supersedes LangSmith/Weave per audit/AI_AGENT_STRATEGY.md §5). No-op when LANGFUSE_* unset.
-# Pinned to the v2 SDK API used by backend/app/services/llm_tracing.py.
-langfuse>=2.0,<3.0
+# v4 SDK: get_client() / @observe / update_current_generation() (see llm_tracing.py, app/observability.py).
+langfuse>=4
 PyJWT>=2.10.1,<3.0.0
 email-validator>=2.0.0
 # [Parker-A] Survival analysis for case-duration prediction. lifelines is pinned

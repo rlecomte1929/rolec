@@ -47,6 +47,13 @@ from .policy_assistant_embedder import (
 
 log = logging.getLogger(__name__)
 
+try:
+    from langfuse import observe as _lf_observe  # type: ignore
+    _observe_pgvector = _lf_observe(name="pgvector_retrieval")
+except Exception:
+    def _observe_pgvector(fn):  # type: ignore[misc]
+        return fn
+
 # W2/AIQ-836 retrieval quality gates.
 #
 # NOTE on schema reality: policy_assistant_chunks has NO `trust_tier` or
@@ -153,6 +160,7 @@ def _apply_quality_gates(
     return scored[: max(1, top_k)]
 
 
+@_observe_pgvector
 def retrieve(
     *,
     company_id: str,
@@ -193,8 +201,19 @@ def retrieve(
 
     dialect = db.engine.dialect.name
     if dialect == "sqlite":
-        return _retrieve_sqlite(company_id, q_emb, top_k, source_types, min_similarity_score, query)
-    return _retrieve_postgres(company_id, q_emb, top_k, source_types, min_similarity_score, query)
+        result = _retrieve_sqlite(company_id, q_emb, top_k, source_types, min_similarity_score, query)
+    else:
+        result = _retrieve_postgres(company_id, q_emb, top_k, source_types, min_similarity_score, query)
+    try:
+        from langfuse import get_client as _lf_get  # type: ignore
+        from .pii_masker import mask_pii
+        _lf_get().update_current_span(
+            input={"query": mask_pii(query)[:500], "top_k": top_k, "table": "policy_assistant_chunks"},
+            output={"chunk_count": len(result), "top_score": result[0].get("score") if result else None},
+        )
+    except Exception:
+        pass
+    return result
 
 
 # --- Postgres (pgvector) ---------------------------------------------------

@@ -23,6 +23,13 @@ from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
+try:
+    from langfuse import observe as _lf_observe  # type: ignore
+    _observe_pgvector = _lf_observe(name="pgvector_retrieval")
+except Exception:
+    def _observe_pgvector(fn):  # type: ignore[misc]
+        return fn
+
 
 class DossierSuggestionUnavailable(RuntimeError):
     """[OBS-01] Raised when the dossier-suggestion LLM call fails (transport /
@@ -72,6 +79,7 @@ def corridor_for_case(draft: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+@_observe_pgvector
 def retrieve_chunks(corridor: str, query: str, k: int = 5) -> List[Dict[str, Any]]:
     """Top-k `policy_assistant_chunks` for `corridor` by pgvector cosine.
     Best-effort: returns [] on no corpus / embedder unavailable / any failure."""
@@ -114,6 +122,14 @@ def retrieve_chunks(corridor: str, query: str, k: int = 5) -> List[Dict[str, Any
             "text": r["chunk_text"],
             "source_url": meta.get("source_url"),
         })
+    try:
+        from langfuse import get_client as _lf_get  # type: ignore
+        _lf_get().update_current_span(
+            input={"top_k": k, "table": "policy_assistant_chunks", "corridor": corridor},
+            output={"chunk_count": len(out)},
+        )
+    except Exception:
+        pass
     return out
 
 

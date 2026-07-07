@@ -37,6 +37,13 @@ from .policy_assistant_embedder import Embedder, cosine_similarity, get_default_
 
 log = logging.getLogger(__name__)
 
+try:
+    from langfuse import observe as _lf_observe  # type: ignore
+    _observe_pgvector = _lf_observe(name="pgvector_retrieval")
+except Exception:
+    def _observe_pgvector(fn):  # type: ignore[misc]
+        return fn
+
 # N3/AIQ-842 retrieval quality gates.
 _IMMIGRATION_MIN_SIMILARITY = float(os.getenv("IMMIGRATION_MIN_SIMILARITY", "0.25"))
 _TIER_BOOST = {1: 1.0, 2: 0.9, 3: 0.75}
@@ -102,6 +109,7 @@ def corridor_key(origin: str, destination: str) -> str:
     return f"{origin.strip().upper()}→{destination.strip().upper()}"
 
 
+@_observe_pgvector
 def retrieve_for_profile(
     *,
     profile: UserProfile,
@@ -176,6 +184,14 @@ def retrieve_for_profile(
         "immigration_retriever corridor=%s pathway=%s returned=%d min_sim=%.2f",
         corridor, classification.pathway_type, len(result), min_sim,
     )
+    try:
+        from langfuse import get_client as _lf_get  # type: ignore
+        _lf_get().update_current_span(
+            input={"top_k": top_k, "table": "immigration_corpus_chunks", "corridor": corridor},
+            output={"chunk_count": len(result), "top_score": result[0].get("score") if result else None},
+        )
+    except Exception:
+        pass
     return result
 
 
