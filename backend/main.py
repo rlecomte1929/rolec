@@ -1138,6 +1138,8 @@ def _seed_demo_cases() -> None:
         ("demo-emp-002", "mark.thompson@relopass.local", "Mark Thompson"),
         ("demo-emp-003", "demo@relopass.com", "Demo Employee"),
         ("test-emp-test", "testEMPtest@relopass.com", "Test Employee"),
+        # AIQ-1413: hero case for the mobility-coordinator demo video (Paris → London).
+        ("demo-emp-schen", "sarah.chen@relopass.local", "Sarah Chen"),
     ]
     for emp_id, emp_email, emp_name in employees:
         ensure_user(emp_id, emp_email, "EMPLOYEE", emp_name)
@@ -1169,6 +1171,8 @@ def _seed_demo_cases() -> None:
     db.create_hr_user("hr-003", test_company_id, hr_user_id_2, {"can_manage_policy": True})
     db.create_employee("emp-001", company_id, "demo-emp-001", "Band2", "Long-Term", "demo-case-oslo-sg-family", "active")
     db.create_employee("emp-002", company_id, "demo-emp-003", "Band1", "Long-Term", "demo-case-demo-emp", "active")
+    # AIQ-1413: Sarah Chen — Paris → London demo case for the coordinator video.
+    db.create_employee("emp-schen", company_id, "demo-emp-schen", "Band2", "Long-Term", "demo-case-paris-london-schen", "active")
 
     db.upsert_relocation_case(
         case_id="demo-case-oslo-sg-family",
@@ -1187,6 +1191,16 @@ def _seed_demo_cases() -> None:
         stage="policy",
         host_country="Singapore",
         home_country="United States",
+    )
+    # AIQ-1413: Sarah Chen — Paris → London, French national, standard international.
+    db.upsert_relocation_case(
+        case_id="demo-case-paris-london-schen",
+        company_id=company_id,
+        employee_id="emp-schen",
+        status="in_progress",
+        stage="docs",
+        host_country="United Kingdom",
+        home_country="France",
     )
 
     db.create_support_case(
@@ -1269,6 +1283,44 @@ def _seed_demo_cases() -> None:
                     "movers": {"inventoryRough": "medium"},
                 },
                 complianceDocs={"hasPassportScans": True, "hasEmploymentLetter": False, "hasMarriageCertificate": False, "hasBirthCertificates": False},
+            ).model_dump(mode="json"),
+        },
+        {
+            # AIQ-1413: hero scenario for the mobility-coordinator demo video.
+            "case_id": "demo-case-paris-london-schen",
+            "assignment_id": "demo-assignment-paris-london-schen",
+            "employee_identifier": "sarah.chen@relopass.local",
+            "status": AssignmentStatus.SUBMITTED.value,
+            "profile": RelocationProfile(
+                userId="demo-assignment-paris-london-schen",
+                familySize=1,
+                spouse={"fullName": None, "wantsToWork": False},
+                dependents=[],
+                primaryApplicant={
+                    "fullName": "Sarah Chen",
+                    "nationality": "French",
+                    "employer": {
+                        "name": "Acme Corp",
+                        "roleTitle": "Senior Engineer",
+                        "jobLevel": "L2",
+                        "salaryBand": "90k - 120k",
+                    },
+                    "assignment": {"startDate": "2026-10-01"},
+                },
+                movePlan={
+                    "origin": "Paris, France",
+                    "destination": "London, United Kingdom",
+                    "targetArrivalDate": "2026-10-01",
+                    "housing": {"budgetMonthlyGBP": "2500-3500"},
+                    "schooling": {"budgetAnnualGBP": "0"},
+                    "movers": {"inventoryRough": "medium"},
+                },
+                complianceDocs={
+                    "hasPassportScans": True,
+                    "hasEmploymentLetter": True,
+                    "hasMarriageCertificate": False,
+                    "hasBirthCertificates": False,
+                },
             ).model_dump(mode="json"),
         },
         {
