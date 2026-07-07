@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
 import { getCountryName } from '../utils/countries';
@@ -115,6 +115,18 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   // IMM-15: immigration context captured when the vendor flow is opened from the
   // immigration panel; flows into VendorBrowsePanel and the RFQ modal.
   const [vendorImmigrationContext, setVendorImmigrationContext] = useState<ImmigrationContext | null>(null);
+  // BUG-260706-4DE4: allow deep-linking straight to the vendor browse (e.g. the
+  // "Find immigration vendor" action on /hr/requirements) via ?openVendors=immigration.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('openVendors') === 'immigration') {
+      setVendorPanelInitialCategory('Immigration/visa');
+      setVendorPanelOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('openVendors');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
   const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
   // NAV-HR-2: case-level escalate — the one case action missing from this view

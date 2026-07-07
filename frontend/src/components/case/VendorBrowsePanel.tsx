@@ -39,6 +39,18 @@ const SERVICE_CATEGORIES = [
   'Other',
 ];
 
+// BUG-260706-4DE4: the dropdown shows friendly labels, but the vendors table keys on a
+// coarser `category` value (e.g. "Immigration Legal"). Send the canonical category so the
+// filter actually matches — otherwise real vendors (e.g. the immigration firm) never show.
+// Labels without a canonical category fall through unmapped (backend also matches
+// service_types), which is honest: an unmatched category simply returns no rows.
+const LABEL_TO_VENDOR_CATEGORY: Record<string, string> = {
+  'Housing search': 'Housing Search',
+  'Immigration/visa': 'Immigration Legal',
+  'Moving & shipping': 'Moving & Freight',
+  'School search': 'School Search',
+};
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -73,7 +85,9 @@ export const VendorBrowsePanel: React.FC<Props> = ({
     queryKey: ['vendors', selectedCategory, selectedCorridor],
     queryFn: async () => {
       const res = await hrAPI.getVendors({
-        ...(selectedCategory ? { category: selectedCategory } : {}),
+        ...(selectedCategory
+          ? { category: LABEL_TO_VENDOR_CATEGORY[selectedCategory] ?? selectedCategory }
+          : {}),
         ...(selectedCorridor ? { corridor: selectedCorridor } : {}),
       });
       return res.vendors;
