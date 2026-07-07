@@ -1,0 +1,46 @@
+# feedback-notion-sync.yml — keep the ReloPass Feedback console in sync with Notion.
+# ─────────────────────────────────────────────────────────────────────────────
+# Polls POST /api/crons/feedback-notion-sync every 6h: for each dispatched feedback
+# item it reads the linked Notion Work Queue task's Status and advances feedback_status
+# so completed work shows Done (green) in the admin console instead of staying at
+# 'dispatched'. Read-only against Notion; only writes feedback_status; idempotent.
+#
+# Runs unconditionally on schedule (benign, forward-only). workflow_dispatch defaults to
+# dry_run=true so a manual run previews the diff without writing.
+# Secret: CRON_SECRET.
+# ─────────────────────────────────────────────────────────────────────────────
+name: Feedback ↔ Notion Status Sync
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (preview the diff, write nothing)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: feedback-notion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync dispatched feedback statuses from Notion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger feedback ↔ Notion sync
+        env:
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # Scheduled runs are real (dry_run=false); manual runs honour the input (default true).
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && 'true' || 'false' }}
+        run: |
+          set -uo pipefail
+          echo "dry_run=$DRY_RUN"
+          code=$(curl -s -o /tmp/out.json -w '%{http_code}' -X POST "$API_BASE/api/crons/feedback-notion-sync" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+            -d "{\"dry_run\": $DRY_RUN}")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          [ "$code" = "200" ] || { echo "feedback-notion-sync failed"; exit 1; }

@@ -28,6 +28,16 @@ const TIER_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
   red: 'error',
 };
 
+// Terminal / notable states get a prominent badge so a completed item reads green
+// ("Done ✓") at a glance — set by the Notion→Feedback sync when the task ships.
+const TERMINAL: Record<string, { label: string; variant: 'success' | 'neutral' | 'error' }> = {
+  done: { label: 'Done ✓', variant: 'success' },
+  deployed: { label: 'Deployed', variant: 'success' },
+  verify_failed: { label: 'Needs attention', variant: 'error' },
+  dismissed: { label: 'Dismissed', variant: 'neutral' },
+  wont_fix: { label: "Won't fix", variant: 'neutral' },
+};
+
 const ORDER = ['new', 'triaged', 'spec_drafted', 'dispatched', 'in_progress', 'in_review', 'deployed', 'done'];
 
 export function ProgressStrip({ status, tier, busy, onAdvance }: {
@@ -37,8 +47,10 @@ export function ProgressStrip({ status, tier, busy, onAdvance }: {
   onAdvance: (target: string) => void;
 }) {
   const idx = ORDER.indexOf(status);
+  const terminal = TERMINAL[status];
   return (
     <div className="flex items-center gap-2 flex-wrap">
+      {terminal && <Badge variant={terminal.variant} size="sm">{terminal.label}</Badge>}
       {tier && <Badge variant={TIER_VARIANT[tier] ?? 'neutral'} size="sm">{tier}</Badge>}
       <span className="text-xs text-gray-500">
         {ORDER.map((s, i) => (

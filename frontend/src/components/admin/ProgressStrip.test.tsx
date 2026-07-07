@@ -14,4 +14,14 @@ describe('ProgressStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: /^done$/i }));
     expect(spy).toHaveBeenCalledWith('done');
   });
+  it('shows a "Done ✓" badge and no further actions when done', () => {
+    render(<ProgressStrip status="done" busy={false} onAdvance={() => {}} />);
+    expect(screen.getByText(/done ✓/i)).toBeInTheDocument();
+    // terminal — no forward-action buttons
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+  it('flags verify_failed as needs-attention', () => {
+    render(<ProgressStrip status="verify_failed" busy={false} onAdvance={() => {}} />);
+    expect(screen.getByText(/needs attention/i)).toBeInTheDocument();
+  });
 });
