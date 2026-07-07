@@ -98,7 +98,9 @@ function destinationKey(d: { city: string; country: string }): string {
  * /hr/vendor-curation route is unchanged.
  */
 export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const [category, setCategory] = useState<string>('schools');
+  // AIQ-1444 pt3: start with no service type chosen so the Admin master-vendors
+  // section stays hidden until HR explicitly picks a category.
+  const [category, setCategory] = useState<string>('');
   // Destinations come from the admin allowlist — HR can't type free-form.
   const [destinations, setDestinations] = useState<AllowlistedDestination[]>([]);
   const [destinationsLoading, setDestinationsLoading] = useState(false);
@@ -220,7 +222,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
   }, [reloadDemand]);
 
   const load = useCallback(async () => {
-    if (!city) {
+    if (!city || !category) {
       setRows([]);
       return;
     }
@@ -569,10 +571,12 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Service category</span>
             <select
+              aria-label="Service category"
               className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
+              <option value="">Select a service type…</option>
               {CATEGORY_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -705,6 +709,15 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
 
+      {/* AIQ-1444 pt3: the Admin master-vendors section only appears once HR has
+          picked a service type — otherwise a placeholder prompts the selection. */}
+      {!category ? (
+        <Card padding="lg" className="mb-6">
+          <p className="text-sm text-[#4b5563]">
+            Select a service type above to view and curate the available vendors.
+          </p>
+        </Card>
+      ) : (
       <Card
         padding="lg"
         className={`mb-6 transition-shadow ${
@@ -848,6 +861,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           </>
         )}
       </Card>
+      )}
 
       <Card padding="lg">
         <h2 className="text-lg font-semibold text-[#0b2b43]">Your own preferred vendors</h2>
