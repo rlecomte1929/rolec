@@ -106,6 +106,10 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
   const [destinationsLoading, setDestinationsLoading] = useState(false);
   // Selected destination key ("city|country"). Empty until user picks one.
   const [selectedDestinationKey, setSelectedDestinationKey] = useState<string>('');
+  // AIQ-1444 pt2: country is picked first, then a dependent city dropdown resolves
+  // the destination. Kept in sync with the active destination (below) so programmatic
+  // selections (approval flow, edit-row) keep the country dropdown correct.
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [rows, setRows] = useState<CurationRow[]>([]);
   // Track unsaved master toggles: master_item_id -> next selected.
   const [pendingToggles, setPendingToggles] = useState<Map<string, boolean>>(new Map());
@@ -160,6 +164,33 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       ),
     [destinations],
   );
+
+  // AIQ-1444 pt2: distinct countries (A-Z) for the country dropdown, and the
+  // cities (A-Z) available under the currently-selected country for the dependent
+  // city dropdown.
+  const countryOptions = useMemo(
+    () =>
+      Array.from(new Set(destinations.map((d) => d.country))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [destinations],
+  );
+
+  const citiesForCountry = useMemo(
+    () =>
+      selectedCountry
+        ? sortedDestinations.filter((d) => d.country === selectedCountry)
+        : [],
+    [sortedDestinations, selectedCountry],
+  );
+
+  // Keep the country dropdown aligned when the destination is set programmatically
+  // (approval flow, edit-row) rather than via the country dropdown itself.
+  useEffect(() => {
+    if (activeDestination && activeDestination.country !== selectedCountry) {
+      setSelectedCountry(activeDestination.country);
+    }
+  }, [activeDestination, selectedCountry]);
 
   const city = activeDestination?.city || '';
   const country = activeDestination?.country || '';
@@ -278,6 +309,16 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       return;
     }
     setSelectedDestinationKey(value);
+  };
+
+  // AIQ-1444 pt2: picking a country resets the dependent city selection.
+  const onPickCountry = (value: string) => {
+    if (value === REQUEST_NEW_VALUE) {
+      setRequestModalOpen(true);
+      return;
+    }
+    setSelectedCountry(value);
+    setSelectedDestinationKey('');
   };
 
   const populateAllForDestination = async () => {
@@ -547,19 +588,18 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       <Card padding="lg" className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="block">
-            <span className="text-sm font-medium text-[#0b2b43]">Destination</span>
+            <span className="text-sm font-medium text-[#0b2b43]">Country</span>
             <select
+              aria-label="Destination country"
               className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
-              value={selectedDestinationKey}
-              onChange={(e) => onPickDestination(e.target.value)}
+              value={selectedCountry}
+              onChange={(e) => onPickCountry(e.target.value)}
               disabled={destinationsLoading}
             >
-              {destinations.length === 0 && !destinationsLoading && (
-                <option value="">No destinations supported yet</option>
-              )}
-              {sortedDestinations.map((d) => (
-                <option key={destinationKey(d)} value={destinationKey(d)}>
-                  {d.city}, {d.country}
+              <option value="">Select a country…</option>
+              {countryOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
                 </option>
               ))}
               <option value={REQUEST_NEW_VALUE}>+ Request a new destination…</option>
@@ -567,6 +607,25 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
             <p className="mt-1 text-xs text-[#94a3b8]">
               HR can pick from supported destinations only. New destinations need admin approval.
             </p>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#0b2b43]">City</span>
+            <select
+              aria-label="Destination city"
+              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+              value={selectedDestinationKey}
+              onChange={(e) => onPickDestination(e.target.value)}
+              disabled={destinationsLoading || !selectedCountry}
+            >
+              <option value="">
+                {selectedCountry ? 'Select a city…' : 'Select a country first'}
+              </option>
+              {citiesForCountry.map((d) => (
+                <option key={destinationKey(d)} value={destinationKey(d)}>
+                  {d.city}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Service category</span>
