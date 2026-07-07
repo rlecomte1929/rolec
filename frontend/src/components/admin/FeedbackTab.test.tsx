@@ -218,10 +218,9 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     fireEvent.click(screen.getByText('Already handled')); // expand the dispatched row
     const advanceBtn = await screen.findByRole('button', { name: /mark in progress/i });
     fireEvent.click(advanceBtn);
-    // The detail may render in more than one error slot (known cosmetic double-display);
-    // asserting it is surfaced at all is what guards this fix.
+    // Renders in exactly one slot (the single per-row dispatchErr under the ProgressStrip).
     const shown = await screen.findAllByText(/illegal transition dispatched → done/i);
-    expect(shown.length).toBeGreaterThanOrEqual(1);
+    expect(shown).toHaveLength(1);
   });
 
   it('clicking a row opens the dispatch panel with the required context field (no separate button)', async () => {
