@@ -100,6 +100,30 @@ def status_from_complexity(complexity: Optional[str]) -> str:
     return "Needs Decomposition" if complexity in ("High", "Very High") else "Ready for AI"
 
 
+_TIER_LABELS = {
+    "green": "🟢 Green — auto",
+    "yellow": "🟡 Yellow — self-validate + sample",
+    "red": "🔴 Red — full human gate",
+}
+_RED_KEYWORDS = ("auth", "login", "password", "billing", "payment", "invoic",
+                 "security", "rls", "permission", "migration", "isolation", "secret", "token")
+
+
+def compute_autonomy_tier(*, task_type: Optional[str], complexity: Optional[str],
+                          layer: Optional[str], product_area: Optional[str],
+                          area: Optional[str] = None, files_to_touch: Optional[str] = None) -> str:
+    """Deterministic risk tier. Red on any sensitive signal; green only for low-risk
+    UI copy; yellow otherwise (default-safe)."""
+    blob = " ".join(str(x or "").lower() for x in (area, product_area, files_to_touch, task_type))
+    if layer == "Isolation" or task_type == "Database Migration" or any(k in blob for k in _RED_KEYWORDS):
+        return "red"
+    if (complexity in ("Trivial", "Low") and layer == "UI"
+            and task_type in ("Frontend Implementation", "UX Redesign")
+            and product_area in ("UX", "Core Product", "GTM")):
+        return "green"
+    return "yellow"
+
+
 def _parse_task(raw: str) -> Dict[str, Any]:
     """Extract the JSON object from the model's reply (tolerant of markdown fences)."""
     s = (raw or "").strip()
@@ -146,4 +170,9 @@ def engineer_task(
     )
     task = _parse_task(raw)
     task["status"] = status_from_complexity(task.get("complexity"))
+    task["autonomy_tier"] = compute_autonomy_tier(
+        task_type=task.get("task_type"), complexity=task.get("complexity"),
+        layer=task.get("layer"), product_area=task.get("product_area"),
+        area=area, files_to_touch=task.get("files_to_touch"),
+    )
     return task
