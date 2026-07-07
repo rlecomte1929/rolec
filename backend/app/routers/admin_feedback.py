@@ -329,6 +329,48 @@ def triage_feedback(
     return {"stream": stream, "id": item_id, "status": body.status}
 
 
+class StateBody(BaseModel):
+    target: str
+
+
+@router.patch("/feedback/{stream}/{item_id}/state")
+def set_state(
+    stream: str,
+    item_id: str,
+    body: StateBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Manually advance (or reject) a feedback item's pipeline `dispatch_status`,
+    validated against the state machine in `feedback_state_machine.py`."""
+    from ..services.feedback_state_machine import ALLOWED_TRANSITIONS, timestamp_column, validate_transition
+
+    if body.target not in ALLOWED_TRANSITIONS:
+        raise HTTPException(status_code=422, detail=f"unknown state {body.target!r}")
+
+    row = db.execute(
+        text("SELECT dispatch_status FROM feedback_status WHERE stream=:s AND source_id=:id"),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    current = row[0] if row else None
+    if not validate_transition(current, body.target):
+        raise HTTPException(status_code=409, detail=f"illegal transition {current} → {body.target}")
+
+    now = datetime.utcnow().isoformat()
+    ts_col = timestamp_column(body.target)
+    set_ts = f", {ts_col} = :now" if ts_col else ""
+    db.execute(
+        text(
+            f"INSERT INTO feedback_status (stream, source_id, status, dispatch_status, updated_at"
+            f"{(', ' + ts_col) if ts_col else ''}) "
+            f"VALUES (:s, :id, 'new', :t, :now{', :now' if ts_col else ''}) "
+            f"ON CONFLICT (stream, source_id) DO UPDATE SET dispatch_status = :t, updated_at = :now{set_ts}"
+        ),
+        {"s": stream, "id": item_id, "t": body.target, "now": now},
+    )
+    return {"ok": True, "dispatch_status": body.target}
+
+
 # ── Dispatch endpoint ─────────────────────────────────────────────────────────
 
 
