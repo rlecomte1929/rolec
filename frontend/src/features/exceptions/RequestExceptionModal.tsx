@@ -24,6 +24,12 @@ interface Props {
   /** Display amounts (already converted from USD) so the modal shows familiar numbers. */
   displayRequested: string;
   displayCap: string;
+  /**
+   * AIQ-1477: general "ask for more" mode — opened from the page-level CTA rather than a
+   * specific over-cap row. Swaps the over-cap copy for general guidance and hides the
+   * amount grid (which is meaningless without a specific cap). Default false.
+   */
+  generalRequest?: boolean;
 }
 
 export const RequestExceptionModal: React.FC<Props> = ({
@@ -37,6 +43,7 @@ export const RequestExceptionModal: React.FC<Props> = ({
   capAmountUsd,
   displayRequested,
   displayCap,
+  generalRequest = false,
 }) => {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -94,22 +101,25 @@ export const RequestExceptionModal: React.FC<Props> = ({
     >
       <Card padding="lg" className="w-full max-w-lg bg-white">
         <h3 id="request-exception-title" className="text-lg font-semibold text-[#0b2b43]">
-          Request exception — {categoryLabel}
+          {generalRequest ? 'Request an exception' : `Request exception — ${categoryLabel}`}
         </h3>
         <p className="mt-2 text-sm text-[#4b5563]">
-          Your shortlist for this category is over your HR policy cap. Send HR a short reason and
-          they will approve or reject the request. You will see the decision on this page.
+          {generalRequest
+            ? 'If a benefit doesn’t match your needs or isn’t covered by your policy, you can ask HR for an exception. Send a short reason and they will review and respond — you’ll see the decision on this page.'
+            : 'Your shortlist for this category is over your HR policy cap. Send HR a short reason and they will approve or reject the request. You will see the decision on this page.'}
         </p>
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-[#6b7280]">You are requesting</dt>
-            <dd className="font-medium text-[#0b2b43]">{displayRequested}</dd>
-          </div>
-          <div>
-            <dt className="text-[#6b7280]">Current cap</dt>
-            <dd className="font-medium text-[#0b2b43]">{displayCap}</dd>
-          </div>
-        </dl>
+        {!generalRequest && (
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-[#6b7280]">You are requesting</dt>
+              <dd className="font-medium text-[#0b2b43]">{displayRequested}</dd>
+            </div>
+            <div>
+              <dt className="text-[#6b7280]">Current cap</dt>
+              <dd className="font-medium text-[#0b2b43]">{displayCap}</dd>
+            </div>
+          </dl>
+        )}
         <label className="mt-4 block text-sm font-medium text-[#0b2b43]" htmlFor="exception-reason">
           Reason
         </label>

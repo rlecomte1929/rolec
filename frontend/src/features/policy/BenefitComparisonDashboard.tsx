@@ -84,6 +84,8 @@ export const BenefitComparisonDashboard: React.FC<{
 
   const [exceptionFor, setExceptionFor] = useState<ComparisonRow | null>(null);
   const [requested, setRequested] = useState<Set<string>>(new Set());
+  // AIQ-1477: page-level "ask for more" request, not tied to a specific over-cap row.
+  const [generalOpen, setGeneralOpen] = useState(false);
 
   if (!mapped.length) {
     return (
@@ -134,6 +136,27 @@ export const BenefitComparisonDashboard: React.FC<{
           Some items can&apos;t be compared numerically yet (your policy doesn&apos;t define a
           comparable limit for them). Totals above reflect only what we can compare with confidence.
         </p>
+      )}
+
+      {/* AIQ-1477: page-level "ask for more" CTA + instructions. The per-row "Request
+          exception" action only appears for over-cap/uncovered rows and was easy to miss,
+          so surface the capability prominently. Reuses the existing modal + endpoint. */}
+      {caseId && (
+        <Card padding="lg" className="border-[#e2e8f0] bg-[#f8fafc]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[#0b2b43]">Need something that isn&apos;t covered?</div>
+              <p className="mt-0.5 text-sm text-[#475569]">
+                You can ask HR for a policy exception — for a benefit that&apos;s over your cap, not
+                covered, or anything else you need. HR reviews each request and you&apos;ll see the
+                decision here.
+              </p>
+            </div>
+            <Button type="button" onClick={() => setGeneralOpen(true)} className="shrink-0">
+              Request an exception
+            </Button>
+          </div>
+        </Card>
       )}
 
       {/* (2) Per-category table */}
@@ -263,6 +286,23 @@ export const BenefitComparisonDashboard: React.FC<{
             setRequested((prev) => new Set(prev).add(exceptionFor.serviceKey));
             setExceptionFor(null);
           }}
+        />
+      )}
+
+      {/* AIQ-1477: general "ask for more" request from the page-level CTA. */}
+      {generalOpen && caseId && (
+        <RequestExceptionModal
+          open
+          caseId={caseId}
+          category="other"
+          categoryLabel="Other / general request"
+          requestedAmountUsd={0}
+          capAmountUsd={0}
+          displayRequested="—"
+          displayCap="—"
+          generalRequest
+          onClose={() => setGeneralOpen(false)}
+          onSuccess={(_req: ExceptionRequest) => setGeneralOpen(false)}
         />
       )}
     </div>
