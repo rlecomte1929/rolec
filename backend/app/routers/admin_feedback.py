@@ -594,6 +594,10 @@ def dispatch_preview(
             reporter_name=reporter_name,
             admin_context=dispatch_context,
             diagnostics=diagnostics,
+            # Single attempt, 55 s cap — interactive preview should fail fast and clearly
+            # rather than retrying 3× (= 90 s) and making the UI appear hung.
+            timeout=55.0,
+            max_retries=0,
         )
     except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
         log.warning("dispatch_preview engineer_task failed: %s", exc)

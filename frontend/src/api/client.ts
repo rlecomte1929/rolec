@@ -4246,7 +4246,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
 export async function apiPost<T>(
   path: string,
   body?: unknown,
-  opts?: { headers?: Record<string, string>; requestId?: string }
+  opts?: { headers?: Record<string, string>; requestId?: string; signal?: AbortSignal }
 ): Promise<T> {
   let response: Response;
   const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -4266,8 +4266,11 @@ export async function apiPost<T>(
         'X-Request-ID': requestId,
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: opts?.signal,
     });
-  } catch {
+  } catch (err) {
+    // Re-throw AbortError so callers can handle their own timeouts with a clear message.
+    if (err instanceof Error && err.name === 'AbortError') throw err;
     recordFailedRequest('POST', pathOnly, 0, requestId);
     throw new Error('Unable to reach the server. Please check your connection and try again.');
   }
