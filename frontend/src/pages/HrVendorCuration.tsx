@@ -23,12 +23,14 @@ import {
   listAllowlistedDestinations,
   listEmployeeDemand,
   populateDestinationWithAi,
+  populateVendorsWithAi,
   discoverVendorsForCity,
   type AllowlistedDestination,
   type CurationRow,
   type DestinationRequest,
   type EmployeeDemandRow,
   type PopulateDestinationResult,
+  type PopulateWithAiResult,
   type ScrapeQuotaState,
 } from '../api/hrCatalog';
 import { serviceTypeOptions, filterByServiceType } from './hrVendorServiceTypes';
@@ -126,6 +128,9 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
 
   // Phase 2b-secured: destination-scoped scraper trigger state
   const [populating, setPopulating] = useState(false);
+  // AIQ-1465: per-category progress while "Populate all" fans the scrape out
+  // one category at a time (so no single request outlives the gateway timeout).
+  const [populateProgress, setPopulateProgress] = useState<{ done: number; total: number; label: string } | null>(null);
   const [populateResult, setPopulateResult] = useState<PopulateDestinationResult | null>(null);
   const [pendingTicket, setPendingTicket] = useState<DestinationRequest | null>(null);
   const [quota, setQuota] = useState<ScrapeQuotaState | null>(null);
@@ -331,16 +336,71 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
     setError(null);
     setPopulateResult(null);
     setPendingTicket(null);
+    // AIQ-1465: fan the populate out one category per request (each a single short
+    // LLM call) instead of one long request that ran the whole multi-category scrape
+    // server-side — that request outlived the edge/gateway timeout, the connection was
+    // dropped, and the client surfaced the generic "Unable to reach the server." Each
+    // per-category call here also runs the backfill, so this matches the old behaviour.
+    const cats = CATEGORY_OPTIONS;
+    const perCategory: Array<{ category: string; status: string; inserted: number }> = [];
+    let populated = 0;
+    let skipped = 0;
+    let quotaBlocked = 0;
+    let totalInserted = 0;
+    let latestQuota: ScrapeQuotaState | null = null;
     try {
-      const result = await populateDestinationWithAi(city, country);
-      if (result.status === 'pending_admin_approval') {
-        // Should not happen — destination came from allowlist — but render it
-        // gracefully if backend disagrees.
-        setPendingTicket(result.request || null);
-      } else {
-        setPopulateResult(result);
-        if (result.quota) setQuota(result.quota);
+      for (let i = 0; i < cats.length; i += 1) {
+        const cat = cats[i];
+        if (!cat) continue;
+        setPopulateProgress({ done: i, total: cats.length, label: cat.label });
+        let res: PopulateWithAiResult;
+        try {
+          res = await populateVendorsWithAi(cat.value, city, country);
+        } catch (err: unknown) {
+          // Daily quota reached mid-run (429): the rest would all fail the same way,
+          // so stop and count the remainder as quota-blocked.
+          if ((err as { status?: number })?.status === 429) {
+            quotaBlocked += cats.length - i;
+            for (let j = i; j < cats.length; j += 1) {
+              const cj = cats[j];
+              if (cj) perCategory.push({ category: cj.value, status: 'quota_blocked', inserted: 0 });
+            }
+            break;
+          }
+          perCategory.push({ category: cat.value, status: 'error', inserted: 0 });
+          continue;
+        }
+        if (res.status === 'pending_admin_approval') {
+          // Destination isn't on the allowlist — the whole (city,country) needs approval,
+          // so stop and surface the ticket exactly as before.
+          setPendingTicket(res.request || null);
+          return;
+        }
+        if (res.quota) latestQuota = res.quota;
+        const inserted = res.inserted ?? 0;
+        if (inserted > 0) {
+          populated += 1;
+          totalInserted += inserted;
+          perCategory.push({ category: cat.value, status: 'populated', inserted });
+        } else {
+          // Already-populated (L1 short-circuit) or nothing found — no new rows either way.
+          skipped += 1;
+          perCategory.push({ category: cat.value, status: 'skipped_existing', inserted: 0 });
+        }
       }
+      setPopulateResult({
+        status: 'completed',
+        destination_city: city,
+        country,
+        categories_total: cats.length,
+        categories_populated: populated,
+        categories_skipped_existing: skipped,
+        categories_quota_blocked: quotaBlocked,
+        total_inserted: totalInserted,
+        per_category: perCategory,
+        quota: latestQuota ?? undefined,
+      });
+      if (latestQuota) setQuota(latestQuota);
       await load();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Could not populate with AI.';
@@ -348,6 +408,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       void getScrapeQuota().then(setQuota).catch(() => {});
     } finally {
       setPopulating(false);
+      setPopulateProgress(null);
     }
   };
 
@@ -654,7 +715,11 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                   : `Populate every service category for ${city}, ${country} with AI`
               }
             >
-              {populating ? 'Asking the AI…' : 'Populate all services with AI'}
+              {populating
+                ? (populateProgress
+                    ? `Populating ${populateProgress.label}… (${populateProgress.done + 1}/${populateProgress.total})`
+                    : 'Asking the AI…')
+                : 'Populate all services with AI'}
             </Button>
             <Button onClick={() => void load()} disabled={loading} variant="outline">
               {loading ? 'Loading…' : 'Reload'}
