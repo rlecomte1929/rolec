@@ -27,17 +27,17 @@ const mockFeedback = submitAiFeedback as unknown as ReturnType<typeof vi.fn>;
 afterEach(cleanup);
 beforeEach(() => { mockAsk.mockReset(); mockFeedback.mockReset(); });
 
-function fillCorridorAndQuestion() {
-  fireEvent.change(screen.getByLabelText('From country'), { target: { value: 'IN' } });
-  fireEvent.change(screen.getByLabelText('To country'), { target: { value: 'DE' } });
-  fireEvent.change(screen.getByLabelText('Nationality'), { target: { value: 'IN' } });
-  fireEvent.change(screen.getByLabelText('Permit type'), { target: { value: 'work' } });
-  fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'What documents?' } });
+// AIQ-1476: corridor + nationality now pre-fill from the case (nationality is a
+// multi-value chip select, permit type is optional). Provide caseContext so the ask
+// gate is satisfied the way it is in production, then just type the question.
+const CASE_CTX = { from: 'IN', to: 'DE', nationalities: ['IN'] } as const;
+function fillQuestion(q = 'What documents?') {
+  fireEvent.change(screen.getByLabelText('Your question'), { target: { value: q } });
 }
 
 describe('ImmigrationAnswerPanel', () => {
-  it('disables Ask until corridor + question are filled', () => {
-    render(<ImmigrationAnswerPanel />);
+  it('disables Ask until a question is entered', () => {
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
     expect(screen.getByRole('button', { name: /ask/i })).toBeDisabled();
   });
 
@@ -49,11 +49,11 @@ describe('ImmigrationAnswerPanel', () => {
       confidence: 'high',
       trace_id: 'tr-1',
     });
-    render(<ImmigrationAnswerPanel />);
-    fillCorridorAndQuestion();
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
+    fillQuestion();
     fireEvent.click(screen.getByRole('button', { name: /ask/i }));
     await waitFor(() => expect(mockAsk).toHaveBeenCalledTimes(1));
-    expect(mockAsk.mock.calls[0][0]).toMatchObject({ corridor_from: 'IN', corridor_to: 'DE', nationality: 'IN', permit_type: 'work', query: 'What documents?' });
+    expect(mockAsk.mock.calls[0][0]).toMatchObject({ corridor_from: 'IN', corridor_to: 'DE', nationality: 'IN', query: 'What documents?' });
     await waitFor(() => expect(screen.getByText(/passport and a contract/i)).toBeInTheDocument());
     expect(screen.getByText(/Make it in Germany/)).toBeInTheDocument();
     expect(screen.getByText(/high confidence/i)).toBeInTheDocument();
@@ -62,8 +62,8 @@ describe('ImmigrationAnswerPanel', () => {
   it('POSTs an approved verdict on 👍 and shows thanks', async () => {
     mockAsk.mockResolvedValue({ answer_text: 'Ans', answer_kind: 'answer', cited_sources: [], confidence: 'medium', trace_id: 'tr-9' });
     mockFeedback.mockResolvedValue({ verdict: 'approved' });
-    render(<ImmigrationAnswerPanel />);
-    fillCorridorAndQuestion();
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
+    fillQuestion();
     fireEvent.click(screen.getByRole('button', { name: /ask/i }));
     await waitFor(() => expect(screen.getByTestId('immigration-answer-verdict')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Helpful' }));
@@ -73,8 +73,8 @@ describe('ImmigrationAnswerPanel', () => {
 
   it('shows the refusal state for an insufficient-context answer', async () => {
     mockAsk.mockResolvedValue({ answer_text: '', answer_kind: 'refusal_insufficient_context', cited_sources: [], trace_id: 'tr-r' });
-    render(<ImmigrationAnswerPanel />);
-    fillCorridorAndQuestion();
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
+    fillQuestion();
     fireEvent.click(screen.getByRole('button', { name: /ask/i }));
     await waitFor(() => expect(screen.getByText(/enough official, corridor-specific/i)).toBeInTheDocument());
   });

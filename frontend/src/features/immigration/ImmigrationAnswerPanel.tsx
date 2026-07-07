@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert, Badge, Button, Card, Input } from '../../components/antigravity';
+import { CountryMultiSelect } from '../policy-config/CountryMultiSelect';
 import {
   askImmigrationQuestion,
   type ImmigrationAnswer,
@@ -52,6 +53,8 @@ export interface ImmigrationCaseContext {
   from: string;
   to: string;
   nationality?: string;
+  /** AIQ-1476: one or more nationalities pre-filled from the intake form (dual nationals). */
+  nationalities?: string[];
   permitType?: string;
   /** Human label, e.g. "IN → DE". Falls back to `from → to`. */
   label?: string;
@@ -62,8 +65,18 @@ export function ImmigrationAnswerPanel(
 ) {
   const [from, setFrom] = useState(caseContext?.from ?? '');
   const [to, setTo] = useState(caseContext?.to ?? '');
-  const [nationality, setNationality] = useState(caseContext?.nationality ?? '');
+  // AIQ-1476: nationality is multi-value (dual nationals) and pre-filled from intake.
+  const [nationalities, setNationalities] = useState<string[]>(
+    caseContext?.nationalities?.length
+      ? caseContext.nationalities
+      : caseContext?.nationality
+        ? [caseContext.nationality]
+        : [],
+  );
   const [permitType, setPermitType] = useState(caseContext?.permitType ?? '');
+  // AIQ-1476: permit type is optional context, not a prerequisite — the assistant's job
+  // is to help determine it. Hidden behind "Advanced" so it never blocks a question.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [query, setQuery] = useState('');
   // Show the manual corridor form when there's no case context, or the employee
   // chose to override the auto-detected corridor.
@@ -79,7 +92,9 @@ export function ImmigrationAnswerPanel(
   const [verdictError, setVerdictError] = useState(false);
 
   const canAsk = !!query.trim();
-  const corridorComplete = !!(from.trim() && to.trim() && nationality.trim() && permitType.trim());
+  // AIQ-1476: permit type dropped from the gate (the assistant determines it). Nationality
+  // is now pre-filled from intake, so this is satisfied automatically for most employees.
+  const corridorComplete = !!(from.trim() && to.trim() && nationalities.length > 0);
 
   function resetAnswers() {
     setError(null);
@@ -114,7 +129,7 @@ export function ImmigrationAnswerPanel(
 
     if (domain === 'immigration') {
       if (!corridorComplete) {
-        setError('Add your corridor (From / To / Nationality / Permit) above for immigration questions.');
+        setError('Add your move corridor (From / To) and at least one nationality above for immigration questions.');
         return;
       }
       setLoading(true);
@@ -122,7 +137,9 @@ export function ImmigrationAnswerPanel(
         const res = await askImmigrationQuestion({
           corridor_from: from.trim().toUpperCase(),
           corridor_to: to.trim().toUpperCase(),
-          nationality: nationality.trim().toUpperCase(),
+          // The immigration engine keys on a single nationality; send the primary one.
+          // Dual nationals can reorder to pick which applies to this corridor.
+          nationality: (nationalities[0] ?? '').trim().toUpperCase(),
           permit_type: permitType.trim(),
           query: q,
           ...(caseId ? { case_id: caseId } : {}),
@@ -162,6 +179,43 @@ export function ImmigrationAnswerPanel(
   const conf = confidenceBadge(answer?.confidence);
   const policyStatus = policyAnswer ? deriveSupportStatus(policyAnswer) : null;
 
+  // AIQ-1476: nationality (pre-filled from intake, editable, multi-value) + an optional
+  // "Advanced" permit-type field — permit is never a prerequisite for asking.
+  const corridorFields = (
+    <>
+      <div>
+        <span className="text-xs font-medium text-slate-500">Your nationality(ies)</span>
+        <div className="mt-1">
+          <CountryMultiSelect value={nationalities} onChange={setNationalities} />
+        </div>
+      </div>
+      <div>
+        <Button
+          unstyled
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="text-xs text-slate-500 underline hover:text-slate-700"
+        >
+          {showAdvanced ? 'Hide advanced' : 'Advanced (permit type)'}
+        </Button>
+        {showAdvanced ? (
+          <div className="mt-2">
+            <Input
+              aria-label="Permit type"
+              placeholder="Permit type (optional)"
+              value={permitType}
+              onChange={(v) => setPermitType(v)}
+            />
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-slate-400">
+            Not sure of your permit type? That&apos;s fine — the assistant will help determine it.
+          </p>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className="max-w-3xl space-y-4">
       <Card>
@@ -173,34 +227,29 @@ export function ImmigrationAnswerPanel(
           </p>
           {caseContext && !editingCorridor ? (
             <div className="space-y-3">
+              {/* AIQ-1476: corridor comes from your case and is shown prominently — the
+                  employee no longer has to hand-type From/To/Nationality. */}
               <div className="flex items-center justify-between gap-3 rounded-lg border border-accent-100 bg-accent-50 px-3 py-2">
                 <p className="text-sm text-slate-700">
                   Answering for{' '}
                   <span className="font-semibold text-navy-800">your {caseContext.label ?? `${from} → ${to}`} move</span>
-                  {permitType && <span className="text-slate-500"> · {permitType}</span>}
+                  {nationalities.length > 0 && (
+                    <span className="text-slate-500"> · {nationalities.join(', ')}</span>
+                  )}
                 </p>
                 <Button variant="ghost" onClick={() => setEditingCorridor(true)} aria-label="Use a different corridor">
                   Edit corridor
                 </Button>
               </div>
-              {/* Corridor comes from your case; confirm the details we don't yet hold. */}
-              {(!caseContext.nationality || !caseContext.permitType) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {!caseContext.nationality && (
-                    <Input aria-label="Nationality" placeholder="Your nationality (e.g. IN)" value={nationality} onChange={(v) => setNationality(v)} />
-                  )}
-                  {!caseContext.permitType && (
-                    <Input aria-label="Permit type" placeholder="Permit (e.g. work)" value={permitType} onChange={(v) => setPermitType(v)} />
-                  )}
-                </div>
-              )}
+              {corridorFields}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Input aria-label="From country" placeholder="From (e.g. IN)" value={from} onChange={(v) => setFrom(v)} />
-              <Input aria-label="To country" placeholder="To (e.g. DE)" value={to} onChange={(v) => setTo(v)} />
-              <Input aria-label="Nationality" placeholder="Nationality (e.g. IN)" value={nationality} onChange={(v) => setNationality(v)} />
-              <Input aria-label="Permit type" placeholder="Permit (e.g. work)" value={permitType} onChange={(v) => setPermitType(v)} />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Input aria-label="From country" placeholder="From (e.g. IN)" value={from} onChange={(v) => setFrom(v)} />
+                <Input aria-label="To country" placeholder="To (e.g. DE)" value={to} onChange={(v) => setTo(v)} />
+              </div>
+              {corridorFields}
             </div>
           )}
           <textarea

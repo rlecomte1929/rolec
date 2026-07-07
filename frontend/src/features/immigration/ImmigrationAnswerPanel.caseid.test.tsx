@@ -23,18 +23,17 @@ const mockAsk = askImmigrationQuestion as unknown as ReturnType<typeof vi.fn>;
 afterEach(cleanup);
 beforeEach(() => mockAsk.mockReset());
 
+// AIQ-1476: corridor + nationality pre-fill from the case (via caseContext); the user
+// only types the question.
+const CASE_CTX = { from: 'IN', to: 'DE', nationalities: ['IN'] } as const;
 function fill() {
-  fireEvent.change(screen.getByLabelText('From country'), { target: { value: 'IN' } });
-  fireEvent.change(screen.getByLabelText('To country'), { target: { value: 'DE' } });
-  fireEvent.change(screen.getByLabelText('Nationality'), { target: { value: 'IN' } });
-  fireEvent.change(screen.getByLabelText('Permit type'), { target: { value: 'blue_card' } });
   fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'What do I need?' } });
 }
 
 describe('ImmigrationAnswerPanel — case_id passthrough', () => {
   it('includes case_id when a caseId is provided', async () => {
     mockAsk.mockResolvedValue({ answer_text: 'ok', answer_kind: 'answer', cited_sources: [], trace_id: 't' });
-    render(<ImmigrationAnswerPanel caseId="case-123" />);
+    render(<ImmigrationAnswerPanel caseId="case-123" caseContext={{ ...CASE_CTX }} />);
     fill();
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => expect(mockAsk).toHaveBeenCalledTimes(1));
@@ -43,7 +42,7 @@ describe('ImmigrationAnswerPanel — case_id passthrough', () => {
 
   it('omits case_id when there is no case', async () => {
     mockAsk.mockResolvedValue({ answer_text: 'ok', answer_kind: 'answer', cited_sources: [], trace_id: 't' });
-    render(<ImmigrationAnswerPanel />);
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
     fill();
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => expect(mockAsk).toHaveBeenCalledTimes(1));
