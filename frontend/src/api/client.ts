@@ -571,6 +571,7 @@ export interface VendorPerformanceResponse {
       id: string;
       name: string;
       location: string;
+      country: string | null;
       rating: number | null;
       review_count: number;
       response_sla_hours: number | null;

@@ -269,6 +269,10 @@ def get_vendor_performance(
             "id": sid,
             "name": str(v["name"]),
             "location": location,
+            # AIQ-1445: discrete country code (already selected for `location`) so the
+            # Vendor Performance page can offer a "filter by region" dropdown without
+            # string-parsing the joined display location.
+            "country": (str(v["country_code"]) or None) if v["country_code"] else None,
             "rating": round(avg_r, 1) if avg_r is not None else None,
             "review_count": int(v["review_count"] or 0),
             "response_sla_hours": int(v["response_sla_hours"]) if v["response_sla_hours"] else None,

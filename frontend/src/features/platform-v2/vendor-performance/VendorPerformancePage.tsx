@@ -503,6 +503,8 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
   // Filters
   const [catFilter, setCatFilter] = useState<string>('all');
   const [vendorFilter, setVendorFilter] = useState('');
+  // AIQ-1445: region (country) filter — distinct countries across all vendor rows.
+  const [regionFilter, setRegionFilter] = useState<string>('all');
 
   // Which category rows are expanded
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
@@ -516,13 +518,34 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
     });
   }, []);
 
+  // ── Derived: distinct regions (countries) for the region filter ──────────
+  const regionOptions = useMemo(() => {
+    if (!data) return [];
+    const set = new Set<string>();
+    data.categories.forEach((c) =>
+      c.vendors.forEach((v) => {
+        if (v.country) set.add(v.country);
+      }),
+    );
+    return Array.from(set).sort();
+  }, [data]);
+
   // ── Derived: filtered categories ─────────────────────────────────────────
+  // Category filter narrows which categories show; region filter narrows the
+  // vendors *within* each category (dropping categories left with no match) so
+  // the KPI strip, charts, scatter and watchlist — all derived from
+  // filteredCats via flatVendors — stay consistent with the region selection.
   const filteredCats = useMemo(() => {
     if (!data) return [];
-    return catFilter === 'all'
-      ? data.categories
-      : data.categories.filter((c) => c.category === catFilter);
-  }, [data, catFilter]);
+    const byCat =
+      catFilter === 'all'
+        ? data.categories
+        : data.categories.filter((c) => c.category === catFilter);
+    if (regionFilter === 'all') return byCat;
+    return byCat
+      .map((c) => ({ ...c, vendors: c.vendors.filter((v) => v.country === regionFilter) }))
+      .filter((c) => c.vendors.length > 0);
+  }, [data, catFilter, regionFilter]);
 
   // ── Derived: monthly trend chart data ────────────────────────────────────
   const MONTHS = useMemo(() => monthsForRange(range), [range]);
@@ -672,19 +695,35 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="vp-cat-filter" className="text-[12px] font-medium text-slate-500">Category</label>
+          <label htmlFor="vp-cat-filter" className="text-[12px] font-medium text-slate-500">Service</label>
           <select
             id="vp-cat-filter"
             value={catFilter}
             onChange={(e) => { setCatFilter(e.target.value); setOpenCats(new Set()); }}
             className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
           >
-            <option value="all">All categories</option>
+            <option value="all">All services</option>
             {(data?.categories ?? []).map((c) => (
               <option key={c.category} value={c.category}>{fmtCat(c.category)}</option>
             ))}
           </select>
         </div>
+        {regionOptions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="vp-region-filter" className="text-[12px] font-medium text-slate-500">Region</label>
+            <select
+              id="vp-region-filter"
+              value={regionFilter}
+              onChange={(e) => { setRegionFilter(e.target.value); setOpenCats(new Set()); }}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+            >
+              <option value="all">All regions</option>
+              {regionOptions.map((code) => (
+                <option key={code} value={code}>{code}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <label htmlFor="vp-vendor-filter" className="text-[12px] font-medium text-slate-500">Vendor</label>
           <input
@@ -696,11 +735,11 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-40"
           />
         </div>
-        {(catFilter !== 'all' || vendorFilter) && (
+        {(catFilter !== 'all' || regionFilter !== 'all' || vendorFilter) && (
           <Button
             unstyled
             type="button"
-            onClick={() => { setCatFilter('all'); setVendorFilter(''); setOpenCats(new Set()); }}
+            onClick={() => { setCatFilter('all'); setRegionFilter('all'); setVendorFilter(''); setOpenCats(new Set()); }}
             className="text-[12px] text-slate-400 hover:text-slate-600 underline-offset-2 hover:underline"
           >
             Clear filters
@@ -915,6 +954,33 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
           </div>
         );
       })()}
+
+      {/* AIQ-1445: data provenance. Honest by design — this is a pre-launch platform
+          seeded with representative datasets, so we do NOT claim invoice/partner
+          aggregation. Ratings/review counts are indicative sample data; per-case
+          prices and review history populate from real assignments over time. */}
+      <details className="rounded-lg border border-slate-200 bg-white overflow-hidden text-[12px] text-slate-600">
+        <summary className="cursor-pointer px-4 py-3 font-medium text-[#0b2b43] marker:text-slate-400">
+          About this data
+        </summary>
+        <div className="border-t border-slate-100 px-4 py-3 space-y-2">
+          <p>
+            <span className="font-medium text-slate-700">Vendor ratings &amp; review counts</span> shown
+            here are indicative sample values from our curated onboarding datasets — not aggregated
+            from partner invoices or third-party review sites.
+          </p>
+          <p>
+            <span className="font-medium text-slate-700">Employee reviews</span> under each vendor are
+            real feedback submitted by your relocating employees after a service; this history builds
+            up as your assignments complete, so it may be sparse before launch.
+          </p>
+          <p>
+            <span className="font-medium text-slate-700">Prices (EUR)</span> are per-vendor figures
+            your admins maintain; where a vendor shows “€—”, no price has been recorded yet and
+            per-case cost is tracked from the point an assignment uses that vendor.
+          </p>
+        </div>
+      </details>
     </div>
   );
 
