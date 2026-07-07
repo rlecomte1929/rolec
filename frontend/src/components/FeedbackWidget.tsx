@@ -69,15 +69,6 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     return () => window.removeEventListener('keydown', handler);
   }, [state]);
 
-  // Close on click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if ((state === 'open' || state === 'error' || state === 'reports') && containerRef.current &&
-          !containerRef.current.contains(e.target as Node)) close();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [state]);
 
   // Fetch reports when entering the reports view
   useEffect(() => {
