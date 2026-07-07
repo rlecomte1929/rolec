@@ -169,17 +169,34 @@ export async function saveDispatchContext(
   await apiPut<unknown>(`/api/admin/feedback/${stream}/${itemId}/context`, { context });
 }
 
-/** Generate (no side effects) an engineered AI Work Queue task for review. */
+/** Generate (no side effects) an engineered AI Work Queue task for review.
+ *
+ * The backend caps at 55 s (single attempt, no retries). We add a 65 s client-side
+ * AbortController so the UI receives a clear "timed out" message rather than the
+ * generic "Unable to reach the server" that raw fetch throws on a dropped connection.
+ */
 export async function dispatchPreview(
   stream: FeedbackStream,
   itemId: string,
   input: { text?: string | null; category?: string },
 ): Promise<EngineeredTask> {
-  const data = await apiPost<{ task: EngineeredTask }>(
-    `/api/admin/feedback/${stream}/${itemId}/dispatch/preview`,
-    { text: input.text ?? '', category: input.category ?? 'bug' },
-  );
-  return data.task;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 65_000);
+  try {
+    const data = await apiPost<{ task: EngineeredTask }>(
+      `/api/admin/feedback/${stream}/${itemId}/dispatch/preview`,
+      { text: input.text ?? '', category: input.category ?? 'bug' },
+      { signal: ac.signal },
+    );
+    return data.task;
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Task spec generation timed out — please try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Create the Notion AI Work Queue page from the reviewed task; returns its URL. */

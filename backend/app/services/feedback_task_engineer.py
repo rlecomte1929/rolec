@@ -149,9 +149,16 @@ def engineer_task(
     reporter_name: Optional[str],
     admin_context: str,
     diagnostics: Optional[str] = None,
+    timeout: float = 30.0,
+    max_retries: int = 3,
 ) -> Dict[str, Any]:
     """Return an engineered AI-Work-Queue task dict + a derived `status`.
-    Raises ValueError/RuntimeError on LLM failure (surfaced as 502 by the caller)."""
+    Raises ValueError/RuntimeError on LLM failure (surfaced as 502 by the caller).
+
+    timeout / max_retries: forwarded to the LLM client. Interactive callers (e.g.
+    dispatch/preview) should pass max_retries=0 so a single timeout surfaces
+    immediately as a 502 rather than retrying 3× (= 90 s total) before failing.
+    """
     masked_bug = _scrub(text)
     masked_ctx = _scrub(admin_context)
     masked_reporter = _scrub(reporter_name) if reporter_name else ""
@@ -167,6 +174,7 @@ def engineer_task(
     )
     raw = claude_complete_text_sync(
         system=_SYSTEM, user=user, model=_MODEL, max_tokens=2000, temperature=0.2,
+        timeout=timeout, max_retries=max_retries,
     )
     task = _parse_task(raw)
     task["status"] = status_from_complexity(task.get("complexity"))
