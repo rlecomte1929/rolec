@@ -44,6 +44,28 @@ const categoryFromCheck = (checkId: string) => {
   return 'general';
 };
 
+// AIQ-1474: per-call error info so one failed request degrades a single section
+// rather than blanking the whole page.
+type CallErr = { status: number; message: string } | null;
+function toCallErr(r: PromiseSettledResult<unknown>): CallErr {
+  if (r.status === 'fulfilled') return null;
+  const reason = (r.reason ?? {}) as {
+    response?: { status?: number; data?: { detail?: unknown } };
+    message?: string;
+  };
+  const detail = reason.response?.data?.detail;
+  return {
+    status: reason.response?.status ?? 0,
+    message: (typeof detail === 'string' && detail) || reason.message || 'Request failed',
+  };
+}
+function friendlyErr(e: { status: number; message: string }): string {
+  if (e.status === 404) return 'no record found for this case yet';
+  if (e.status >= 500) return 'server error — please retry';
+  if (e.status === 0) return 'could not reach the server (network)';
+  return e.message;
+}
+
 export const HrComplianceCheck: React.FC = () => {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,13 +97,20 @@ export const HrComplianceCheck: React.FC = () => {
   const complianceQuery = useQuery({
     queryKey: ['hr', 'case-compliance', caseId],
     queryFn: async () => {
-      const [assignmentData, policyData, complianceData] = await Promise.all([
+      // AIQ-1474: allSettled (not all) so a single failing call (e.g. a 404 on the
+      // compliance report) degrades that section instead of blanking the entire page.
+      const [aR, pR, cR] = await Promise.allSettled([
         hrAPI.getAssignment(caseId),
         hrAPI.getPolicy(caseId),
         hrAPI.getCaseCompliance(caseId),
       ]);
       localStorage.setItem('relopass_last_assignment_id', caseId);
-      return { assignment: assignmentData, policy: policyData, report: complianceData };
+      return {
+        assignment: aR.status === 'fulfilled' ? aR.value : null,
+        policy: pR.status === 'fulfilled' ? pR.value : null,
+        report: cR.status === 'fulfilled' ? cR.value : null,
+        errors: { assignment: toCallErr(aR), policy: toCallErr(pR), compliance: toCallErr(cR) },
+      };
     },
     enabled: !!caseId,
   });
@@ -89,6 +118,17 @@ export const HrComplianceCheck: React.FC = () => {
   const assignment: AssignmentDetail | null = complianceQuery.data?.assignment ?? null;
   const policy: PolicyResponse | null = complianceQuery.data?.policy ?? null;
   const report: ComplianceCaseReport | null = complianceQuery.data?.report ?? null;
+  const callErrors = complianceQuery.data?.errors;
+  // Sections that failed for a non-auth reason — surfaced individually, never as a
+  // single opaque "error" that hides the rest of the page.
+  const degradedSections = [
+    callErrors?.assignment && callErrors.assignment.status !== 401
+      ? { label: 'Case details', ...callErrors.assignment } : null,
+    callErrors?.policy && callErrors.policy.status !== 401
+      ? { label: 'Policy caps', ...callErrors.policy } : null,
+    callErrors?.compliance && callErrors.compliance.status !== 401
+      ? { label: 'Compliance checklist', ...callErrors.compliance } : null,
+  ].filter((s): s is { label: string; status: number; message: string } => s !== null);
 
   // Original kept isLoading=true until a compliance load resolved; with no case
   // selected it never flips false.
@@ -96,15 +136,13 @@ export const HrComplianceCheck: React.FC = () => {
 
   const assignments401 =
     (assignmentsQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
-  const compliance401 =
-    (complianceQuery.error as { response?: { status?: number } } | null)?.response?.status === 401;
-  const readError =
-    assignmentsQuery.isError && !assignments401
-      ? 'Unable to load assignments.'
-      : complianceQuery.isError && !compliance401
-        ? 'Unable to load compliance data.'
-        : '';
-  const displayedError = error || readError;
+  // AIQ-1474: the combined query now resolves (allSettled), so a 401 is detected from the
+  // per-call errors rather than the query erroring. Read failures render per-section
+  // (degradedSections) — displayedError is reserved for mutation errors.
+  const compliance401 = [callErrors?.assignment, callErrors?.policy, callErrors?.compliance].some(
+    (e) => e?.status === 401,
+  );
+  const displayedError = error;
 
   // Auto-select the first assignment when no case is in scope (mirrors the old
   // loadAssignments side effect).
@@ -123,10 +161,10 @@ export const HrComplianceCheck: React.FC = () => {
 
   // Preserve the 401 → landing redirect from both reads.
   useEffect(() => {
-    if ((assignmentsQuery.isError && assignments401) || (complianceQuery.isError && compliance401)) {
+    if ((assignmentsQuery.isError && assignments401) || compliance401) {
       safeNavigate(navigate, 'landing');
     }
-  }, [assignmentsQuery.isError, assignments401, complianceQuery.isError, compliance401, navigate]);
+  }, [assignmentsQuery.isError, assignments401, compliance401, navigate]);
 
   const complianceMutationsBusy = complianceRunPending || complianceMutationKey !== null;
 
@@ -253,11 +291,47 @@ export const HrComplianceCheck: React.FC = () => {
   return (
     <AppShell title="Compliance" subtitle={`${employeeName}: requirements check`}>
       {displayedError && <Alert variant="error">{displayedError}</Alert>}
+
+      {/* AIQ-1474: per-section status summary — one call failing no longer blanks the
+          page; the user sees exactly which parts are degraded and why. */}
+      {!isLoading && degradedSections.length > 0 && (
+        <Alert variant="warning" className="mb-4">
+          <div className="text-sm font-medium">Some compliance data couldn&apos;t be loaded</div>
+          <ul className="mt-1 space-y-0.5 text-xs">
+            {degradedSections.map((s) => (
+              <li key={s.label}>• {s.label}: {friendlyErr(s)}</li>
+            ))}
+          </ul>
+          <Button
+            unstyled
+            type="button"
+            onClick={() => void complianceQuery.refetch()}
+            className="mt-2 text-xs underline hover:no-underline"
+          >
+            Retry
+          </Button>
+        </Alert>
+      )}
+
       {isLoading && <div className="text-sm text-[#6b7280]">Loading compliance checks...</div>}
 
       {!isLoading && !caseId && (
         <Card padding="lg">
           <div className="text-sm text-[#4b5563]">Select a case from the HR Dashboard to view compliance checks.</div>
+        </Card>
+      )}
+
+      {/* AIQ-1474: the compliance checklist failed to load, but the page shell + the
+          summary above still render — never a blank screen. */}
+      {!isLoading && caseId && !report && (
+        <Card padding="lg">
+          <div className="text-sm font-medium text-[#0b2b43]">Compliance checklist unavailable</div>
+          <div className="mt-1 text-xs text-[#6b7280]">
+            {callErrors?.compliance
+              ? `We couldn't load the requirements checklist for this employee (${friendlyErr(callErrors.compliance)}).`
+              : "We couldn't load the requirements checklist for this employee."}{' '}
+            Any sections that did load are shown above.
+          </div>
         </Card>
       )}
 
