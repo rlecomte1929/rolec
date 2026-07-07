@@ -154,6 +154,7 @@ from .app.routers import policy_helpfulness as policy_helpfulness_router  # [WS-
 from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
 from .app.routers import ocr as ocr_router  # [AIQ-1148] general document OCR endpoint
 from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
+from .app.routers import admin_autopilot_metrics as admin_autopilot_metrics_router  # Autopilot P4 — dual-layer registration
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
 from .app.routers import admin_dsar as admin_dsar_router  # GDPR/DSAR desk (dual-layer registration)
 from .app.routers import admin_feature_flags as admin_feature_flags_router  # Feature-flag console (dual-layer registration)
@@ -257,6 +258,8 @@ from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] uni
 from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
 from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
 from .app.routers import public_analytics as public_analytics_router  # [audos-P2] public funnel event ingest
+from .app.routers import public_corridor as public_corridor_router  # [audos] public corridor requirements read model
+from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -823,6 +826,7 @@ app.include_router(policy_helpfulness_router.router)  # [WS-E] dual-layer regist
 app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
 app.include_router(ocr_router.router)  # [AIQ-1148] /api/ocr/process — general document OCR
 app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
+app.include_router(admin_autopilot_metrics_router.router)  # Autopilot P4 — dual-layer registration
 app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval/metrics — dual-layer registration
 app.include_router(admin_dsar_router.router)  # GDPR/DSAR desk — /api/admin/erasure-requests — dual-layer registration
 app.include_router(admin_feature_flags_router.router)  # Feature-flag console — /api/admin/feature-flags — dual-layer registration
@@ -875,6 +879,7 @@ app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — 
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
 app.include_router(public_analytics_router.router)  # [audos-P2] public POST /api/public/track (no prefix)
+app.include_router(public_corridor_router.router)  # [audos] public GET /api/public/corridor-requirements
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(admin_mobility_router.router)
@@ -956,6 +961,9 @@ def health_check():
         "status": "ok",
         "service": "ReloPass API",
         "version": "1.0.0",
+        # Render injects RENDER_GIT_COMMIT per deploy; the autopilot canary polls this to
+        # confirm a merged fix is actually live before validating it. "unknown" off-Render.
+        "commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
@@ -1135,6 +1143,8 @@ def _seed_demo_cases() -> None:
         ("demo-emp-002", "mark.thompson@relopass.local", "Mark Thompson"),
         ("demo-emp-003", "demo@relopass.com", "Demo Employee"),
         ("test-emp-test", "testEMPtest@relopass.com", "Test Employee"),
+        # AIQ-1413: hero case for the mobility-coordinator demo video (Paris → London).
+        ("demo-emp-schen", "sarah.chen@relopass.local", "Sarah Chen"),
     ]
     for emp_id, emp_email, emp_name in employees:
         ensure_user(emp_id, emp_email, "EMPLOYEE", emp_name)
@@ -1166,6 +1176,8 @@ def _seed_demo_cases() -> None:
     db.create_hr_user("hr-003", test_company_id, hr_user_id_2, {"can_manage_policy": True})
     db.create_employee("emp-001", company_id, "demo-emp-001", "Band2", "Long-Term", "demo-case-oslo-sg-family", "active")
     db.create_employee("emp-002", company_id, "demo-emp-003", "Band1", "Long-Term", "demo-case-demo-emp", "active")
+    # AIQ-1413: Sarah Chen — Paris → London demo case for the coordinator video.
+    db.create_employee("emp-schen", company_id, "demo-emp-schen", "Band2", "Long-Term", "demo-case-paris-london-schen", "active")
 
     db.upsert_relocation_case(
         case_id="demo-case-oslo-sg-family",
@@ -1184,6 +1196,16 @@ def _seed_demo_cases() -> None:
         stage="policy",
         host_country="Singapore",
         home_country="United States",
+    )
+    # AIQ-1413: Sarah Chen — Paris → London, French national, standard international.
+    db.upsert_relocation_case(
+        case_id="demo-case-paris-london-schen",
+        company_id=company_id,
+        employee_id="emp-schen",
+        status="in_progress",
+        stage="docs",
+        host_country="United Kingdom",
+        home_country="France",
     )
 
     db.create_support_case(
@@ -1266,6 +1288,44 @@ def _seed_demo_cases() -> None:
                     "movers": {"inventoryRough": "medium"},
                 },
                 complianceDocs={"hasPassportScans": True, "hasEmploymentLetter": False, "hasMarriageCertificate": False, "hasBirthCertificates": False},
+            ).model_dump(mode="json"),
+        },
+        {
+            # AIQ-1413: hero scenario for the mobility-coordinator demo video.
+            "case_id": "demo-case-paris-london-schen",
+            "assignment_id": "demo-assignment-paris-london-schen",
+            "employee_identifier": "sarah.chen@relopass.local",
+            "status": AssignmentStatus.SUBMITTED.value,
+            "profile": RelocationProfile(
+                userId="demo-assignment-paris-london-schen",
+                familySize=1,
+                spouse={"fullName": None, "wantsToWork": False},
+                dependents=[],
+                primaryApplicant={
+                    "fullName": "Sarah Chen",
+                    "nationality": "French",
+                    "employer": {
+                        "name": "Acme Corp",
+                        "roleTitle": "Senior Engineer",
+                        "jobLevel": "L2",
+                        "salaryBand": "90k - 120k",
+                    },
+                    "assignment": {"startDate": "2026-10-01"},
+                },
+                movePlan={
+                    "origin": "Paris, France",
+                    "destination": "London, United Kingdom",
+                    "targetArrivalDate": "2026-10-01",
+                    "housing": {"budgetMonthlyGBP": "2500-3500"},
+                    "schooling": {"budgetAnnualGBP": "0"},
+                    "movers": {"inventoryRough": "medium"},
+                },
+                complianceDocs={
+                    "hasPassportScans": True,
+                    "hasEmploymentLetter": True,
+                    "hasMarriageCertificate": False,
+                    "hasBirthCertificates": False,
+                },
             ).model_dump(mode="json"),
         },
         {
@@ -4506,15 +4566,19 @@ def _dispatch_hr_assign_side_effects(
             f"Once logged in, go to My Case to start your intake.\n"
         )
         try:
-            db.create_message(
-                message_id=str(uuid.uuid4()),
-                assignment_id=assignment_id,
-                hr_user_id=hr_user_id,
-                employee_identifier=stored_identifier,
-                subject="Your relocation case is ready",
-                body=message_body,
-                status="draft",
-            )
+            # AIQ-1455: only write when no thread-starter exists yet — the canonical
+            # post-creation hook (ensure_welcome_message_for_assignment) may already have
+            # written one for this assignment. Guards against a duplicate inbox message.
+            if not db.list_messages_by_assignment(assignment_id):
+                db.create_message(
+                    message_id=str(uuid.uuid4()),
+                    assignment_id=assignment_id,
+                    hr_user_id=hr_user_id,
+                    employee_identifier=stored_identifier,
+                    subject="Your relocation case is ready",
+                    body=message_body,
+                    status="draft",
+                )
         except Exception as exc:
             log.warning(
                 "create_message skipped assignment_id=%s case_id=%s error=%s",
@@ -15058,6 +15122,7 @@ app.include_router(admin_settings_router.router)  # [Task-4] admin AI-governance
 app.include_router(admin_feedback_router.router)  # [Task-6] unified feedback console
 app.include_router(admin_admins_router.router)  # [Task-7] admin lifecycle management
 app.include_router(admin_audit_log_router.router)  # [Task-7] platform audit-log viewer
+app.include_router(test_drive_router.router)  # TD-2 (AIQ-1420) test-drive provisioning
 # ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented

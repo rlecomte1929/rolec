@@ -215,10 +215,27 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
     return (
       <div className="space-y-4">
         <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-6 text-center">
-          <p className="text-sm font-medium text-[#64748b]">Immigration setup not started</p>
-          <p className="mt-1 text-xs text-[#94a3b8]">
-            No immigration requirements have been generated for this case yet.
+          <p className="text-sm font-medium text-[#64748b]">
+            {immData?.corridor
+              ? `No immigration checklist yet for ${immData.corridor}`
+              : 'Immigration checklist not generated yet'}
           </p>
+          {/* BUG-260706-4DE4: explain WHY it's empty and offer the action, instead of a
+              bare "not started" that reads as broken. */}
+          <p className="mt-1 text-xs text-[#94a3b8]">
+            We publish verified document checklists per corridor and visa type. This
+            case&apos;s corridor isn&apos;t covered yet — request it and our team will add the
+            checklist here.
+          </p>
+          {immData && (immData.corridor_to || immData.corridor_from) && (
+            <div className="mt-4">
+              <RequestResearchButton
+                destCountry={immData.corridor_to}
+                originCountry={immData.corridor_from}
+                corridorLabel={immData.corridor}
+              />
+            </div>
+          )}
         </div>
         <QuickActions onFindVendor={() => onFindVendor(buildImmigrationContext())} onViewProfile={onViewProfile} />
       </div>

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS feedback_status (
   dispatch_ref    TEXT,
   dispatch_status TEXT,
   dispatch_context TEXT,
+  autonomy_tier   TEXT,
   dismissed_at TEXT,
   PRIMARY KEY (stream, source_id)
 );

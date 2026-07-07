@@ -80,13 +80,16 @@ _SCHEMA = """
 CREATE TABLE feedback (
   id TEXT PRIMARY KEY, user_id TEXT, page_url TEXT, category TEXT, message TEXT,
   status TEXT, created_at TEXT, report_id TEXT, screenshot_data TEXT,
-  reporter_email TEXT, reporter_name TEXT, reporter_role TEXT
+  reporter_email TEXT, reporter_name TEXT, reporter_role TEXT, client_context TEXT
 );
 CREATE TABLE feedback_status (
   stream TEXT NOT NULL, source_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','reviewed','acted_on','closed')),
   owner TEXT, resolution TEXT, updated_at TEXT, severity TEXT, area TEXT,
   reporter_id TEXT, dispatch_ref TEXT, dispatch_status TEXT, dispatch_context TEXT, dismissed_at TEXT,
+  notion_task_id TEXT, autonomy_tier TEXT, spec_drafted_at TEXT, dispatched_at TEXT,
+  triaged_at TEXT, in_progress_at TEXT, deployed_at TEXT, done_at TEXT,
+  pr_url TEXT, pr_number INTEGER, branch_name TEXT,
   PRIMARY KEY (stream, source_id)
 );
 """
@@ -171,6 +174,34 @@ def test_create_dispatches_via_notion(db_session, monkeypatch):
     assert row[0] == "new"
     assert row[1] == "dispatched"
     assert row[2] == "https://notion.so/work-queue-page-123"
+
+
+def test_create_is_idempotent_when_already_dispatched(db_session, monkeypatch):
+    client = _client(db_session)
+    # fb-1 was already dispatched — feedback_status carries a Notion URL.
+    db_session.execute(text(
+        "INSERT INTO feedback_status (stream, source_id, status, dispatch_status, dispatch_ref) "
+        "VALUES ('product', 'fb-1', 'new', 'dispatched', 'https://notion.so/existing-page-999')"
+    ))
+    db_session.commit()
+
+    calls = {"n": 0}
+
+    def _fake_create(task, *, failure_evidence, context_links):
+        calls["n"] += 1
+        return "https://notion.so/should-not-be-created"
+    monkeypatch.setattr(admin_feedback.notion_work_queue, "create_work_queue_task", _fake_create)
+
+    resp = client.post(
+        "/api/admin/feedback/product/fb-1/dispatch/create",
+        json={"task": {"title": "Fix roadmap", "priority": "P1", "status": "Ready for AI"}, "confirm": True},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["already_exists"] is True
+    assert body["notion_url"] == "https://notion.so/existing-page-999"
+    # No second Notion task was created.
+    assert calls["n"] == 0
 
 
 def test_create_surfaces_notion_not_configured(db_session, monkeypatch):

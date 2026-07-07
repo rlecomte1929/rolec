@@ -6,6 +6,7 @@ from .routers import (
     ab_tests,
     admin,
     admin_ai_unit_economics,
+    admin_autopilot_metrics,
     admin_corrections,
     admin_dsar,
     admin_feature_flags,
@@ -95,6 +96,7 @@ from .routers import (
     admin_admins,
     admin_audit_log,
     public_analytics,
+    public_corridor,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -194,6 +196,7 @@ def create_app() -> FastAPI:
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
+    app.include_router(public_corridor.router)   # [audos] public GET /api/public/corridor-requirements
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
     # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
@@ -213,6 +216,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_ocr_shadow.router)
     # [Parker-G] AI unit-economics admin rollup
     app.include_router(admin_ai_unit_economics.router)
+    app.include_router(admin_autopilot_metrics.router)  # Autopilot P4 — funnel + cost dashboard
     app.include_router(admin_rag_eval.router)
     app.include_router(admin_dsar.router)  # GDPR/DSAR desk — /api/admin/erasure-requests
     app.include_router(admin_feature_flags.router)  # Feature-flag console — /api/admin/feature-flags
@@ -294,6 +298,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_prospects.router, prefix="/api/admin")
     app.include_router(admin_form_templates.router, prefix="/api/admin")
     app.include_router(admin_policy_config_router)
+
+    from .routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
+    app.include_router(test_drive_router.router)
 
     # ── Month-1 TODO: Tier 4 routers blocked on Month-0 P3 extraction ─────────
     # TODO [AUDIT-C2.3 / Month-0 P3]: add hr_policy_config + employee_policy_config

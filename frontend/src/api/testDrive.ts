@@ -9,9 +9,9 @@ import { apiPost } from './client';
 
 export interface ProvisionInput {
   first_name: string;
-  corridor_id: string;
+  corridor_id?: string;
   tester_segment: 'internal' | 'prospect';
-  invite_token: string;
+  invite_token?: string;
   campaign?: string;
 }
 
@@ -60,12 +60,15 @@ export async function provisionTestDrive(input: ProvisionInput): Promise<Provisi
   } catch (err) {
     const status = (err as { status?: number })?.status;
     const detail = (err as { detail?: unknown })?.detail;
-    let error =
-      err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+    // Default to a safe generic message. We never surface err.message here: on a 422
+    // it is the stringified Pydantic error array, which must not leak to the page.
+    let error = 'Something went wrong. Please try again.';
     if (status === 404) {
       error = 'This test drive isn’t open right now. Check with whoever sent you the link.';
     } else if (status === 403) {
       error = 'This invite link is invalid or has expired.';
+    } else if (status === 422) {
+      error = 'Please check your details and try again.';
     } else if (typeof detail === 'string' && detail) {
       error = detail;
     }

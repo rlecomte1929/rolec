@@ -78,6 +78,52 @@ def _link_contact_post_create(
         )
 
 
+def ensure_welcome_message_for_assignment(
+    db: "Database",
+    assignment_id: str,
+    *,
+    request_id: Optional[str] = None,
+) -> None:
+    """AIQ-1455: guarantee every assignment has a thread-starter message so the case
+    surfaces in the HR inbox.
+
+    /hr/messages reads the ``messages`` table grouped by ``assignment_id``. Previously a
+    thread-starter row was written only in the HR-dashboard assign path; assignments
+    created via the canonical/admin path (or integrations) got no ``messages`` row, so the
+    inbox showed nothing for that employee. This hook — run by every creation path via
+    ``run_assignment_post_creation_hooks`` — writes one on their behalf. Idempotent: it is
+    a no-op when a message already exists (e.g. the assign path's own richer draft), so it
+    never duplicates a thread.
+    """
+    try:
+        if db.list_messages_by_assignment(assignment_id):
+            return
+        asg = db.get_assignment_by_id(assignment_id)
+        if not asg:
+            return
+        hr_user_id = asg.get("hr_user_id")
+        if not hr_user_id:
+            return
+        db.create_message(
+            message_id=str(uuid.uuid4()),
+            assignment_id=assignment_id,
+            hr_user_id=hr_user_id,
+            employee_identifier=asg.get("employee_identifier"),
+            subject="Your relocation case is ready",
+            body=(
+                "Your relocation case has been created. An invitation to get started has "
+                "been sent to the employee — you can message them here at any time."
+            ),
+            status="draft",
+        )
+    except Exception as exc:
+        log.warning(
+            "ensure_welcome_message_for_assignment failed assignment_id=%s: %s",
+            assignment_id,
+            exc,
+        )
+
+
 def run_assignment_post_creation_hooks(
     db: "Database",
     assignment_id: str,
@@ -121,6 +167,8 @@ def run_assignment_post_creation_hooks(
             assignment_id,
             exc,
         )
+    # AIQ-1455: give every new assignment an inbox thread (idempotent).
+    ensure_welcome_message_for_assignment(db, assignment_id, request_id=request_id)
 
 
 def create_assignment_with_contact_and_invites(

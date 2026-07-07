@@ -16,6 +16,7 @@ vi.mock('../../api/adminFeedback', () => ({
   dispatchCreate: vi.fn(),
   dismissFeedback: vi.fn().mockResolvedValue(undefined),
   deleteFeedback: vi.fn().mockResolvedValue(undefined),
+  advanceState: vi.fn(),
 }));
 import * as feedbackApi from '../../api/adminFeedback';
 import { FeedbackTab } from './FeedbackTab';
@@ -206,6 +207,22 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     expect(screen.getByText('isolation')).toBeTruthy();
   });
 
+  it('surfaces the backend 409 detail when a pipeline transition is rejected', async () => {
+    // Regression: the ProgressStrip advance catch must show the backend's
+    // {"detail":"illegal transition X → Y"} (at err.response.data.detail), not a generic message.
+    vi.mocked(feedbackApi.advanceState).mockRejectedValue({
+      response: { data: { detail: 'illegal transition dispatched → done' } },
+    });
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByText('Already handled')); // expand the dispatched row
+    const advanceBtn = await screen.findByRole('button', { name: /mark in progress/i });
+    fireEvent.click(advanceBtn);
+    // Renders in exactly one slot (the single per-row dispatchErr under the ProgressStrip).
+    const shown = await screen.findAllByText(/illegal transition dispatched → done/i);
+    expect(shown).toHaveLength(1);
+  });
+
   it('clicking a row opens the dispatch panel with the required context field (no separate button)', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
@@ -234,7 +251,7 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     fireEvent.click(screen.getByRole('button', { name: /draft task with ai/i }));
     await waitFor(() => expect(feedbackApi.dispatchPreview).toHaveBeenCalled());
 
-    const createBtn = await screen.findByRole('button', { name: /create task in notion/i });
+    const createBtn = await screen.findByRole('button', { name: /create notion task/i });
     fireEvent.click(createBtn);
     await waitFor(() => expect(feedbackApi.dispatchCreate).toHaveBeenCalled());
     const links = await screen.findAllByRole('link', { name: /notion/i });

@@ -110,9 +110,11 @@ def query_queue(token: str, status: str, db_id: str = QUEUE_DB_ID) -> list[dict]
             rows.append(
                 {
                     "aiq": _unique_id(props.get("ID") or props.get("userDefined:ID")),
+                    "page_id": page.get("id", ""),
                     "title": _plain_text(props.get("Task Title") or props.get("Name")),
                     "priority": _plain_text(props.get("Priority")),
                     "complexity": _plain_text(props.get("Estimated Complexity")),
+                    "autonomy_tier": _plain_text(props.get("Autonomy Tier")),
                     "task_type": _plain_text(props.get("Task Type")),
                     "status": _plain_text(props.get("Status")),
                     "dependencies": _plain_text(props.get("Dependencies")),
@@ -139,10 +141,28 @@ def rank(tasks: list[dict]) -> list[dict]:
     )
 
 
+# The Claude Code agent lane (Autopilot Phase 3) handles the slice the headless Haiku
+# pipeline cannot: Medium/High complexity, on the 🟢/🟡 autonomy tiers only. Trivial/Low go
+# to the headless lane; Very High → decomposition; 🔴 Red is never auto-dispatched to an agent.
+_CC_COMPLEXITY = {"Medium", "High"}
+
+
+def cc_eligible(task: dict) -> bool:
+    tier = task.get("autonomy_tier", "") or ""
+    if "🔴" in tier or "Red" in tier:
+        return False
+    if not any(m in tier for m in ("🟢", "🟡", "Green", "Yellow")):
+        return False
+    return task.get("complexity") in _CC_COMPLEXITY
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="List AI Work Queue tasks by status, ranked.")
     ap.add_argument("--status", default="Ready for AI", help='Status to filter on (default: "Ready for AI")')
     ap.add_argument("--next", action="store_true", help="Print only the single top-ranked task.")
+    ap.add_argument("--cc-next", action="store_true",
+                    help="Print (JSON) the top Ready-for-AI task eligible for the Claude Code "
+                         "agent lane (🟢/🟡 tier, Medium/High complexity). Empty JSON if none.")
     ap.add_argument("--json", action="store_true", help="Emit JSON instead of a table.")
     args = ap.parse_args(argv)
 
@@ -157,6 +177,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     tasks = rank(query_queue(token, args.status))
+
+    if args.cc_next:
+        eligible = [t for t in tasks if cc_eligible(t)]
+        top = eligible[0] if eligible else None
+        print(json.dumps(
+            {"aiq": top["aiq"], "page_id": top["page_id"], "title": top["title"], "url": top["url"],
+             "autonomy_tier": top["autonomy_tier"], "complexity": top["complexity"]}
+            if top else {}
+        ))
+        return 0
 
     if args.next:
         if not tasks:

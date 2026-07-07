@@ -142,6 +142,26 @@ async function fetchReadyBugs(token: string, dbId: string, max: number) {
   }).filter((t: { title: string }) => t.title.length > 0);
 }
 
+// Fetch a single Work Queue task by page id — the on-demand path used when an admin
+// clicks "Auto-attempt" in the Feedback console (bypasses the Ready-for-AI batch filter).
+async function fetchTaskById(token: string, pageId: string) {
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`Notion page fetch failed: ${res.status}`);
+  const page = await res.json();
+  const props = (page.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const title = ((props["fable"]?.title ?? props["Task Title"]?.title ?? props["title"]?.title ?? []) as Array<{ plain_text: string }>)
+    .map((t) => t.plain_text).join("");
+  const desc = ((props["Expected Output"]?.rich_text ?? props["Description"]?.rich_text ?? []) as Array<{ plain_text: string }>)
+    .map((t) => t.plain_text).join("");
+  return { notionId: page.id as string, title, description: desc, notionUrl: page.url as string };
+}
+
 async function updateNotionTask(id: string, status: string, notes: string, token: string) {
   await fetch(`https://api.notion.com/v1/pages/${id}`, {
     method: "PATCH",
@@ -314,11 +334,23 @@ If you cannot generate a safe fix: {"fixed_content": null, "diff_summary": "reas
     return { outcome: "skipped_no_fix", reason };
   }
 
-  // 7. Create branch
+  // 7. Open-PR dedup — skip if an open autofix PR already exists for this task, so the same
+  // bug never fans out into a second PR → CI run → deploy. (The branch-create below would 422
+  // on an existing branch anyway; this makes the skip explicit + cheap.)
+  const branchName = `autofix/bug-${bug.notionId.replace(/-/g, "").slice(0, 16)}`;
+  const openPrs = await ghGet<Array<{ html_url: string }>>(
+    `/repos/${owner}/${repo}/pulls?state=open&head=${owner}:${branchName}`, env.githubToken
+  );
+  if (Array.isArray(openPrs) && openPrs.length > 0) {
+    const reason = `Skipped: open autofix PR already exists (${openPrs[0].html_url})`;
+    log(reason);
+    return { outcome: "skipped_duplicate_pr", reason };
+  }
+
+  // 8. Create branch
   const baseSha = await ghGet<{ object: { sha: string } }>(
     `/repos/${owner}/${repo}/git/refs/heads/${env.baseBranch}`, env.githubToken
   );
-  const branchName = `autofix/bug-${bug.notionId.replace(/-/g, "").slice(0, 16)}`;
   await ghPost(`/repos/${owner}/${repo}/git/refs`,
     { ref: `refs/heads/${branchName}`, sha: baseSha.object.sha }, env.githubToken);
 
@@ -411,11 +443,21 @@ If you cannot generate a safe fix: {"fixed_content": null, "diff_summary": "reas
     return { outcome: "skipped_no_fix", reason: fix.diff_summary };
   }
 
-  // 7. Branch (autofix/bug-<16 hex> from the work_item uuid → validate fires)
+  // 7. Open-PR dedup — skip if an open autofix PR already exists for this work_item.
+  const branchName = `autofix/bug-${wi.id.replace(/-/g, "").slice(0, 16)}`;
+  const openPrs = await ghGet<Array<{ html_url: string }>>(
+    `/repos/${owner}/${repo}/pulls?state=open&head=${owner}:${branchName}`, env.githubToken,
+  );
+  if (Array.isArray(openPrs) && openPrs.length > 0) {
+    const reason = `Skipped: open autofix PR already exists (${openPrs[0].html_url})`;
+    log(reason);
+    return { outcome: "skipped_duplicate_pr", reason };
+  }
+
+  // 8. Branch (autofix/bug-<16 hex> from the work_item uuid → validate fires)
   const baseSha = await ghGet<{ object: { sha: string } }>(
     `/repos/${owner}/${repo}/git/refs/heads/${env.baseBranch}`, env.githubToken,
   );
-  const branchName = `autofix/bug-${wi.id.replace(/-/g, "").slice(0, 16)}`;
   await ghPost(`/repos/${owner}/${repo}/git/refs`, { ref: `refs/heads/${branchName}`, sha: baseSha.object.sha }, env.githubToken);
 
   // 8. Commit + 9. draft PR
@@ -454,9 +496,23 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // Autopilot governance gate: the fix lane is OFF until AUTOPILOT_FIX_ENABLED=true in the
+  // Supabase vault. Brings the daily auto-merge-to-prod pipeline under the kill-switch
+  // (default OFF) — nothing auto-ships until an operator enables it.
+  if (Deno.env.get("AUTOPILOT_FIX_ENABLED") !== "true") {
+    return Response.json(
+      { ok: true, halted: true, reason: "AUTOPILOT_FIX_ENABLED off" },
+      { headers: CORS_HEADERS },
+    );
+  }
+
   const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
   const dryRun = body.dry_run === true || Deno.env.get("DRY_RUN") === "true";
   const maxBugs = parseInt(body.max_bugs ?? Deno.env.get("MAX_BUGS") ?? "5", 10);
+  // Single-task mode: fix exactly this Work Queue task instead of the Ready-for-AI batch.
+  const singleTaskId = typeof body.notion_task_id === "string" && body.notion_task_id
+    ? body.notion_task_id
+    : null;
 
   const env: Env = {
     anthropicKey, githubToken, githubOwner, githubRepo, notionToken, notionDbId,
@@ -482,9 +538,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Fetch candidate bugs
-    const bugs = await fetchReadyBugs(notionToken, notionDbId, maxBugs);
-    console.log(`autofix-pipeline: ${date}: fetched ${bugs.length} candidate bugs`);
+    // Fetch candidate bugs — single task (on-demand) or the Ready-for-AI batch (cron).
+    const bugs = singleTaskId
+      ? [await fetchTaskById(notionToken, singleTaskId)].filter((t) => t.title.length > 0)
+      : await fetchReadyBugs(notionToken, notionDbId, maxBugs);
+    console.log(`autofix-pipeline: ${date}: ${singleTaskId ? `single-task ${singleTaskId}` : "batch"} → ${bugs.length} candidate(s)`);
 
     const results = [];
     for (const bug of bugs) {

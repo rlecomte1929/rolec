@@ -30,6 +30,7 @@ import type { ConfidenceByTitle } from '../../features/relocation-plan-employee/
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
+import { track } from '../../analytics';
 import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
 
 export const EmployeeCaseRoadmapPage: React.FC = () => {
@@ -53,8 +54,23 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     };
   }, []);
 
+  // AIQ-1435: journey funnel — roadmap step reached (once per mount).
+  useEffect(() => {
+    track('journey_step_started', { step: 'roadmap', case_id: caseId, persona: 'employee' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data, loading, error, refetch, ensureDefaultsAndReload } =
     useEmployeeRelocationPlanPageData(caseId);
+
+  // AIQ-1435: journey funnel — roadmap completed once the plan data has loaded.
+  const roadmapCompletedRef = useRef(false);
+  useEffect(() => {
+    if (data && !roadmapCompletedRef.current) {
+      roadmapCompletedRef.current = true;
+      track('journey_step_completed', { step: 'roadmap', case_id: caseId, persona: 'employee' });
+    }
+  }, [data, caseId]);
   const runCta = useRelocationPlanCtaHandler(caseId ?? '', { resourceCaseId: data?.case_id });
   const handleCta = (t: RelocationPlanPhaseTaskDTO) => {
     // [AIQ-1252] For document-upload tasks, pass the document key so the dossier

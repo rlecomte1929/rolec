@@ -235,6 +235,21 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
     });
   }, [sorted]);
 
+  // AIQ-1459: the "Next focus" banner must match the TOP of the list the HR user sees.
+  // Both now derive from the SAME `sorted` (sortTasksForTracker) instead of the banner
+  // preferring the backend `phasedSnapshot.next_action` (which uses a different sort and
+  // could disagree with the list's first row). bannerTask = the first urgent/orange task,
+  // else the first non-done task — i.e. the top actionable item of the same ordering.
+  const bannerTask = useMemo(
+    () =>
+      nextCritical ??
+      sorted.find((m) => {
+        const st = (m.status || '').toLowerCase();
+        return st !== 'done' && st !== 'skipped';
+      }),
+    [nextCritical, sorted],
+  );
+
   const patchMilestone = useCallback(
     async (milestoneId: string, patch: Parameters<typeof timelineAPI.updateMilestone>[2]) => {
       if (!caseId) return;
@@ -322,24 +337,21 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
         </div>
       </div>
 
-      {(phasedSnapshot?.next_action || nextCritical) && (
+      {bannerTask && (
         <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm">
           <span className="font-semibold text-[#9a3412]">Next focus: </span>
-          <span className="text-[#0b2b43]">
-            {phasedSnapshot?.next_action?.title ?? nextCritical?.title}
-          </span>
+          <span className="text-[#0b2b43]">{bannerTask.title}</span>
           <span className="text-[#6b7280] text-xs ml-2">
             (
-            {OWNER_OPTIONS.find(
-              (o) =>
-                o.value ===
-                (phasedSnapshot?.next_action?.owner || nextCritical?.owner || 'joint')
-            )?.label ?? 'Joint'}
+            {OWNER_OPTIONS.find((o) => o.value === (bannerTask.owner || 'joint'))?.label ?? 'Joint'}
             )
           </span>
-          {phasedSnapshot?.next_action?.reason && (
-            <div className="text-xs text-[#64748b] mt-1">{phasedSnapshot.next_action.reason}</div>
-          )}
+          {/* AIQ-1459: only surface the backend reason when it refers to this same task,
+              so the explanation can't describe a different task than the one shown. */}
+          {phasedSnapshot?.next_action?.reason &&
+            phasedSnapshot.next_action.title === bannerTask.title && (
+              <div className="text-xs text-[#64748b] mt-1">{phasedSnapshot.next_action.reason}</div>
+            )}
         </div>
       )}
 

@@ -64,6 +64,7 @@ const CasePlanToRoadmapRedirect = lazy(() => import('./pages/employee/CasePlanTo
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 // [P1-5] Dossier & Forms list view
 const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierPage').then((module) => ({ default: module.EmployeeDossierPage })));
+const FormEditorPage = lazy(() => import('./pages/employee/FormEditorPage').then((module) => ({ default: module.FormEditorPage })));
 // Employee document vault (case-scoped + assignment fallback)
 const EmployeeDocumentsPage = lazy(() => import('./pages/employee/EmployeeDocumentsPage').then((module) => ({ default: module.EmployeeDocumentsPage })));
 // [P1-6] Case roadmap page
@@ -127,6 +128,7 @@ const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').t
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminRagQualityPage = lazy(() => import('./pages/admin/AdminRagQualityPage').then((module) => ({ default: module.AdminRagQualityPage })));
 const AdminAiUnitEconomicsPage = lazy(() => import('./pages/admin/AdminAiUnitEconomicsPage').then((module) => ({ default: module.AdminAiUnitEconomicsPage })));
+const AdminAutopilotMetricsPage = lazy(() => import('./pages/admin/AdminAutopilotMetricsPage').then((module) => ({ default: module.AdminAutopilotMetricsPage })));
 const AdminDsarPage = lazy(() => import('./pages/admin/AdminDsarPage').then((module) => ({ default: module.AdminDsarPage })));
 const AdminPolicyVersionsPage = lazy(() => import('./pages/admin/AdminPolicyVersionsPage').then((module) => ({ default: module.AdminPolicyVersionsPage })));
 const AdminFeatureFlagsPage = lazy(() => import('./pages/admin/AdminFeatureFlagsPage').then((module) => ({ default: module.AdminFeatureFlagsPage })));
@@ -149,6 +151,8 @@ const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) =
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
+const AdminWorkflowFunnelPage = lazy(() => import('./pages/admin/AdminWorkflowFunnelPage').then((module) => ({ default: module.AdminWorkflowFunnelPage })));
+const AdminAssistantAnalyticsPage = lazy(() => import('./pages/admin/AdminAssistantAnalyticsPage').then((module) => ({ default: module.AdminAssistantAnalyticsPage })));
 const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
 const AdminTestDrive = lazy(() => import('./pages/admin/AdminTestDrive'));
@@ -396,6 +400,10 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
+        {/* AIQ-1449: wire the form editor route. CaseFormCard's "Open form" navigates to
+            employeeCaseFormEditor, but no <Route> rendered it — so it fell through to the
+            catch-all redirect ("lands on an unrelated page"). FormEditorPage prefills. */}
+        <Route path={ROUTE_DEFS.employeeCaseFormEditor.path} element={<RequireEmployeeRoute><FormEditorPage /></RequireEmployeeRoute>} />
         {/* Employee document vault — case-scoped + bare /employee/documents (assignment fallback) */}
         <Route path={ROUTE_DEFS.employeeCaseDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeDocuments.path} element={<RequireEmployeeRoute><EmployeeDocumentsPage /></RequireEmployeeRoute>} />
@@ -408,6 +416,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiUnitEconomics.path} element={<RequireAdminRoute><AdminAiUnitEconomicsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAutopilotMetrics.path} element={<RequireAdminRoute><AdminAutopilotMetricsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminDsar.path} element={<RequireAdminRoute><AdminDsarPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicyVersions.path} element={<RequireAdminRoute><AdminPolicyVersionsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />
@@ -448,6 +457,12 @@ function App() {
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminAssignments.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
+        {/* AIQ-1437: /admin/ops/errors surfaces the same admin error dashboard. */}
+        <Route path={ROUTE_DEFS.adminOpsErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
+        {/* AIQ-1439: workflow conversion funnel. */}
+        <Route path={ROUTE_DEFS.adminWorkflowFunnel.path} element={<RequireAdminRoute><AdminWorkflowFunnelPage /></RequireAdminRoute>} />
+        {/* AIQ-1438: policy-assistant question analytics. */}
+        <Route path={ROUTE_DEFS.adminAiQuestions.path} element={<RequireAdminRoute><AdminAssistantAnalyticsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminTestDrive.path} element={<RequireAdminRoute><AdminTestDrive /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />

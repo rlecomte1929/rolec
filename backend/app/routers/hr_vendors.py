@@ -209,7 +209,14 @@ def list_vendors(
         params["corridor"] = corridor
 
     if category:
-        conditions.append(":category = ANY(v.service_types)")
+        # BUG-260706-4DE4: match either the coarse `vendors.category` (case-insensitive,
+        # e.g. "Immigration Legal") OR a fine-grained `service_types` slug. The vendor-browse
+        # dropdown sends coarse category labels, which never matched the slug-only filter —
+        # so real vendors (e.g. the immigration firm) stayed invisible. This broadens the
+        # match without regressing callers that pass a service_types slug.
+        conditions.append(
+            "(LOWER(v.category) = LOWER(:category) OR :category = ANY(v.service_types))"
+        )
         params["category"] = category
 
     where_sql = " AND ".join(conditions)

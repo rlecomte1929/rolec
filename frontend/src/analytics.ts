@@ -13,6 +13,11 @@ export function initAnalytics(): void {
     capture_pageview: true,
     persistence: 'localStorage+cookie',
     autocapture: false,
+    // Session replay for the testing phase (AIQ-1434). maskAllInputs redacts every
+    // input value (passwords, tokens, PII typed into fields). Rendered text is left
+    // unmasked (the default — posthog-js 1.393 has no maskAllText; maskTextSelector
+    // would opt into masking) so replays stay legible for diagnosing UI friction.
+    session_recording: { maskAllInputs: true },
   });
   enabled = true;
 }

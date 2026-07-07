@@ -11,7 +11,12 @@ Dual-registered in backend/main.py AND backend/app/main.py (CLAUDE.md rule).
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
+import re
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional
@@ -171,6 +176,7 @@ SELECT
     CAST(fs.area            AS TEXT) AS area,
     CAST(fs.dispatch_status AS TEXT) AS dispatch_status,
     CAST(fs.dispatch_ref    AS TEXT) AS dispatch_ref,
+    CAST(fs.autonomy_tier   AS TEXT) AS autonomy_tier,
     CASE WHEN fs.dismissed_at IS NOT NULL THEN 1 ELSE 0 END AS dismissed
 FROM (
     {union}
@@ -324,6 +330,57 @@ def triage_feedback(
     return {"stream": stream, "id": item_id, "status": body.status}
 
 
+class StateBody(BaseModel):
+    target: str
+
+
+@router.patch("/feedback/{stream}/{item_id}/state")
+def set_state(
+    stream: str,
+    item_id: str,
+    body: StateBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Manually advance (or reject) a feedback item's pipeline `dispatch_status`,
+    validated against the state machine in `feedback_state_machine.py`."""
+    from ..services.feedback_state_machine import ALLOWED_TRANSITIONS, timestamp_column, validate_transition
+
+    if body.target not in ALLOWED_TRANSITIONS:
+        raise HTTPException(status_code=422, detail=f"unknown state {body.target!r}")
+
+    row = db.execute(
+        text("SELECT dispatch_status FROM feedback_status WHERE stream=:s AND source_id=:id"),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    current = row[0] if row else None
+    if not validate_transition(current, body.target):
+        raise HTTPException(status_code=409, detail=f"illegal transition {current} → {body.target}")
+
+    now = datetime.utcnow().isoformat()
+    ts_col = timestamp_column(body.target)
+    set_ts = f", {ts_col} = :now" if ts_col else ""
+    db.execute(
+        text(
+            f"INSERT INTO feedback_status (stream, source_id, status, dispatch_status, updated_at"
+            f"{(', ' + ts_col) if ts_col else ''}) "
+            f"VALUES (:s, :id, 'new', :t, :now{', :now' if ts_col else ''}) "
+            f"ON CONFLICT (stream, source_id) DO UPDATE SET dispatch_status = :t, updated_at = :now{set_ts}"
+        ),
+        {"s": stream, "id": item_id, "t": body.target, "now": now},
+    )
+
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="feedback_state_changed",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "from": current, "to": body.target},
+    )
+    return {"ok": True, "dispatch_status": body.target}
+
+
 # ── Dispatch endpoint ─────────────────────────────────────────────────────────
 
 
@@ -452,7 +509,8 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
     row = db.execute(
         text(
             "SELECT message, category, page_url, "
-            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id "
+            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id, "
+            "client_context "
             "FROM feedback WHERE CAST(id AS TEXT) = :id"
         ),
         {"id": item_id},
@@ -466,6 +524,7 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
         "has_screenshot": bool(row[3]),
         "reporter_name": row[4],
         "report_id": row[5],
+        "client_context": row[6],
     }
 
 
@@ -516,6 +575,9 @@ def dispatch_preview(
         has_screenshot = pf["has_screenshot"]
         reporter_name = pf["reporter_name"]
 
+    from ..services.feedback_task_engineer import format_diagnostics
+    diagnostics = format_diagnostics(pf["client_context"]) if pf else ""
+
     if not severity or not area:
         cls = classify(text_val, category)
         severity = severity or cls["severity"]
@@ -531,10 +593,32 @@ def dispatch_preview(
             has_screenshot=has_screenshot,
             reporter_name=reporter_name,
             admin_context=dispatch_context,
+            diagnostics=diagnostics,
+            # Single attempt, 55 s cap — interactive preview should fail fast and clearly
+            # rather than retrying 3× (= 90 s) and making the UI appear hung.
+            timeout=55.0,
+            max_retries=0,
         )
     except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
         log.warning("dispatch_preview engineer_task failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"Could not engineer the task: {exc}") from exc
+
+    _db2 = SessionLocal()
+    try:
+        _db2.execute(
+            text(
+                "INSERT INTO feedback_status (stream, source_id, status, dispatch_status, spec_drafted_at, updated_at) "
+                "VALUES (:s, :id, 'new', 'spec_drafted', :now, :now) "
+                "ON CONFLICT (stream, source_id) DO UPDATE SET "
+                "  dispatch_status = 'spec_drafted', spec_drafted_at = COALESCE(feedback_status.spec_drafted_at, :now), "
+                "  updated_at = :now"
+            ),
+            {"s": stream, "id": item_id, "now": datetime.utcnow().isoformat()},
+        )
+        _db2.commit()
+    finally:
+        _db2.close()
+
     return {"task": task}
 
 
@@ -557,6 +641,85 @@ def dispatch_create(
     if not task.get("title"):
         raise HTTPException(status_code=400, detail="Task title is required.")
 
+    # ── Idempotency + pre-flight sentinel ────────────────────────────────────────
+    # Root cause of the duplicate-Notion-task bug (AIQ-1465/1466): if the client
+    # disconnects while Notion is in-flight, _get_db rolls back the DB write so
+    # dispatch_ref stays NULL.  A retry then passes the old idempotency check and
+    # creates a second task.
+    #
+    # Fix: write 'PENDING' to dispatch_ref BEFORE calling Notion, committed
+    # immediately, so any concurrent or retried call sees it and gets a 409.
+    # A PENDING older than 2 minutes is considered orphaned (server crash / Render
+    # restart) and is silently overwritten so the admin can retry.
+    existing = db.execute(
+        text("SELECT dispatch_ref, updated_at FROM feedback_status WHERE stream = :s AND source_id = :id"),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    existing_ref = existing[0] if existing else None
+    existing_updated_at = existing[1] if existing else None
+
+    if existing_ref and str(existing_ref).startswith("http"):
+        return {
+            "dispatched": True,
+            "already_exists": True,
+            "notion_url": existing_ref,
+            "url": existing_ref,
+            "dispatch_ref": existing_ref,
+        }
+
+    _PENDING_STALE_SECS = 120
+    now_dt = datetime.utcnow()
+    now = now_dt.isoformat()
+
+    if existing_ref == "PENDING":
+        stale = True
+        if existing_updated_at:
+            try:
+                age = (now_dt - datetime.fromisoformat(str(existing_updated_at))).total_seconds()
+                stale = age >= _PENDING_STALE_SECS
+            except Exception:  # noqa: BLE001
+                stale = True
+        if not stale:
+            raise HTTPException(
+                status_code=409,
+                detail="Dispatch already in progress — please wait a moment and try again.",
+            )
+        # stale PENDING: fall through and overwrite
+
+    # Atomically claim the dispatch slot.  Only writes PENDING when dispatch_ref IS NULL
+    # or is an existing (stale) PENDING; returns 0 rows when a real URL is already set.
+    claim = db.execute(
+        text(
+            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, updated_at) "
+            "VALUES (:s, :id, 'new', 'PENDING', :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "  dispatch_ref = 'PENDING', updated_at = :now "
+            "WHERE feedback_status.dispatch_ref IS NULL OR feedback_status.dispatch_ref = 'PENDING' "
+            "RETURNING dispatch_ref"
+        ),
+        {"s": stream, "id": item_id, "now": now},
+    ).fetchone()
+    if claim is None:
+        fresh = db.execute(
+            text("SELECT dispatch_ref FROM feedback_status WHERE stream = :s AND source_id = :id"),
+            {"s": stream, "id": item_id},
+        ).fetchone()
+        ref = fresh[0] if fresh else None
+        if ref and str(ref).startswith("http"):
+            db.commit()
+            return {
+                "dispatched": True,
+                "already_exists": True,
+                "notion_url": ref,
+                "url": ref,
+                "dispatch_ref": ref,
+            }
+        raise HTTPException(status_code=409, detail="Concurrent dispatch in progress — please retry.")
+
+    # Commit sentinel immediately so concurrent requests see it before Notion is called.
+    db.commit()
+    # ── end sentinel block ────────────────────────────────────────────────────────
+
     report_id = item_id
     message = page_url = ""
     reporter_name = None
@@ -575,25 +738,44 @@ def dispatch_create(
     )
     context_links = f"https://relopass.com/admin/feedback  (report_id={report_id})"
 
+    def _clear_pending() -> None:
+        """Roll the sentinel back on Notion failure so the admin can retry."""
+        try:
+            db.execute(
+                text(
+                    "UPDATE feedback_status SET dispatch_ref = NULL, updated_at = :now "
+                    "WHERE stream = :s AND source_id = :id AND dispatch_ref = 'PENDING'"
+                ),
+                {"s": stream, "id": item_id, "now": now},
+            )
+            db.commit()
+        except Exception:  # noqa: BLE001
+            log.warning("dispatch_create: could not clear PENDING sentinel for %s/%s", stream, item_id)
+
     try:
         url = notion_work_queue.create_work_queue_task(
             task, failure_evidence=failure_evidence, context_links=context_links
         )
     except notion_work_queue.NotionNotConfigured as exc:
+        _clear_pending()
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except notion_work_queue.NotionApiError as exc:
+        _clear_pending()
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    now = datetime.utcnow().isoformat()
+    page_id = notion_work_queue.page_id_from_ref(url) or ""
+    notion_task_id = re.sub(r"[^0-9a-f]", "", page_id.lower())  # dashless-lower 32hex join key
+    tier = task.get("autonomy_tier") or None
     db.execute(
         text(
-            "INSERT INTO feedback_status (stream, source_id, status, dispatch_ref, dispatch_status, updated_at) "
-            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now) "
+            "INSERT INTO feedback_status "
+            "(stream, source_id, status, dispatch_ref, dispatch_status, dispatched_at, notion_task_id, autonomy_tier, updated_at) "
+            "VALUES (:s, :id, 'new', :ref, 'dispatched', :now, :ntid, :tier, :now) "
             "ON CONFLICT (stream, source_id) DO UPDATE SET "
-            "    dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
-            "    updated_at = excluded.updated_at"
+            "  dispatch_ref = excluded.dispatch_ref, dispatch_status = 'dispatched', "
+            "  dispatched_at = :now, notion_task_id = excluded.notion_task_id, "
+            "  autonomy_tier = excluded.autonomy_tier, updated_at = :now"
         ),
-        {"s": stream, "id": item_id, "ref": url, "now": now},
+        {"s": stream, "id": item_id, "ref": url, "now": now, "ntid": notion_task_id, "tier": tier},
     )
     record_admin_event(
         db,
@@ -603,7 +785,139 @@ def dispatch_create(
         entity_id=item_id,
         detail={"stream": stream, "notion_url": url, "title": task.get("title")},
     )
-    return {"dispatched": True, "url": url, "dispatch_ref": url}
+    return {"dispatched": True, "already_exists": False, "notion_url": url, "url": url, "dispatch_ref": url}
+
+
+# ── Trigger fix (skill handoff) + Auto-attempt (autofix pipeline) ─────────────
+# Once a row is dispatched (feedback_status.dispatch_ref = Notion URL), an admin can
+# MANUALLY launch a fix. Gated by FEEDBACK_FIX_TRIGGER_ENABLED (404 when off).
+
+
+def _fix_trigger_enabled() -> bool:
+    return os.getenv("FEEDBACK_FIX_TRIGGER_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _require_fix_enabled() -> None:
+    if not _fix_trigger_enabled():
+        raise HTTPException(status_code=404, detail="Feedback fix-trigger is not enabled.")
+
+
+def _dispatched_page_id(db: Session, stream: str, item_id: str) -> str:
+    """Resolve the Notion page id for a dispatched row, or 409 if not dispatched."""
+    row = db.execute(
+        text(
+            "SELECT dispatch_ref, dispatch_status FROM feedback_status "
+            "WHERE stream = :s AND source_id = :id"
+        ),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    ref = row[0] if row else None
+    status = row[1] if row else None
+    if status != "dispatched" or not ref or not str(ref).startswith("http"):
+        raise HTTPException(
+            status_code=409,
+            detail="Dispatch this feedback to the AI Work Queue before triggering a fix.",
+        )
+    page_id = notion_work_queue.page_id_from_ref(ref)
+    if not page_id:
+        raise HTTPException(status_code=422, detail="Could not resolve the Notion page id for this task.")
+    return page_id
+
+
+def _invoke_autofix_pipeline(notion_task_id: str) -> Dict[str, Any]:
+    base = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not base or not key:
+        raise HTTPException(status_code=503, detail="Autofix pipeline is not configured.")
+    req = urllib.request.Request(
+        f"{base.rstrip('/')}/functions/v1/autofix-pipeline",
+        data=json.dumps({"notion_task_id": notion_task_id}).encode("utf-8"),
+        method="POST",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return {"pipeline": json.loads(resp.read())}
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:300]
+        raise HTTPException(status_code=502, detail=f"Autofix pipeline returned {exc.code}: {detail}")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Autofix pipeline unreachable: {exc}") from exc
+
+
+@router.post("/feedback/{stream}/{item_id}/fix", dependencies=[Depends(_require_fix_enabled)])
+def trigger_fix(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Mark the dispatched task 'Ready for AI' and return the exact skill command to
+    run in Claude Code. No code executes here — it hands off to /relopass-dev-queue."""
+    page_id = _dispatched_page_id(db, stream, item_id)
+    try:
+        meta = notion_work_queue.get_task_meta(page_id)
+        notion_work_queue.set_task_status(
+            page_id, "Ready for AI", notes="Fix triggered from the admin Feedback console."
+        )
+    except notion_work_queue.NotionNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except notion_work_queue.NotionApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    aiq = meta.get("aiq_id") or ""
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="ticket_fix_triggered",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "aiq_id": aiq, "page_id": page_id},
+    )
+    return {
+        "triggered": True,
+        "skill": "relopass-dev-queue",
+        "command": f"/relopass-dev-queue {aiq}".strip(),
+        "routes_to": "relopass-fix-ui-bug / relopass-fix-api-bug / relopass-fix-isolation-bug (by Layer)",
+        "aiq_id": meta.get("aiq_id"),
+        "url": meta.get("url"),
+    }
+
+
+@router.post("/feedback/{stream}/{item_id}/auto-attempt", dependencies=[Depends(_require_fix_enabled)])
+def auto_attempt(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Fire the autofix pipeline for this one task — Trivial/Low + non-Red only."""
+    page_id = _dispatched_page_id(db, stream, item_id)
+    try:
+        meta = notion_work_queue.get_task_meta(page_id)
+    except notion_work_queue.NotionNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except notion_work_queue.NotionApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    complexity = (meta.get("complexity") or "").strip().lower()
+    tier = (meta.get("autonomy_tier") or "").lower()
+    if "red" in tier or complexity not in ("trivial", "low"):
+        raise HTTPException(
+            status_code=422,
+            detail="Auto-attempt is only allowed for Trivial/Low, non-Red tasks. Use Trigger fix instead.",
+        )
+
+    result = _invoke_autofix_pipeline(page_id)
+    record_admin_event(
+        db,
+        actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
+        event="ticket_auto_attempt",
+        entity="feedback_status",
+        entity_id=item_id,
+        detail={"stream": stream, "page_id": page_id},
+    )
+    return {"status": "dispatched", "url": meta.get("url"), **result}
 
 
 # ── Dismiss (soft-hide, all streams) + Delete (hard, product only) ────────────

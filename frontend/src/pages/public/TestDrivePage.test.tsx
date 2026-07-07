@@ -61,9 +61,13 @@ describe('TestDrivePage', () => {
     expect(screen.getByText(/early coverage/i)).toBeInTheDocument();
   });
 
-  it('falls back to the default corridor for an unknown token', () => {
+  it('hides corridor label when ?corridor= is unknown (shown only after server assigns)', () => {
     renderAt('?corridor=ZZ_ZZ&token=t');
-    expect(screen.getAllByText(/Paris → Oslo/).length).toBeGreaterThan(0);
+    // Unknown corridor → assignedCorridorId null until provision → no corridor section
+    expect(screen.queryByText(/Paris → Oslo/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /Run one relocation, end to end/i }),
+    ).toBeInTheDocument();
   });
 
   it('provisions with the corridor + invite token from the URL and shows both credential sets', async () => {
@@ -95,6 +99,28 @@ describe('TestDrivePage', () => {
     // The card shows the login email (login accepts email or username).
     expect(await screen.findByText('hr-alex@probe.test')).toBeInTheDocument();
     expect(screen.getByText('emp-alex@probe.test')).toBeInTheDocument();
+  });
+
+  it('provisions from a bare /test-drive URL (no token) with invite_token undefined', async () => {
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 's2',
+      corridorId: 'FR_NO',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-r-1a2b', email: 'hr-r@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-r-1a2b', email: 'emp-r@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    renderAt('');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith({
+      first_name: 'Romain',
+      tester_segment: 'prospect',
+      invite_token: undefined,
+    });
   });
 
   it('surfaces the API error and does not show credentials', async () => {

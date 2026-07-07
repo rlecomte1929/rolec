@@ -189,8 +189,11 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     return status ?? 'submitted';
   }
 
+  // AIQ-1454: z-[60] keeps the feedback button clickable ABOVE the Setup/AI assistant
+  // drawer (a right/bottom fixed panel at z-50 that otherwise covers this bottom-right
+  // corner) — so feedback stays reachable while the assistant is open.
   return (
-    <div ref={containerRef} className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+    <div ref={containerRef} className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2">
       {isVisible && (
         <div className="w-80 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
           {/* Header */}

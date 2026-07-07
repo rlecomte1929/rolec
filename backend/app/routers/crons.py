@@ -38,6 +38,7 @@ import os
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
@@ -64,6 +65,107 @@ def _verify_cron_secret(request: Request) -> None:
     token = auth.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid cron secret")
+
+
+class CanaryBody(BaseModel):
+    failing_requests: Optional[list] = None
+    client_context: Optional[Dict[str, Any]] = None
+    base_url: Optional[str] = None
+    health_path: str = "/health"
+    auth_token: Optional[str] = None
+    dry_run: bool = False
+
+
+@router.post("/autopilot-canary")
+def autopilot_canary(request: Request, body: CanaryBody) -> Dict[str, Any]:
+    """[Autopilot P0] Post-deploy diagnostics-replay canary. Read-only: replays only the
+    idempotent (GET/HEAD) failing requests recorded in a feedback item's client_context and
+    reports whether the signal is resolved. Not yet wired into auto-merge (that is Phase 2,
+    which will call notion_work_queue.set_validation_result with the outcome)."""
+    _verify_cron_secret(request)
+    from ..services import autopilot_canary as canary
+
+    reqs = body.failing_requests
+    if reqs is None:
+        reqs = canary.failing_requests_from_context(body.client_context)
+
+    if body.dry_run:
+        base = (body.base_url or canary.prod_base_url()).rstrip("/")
+        return {
+            "dry_run": True,
+            "base_url": base,
+            "health_path": body.health_path,
+            "would_replay": [
+                {"method": (r.get("method") or "GET").upper(), "path": r.get("path"), "was": r.get("status")}
+                for r in reqs
+            ],
+        }
+
+    result = canary.run_canary(
+        failing_requests=reqs,
+        base_url=body.base_url,
+        health_path=body.health_path,
+        auth_token=body.auth_token,
+    )
+    return {"dry_run": False, **result.as_dict()}
+
+
+class AutopilotEventBody(BaseModel):
+    event_type: str
+    entity_id: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+
+
+@router.post("/autopilot-event")
+def autopilot_event(request: Request, body: AutopilotEventBody) -> Dict[str, Any]:
+    """[Autopilot P2] Record one autopilot funnel event (fired by the autofix-validate workflow)
+    into public.events, so the metrics dashboard sees the CI-side stages — merged / canary /
+    reverted / task_done — that the backend can't observe on its own."""
+    _verify_cron_secret(request)
+    from ..services import autopilot_events as ev
+
+    if body.event_type not in ev.ALL_EVENTS:
+        raise HTTPException(status_code=422, detail=f"unknown autopilot event_type {body.event_type!r}")
+    ev.emit(body.event_type, entity_id=body.entity_id, properties=body.properties)
+
+    from ..services.feedback_status_bridge import advance_status_for_event
+    from ..db import SessionLocal
+    _s = SessionLocal()
+    try:
+        advance_status_for_event(_s, body.event_type, body.entity_id)
+    finally:
+        _s.close()
+
+    return {"recorded": True, "event_type": body.event_type}
+
+
+class IngestBody(BaseModel):
+    dry_run: bool = False
+    lookback_hours: int = 24
+
+
+@router.post("/autopilot-ingest")
+def autopilot_ingest(request: Request, body: IngestBody) -> Dict[str, Any]:
+    """[Autopilot P1] Nightly feedback → dedup (by error fingerprint) → engineered Notion task.
+    Governor-gated (AUTOPILOT_ENABLED + per-stage flag + monthly-USD cap, all default OFF), capped
+    per night, cost-traced, dry-run capable. A no-op that returns {halted:true} until the flags
+    are on, so scheduling it is safe before go-live."""
+    _verify_cron_secret(request)
+    from ..services.autopilot_ingest import run_ingest
+
+    return run_ingest(dry_run=body.dry_run, lookback_hours=body.lookback_hours)
+
+
+@router.post("/autopilot-digest")
+def autopilot_digest(request: Request) -> Dict[str, Any]:
+    """[Autopilot P4] Write today's autopilot funnel+cost summary to daily_summaries. Fail-soft;
+    invoked by the autopilot-nightly workflow after the ingest step."""
+    _verify_cron_secret(request)
+    from datetime import date
+
+    from ..services.autopilot_metrics import write_daily_digest
+
+    return write_daily_digest(day=date.today().isoformat())
 
 
 @router.post("/deadline-reminder")

@@ -140,7 +140,10 @@ export function HrRequirementsPage() {
         <ImmigrationStatusPanel
           caseId={caseId}
           moveDate={null}
-          onFindVendor={() => navigate(buildRoute('hrCommandCenterCase', { id: caseId }))}
+          // BUG-260706-4DE4: don't dead-end on the case hub — deep-link straight to the
+          // case's vendor browse, pre-opened on immigration, so "Find immigration vendor"
+          // actually lands on a vendor search (which now surfaces real immigration firms).
+          onFindVendor={() => navigate(`${buildRoute('hrCommandCenterCase', { id: caseId })}?openVendors=immigration`)}
           onViewProfile={() => navigate(buildRoute('hrAssignmentReview', { id: caseId }))}
         />
       </section>

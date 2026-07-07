@@ -52,6 +52,9 @@ logger = logging.getLogger(__name__)
 _RATE_LIMIT = os.getenv("RELOPASS_TEST_DRIVE_RATE_LIMIT", "5/minute;60/hour")
 _IS_SQLITE = (db_config.DATABASE_URL or "").startswith("sqlite")
 
+_LOCKED_CORRIDORS = ["FR_NO", "IN_DE", "GB_US", "NL_SG", "ES_AE"]
+_CORRIDOR_WEIGHTS = {"FR_NO": 0.35, "IN_DE": 0.35, "GB_US": 0.10, "NL_SG": 0.10, "ES_AE": 0.10}
+
 
 def _test_drive_enabled() -> bool:
     return os.getenv("RELOPASS_TEST_DRIVE_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
@@ -115,10 +118,41 @@ def _emit_funnel_event(
         return False
 
 
+def _assign_corridor(campaign: str) -> str:
+    """Pick the corridor furthest below its target share (from test_sessions counts)."""
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT corridor_id, COUNT(*) AS cnt FROM test_sessions "
+                    "WHERE campaign = :campaign GROUP BY corridor_id"
+                ),
+                {"campaign": campaign},
+            ).fetchall()
+    except Exception:
+        return _LOCKED_CORRIDORS[0]
+
+    counts = {c: 0 for c in _LOCKED_CORRIDORS}
+    for row in rows:
+        if row[0] in counts:
+            counts[row[0]] = int(row[1])
+
+    total = sum(counts.values())
+    if total == 0:
+        return _LOCKED_CORRIDORS[0]
+
+    best, best_deficit = _LOCKED_CORRIDORS[0], float("-inf")
+    for cid in _LOCKED_CORRIDORS:
+        deficit = _CORRIDOR_WEIGHTS[cid] - counts[cid] / total
+        if deficit > best_deficit:
+            best_deficit, best = deficit, cid
+    return best
+
+
 class ProvisionRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=40)
-    corridor_id: str = Field(..., min_length=1, max_length=64)
-    invite_token: str = Field(..., min_length=1)
+    corridor_id: Optional[str] = Field(None, max_length=64)
+    invite_token: Optional[str] = Field(None, max_length=200)
     tester_segment: str = Field("prospect", pattern="^(internal|prospect)$")
     campaign: Optional[str] = Field(None, max_length=64)
 
@@ -143,21 +177,29 @@ def provision(body: ProvisionRequest, request: Request):
     """Provision a paired HR + Employee test identity for the self-serve flow.
 
     Returns both credential sets (username + email + plaintext one-time password)
-    plus the ``test_sessions`` id. 404 when the campaign is off, 403 on a bad
-    invite token.
+    plus the ``test_sessions`` id. 404 when the campaign is off; 403 only when a
+    token is supplied that doesn't match the configured campaign secret (a missing
+    token is allowed — public self-serve).
     """
     # 1) Campaign gate — dark by default.
     if not _test_drive_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
-    # 2) Invite-token gate — constant-time compare against the campaign secret.
+    # 2) Invite token is now optional (public self-serve). If the campaign has a token
+    #    configured AND the caller supplies one, it must still match — keeps existing
+    #    invite links meaningful and rejects a wrong/stale token. A missing token is OK.
     expected_token = os.getenv("RELOPASS_TEST_DRIVE_INVITE_TOKEN") or ""
-    if not expected_token or not secrets.compare_digest(body.invite_token, expected_token):
+    supplied_token = (body.invite_token or "").strip()
+    if supplied_token and expected_token and not secrets.compare_digest(supplied_token, expected_token):
         raise HTTPException(status_code=403, detail="Invalid or missing invite token")
 
     first_name = body.first_name.strip()
     slug = _slugify(first_name)
     campaign = (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+    # Whitelist the corridor: honour an explicit valid one, otherwise auto-assign. This
+    # blocks free-text corridor_id injection now that the endpoint is public.
+    requested_corridor = (body.corridor_id or "").strip()
+    resolved_corridor = requested_corridor if requested_corridor in _LOCKED_CORRIDORS else _assign_corridor(campaign)
 
     # Passwords are independent of the collision retry, so hash once (pbkdf2 is costly).
     hr_password = secrets.token_urlsafe(9)
@@ -223,7 +265,7 @@ def provision(body: ProvisionRequest, request: Request):
             {
                 "id": session_id,
                 "campaign": campaign,
-                "corridor_id": body.corridor_id.strip(),
+                "corridor_id": resolved_corridor,
                 "tester_segment": body.tester_segment,
                 "first_name_label": first_name,
                 "hr_username": hr_username,
@@ -234,16 +276,16 @@ def provision(body: ProvisionRequest, request: Request):
     # TD-8: funnel — a provisioned session is the "start" of the run.
     _emit_funnel_event(
         event_type="start", session_id=session_id, campaign=campaign,
-        corridor_id=body.corridor_id.strip(), tester_segment=body.tester_segment,
+        corridor_id=resolved_corridor, tester_segment=body.tester_segment,
     )
 
     logger.info(
         "test_drive_provision session=%s corridor=%s segment=%s hr=%s emp=%s",
-        session_id, body.corridor_id, body.tester_segment, hr_username, emp_username,
+        session_id, resolved_corridor, body.tester_segment, hr_username, emp_username,
     )
     return {
         "session_id": session_id,
-        "corridor_id": body.corridor_id.strip(),
+        "corridor_id": resolved_corridor,
         "campaign": campaign,
         "hr": {"username": hr_username, "email": hr_email, "password": hr_password, "role": "HR"},
         "employee": {"username": emp_username, "email": emp_email, "password": emp_password, "role": "EMPLOYEE"},

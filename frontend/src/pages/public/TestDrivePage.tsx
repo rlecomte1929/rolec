@@ -17,8 +17,6 @@ const TEST_DRIVE_LS_KEY = 'relopass_test_drive';
 import {
   testDriveContent as c,
   TEST_DRIVE_CORRIDORS,
-  DEFAULT_CORRIDOR_ID,
-  DEFAULT_CORRIDOR,
 } from './testDriveContent';
 
 type SubmitState = 'idle' | 'submitting';
@@ -34,10 +32,16 @@ export const TestDrivePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const rawCorridor = (searchParams.get('corridor') || '').toUpperCase();
   const matched = TEST_DRIVE_CORRIDORS[rawCorridor];
-  const corridorId = matched ? rawCorridor : DEFAULT_CORRIDOR_ID;
-  const corridor = matched ?? DEFAULT_CORRIDOR;
-  const isTierB = corridor.tier === 'B';
-  const corridorLabel = `${corridor.origin} → ${corridor.destination}`;
+  const hasExplicitCorridor = !!matched;
+  // null until server assigns one (auto-assign) or immediately set for explicit ?corridor=
+  const [assignedCorridorId, setAssignedCorridorId] = useState<string | null>(
+    matched ? rawCorridor : null,
+  );
+  const assignedCorridorMeta = assignedCorridorId ? TEST_DRIVE_CORRIDORS[assignedCorridorId] : null;
+  const isTierB = assignedCorridorMeta?.tier === 'B';
+  const corridorLabel = assignedCorridorMeta
+    ? `${assignedCorridorMeta.origin} → ${assignedCorridorMeta.destination}`
+    : '';
   const inviteToken = searchParams.get('token') || '';
   const segment: 'internal' | 'prospect' =
     searchParams.get('segment') === 'internal' ? 'internal' : 'prospect';
@@ -54,7 +58,7 @@ export const TestDrivePage: React.FC = () => {
   useEffect(() => {
     void recordTestDriveEvent({
       event_type: 'click',
-      corridor_id: corridorId,
+      corridor_id: assignedCorridorId ?? undefined,
       tester_segment: segment,
       invite_token: inviteToken || undefined,
     });
@@ -68,7 +72,7 @@ export const TestDrivePage: React.FC = () => {
       if (raw) {
         const parsed = JSON.parse(raw) as { session_id?: string; corridor_id?: string };
         if (parsed?.session_id) {
-          setPriorSession({ session: parsed.session_id, corridor: parsed.corridor_id || corridorId });
+          setPriorSession({ session: parsed.session_id, corridor: parsed.corridor_id || assignedCorridorId || '' });
         }
       }
     } catch {
@@ -88,11 +92,12 @@ export const TestDrivePage: React.FC = () => {
     setError(null);
     const res = await provisionTestDrive({
       first_name: firstName.trim(),
-      corridor_id: corridorId,
+      ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
       tester_segment: segment,
-      invite_token: inviteToken,
+      invite_token: inviteToken || undefined,
     });
     if (res.ok) {
+      setAssignedCorridorId(res.corridorId);
       // TD-9: stash the campaign slice for the FeedbackWidget to stamp in-session feedback.
       try {
         localStorage.setItem(
@@ -127,26 +132,28 @@ export const TestDrivePage: React.FC = () => {
       {/* Hero */}
       <Section spacing="lg" background="transparent">
         <HeroSurface
-          eyebrow={`${c.hero.eyebrowPrefix} · ${corridorLabel}`}
+          eyebrow={assignedCorridorMeta ? `${c.hero.eyebrowPrefix} · ${corridorLabel}` : c.hero.eyebrowPrefix}
           title={c.hero.headline}
           subtitle={c.hero.subhead}
         />
       </Section>
 
-      {/* Corridor label + Tier-B early-coverage note */}
-      <Section spacing="sm" background="transparent">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm text-marketing-text">
-            <span className="font-semibold text-marketing-primary">{c.corridorLabel.prefix}</span>{' '}
-            {corridorLabel}
-          </p>
-          {isTierB && (
-            <Alert variant="info" className="mt-4 text-left">
-              {c.corridorLabel.tierBNote}
-            </Alert>
-          )}
-        </div>
-      </Section>
+      {/* Corridor label + Tier-B early-coverage note — hidden until corridor is known */}
+      {assignedCorridorMeta && (
+        <Section spacing="sm" background="transparent">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm text-marketing-text">
+              <span className="font-semibold text-marketing-primary">{c.corridorLabel.prefix}</span>{' '}
+              {corridorLabel}
+            </p>
+            {isTierB && (
+              <Alert variant="info" className="mt-4 text-left">
+                {c.corridorLabel.tierBNote}
+              </Alert>
+            )}
+          </div>
+        </Section>
+      )}
 
       {/* What we're testing */}
       <Section spacing="lg" background="muted">
