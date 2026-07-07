@@ -217,7 +217,7 @@ export function ImmigrationAnswerPanel(
   );
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="w-full space-y-4">
       <Card>
         <div className="space-y-3 p-1">
           <p className="text-sm text-slate-600">
