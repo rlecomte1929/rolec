@@ -22,11 +22,9 @@ import {
   deleteFeedback,
   triggerFix,
   autoAttempt,
-  advanceState,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
-  type DispatchStatus,
   type EngineeredTask,
   type FixTriggerResult,
 } from '../../api/adminFeedback';
@@ -265,22 +263,8 @@ export function FeedbackTab() {
     setSavingId(null);
   };
 
-  /** Manually advance (or reject) a row's pipeline `dispatch_status` via the ProgressStrip. */
-  const handleAdvance = useCallback(async (row: UnifiedFeedbackItem, target: string) => {
-    setSavingId(row.id);
-    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
-    try {
-      const res = await advanceState(row.stream, row.id, target as DispatchStatus);
-      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, dispatch_status: res.dispatch_status } : r));
-    } catch (err) {
-      // Surface the backend's message (e.g. 409 {"detail":"illegal transition X → Y"}) —
-      // it lives at err.response.data.detail on the axios error, not err.detail.
-      const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Transition failed';
-      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
-    } finally {
-      setSavingId(null);
-    }
-  }, []);
+  // AIQ-1478: manual pipeline-advance (ProgressStrip buttons) removed — the AI actions
+  // + Notion sync drive `dispatch_status`; the strip is now a passive visual flowchart.
 
   const ctxValue = (row: UnifiedFeedbackItem) =>
     contextDrafts[row.id] ?? row.dispatch_context ?? '';
@@ -343,7 +327,13 @@ export function FeedbackTab() {
       const res = await triggerFix(row.stream, row.id);
       setTriggerResults((prev) => ({ ...prev, [row.id]: res }));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not trigger the fix.';
+      // AIQ-1478: handle the 409 gracefully with a clear, persistent inline message
+      // (the /fix 409 means the item isn't dispatched yet) rather than a raw error.
+      const status = (err as { status?: number } | null)?.status;
+      const msg =
+        status === 409
+          ? getApiErrorMessage(err, 'Dispatch this feedback to the AI Work Queue before triggering a fix.')
+          : getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Could not trigger the fix.';
       setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
     } finally {
       setFixBusyId(null);
@@ -358,7 +348,7 @@ export function FeedbackTab() {
       await autoAttempt(row.stream, row.id);
       setDispatchErrors((prev) => ({ ...prev, [row.id]: 'Auto-attempt dispatched — a draft PR will appear shortly.' }));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not start the auto-attempt.';
+      const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Could not start the auto-attempt.';
       setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
     } finally {
       setFixBusyId(null);
@@ -784,26 +774,47 @@ export function FeedbackTab() {
                         </span>
                       </div>
                       <p className="text-sm text-gray-800 whitespace-pre-wrap">{row.text ?? '—'}</p>
-                      {row.stream === 'product' && row.has_screenshot && (
-                        <div className="pt-1">
-                          <p className="text-[10.5px] font-semibold text-gray-500 mb-1">Screenshot</p>
-                          {shots[row.id] ? (
-                            <img
-                              src={shots[row.id]!}
-                              alt="Feedback screenshot"
-                              className="max-w-full max-h-[520px] rounded border border-gray-200 shadow-sm object-contain bg-white"
-                            />
-                          ) : shotLoadingId === row.id ? (
-                            <p className="text-[11px] text-gray-400">Loading screenshot…</p>
-                          ) : row.id in shots ? (
-                            <p className="text-[11px] text-gray-400">Screenshot unavailable.</p>
-                          ) : (
-                            <p className="text-[11px] text-gray-400">Loading screenshot…</p>
-                          )}
+                      {/* AIQ-1478: visual pipeline flowchart up top (was a text breadcrumb +
+                          manual advance buttons). This is the SINGLE per-row error slot
+                          (dispatchErr) for dispatch/preview/fix actions. */}
+                      <div className="pt-2 mt-1 border-t border-gray-200 space-y-1">
+                        <ProgressStrip
+                          status={row.dispatch_status ?? 'new'}
+                          tier={row.autonomy_tier}
+                        />
+                        {dispatchErr && <p className="text-[11px] text-red-600">{dispatchErr}</p>}
+                      </div>
+
+                      {/* AIQ-1478: screenshot (left) + diagnostics & recent activity (right). */}
+                      {row.stream === 'product' && (
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          <div>
+                            <p className="text-[10.5px] font-semibold text-gray-500 mb-1">Screenshot</p>
+                            {!row.has_screenshot ? (
+                              <p className="text-[11px] text-gray-400">No screenshot attached.</p>
+                            ) : shots[row.id] ? (
+                              <img
+                                src={shots[row.id]!}
+                                alt="Feedback screenshot"
+                                className="max-w-full max-h-[520px] rounded border border-gray-200 shadow-sm object-contain bg-white"
+                              />
+                            ) : shotLoadingId === row.id ? (
+                              <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                            ) : row.id in shots ? (
+                              <p className="text-[11px] text-gray-400">Screenshot unavailable.</p>
+                            ) : (
+                              <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-[10.5px] font-semibold text-gray-500 mb-1">Diagnostics &amp; recent activity</p>
+                            {parseCtx(row.client_context) ? (
+                              <DiagnosticsPanel ctx={parseCtx(row.client_context)!} />
+                            ) : (
+                              <p className="text-[11px] text-gray-400">No diagnostics captured for this report.</p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {row.stream === 'product' && parseCtx(row.client_context) && (
-                        <DiagnosticsPanel ctx={parseCtx(row.client_context)!} />
                       )}
                       {row.owner && (
                         <p className="text-[10.5px] text-gray-400">Owner: {row.owner}</p>
@@ -811,20 +822,6 @@ export function FeedbackTab() {
                       {row.resolution && (
                         <p className="text-[10.5px] text-gray-400">Resolution: {row.resolution}</p>
                       )}
-
-                      {/* Pipeline state — stepper + valid next-action button(s). This is the
-                          SINGLE per-row error slot (dispatchErr) for state transitions AND
-                          dispatch/preview/fix actions: it always renders for an expanded row,
-                          so we do NOT duplicate it inside the conditional dispatch branches below. */}
-                      <div className="pt-2 mt-1 border-t border-gray-200 space-y-1">
-                        <ProgressStrip
-                          status={row.dispatch_status ?? 'new'}
-                          tier={row.autonomy_tier}
-                          busy={savingId === row.id}
-                          onAdvance={(t) => void handleAdvance(row, t)}
-                        />
-                        {dispatchErr && <p className="text-[11px] text-red-600">{dispatchErr}</p>}
-                      </div>
 
                       {/* Dispatch → AI Work Queue */}
                       <div className="pt-2 mt-1 border-t border-gray-200">
