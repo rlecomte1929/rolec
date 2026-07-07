@@ -80,7 +80,7 @@ _SCHEMA = """
 CREATE TABLE feedback (
   id TEXT PRIMARY KEY, user_id TEXT, page_url TEXT, category TEXT, message TEXT,
   status TEXT, created_at TEXT, report_id TEXT, screenshot_data TEXT,
-  reporter_email TEXT, reporter_name TEXT, reporter_role TEXT
+  reporter_email TEXT, reporter_name TEXT, reporter_role TEXT, client_context TEXT
 );
 CREATE TABLE feedback_status (
   stream TEXT NOT NULL, source_id TEXT NOT NULL,
