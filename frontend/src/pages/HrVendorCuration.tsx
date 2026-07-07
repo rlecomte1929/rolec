@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
@@ -661,10 +662,25 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           </div>
         </div>
         {quota && (
-          <p className="mt-3 text-xs text-[#64748b]">
-            AI catalog quota today: <strong className="text-[#0b2b43]">{quota.used}/{quota.limit}</strong> used
-            ({quota.remaining} remaining; resets at midnight UTC). Each service category that
-            actually calls the AI counts as 1 — already-populated categories don&apos;t.
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-[#64748b]">
+            <Info
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#94a3b8]"
+              aria-hidden="true"
+            />
+            <span
+              title={
+                'Each AI catalog search spends 1 quota unit to find real, review-verified '
+                + 'vendors for one service category in your selected destination. Those vendors '
+                + 'appear in the Admin master-vendors list below, where you tick the ones to show '
+                + 'your employees. Already-populated categories are reused and cost nothing. '
+                + 'Quota resets daily at midnight UTC.'
+              }
+            >
+              AI catalog searches used today:{' '}
+              <strong className="text-[#0b2b43]">{quota.used} / {quota.limit}</strong>{' '}
+              ({quota.remaining} left). Each search adds real vendors for one service category
+              to your list below — hover the ⓘ for details.
+            </span>
           </p>
         )}
         {populateResult && populateResult.status === 'completed' && (
