@@ -187,7 +187,7 @@ export async function dispatchCreate(
   stream: FeedbackStream,
   itemId: string,
   task: EngineeredTask,
-): Promise<{ dispatched: boolean; url: string; dispatch_ref: string }> {
+): Promise<{ dispatched: boolean; url: string; dispatch_ref: string; notion_url?: string; already_exists?: boolean }> {
   return apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, { task, confirm: true });
 }
 

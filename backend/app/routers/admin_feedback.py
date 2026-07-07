@@ -637,6 +637,23 @@ def dispatch_create(
     if not task.get("title"):
         raise HTTPException(status_code=400, detail="Task title is required.")
 
+    # Idempotency: if this item was already dispatched (dispatch_ref set to a URL), do NOT
+    # create a second Notion task — return the existing one. Guards against double-submits,
+    # client retries, and races from spawning duplicate Work Queue pages.
+    existing = db.execute(
+        text("SELECT dispatch_ref FROM feedback_status WHERE stream = :s AND source_id = :id"),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    existing_ref = existing[0] if existing else None
+    if existing_ref and str(existing_ref).startswith("http"):
+        return {
+            "dispatched": True,
+            "already_exists": True,
+            "notion_url": existing_ref,
+            "url": existing_ref,
+            "dispatch_ref": existing_ref,
+        }
+
     report_id = item_id
     message = page_url = ""
     reporter_name = None
@@ -688,7 +705,7 @@ def dispatch_create(
         entity_id=item_id,
         detail={"stream": stream, "notion_url": url, "title": task.get("title")},
     )
-    return {"dispatched": True, "url": url, "dispatch_ref": url}
+    return {"dispatched": True, "already_exists": False, "notion_url": url, "url": url, "dispatch_ref": url}
 
 
 # ── Trigger fix (skill handoff) + Auto-attempt (autofix pipeline) ─────────────
