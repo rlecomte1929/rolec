@@ -179,6 +179,60 @@ class VendorCurationTests(unittest.TestCase):
             company_id=co_b, row_id=row["id"],
         ))
 
+    # ------------------------------------------------------------------
+    # AIQ-1457 — city matching must tolerate case/whitespace/diacritic drift
+    # between HR's picker city and the employee's intake city, or HR-curated
+    # vendors silently vanish and the employee sees "HR is finalizing providers".
+    # ------------------------------------------------------------------
+    def _seed_city(self, company: str, city: str) -> None:
+        vendor_curation.add_custom_vendor(
+            company_id=company, category="movers",
+            name="Hannah's Trusted Movers", attributes={},
+            destination_city=city,
+        )
+
+    def test_list_curation_matches_city_case_insensitively(self) -> None:
+        company = str(uuid.uuid4())
+        self._seed_city(company, "Zürich")
+        rows = vendor_curation.list_curation(
+            company_id=company, category="movers", destination_city="zürich",
+        )
+        self.assertEqual(len(rows), 1)
+
+    def test_list_curation_matches_city_ignoring_diacritics(self) -> None:
+        # The reported bug: HR picked "Zürich", the case city is "Zurich".
+        company = str(uuid.uuid4())
+        self._seed_city(company, "Zürich")
+        rows = vendor_curation.list_curation(
+            company_id=company, category="movers", destination_city="Zurich",
+        )
+        self.assertEqual(len(rows), 1)
+
+    def test_list_curation_matches_city_ignoring_whitespace(self) -> None:
+        company = str(uuid.uuid4())
+        self._seed_city(company, "Munich")
+        rows = vendor_curation.list_curation(
+            company_id=company, category="movers", destination_city="  Munich  ",
+        )
+        self.assertEqual(len(rows), 1)
+
+    def test_list_curation_still_excludes_a_different_city(self) -> None:
+        company = str(uuid.uuid4())
+        self._seed_city(company, "Munich")
+        rows = vendor_curation.list_curation(
+            company_id=company, category="movers", destination_city="Berlin",
+        )
+        self.assertEqual(rows, [])
+
+    def test_list_curation_null_city_rows_always_returned(self) -> None:
+        # Company-wide (city-agnostic) curation must show for any destination.
+        company = str(uuid.uuid4())
+        self._seed_city(company, None)
+        rows = vendor_curation.list_curation(
+            company_id=company, category="movers", destination_city="Anywhere",
+        )
+        self.assertEqual(len(rows), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
