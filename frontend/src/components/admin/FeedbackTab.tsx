@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
+import { ProgressStrip } from './ProgressStrip';
 import {
   listFeedback,
   triageFeedback,
@@ -21,9 +22,11 @@ import {
   deleteFeedback,
   triggerFix,
   autoAttempt,
+  advanceState,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
+  type DispatchStatus,
   type EngineeredTask,
   type FixTriggerResult,
 } from '../../api/adminFeedback';
@@ -260,6 +263,21 @@ export function FeedbackTab() {
     }
     setSavingId(null);
   };
+
+  /** Manually advance (or reject) a row's pipeline `dispatch_status` via the ProgressStrip. */
+  const handleAdvance = useCallback(async (row: UnifiedFeedbackItem, target: string) => {
+    setSavingId(row.id);
+    setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      const res = await advanceState(row.stream, row.id, target as DispatchStatus);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, dispatch_status: res.dispatch_status } : r));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update the pipeline state.';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setSavingId(null);
+    }
+  }, []);
 
   const ctxValue = (row: UnifiedFeedbackItem) =>
     contextDrafts[row.id] ?? row.dispatch_context ?? '';
@@ -788,6 +806,20 @@ export function FeedbackTab() {
                       {row.resolution && (
                         <p className="text-[10.5px] text-gray-400">Resolution: {row.resolution}</p>
                       )}
+
+                      {/* Pipeline state — stepper + valid next-action button(s). Shows its
+                          own error (e.g. a 409 illegal transition) since the shared
+                          dispatchErr slot below isn't always rendered (only inside the
+                          fix-enabled / not-yet-dispatched branches). */}
+                      <div className="pt-2 mt-1 border-t border-gray-200 space-y-1">
+                        <ProgressStrip
+                          status={row.dispatch_status ?? 'new'}
+                          tier={row.autonomy_tier}
+                          busy={savingId === row.id}
+                          onAdvance={(t) => void handleAdvance(row, t)}
+                        />
+                        {dispatchErr && <p className="text-[11px] text-red-600">{dispatchErr}</p>}
+                      </div>
 
                       {/* Dispatch → AI Work Queue */}
                       <div className="pt-2 mt-1 border-t border-gray-200">
