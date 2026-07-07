@@ -69,5 +69,31 @@ class HrMutationTenantScopeGuardTests(unittest.TestCase):
         self.assertIn("Case not found", body)
 
 
+class HrComplianceReadTenantScopeGuardTests(unittest.TestCase):
+    """AIQ-1474: the /hr/compliance page's two READ endpoints (get_hr_policy,
+    get_case_compliance) were missing the company/owner tenant-scope check their
+    sibling write endpoints already enforce — a cross-tenant read (IDOR) given a
+    valid id. Guard at source, same rationale as the mutation suite above."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(os.path.join(_REPO, "backend", "main.py"), encoding="utf-8") as fh:
+            cls.main_src = fh.read()
+
+    def _assert_read_scoped(self, fn: str) -> None:
+        body = _fn_body(self.main_src, f"def {fn}(", "\n@app.")
+        self.assertIn(
+            "_hr_can_access_assignment",
+            body,
+            f"{fn} is missing a tenant-scope check (cross-tenant read / IDOR risk)",
+        )
+
+    def test_get_hr_policy_scoped(self):
+        self._assert_read_scoped("get_hr_policy")
+
+    def test_get_case_compliance_scoped(self):
+        self._assert_read_scoped("get_case_compliance")
+
+
 if __name__ == "__main__":
     unittest.main()

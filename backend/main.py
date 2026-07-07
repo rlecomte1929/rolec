@@ -14638,8 +14638,13 @@ def get_applicable_employee_policy(
 
 @app.get("/api/hr/policy")
 def get_hr_policy(caseId: str = Query(...), user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignment = db.get_assignment_by_id(caseId)
+    # AIQ-1474: resolve by assignment PK or case id (the compliance page passes the PK),
+    # and enforce the company/owner tenant scope — this read was missing the check its
+    # sibling write endpoints have, allowing a cross-tenant read given a valid id (IDOR).
+    assignment = db.get_assignment_by_id(caseId) or db.get_assignment_by_case_id(caseId)
     if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
         raise HTTPException(status_code=404, detail="Assignment not found")
     profile = db.get_employee_profile(caseId)
     if not profile:
@@ -14680,8 +14685,14 @@ def create_policy_exception(
 
 @app.get("/api/hr/cases/{case_id}/compliance")
 def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignment = db.get_assignment_by_case_id(case_id)
+    # AIQ-1474: the compliance page passes the assignment PK, but this resolved only by
+    # canonical/case id (get_assignment_by_case_id), so it 404'd and blanked the page.
+    # Match get_hr_assignment's robust PK-or-case-id lookup, and add the company/owner
+    # tenant scope this read was missing (IDOR) — same guard as the write endpoints.
+    assignment = db.get_assignment_by_id(case_id) or db.get_assignment_by_case_id(case_id)
     if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
         raise HTTPException(status_code=404, detail="Assignment not found")
     assignment_id = assignment.get("id")
     profile = db.get_employee_profile(case_id)
