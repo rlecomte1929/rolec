@@ -16,6 +16,7 @@ vi.mock('../../api/adminFeedback', () => ({
   dispatchCreate: vi.fn(),
   dismissFeedback: vi.fn().mockResolvedValue(undefined),
   deleteFeedback: vi.fn().mockResolvedValue(undefined),
+  advanceState: vi.fn(),
 }));
 import * as feedbackApi from '../../api/adminFeedback';
 import { FeedbackTab } from './FeedbackTab';
@@ -204,6 +205,23 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     expect(uiBadges.length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('auth')).toBeTruthy();
     expect(screen.getByText('isolation')).toBeTruthy();
+  });
+
+  it('surfaces the backend 409 detail when a pipeline transition is rejected', async () => {
+    // Regression: the ProgressStrip advance catch must show the backend's
+    // {"detail":"illegal transition X → Y"} (at err.response.data.detail), not a generic message.
+    vi.mocked(feedbackApi.advanceState).mockRejectedValue({
+      response: { data: { detail: 'illegal transition dispatched → done' } },
+    });
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByText('Already handled')); // expand the dispatched row
+    const advanceBtn = await screen.findByRole('button', { name: /mark in progress/i });
+    fireEvent.click(advanceBtn);
+    // The detail may render in more than one error slot (known cosmetic double-display);
+    // asserting it is surfaced at all is what guards this fix.
+    const shown = await screen.findAllByText(/illegal transition dispatched → done/i);
+    expect(shown.length).toBeGreaterThanOrEqual(1);
   });
 
   it('clicking a row opens the dispatch panel with the required context field (no separate button)', async () => {

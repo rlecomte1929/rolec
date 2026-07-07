@@ -30,6 +30,7 @@ import {
   type EngineeredTask,
   type FixTriggerResult,
 } from '../../api/adminFeedback';
+import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
 
@@ -272,7 +273,9 @@ export function FeedbackTab() {
       const res = await advanceState(row.stream, row.id, target as DispatchStatus);
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, dispatch_status: res.dispatch_status } : r));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not update the pipeline state.';
+      // Surface the backend's message (e.g. 409 {"detail":"illegal transition X → Y"}) —
+      // it lives at err.response.data.detail on the axios error, not err.detail.
+      const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Transition failed';
       setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
     } finally {
       setSavingId(null);
@@ -934,7 +937,7 @@ export function FeedbackTab() {
                                 onClick={() => void openPreview(row)}
                                 className="text-[11px] font-medium px-3 py-1 rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white transition-colors disabled:opacity-40"
                               >
-                                {previewLoadingId === row.id ? 'Drafting task…' : 'Draft task with AI'}
+                                {previewLoadingId === row.id ? 'Generating spec… (this takes ~30s)' : 'Draft task with AI'}
                               </Button>
                             )}
                           </div>
