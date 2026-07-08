@@ -507,6 +507,10 @@ export interface CaseRequirementsDTO {
   requirements: RequirementItemDTO[];
   sources: SourceRecordDTO[];
   staWaived?: string[];
+  // AIQ-1473c/d: false when the destination isn't in our requirements catalogue —
+  // the empty list then means "no catalogue yet", not "nothing required".
+  // Undefined from older backends → treat as covered (no notice).
+  covered?: boolean;
 }
 
 export interface RelocationCaseListItem {

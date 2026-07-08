@@ -13,6 +13,7 @@ import type {
 } from '../../../types';
 import { buildRequirementsFromMissingFields, getRelocationCase } from '../../../api/relocation';
 import { RequirementList } from '../../../components/requirements/RequirementList';
+import { RequirementsCoverageNotice } from '../../../components/requirements/RequirementsCoverageNotice';
 import { dossierAPI, requirementsAPI } from '../../../api/client';
 import { GuidancePackPanel } from '../../../components/guidance/GuidancePackPanel';
 
@@ -423,6 +424,11 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
           )}
         </div>
       )}
+
+      <RequirementsCoverageNotice
+        covered={requirements?.covered}
+        destCountry={requirements?.destCountry}
+      />
 
       {requirements?.staWaived && requirements.staWaived.length > 0 && (
         <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
