@@ -4,7 +4,7 @@ import { ScreenshotCapture } from '../ScreenshotCapture';
 
 // html2canvas is lazy-imported inside the component — mock the module.
 vi.mock('html2canvas', () => ({
-  default: vi.fn(async () => ({ toDataURL: () => 'data:image/png;base64,MOCKSHOT' })),
+  default: vi.fn(() => Promise.resolve({ toDataURL: () => 'data:image/png;base64,MOCKSHOT' })),
 }));
 
 describe('ScreenshotCapture', () => {

@@ -10,14 +10,18 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import os
 import re
 import uuid
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
 _BUCKET = "feedback-screenshots"
 _SIGNED_URL_TTL = 3600  # 1h — admin views mint a fresh signed URL on each open
+# Soft budget for the screenshots bucket, so the reporter can be told how much room is
+# left after submitting. Configurable; purely informational (not an enforced cap).
+_BUDGET_MB = float(os.getenv("FEEDBACK_SCREENSHOT_BUDGET_MB", "500") or "500")
 _DATA_URI = re.compile(r"^data:image/(png|jpeg|jpg);base64,", re.IGNORECASE)
 
 
@@ -69,4 +73,31 @@ def signed_url(path: str, *, ttl: int = _SIGNED_URL_TTL) -> Optional[str]:
         return (res or {}).get("signedURL") or (res or {}).get("signedUrl")
     except Exception as exc:  # noqa: BLE001
         log.warning("feedback screenshot signed-url failed for %s: %s", path, exc)
+        return None
+
+
+def storage_usage() -> Optional[Dict[str, float]]:
+    """Best-effort screenshot-bucket usage vs the configured soft budget, so the widget can
+    tell the reporter how much image storage is left. Returns {used_mb, budget_mb,
+    remaining_mb}; None on failure (the notice is then simply omitted)."""
+    try:
+        from .supabase_client import get_supabase_admin_client
+        client = get_supabase_admin_client()
+        used = 0
+        offset = 0
+        while offset < 5000:  # safety cap on pagination
+            batch = client.storage.from_(_BUCKET).list(options={"limit": 100, "offset": offset}) or []
+            for it in batch:
+                used += int(((it or {}).get("metadata") or {}).get("size") or 0)
+            if len(batch) < 100:
+                break
+            offset += 100
+        budget = _BUDGET_MB * 1_048_576
+        return {
+            "used_mb": round(used / 1_048_576, 1),
+            "budget_mb": round(_BUDGET_MB, 1),
+            "remaining_mb": round(max(0.0, budget - used) / 1_048_576, 1),
+        }
+    except Exception as exc:  # noqa: BLE001 — informational only, never blocks a submit
+        log.warning("feedback screenshot storage usage failed: %s", exc)
         return None

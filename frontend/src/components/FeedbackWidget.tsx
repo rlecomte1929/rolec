@@ -11,8 +11,11 @@
  * - Page URL automatically attached
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { supabase } from '../api/supabase';
+import { useState, useRef, useEffect } from 'react';
+import { submitProductFeedback, type ScreenshotStorage } from '../api/productFeedback';
+import { collectDiagnostics } from '../lib/diagnostics';
+import { ScreenshotCapture } from './feedback/ScreenshotCapture';
+import { AnnotationCanvas, type AnnotationCanvasHandle } from './feedback/AnnotationCanvas';
 import { Button } from './antigravity/Button';
 
 type Category    = 'bug' | 'idea' | 'other';
@@ -43,9 +46,14 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   const [message, setMessage]     = useState('');
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [reportId, setReportId]   = useState<string | null>(null);
+  // [AIQ-1480] screenshot capture + markup flow.
+  const [shotStep, setShotStep]   = useState<'none' | 'capture' | 'annotate'>('none');
+  const [rawCapture, setRawCapture] = useState<string | null>(null);
+  const [storageNote, setStorageNote] = useState<ScreenshotStorage | null>(null);
 
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const annotRef     = useRef<AnnotationCanvasHandle>(null);
 
   // Focus textarea when popover opens
   useEffect(() => {
@@ -67,33 +75,23 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     setCategory('bug');
     setScreenshot(null);
     setReportId(null);
+    setShotStep('none');
+    setRawCapture(null);
+    setStorageNote(null);
   }
 
-  const captureScreenshot = useCallback(async () => {
-    setState('capturing');
-    // Hide widget during capture so it doesn't appear in the screenshot
-    const widgetEl = containerRef.current;
-    if (widgetEl) widgetEl.style.visibility = 'hidden';
+  // [AIQ-1480] Capture (full page / region) → annotate → attach.
+  const onCaptured = (dataUrl: string) => {
+    setRawCapture(dataUrl);
+    setShotStep('annotate');
+  };
 
-    try {
-      // Lazy-import html2canvas so it doesn't affect initial bundle
-      const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(document.body, {
-        useCORS:        true,
-        allowTaint:     true,
-        logging:        false,
-        scale:          0.4,          // reduce resolution → smaller payload
-        ignoreElements: (el) => el === widgetEl,
-      });
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
-      setScreenshot(dataUrl);
-    } catch {
-      // Screenshot failed silently — user can still submit without it
-    } finally {
-      if (widgetEl) widgetEl.style.visibility = '';
-      setState('open');
-    }
-  }, []);
+  const attachAnnotated = () => {
+    const url = annotRef.current?.getAnnotatedDataURL() ?? rawCapture;
+    setScreenshot(url);
+    setRawCapture(null);
+    setShotStep('none');
+  };
 
   async function submit() {
     const trimmed = message.trim();
@@ -102,22 +100,26 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     setState('submitting');
     const rid = reportId ?? makeReportId(category);
     setReportId(rid);
+    void userId; // kept for future analytics; the backend sets user_id from the session.
 
-    void userId; // kept for future analytics; DB uses auth.uid() default
-    const { error } = await supabase.from('feedback').insert({
-      page_url:        window.location.pathname,
-      category,
-      message:         trimmed.slice(0, 2000),
-      report_id:       rid,
-      screenshot_data: screenshot ?? null,
-    });
-
-    if (error) {
+    try {
+      // POST /api/feedback (backend writes via the service role + uploads the screenshot to
+      // the private Storage bucket). Direct Supabase inserts fail for ReloPass-session users.
+      const res = await submitProductFeedback({
+        category,
+        message: trimmed.slice(0, 2000),
+        page_url: window.location.pathname,
+        report_id: rid,
+        screenshot_data: screenshot ?? null,
+        client_context: collectDiagnostics(),
+      });
+      setStorageNote(res.screenshot_storage ?? null);
+      setState('success');
+      // Keep the success panel up a little longer when there's a storage note to read.
+      setTimeout(() => close(), res.screenshot_storage ? 6000 : 3500);
+    } catch {
       setState('error');
       setTimeout(() => setState('open'), 2500);
-    } else {
-      setState('success');
-      setTimeout(() => close(), 3500);
     }
   }
 
@@ -126,8 +128,10 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   return (
     // onMouseDown stopPropagation prevents the widget's clicks from closing
     // page-level dropdowns that use document mousedown to detect "click outside".
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- non-interactive wrapper; the handler only stops event propagation
     <div
       ref={containerRef}
+      data-html2canvas-ignore
       onMouseDown={(e) => e.stopPropagation()}
       className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2"
     >
@@ -156,7 +160,13 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                   Reference: <span className="font-mono font-semibold text-gray-600">{reportId}</span>
                 </p>
               )}
-              <p className="text-xs text-gray-400">We'll look into it.</p>
+              <p className="text-xs text-gray-400">We&apos;ll look into it.</p>
+              {storageNote && (
+                <p className="mt-1 text-[11px] text-gray-500 leading-snug">
+                  Screenshot saved. Image storage: <span className="font-semibold">{storageNote.remaining_mb} MB</span> left
+                  of {storageNote.budget_mb} MB ({storageNote.used_mb} MB used).
+                </p>
+              )}
             </div>
           )}
 
@@ -193,12 +203,29 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                 disabled={state === 'submitting'}
               />
 
-              {/* Screenshot area */}
+              {/* Screenshot: capture (full page / region) → annotate → attach */}
               <div className="space-y-2">
-                {screenshot ? (
+                {shotStep === 'annotate' && rawCapture ? (
+                  <div className="space-y-1.5">
+                    <AnnotationCanvas ref={annotRef} imageSrc={rawCapture} />
+                    <div className="flex items-center gap-2">
+                      <Button unstyled onClick={attachAnnotated}
+                        className="text-xs font-semibold px-3 py-1.5 rounded bg-[#0b2b43] text-white hover:bg-[#123a5a]">
+                        Attach
+                      </Button>
+                      <Button unstyled onClick={() => { setRawCapture(null); setShotStep('capture'); }}
+                        className="text-xs px-2 py-1.5 text-gray-500 hover:text-gray-700">
+                        Retake
+                      </Button>
+                    </div>
+                  </div>
+                ) : shotStep === 'capture' ? (
+                  <ScreenshotCapture onCapture={onCaptured} onCancel={() => setShotStep('none')} />
+                ) : screenshot ? (
                   <div className="relative rounded-lg overflow-hidden border border-gray-200">
                     <img src={screenshot} alt="Page screenshot" className="w-full object-cover max-h-28" />
                     <button
+                      type="button"
                       onClick={() => setScreenshot(null)}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-900/70 text-white text-[10px] flex items-center justify-center hover:bg-gray-900"
                       title="Remove screenshot"
@@ -211,7 +238,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                   </div>
                 ) : (
                   <Button unstyled
-                    onClick={captureScreenshot}
+                    onClick={() => setShotStep('capture')}
                     disabled={state === 'submitting'}
                     className="w-full flex items-center justify-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-40"
                   >
@@ -221,7 +248,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                       <path strokeLinecap="round" strokeLinejoin="round"
                         d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
                     </svg>
-                    Capture screenshot
+                    Attach Screenshot
                   </Button>
                 )}
               </div>

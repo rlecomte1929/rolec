@@ -10,7 +10,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
-import { ProgressStrip } from './ProgressStrip';
 import {
   listFeedback,
   triageFeedback,
@@ -31,6 +30,7 @@ import {
 import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
+import { ProgressStrip } from './ProgressStrip';
 
 type FilterStatus = TriageStatus | 'all';
 type ActiveMode = FeedbackStream | 'all' | 'dispatched';
@@ -201,6 +201,7 @@ export function FeedbackTab() {
   // Lazily-fetched screenshots, cached by row id (a null entry = fetched, none available).
   const [shots, setShots]                 = useState<Record<string, string | null>>({});
   const [shotLoadingId, setShotLoadingId] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc]     = useState<string | null>(null); // AIQ-1480: full-image view
 
   // Dispatch → AI Work Queue
   const [contextDrafts, setContextDrafts]       = useState<Record<string, string>>({});
@@ -793,17 +794,44 @@ export function FeedbackTab() {
                             {!row.has_screenshot ? (
                               <p className="text-[11px] text-gray-400">No screenshot attached.</p>
                             ) : shots[row.id] ? (
-                              <img
-                                src={shots[row.id]!}
-                                alt="Feedback screenshot"
-                                className="max-w-full max-h-[520px] rounded border border-gray-200 shadow-sm object-contain bg-white"
-                              />
+                              <button
+                                type="button"
+                                onClick={() => setLightboxSrc(shots[row.id]!)}
+                                title="Click to enlarge"
+                                className="block cursor-zoom-in"
+                              >
+                                <img
+                                  src={shots[row.id]!}
+                                  alt="Feedback screenshot"
+                                  className="max-w-full max-h-[520px] rounded border border-gray-200 shadow-sm object-contain bg-white"
+                                />
+                              </button>
                             ) : shotLoadingId === row.id ? (
                               <p className="text-[11px] text-gray-400">Loading screenshot…</p>
                             ) : row.id in shots ? (
                               <p className="text-[11px] text-gray-400">Screenshot unavailable.</p>
                             ) : (
                               <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                            )}
+                            {/* AIQ-1480: click a thumbnail to view it full-size. */}
+                            {lightboxSrc && (
+                              <div
+                                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-6"
+                                role="dialog"
+                                aria-label="Screenshot full view"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxSrc(null)}
+                                  aria-label="Close full-size screenshot"
+                                  className="absolute inset-0 cursor-zoom-out"
+                                />
+                                <img
+                                  src={lightboxSrc}
+                                  alt="Feedback screenshot (full size)"
+                                  className="relative max-w-full max-h-full object-contain pointer-events-none"
+                                />
+                              </div>
                             )}
                           </div>
                           <div>

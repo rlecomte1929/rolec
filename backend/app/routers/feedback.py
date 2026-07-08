@@ -228,7 +228,16 @@ def submit_feedback(
             report_id,
         )
 
-    return {"ok": True, "report_id": report_id}
+    resp: Dict[str, Any] = {"ok": True, "report_id": report_id}
+    # [AIQ-1480] When the screenshot landed in Storage, tell the reporter how much image
+    # storage is left (best-effort; omitted if it can't be computed).
+    if screenshot_url:
+        from ..services.feedback_screenshot_storage import storage_usage
+
+        usage = storage_usage()
+        if usage:
+            resp["screenshot_storage"] = usage
+    return resp
 
 
 @router.get("/mine")

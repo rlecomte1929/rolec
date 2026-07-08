@@ -1,5 +1,5 @@
-import { apiGet, apiPost } from './client';
 import type { ClientContext } from '../lib/diagnostics';
+import { apiGet, apiPost } from './client';
 
 /**
  * Product "Share feedback" widget submission. Routes through the FastAPI backend
@@ -23,10 +23,19 @@ export interface ProductFeedbackInput {
   client_context?: ClientContext;
 }
 
+/** Screenshot-bucket usage returned after a submit that stored a screenshot (AIQ-1480). */
+export interface ScreenshotStorage {
+  used_mb: number;
+  budget_mb: number;
+  remaining_mb: number;
+}
+
 export async function submitProductFeedback(
   input: ProductFeedbackInput,
-): Promise<{ ok: boolean; report_id: string }> {
-  return apiPost<{ ok: boolean; report_id: string }>('/api/feedback', input);
+): Promise<{ ok: boolean; report_id: string; screenshot_storage?: ScreenshotStorage }> {
+  return apiPost<{ ok: boolean; report_id: string; screenshot_storage?: ScreenshotStorage }>(
+    '/api/feedback', input,
+  );
 }
 
 /** One row returned by GET /api/feedback/mine */
