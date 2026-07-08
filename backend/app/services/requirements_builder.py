@@ -8,36 +8,8 @@ from .. import crud
 from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
 from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
+from .requirements_country_key import resolve_catalog_country
 from .rules_engine import apply_rules
-
-
-# AIQ-1349: requirement_items.country_code is stored as a FULL UPPERCASE name
-# ("SINGAPORE"), but cases store ISO codes ("SG"/"GB"). Without resolving, the
-# lookup misses and the case sees ZERO requirements. Map the ISO code of each
-# country we have catalog data for onto its catalog name; everything else falls
-# back to the raw value upper-cased (no catalog rows yet anyway).
-_ISO_TO_CATALOG_NAME = {
-    "DE": "GERMANY",
-    "NO": "NORWAY",
-    "SG": "SINGAPORE",
-    "GB": "UNITED KINGDOM",
-    "UK": "UNITED KINGDOM",
-    "US": "UNITED STATES",
-    "USA": "UNITED STATES",
-    "FR": "FRANCE",
-    "NL": "NETHERLANDS",
-}
-
-
-def _resolve_catalog_country(dest: str) -> str:
-    """Resolve a case destination (ISO code or name) to the requirement catalog's
-    country_code naming (FULL UPPERCASE name)."""
-    if not dest:
-        return "UNKNOWN"
-    d = dest.strip()
-    if len(d) <= 3 and d.upper() in _ISO_TO_CATALOG_NAME:
-        return _ISO_TO_CATALOG_NAME[d.upper()]
-    return d.upper()
 
 
 def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
@@ -48,7 +20,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         draft = json.loads(case.draft_json)
         dest_raw = case.dest_country or draft.get("relocationBasics", {}).get("destCountry") or "UNKNOWN"
-        dest_country = _resolve_catalog_country(dest_raw)  # AIQ-1349: ISO → catalog name
+        # AIQ-1473b: single shared resolver (ISO → catalog name), replacing the
+        # former private map.
+        # TODO [AIQ-1473c]: fail closed when requirements_country_key.to_iso(dest_raw)
+        # is None instead of querying with a raw-upper key that returns zero rows
+        # (the AIQ-1349 silent-miss).
+        dest_country = resolve_catalog_country(dest_raw)
         purpose = case.purpose or draft.get("relocationBasics", {}).get("purpose") or "employment"
 
         sources = crud.list_sources(db, dest_country)

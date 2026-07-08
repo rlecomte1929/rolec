@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from ...database import db
+from .requirements_country_key import normalize_corridor_code
 
 log = logging.getLogger(__name__)
 
@@ -377,8 +378,8 @@ def _fetch_requirements(
                 ORDER BY is_required DESC, document_name ASC
             """),
             {
-                "corridor_from": corridor_from.upper(),
-                "corridor_to": corridor_to.upper(),
+                "corridor_from": normalize_corridor_code(corridor_from),
+                "corridor_to": normalize_corridor_code(corridor_to),
                 "visa_type": visa_type.lower(),
                 "employee_type": employee_type,
             },
