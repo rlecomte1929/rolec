@@ -139,6 +139,11 @@ class CaseRequirementsDTO(BaseModel):
     # AIQ-1349: requirement titles waived because this is a short-term (STA)
     # assignment — surfaced so the UI can explain the shorter list.
     staWaived: List[str] = []
+    # AIQ-1473c: False when the destination doesn't resolve to a known catalog
+    # key — the requirements list is then empty because we have no catalogue for
+    # that country, NOT because nothing is required. Lets the UI say so instead
+    # of rendering an empty list as "nothing required" (the AIQ-1349 silent-miss).
+    covered: bool = True
 
 
 class AssignmentType(str, Enum):

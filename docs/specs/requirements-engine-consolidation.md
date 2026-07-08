@@ -201,3 +201,45 @@ Recommendation: **(a)** where corridor+visa resolve, fall back to **(b)**.
 If the reviewer instead wants the full **Option 1 merge** (single store + single
 service), that is a larger, migration-bearing effort and 1473b–e should be
 re-scoped before proceeding.
+
+---
+
+## 9. Implemented boundary (AIQ-1473c) — as built
+
+**Reviewer confirmed Option 2** (2026-07-08). Implementation recon then found the
+"immigration-pillar deferral" the spec sketched was **not needed**, because the
+premise didn't hold in the data:
+
+- Path B's catalog (`requirement_items`, seeded from
+  `backend/seeds/requirements/*.yaml`) has pillars **IDENTITY, RESIDENCE,
+  EMPLOYMENT, HOUSING, HEALTHCARE** — there is **no `IMMIGRATION` pillar** and no
+  parallel entry-visa document list to de-duplicate. Its nearest immigration-
+  adjacent pillar, `RESIDENCE` (residence permit / registration), is a distinct
+  *in-country* layer from Path A's *entry-visa* checklist.
+- Path B also has no `visa_type` to call Path A with (`Case` carries
+  `origin_country` / `dest_country` / `purpose` only), so "defer to A" was not
+  cleanly possible regardless.
+
+**The boundary is therefore structural and documented, not enforced by deferral
+code** (satisfying criterion 1 = "made explicitly non-overlapping with a
+documented boundary"):
+
+| | Path A — `immigration_requirement_service` | Path B — `requirements_builder` |
+|---|---|---|
+| Owns | Entry-**visa document checklist** | In-country **relocation dossier** (5 pillars) |
+| Key | corridor (origin × dest) × visa_type | destination only |
+| Personas | HR + employee (shared via `immigration_snapshot_service`) | employee dossier |
+
+Docstring/comment on each engine states this boundary and points here.
+
+### Fail-closed (the AIQ-1349 fix)
+
+`CaseRequirementsDTO` gains `covered: bool = True`. `compute_case_requirements`
+returns `covered=False` + empty `requirements` when
+`requirements_country_key.to_iso(dest_raw)` is `None` (destination not a known
+catalog key), so the UI can say "no catalogue for {country} yet" instead of
+rendering an empty list as "nothing required". A destination that *resolves* but
+has no rows yet stays `covered=True, requirements=[]` — a catalog-population gap,
+a deliberately different state. Surfacing `covered=False` in the employee/HR UI
+copy is left to **1473d** (consumer wiring); the end-to-end zero-miss assertion is
+**1473e**.

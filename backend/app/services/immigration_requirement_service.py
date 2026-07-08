@@ -11,6 +11,13 @@ Entry points:
   evaluate_condition(condition_expression, employee_profile_dict)
   evaluate_risks(employee_profile, requirements, move_date)
   get_timeline_days(requirements)
+
+AIQ-1473 boundary (see docs/specs/requirements-engine-consolidation.md): this
+path (immigration_requirements) is the ENTRY-VISA document checklist, keyed by
+corridor (origin × destination) × visa_type. It is distinct-by-design from the
+in-country relocation dossier (requirements_builder → requirement_items, keyed
+by destination only). The two are documented as non-overlapping, not merged;
+they share one key convention via requirements_country_key.
 """
 from __future__ import annotations
 
