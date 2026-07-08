@@ -2,7 +2,7 @@
  * FeedbackWidget — floating feedback button for authenticated users.
  *
  * Fixed bottom-right on all product pages.
- * Submits via the FastAPI backend (POST /api/feedback) → public.feedback.
+ * Submits to the `feedback` Supabase table via direct insert.
  *
  * Features:
  * - Category: Bug / Idea / Other
@@ -12,14 +12,11 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { submitProductFeedback, getMyReports } from '../api/productFeedback';
-import { collectDiagnostics } from '../lib/diagnostics';
-import type { MyReport } from '../api/productFeedback';
+import { supabase } from '../api/supabase';
 import { Button } from './antigravity/Button';
-import { Badge } from './antigravity/Badge';
 
 type Category    = 'bug' | 'idea' | 'other';
-type WidgetState = 'idle' | 'open' | 'capturing' | 'submitting' | 'success' | 'error' | 'reports';
+type WidgetState = 'idle' | 'open' | 'capturing' | 'submitting' | 'success' | 'error';
 
 const CATEGORY_LABELS: Record<Category, string> = {
   bug:   'Bug',
@@ -47,11 +44,6 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [reportId, setReportId]   = useState<string | null>(null);
 
-  // My reports view state
-  const [reports, setReports]           = useState<MyReport[] | null>(null);
-  const [reportsLoading, setReportsLoading] = useState(false);
-  const [reportsError, setReportsError] = useState(false);
-
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,22 +55,10 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && (state === 'open' || state === 'error' || state === 'reports')) close();
+      if (e.key === 'Escape' && (state === 'open' || state === 'error')) close();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [state]);
-
-
-  // Fetch reports when entering the reports view
-  useEffect(() => {
-    if (state !== 'reports') return;
-    setReportsLoading(true);
-    setReportsError(false);
-    getMyReports()
-      .then((res) => setReports(res.reports))
-      .catch(() => setReportsError(true))
-      .finally(() => setReportsLoading(false));
   }, [state]);
 
   function close() {
@@ -87,8 +67,6 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     setCategory('bug');
     setScreenshot(null);
     setReportId(null);
-    setReports(null);
-    setReportsError(false);
   }
 
   const captureScreenshot = useCallback(async () => {
@@ -125,88 +103,39 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     const rid = reportId ?? makeReportId(category);
     setReportId(rid);
 
-    void userId; // kept for future analytics; the backend derives user_id from the session
+    void userId; // kept for future analytics; DB uses auth.uid() default
+    const { error } = await supabase.from('feedback').insert({
+      page_url:        window.location.pathname,
+      category,
+      message:         trimmed.slice(0, 2000),
+      report_id:       rid,
+      screenshot_data: screenshot ?? null,
+    });
 
-    // Route through the FastAPI backend (ReloPass session auth) — the prior direct
-    // Supabase insert failed for employees without a live Supabase Auth session.
-    // TD-9: if this is an in-flight test-drive session, stamp campaign/corridor/segment
-    // (written to localStorage by TestDrivePage). Absent for normal users → fields omitted.
-    const testDrive: { campaign?: string; corridor_id?: string; tester_segment?: string } = {};
-    try {
-      const raw = localStorage.getItem('relopass_test_drive');
-      if (raw) {
-        const p = JSON.parse(raw) as { campaign?: string; corridor_id?: string; tester_segment?: string };
-        if (p.campaign) testDrive.campaign = p.campaign;
-        if (p.corridor_id) testDrive.corridor_id = p.corridor_id;
-        if (p.tester_segment) testDrive.tester_segment = p.tester_segment;
-      }
-    } catch {
-      /* malformed / storage disabled — ignore */
-    }
-
-    try {
-      await submitProductFeedback({
-        category,
-        message:         trimmed.slice(0, 2000),
-        page_url:        window.location.pathname,
-        report_id:       rid,
-        screenshot_data: screenshot ?? null,
-        // Auto-attach diagnostics (page, failing function, recent failed requests,
-        // breadcrumbs, viewport, app version) so triagers get the "what/where failed".
-        client_context:  collectDiagnostics(),
-        ...testDrive,
-      });
-      setState('success');
-      setTimeout(() => close(), 3500);
-    } catch {
+    if (error) {
       setState('error');
       setTimeout(() => setState('open'), 2500);
+    } else {
+      setState('success');
+      setTimeout(() => close(), 3500);
     }
   }
 
   const isVisible = state !== 'idle' && state !== 'capturing';
 
-  // Status badge variant mapping
-  function statusVariant(status: string | null): 'neutral' | 'info' | 'success' {
-    if (!status) return 'neutral';
-    if (status === 'new') return 'neutral';
-    if (status === 'triaged') return 'info';
-    if (status === 'dispatched') return 'success';
-    if (status === 'resolved') return 'success';
-    return 'neutral';
-  }
-
-  function statusLabel(status: string | null): string {
-    return status ?? 'submitted';
-  }
-
-  // AIQ-1454: z-[60] keeps the feedback button clickable ABOVE the Setup/AI assistant
-  // drawer (a right/bottom fixed panel at z-50 that otherwise covers this bottom-right
-  // corner) — so feedback stays reachable while the assistant is open.
   return (
-    <div ref={containerRef} className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2">
+    // onMouseDown stopPropagation prevents the widget's clicks from closing
+    // page-level dropdowns that use document mousedown to detect "click outside".
+    <div
+      ref={containerRef}
+      onMouseDown={(e) => e.stopPropagation()}
+      className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2"
+    >
       {isVisible && (
         <div className="w-80 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-semibold text-gray-900">
-                {state === 'reports' ? 'My reports' : 'Share feedback'}
-              </p>
-              {(state === 'open' || state === 'error' || state === 'submitting') && (
-                <Button unstyled onClick={() => setState('reports')}
-                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors"
-                  aria-label="My reports">
-                  My reports
-                </Button>
-              )}
-              {state === 'reports' && (
-                <Button unstyled onClick={() => setState('open')}
-                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors">
-                  ← Write feedback
-                </Button>
-              )}
-            </div>
+            <p className="text-sm font-semibold text-gray-900">Share feedback</p>
             <Button unstyled onClick={close}
               className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -227,60 +156,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                   Reference: <span className="font-mono font-semibold text-gray-600">{reportId}</span>
                 </p>
               )}
-              <p className="text-xs text-gray-400">
-                We&apos;ll track this — check{' '}
-                <button
-                  onClick={() => setState('reports')}
-                  className="underline underline-offset-2 hover:text-gray-600 transition-colors"
-                >
-                  My reports
-                </button>{' '}
-                for status updates.
-              </p>
-            </div>
-          )}
-
-          {/* My reports */}
-          {state === 'reports' && (
-            <div className="px-4 py-4 max-h-72 overflow-y-auto">
-              {reportsLoading && (
-                <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
-              )}
-              {reportsError && !reportsLoading && (
-                <p className="text-xs text-red-500 text-center py-4">
-                  Could not load your reports — please try again.
-                </p>
-              )}
-              {!reportsLoading && !reportsError && reports !== null && reports.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-4">No reports yet.</p>
-              )}
-              {!reportsLoading && !reportsError && reports !== null && reports.length > 0 && (
-                <ul className="space-y-2">
-                  {reports.map((r) => (
-                    <li key={r.report_id} className="rounded-lg border border-gray-100 px-3 py-2 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[10.5px] text-gray-500 truncate">{r.report_id}</span>
-                        <Badge variant={statusVariant(r.status)} size="sm">
-                          {statusLabel(r.status)}
-                        </Badge>
-                      </div>
-                      {r.message_excerpt && (
-                        <p className="text-xs text-gray-600 truncate">{r.message_excerpt}</p>
-                      )}
-                      {(r.severity || r.area) && (
-                        <div className="flex flex-wrap gap-1">
-                          {r.severity && (
-                            <Badge variant="neutral" size="sm">{r.severity}</Badge>
-                          )}
-                          {r.area && (
-                            <Badge variant="neutral" size="sm">{r.area}</Badge>
-                          )}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="text-xs text-gray-400">We'll look into it.</p>
             </div>
           )}
 
