@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   status       TEXT DEFAULT 'new',
   created_at   TEXT DEFAULT (datetime('now')),
   report_id    TEXT,
-  screenshot_data TEXT
+  screenshot_data TEXT, screenshot_url TEXT
 );
 CREATE TABLE IF NOT EXISTS feedback_status (
   stream          TEXT NOT NULL,

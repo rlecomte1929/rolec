@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   status TEXT DEFAULT 'new',
   created_at TEXT,
   report_id TEXT,
-  screenshot_data TEXT,
+  screenshot_data TEXT, screenshot_url TEXT,
   reporter_email TEXT,
   reporter_name TEXT,
   reporter_role TEXT,
