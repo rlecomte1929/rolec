@@ -57,9 +57,9 @@ from .. import crud
 from ..db import SessionLocal
 from ..services.disclaimers import IMMIGRATION_DISCLAIMER
 from ..services.rules_engine import apply_rules
-# Private seam: single source of truth for ISO → catalog-name mapping. Imported
+# AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
 # (not duplicated) so this endpoint stays in sync if the catalog naming changes.
-from ..services.requirements_builder import _resolve_catalog_country
+from ..services.requirements_country_key import resolve_catalog_country
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -117,7 +117,7 @@ def corridor_requirements(
     if purp not in _VALID_PURPOSES:
         raise HTTPException(status_code=422, detail=f"purpose must be one of {sorted(_VALID_PURPOSES)}")
 
-    dest_catalog = _resolve_catalog_country(to)
+    dest_catalog = resolve_catalog_country(to)
     # Minimal, PII-free draft: only assignment type + purpose drive deterministic filtering.
     draft = {"relocationBasics": {"purpose": purp}, "assignmentContext": {"assignmentType": etype}}
 
