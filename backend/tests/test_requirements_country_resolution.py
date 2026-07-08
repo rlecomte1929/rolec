@@ -5,7 +5,11 @@ import os
 
 os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
 
-from backend.app.services.requirements_builder import _resolve_catalog_country
+# AIQ-1473b: the resolver moved to the shared requirements_country_key module
+# (single source of truth). Behaviour is unchanged — these assertions still hold.
+from backend.app.services.requirements_country_key import (
+    resolve_catalog_country as _resolve_catalog_country,
+)
 
 
 def test_iso_codes_map_to_catalog_names():
