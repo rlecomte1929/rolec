@@ -8,8 +8,34 @@ from .. import crud
 from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
 from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
-from .requirements_country_key import resolve_catalog_country
+from .requirements_country_key import resolve_catalog_country, to_iso
 from .rules_engine import apply_rules
+
+# AIQ-1473 boundary (see docs/specs/requirements-engine-consolidation.md):
+# this path (requirement_items) is the in-country RELOCATION DOSSIER across the
+# IDENTITY / RESIDENCE / EMPLOYMENT / HOUSING / HEALTHCARE pillars, keyed by
+# destination only. It is distinct-by-design from the immigration ENTRY-VISA
+# checklist (immigration_requirement_service, keyed corridor × visa_type) — the
+# two are documented as non-overlapping, not merged.
+
+
+def _not_covered(case_id: str, dest_raw: str, purpose: str) -> CaseRequirementsDTO:
+    """AIQ-1473c fail-closed: the destination didn't resolve to a known catalog
+    key, so we have no requirements catalogue for it. Return an explicit
+    covered=False result with an empty list, rather than querying with a
+    raw-upper key that yields zero rows and reads as "nothing required"."""
+    return CaseRequirementsDTO(
+        caseId=case_id,
+        destCountry=resolve_catalog_country(dest_raw),
+        purpose=purpose,
+        computedAt=datetime.utcnow(),
+        requirements=[],
+        sources=[],
+        disclaimer=IMMIGRATION_DISCLAIMER,
+        verificationStatus=DEFAULT_VERIFICATION_STATUS,
+        staWaived=[],
+        covered=False,
+    )
 
 
 def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
@@ -20,13 +46,18 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         draft = json.loads(case.draft_json)
         dest_raw = case.dest_country or draft.get("relocationBasics", {}).get("destCountry") or "UNKNOWN"
-        # AIQ-1473b: single shared resolver (ISO → catalog name), replacing the
-        # former private map.
-        # TODO [AIQ-1473c]: fail closed when requirements_country_key.to_iso(dest_raw)
-        # is None instead of querying with a raw-upper key that returns zero rows
-        # (the AIQ-1349 silent-miss).
-        dest_country = resolve_catalog_country(dest_raw)
         purpose = case.purpose or draft.get("relocationBasics", {}).get("purpose") or "employment"
+
+        # AIQ-1473c: fail closed. If the destination doesn't resolve to a known
+        # ISO key (to_iso is None), we have no catalogue for it — return an
+        # explicit "not covered" result instead of a misleading empty list.
+        # NOTE: a destination that DOES resolve but has no rows yet is a catalog
+        # gap (covered=True, empty) — a different state, deliberately not merged.
+        if to_iso(dest_raw) is None:
+            return _not_covered(case.id, dest_raw, purpose)
+
+        # AIQ-1473b: single shared resolver (ISO → catalog name).
+        dest_country = resolve_catalog_country(dest_raw)
 
         sources = crud.list_sources(db, dest_country)
         requirements = crud.list_requirements(db, dest_country, purpose)
@@ -95,6 +126,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             # assignment, so the UI can explain the shorter list instead of
             # silently dropping items. Empty for LTA/PERMANENT.
             staWaived=sorted({t for t in (flags.get("staWaived") or []) if t}),
+            covered=True,  # AIQ-1473c: destination resolved to a known catalog key
         )
 
 
