@@ -25,7 +25,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
@@ -56,6 +56,15 @@ class FeedbackBody(BaseModel):
     # failed requests + correlation id, breadcrumbs, viewport, app version). PII-scrubbed
     # client-side; stored in feedback.client_context (jsonb) for the admin Diagnostics panel.
     client_context: Optional[Dict[str, Any]] = None
+
+    @field_validator("screenshot_data")
+    @classmethod
+    def _screenshot_within_limit(cls, v: Optional[str]) -> Optional[str]:
+        # [AIQ-1480] Reject oversized screenshots up front with a clear 422 (the bucket
+        # file_size_limit is 5 MB; base64 is ~33% larger than the raw image).
+        if v is not None and len(v) > _MAX_SCREENSHOT:
+            raise ValueError("screenshot exceeds the 5 MB limit")
+        return v
 
 
 def _resolve_auth_user_id(reporter_id: Any) -> Optional[str]:
@@ -113,9 +122,18 @@ def submit_feedback(
     # Otherwise NULL; attribution stays on reporter_email/name/role + feedback_status.
     reporter_id = current_user.get("id")  # kept: feedback_status pre-fill binds it as reporter_id
     auth_user_id = _resolve_auth_user_id(reporter_id)
+    # [AIQ-1480] Prefer the private Supabase Storage bucket for the screenshot so multi-MB
+    # base64 stays out of the DB (capacity). base64 in screenshot_data remains the fallback
+    # when the upload fails, so a screenshot is never lost. Size is already gated to <=5 MB
+    # by the FeedbackBody validator (422).
     screenshot = body.screenshot_data
-    if screenshot is not None and len(screenshot) > _MAX_SCREENSHOT:
-        screenshot = None  # too large to persist; keep the text feedback
+    screenshot_url: Optional[str] = None
+    if screenshot:
+        from ..services.feedback_screenshot_storage import upload_screenshot
+
+        screenshot_url = upload_screenshot(screenshot, key_hint=report_id)
+        if screenshot_url:
+            screenshot = None  # stored in Storage → don't also persist the base64
 
     # Snapshot the reporter's identity from the authenticated session so the admin
     # log can show WHO reported this even when user_id is NULL (legacy/HR sessions
@@ -126,11 +144,13 @@ def submit_feedback(
     reporter_role = current_user.get("role")
 
     cols = [
-        "id", "user_id", "page_url", "category", "message", "report_id", "screenshot_data",
+        "id", "user_id", "page_url", "category", "message", "report_id",
+        "screenshot_data", "screenshot_url",
         "reporter_email", "reporter_name", "reporter_role",
     ]
     vals = [
-        ":fid", ":uid", ":page", ":cat", ":msg", ":rid", ":shot",
+        ":fid", ":uid", ":page", ":cat", ":msg", ":rid",
+        ":shot", ":shot_url",
         ":r_email", ":r_name", ":r_role",
     ]
     params: Dict[str, Any] = {
@@ -141,6 +161,7 @@ def submit_feedback(
         "msg": message[:_MAX_MESSAGE],
         "rid": report_id,
         "shot": screenshot,
+        "shot_url": screenshot_url,
         "r_email": reporter_email,
         "r_name": reporter_name,
         "r_role": reporter_role,
@@ -207,7 +228,16 @@ def submit_feedback(
             report_id,
         )
 
-    return {"ok": True, "report_id": report_id}
+    resp: Dict[str, Any] = {"ok": True, "report_id": report_id}
+    # [AIQ-1480] When the screenshot landed in Storage, tell the reporter how much image
+    # storage is left (best-effort; omitted if it can't be computed).
+    if screenshot_url:
+        from ..services.feedback_screenshot_storage import storage_usage
+
+        usage = storage_usage()
+        if usage:
+            resp["screenshot_storage"] = usage
+    return resp
 
 
 @router.get("/mine")

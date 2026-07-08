@@ -1,31 +1,29 @@
 /**
- * FeedbackWidget — routes submissions through the backend (POST /api/feedback)
- * instead of a direct Supabase insert (which failed for ReloPass-session users).
- * API module is mocked (avoids importing api/client → api/supabase jsdom trap).
+ * FeedbackWidget — routes submissions through the backend (POST /api/feedback) instead of a
+ * direct Supabase insert (which fails for ReloPass-session users), attaches diagnostics, and
+ * supports screenshot capture + markup (AIQ-1480). The productFeedback API is mocked.
+ *
+ * NOTE: this widget was reverted on main (#1400/#1404), which also dropped the "My reports"
+ * tab. Those tests were removed here to match the shipped component; restoring that tab is
+ * tracked as a SEPARATE regression (filed from AIQ-1480 handoff), not part of this task.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import React from 'react';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 
 expect.extend(matchers);
 
 vi.mock('../api/productFeedback', () => ({
   submitProductFeedback: vi.fn(),
-  getMyReports: vi.fn(),
 }));
 
-import { submitProductFeedback, getMyReports } from '../api/productFeedback';
+import { submitProductFeedback } from '../api/productFeedback';
 import { FeedbackWidget } from './FeedbackWidget';
 
 const mockSubmit = submitProductFeedback as unknown as ReturnType<typeof vi.fn>;
-const mockGetReports = getMyReports as unknown as ReturnType<typeof vi.fn>;
 
 afterEach(cleanup);
-beforeEach(() => {
-  mockSubmit.mockReset();
-  mockGetReports.mockReset();
-});
+beforeEach(() => mockSubmit.mockReset());
 
 function openAndType(text: string) {
   fireEvent.click(screen.getByLabelText('Give feedback'));
@@ -34,13 +32,8 @@ function openAndType(text: string) {
   return box;
 }
 
-function openMyReports() {
-  fireEvent.click(screen.getByLabelText('Give feedback'));
-  fireEvent.click(screen.getByRole('button', { name: /my reports/i }));
-}
-
 describe('FeedbackWidget', () => {
-  it('submits via the backend API and shows success', async () => {
+  it('submits via the backend API (with diagnostics) and shows success', async () => {
     mockSubmit.mockResolvedValue({ ok: true, report_id: 'BUG-x' });
     render(<FeedbackWidget userId="u1" />);
     openAndType('ÇVX');
@@ -50,6 +43,7 @@ describe('FeedbackWidget', () => {
     expect(arg.category).toBe('bug');
     expect(arg.message).toBe('ÇVX');
     expect(typeof arg.page_url).toBe('string');
+    expect(arg.client_context).toBeTruthy(); // diagnostics attached (restored from the revert)
     await waitFor(() => expect(screen.getByText(/received/i)).toBeInTheDocument());
   });
 
@@ -60,119 +54,33 @@ describe('FeedbackWidget', () => {
     expect(mockSubmit).not.toHaveBeenCalled();
   });
 
-  it('success state shows the submitted report_id reference label', async () => {
+  it('success shows the generated report_id reference', async () => {
     mockSubmit.mockResolvedValue({ ok: true, report_id: 'BUG-x' });
     render(<FeedbackWidget userId="u1" />);
     openAndType('Something broke');
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
-    // The widget generates the report_id client-side and shows it in the success state
-    await waitFor(() =>
-      expect(screen.getByText(/reference/i)).toBeInTheDocument()
-    );
-    // The generated ID follows the pattern BUG-YYMMDD-XXXX
+    await waitFor(() => expect(screen.getByText(/reference/i)).toBeInTheDocument());
     expect(screen.getByText(/BUG-\d{6}-/)).toBeInTheDocument();
   });
-});
 
-// ── R2: My reports view ───────────────────────────────────────────────────────
-
-const MOCK_REPORTS = [
-  {
-    report_id: 'BUG-260630-1111',
-    category: 'bug',
-    message_excerpt: 'Button is broken',
-    status: 'new',
-    severity: 'low',
-    area: 'ui',
-    dispatch_status: null,
-    created_at: new Date().toISOString(),
-  },
-  {
-    report_id: 'IDR-260630-2222',
-    category: 'idea',
-    message_excerpt: 'Add dark mode',
-    status: 'triaged',
-    severity: null,
-    area: null,
-    dispatch_status: null,
-    created_at: new Date().toISOString(),
-  },
-  {
-    report_id: 'BUG-260630-3333',
-    category: 'bug',
-    message_excerpt: 'Login fails',
-    status: 'dispatched',
-    severity: 'high',
-    area: 'auth',
-    dispatch_status: 'dispatched',
-    created_at: new Date().toISOString(),
-  },
-  {
-    report_id: 'OTH-260630-4444',
-    category: 'other',
-    message_excerpt: 'General question',
-    status: 'resolved',
-    severity: null,
-    area: null,
-    dispatch_status: null,
-    created_at: new Date().toISOString(),
-  },
-  {
-    report_id: 'BUG-260630-5555',
-    category: 'bug',
-    message_excerpt: 'Null status report',
-    status: null,
-    severity: null,
-    area: null,
-    dispatch_status: null,
-    created_at: new Date().toISOString(),
-  },
-];
-
-describe('FeedbackWidget — My reports (R2)', () => {
-  it('renders reports with correct status badge labels', async () => {
-    mockGetReports.mockResolvedValue({ reports: MOCK_REPORTS });
+  it('[AIQ-1480] "Attach Screenshot" reveals full-page / region capture options', () => {
     render(<FeedbackWidget userId="u1" />);
-    openMyReports();
-    await waitFor(() => expect(mockGetReports).toHaveBeenCalledTimes(1));
-    // report IDs visible
-    expect(await screen.findByText('BUG-260630-1111')).toBeInTheDocument();
-    // status badge labels
-    expect(screen.getByText('new')).toBeInTheDocument();
-    expect(screen.getByText('triaged')).toBeInTheDocument();
-    expect(screen.getByText('dispatched')).toBeInTheDocument();
-    expect(screen.getByText('resolved')).toBeInTheDocument();
-    // null status → "submitted"
-    expect(screen.getByText('submitted')).toBeInTheDocument();
+    openAndType('needs a shot');
+    fireEvent.click(screen.getByRole('button', { name: /attach screenshot/i }));
+    expect(screen.getByRole('button', { name: /full page/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /select region/i })).toBeInTheDocument();
   });
 
-  it('shows "No reports yet" for an empty reports list', async () => {
-    mockGetReports.mockResolvedValue({ reports: [] });
+  it('[AIQ-1480] shows the storage-capacity notice after a submit that stored a screenshot', async () => {
+    mockSubmit.mockResolvedValue({
+      ok: true, report_id: 'BUG-x',
+      screenshot_storage: { used_mb: 12, budget_mb: 500, remaining_mb: 488 },
+    });
     render(<FeedbackWidget userId="u1" />);
-    openMyReports();
-    await waitFor(() =>
-      expect(screen.getByText(/no reports yet/i)).toBeInTheDocument()
-    );
-  });
-
-  it('shows error message when getMyReports rejects', async () => {
-    mockGetReports.mockRejectedValue(new Error('Network error'));
-    render(<FeedbackWidget userId="u1" />);
-    openMyReports();
-    await waitFor(() =>
-      expect(screen.getByText(/could not load/i)).toBeInTheDocument()
-    );
-  });
-
-  it('renders severity and area chips when present', async () => {
-    mockGetReports.mockResolvedValue({ reports: MOCK_REPORTS });
-    render(<FeedbackWidget userId="u1" />);
-    openMyReports();
-    await waitFor(() => expect(mockGetReports).toHaveBeenCalledTimes(1));
-    // severity chips
-    expect(await screen.findByText('low')).toBeInTheDocument();
-    expect(screen.getByText('high')).toBeInTheDocument();
-    // area chip
-    expect(screen.getByText('auth')).toBeInTheDocument();
+    openAndType('with shot');
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    const note = await screen.findByText(/image storage/i);
+    expect(note.textContent).toContain('488 MB');
+    expect(note.textContent).toContain('500 MB');
   });
 });

@@ -1,5 +1,5 @@
-import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from './client';
 import type { ClientContext } from '../lib/diagnostics';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from './client';
 
 export type FeedbackStream =
   | 'product'
@@ -84,18 +84,19 @@ export async function listFeedback(params?: {
 }
 
 /**
- * Fetch the base64 screenshot data URL for a single feedback item, on demand.
- * Only the `product` stream carries screenshots; others resolve to null.
+ * Fetch a renderable screenshot src for a single feedback item, on demand.
+ * Storage-backed screenshots (AIQ-1480) resolve to a short-lived signed URL; older ones
+ * to an inline base64 data URL. Only the `product` stream carries screenshots.
  * Called lazily when an admin expands a row (keeps the list response small).
  */
 export async function getFeedbackScreenshot(
   stream: FeedbackStream,
   id: string,
 ): Promise<string | null> {
-  const data = await apiGet<{ screenshot_data: string | null }>(
+  const data = await apiGet<{ screenshot_data: string | null; screenshot_url?: string | null }>(
     `/api/admin/feedback/${stream}/${id}/screenshot`,
   );
-  return data.screenshot_data ?? null;
+  return data.screenshot_url ?? data.screenshot_data ?? null;
 }
 
 export async function triageFeedback(

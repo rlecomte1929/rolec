@@ -15,7 +15,7 @@ from backend.app.services.feedback_status_bridge import advance_status_for_event
 _SCHEMA = """
 CREATE TABLE feedback (
   id TEXT PRIMARY KEY, user_id TEXT, page_url TEXT, category TEXT, message TEXT,
-  status TEXT, created_at TEXT, report_id TEXT, screenshot_data TEXT,
+  status TEXT, created_at TEXT, report_id TEXT, screenshot_data TEXT, screenshot_url TEXT,
   reporter_email TEXT, reporter_name TEXT, reporter_role TEXT, client_context TEXT
 );
 CREATE TABLE feedback_status (

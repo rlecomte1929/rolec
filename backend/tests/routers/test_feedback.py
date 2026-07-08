@@ -27,7 +27,7 @@ CREATE TABLE feedback (
   message TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  screenshot_data TEXT,
+  screenshot_data TEXT, screenshot_url TEXT,
   report_id TEXT,
   reporter_email TEXT,
   reporter_name TEXT,
@@ -136,14 +136,13 @@ class FeedbackEndpointTests(unittest.TestCase):
         self.assertEqual(row["message"], "keep")
         self.assertIsNone(row["client_context"])
 
-    def test_oversized_screenshot_dropped_but_text_kept(self):
+    def test_oversized_screenshot_rejected_with_422(self):
+        # [AIQ-1480] the FeedbackBody validator rejects a >5MB screenshot up front
+        # (FastAPI surfaces the ValidationError as a 422), rather than silently dropping it.
+        from pydantic import ValidationError
         big = "x" * (fb._MAX_SCREENSHOT + 1)
-        fb.submit_feedback(
-            fb.FeedbackBody(category="idea", message="keep me", page_url="/", screenshot_data=big),
-            _req(), EMP)
-        rows = self._rows()
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["message"], "keep me")
+        with self.assertRaises(ValidationError):
+            fb.FeedbackBody(category="idea", message="keep me", page_url="/", screenshot_data=big)
 
 
 class _FakeConn:

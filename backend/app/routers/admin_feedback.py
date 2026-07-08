@@ -80,7 +80,7 @@ SELECT
     CAST(f.user_id   AS TEXT) AS user_id,
     CAST(NULL AS TEXT)        AS company_id,
     f.created_at,
-    CASE WHEN f.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot,
+    CASE WHEN f.screenshot_data IS NOT NULL OR f.screenshot_url IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot,
     f.reporter_name           AS reporter_name,
     f.reporter_email          AS reporter_email,
     f.reporter_role           AS reporter_role,
@@ -261,14 +261,23 @@ def get_feedback_screenshot(
     endpoint never has to ship large base64 blobs for 500 rows at once.
     """
     if stream != "product":
-        return {"screenshot_data": None}
+        return {"screenshot_data": None, "screenshot_url": None}
     row = db.execute(
-        text("SELECT screenshot_data FROM feedback WHERE CAST(id AS TEXT) = :id"),
+        text("SELECT screenshot_data, screenshot_url FROM feedback WHERE CAST(id AS TEXT) = :id"),
         {"id": item_id},
     ).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Not found")
-    return {"screenshot_data": row[0]}
+    data, path = row[0], row[1]
+    # [AIQ-1480] Prefer the Storage-backed image: mint a short-lived signed URL (private
+    # bucket — never exposed publicly). Fall back to inline base64 when no object exists.
+    if path:
+        from ..services.feedback_screenshot_storage import signed_url
+
+        signed = signed_url(path)
+        if signed:
+            return {"screenshot_url": signed, "screenshot_data": None}
+    return {"screenshot_data": data, "screenshot_url": None}
 
 
 class TriageUpdate(BaseModel):
@@ -509,7 +518,7 @@ def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
     row = db.execute(
         text(
             "SELECT message, category, page_url, "
-            "(CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id, "
+            "(CASE WHEN screenshot_data IS NOT NULL OR screenshot_url IS NOT NULL THEN 1 ELSE 0 END), reporter_name, report_id, "
             "client_context "
             "FROM feedback WHERE CAST(id AS TEXT) = :id"
         ),
