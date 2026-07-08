@@ -12,14 +12,16 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { submitProductFeedback, type ScreenshotStorage } from '../api/productFeedback';
+import { submitProductFeedback, getMyReports, type ScreenshotStorage } from '../api/productFeedback';
+import type { MyReport } from '../api/productFeedback';
 import { collectDiagnostics } from '../lib/diagnostics';
 import { ScreenshotCapture } from './feedback/ScreenshotCapture';
 import { AnnotationCanvas, type AnnotationCanvasHandle } from './feedback/AnnotationCanvas';
 import { Button } from './antigravity/Button';
+import { Badge } from './antigravity/Badge';
 
 type Category    = 'bug' | 'idea' | 'other';
-type WidgetState = 'idle' | 'open' | 'capturing' | 'submitting' | 'success' | 'error';
+type WidgetState = 'idle' | 'open' | 'capturing' | 'submitting' | 'success' | 'error' | 'reports';
 
 const CATEGORY_LABELS: Record<Category, string> = {
   bug:   'Bug',
@@ -50,6 +52,10 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   const [shotStep, setShotStep]   = useState<'none' | 'capture' | 'annotate'>('none');
   const [rawCapture, setRawCapture] = useState<string | null>(null);
   const [storageNote, setStorageNote] = useState<ScreenshotStorage | null>(null);
+  // My reports view state.
+  const [reports, setReports]           = useState<MyReport[] | null>(null);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState(false);
 
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,10 +69,21 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && (state === 'open' || state === 'error')) close();
+      if (e.key === 'Escape' && (state === 'open' || state === 'error' || state === 'reports')) close();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, [state]);
+
+  // Fetch the caller's reports when entering the My-reports view.
+  useEffect(() => {
+    if (state !== 'reports') return;
+    setReportsLoading(true);
+    setReportsError(false);
+    getMyReports()
+      .then((res) => setReports(res.reports))
+      .catch(() => setReportsError(true))
+      .finally(() => setReportsLoading(false));
   }, [state]);
 
   function close() {
@@ -125,6 +142,16 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
 
   const isVisible = state !== 'idle' && state !== 'capturing';
 
+  // Status badge variant + label for the My-reports list.
+  function statusVariant(status: string | null): 'neutral' | 'info' | 'success' {
+    if (status === 'triaged') return 'info';
+    if (status === 'dispatched' || status === 'resolved') return 'success';
+    return 'neutral';
+  }
+  function statusLabel(status: string | null): string {
+    return status ?? 'submitted';
+  }
+
   return (
     // onMouseDown stopPropagation prevents the widget's clicks from closing
     // page-level dropdowns that use document mousedown to detect "click outside".
@@ -139,7 +166,24 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
         <div className="w-80 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <p className="text-sm font-semibold text-gray-900">Share feedback</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-semibold text-gray-900">
+                {state === 'reports' ? 'My reports' : 'Share feedback'}
+              </p>
+              {(state === 'open' || state === 'error' || state === 'submitting') && (
+                <Button unstyled onClick={() => setState('reports')}
+                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors"
+                  aria-label="My reports">
+                  My reports
+                </Button>
+              )}
+              {state === 'reports' && (
+                <Button unstyled onClick={() => setState('open')}
+                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors">
+                  ← Write feedback
+                </Button>
+              )}
+            </div>
             <Button unstyled onClick={close}
               className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -166,6 +210,53 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                   Screenshot saved. Image storage: <span className="font-semibold">{storageNote.remaining_mb} MB</span> left
                   of {storageNote.budget_mb} MB ({storageNote.used_mb} MB used).
                 </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setState('reports')}
+                className="mt-1 text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600 transition-colors"
+              >
+                View my reports
+              </button>
+            </div>
+          )}
+
+          {/* My reports */}
+          {state === 'reports' && (
+            <div className="px-4 py-4 max-h-72 overflow-y-auto">
+              {reportsLoading && (
+                <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
+              )}
+              {reportsError && !reportsLoading && (
+                <p className="text-xs text-red-500 text-center py-4">
+                  Could not load your reports — please try again.
+                </p>
+              )}
+              {!reportsLoading && !reportsError && reports !== null && reports.length === 0 && (
+                <p className="text-xs text-gray-400 text-center py-4">No reports yet.</p>
+              )}
+              {!reportsLoading && !reportsError && reports !== null && reports.length > 0 && (
+                <ul className="space-y-2">
+                  {reports.map((r) => (
+                    <li key={r.report_id} className="rounded-lg border border-gray-100 px-3 py-2 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10.5px] text-gray-500 truncate">{r.report_id}</span>
+                        <Badge variant={statusVariant(r.status)} size="sm">
+                          {statusLabel(r.status)}
+                        </Badge>
+                      </div>
+                      {r.message_excerpt && (
+                        <p className="text-xs text-gray-600 truncate">{r.message_excerpt}</p>
+                      )}
+                      {(r.severity || r.area) && (
+                        <div className="flex flex-wrap gap-1">
+                          {r.severity && <Badge variant="neutral" size="sm">{r.severity}</Badge>}
+                          {r.area && <Badge variant="neutral" size="sm">{r.area}</Badge>}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           )}
