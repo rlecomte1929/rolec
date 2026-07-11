@@ -36,9 +36,14 @@ Design notes:
 Configuration:
 
 * ``ANTHROPIC_API_KEY`` — required. Absence → returns None.
-* ``RELOPASS_LLM_POLICY_MODEL`` — optional. Defaults to ``claude-fable-5``
+* ``RELOPASS_LLM_POLICY_MODEL`` — optional. Code default is ``claude-fable-5``
   (AIQ-1219): Fable 5's 1M-token context lets a full 100-200pg policy be
   ingested in a single pass. The env var stays the operator escape hatch.
+  AIQ-1488: the intended activation target is ``claude-sonnet-5`` (also 1M
+  context, cheaper intro pricing $2/$10 through 2026-08-31) — set
+  ``RELOPASS_LLM_POLICY_MODEL=claude-sonnet-5`` to switch this path. Env-gated
+  so merge forces no live model change; benchmark before flipping (see
+  ``scripts/benchmark_policy_model.py``).
 * ``RELOPASS_LLM_POLICY_MAX_INPUT_CHARS`` — optional. The per-call truncation
   cap. The *default* is model-aware (AIQ-1219): the Fable-5 path defaults to
   1,500,000 chars (~430k tokens — a whole manual in one pass, well inside the
