@@ -26,6 +26,14 @@ claude-fable-5:
   in_per_million: 10.00
   out_per_million: 50.00
 
+# Claude Sonnet 5 (AIQ-1488) — 1M context, 128k output. INTRODUCTORY pricing
+# $2/$10 per 1M input/output, valid through 2026-08-31 — revert to standard pricing
+# after. Wired here so cost calc resolves the moment a route or env flip names it;
+# no task_class routes to it yet (activation is env-gated: RELOPASS_LLM_*_MODEL).
+claude-sonnet-5:
+  in_per_million: 2.00
+  out_per_million: 10.00
+
 # Claude Haiku 4.5 — cheap tier used by the AIQ-1414 coordinator's rolling-summary
 # folds. $1/$5. (Alias, not date-suffixed, so router.usd_cost resolves it.)
 claude-haiku-4-5:

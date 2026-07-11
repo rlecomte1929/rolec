@@ -44,7 +44,13 @@ log = logging.getLogger(__name__)
 
 # Model IDs we support. The default is Sonnet 4.6 per the design doc;
 # Haiku 4.5 is a cost-aware fallback.
-DEFAULT_MODEL = "claude-sonnet-4-6"
+#
+# AIQ-1488: claude-sonnet-5 is wired (priced below) but NOT the merge-time default —
+# the default stays sonnet-4-6 so prod behaviour and the sonnet-4-6 test suite are
+# unchanged. Activate sonnet-5 by setting RELOPASS_LLM_ASSISTANT_MODEL=claude-sonnet-5
+# (env-gated, no forced prod swap). This constant also feeds roadmap_generator, which
+# is exactly why the swap is env-gated rather than a code-default flip.
+DEFAULT_MODEL = os.environ.get("RELOPASS_LLM_ASSISTANT_MODEL", "claude-sonnet-4-6")
 FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 
 # Pricing per 1M tokens, as of 2026-04. Used for the per-question cost
@@ -58,6 +64,10 @@ _PRICING_USD_PER_1M = {
     # the costs.yaml entry so cost_usd_estimated is correct on whichever path
     # prices a Fable-5 call.
     "claude-fable-5": {"input": 10.00, "output": 50.00},
+    # Claude Sonnet 5 (AIQ-1488) — 1M context, 128k output. INTRODUCTORY pricing
+    # $2 / $10 per 1M input/output tokens, valid through 2026-08-31; revert to
+    # standard pricing after. Mirrors the costs.yaml entry.
+    "claude-sonnet-5": {"input": 2.00, "output": 10.00},
 }
 
 
