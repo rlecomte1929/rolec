@@ -280,6 +280,105 @@ def get_feedback_screenshot(
     return {"screenshot_data": data, "screenshot_url": None}
 
 
+class NewFeedbackBody(BaseModel):
+    """Admin-authored feedback item (AIQ-1492). Shaped like a widget submission so
+    every downstream route (dispatch/preview/create, /fix, feedback_notion_sync) works
+    unchanged. dispatch_context is REQUIRED so the item is immediately dispatch-ready
+    (dispatch/preview 400s on empty context)."""
+    page_url: str
+    category: str = "other"                     # bug | idea | other
+    message: str
+    screenshot_data: Optional[str] = None       # base64 data-URL (optional)
+    reporter_name: Optional[str] = None          # default to the logged-in admin
+    reporter_email: Optional[str] = None
+    reporter_role: Optional[str] = None
+    dispatch_context: str                        # REQUIRED — the admin's per-item note
+    severity: Optional[str] = None               # else derived from classify()
+    area: Optional[str] = None
+    # Structured extras (steps_to_reproduce, expected, actual, persona, campaign,
+    # corridor_id, tester_segment, environment/browser) → feedback.client_context jsonb.
+    client_context: Optional[Dict[str, Any]] = None
+
+
+_MAX_ADMIN_SCREENSHOT = 5_000_000
+_MAX_ADMIN_CLIENT_CONTEXT = 32_000
+
+
+@router.post("/feedback", status_code=201)
+def create_feedback(
+    body: NewFeedbackBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Author a new product-stream feedback item from the admin console, dispatch-ready.
+
+    Writes public.feedback (widget-shaped) AND upserts feedback_status with
+    dispatch_context/severity/area in one pass, so the item flows through the exact same
+    pipeline as a tester-widget submission with no follow-up step."""
+    context = (body.dispatch_context or "").strip()
+    if not context:
+        raise HTTPException(status_code=400, detail="dispatch_context is required so the item is dispatch-ready.")
+    message = (body.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required.")
+    category = body.category if body.category in {"bug", "idea", "other"} else "other"
+
+    feedback_id = str(uuid.uuid4())
+    report_id = f"{category[:3].upper()}-{uuid.uuid4().hex[:8]}"
+    reporter_name = body.reporter_name or user.get("name") or user.get("full_name")
+    reporter_email = body.reporter_email or user.get("email")
+    reporter_role = body.reporter_role or user.get("role") or "ADMIN"
+    screenshot = body.screenshot_data
+    if screenshot and len(screenshot) > _MAX_ADMIN_SCREENSHOT:
+        screenshot = None
+
+    # INSERT public.feedback — same column shape as a widget submission (feedback.py),
+    # but via the router session (_get_db) so tests + the SQLite override cover it.
+    cols = ["id", "page_url", "category", "message", "report_id",
+            "screenshot_data", "reporter_email", "reporter_name", "reporter_role"]
+    vals = [":fid", ":page", ":cat", ":msg", ":rid",
+            ":shot", ":r_email", ":r_name", ":r_role"]
+    params: Dict[str, Any] = {
+        "fid": feedback_id, "page": body.page_url or "", "cat": category,
+        "msg": message[:2000], "rid": report_id, "shot": screenshot,
+        "r_email": reporter_email, "r_name": reporter_name, "r_role": reporter_role,
+    }
+    if body.client_context is not None:
+        try:
+            ctx_json: Optional[str] = json.dumps(body.client_context, default=str)
+        except (TypeError, ValueError):
+            ctx_json = None
+        if ctx_json is not None and len(ctx_json) <= _MAX_ADMIN_CLIENT_CONTEXT:
+            is_pg = db.get_bind().dialect.name == "postgresql"
+            cols.append("client_context")
+            vals.append("CAST(:ctx AS jsonb)" if is_pg else ":ctx")
+            params["ctx"] = ctx_json
+    db.execute(text(f"INSERT INTO feedback ({', '.join(cols)}) VALUES ({', '.join(vals)})"), params)
+
+    # Severity/area: caller-supplied wins, else classify() (same triage as the widget seed).
+    severity, area = body.severity, body.area
+    if not severity or not area:
+        labels = classify(message, category)
+        severity = severity or labels.get("severity")
+        area = area or labels.get("area")
+
+    # UPSERT feedback_status WITH dispatch_context → immediately dispatch-ready.
+    now = datetime.utcnow().isoformat()
+    db.execute(
+        text(
+            "INSERT INTO feedback_status "
+            "(stream, source_id, status, severity, area, reporter_id, dispatch_context, updated_at) "
+            "VALUES ('product', :id, 'new', :sev, :area, :rep, :ctx, :now) "
+            "ON CONFLICT (stream, source_id) DO UPDATE SET "
+            "    severity = excluded.severity, area = excluded.area, "
+            "    dispatch_context = excluded.dispatch_context, updated_at = excluded.updated_at"
+        ),
+        {"id": feedback_id, "sev": severity, "area": area,
+         "rep": str(user.get("id")) if user.get("id") else None, "ctx": context, "now": now},
+    )
+    return {"id": feedback_id, "report_id": report_id}
+
+
 class TriageUpdate(BaseModel):
     status: str
     owner: Optional[str] = None

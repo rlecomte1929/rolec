@@ -57,6 +57,27 @@ export interface DispatchResult {
   status: string;
 }
 
+/** AIQ-1492 — admin authors a new product-stream feedback item, dispatch-ready. */
+export interface NewFeedbackInput {
+  page_url: string;
+  category: 'bug' | 'idea' | 'other';
+  message: string;
+  dispatch_context: string;              // required — makes it immediately dispatchable
+  severity?: string | null;
+  area?: string | null;
+  screenshot_data?: string | null;       // base64 data-URL (optional)
+  reporter_name?: string | null;
+  reporter_email?: string | null;
+  reporter_role?: string | null;
+  client_context?: Record<string, unknown> | null;  // steps_to_reproduce, expected, actual, persona, …
+}
+
+export async function createAdminFeedback(
+  input: NewFeedbackInput,
+): Promise<{ id: string; report_id: string }> {
+  return apiPost<{ id: string; report_id: string }>('/api/admin/feedback', input);
+}
+
 export async function listFeedback(params?: {
   stream?: FeedbackStream;
   status?: TriageStatus;
