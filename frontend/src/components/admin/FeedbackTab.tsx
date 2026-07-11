@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
 import {
@@ -31,6 +32,7 @@ import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
 import { ProgressStrip } from './ProgressStrip';
+import { NewFeedbackModal } from './NewFeedbackModal';
 
 type FilterStatus = TriageStatus | 'all';
 type ActiveMode = FeedbackStream | 'all' | 'dispatched';
@@ -214,6 +216,7 @@ export function FeedbackTab() {
   // Trigger fix / Auto-attempt (on dispatched rows).
   const [triggerResults, setTriggerResults]     = useState<Record<string, FixTriggerResult>>({});
   const [fixBusyId, setFixBusyId]               = useState<string | null>(null);
+  const [showNew, setShowNew]                   = useState(false); // AIQ-1492: author a new feedback item
   const fixEnabled = isTriggerFixEnabled();
 
   const load = useCallback(async () => {
@@ -424,23 +427,36 @@ export function FeedbackTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stream tabs */}
-      <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5 bg-gray-50 w-fit">
-        {(['all', ...STREAMS, 'dispatched'] as ActiveMode[]).map((s) => (
-          <Button
-            unstyled
-            key={s}
-            onClick={() => { setActiveStream(s); setExpanded(null); }}
-            className={`text-xs px-3 py-1 rounded-md font-medium transition-colors ${
-              activeStream === s
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s]}
-          </Button>
-        ))}
+      {/* Stream tabs + New feedback */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5 bg-gray-50 w-fit">
+          {(['all', ...STREAMS, 'dispatched'] as ActiveMode[]).map((s) => (
+            <Button
+              unstyled
+              key={s}
+              onClick={() => { setActiveStream(s); setExpanded(null); }}
+              className={`text-xs px-3 py-1 rounded-md font-medium transition-colors ${
+                activeStream === s
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s]}
+            </Button>
+          ))}
+        </div>
+        <Button onClick={() => setShowNew(true)} className="inline-flex items-center gap-1.5 text-sm">
+          <Plus className="w-4 h-4" /> New feedback
+        </Button>
       </div>
+
+      {showNew && (
+        <NewFeedbackModal
+          open={showNew}
+          onClose={() => setShowNew(false)}
+          onCreated={() => { setActiveStream('product'); void load(); }}
+        />
+      )}
 
       {/* ── Dispatched view ── */}
       {activeStream === 'dispatched' && (
