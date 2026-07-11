@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Fingerprint } from 'lucide-react';
 import { Alert, Button, Input, Select, LoadingButton } from '../components/antigravity';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -64,7 +65,7 @@ export const Auth: React.FC = () => {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login, register, loginWithPasskey } = useAuth();
   const authInFlight = useRef(false);
   const { config: authPageConfig } = useAuthPageConfig();
 
@@ -276,6 +277,21 @@ export const Auth: React.FC = () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth?mode=login` },
     });
+  };
+
+  // [AIQ-1491] Passwordless passkey sign-in (POC). signInWithPasskey() runs the WebAuthn
+  // ceremony (Face ID / Touch ID / Windows Hello / security key) → Supabase session →
+  // exchanged for a ReloPass token inside loginWithPasskey. Password login is untouched.
+  const handlePasskeySignIn = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      await loginWithPasskey();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Passkey sign-in failed. Register a passkey from Settings first, or use your password.'));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ── Redirect if already logged in ───────────────────────────────────────────
@@ -595,6 +611,13 @@ export const Auth: React.FC = () => {
                   <MicrosoftIcon /> Microsoft SSO
                 </Button>
               </div>
+
+              {/* [AIQ-1491] Passwordless passkey sign-in (POC). */}
+              <Button type="button" variant="ghost" onClick={() => void handlePasskeySignIn()}
+                disabled={isLoading} fullWidth
+                className="flex items-center justify-center gap-2 !py-2.5 mt-3 border border-slate-200 text-sm !text-slate-700 hover:!bg-slate-50 transition-colors">
+                <Fingerprint className="w-4 h-4" /> Sign in with a passkey
+              </Button>
 
               <p className="text-center text-sm text-slate-500 mt-5">
                 New to ReloPass?{' '}

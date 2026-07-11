@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/client';
 import { signInSupabase } from '../api/supabaseAuth';
+import { supabase } from '../api/supabase';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { normalizeStoredRole, setAuthItem, setStoredRoles, setActiveRole } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
@@ -122,5 +123,36 @@ export const useAuth = () => {
     return response;
   };
 
-  return { login, register };
+  // [AIQ-1491] Passwordless passkey sign-in (POC). Drives the WebAuthn ceremony via
+  // auth-js 2.108's first-class signInWithPasskey(), which yields a SUPABASE session;
+  // that JWT is then exchanged for the ReloPass session token the rest of the API needs
+  // (POST /api/auth/exchange-supabase-token). Password login is untouched.
+  const loginWithPasskey = async () => {
+    const { data, error } = await supabase.auth.signInWithPasskey();
+    if (error) throw error;
+    const accessToken = data?.session?.access_token;
+    if (!accessToken) {
+      throw new Error('Passkey sign-in did not return a session.');
+    }
+    const response = await authAPI.exchangeSupabaseToken(accessToken);
+    setSession(response.token, response.user);
+    trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+      role: response.user.role,
+      targetRouteKey: postAuthRouteKey(response.user.role),
+      source: 'login',
+    });
+    redirectByRole(response.user.role);
+    return response;
+  };
+
+  // [AIQ-1491] Register a passkey for the CURRENT (already-authenticated) user. Requires
+  // an active Supabase session — established after password login by signInSupabase — so
+  // this is offered from Settings, not the logged-out screen.
+  const registerPasskey = async () => {
+    const { data, error } = await supabase.auth.registerPasskey();
+    if (error) throw error;
+    return data;
+  };
+
+  return { login, register, loginWithPasskey, registerPasskey };
 };

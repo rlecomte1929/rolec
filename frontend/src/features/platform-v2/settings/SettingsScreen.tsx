@@ -5,11 +5,50 @@
 
 import { useRef, useState } from 'react';
 import type * as React from 'react';
+import { Fingerprint } from 'lucide-react';
 import { FileInput } from '../../../components/antigravity/FileInput';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { Avatar, Pill } from '../shared';
+import { useAuth } from '../../../hooks/useAuth';
 import type { UserRole } from '../../../types/relopass-api-contracts';
+
+// ─── Passkey (AIQ-1491) ──────────────────────────────────────────────────────
+// Register a passkey (Face ID / Touch ID / Windows Hello / security key) for the
+// signed-in user. Additive; requires WebAuthn enabled on the Supabase project.
+function PasskeySection() {
+  const { registerPasskey } = useAuth();
+  const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+
+  async function handleRegister() {
+    setStatus('working');
+    setMessage('');
+    try {
+      await registerPasskey();
+      setStatus('done');
+    } catch (err) {
+      setStatus('error');
+      setMessage((err as { message?: string })?.message ?? 'Could not register a passkey.');
+    }
+  }
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginTop: '20px', maxWidth: '600px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <Fingerprint style={{ width: 16, height: 16 }} /> Passkey
+      </div>
+      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '6px 0 12px' }}>
+        Add a passkey to sign in with Face ID, Touch ID, Windows Hello, or a security key — no password needed.
+      </p>
+      <Button unstyled type="button" onClick={() => void handleRegister()} disabled={status === 'working'}
+        style={{ padding: '9px 20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+        {status === 'working' ? 'Registering…' : status === 'done' ? '✓ Passkey added' : 'Register a passkey'}
+      </Button>
+      {status === 'error' && <p style={{ fontSize: '12px', color: 'var(--danger, #b91c1c)', marginTop: '8px' }}>{message}</p>}
+    </div>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -254,6 +293,9 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
           {saved ? '✓ Saved' : 'Save changes'}
         </Button>
       </div>
+
+      {/* [AIQ-1491] Passkey registration — additive, type="button" so it never submits the form. */}
+      <PasskeySection />
     </form>
   );
 }
