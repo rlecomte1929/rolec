@@ -84,6 +84,50 @@ class TestTestDriveCompletion(unittest.TestCase):
         sqls = " ".join(str(c.args[0]) for c in conn.execute.call_args_list)
         self.assertIn("UPDATE test_sessions", sqls)
 
+    # ── TD-FIX-1 (AIQ-1502): belt-and-braces completion on survey submit ──────
+    def _emitted_events(self, emit):
+        return [c.kwargs.get("event_type") for c in emit.call_args_list]
+
+    def test_survey_completes_incomplete_session(self):
+        """Submitting the survey on a session with no completed_at marks it completed
+        and emits a distinct 'completed' event alongside 'surveyed'."""
+        db = _db_with_session({"completed_at": None})
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._process_survey_pipeline"), \
+                patch("backend.app.routers.test_drive._emit_funnel_event") as emit:
+            resp = self.client.post(
+                "/api/test-drive/survey",
+                json={"session_id": "sess-1", "campaign": "insead-2026"},
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sqls = " ".join(str(c.args[0]) for c in conn.execute.call_args_list)
+        self.assertIn("UPDATE test_sessions", sqls)
+        events = self._emitted_events(emit)
+        self.assertIn("completed", events)  # belt-and-braces completion
+        self.assertIn("surveyed", events)   # kept distinct
+
+    def test_survey_does_not_recomplete_already_completed_session(self):
+        """A session already completed (via the CTA) is not re-completed by the survey:
+        no UPDATE, no second 'completed' event — only 'surveyed'."""
+        db = _db_with_session({"completed_at": "2026-07-12T10:00:00"})
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._process_survey_pipeline"), \
+                patch("backend.app.routers.test_drive._emit_funnel_event") as emit:
+            resp = self.client.post(
+                "/api/test-drive/survey",
+                json={"session_id": "sess-1", "campaign": "insead-2026"},
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sqls = " ".join(str(c.args[0]) for c in conn.execute.call_args_list)
+        self.assertNotIn("UPDATE test_sessions", sqls)
+        events = self._emitted_events(emit)
+        self.assertNotIn("completed", events)
+        self.assertIn("surveyed", events)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -358,12 +358,41 @@ def survey(body: SurveyRequest, request: Request):
     val_sql = ", ".join(
         [id_expr, session_expr] + [f":{c}" for c in _SURVEY_COLUMNS if c != "session_id"]
     )
+    session_id = params["session_id"]
+    newly_completed = False
     with db.engine.begin() as conn:
         conn.execute(text(f"INSERT INTO survey_responses ({col_sql}) VALUES ({val_sql})"), params)
+        # TD-FIX-1 (AIQ-1502): belt-and-braces completion. The survey page is reachable
+        # directly and its copy invites people who "had to stop early", so a submitted
+        # survey on a session that was never marked complete counts as completion. This is
+        # kept DISTINCT from the 'surveyed' event below (the CTA is the primary trigger).
+        if session_id:
+            sid_expr = ":sid" if _IS_SQLITE else "CAST(:sid AS uuid)"
+            sess = conn.execute(
+                text(f"SELECT completed_at FROM test_sessions WHERE id = {sid_expr}"),
+                {"sid": session_id},
+            ).mappings().first()
+            if sess is not None and sess.get("completed_at") is None:
+                conn.execute(
+                    text(
+                        "UPDATE test_sessions SET status='completed', completed_at=CURRENT_TIMESTAMP "
+                        f"WHERE id = {sid_expr}"
+                    ),
+                    {"sid": session_id},
+                )
+                newly_completed = True
+
+    # TD-FIX-1: emit a distinct 'completed' event when the survey itself completed the session.
+    if newly_completed:
+        _emit_funnel_event(
+            event_type="completed", session_id=session_id, campaign=campaign,
+            corridor_id=body.corridor_id, tester_segment=body.tester_segment,
+            metadata={"via": "survey"},
+        )
 
     # TD-8: funnel — this session reached the survey.
     _emit_funnel_event(
-        event_type="surveyed", session_id=params["session_id"], campaign=campaign,
+        event_type="surveyed", session_id=session_id, campaign=campaign,
         corridor_id=body.corridor_id, tester_segment=body.tester_segment,
     )
     # TD-7: turn survey answers into pipeline (best-effort; never breaks the survey write).

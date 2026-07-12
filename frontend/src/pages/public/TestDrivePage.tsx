@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Copy, Check, PlayCircle } from 'lucide-react';
 import { PublicLayout } from '../../components/public';
 import { Section, HeroSurface, SectionHeader, CTAButton, FadeIn } from '../../components/marketing';
@@ -8,6 +8,7 @@ import { usePageMeta } from '../../hooks/usePageMeta';
 import {
   provisionTestDrive,
   recordTestDriveEvent,
+  completeTestDrive,
   type ProvisionSuccess,
   type TestDriveCredential,
 } from '../../api/testDrive';
@@ -335,7 +336,19 @@ export const TestDrivePage: React.FC = () => {
 };
 
 /** Dual-credential display shown after a successful provision. */
-const CredentialResult: React.FC<{ result: ProvisionSuccess }> = ({ result }) => (
+const CredentialResult: React.FC<{ result: ProvisionSuccess }> = ({ result }) => {
+  const navigate = useNavigate();
+  const surveyPath = `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`;
+
+  // TD-FIX-1 (AIQ-1502): record completion BEFORE the survey. Await the call so the
+  // session is marked complete, then navigate regardless of its outcome — a failed
+  // telemetry call must never trap the tester on this page.
+  const handleComplete = async () => {
+    await completeTestDrive(result.sessionId);
+    navigate(surveyPath);
+  };
+
+  return (
   <div>
     <SectionHeader title={c.credentials.header} align="center" narrow />
     <Alert variant="info" className="mt-6">
@@ -354,16 +367,13 @@ const CredentialResult: React.FC<{ result: ProvisionSuccess }> = ({ result }) =>
       />
     </div>
     <div className="mt-8 text-center">
-      <CTAButton
-        to={`/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`}
-        variant="primary"
-        size="lg"
-      >
+      <CTAButton onClick={() => void handleComplete()} variant="primary" size="lg">
         {c.credentials.completeCta}
       </CTAButton>
     </div>
   </div>
-);
+  );
+};
 
 const CredentialCard: React.FC<{
   title: string;

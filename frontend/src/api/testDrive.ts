@@ -127,6 +127,29 @@ export async function submitSurvey(input: SurveyInput): Promise<SurveyResult> {
   }
 }
 
+// ── TD-FIX-1 (AIQ-1502): mark a session complete ──────────────────────────────
+
+/**
+ * Record self-declared completion for a test-drive session (POST /complete).
+ * Best-effort by design: the caller MUST navigate to the survey regardless of the
+ * result, so this never throws — it resolves `true` on success, `false` on any
+ * failure (logged), and the tester is never trapped on the page.
+ */
+export async function completeTestDrive(sessionId: string): Promise<boolean> {
+  if (!sessionId) return false;
+  try {
+    await apiPost<{ ok: boolean; reached: boolean; nudge: string | null }>(
+      '/api/test-drive/complete',
+      { session_id: sessionId },
+    );
+    return true;
+  } catch {
+    // Completion telemetry must never block the tester's path to the survey — swallow
+    // and let the caller navigate anyway. The backend logs the failure server-side.
+    return false;
+  }
+}
+
 // ── TD-8 (AIQ-1426): funnel-event recorder (best-effort) ──────────────────────
 
 export interface TestDriveEventInput {
