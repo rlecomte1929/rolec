@@ -69,8 +69,8 @@ def _slugify(name: str) -> str:
 # ── TD-8 (AIQ-1426): funnel instrumentation ───────────────────────────────────
 # Free-text event_type is allow-listed so the public recorder can't write arbitrary rows.
 _ALLOWED_FUNNEL_EVENTS = {
-    "invite-sent", "click", "start", "hr-handoff", "intake-start", "roadmap-reached",
-    "vendor-selected", "completed", "surveyed", "intro", "pilot-interested",
+    "invite-sent", "click", "start", "hr-handoff", "intake-start", "intake-completed",
+    "roadmap-reached", "vendor-selected", "completed", "surveyed", "intro", "pilot-interested",
 }
 
 

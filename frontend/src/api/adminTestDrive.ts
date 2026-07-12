@@ -6,6 +6,12 @@ export interface TestDriveFunnel {
   invited: number;
   clicked: number;
   provisioned: number;
+  // TD-FIX-4 (AIQ-1505): mid-journey stages (distinct sessions per stage).
+  hr_handoff: number;
+  intake_start: number;
+  intake_completed: number;
+  roadmap_reached: number;
+  vendor_selected: number;
   completed: number;
   surveyed: number;
   pilot: number;

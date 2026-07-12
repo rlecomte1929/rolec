@@ -146,3 +146,48 @@ export async function recordTestDriveEvent(input: TestDriveEventInput): Promise<
     /* funnel telemetry is best-effort — never surface to the user */
   }
 }
+
+// ── TD-FIX-4 (AIQ-1505): mid-journey stage events ─────────────────────────────
+/** localStorage slice stashed by TestDrivePage at provision (same key it uses). */
+const TEST_DRIVE_LS_KEY = 'relopass_test_drive';
+
+export type TestDriveStage =
+  | 'hr-handoff'
+  | 'intake-start'
+  | 'intake-completed'
+  | 'roadmap-reached'
+  | 'vendor-selected';
+
+/**
+ * Emit a mid-journey funnel event for the active test-drive session, if any. The tester
+ * runs the HR + employee journeys logged in as the seeded @probe.test accounts in the
+ * same browser where /test-drive stashed the session, so the session_id is in localStorage.
+ * No-op (and never throws) when there is no active test-drive session — i.e. for real
+ * users this does nothing. Fire-and-forget; best-effort via recordTestDriveEvent.
+ */
+export function emitTestDriveStage(stage: TestDriveStage): void {
+  type TestDriveSlice = {
+    session_id?: string;
+    corridor_id?: string;
+    tester_segment?: string;
+    campaign?: string;
+  };
+  let slice: TestDriveSlice | null = null;
+  try {
+    const raw = localStorage.getItem(TEST_DRIVE_LS_KEY);
+    slice = raw ? (JSON.parse(raw) as TestDriveSlice) : null;
+  } catch {
+    slice = null;
+  }
+  if (!slice?.session_id) return; // not a test-drive session — no-op for real users
+  void recordTestDriveEvent({
+    event_type: stage,
+    session_id: slice.session_id,
+    corridor_id: slice.corridor_id,
+    tester_segment:
+      slice.tester_segment === 'internal' || slice.tester_segment === 'prospect'
+        ? slice.tester_segment
+        : undefined,
+    campaign: slice.campaign,
+  });
+}

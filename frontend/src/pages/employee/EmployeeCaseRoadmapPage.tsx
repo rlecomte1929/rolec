@@ -24,6 +24,7 @@ import {
 } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { validateRoadmap } from '../../api/cases';
+import { emitTestDriveStage } from '../../api/testDrive';
 import { getCaseRoadmapV2 } from '../../api/roadmapV2';
 import { buildConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/roadmapTemplateHelpers';
 import type { ConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
@@ -57,6 +58,8 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // AIQ-1435: journey funnel — roadmap step reached (once per mount).
   useEffect(() => {
     track('journey_step_started', { step: 'roadmap', case_id: caseId, persona: 'employee' });
+    // TD-FIX-4 (AIQ-1505): test-drive funnel — roadmap reached (no-op for real users).
+    emitTestDriveStage('roadmap-reached');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

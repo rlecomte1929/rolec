@@ -7,6 +7,7 @@ import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeS
 import { Alert, Button, Card } from '../components/antigravity';
 import { RefreshButton } from '../components/RefreshButton';
 import { API_BASE_URL, employeeAPI } from '../api/client';
+import { emitTestDriveStage } from '../api/testDrive';
 import { buildRoute } from '../navigation/routes';
 import { track } from '../analytics';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
@@ -323,6 +324,8 @@ export const ProvidersPage: React.FC = () => {
         };
       });
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
+      // TD-FIX-4 (AIQ-1505): test-drive funnel — vendor(s) selected (≥1 selected service).
+      if (payload.some((p) => p.selected)) emitTestDriveStage('vendor-selected');
       setMessage('Saved.');
       // Refetch so the form re-seeds from the saved server state.
       await queryClient.invalidateQueries({ queryKey: ['employee', 'assignment-services', assignmentId] });
