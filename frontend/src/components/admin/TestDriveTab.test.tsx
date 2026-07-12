@@ -75,8 +75,8 @@ describe('TestDriveTab', () => {
     mockOverview.mockResolvedValue(OVERVIEW);
     render(<TestDriveTab />);
 
-    expect(await screen.findByText(/Completions \(2\)/)).toBeInTheDocument();
-    // Priya completed but is NOT a pilot lead — she only appears via Completions.
+    expect(await screen.findByText(/Survey responses \(2\)/)).toBeInTheDocument();
+    // Priya completed but is NOT a pilot lead — she only appears via Survey responses.
     expect(screen.getByText('Priya')).toBeInTheDocument();
     // Every completer with an email gets a thank-you mailto (pilot leads + completions).
     const links = screen.getAllByRole('link', { name: /Send thank-you/ });

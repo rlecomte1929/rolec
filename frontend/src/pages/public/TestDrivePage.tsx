@@ -199,6 +199,15 @@ export const TestDrivePage: React.FC = () => {
                 <span className="text-marketing-body text-marketing-text leading-relaxed">
                   <span className="font-semibold text-marketing-primary">{step.title}</span>{' '}
                   {step.body}
+                  {/* TD-FIX-5 (AIQ-1506): name the assigned route inside the HR step so the
+                      tester keeps the case on-corridor. Shown once a corridor is known. */}
+                  {idx === 1 && assignedCorridorMeta && (
+                    <span className="mt-2 block font-medium text-marketing-primary">
+                      {c.howItWorks.corridorInstruction
+                        .replace('{origin}', assignedCorridorMeta.origin)
+                        .replace('{destination}', assignedCorridorMeta.destination)}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}
