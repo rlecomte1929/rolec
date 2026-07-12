@@ -43,8 +43,12 @@ export const TestDrivePage: React.FC = () => {
     ? `${assignedCorridorMeta.origin} → ${assignedCorridorMeta.destination}`
     : '';
   const inviteToken = searchParams.get('token') || '';
-  const segment: 'internal' | 'prospect' =
-    searchParams.get('segment') === 'internal' ? 'internal' : 'prospect';
+  // TD-FIX-2 (AIQ-1503): single link for everyone — the segment is NOT assumed at
+  // provision. Honour an explicit ?segment= (internal deploy checks), else leave it
+  // undefined so the row is NULL until the survey's one-tap self-ID resolves it.
+  const rawSegment = searchParams.get('segment');
+  const segment: 'internal' | 'prospect' | undefined =
+    rawSegment === 'internal' ? 'internal' : rawSegment === 'prospect' ? 'prospect' : undefined;
 
   const [firstName, setFirstName] = useState('');
   const [state, setState] = useState<SubmitState>('idle');

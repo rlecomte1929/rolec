@@ -90,10 +90,12 @@ describe('TestDrivePage', () => {
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    // TD-FIX-2 (AIQ-1503): no ?segment= on the single link → segment left undefined
+    // at provision (resolved later by the survey one-tap), never silently 'prospect'.
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Alex',
       corridor_id: 'GB_US',
-      tester_segment: 'prospect',
+      tester_segment: undefined,
       invite_token: 'invite-xyz',
     });
     // The card shows the login email (login accepts email or username).
@@ -118,8 +120,31 @@ describe('TestDrivePage', () => {
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Romain',
-      tester_segment: 'prospect',
+      tester_segment: undefined,
       invite_token: undefined,
+    });
+  });
+
+  it('honours an explicit ?segment=internal at provision (TD-FIX-2)', async () => {
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 's3',
+      corridorId: 'FR_NO',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-d-1a2b', email: 'hr-d@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-d-1a2b', email: 'emp-d@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    renderAt('?corridor=FR_NO&token=t&segment=internal');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Dana' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith({
+      first_name: 'Dana',
+      corridor_id: 'FR_NO',
+      tester_segment: 'internal',
+      invite_token: 't',
     });
   });
 

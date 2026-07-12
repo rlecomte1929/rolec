@@ -153,7 +153,10 @@ class ProvisionRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=40)
     corridor_id: Optional[str] = Field(None, max_length=64)
     invite_token: Optional[str] = Field(None, max_length=200)
-    tester_segment: str = Field("prospect", pattern="^(internal|prospect)$")
+    # TD-FIX-2 (AIQ-1503): single-link model can't tag the segment at provision, so
+    # default to NULL (not 'prospect') — the survey one-tap is the source of truth.
+    # A silent 'prospect' default made the admin 'Internal' filter always empty.
+    tester_segment: Optional[str] = Field(None, pattern="^(internal|prospect)$")
     campaign: Optional[str] = Field(None, max_length=64)
 
 
@@ -333,6 +336,24 @@ class SurveyRequest(BaseModel):
     referral_consent: bool = False
 
 
+def _propagate_tester_segment(session_id: Optional[str], tester_segment: Optional[str]) -> None:
+    """TD-FIX-2 (AIQ-1503): the survey's one-tap self-ID is the source of truth for the
+    tester segment (the single-link model can't tag it at provision). Write it back onto
+    the linked test_sessions row so the admin segment slices are correct. Best-effort —
+    never raises into the survey write; a NULL/absent answer is left untouched (honest)."""
+    if not session_id or not tester_segment:
+        return
+    try:
+        sid_expr = ":sid" if _IS_SQLITE else "CAST(:sid AS uuid)"
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE test_sessions SET tester_segment = :seg WHERE id = {sid_expr}"),
+                {"seg": tester_segment, "sid": session_id},
+            )
+    except Exception:  # noqa: BLE001 — segment propagation must never break the survey write
+        logger.warning("test_drive segment propagation failed (suppressed)")
+
+
 @router.post("/survey")
 @limiter.limit(_RATE_LIMIT)
 def survey(body: SurveyRequest, request: Request):
@@ -360,6 +381,9 @@ def survey(body: SurveyRequest, request: Request):
     )
     with db.engine.begin() as conn:
         conn.execute(text(f"INSERT INTO survey_responses ({col_sql}) VALUES ({val_sql})"), params)
+
+    # TD-FIX-2 (AIQ-1503): stamp the self-declared segment back onto the session row.
+    _propagate_tester_segment(params["session_id"], body.tester_segment)
 
     # TD-8: funnel — this session reached the survey.
     _emit_funnel_event(
