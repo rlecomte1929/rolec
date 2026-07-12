@@ -126,6 +126,24 @@ class TestTestDriveProvision(unittest.TestCase):
         db.engine.begin.assert_called()
         self.assertEqual(sync.call_count, 2)
 
+    def test_no_segment_defaults_null_not_prospect(self):
+        """TD-FIX-2 (AIQ-1503): single-link provision with no segment writes NULL to
+        test_sessions, not a silent 'prospect'."""
+        db = _db_mock()
+        body = _body()
+        body.pop("tester_segment", None)
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=body)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sess_inserts = [
+            c for c in conn.execute.call_args_list if "INSERT INTO test_sessions" in str(c.args[0])
+        ]
+        self.assertEqual(len(sess_inserts), 1)
+        self.assertIsNone(sess_inserts[0].args[1]["tester_segment"])
+
     def test_bad_segment_returns_422(self):
         db = _db_mock()
         with patch.dict(os.environ, _ENABLED_ENV, clear=False), \

@@ -16,6 +16,18 @@ export const testDriveSurveyContent = {
     "Everything you share here comes to me alone. I treat it as confidential — it's used only to improve ReloPass and to follow up with you, and it's never shared with anyone else.",
   signature: '— Romain Lecomte',
 
+  // TD-FIX-2 (AIQ-1503): one-tap self-ID so friendly feedback can be told apart from
+  // real ICP feedback. Required — the single-link model has no other way to tag it.
+  segment: {
+    label: 'Do you work in HR, mobility, or relocation?',
+    helper: 'This tells me whether to read your feedback as an industry view or a friendly one.',
+    options: [
+      { value: 'prospect', label: 'Yes' },
+      { value: 'internal', label: 'No' },
+    ],
+    required: 'Please pick one so I can weight your feedback correctly.',
+  },
+
   aboutYou: {
     header: 'About you',
     name: { label: 'Your name' },

@@ -10,7 +10,9 @@ import { apiPost } from './client';
 export interface ProvisionInput {
   first_name: string;
   corridor_id?: string;
-  tester_segment: 'internal' | 'prospect';
+  // TD-FIX-2 (AIQ-1503): optional — omitted for the single-link flow (segment is
+  // captured later via the survey's one-tap self-ID), set only for explicit ?segment=.
+  tester_segment?: 'internal' | 'prospect';
   invite_token?: string;
   campaign?: string;
 }

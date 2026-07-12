@@ -53,6 +53,7 @@ describe('TestDriveSurveyPage', () => {
     mockSubmit.mockResolvedValue({ ok: true, responseId: 'r1' });
     renderAt('?corridor=GB_US&session=sess-1');
 
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' })); // segment: prospect (TD-FIX-2)
     fireEvent.click(screen.getByRole('button', { name: '4' })); // Q1 = 4
     fireEvent.click(screen.getByRole('button', { name: /Maybe, tell me more/i })); // Q6
     fireEvent.click(screen.getByLabelText(/You can quote me/i)); // Q5 consent
@@ -62,6 +63,7 @@ describe('TestDriveSurveyPage', () => {
     const payload = mockSubmit.mock.calls[0][0];
     expect(payload.session_id).toBe('sess-1');
     expect(payload.corridor_id).toBe('GB_US');
+    expect(payload.tester_segment).toBe('prospect');
     expect(payload.q1_overall).toBe(4);
     expect(payload.pilot_interest).toBe('maybe');
     expect(payload.testimonial_consent).toBe(true);
@@ -69,9 +71,28 @@ describe('TestDriveSurveyPage', () => {
     expect(await screen.findByText(/genuinely useful/i)).toBeInTheDocument();
   });
 
+  it('requires the segment tap before submitting (TD-FIX-2)', async () => {
+    mockSubmit.mockResolvedValue({ ok: true, responseId: 'r1' });
+    renderAt('?corridor=GB_US&session=sess-1');
+    // Submit with no segment chosen → blocked with the required prompt, no network call.
+    fireEvent.click(screen.getByRole('button', { name: /^Submit$/ }));
+    expect(await screen.findByText(/weight your feedback correctly/i)).toBeInTheDocument();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it("stores 'internal' when the tester answers No (TD-FIX-2)", async () => {
+    mockSubmit.mockResolvedValue({ ok: true, responseId: 'r1' });
+    renderAt('?corridor=GB_US&session=sess-1');
+    fireEvent.click(screen.getByRole('button', { name: 'No' })); // segment: internal
+    fireEvent.click(screen.getByRole('button', { name: /^Submit$/ }));
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalledTimes(1));
+    expect(mockSubmit.mock.calls[0][0].tester_segment).toBe('internal');
+  });
+
   it('surfaces an API error and stays on the form', async () => {
     mockSubmit.mockResolvedValue({ ok: false, error: 'Survey closed for now.' });
     renderAt();
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' })); // segment required before submit
     fireEvent.click(screen.getByRole('button', { name: /^Submit$/ }));
     expect(await screen.findByText(/Survey closed for now/i)).toBeInTheDocument();
     expect(screen.queryByText(/genuinely useful/i)).not.toBeInTheDocument();
