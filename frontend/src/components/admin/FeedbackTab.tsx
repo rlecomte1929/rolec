@@ -493,7 +493,10 @@ export function FeedbackTab() {
                   >
                     <div className="px-3">
                       <span className="font-mono text-[10.5px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                        {(row.source_ref ?? row.id).slice(0, 10)}
+                        {/* TD-FIX-5 (AIQ-1506): show the full report_id (BUG-YYMMDD-XXXX) —
+                            slicing to N chars dropped the unique suffix, so every row read
+                            the same date prefix. Only the raw UUID fallback is truncated. */}
+                        {row.source_ref ?? row.id.slice(0, 10)}
                       </span>
                     </div>
                     <div className="px-3">
@@ -675,7 +678,8 @@ export function FeedbackTab() {
                   >
                     <div className="px-3 py-2.5 flex items-center gap-1">
                       <span className="font-mono text-[10.5px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                        {(row.source_ref ?? row.id).slice(0, 8)}
+                        {/* TD-FIX-5 (AIQ-1506): full report_id — see note above. */}
+                        {row.source_ref ?? row.id.slice(0, 8)}
                       </span>
                       {row.has_screenshot && (
                         <span title="Screenshot attached" aria-label="Screenshot attached" className="text-[11px] leading-none">📷</span>

@@ -188,10 +188,12 @@ export function TestDriveTab() {
             )}
           </Section>
 
-          {/* Completions — every surveyed tester with a contact email (TD-12) */}
-          <Section title={`Completions (${data.completions.length})`}>
+          {/* Survey responses — every surveyed tester with a contact email (TD-12).
+              TD-FIX-5 (AIQ-1506): labelled by what it actually lists (survey responses),
+              not "Completions" — that conflicted with the 'Completed' funnel counter. */}
+          <Section title={`Survey responses (${data.completions.length})`}>
             {data.completions.length === 0 ? (
-              <EmptyRow text="No completed surveys yet." />
+              <EmptyRow text="No survey responses yet." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
                 <div className="grid grid-cols-[1fr_1.4fr_1fr_70px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">

@@ -53,6 +53,10 @@ describe('TestDrivePage', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText(/Paris → Oslo/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/early coverage/i)).not.toBeInTheDocument();
+    // TD-FIX-5: the HR step names the assigned route so the case can't drift off-corridor.
+    expect(
+      screen.getByText(/Set the case route to your assigned corridor: Paris → Oslo\./i),
+    ).toBeInTheDocument();
   });
 
   it('shows the Tier-B early-coverage note only for a Tier-B corridor', () => {

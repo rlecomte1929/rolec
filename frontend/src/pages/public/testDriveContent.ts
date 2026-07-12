@@ -57,8 +57,11 @@ export const testDriveContent = {
       { title: 'Run the HR side.', body: 'Configure the case and hand it to the employee.' },
       { title: 'Run the employee side.', body: 'Complete intake and reach the roadmap.' },
       { title: 'Flag anything, anytime.', body: 'The feedback button stays with you the whole way.' },
-      { title: 'Mark it complete.', body: "Answer five short questions and you're done." },
+      { title: 'Mark it complete.', body: "Answer a few short questions and you're done." },
     ],
+    // TD-FIX-5 (AIQ-1506): shown inside the HR step once a corridor is assigned, so the
+    // case can't drift off the route we measure. Tokenised — one page serves all corridors.
+    corridorInstruction: 'Set the case route to your assigned corridor: {origin} → {destination}.',
   },
 
   aboutData: {
