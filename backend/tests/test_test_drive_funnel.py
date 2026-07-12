@@ -47,6 +47,20 @@ class TestTestDriveFunnel(unittest.TestCase):
         sql = str(conn.execute.call_args.args[0])
         self.assertIn("funnel_events", sql)
 
+    def test_journey_stage_events_accepted(self):
+        """TD-FIX-4 (AIQ-1505): the mid-journey stages are allow-listed (incl the new
+        'intake-completed') so the frontend can record them at each milestone."""
+        db = MagicMock()
+        stages = ["hr-handoff", "intake-start", "intake-completed", "roadmap-reached", "vendor-selected"]
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            for et in stages:
+                resp = self.client.post(
+                    "/api/test-drive/event",
+                    json={"event_type": et, "session_id": "11111111-1111-1111-1111-111111111111"},
+                )
+                self.assertEqual(resp.status_code, 200, f"{et}: {resp.text}")
+
     def test_unknown_event_type_returns_400(self):
         db = MagicMock()
         with patch.dict(os.environ, _ENABLED, clear=False), \

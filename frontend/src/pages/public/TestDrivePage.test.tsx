@@ -4,7 +4,11 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom';
 
 // Mock the network client (also keeps the test off client.ts's supabase import chain).
-vi.mock('../../api/testDrive', () => ({ provisionTestDrive: vi.fn(), recordTestDriveEvent: vi.fn() }));
+vi.mock('../../api/testDrive', () => ({
+  provisionTestDrive: vi.fn(),
+  recordTestDriveEvent: vi.fn(),
+  completeTestDrive: vi.fn(),
+}));
 // The marketing barrel transitively imports api/supabase, whose createClient throws
 // in jsdom when VITE_SUPABASE_* are unset — neutralise it (known vitest trap).
 vi.mock('../../api/supabase', () => ({ supabase: { functions: { invoke: vi.fn() } } }));
@@ -13,7 +17,7 @@ vi.mock('../../components/public', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-import { provisionTestDrive } from '../../api/testDrive';
+import { provisionTestDrive, completeTestDrive } from '../../api/testDrive';
 import { TestDrivePage } from './TestDrivePage';
 
 // jsdom has no matchMedia; the marketing FadeIn reads it on mount.
@@ -31,6 +35,7 @@ if (!window.matchMedia) {
 }
 
 const mockProvision = provisionTestDrive as unknown as ReturnType<typeof vi.fn>;
+const mockComplete = completeTestDrive as unknown as ReturnType<typeof vi.fn>;
 
 function renderAt(search: string) {
   return render(
@@ -94,10 +99,12 @@ describe('TestDrivePage', () => {
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    // TD-FIX-2 (AIQ-1503): no ?segment= on the single link → segment left undefined
+    // at provision (resolved later by the survey one-tap), never silently 'prospect'.
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Alex',
       corridor_id: 'GB_US',
-      tester_segment: 'prospect',
+      tester_segment: undefined,
       invite_token: 'invite-xyz',
     });
     // The card shows the login email (login accepts email or username).
@@ -122,9 +129,54 @@ describe('TestDrivePage', () => {
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Romain',
-      tester_segment: 'prospect',
+      tester_segment: undefined,
       invite_token: undefined,
     });
+  });
+
+  it('honours an explicit ?segment=internal at provision (TD-FIX-2)', async () => {
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 's3',
+      corridorId: 'FR_NO',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-d-1a2b', email: 'hr-d@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-d-1a2b', email: 'emp-d@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    renderAt('?corridor=FR_NO&token=t&segment=internal');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Dana' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith({
+      first_name: 'Dana',
+      corridor_id: 'FR_NO',
+      tester_segment: 'internal',
+      invite_token: 't',
+    });
+  });
+
+  it("records completion via POST /complete when 'I've completed my test' is clicked (TD-FIX-1)", async () => {
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 'sess-42',
+      corridorId: 'GB_US',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-alex-1a2b', email: 'hr-alex@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-alex-1a2b', email: 'emp-alex@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    mockComplete.mockResolvedValue(undefined);
+    renderAt('?corridor=GB_US&token=invite-xyz');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Alex' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    const cta = await screen.findByRole('button', { name: /i've completed my test/i });
+    fireEvent.click(cta);
+
+    // The session is marked complete before the tester is routed to the survey.
+    await waitFor(() => expect(mockComplete).toHaveBeenCalledWith('sess-42'));
   });
 
   it('surfaces the API error and does not show credentials', async () => {

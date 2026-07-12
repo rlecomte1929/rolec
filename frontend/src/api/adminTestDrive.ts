@@ -1,4 +1,4 @@
-import { apiGet, API_BASE_URL } from './client';
+import { apiGet, apiPost, API_BASE_URL } from './client';
 
 /** TD-10 (AIQ-1428) — admin Test-Drive dashboard read model. */
 
@@ -6,6 +6,12 @@ export interface TestDriveFunnel {
   invited: number;
   clicked: number;
   provisioned: number;
+  // TD-FIX-4 (AIQ-1505): mid-journey stages (distinct sessions per stage).
+  hr_handoff: number;
+  intake_start: number;
+  intake_completed: number;
+  roadmap_reached: number;
+  vendor_selected: number;
   completed: number;
   surveyed: number;
   pilot: number;
@@ -82,4 +88,19 @@ export async function getTestDriveOverview(params?: TestDriveSlice): Promise<Tes
 
 export function testDriveContactsCsvUrl(params?: TestDriveSlice): string {
   return `${API_BASE_URL}/api/admin/test-drive/contacts.csv${toQuery(params)}`;
+}
+
+// TD-FIX-3 (AIQ-1504): record invites sent so the funnel has a denominator.
+export type InviteChannel = 'whatsapp' | 'email' | 'other';
+
+export interface RecordInvitesInput {
+  count: number;
+  segment?: 'internal' | 'prospect';
+  channel: InviteChannel;
+}
+
+export async function recordInvitesSent(
+  input: RecordInvitesInput,
+): Promise<{ ok: boolean; recorded: number }> {
+  return apiPost<{ ok: boolean; recorded: number }>('/api/admin/test-drive/invites', input);
 }

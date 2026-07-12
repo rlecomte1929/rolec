@@ -13,19 +13,26 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
+import os
+import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..auth_deps import require_admin
+from ... import db_config
 from ...database import db
 
 router = APIRouter(prefix="/api/admin", tags=["admin-test-drive"])
 logger = logging.getLogger(__name__)
+
+_IS_SQLITE = (db_config.DATABASE_URL or "").startswith("sqlite")
 
 # SQL clause fragments (kept as module constants so they never sit inside an f-string
 # expression — Python 3.11 forbids backslashes/quotes there).
@@ -85,11 +92,51 @@ def test_drive_overview(
         val = _scalar("SELECT count(*) FROM " + table + _where(clauses, extra), {**params, **(extra_params or {})})
         return int(val or 0)
 
+    def stage(event_type: str) -> int:
+        # TD-FIX-4 (AIQ-1505): mid-journey drop-off = DISTINCT sessions that reached a
+        # stage (a page can re-emit, so raw row counts would over-report).
+        val = _scalar(
+            "SELECT count(DISTINCT session_id) FROM funnel_events" + _where(clauses, "event_type = :et"),
+            {**params, "et": event_type},
+        )
+        return int(val or 0)
+
+    def invited_total() -> int:
+        # TD-FIX-3 (AIQ-1504): invites are recorded as 'invite-sent' rows carrying a
+        # metadata `count`, so the denominator is the SUM of those counts (not a row
+        # count). A legacy row without a count is worth 1. Summed in Python to stay
+        # dialect-agnostic (metadata is jsonb on PG, a JSON string on SQLite).
+        rows = _rows(
+            "SELECT metadata FROM funnel_events" + _where(clauses, "event_type = :et"),
+            {**params, "et": "invite-sent"},
+        )
+        total = 0
+        for r in rows:
+            md = r.get("metadata")
+            if isinstance(md, str):
+                try:
+                    md = json.loads(md)
+                except (ValueError, TypeError):
+                    md = {}
+            c = md.get("count") if isinstance(md, dict) else None
+            try:
+                total += int(c) if c is not None else 1
+            except (ValueError, TypeError):
+                total += 1
+        return total
+
     def funnel() -> Dict[str, int]:
         return {
-            "invited": count("funnel_events", "event_type = :et", {"et": "invite-sent"}),
+            "invited": invited_total(),
             "clicked": count("funnel_events", "event_type = :et", {"et": "click"}),
             "provisioned": count("test_sessions"),
+            # TD-FIX-4: intermediate journey stages, so drop-off between provisioned and
+            # completed is visible.
+            "hr_handoff": stage("hr-handoff"),
+            "intake_start": stage("intake-start"),
+            "intake_completed": stage("intake-completed"),
+            "roadmap_reached": stage("roadmap-reached"),
+            "vendor_selected": stage("vendor-selected"),
             "completed": count("test_sessions", "status = 'completed'"),
             "surveyed": count("survey_responses"),
             "pilot": count("survey_responses", _PILOT_CLAUSE),
@@ -149,6 +196,48 @@ def test_drive_overview(
         "segment": segment,
         "generated_at": datetime.utcnow().isoformat(),
     }
+
+
+class RecordInvitesRequest(BaseModel):
+    """TD-FIX-3 (AIQ-1504): one 'Record invites sent' action. Reuses funnel_events."""
+    count: int = Field(..., ge=1, le=100000)
+    segment: Optional[str] = Field(None, pattern="^(internal|prospect)$")
+    channel: str = Field("other", pattern="^(whatsapp|email|other)$")
+    campaign: Optional[str] = Field(None, max_length=64)
+
+
+@router.post("/test-drive/invites")
+def record_invites_sent(
+    body: RecordInvitesRequest,
+    _admin: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Record a batch of invites sent so the funnel has a denominator (click-through).
+
+    Persists ONE funnel_events row (event_type='invite-sent') carrying count + channel in
+    metadata, tagged with campaign and optional tester_segment. The overview's 'Invited'
+    tile sums these counts. Admin-gated; reuses funnel_events (no new table)."""
+    campaign = (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+    row_id = str(uuid.uuid4())
+    id_expr = ":id" if _IS_SQLITE else "CAST(:id AS uuid)"
+    meta_expr = ":metadata" if _IS_SQLITE else "CAST(:metadata AS jsonb)"
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                f"INSERT INTO funnel_events (id, event_type, campaign, tester_segment, metadata) "
+                f"VALUES ({id_expr}, 'invite-sent', :campaign, :tester_segment, {meta_expr})"
+            ),
+            {
+                "id": row_id,
+                "campaign": campaign,
+                "tester_segment": body.segment,
+                "metadata": json.dumps({"count": body.count, "channel": body.channel}),
+            },
+        )
+    logger.info(
+        "test_drive_invites_recorded count=%s segment=%s channel=%s campaign=%s",
+        body.count, body.segment, body.channel, campaign,
+    )
+    return {"ok": True, "recorded": body.count, "channel": body.channel, "segment": body.segment}
 
 
 @router.get("/test-drive/contacts.csv")

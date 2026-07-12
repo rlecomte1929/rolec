@@ -6,6 +6,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { useGeocodedAddress } from '../../../components/geocode';
 import { patchCase } from '../../../api/cases';
+import { emitTestDriveStage } from '../../../api/testDrive';
 import { employeeAPI } from '../../../api/client';
 import { track } from '../../../analytics';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
@@ -602,6 +603,8 @@ export function EmployeeIntakePage() {
   // AIQ-1435: journey funnel — mark the intake step reached (once per mount).
   useEffect(() => {
     track('journey_step_started', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
+    // TD-FIX-4 (AIQ-1505): test-drive funnel — intake reached (no-op for real users).
+    emitTestDriveStage('intake-start');
   }, []);
   // Latest assignment id captured in a ref so the debounced autosave
   // (set up inside `setField`'s closure) always posts to the *current*
@@ -1325,6 +1328,8 @@ export function EmployeeIntakePage() {
                       }
                       // AIQ-1435: journey funnel — intake completed on successful submit.
                       track('journey_step_completed', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
+                      // TD-FIX-4 (AIQ-1505): test-drive funnel — intake completed.
+                      emitTestDriveStage('intake-completed');
                       // B5: land on the roadmap the submit just unlocked, not a
                       // dashboard that can momentarily read as "intake not started".
                       navigate(
