@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Copy, Check, PlayCircle } from 'lucide-react';
 import { PublicLayout } from '../../components/public';
 import { Section, HeroSurface, SectionHeader, CTAButton, FadeIn } from '../../components/marketing';
@@ -8,6 +8,7 @@ import { usePageMeta } from '../../hooks/usePageMeta';
 import {
   provisionTestDrive,
   recordTestDriveEvent,
+  completeTestDrive,
   type ProvisionSuccess,
   type TestDriveCredential,
 } from '../../api/testDrive';
@@ -30,6 +31,7 @@ export const TestDrivePage: React.FC = () => {
   });
 
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const rawCorridor = (searchParams.get('corridor') || '').toUpperCase();
   const matched = TEST_DRIVE_CORRIDORS[rawCorridor];
   const hasExplicitCorridor = !!matched;
@@ -126,6 +128,16 @@ export const TestDrivePage: React.FC = () => {
     : priorSession
       ? `/test-drive/survey?corridor=${priorSession.corridor}&session=${priorSession.session}`
       : null;
+  const surveySessionId = result?.sessionId ?? priorSession?.session ?? null;
+
+  // TD-FIX-1 (AIQ-1502): the "I've completed my test" CTA must RECORD completion
+  // before it routes to the survey — otherwise `test_sessions.completed_at` stays NULL
+  // and "Testers completed" reads zero forever. completeTestDrive is best-effort, so
+  // on failure we still navigate — never trap the tester behind a telemetry call.
+  const completeThenSurvey = async (sessionId: string, link: string) => {
+    await completeTestDrive(sessionId);
+    navigate(link);
+  };
 
   return (
     <PublicLayout>
@@ -242,7 +254,12 @@ export const TestDrivePage: React.FC = () => {
         <FadeIn>
           <div className={result ? 'mx-auto max-w-3xl' : 'mx-auto max-w-xl'}>
             {result ? (
-              <CredentialResult result={result} />
+              <CredentialResult
+                result={result}
+                onComplete={(sessionId, link) => {
+                  void completeThenSurvey(sessionId, link);
+                }}
+              />
             ) : (
               <>
                 <SectionHeader title={c.startBlock.header} align="center" narrow />
@@ -321,7 +338,13 @@ export const TestDrivePage: React.FC = () => {
                 {c.wrapUp.body}
               </p>
               <div className="mt-8">
-                <CTAButton to={surveyLink} variant="primary" size="lg">
+                <CTAButton
+                  onClick={() => {
+                    void completeThenSurvey(surveySessionId ?? '', surveyLink);
+                  }}
+                  variant="primary"
+                  size="lg"
+                >
                   {c.wrapUp.button}
                 </CTAButton>
               </div>
@@ -335,7 +358,10 @@ export const TestDrivePage: React.FC = () => {
 };
 
 /** Dual-credential display shown after a successful provision. */
-const CredentialResult: React.FC<{ result: ProvisionSuccess }> = ({ result }) => (
+const CredentialResult: React.FC<{
+  result: ProvisionSuccess;
+  onComplete: (sessionId: string, link: string) => void;
+}> = ({ result, onComplete }) => (
   <div>
     <SectionHeader title={c.credentials.header} align="center" narrow />
     <Alert variant="info" className="mt-6">
@@ -355,7 +381,12 @@ const CredentialResult: React.FC<{ result: ProvisionSuccess }> = ({ result }) =>
     </div>
     <div className="mt-8 text-center">
       <CTAButton
-        to={`/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`}
+        onClick={() =>
+          onComplete(
+            result.sessionId,
+            `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`,
+          )
+        }
         variant="primary"
         size="lg"
       >
