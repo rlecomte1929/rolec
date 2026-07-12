@@ -85,5 +85,51 @@ class TestTestDriveCompletion(unittest.TestCase):
         self.assertIn("UPDATE test_sessions", sqls)
 
 
+class TestSurveyBackfillsCompletion(unittest.TestCase):
+    """TD-FIX-1 (AIQ-1502) belt-and-braces: the survey page is reachable directly, so a
+    submit on a session that never hit the /complete CTA must still mark it completed —
+    with a 'completed' funnel event kept distinct from 'surveyed', fired at most once."""
+
+    def setUp(self):
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def _survey_body(self, **overrides):
+        body = {
+            "session_id": "11111111-1111-1111-1111-111111111111",
+            "corridor_id": "GB_US",
+            "tester_segment": "prospect",
+            "q1_overall": 4,
+        }
+        body.update(overrides)
+        return body
+
+    def test_survey_marks_session_completed(self):
+        db = MagicMock()
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._emit_funnel_event") as emit:
+            resp = self.client.post("/api/test-drive/survey", json=self._survey_body())
+        self.assertEqual(resp.status_code, 200, resp.text)
+        # An idempotent UPDATE ... completed_at IS NULL fired.
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sqls = " ".join(str(c.args[0]) for c in conn.execute.call_args_list)
+        self.assertIn("UPDATE test_sessions", sqls)
+        self.assertIn("completed_at IS NULL", sqls)
+        # Both funnel events fired and stayed distinct.
+        events = [kw.get("event_type") for _, kw in emit.call_args_list]
+        self.assertIn("completed", events)
+        self.assertIn("surveyed", events)
+
+    def test_survey_without_session_does_not_complete(self):
+        db = MagicMock()
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._emit_funnel_event") as emit:
+            resp = self.client.post("/api/test-drive/survey", json=self._survey_body(session_id=None))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        events = [kw.get("event_type") for _, kw in emit.call_args_list]
+        self.assertNotIn("completed", events)  # no session → nothing to backfill
+
+
 if __name__ == "__main__":
     unittest.main()
