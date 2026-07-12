@@ -44,6 +44,12 @@ const FUNNEL_STAGES: { key: keyof TestDriveOverview['funnel']; label: string }[]
   { key: 'invited', label: 'Invited' },
   { key: 'clicked', label: 'Clicked' },
   { key: 'provisioned', label: 'Provisioned' },
+  // TD-FIX-4 (AIQ-1505): mid-journey stages reveal where testers drop off.
+  { key: 'hr_handoff', label: 'HR case created' },
+  { key: 'intake_start', label: 'Intake started' },
+  { key: 'intake_completed', label: 'Intake completed' },
+  { key: 'roadmap_reached', label: 'Roadmap reached' },
+  { key: 'vendor_selected', label: 'Vendor selected' },
   { key: 'completed', label: 'Completed' },
   { key: 'surveyed', label: 'Surveyed' },
   { key: 'pilot', label: 'Pilot interest' },

@@ -92,6 +92,15 @@ def test_drive_overview(
         val = _scalar("SELECT count(*) FROM " + table + _where(clauses, extra), {**params, **(extra_params or {})})
         return int(val or 0)
 
+    def stage(event_type: str) -> int:
+        # TD-FIX-4 (AIQ-1505): mid-journey drop-off = DISTINCT sessions that reached a
+        # stage (a page can re-emit, so raw row counts would over-report).
+        val = _scalar(
+            "SELECT count(DISTINCT session_id) FROM funnel_events" + _where(clauses, "event_type = :et"),
+            {**params, "et": event_type},
+        )
+        return int(val or 0)
+
     def invited_total() -> int:
         # TD-FIX-3 (AIQ-1504): invites are recorded as 'invite-sent' rows carrying a
         # metadata `count`, so the denominator is the SUM of those counts (not a row
@@ -121,6 +130,13 @@ def test_drive_overview(
             "invited": invited_total(),
             "clicked": count("funnel_events", "event_type = :et", {"et": "click"}),
             "provisioned": count("test_sessions"),
+            # TD-FIX-4: intermediate journey stages, so drop-off between provisioned and
+            # completed is visible.
+            "hr_handoff": stage("hr-handoff"),
+            "intake_start": stage("intake-start"),
+            "intake_completed": stage("intake-completed"),
+            "roadmap_reached": stage("roadmap-reached"),
+            "vendor_selected": stage("vendor-selected"),
             "completed": count("test_sessions", "status = 'completed'"),
             "surveyed": count("survey_responses"),
             "pilot": count("survey_responses", _PILOT_CLAUSE),

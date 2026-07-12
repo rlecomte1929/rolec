@@ -6,6 +6,7 @@ import { logger } from '../lib/logger';
 import { Card, Button, Input, Alert, Badge, Select } from '../components/antigravity';
 import { RefreshButton } from '../components/RefreshButton';
 import { hrAPI } from '../api/client';
+import { emitTestDriveStage } from '../api/testDrive';
 import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
 import { buildRoute } from '../navigation/routes';
@@ -224,6 +225,8 @@ export const HrDashboard: React.FC = () => {
         trackFirstCaseCreated({ prior_case_count: assignments.length });
       }
       setCaseId(created.caseId);
+      // TD-FIX-4 (AIQ-1505): test-drive funnel — HR handed off a case (no-op for real users).
+      emitTestDriveStage('hr-handoff');
       const response = await hrAPI.assignCase(created.caseId, employeeIdentifier.trim(), {
         firstName: employeeFirstName || undefined,
         lastName: employeeLastName || undefined,

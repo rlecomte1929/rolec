@@ -16,12 +16,18 @@ import { TestDriveTab } from './TestDriveTab';
 const mockOverview = getTestDriveOverview as unknown as ReturnType<typeof vi.fn>;
 const mockRecord = recordInvitesSent as unknown as ReturnType<typeof vi.fn>;
 
+const FUNNEL = {
+  invited: 10, clicked: 8, provisioned: 5,
+  hr_handoff: 5, intake_start: 4, intake_completed: 4, roadmap_reached: 3, vendor_selected: 3,
+  completed: 3, surveyed: 3, pilot: 2, intro: 1,
+};
+
 const OVERVIEW = {
-  funnel: { invited: 10, clicked: 8, provisioned: 5, completed: 3, surveyed: 3, pilot: 2, intro: 1 },
+  funnel: FUNNEL,
   scorecard: {
     avg_overall: 4.2,
     problem_fit: { yes: 2, somewhat: 1, no: 0 },
-    totals: { invited: 10, clicked: 8, provisioned: 5, completed: 3, surveyed: 3, pilot: 2, intro: 1 },
+    totals: FUNNEL,
   },
   pilot_leads: [{
     tester_name: 'Alex', tester_email: 'a@x.test', tester_company_role: 'Head of Mobility',

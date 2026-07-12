@@ -69,6 +69,9 @@ class TestAdminTestDrive(unittest.TestCase):
         # funnel
         self.assertEqual(data["funnel"]["provisioned"], 3)
         self.assertEqual(data["funnel"]["pilot"], 3)
+        # TD-FIX-4: mid-journey stages present with counts (distinct sessions per stage)
+        for k in ("hr_handoff", "intake_start", "intake_completed", "roadmap_reached", "vendor_selected"):
+            self.assertEqual(data["funnel"][k], 3, k)
         # scorecard
         self.assertEqual(data["scorecard"]["avg_overall"], 3.0)
         self.assertEqual(data["scorecard"]["problem_fit"], {"yes": 2, "no": 1})
