@@ -73,6 +73,37 @@ class TestTestDriveSurvey(unittest.TestCase):
         self.assertTrue(bound["testimonial_consent"])
         self.assertEqual(bound["pilot_interest"], "maybe")
 
+    def test_segment_propagates_to_session(self):
+        """TD-FIX-2 (AIQ-1503): the self-declared segment is written back onto test_sessions."""
+        db = MagicMock()
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/survey", json=_body(tester_segment="internal"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        seg_calls = [
+            c for c in conn.execute.call_args_list
+            if "UPDATE test_sessions SET tester_segment" in str(c.args[0])
+        ]
+        self.assertEqual(len(seg_calls), 1)
+        self.assertEqual(seg_calls[0].args[1]["seg"], "internal")
+
+    def test_no_session_skips_segment_propagation(self):
+        """No session_id → nothing to stamp; the segment update is skipped."""
+        db = MagicMock()
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post(
+                "/api/test-drive/survey", json=_body(session_id=None, tester_segment="prospect")
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        seg_calls = [
+            c for c in conn.execute.call_args_list
+            if "UPDATE test_sessions SET tester_segment" in str(c.args[0])
+        ]
+        self.assertEqual(len(seg_calls), 0)
+
     def test_out_of_range_q1_returns_422(self):
         db = MagicMock()
         with patch.dict(os.environ, _ENABLED, clear=False), \

@@ -13,8 +13,10 @@ const RATING_COLORS = ['#bf4a42', '#cf7d38', '#be8f2f', '#6f9e56', '#3f9b6a'];
 
 type ProblemFit = '' | 'yes' | 'somewhat' | 'no';
 type PilotInterest = '' | 'yes' | 'maybe' | 'no';
+type TesterSegment = '' | 'prospect' | 'internal';
 
 interface SurveyForm {
+  tester_segment: TesterSegment;
   tester_name: string;
   tester_email: string;
   tester_company_role: string;
@@ -35,6 +37,7 @@ interface SurveyForm {
 }
 
 const EMPTY: SurveyForm = {
+  tester_segment: '',
   tester_name: '',
   tester_email: '',
   tester_company_role: '',
@@ -78,11 +81,18 @@ export const TestDriveSurveyPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (state !== 'idle') return;
+    // TD-FIX-2 (AIQ-1503): the segment tap is required — never silently default to
+    // 'prospect'. An unanswered survey stays honest (no segment written).
+    if (!form.tester_segment) {
+      setError(c.segment.required);
+      return;
+    }
     setState('submitting');
     setError(null);
     const payload: SurveyInput = {
       session_id: sessionId || undefined,
       corridor_id: corridorId || undefined,
+      tester_segment: form.tester_segment,
       tester_name: clean(form.tester_name),
       tester_email: clean(form.tester_email),
       tester_company_role: clean(form.tester_company_role),
@@ -152,6 +162,20 @@ export const TestDriveSurveyPage: React.FC = () => {
             noValidate
             className="mx-auto max-w-xl space-y-8 rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8"
           >
+            {/* TD-FIX-2 (AIQ-1503): required one-tap segment self-ID — lead-in question. */}
+            <div>
+              <p className="text-sm font-medium text-marketing-primary">
+                {c.segment.label}
+                <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>
+              </p>
+              <p className="mt-1 text-xs text-marketing-text-muted">{c.segment.helper}</p>
+              <TapGroup
+                options={c.segment.options}
+                value={form.tester_segment}
+                onSelect={(v) => set('tester_segment', v as TesterSegment)}
+              />
+            </div>
+
             {/* About you */}
             <fieldset className="space-y-4">
               <legend className="text-[15px] font-semibold text-marketing-primary">

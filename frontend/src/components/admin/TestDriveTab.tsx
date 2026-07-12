@@ -5,7 +5,7 @@
  * pilot leads + consented testimonials, sliceable by corridor/segment, with a contact
  * CSV export. Mirrors FeedbackTab's load-hook + grid-table conventions.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Mail } from 'lucide-react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
@@ -13,7 +13,9 @@ import { getAuthItem } from '../../utils/demo';
 import {
   getTestDriveOverview,
   testDriveContactsCsvUrl,
+  recordInvitesSent,
   type TestDriveOverview,
+  type InviteChannel,
 } from '../../api/adminTestDrive';
 import { TEST_DRIVE_CORRIDORS } from '../../pages/public/testDriveContent';
 
@@ -121,6 +123,9 @@ export function TestDriveTab() {
         </div>
       </div>
 
+      {/* TD-FIX-3 (AIQ-1504): record invites sent — gives the funnel a denominator. */}
+      <RecordInvitesForm onRecorded={() => void load()} />
+
       {loading && <p className="text-sm text-gray-400">Loading…</p>}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
@@ -154,6 +159,17 @@ export function TestDriveTab() {
 
           {/* Funnel */}
           <Section title="Funnel">
+            {funnel && funnel.invited > 0 && (
+              <p className="mb-2 text-sm text-gray-600">
+                Click-through:{' '}
+                <strong className="text-gray-900">
+                  {Math.round((funnel.clicked / funnel.invited) * 100)}%
+                </strong>{' '}
+                <span className="text-gray-400">
+                  ({funnel.clicked} clicked / {funnel.invited} invited)
+                </span>
+              </p>
+            )}
             <div className="space-y-1.5">
               {FUNNEL_STAGES.map((st) => {
                 const v = funnel ? funnel[st.key] : 0;
@@ -291,5 +307,94 @@ function EmptyRow({ text }: { text: string }) {
     <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
       <p className="text-sm text-gray-500">{text}</p>
     </div>
+  );
+}
+
+// TD-FIX-3 (AIQ-1504): record invites sent (count + segment + channel) so the funnel has a
+// denominator. Persists into funnel_events; the 'Invited' tile + click-through read from it.
+const INVITE_SELECT_CLASS =
+  'mt-1 rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700 focus:border-[#1f8e8b] focus:outline-none focus:ring-2 focus:ring-[#1f8e8b]/30';
+
+function RecordInvitesForm({ onRecorded }: { onRecorded: () => void }) {
+  const [count, setCount] = useState('');
+  const [segment, setSegment] = useState<'' | 'internal' | 'prospect'>('');
+  const [channel, setChannel] = useState<InviteChannel>('whatsapp');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    setErr(null);
+    const n = Number.parseInt(count, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      setErr('Enter how many invites you sent (1 or more).');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await recordInvitesSent({ count: n, channel, ...(segment ? { segment } : {}) });
+      setMsg(`Recorded ${res.recorded} invite${res.recorded === 1 ? '' : 's'}.`);
+      setCount('');
+      onRecorded();
+    } catch {
+      setErr('Could not record invites. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+      <div>
+        <label htmlFor="td-invite-count" className="block text-xs font-medium text-gray-500">Invites sent</label>
+        <input
+          id="td-invite-count"
+          type="number"
+          min={1}
+          value={count}
+          onChange={(e) => setCount(e.target.value)}
+          placeholder="e.g. 25"
+          className="mt-1 w-24 rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700 focus:border-[#1f8e8b] focus:outline-none focus:ring-2 focus:ring-[#1f8e8b]/30"
+        />
+      </div>
+      <div>
+        <label htmlFor="td-invite-segment" className="block text-xs font-medium text-gray-500">Segment</label>
+        <select
+          id="td-invite-segment"
+          value={segment}
+          onChange={(e) => setSegment(e.target.value as '' | 'internal' | 'prospect')}
+          className={INVITE_SELECT_CLASS}
+        >
+          <option value="">Unspecified</option>
+          <option value="prospect">Prospect</option>
+          <option value="internal">Internal</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="td-invite-channel" className="block text-xs font-medium text-gray-500">Channel</label>
+        <select
+          id="td-invite-channel"
+          value={channel}
+          onChange={(e) => setChannel(e.target.value as InviteChannel)}
+          className={INVITE_SELECT_CLASS}
+        >
+          <option value="whatsapp">WhatsApp</option>
+          <option value="email">Email</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <Button
+        unstyled
+        type="submit"
+        disabled={busy}
+        className="rounded-lg bg-[#0b2b43] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#0b2b43]/90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {busy ? 'Recording…' : 'Record invites sent'}
+      </Button>
+      {msg && <span className="text-xs font-medium text-green-600">{msg}</span>}
+      {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+    </form>
   );
 }

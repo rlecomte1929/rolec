@@ -10,7 +10,9 @@ import { apiPost } from './client';
 export interface ProvisionInput {
   first_name: string;
   corridor_id?: string;
-  tester_segment: 'internal' | 'prospect';
+  // TD-FIX-2 (AIQ-1503): optional — omitted for the single-link flow (segment is
+  // captured later via the survey's one-tap self-ID), set only for explicit ?segment=.
+  tester_segment?: 'internal' | 'prospect';
   invite_token?: string;
   campaign?: string;
 }
@@ -124,6 +126,21 @@ export async function submitSurvey(input: SurveyInput): Promise<SurveyResult> {
       error = 'This survey isn’t open right now.';
     }
     return { ok: false, error };
+  }
+}
+
+// ── TD-FIX-1 (AIQ-1502): record completion ────────────────────────────────────
+
+/**
+ * Mark a test session complete via POST /api/test-drive/complete. Best-effort: the
+ * caller awaits this before routing to the survey, but a failure must never trap the
+ * tester on the page — mirrors `recordTestDriveEvent`, so it always resolves.
+ */
+export async function completeTestDrive(sessionId: string): Promise<void> {
+  try {
+    await apiPost<{ ok: boolean }>('/api/test-drive/complete', { session_id: sessionId });
+  } catch {
+    /* completion telemetry is best-effort — log-and-continue, never block the tester */
   }
 }
 

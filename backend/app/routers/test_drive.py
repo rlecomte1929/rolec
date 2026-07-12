@@ -153,7 +153,10 @@ class ProvisionRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=40)
     corridor_id: Optional[str] = Field(None, max_length=64)
     invite_token: Optional[str] = Field(None, max_length=200)
-    tester_segment: str = Field("prospect", pattern="^(internal|prospect)$")
+    # TD-FIX-2 (AIQ-1503): single-link model can't tag the segment at provision, so
+    # default to NULL (not 'prospect') — the survey one-tap is the source of truth.
+    # A silent 'prospect' default made the admin 'Internal' filter always empty.
+    tester_segment: Optional[str] = Field(None, pattern="^(internal|prospect)$")
     campaign: Optional[str] = Field(None, max_length=64)
 
 
@@ -333,6 +336,63 @@ class SurveyRequest(BaseModel):
     referral_consent: bool = False
 
 
+def _propagate_tester_segment(session_id: Optional[str], tester_segment: Optional[str]) -> None:
+    """TD-FIX-2 (AIQ-1503): the survey's one-tap self-ID is the source of truth for the
+    tester segment (the single-link model can't tag it at provision). Write it back onto
+    the linked test_sessions row so the admin segment slices are correct. Best-effort —
+    never raises into the survey write; a NULL/absent answer is left untouched (honest)."""
+    if not session_id or not tester_segment:
+        return
+    try:
+        sid_expr = ":sid" if _IS_SQLITE else "CAST(:sid AS uuid)"
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE test_sessions SET tester_segment = :seg WHERE id = {sid_expr}"),
+                {"seg": tester_segment, "sid": session_id},
+            )
+    except Exception:  # noqa: BLE001 — segment propagation must never break the survey write
+        logger.warning("test_drive segment propagation failed (suppressed)")
+
+
+def _mark_session_completed_if_needed(
+    session_id: Optional[str],
+    *,
+    campaign: Optional[str],
+    corridor_id: Optional[str],
+    tester_segment: Optional[str],
+) -> None:
+    """TD-FIX-1 (AIQ-1502) belt-and-braces: the survey page is reachable directly
+    (its copy explicitly invites testers who "had to stop early"), so a tester can
+    submit it without the /complete CTA ever firing. If the linked session has no
+    completed_at yet, mark it completed and emit a distinct 'completed' funnel event.
+
+    Idempotent via ``completed_at IS NULL`` so a session already completed by the CTA
+    is left untouched and the 'completed' event fires at most once. Best-effort —
+    never raises into the survey write."""
+    if not session_id:
+        return
+    try:
+        sid_expr = ":sid" if _IS_SQLITE else "CAST(:sid AS uuid)"
+        with db.engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    f"UPDATE test_sessions SET status='completed', completed_at=CURRENT_TIMESTAMP "
+                    f"WHERE id = {sid_expr} AND completed_at IS NULL"
+                ),
+                {"sid": session_id},
+            )
+        # Only emit on the started→completed transition — keeps the completed count
+        # honest when the /complete CTA already fired for this session.
+        if getattr(result, "rowcount", 0):
+            _emit_funnel_event(
+                event_type="completed", session_id=session_id, campaign=campaign,
+                corridor_id=corridor_id, tester_segment=tester_segment,
+                metadata={"via": "survey"},
+            )
+    except Exception:  # noqa: BLE001 — belt-and-braces must never break the survey write
+        logger.warning("test_drive survey→complete backfill failed (suppressed)")
+
+
 @router.post("/survey")
 @limiter.limit(_RATE_LIMIT)
 def survey(body: SurveyRequest, request: Request):
@@ -361,6 +421,15 @@ def survey(body: SurveyRequest, request: Request):
     with db.engine.begin() as conn:
         conn.execute(text(f"INSERT INTO survey_responses ({col_sql}) VALUES ({val_sql})"), params)
 
+    # TD-FIX-2 (AIQ-1503): stamp the self-declared segment back onto the session row.
+    _propagate_tester_segment(params["session_id"], body.tester_segment)
+
+    # TD-FIX-1 (AIQ-1502): belt-and-braces — a direct survey submit also completes the
+    # session if the /complete CTA never fired. 'completed' stays distinct from 'surveyed'.
+    _mark_session_completed_if_needed(
+        params["session_id"], campaign=campaign,
+        corridor_id=body.corridor_id, tester_segment=body.tester_segment,
+    )
     # TD-8: funnel — this session reached the survey.
     _emit_funnel_event(
         event_type="surveyed", session_id=params["session_id"], campaign=campaign,
