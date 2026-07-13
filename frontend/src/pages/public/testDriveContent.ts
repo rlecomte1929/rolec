@@ -44,10 +44,25 @@ export const testDriveContent = {
       "This corridor is in early coverage. Expect gaps in the guidance — flagging them is exactly what we're testing.",
   },
 
+  // TD-FIX-6 (AIQ-1509): newcomer-facing intro. Romain-approved copy, validated
+  // 2026-07-12. HARD RULE — plain text only: no bold/emphasis/<strong>/font-weight
+  // on any word in either block (including "service providers"). Rendered as plain
+  // <p> paragraphs in TestDrivePage.tsx.
+  whatReloPassIs: {
+    header: 'What ReloPass is',
+    paragraphs: [
+      "A cross-border move never lives in one place. HR chases documents, the employee guesses what's next, and a dozen service providers — immigration, movers, housing, banking, tax — each work from their own inbox.",
+      'ReloPass puts the whole relocation in one place: HR sees exactly where the case stands, the employee gets a clear roadmap, and every service provider stays attached to the case instead of an email thread.',
+    ],
+  },
+
   whatWeTest: {
     header: "What we're testing",
-    body:
-      "ReloPass is the coordination layer across HR, employees, and providers. This test checks one thing: does a case stay visible, compliant, and on-time from the first HR action to the employee's roadmap? Run it, and tell us where it holds and where it breaks.",
+    paragraphs: [
+      "You're seeing this early, on purpose. Some of you have heard me talk about ReloPass — what I don't know is whether it makes sense to someone opening it cold.",
+      'So: run one relocation from both sides — the HR manager who sets it up, and the employee who goes through it. Made-up data, about 20 minutes.',
+      "I'm not after polite feedback. Tell me where you got lost, what you expected and didn't get, and whether you'd trust this with a real move. A clear \"no\" is the most useful thing you can give me — better now than after launch.",
+    ],
   },
 
   howItWorks: {
