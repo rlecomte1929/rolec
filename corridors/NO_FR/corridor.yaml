@@ -1,0 +1,41 @@
+# Corridor registry profile — Norway → France.
+#
+# The reverse of FR_NO, and the corridor our first real validation case needs.
+# Authoring it is also the schema stress-test: running a REVERSE corridor through
+# the FR->NO template is what surfaced the two engine gaps (EMPLOYER_ABSENT and
+# retrospective red_late flagging) that are now first-class.
+#
+# STATUS: authoring. Every item is informational and source-verification pending.
+# France is the binding regulatory jurisdiction (Loi 71-1130); nothing here is
+# counsel-assured, and nothing may render as legal advice in ReloPass's own voice.
+# The corridor stays `authoring` until counsel closes the five open questions in
+# ReloPass_Fixture_NO-FR.md §0 (they are modelled as `assertion: PENDING` steps).
+
+corridor:
+  id: "NO_FR"
+  origin_iso: "NO"        # quoted — bare NO is a YAML boolean (the Norway problem)
+  destination_iso: "FR"
+  display_name: "Norway → France"
+  aliases: ["NO→FR", "NO-FR"]
+
+  # Not counsel-verified. Drives the "informational, not verified counsel" banner.
+  status: authoring
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # A returning EU/EEA citizen relocating to France. Note this pathway is NOT an
+  # immigration pathway: for this profile immigration is the one thing that is
+  # genuinely nothing-to-do. The work is exit admin, social-security switchover,
+  # French establishment, and the EEA-not-EU-customs-union traps.
+  pathways:
+    - id: "RETURNING_EEA_CITIZEN_2026"
+      file: "pathways/RETURNING_EEA_CITIZEN_2026/v1.yaml"

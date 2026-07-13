@@ -190,19 +190,29 @@ def classify_step_flags(
             flags[step.step_id] = GREEN
             continue
 
-        # An unmet prerequisite dominates: the step cannot be actioned yet, so
-        # reporting it as late would blame the employee for our own ordering.
+        due = due_by_step.get(step.step_id)
+
+        # RED_LATE outranks BLOCKED, deliberately.
+        #
+        # A statutory window that has closed has closed. Being stuck behind an
+        # unfinished prerequisite does not make you less late — it makes you late
+        # AND stuck, and the breach is the more urgent of the two facts. Reporting
+        # only "blocked" would bury a real, already-incurred breach behind a
+        # process note, which is precisely the silent miss this product exists to
+        # prevent. Lateness is a fact about the world; blocked is a fact about our
+        # own graph. The world wins.
+        if due is not None and today > due:
+            flags[step.step_id] = RED_LATE
+            continue
+
+        # Not late (yet) — so an unmet prerequisite is the honest thing to say,
+        # rather than nagging about something that cannot be actioned.
         if any(p not in done for p in step.prerequisite_step_ids):
             flags[step.step_id] = BLOCKED
             continue
 
-        due = due_by_step.get(step.step_id)
         if due is None:
             flags[step.step_id] = NO_DEADLINE
-            continue
-
-        if today > due:
-            flags[step.step_id] = RED_LATE
         elif (due - today).days <= amber_threshold_days:
             flags[step.step_id] = AMBER
         else:

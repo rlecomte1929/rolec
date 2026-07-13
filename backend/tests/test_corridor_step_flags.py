@@ -128,10 +128,12 @@ class TestBlocked:
         flags = _flags(departed_days_ago=30, done=["C0_DOMICILE"])
         assert flags["C1_CPAM"] != "blocked"
 
-    def test_blocked_beats_late_so_we_dont_blame_the_employee_for_our_ordering(self):
-        # 200 days elapsed: C1's window is long gone, but C0 still isn't done.
-        # Reporting "you are late" for something not yet actionable is a lie.
-        assert _flags(departed_days_ago=200)["C1_CPAM"] == "blocked"
+    def test_late_beats_blocked_because_a_closed_window_has_closed(self):
+        # 200 days elapsed: C1's 90-day window is long gone AND C0 isn't done.
+        # He is late *and* stuck. Reporting only "blocked" would bury a real,
+        # already-incurred breach behind a process note — the exact silent miss
+        # this product exists to prevent.
+        assert _flags(departed_days_ago=200)["C1_CPAM"] == "red_late"
 
 
 class TestNoDeadline:
