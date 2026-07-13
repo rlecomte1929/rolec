@@ -82,7 +82,6 @@ type StatusStripProps = {
   normalized: NormalizedPolicy | null;
   matrixPayload: PolicyConfigWorkingPayload | null;
   hasDocument: boolean;
-  onPreviewEmployeeView: () => void;
   onPublish: () => void;
   publishEnabled: boolean;
   publishBusy: boolean;
@@ -92,7 +91,6 @@ const StatusStrip: React.FC<StatusStripProps> = ({
   normalized,
   matrixPayload,
   hasDocument,
-  onPreviewEmployeeView,
   onPublish,
   publishEnabled,
   publishBusy,
@@ -147,9 +145,6 @@ const StatusStrip: React.FC<StatusStripProps> = ({
           <Badge variant="neutral" size="sm">{publishedAt}</Badge>
           <Badge variant="neutral" size="sm">{sourceLabel}</Badge>
           <div className="ml-auto flex gap-2">
-            <Button size="sm" variant="outline" onClick={onPreviewEmployeeView}>
-              Preview employee view
-            </Button>
             <Button
               size="sm"
               onClick={onPublish}
@@ -164,38 +159,120 @@ const StatusStrip: React.FC<StatusStripProps> = ({
   );
 };
 
-// --- Topic summary ----------------------------------------------------------
-// Per-theme summary + read-only drill-down now lives in
-// PolicyTopicSummaryList (PR #2). We wrap it in a Card here so Section 2
-// keeps the same visual frame as the rest of the page.
+// --- Preview & compare ------------------------------------------------------
+// AIQ-1507: the page previously stacked three separate accordions — "Preview
+// your draft", "See draft vs live changes", and "See policy rules from your
+// documents" — plus a "Preview employee view" button: four overlapping
+// preview/diff entry points HR found redundant and confusing (feedback
+// BUG-260713-CED5). They are unified into one control with two tabs:
+//   • Preview — the policy rendered as employees read it (PolicyTopicSummaryList)
+//   • Changes — the draft-vs-live matrix diff (PolicyDiffView) + the document-
+//               rules diff (CanonicalPolicyDiffView), folded in when documents
+//               exist.
+// When there is no live version yet, Changes shows a first-run message rather
+// than an all-"added" diff that looks identical to the Preview — the exact
+// state that made the two controls feel like duplicates.
 
-const TopicSummarySection: React.FC<{
+const PreviewCompareSection: React.FC<{
   matrixPayload: PolicyConfigWorkingPayload | null;
+  hasLivePolicy: boolean;
+  hasDocuments: boolean;
+  adminCompanyId: string | null;
+  refreshTrigger: number;
   onRequestDetails: () => void;
-}> = ({ matrixPayload, onRequestDetails }) => {
-  // The HR endpoint hands back EITHER the published clone (read-only)
-  // OR the draft (editable, never been published). The accordion has
-  // historically said "What employees see today" for both — which is a
-  // lie when the payload is a draft, because employees see nothing
-  // until HR publishes. Switch the title + subtitle on that flag so
-  // HR isn't surprised when the employee surface is empty.
+}> = ({
+  matrixPayload,
+  hasLivePolicy,
+  hasDocuments,
+  adminCompanyId,
+  refreshTrigger,
+  onRequestDetails,
+}) => {
+  const [tab, setTab] = useState<'preview' | 'changes'>('preview');
+
+  // The HR endpoint hands back EITHER the published clone (read-only) OR the
+  // draft (never published). Keep the historical heading nuance so HR isn't
+  // misled into thinking employees can already see a draft.
   const isLive =
     matrixPayload?.status === 'published' ||
     matrixPayload?.source === 'published' ||
     matrixPayload?.source === 'published_clone';
-  const heading = isLive ? 'What employees see today' : 'Your draft preview (not live yet)';
-  const subtitle = isLive
-    ? 'Summary of the currently live relocation policy by theme. Click a theme to see its individual benefit rows — read-only here. Edits happen in the Detailed review drawer.'
-    : 'This draft is HR-only — employees see nothing from this on /hr/policy until you Publish draft. Click a theme to preview the benefit rows that would go live.';
+  const previewHeading = isLive ? 'What employees see today' : 'Your draft preview (not live yet)';
+  const previewSubtitle = isLive
+    ? 'Summary of the currently live relocation policy by theme. Click a theme to see its benefit rows — read-only here. Edits happen in the benefit table below.'
+    : 'This draft is HR-only — employees see nothing from it until you Publish draft. Click a theme to preview the benefit rows that would go live.';
+
+  const tabButton = (id: 'preview' | 'changes', label: string) => (
+    <Button
+      unstyled
+      type="button"
+      role="tab"
+      aria-selected={tab === id}
+      onClick={() => setTab(id)}
+      className={[
+        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+        tab === id
+          ? 'border-accent-600 text-accent-700'
+          : 'border-transparent text-slate-500 hover:text-slate-700',
+      ].join(' ')}
+    >
+      {label}
+    </Button>
+  );
+
   return (
-    <Card padding="lg">
-      <PolicyTopicSummaryList
-        matrixPayload={matrixPayload}
-        onRequestDetails={onRequestDetails}
-        heading={heading}
-        subtitle={subtitle}
-      />
-    </Card>
+    <div
+      className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm"
+      data-testid="hr-policy-preview-compare"
+    >
+      <div className="px-5 pt-4">
+        <h2 className="text-base font-semibold text-[#0b2b43]">Preview &amp; compare</h2>
+        <p className="text-sm text-slate-600 mt-1">
+          See your policy as employees will read it, and what’s changed since the live version — in one place.
+        </p>
+        <div
+          className="mt-3 flex gap-1 border-b border-slate-200"
+          role="tablist"
+          aria-label="Preview and compare"
+        >
+          {tabButton('preview', 'Preview')}
+          {tabButton('changes', 'Changes')}
+        </div>
+      </div>
+      <div className="px-5 py-5">
+        {tab === 'preview' ? (
+          <PolicyTopicSummaryList
+            matrixPayload={matrixPayload}
+            onRequestDetails={onRequestDetails}
+            heading={previewHeading}
+            subtitle={previewSubtitle}
+          />
+        ) : !hasLivePolicy ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-[#0b2b43]">No published version yet</p>
+            <p className="text-sm text-slate-600 mt-1">
+              This will be your first publication, so there’s nothing to compare against yet.
+              Publish your draft, and future edits will show up here as changes.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <PolicyDiffView adminCompanyId={adminCompanyId} refreshTrigger={refreshTrigger} />
+            {hasDocuments && (
+              <div className="border-t border-slate-200 pt-5">
+                <h3 className="text-sm font-semibold text-[#0b2b43]">
+                  Policy rules from your documents
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                  How the rules extracted from your uploaded documents compare to what’s live.
+                </p>
+                <CanonicalPolicyDiffView adminCompanyId={adminCompanyId} refreshTrigger={refreshTrigger} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -567,54 +644,27 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         normalized={normalized}
         matrixPayload={matrixPayload}
         hasDocument={documents.length > 0}
-        onPreviewEmployeeView={() => {
-          // Workspace is now flat (no collapsible) — scroll to it so the
-          // user lands on the publish/preview controls inside.
-          const el = document.getElementById('hr-policy-detailed-review');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
         onPublish={() => void publishMatrix()}
         publishEnabled={publishEnabled}
         publishBusy={publishBusy}
       />
 
-      {/* 2. What employees see today — collapsed disclosure (slice 3d).
-          The benefit table further down is HR's primary work surface;
-          this read-only summary is reference, not action. Stays in DOM
-          (data still pre-fetched) so opening is instant.
-          Disclosure label flips to "Preview your draft" when the
-          payload is a draft (matches the inner heading from
-          TopicSummarySection so HR isn't misled into thinking employees
-          can see the draft). */}
-      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
-        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-base font-semibold text-[#0b2b43]">
-              {(matrixPayload?.status === 'published' ||
-                matrixPayload?.source === 'published' ||
-                matrixPayload?.source === 'published_clone')
-                ? '▸ See what employees see today'
-                : '▸ Preview your draft (not live for employees yet)'}
-            </span>
-            <span className="text-xs text-[#64748b]">
-              {(matrixPayload?.status === 'published' ||
-                matrixPayload?.source === 'published' ||
-                matrixPayload?.source === 'published_clone')
-                ? 'read-only summary by theme'
-                : ''}
-            </span>
-          </div>
-        </summary>
-        <div className="px-5 pb-5">
-          <TopicSummarySection
-            matrixPayload={matrixPayload}
-            onRequestDetails={() => {
-              const el = document.getElementById('hr-policy-detailed-review');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-          />
-        </div>
-      </details>
+      {/* 2. Preview & compare (AIQ-1507) — one control replacing the former
+          "Preview your draft" / "See draft vs live changes" / "See policy rules
+          from your documents" accordions + the "Preview employee view" button.
+          Tabs: Preview (rendered employee view) · Changes (draft-vs-live diff,
+          with the document-rules diff folded in). Data is still pre-fetched. */}
+      <PreviewCompareSection
+        matrixPayload={matrixPayload}
+        hasLivePolicy={hasLivePolicy}
+        hasDocuments={documents.length > 0}
+        adminCompanyId={adminCompanyId ?? null}
+        refreshTrigger={workspaceRefreshTrigger}
+        onRequestDetails={() => {
+          const el = document.getElementById('hr-policy-detailed-review');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
+      />
 
       {/* 3. Build your next version (only shown when there is no live policy
           OR no draft in progress — once HR has a working version, the matrix
@@ -642,46 +692,8 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         adminCompanyId={adminCompanyId}
       />
 
-      {/* 4. Draft vs Live diffs — collapsed disclosures (slice 3d).
-          Big diffs need to stay one click away, not push the editable
-          benefit table further down the page. The category-grouped
-          accordions inside (slice 3a) keep the open state scannable.
-          Slice 2 still gates the canonical diff to deployments with
-          uploaded documents. */}
-      <details id="hr-policy-draft-vs-live-diff" className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
-        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-base font-semibold text-[#0b2b43]">
-              ▸ See draft vs live changes
-            </span>
-            <span className="text-xs text-[#64748b]">What changed, benefit by benefit</span>
-          </div>
-        </summary>
-        <div className="px-5 pb-5">
-          <PolicyDiffView
-            adminCompanyId={adminCompanyId ?? null}
-            refreshTrigger={workspaceRefreshTrigger}
-          />
-        </div>
-      </details>
-      {documents.length > 0 && (
-        <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
-          <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-base font-semibold text-[#0b2b43]">
-                ▸ See policy rules from your documents
-              </span>
-              <span className="text-xs text-[#64748b]">Policy rules extracted from your source documents</span>
-            </div>
-          </summary>
-          <div className="px-5 pb-5">
-            <CanonicalPolicyDiffView
-              adminCompanyId={adminCompanyId ?? null}
-              refreshTrigger={workspaceRefreshTrigger}
-            />
-          </div>
-        </details>
-      )}
+      {/* (Draft-vs-Live and document-rules diffs moved into the Preview &
+          compare "Changes" tab above — AIQ-1507.) */}
 
       {/* 5. Benefit table & publish (was: "Detailed review" collapsible).
           PR 0.5 simplification flattens this — the table is the primary
