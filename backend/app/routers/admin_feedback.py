@@ -30,7 +30,12 @@ from ..auth_deps import require_admin
 from ..db import SessionLocal
 from ..services.admin_audit import record_admin_event
 from ..services.feedback_triage import classify
-from ..services.feedback_task_engineer import engineer_task
+from ..services.feedback_task_engineer import (
+    engineer_task,
+    extract_confirmed_signals,
+    format_diagnostics,
+    score_task,
+)
 from ..services import notion_work_queue
 
 log = logging.getLogger(__name__)
@@ -683,7 +688,6 @@ def dispatch_preview(
         has_screenshot = pf["has_screenshot"]
         reporter_name = pf["reporter_name"]
 
-    from ..services.feedback_task_engineer import format_diagnostics
     diagnostics = format_diagnostics(pf["client_context"]) if pf else ""
 
     if not severity or not area:
@@ -711,6 +715,18 @@ def dispatch_preview(
         log.warning("dispatch_preview engineer_task failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"Could not engineer the task: {exc}") from exc
 
+    # ── Eval gate ────────────────────────────────────────────────────────────
+    # Extract confirmed ground-truth signals from the browser diagnostics and
+    # score the engineered task against them. The score and issues are returned
+    # to the admin UI so they can review quality before confirming dispatch.
+    # Override files_to_touch with the confirmed failing_frame when available.
+    raw_ctx = pf.get("client_context") if pf else None
+    signals = extract_confirmed_signals(raw_ctx)
+    if signals["failing_frame"]:
+        task["files_to_touch"] = signals["failing_frame"]
+    eval_result = score_task(task, confirmed_signals=signals, user_text=text_val)
+    # ── end eval gate ─────────────────────────────────────────────────────────
+
     _db2 = SessionLocal()
     try:
         _db2.execute(
@@ -727,12 +743,13 @@ def dispatch_preview(
     finally:
         _db2.close()
 
-    return {"task": task}
+    return {"task": task, "eval": eval_result}
 
 
 class CreateTaskBody(BaseModel):
     task: Dict[str, Any]
     confirm: bool = True
+    force_dispatch: bool = False  # set True to bypass the eval gate (admin override)
 
 
 @router.post("/feedback/{stream}/{item_id}/dispatch/create")
@@ -828,26 +845,9 @@ def dispatch_create(
     db.commit()
     # ── end sentinel block ────────────────────────────────────────────────────────
 
-    report_id = item_id
-    message = page_url = ""
-    reporter_name = None
-    if stream == "product":
-        pf = _load_product_fields(db, item_id)
-        if pf:
-            report_id = pf["report_id"] or item_id
-            message = pf["message"]
-            page_url = pf["page_url"] or ""
-            reporter_name = pf["reporter_name"]
-
-    failure_evidence = (
-        f"Reported via the feedback widget (stream={stream}). "
-        f"Page: {page_url or '?'} · Reporter: {reporter_name or '?'} · Ref: {report_id}.\n\n"
-        f"Original message:\n{message or '(see admin console)'}"
-    )
-    context_links = f"https://relopass.com/admin/feedback  (report_id={report_id})"
-
     def _clear_pending() -> None:
-        """Roll the sentinel back on Notion failure so the admin can retry."""
+        """Roll the sentinel back on Notion failure (or a failed eval gate) so the
+        admin can retry. Defined here so it's in scope for the eval gate below."""
         try:
             db.execute(
                 text(
@@ -859,6 +859,41 @@ def dispatch_create(
             db.commit()
         except Exception:  # noqa: BLE001
             log.warning("dispatch_create: could not clear PENDING sentinel for %s/%s", stream, item_id)
+
+    report_id = item_id
+    message = page_url = ""
+    reporter_name = None
+    if stream == "product":
+        pf = _load_product_fields(db, item_id)
+        if pf:
+            report_id = pf["report_id"] or item_id
+            message = pf["message"]
+            page_url = pf["page_url"] or ""
+            reporter_name = pf["reporter_name"]
+
+    # ── Eval gate (re-run at create time so admin edits are also checked) ────
+    if stream == "product" and not body.force_dispatch:
+        raw_ctx = pf.get("client_context") if pf else None
+        signals = extract_confirmed_signals(raw_ctx)
+        eval_result = score_task(task, confirmed_signals=signals, user_text=message)
+        if not eval_result["passed"]:
+            _clear_pending()
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Task did not pass quality gate. Review issues and either "
+                             "fix the task or re-submit with force_dispatch=true.",
+                    "eval": eval_result,
+                },
+            )
+    # ── end eval gate ─────────────────────────────────────────────────────────
+
+    failure_evidence = (
+        f"Reported via the feedback widget (stream={stream}). "
+        f"Page: {page_url or '?'} · Reporter: {reporter_name or '?'} · Ref: {report_id}.\n\n"
+        f"Original message:\n{message or '(see admin console)'}"
+    )
+    context_links = f"https://relopass.com/admin/feedback  (report_id={report_id})"
 
     try:
         url = notion_work_queue.create_work_queue_task(
