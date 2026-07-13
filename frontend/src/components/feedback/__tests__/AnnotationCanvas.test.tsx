@@ -9,7 +9,7 @@ describe('AnnotationCanvas', () => {
   it('renders the pen / rectangle / arrow / undo / clear toolbar', () => {
     render(<AnnotationCanvas imageSrc={IMG} />);
     expect(screen.getByRole('button', { name: /pen/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /rectangle/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rect/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /arrow/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /undo/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument();
@@ -18,8 +18,8 @@ describe('AnnotationCanvas', () => {
   it('selecting a tool marks it pressed (pen is the default)', () => {
     render(<AnnotationCanvas imageSrc={IMG} />);
     expect(screen.getByRole('button', { name: /pen/i })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: /rectangle/i }));
-    expect(screen.getByRole('button', { name: /rectangle/i })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /rect/i }));
+    expect(screen.getByRole('button', { name: /rect/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /pen/i })).toHaveAttribute('aria-pressed', 'false');
   });
 

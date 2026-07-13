@@ -11,19 +11,21 @@
  * intercepts pointer events while a region is being selected, so page scroll/stacking is
  * unaffected the rest of the time. On capture it emits a PNG data URL via `onCapture`.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Props {
-  onCapture: (dataUrl: string) => void;
-  onCancel: () => void;
+  onCapture:     (dataUrl: string) => void;
+  onCancel:      () => void;
+  onDelayStart?: () => void;  // called when countdown begins — parent can hide itself
 }
 
 type Rect = { x: number; y: number; w: number; h: number };
 
-export function ScreenshotCapture({ onCapture, onCancel }: Props) {
+export function ScreenshotCapture({ onCapture, onCancel, onDelayStart }: Props) {
   const [selecting, setSelecting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
 
   const runCapture = useCallback(async (crop?: Rect) => {
@@ -53,6 +55,23 @@ export function ScreenshotCapture({ onCapture, onCancel }: Props) {
     }
   }, [onCapture, onCancel]);
 
+  // Countdown effect: ticks every second, fires capture at 0.
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      void runCapture();
+      setCountdown(null);
+      return;
+    }
+    const id = window.setTimeout(() => setCountdown((n) => (n !== null ? n - 1 : null)), 1000);
+    return () => window.clearTimeout(id);
+  }, [countdown, runCapture]);
+
+  const startDelayed = () => {
+    onDelayStart?.();
+    setCountdown(5);
+  };
+
   // ── region-select drag handlers ──
   const onDown = (e: React.PointerEvent) => {
     start.current = { x: e.clientX, y: e.clientY };
@@ -72,6 +91,29 @@ export function ScreenshotCapture({ onCapture, onCancel }: Props) {
     if (r && r.w > 4 && r.h > 4) void runCapture(r);
     else { setSelecting(false); setRect(null); }
   };
+
+  if (countdown !== null) {
+    return (
+      <div
+        data-html2canvas-ignore
+        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60"
+      >
+        <div className="text-white text-center space-y-2">
+          <p className="text-6xl font-bold tabular-nums leading-none">{countdown}</p>
+          <p className="text-sm text-white/70">
+            {countdown > 0 ? 'Open your dropdown now — screenshot in…' : 'Capturing…'}
+          </p>
+          <button
+            type="button"
+            onClick={() => { setCountdown(null); onCancel(); }}
+            className="mt-2 text-xs text-white/60 underline hover:text-white"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (selecting) {
     return (
@@ -106,6 +148,10 @@ export function ScreenshotCapture({ onCapture, onCancel }: Props) {
         type="button" disabled={busy} onClick={() => setSelecting(true)}
         className="px-3 py-1.5 text-xs rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-40"
       >Select region</button>
+      <button
+        type="button" disabled={busy} onClick={startDelayed}
+        className="px-3 py-1.5 text-xs rounded border border-[#0b2b43] text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-40"
+      >Delayed (5s)</button>
       <button type="button" onClick={onCancel} className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700">Skip</button>
     </div>
   );

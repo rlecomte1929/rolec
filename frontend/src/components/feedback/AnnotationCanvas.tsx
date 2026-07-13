@@ -13,7 +13,7 @@ import {
   forwardRef, useEffect, useImperativeHandle, useRef, useState, useCallback,
 } from 'react';
 
-export type Tool = 'pen' | 'rect' | 'arrow';
+export type Tool = 'pen' | 'rect' | 'circle' | 'arrow' | 'text';
 const STROKE = '#e5484d'; // red
 const LINE_WIDTH = 3;
 const MAX_W = 900; // cap canvas width so annotated exports stay small
@@ -36,6 +36,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, Props>(
     const preDrag = useRef<ImageData | null>(null);     // snapshot before a shape drag
     const [tool, setTool] = useState<Tool>('pen');
     const [ready, setReady] = useState(false);
+    const [pendingText, setPendingText] = useState<{ cx: number; cy: number } | null>(null);
+    const [textValue, setTextValue]     = useState('');
 
     const ctx = () => canvasRef.current?.getContext('2d') ?? null;
 
@@ -88,6 +90,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, Props>(
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
+      // Text tool: record click position and show input — no canvas drag needed.
+      if (tool === 'text') {
+        const p = pos(e);
+        setPendingText({ cx: p.x, cy: p.y });
+        return;
+      }
       const c = ctx(); if (!c) return;
       e.currentTarget.setPointerCapture?.(e.pointerId);
       preDrag.current = snapshot();
@@ -106,7 +114,11 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, Props>(
         if (preDrag.current) c.putImageData(preDrag.current, 0, 0); // live preview
         c.strokeStyle = STROKE; c.lineWidth = LINE_WIDTH;
         if (tool === 'rect') c.strokeRect(s.x, s.y, p.x - s.x, p.y - s.y);
-        else drawArrow(c, s.x, s.y, p.x, p.y);
+        else if (tool === 'circle') {
+          const cx = (s.x + p.x) / 2, cy = (s.y + p.y) / 2;
+          const rx = Math.abs(p.x - s.x) / 2, ry = Math.abs(p.y - s.y) / 2;
+          if (rx > 0 && ry > 0) { c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI); c.stroke(); }
+        } else drawArrow(c, s.x, s.y, p.x, p.y);
       }
     };
 
@@ -129,6 +141,31 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, Props>(
       undoStack.current = [];
       if (baseRef.current) c.putImageData(baseRef.current, 0, 0);
     };
+
+    const commitText = () => {
+      const trimmed = textValue.trim();
+      if (trimmed && pendingText) {
+        const c = ctx(), canvas = canvasRef.current;
+        if (c && canvas) {
+          // Scale font size to canvas pixel density so text looks consistent
+          const scale = canvas.width / Math.max(1, canvas.offsetWidth || canvas.width);
+          const fontSize = Math.round(16 * scale);
+          c.fillStyle = STROKE;
+          c.font = `bold ${fontSize}px sans-serif`;
+          c.fillText(trimmed, pendingText.cx, pendingText.cy);
+          // Push AFTER drawing so undoStack's top matches the canvas — same invariant
+          // as commit() (pushing before would make one undo remove text + the next shape).
+          const snap = snapshot();
+          if (snap) undoStack.current.push(snap);
+        }
+      }
+      setPendingText(null);
+      setTextValue('');
+    };
+
+    // Focus the text input once when it mounts (stable identity → fires only on
+    // mount/unmount, not every render — the repo avoids the autoFocus prop).
+    const focusTextInput = useCallback((el: HTMLInputElement | null) => { el?.focus(); }, []);
 
     useImperativeHandle(ref, () => ({
       getAnnotatedDataURL: () => {
@@ -154,12 +191,35 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, Props>(
     return (
       <div className={className}>
         <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-          {toolBtn('pen', 'Pen')}
-          {toolBtn('rect', 'Rectangle')}
-          {toolBtn('arrow', 'Arrow')}
-          <button type="button" onClick={undo} className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-700">Undo</button>
+          {toolBtn('pen',    'Pen')}
+          {toolBtn('rect',   'Rect')}
+          {toolBtn('circle', 'Circle')}
+          {toolBtn('arrow',  'Arrow')}
+          {toolBtn('text',   'Text')}
+          <button type="button" onClick={undo}  className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-700">Undo</button>
           <button type="button" onClick={clear} className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-700">Clear</button>
         </div>
+        {/* Text-tool pending input — appears after user clicks on canvas with Text active */}
+        {pendingText && (
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <input
+              ref={focusTextInput}
+              type="text"
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitText(); }
+                if (e.key === 'Escape') { setPendingText(null); setTextValue(''); }
+              }}
+              placeholder="Type text, then Enter"
+              className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
+            />
+            <button type="button" onClick={commitText}
+              className="text-xs px-2 py-1 bg-[#0b2b43] text-white rounded">Add</button>
+            <button type="button" onClick={() => { setPendingText(null); setTextValue(''); }}
+              className="text-xs px-2 py-1 text-gray-500">✕</button>
+          </div>
+        )}
         <canvas
           ref={canvasRef}
           onPointerDown={onPointerDown}

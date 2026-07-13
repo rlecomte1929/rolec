@@ -67,10 +67,10 @@ describe('FeedbackWidget', () => {
     expect(screen.getByText(/BUG-\d{6}-/)).toBeInTheDocument();
   });
 
-  it('[AIQ-1480] "Attach Screenshot" reveals full-page / region capture options', () => {
+  it('[AIQ-1480] "Screenshot" reveals full-page / region capture options', () => {
     render(<FeedbackWidget userId="u1" />);
     openAndType('needs a shot');
-    fireEvent.click(screen.getByRole('button', { name: /attach screenshot/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^screenshot$/i }));
     expect(screen.getByRole('button', { name: /full page/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /select region/i })).toBeInTheDocument();
   });

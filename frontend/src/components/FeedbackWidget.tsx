@@ -16,7 +16,7 @@ import { submitProductFeedback, getMyReports, type ScreenshotStorage } from '../
 import type { MyReport } from '../api/productFeedback';
 import { collectDiagnostics } from '../lib/diagnostics';
 import { ScreenshotCapture } from './feedback/ScreenshotCapture';
-import { AnnotationCanvas, type AnnotationCanvasHandle } from './feedback/AnnotationCanvas';
+import { AnnotationModal } from './feedback/AnnotationModal';
 import { Button } from './antigravity/Button';
 import { Badge } from './antigravity/Badge';
 
@@ -59,7 +59,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
 
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const annotRef     = useRef<AnnotationCanvasHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Focus textarea when popover opens
   useEffect(() => {
@@ -97,17 +97,32 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     setStorageNote(null);
   }
 
-  // [AIQ-1480] Capture (full page / region) → annotate → attach.
+  // [AIQ-1480] Capture (full page / region / upload) → annotate → attach.
   const onCaptured = (dataUrl: string) => {
     setRawCapture(dataUrl);
     setShotStep('annotate');
+    // If we were hidden during a delayed capture, reopen the widget popover.
+    setState((s) => s === 'capturing' ? 'open' : s);
   };
 
-  const attachAnnotated = () => {
-    const url = annotRef.current?.getAnnotatedDataURL() ?? rawCapture;
-    setScreenshot(url);
+  // The AnnotationModal calls onSave(dataUrl) with the already-annotated URL.
+  const attachAnnotated = (dataUrl: string) => {
+    setScreenshot(dataUrl);
     setRawCapture(null);
     setShotStep('none');
+  };
+
+  const onFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset the input so the same file can be re-selected after cancel.
+    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result;
+      if (typeof dataUrl === 'string') onCaptured(dataUrl);
+    };
+    reader.readAsDataURL(file);
   };
 
   async function submit() {
@@ -162,6 +177,24 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
       onMouseDown={(e) => e.stopPropagation()}
       className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2"
     >
+      {/* Annotation modal — fullscreen via portal, shown when a capture/upload is ready */}
+      {shotStep === 'annotate' && rawCapture && (
+        <AnnotationModal
+          imageSrc={rawCapture}
+          onSave={attachAnnotated}
+          onCancel={() => { setRawCapture(null); setShotStep('none'); }}
+        />
+      )}
+
+      {/* Hidden file input for "Upload image" */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onFileUpload}
+      />
+
       {isVisible && (
         <div className="w-80 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
           {/* Header */}
@@ -294,53 +327,58 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                 disabled={state === 'submitting'}
               />
 
-              {/* Screenshot: capture (full page / region) → annotate → attach */}
+              {/* Attach image — screenshot or upload */}
               <div className="space-y-2">
-                {shotStep === 'annotate' && rawCapture ? (
-                  <div className="space-y-1.5">
-                    <AnnotationCanvas ref={annotRef} imageSrc={rawCapture} />
-                    <div className="flex items-center gap-2">
-                      <Button unstyled onClick={attachAnnotated}
-                        className="text-xs font-semibold px-3 py-1.5 rounded bg-[#0b2b43] text-white hover:bg-[#123a5a]">
-                        Attach
-                      </Button>
-                      <Button unstyled onClick={() => { setRawCapture(null); setShotStep('capture'); }}
-                        className="text-xs px-2 py-1.5 text-gray-500 hover:text-gray-700">
-                        Retake
-                      </Button>
-                    </div>
-                  </div>
-                ) : shotStep === 'capture' ? (
-                  <ScreenshotCapture onCapture={onCaptured} onCancel={() => setShotStep('none')} />
+                {shotStep === 'capture' ? (
+                  <ScreenshotCapture
+                    onCapture={onCaptured}
+                    onCancel={() => setShotStep('none')}
+                    onDelayStart={() => setState('capturing')}
+                  />
                 ) : screenshot ? (
                   <div className="relative rounded-lg overflow-hidden border border-gray-200">
-                    <img src={screenshot} alt="Page screenshot" className="w-full object-cover max-h-28" />
+                    <img src={screenshot} alt="Attachment preview" className="w-full object-cover max-h-28" />
                     <button
                       type="button"
                       onClick={() => setScreenshot(null)}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-900/70 text-white text-[10px] flex items-center justify-center hover:bg-gray-900"
-                      title="Remove screenshot"
+                      title="Remove image"
                     >
                       ✕
                     </button>
                     <div className="absolute bottom-1 left-1 text-[9px] font-mono bg-gray-900/60 text-white rounded px-1.5 py-0.5">
-                      screenshot attached
+                      image attached
                     </div>
                   </div>
                 ) : (
-                  <Button unstyled
-                    onClick={() => setShotStep('capture')}
-                    disabled={state === 'submitting'}
-                    className="w-full flex items-center justify-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-40"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round"
-                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-                      <path strokeLinecap="round" strokeLinejoin="round"
-                        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
-                    </svg>
-                    Attach Screenshot
-                  </Button>
+                  <div className="flex gap-2">
+                    {/* Take screenshot */}
+                    <Button unstyled
+                      onClick={() => setShotStep('capture')}
+                      disabled={state === 'submitting'}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-40"
+                    >
+                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                          d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                          d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                      </svg>
+                      Screenshot
+                    </Button>
+                    {/* Upload from disk */}
+                    <Button unstyled
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={state === 'submitting'}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-40"
+                    >
+                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                      Upload
+                    </Button>
+                  </div>
                 )}
               </div>
 
