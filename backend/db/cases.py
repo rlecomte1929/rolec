@@ -1999,6 +1999,15 @@ class CasesMixin:
                         {extra_joins}
                         WHERE 1=1
                     """
+                # The e2e/verify suites provision synthetic personas (…@testco.com)
+                # against PROD on every run, so they reappear within minutes of any
+                # purge. The admin Companies list already excludes them at read
+                # time; the HR command center did not, so they polluted the case
+                # list and every portfolio count derived from it. Same filter, same
+                # seam as risk_filter — every branch above ends in a WHERE clause.
+                from .test_data_filter import exclude_test_people
+
+                sql = sql.rstrip() + " AND " + exclude_test_people("ca.employee_identifier")
                 if risk_filter:
                     sql = sql.rstrip() + " AND COALESCE(ca.risk_status, 'green') = :risk"
                     params["risk"] = risk_filter
