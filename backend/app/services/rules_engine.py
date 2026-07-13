@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
+from .nationality_class import OWN_NATIONAL, classify
+
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
     required_fields: List[str] = []
@@ -94,7 +96,65 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
                 r.get("title") for r in dropped if r.get("title")
             )
 
+    # Nationality gating. The FRANCE catalog is the non-EEA salaried route (its
+    # own seed says "EEA/EU nationals have free movement and need none of this"),
+    # but nothing enforced that, so a French citizen relocating home was served
+    # the full French work-visa track. Drop requirements that don't apply to the
+    # case's nationality class — and, critically, STATE the resulting "nothing
+    # required" rather than leaving an empty pillar (see _immigration_confirmation).
+    nationality_class = classify(profile.get("nationality"), basics.get("destCountry"))
+    if nationality_class:
+        dropped = [r for r in expanded if not _applies_to_nationality_class(r, nationality_class)]
+        if dropped:
+            expanded = [r for r in expanded if _applies_to_nationality_class(r, nationality_class)]
+            flags["nationalityWaived"] = [r.get("title") for r in dropped if r.get("title")]
+            flags["nationalityClass"] = nationality_class
+            expanded.append(_immigration_confirmation(nationality_class, basics.get("destCountry")))
+
     return required_fields, expanded, flags
+
+
+def _applies_to_nationality_class(requirement: Dict[str, Any], nationality_class: str) -> bool:
+    """True when the requirement applies to the case's nationality class. A
+    requirement with no ``appliesToNationalityClasses`` (None/empty) applies to
+    all — same null-means-universal contract as appliesToAssignmentTypes."""
+    allowed = requirement.get("appliesToNationalityClasses")
+    if not allowed:
+        return True
+    norm = {str(a).strip().upper() for a in allowed if str(a).strip()}
+    return (not norm) or (nationality_class in norm)
+
+
+def _immigration_confirmation(nationality_class: str, dest_country: Optional[str]) -> Dict[str, Any]:
+    """The anti-silence gate (ReloPass_Fixture_NO-FR.md §3.1).
+
+    Suppressing the visa track leaves the immigration pillar empty, and an empty
+    pillar reads as a broken screen — or worse, as "we didn't check". A correct
+    answer of "none" must be *stated*, with its reason, not implied by omission.
+    So we emit a positive confirmation in place of what we removed.
+    """
+    where = (dest_country or "the destination").title()
+    if nationality_class == OWN_NATIONAL:
+        reason = (
+            f"You are a national of {where}. You have the right of entry and residence in "
+            "your own country — no visa, residence permit, or immigration registration applies."
+        )
+    else:
+        reason = (
+            f"You are an EU/EEA national moving to {where}. Freedom of movement applies — "
+            "no visa or work permit is required."
+        )
+    return {
+        "id": "immigration_nothing_to_do",
+        "title": "No visa or residence permit required",
+        "pillar": "RESIDENCE",
+        "description": reason,
+        "severity": "INFO",
+        "owner": "EMPLOYEE",
+        "requiredFields": [],
+        "outcomeType": "nothing_to_do",
+        "reason": reason,
+    }
 
 
 def _applies_to_assignment_type(requirement: Dict[str, Any], case_assignment_type: str) -> bool:

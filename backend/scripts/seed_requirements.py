@@ -42,6 +42,11 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
     purposes_by_country: Dict[str, List[str]] = seed.get("purposes_by_country", {})
     # AIQ-1349: file-level provenance applies to every requirement in the seed.
     verification_status = seed.get("verification_status") or "representative"
+    # A seed file is usually written for one nationality track (france.yaml is
+    # the non-EEA salaried route). Declare that once at file level; a requirement
+    # that genuinely applies to everyone (a passport) overrides it with an
+    # explicit `applies_to_nationality_classes: null`.
+    default_nationality_classes = seed.get("default_applies_to_nationality_classes") or None
     payloads: List[Dict[str, Any]] = []
     for req in seed.get("requirements", []):
         pillar = req["pillar"]
@@ -49,6 +54,12 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
         owner = req["owner"]
         applies = req.get("applies_to_assignment_types") or None
         applies_json = json.dumps(applies) if applies else None
+        nat_classes = (
+            req["applies_to_nationality_classes"]
+            if "applies_to_nationality_classes" in req
+            else default_nationality_classes
+        )
+        nat_classes_json = json.dumps(nat_classes) if nat_classes else None
         for country, spec in (req.get("countries") or {}).items():
             if only_country and country.upper() != only_country.upper():
                 continue
@@ -67,6 +78,7 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
                     "required_fields_json": json.dumps(req.get("required_fields", [])),
                     "citations_json": json.dumps(req.get("citations", [])),
                     "applies_to_assignment_types_json": applies_json,
+                    "applies_to_nationality_classes_json": nat_classes_json,
                     "verification_status": verification_status,
                     "last_verified_at": stamp,
                 })

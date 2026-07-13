@@ -94,6 +94,10 @@ class RequirementItem(Base):
     # to (e.g. ["LTA","PERMANENT"]). NULL ⇒ applies to all. Drives data-driven
     # STA/LTA requirement filtering without hardcoded title heuristics.
     applies_to_assignment_types_json = Column(Text, nullable=True)
+    # Optional JSON array of nationality classes this requirement applies to
+    # (["THIRD_COUNTRY"]). NULL ⇒ applies to all. Stops the non-EEA visa track
+    # being served to an EU/EEA national. See services/nationality_class.py.
+    applies_to_nationality_classes_json = Column(Text, nullable=True)
     # AIQ-1349: provenance level (representative / corpus_grounded / expert_verified).
     verification_status = Column(String, nullable=True)
     last_verified_at = Column(DateTime, nullable=False)

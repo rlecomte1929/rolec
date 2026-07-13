@@ -18,6 +18,23 @@
 
 verification_status: corpus_grounded
 source_scope: "US->FR corpus (non-EEA salaried route); EEA nationals exempt"
+
+# Every requirement in this file is part of the non-EEA salaried route: each one
+# is either the visa/permit itself or evidence submitted in support of it. The
+# scope note above has said "EEA nationals exempt" since the file was written,
+# but until now nothing enforced it and a French citizen relocating home was
+# served the full VLS-TS track. This line is that scope, made executable.
+#
+# An EU/EEA national therefore matches NOTHING here — and rules_engine emits a
+# stated "no visa or residence permit required" confirmation in its place, so the
+# result is an explicit answer rather than an empty screen. Their substantive
+# French establishment steps (CPAM, justificatif de domicile, …) come from the
+# corridor pathway, not from this visa catalog.
+#
+# A requirement that genuinely applies to everyone overrides this with an
+# explicit `applies_to_nationality_classes: null`.
+default_applies_to_nationality_classes: [THIRD_COUNTRY]
+
 purposes_by_country:
   FRANCE: [employment, other]
 

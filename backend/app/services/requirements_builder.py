@@ -78,6 +78,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     if getattr(item, "applies_to_assignment_types_json", None)
                     else None
                 ),
+                # None ⇒ applies to all nationality classes.
+                "appliesToNationalityClasses": (
+                    json.loads(item.applies_to_nationality_classes_json)
+                    if getattr(item, "applies_to_nationality_classes_json", None)
+                    else None
+                ),
                 "verificationStatus": getattr(item, "verification_status", None),
             }
             for item in requirements
@@ -90,7 +96,11 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         for item in expanded:
             required = item.get("requiredFields", [])
-            status = _status_for_case(required, draft)
+            outcome_type = item.get("outcomeType") or "action"
+            # A 'nothing_to_do' item asks nothing of anyone, so the MISSING /
+            # PROVIDED / NEEDS_REVIEW ladder doesn't apply — running it through
+            # _status_for_case would mark a positive confirmation NEEDS_REVIEW.
+            status = "CONFIRMED" if outcome_type == "nothing_to_do" else _status_for_case(required, draft)
             citations = [
                 _source_dto(source_map[cid])
                 for cid in item.get("citations", [])
@@ -108,6 +118,8 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     statusForCase=status,
                     citations=citations,
                     verificationStatus=item.get("verificationStatus"),
+                    outcomeType=outcome_type,
+                    reason=item.get("reason"),
                 )
             )
 
