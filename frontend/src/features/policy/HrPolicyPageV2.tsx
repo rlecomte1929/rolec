@@ -624,13 +624,30 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           without competing with the page heading. The docked shell
           owns the close affordance via its header X — the trigger
           hides when the panel is open so we don't render two ways to
-          close the same panel. */}
+          close the same panel.
+          AIQ-1508: policy Q&A is company-scoped RAG over the PUBLISHED
+          policy, so the ask box only renders once a policy is live
+          (HrPolicyAssistantPanel's `canQuery` gate). Previously the
+          trigger stayed enabled with no live policy, so clicking it
+          opened a dead-end panel with no textarea — the "no area to type"
+          an HR user reported (BUG-260713-D3F4). Disable the trigger until
+          there's a live policy and explain the unlock inline (visible on
+          mobile + keyboard, unlike a hover tooltip). This is a DISTINCT
+          feature from the app-shell "?" Setup & Help assistant (product
+          how-to help) — they are not duplicate Q&A. See
+          docs/qa-consolidation-recommendation.md. */}
       {assistantOpen ? null : (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {!hasLivePolicy && (
+            <span className="text-xs text-slate-500">
+              Publish your policy to ask questions about it.
+            </span>
+          )}
           <Button
             type="button"
             variant="outline"
             onClick={() => setAssistantOpen(true)}
+            disabled={!hasLivePolicy}
             aria-expanded={false}
             aria-controls="hr-policy-assistant-shell-title"
           >
