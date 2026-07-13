@@ -171,14 +171,35 @@ export const TestDrivePage: React.FC = () => {
         </Section>
       )}
 
+      {/* What ReloPass is (TD-FIX-6 / AIQ-1509) — newcomer intro, above "What
+          we're testing". Plain-text paragraphs only — no emphasis on any word. */}
+      <Section spacing="lg" background="transparent">
+        <FadeIn>
+          <div className="mx-auto max-w-2xl">
+            <SectionHeader title={c.whatReloPassIs.header} align="center" narrow />
+            <div className="mt-6 space-y-4">
+              {c.whatReloPassIs.paragraphs.map((p) => (
+                <p key={p} className="text-marketing-body text-marketing-text leading-relaxed text-center">
+                  {p}
+                </p>
+              ))}
+            </div>
+          </div>
+        </FadeIn>
+      </Section>
+
       {/* What we're testing */}
       <Section spacing="lg" background="muted">
         <FadeIn>
           <div className="mx-auto max-w-2xl">
             <SectionHeader title={c.whatWeTest.header} align="center" narrow />
-            <p className="mt-6 text-marketing-body text-marketing-text leading-relaxed text-center">
-              {c.whatWeTest.body}
-            </p>
+            <div className="mt-6 space-y-4">
+              {c.whatWeTest.paragraphs.map((p) => (
+                <p key={p} className="text-marketing-body text-marketing-text leading-relaxed text-center">
+                  {p}
+                </p>
+              ))}
+            </div>
           </div>
         </FadeIn>
       </Section>
