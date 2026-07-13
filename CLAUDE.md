@@ -213,6 +213,29 @@ If a migration was applied to prod out-of-band:
      exactly what was applied (idempotent DDL).
   5. Commit as:  chore(migrations): reconcile ledger for <name>
 
+## Supabase tooling (MCP + agent skills)
+
+Database work goes through the **Supabase MCP** — in this environment that is the
+claude.ai "Supabase" connector, whose tools are namespaced `mcp__claude_ai_Supabase__*`
+(`list_tables`, `list_migrations`, `apply_migration`, `execute_sql`, `get_advisors`,
+`deploy_edge_function`, …). It is a per-user OAuth connector, not defined in any
+`.mcp.json`/`settings.json`. **Do not add a second, standalone Supabase MCP server**: it
+would duplicate every tool and hand you a fresh `apply_migration` path that bypasses the
+gates below.
+
+Two Supabase **agent skills** add procedural guidance. Install them locally with
+`npx skills add supabase/agent-skills`; they land in the git-ignored `.agents/skills/`
+(tracked in the untracked `skills-lock.json`), so each contributor installs their own —
+they are not committed:
+- `supabase` — Database, Auth, Edge Functions, Storage, Realtime guidance.
+- `supabase-postgres-best-practices` — query optimization, schema design, RLS patterns.
+
+**Whatever a tool or skill suggests, the rules above still bind.** No `apply_migration`
+to production (migrations are applied out-of-band and reconciled — see *Migration
+discipline (MANDATORY)* and *Ledger reconciliation*); `execute_sql` only for read-only
+queries or non-schema backfills; every new `public` table needs RLS + a policy +
+`REVOKE ALL ... FROM anon` (see *Database Migrations — Security Rules*).
+
 ## Build hygiene (pre-push hook + CI)
 
 Render auto-deploys `main` on every push, so **every commit on `main` must build cleanly** — a broken build is a user-visible deploy failure.
