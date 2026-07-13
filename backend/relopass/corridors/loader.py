@@ -90,6 +90,21 @@ class CorridorStep:
     time_window_max_days: Optional[int] = None
     conditional_on: Optional[str] = None
     cite: Optional[str] = None
+    # 'action' (something is required of someone) or 'nothing_to_do' (a stated
+    # positive: nothing is required, and here is why). A returning citizen's
+    # immigration steps are genuinely nothing-to-do; rendering them as blank rows
+    # reads as a broken screen, so they are first-class rather than absent.
+    outcome_type: str = "action"
+    # Something a non-expert wouldn't know to look for — the flag the product
+    # exists to raise: the week-seven ambush, surfaced in week one.
+    non_obvious: bool = False
+    # 'information_only' or 'route_to_professional'. A personalised legal or tax
+    # determination must route to a regulated professional and must never be
+    # answered in ReloPass's own voice.
+    advice_boundary: str = "information_only"
+    # 'HARD' (the engine asserts this) or 'PENDING' (an open counsel question —
+    # surface as pending_verification, NEVER as asserted fact).
+    assertion: str = "HARD"
 
 
 @dataclass(frozen=True)
@@ -405,6 +420,25 @@ def _require(d: Mapping[str, Any], key: str, where: str) -> Any:
     return d[key]
 
 
+# Closed vocabularies. A typo in corridor content must fail the load, not sail
+# through as a silently-wrong default — 'assertion: PENIDNG' quietly becoming
+# HARD would publish an open counsel question as asserted fact.
+_OUTCOME_TYPES = ("action", "nothing_to_do")
+_ADVICE_BOUNDARIES = ("information_only", "route_to_professional")
+_ASSERTIONS = ("HARD", "PENDING")
+
+
+def _enum(step: Any, key: str, allowed: Tuple[str, ...], default: str) -> str:
+    if not isinstance(step, Mapping) or step.get(key) is None:
+        return default
+    value = str(step[key])
+    if value not in allowed:
+        raise CorridorLoadError(
+            f"step_graph[*].{key} must be one of {list(allowed)}, got {value!r}"
+        )
+    return value
+
+
 def _as_tuple(value: Any) -> Tuple[Any, ...]:
     if value is None:
         return ()
@@ -480,6 +514,10 @@ def _build_corridor(parsed: Mapping[str, Any]) -> CorridorAgent:
             time_window_max_days=(s.get("time_window_max_days") if isinstance(s, Mapping) else None),
             conditional_on=(s.get("conditional_on") if isinstance(s, Mapping) else None),
             cite=(s.get("cite") if isinstance(s, Mapping) else None),
+            outcome_type=_enum(s, "outcome_type", _OUTCOME_TYPES, "action"),
+            non_obvious=bool(s.get("non_obvious", False)) if isinstance(s, Mapping) else False,
+            advice_boundary=_enum(s, "advice_boundary", _ADVICE_BOUNDARIES, "information_only"),
+            assertion=_enum(s, "assertion", _ASSERTIONS, "HARD"),
         )
         for s in _as_tuple(cfg.get("step_graph"))
     )
