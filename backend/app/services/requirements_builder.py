@@ -157,7 +157,16 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
         # purpose field while assignmentContext.assignmentType sits empty — so the
         # assignment-type gate, and every STA waiver, has never fired for them.
         # Recover it. Only when the real field is empty: never override a real value.
-        recovered = assignment_type_from_purpose(purpose_raw)
+        #
+        # Check BOTH the column and the draft. `purpose_raw` prefers the column, and
+        # the column is now canonicalised on write (`sta` -> `employment`) — so for a
+        # freshly written case the assignment signal survives ONLY in the draft.
+        # Reading the column alone silently dropped every STA waiver on new cases;
+        # caught by live verification, not by the unit tests, because the unit tests
+        # never went through the write path.
+        recovered = assignment_type_from_purpose(purpose_raw) or assignment_type_from_purpose(
+            (draft.get("relocationBasics", {}) or {}).get("purpose")
+        )
         if recovered:
             assignment_ctx = draft.setdefault("assignmentContext", {})
             if not (assignment_ctx.get("assignmentType") or "").strip():
