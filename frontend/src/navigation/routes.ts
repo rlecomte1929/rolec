@@ -224,6 +224,9 @@ export const ROUTE_DEFS = {
   adminCorrectionsTrends: { path: '/admin/corrections/trends', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
+  // AIQ-1521 — supplier answers an RFQ by magic link. PUBLIC by design: a moving company will
+  // not create an account to give us a price.
+  supplierQuote: { path: '/supplier/quote', roles: ['PUBLIC'] as RouteRole[] },
   /** [AIQ-633] Specialist review — admin reviews AI-generated roadmap steps per case */
   adminSpecialistReview: { path: '/admin/specialist-review/:case_id', roles: ['ADMIN'] as RouteRole[] },
   /** Auth Page Design — live-tune the /auth page's GlobeNetwork canvas (platform-wide, admin-only). */

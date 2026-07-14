@@ -119,6 +119,7 @@ const HrPolicyDashboardPage = lazy(() => import('./features/platform-v2/policy-d
 const EmployeeRichProfilePage = lazy(() => import('./features/platform-v2/employee-profile/EmployeeRichProfilePage').then((module) => ({ default: module.EmployeeRichProfilePage })));
 const EmployeeIntakePage = lazy(() => import('./features/platform-v2/intake/EmployeeIntakePage').then((module) => ({ default: module.EmployeeIntakePage })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
+const SupplierQuotePage = lazy(() => import('./pages/public/SupplierQuotePage').then((module) => ({ default: module.SupplierQuotePage })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
 const DesignPreview = lazy(() => import('./pages/DesignPreview').then((module) => ({ default: module.DesignPreview })));
@@ -289,6 +290,8 @@ function App() {
         <Route path="/design-preview" element={<DesignPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}
         <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
+        {/* AIQ-1521 — supplier magic-link quote page. Public: token in the URL is the only auth. */}
+        <Route path={ROUTE_DEFS.supplierQuote.path} element={<SupplierQuotePage />} />
         <Route path="/journey" element={<RequireEmployeeRoute><Journey /></RequireEmployeeRoute>} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />

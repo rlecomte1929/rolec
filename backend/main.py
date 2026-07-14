@@ -216,6 +216,7 @@ from .app.routers import hr_case_escalation as hr_case_escalation_router  # W2-3
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
 from .app.routers import provider_portal as provider_portal_router  # H2 — external provider portal (dual-layer per CLAUDE.md)
+from .app.routers import supplier_rfq as supplier_rfq_router  # AIQ-1521 — supplier magic-link (dual-layer per CLAUDE.md)
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
@@ -857,6 +858,10 @@ app.include_router(setup_assistant_router.router)  # Setup & Help Assistant — 
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
 app.include_router(provider_portal_router.router)  # H2 — /api/provider/{tasks,case-summary,profile}
+# AIQ-1521 — supplier magic-link. Registered HERE too (not just backend/app/main.py): Render boots
+# `uvicorn backend.main:app`, so a router registered only in the modular app 405s in production.
+app.include_router(supplier_rfq_router.router)     # /api/supplier/rfq (token-scoped, no account)
+app.include_router(supplier_rfq_router.hr_router)  # /api/hr/rfqs/{id}/supplier-links
 app.include_router(employee_quotes_router.router)
 app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provider ratings
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard

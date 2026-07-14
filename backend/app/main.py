@@ -40,6 +40,7 @@ from .routers import (
     employee_quotes,
     employee_steps,
     provider_portal,
+    supplier_rfq,
     provider_ratings,
     hr_vendor_performance,
     exception_requests,
@@ -138,6 +139,8 @@ def create_app() -> FastAPI:
     app.include_router(ocr.router)  # [AIQ-1148] /api/ocr/process — general document OCR
     app.include_router(employee_quotes.router)
     app.include_router(provider_portal.router)  # H2 — external provider portal (/api/provider/{tasks,case-summary,profile})
+    app.include_router(supplier_rfq.router)     # AIQ-1521 — supplier magic-link (/api/supplier/rfq)
+    app.include_router(supplier_rfq.hr_router)  # AIQ-1521 — HR mints/sends the links
     app.include_router(provider_ratings.router)  # CATALOG-3 employee provider ratings
     app.include_router(hr_vendor_performance.router)  # NAV-SP-2 HR vendor performance dashboard
     app.include_router(employee_steps.router)  # [B11/AIQ-421] /api/employee/steps/4 → quote-request alias
