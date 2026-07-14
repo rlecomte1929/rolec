@@ -35,6 +35,7 @@ const envSchema = z.object({
   VITE_SUPABASE_ANON_KEY: z.string().min(1),
   VITE_POSTHOG_KEY: optionalString,
   VITE_POSTHOG_HOST: optionalString,
+  VITE_ENABLE_PASSKEYS: optionalString,
 });
 
 const raw = {
@@ -44,6 +45,7 @@ const raw = {
   VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
   VITE_POSTHOG_KEY: import.meta.env.VITE_POSTHOG_KEY as string | undefined,
   VITE_POSTHOG_HOST: import.meta.env.VITE_POSTHOG_HOST as string | undefined,
+  VITE_ENABLE_PASSKEYS: import.meta.env.VITE_ENABLE_PASSKEYS as string | undefined,
 };
 
 const parsed = envSchema.safeParse(raw);
@@ -78,6 +80,15 @@ export const env = {
   supabaseAnonKey: data.VITE_SUPABASE_ANON_KEY,
   posthogKey: data.VITE_POSTHOG_KEY,
   posthogHost: data.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+  /**
+   * [AIQ-1491] Passkey sign-in + registration. OFF unless explicitly set to
+   * 'true'. Passkeys additionally require the WebAuthn toggle to be enabled on
+   * the Supabase project — while that is off, every passkey call fails, so the
+   * UI must not be reachable. Absent this flag the button and the Settings
+   * section do not render at all: a POC that ships a dead end to every user on
+   * the login page is not "additive".
+   */
+  enablePasskeys: data.VITE_ENABLE_PASSKEYS === 'true',
   /** Vite-provided runtime flags. */
   isDev: DEV,
   isProd: PROD,

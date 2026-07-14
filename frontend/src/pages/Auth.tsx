@@ -8,6 +8,7 @@ import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/api
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import { supabase } from '../api/supabase';
+import { env } from '../config/env';
 import { swallow } from '../lib/errorTracking';
 import { GlobeNetwork } from '../components/auth/GlobeNetwork';
 import { useAuthPageConfig } from '../hooks/useAuthPageConfig';
@@ -288,7 +289,22 @@ export const Auth: React.FC = () => {
     try {
       await loginWithPasskey();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Passkey sign-in failed. Register a passkey from Settings first, or use your password.'));
+      // Two different error shapes reach here. The token-exchange leg is axios
+      // (detail in err.response.data.detail); the WebAuthn leg is a Supabase
+      // AuthError, which has no `.response` at all — so getApiErrorMessage
+      // silently yields its fallback. Fall back to err.message before the
+      // generic hint, or a project with WebAuthn disabled reports "register a
+      // passkey from Settings first" — advice that sends the user to a second
+      // button that fails for the very same reason.
+      const supabaseMessage =
+        typeof (err as { message?: unknown })?.message === 'string'
+          ? (err as { message: string }).message
+          : '';
+      setError(
+        getApiErrorMessage(err, '') ||
+          supabaseMessage ||
+          'Passkey sign-in failed. Use your password instead.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -612,12 +628,17 @@ export const Auth: React.FC = () => {
                 </Button>
               </div>
 
-              {/* [AIQ-1491] Passwordless passkey sign-in (POC). */}
-              <Button type="button" variant="ghost" onClick={() => void handlePasskeySignIn()}
-                disabled={isLoading} fullWidth
-                className="flex items-center justify-center gap-2 !py-2.5 mt-3 border border-slate-200 text-sm !text-slate-700 hover:!bg-slate-50 transition-colors">
-                <Fingerprint className="w-4 h-4" /> Sign in with a passkey
-              </Button>
+              {/* [AIQ-1491] Passwordless passkey sign-in (POC). Dark by default:
+                  passkeys also need the WebAuthn toggle enabled on the Supabase
+                  project, and until that lands every click here dead-ends. Set
+                  VITE_ENABLE_PASSKEYS=true to light it up on staging. */}
+              {env.enablePasskeys && (
+                <Button type="button" variant="ghost" onClick={() => void handlePasskeySignIn()}
+                  disabled={isLoading} fullWidth
+                  className="flex items-center justify-center gap-2 !py-2.5 mt-3 border border-slate-200 text-sm !text-slate-700 hover:!bg-slate-50 transition-colors">
+                  <Fingerprint className="w-4 h-4" /> Sign in with a passkey
+                </Button>
+              )}
 
               <p className="text-center text-sm text-slate-500 mt-5">
                 New to ReloPass?{' '}

@@ -11,6 +11,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { Avatar, Pill } from '../shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { env } from '../../../config/env';
 import type { UserRole } from '../../../types/relopass-api-contracts';
 
 // ─── Passkey (AIQ-1491) ──────────────────────────────────────────────────────
@@ -294,8 +295,11 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
         </Button>
       </div>
 
-      {/* [AIQ-1491] Passkey registration — additive, type="button" so it never submits the form. */}
-      <PasskeySection />
+      {/* [AIQ-1491] Passkey registration — additive, type="button" so it never
+          submits the form. Behind VITE_ENABLE_PASSKEYS: registration needs the
+          Supabase WebAuthn toggle, so while that's off this section can only
+          fail. Hidden rather than shown-and-broken. */}
+      {env.enablePasskeys && <PasskeySection />}
     </form>
   );
 }
