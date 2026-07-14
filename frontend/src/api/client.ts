@@ -557,6 +557,9 @@ export interface HrQuoteRequest {
   status: string;
   created_at: string;
   updated_at: string;
+  // [AIQ-1514/1515] The vendors the employee shortlisted. Absent/empty on requests created
+  // before AIQ-1514 — that choice was never captured and cannot be recovered.
+  vendors?: Array<{ service_category: string; item_id: string; name: string }>;
 }
 
 export interface VendorPerformanceResponse {

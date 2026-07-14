@@ -21,8 +21,9 @@ const SERVICE_LABELS: Record<string, string> = {
   electricity: 'Electricity',
 };
 
+// [AIQ-1515] Was "you ask shortlisted vendors for formal prices" — you don't; HR does.
 const RFQ_SUBTITLE =
-  'RFQ means Request For Quotation: you ask shortlisted vendors for formal prices, then compare their offers.';
+  'RFQ means Request For Quotation: your HR team asks your shortlisted vendors for formal prices, then you compare their offers.';
 
 export const ServicesRfqNew: React.FC = () => {
   const navigate = useNavigate();
@@ -186,8 +187,12 @@ export const ServicesRfqNew: React.FC = () => {
       <RfqWorkflowDiagram />
 
       <p className="text-sm font-medium text-[#0b2b43] mt-8 mb-3">Your shortlisted vendors</p>
+      {/* [AIQ-1515] This used to read "These are the providers your requests will go to."
+          Nothing is sent to a provider — the request goes to HR, who contacts the vendor.
+          Say what actually happens. */}
       <p className="text-xs text-[#64748b] mb-4">
-        Add an optional note for each, then send. These are the providers your requests will go to.
+        Add an optional note for each, then send. Your HR team requests the quotes from these
+        providers on your behalf.
       </p>
       {shortlisted.map(({ service, vendor }) => (
         <div key={`${service}-${vendor.item_id}`} className="border border-[#e2e8f0] rounded-lg p-4 mb-3 bg-white">
@@ -207,7 +212,10 @@ export const ServicesRfqNew: React.FC = () => {
           data-testid="rfq-sent"
           className="mt-4 flex items-start gap-2 rounded-lg border border-green-100 bg-green-50 p-3 text-sm text-green-700"
         >
-          ✅ <span>Quotation requests sent — your HR team will follow up, and we&apos;ve added them to your roadmap.</span>
+          {/* [AIQ-1515] Was "Quotation requests sent", which implied the vendors had been
+              contacted. They have not — the request goes to HR, who now sees exactly which
+              vendors you picked and requests the quotes. */}
+          ✅ <span>Sent to your HR team — they can see the vendors you picked and will request the quotes. We&apos;ve added this to your roadmap.</span>
         </div>
       ) : (
         <div className="mt-4 flex flex-col items-end gap-2">
