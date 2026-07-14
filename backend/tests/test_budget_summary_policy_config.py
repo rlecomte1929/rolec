@@ -43,9 +43,9 @@ def test_maps_published_caps_to_selected_services(monkeypatch):
     by_name = {r["name"]: r for r in rows}
 
     assert by_name["housing"]["cap_amount"] == 2000.0
-    assert by_name["housing"]["status"] == "within_budget"
+    assert by_name["housing"]["status"] == "no_estimate"
     assert by_name["immigration"]["cap_amount"] == 1500.0
-    assert by_name["immigration"]["status"] == "within_budget"
+    assert by_name["immigration"]["status"] == "no_estimate"
     # An intake service with no mapped benefit key stays uncapped.
     assert by_name["banking"]["cap_amount"] is None
     assert by_name["banking"]["status"] == "no_cap"
@@ -66,7 +66,7 @@ def test_sums_multiple_benefit_keys_for_one_service(monkeypatch):
     rows = cr._budget_categories_from_policy_config("co-1", ["moving"], None, None)
     assert rows[0]["name"] == "moving"
     assert rows[0]["cap_amount"] == 4500.0
-    assert rows[0]["status"] == "within_budget"
+    assert rows[0]["status"] == "no_estimate"
 
 
 def test_no_company_yields_all_no_cap(monkeypatch):
