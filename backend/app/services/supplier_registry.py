@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Supplier, SupplierServiceCapability, SupplierScoringMetadata
@@ -19,6 +20,14 @@ from .supplier_validation import (
     validate_supplier_create,
     validate_supplier_update,
 )
+
+
+class DuplicateSupplierError(ValueError):
+    """[AIQ-1511] A supplier with this name already exists.
+
+    Subclasses ValueError so existing `except ValueError` callers keep working; routers
+    that want the distinct 409 catch this first (see routers/suppliers.py).
+    """
 
 log = logging.getLogger(__name__)
 
@@ -311,10 +320,30 @@ def _supplier_to_recommendation_item(
 
 
 def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create supplier with optional capabilities and scoring. Use data['id'] for explicit id (e.g. when seeding from recommendation datasets)."""
+    """Create supplier with optional capabilities and scoring. Use data['id'] for explicit id (e.g. when seeding from recommendation datasets).
+
+    Raises DuplicateSupplierError if the name already exists (case/whitespace-insensitive).
+    """
     ok, err = validate_supplier_create(data)
     if not ok:
         raise ValueError(err or "Validation failed")
+
+    # [AIQ-1511] The registry is keyed by id, but a supplier is identified by NAME. An
+    # explicit id (used when seeding from the recommendation datasets) is exactly how the
+    # duplicate rows got in: the same ten movers were inserted once with uuid4 ids and once
+    # with the dataset's 'm-N' ids. Reject the name up-front so the caller gets a 409 rather
+    # than a raw unique_violation from uq_suppliers_name_ci (migration 20260913000000).
+    name = (data.get("name") or "").strip()
+    existing = (
+        session.query(Supplier.id)
+        .filter(func.lower(func.trim(Supplier.name)) == name.lower())
+        .first()
+    )
+    if existing:
+        raise DuplicateSupplierError(
+            f"A supplier named '{name}' already exists (id={existing[0]})."
+        )
+
     sid = (data.get("id") or "").strip() or str(uuid.uuid4())
     s = Supplier(
         id=sid,
