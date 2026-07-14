@@ -8,7 +8,7 @@
  * membership check reads `undefined` and the employee's shortlist quietly empties.
  */
 import { describe, it, expect } from 'vitest';
-import { toShortlistMap } from '../ServicesFlowContext';
+import { toShortlistMap } from '../shortlist';
 
 describe('toShortlistMap', () => {
   it('migrates the legacy single-value shape', () => {
