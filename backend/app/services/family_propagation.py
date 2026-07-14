@@ -31,6 +31,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from .nationality_class import is_free_movement_national
+
 
 # ─── EU / EEA countries ───────────────────────────────────────────────────────
 # Used to determine if a partner has free movement rights.
@@ -62,9 +64,14 @@ _FAMILY_REUNIFICATION_DESTINATIONS = frozenset({
 
 
 def _is_eu_national(nationality: Optional[str]) -> bool:
-    if not nationality:
-        return False
-    return nationality.strip().lower() in _EU_EEA_COUNTRIES
+    """Delegates to the single free-movement classifier — see
+    nationality_class.is_free_movement_national. This was a third independent copy
+    of the same predicate, built from a name/ISO set with no adjectival forms, so
+    a spouse recorded as "French" was treated as a third-country national.
+
+    `_EU_EEA_COUNTRIES` stays for `_is_eu_destination` (a different question).
+    """
+    return is_free_movement_national(nationality)
 
 
 def _is_eu_destination(destination: Optional[str]) -> bool:

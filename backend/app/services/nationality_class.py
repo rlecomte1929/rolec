@@ -151,3 +151,24 @@ def classify(nationality: Optional[str], dest_country: Optional[str]) -> Optiona
     if dest in _EEA and nat in _FREE_MOVEMENT:
         return EU_EEA
     return THIRD_COUNTRY
+
+
+def is_free_movement_national(nationality: Optional[str]) -> bool:
+    """True when this nationality is from the EU/EEA/CH free-movement area.
+
+    Destination-independent on purpose: callers pair it with their own
+    destination check (`immigration_regime._is_eu_destination`). Use `classify`
+    when you need the full three-way answer for a (nationality, destination) pair.
+
+    This exists so there is exactly ONE answer to "does this person have free
+    movement?" in the product. `immigration_regime` and `family_propagation` each
+    grew their own EU set built from country names and ISO codes ("france", "fr")
+    with no adjectival forms — and adjectival is what production actually stores.
+    So `classify("French", "FRANCE")` said OWN_NATIONAL (no visa required) while
+    their `_is_eu_national("French")` said False (build a permit journey). The same
+    citizen was told two different things by two different screens. Delegating to
+    this function also buys those callers the ISO-3166 whitelist (junk cannot
+    become a country), the adjectival/country-name tables, and Swiss AFMP handling.
+    """
+    iso = _nationality_to_iso(nationality)
+    return bool(iso and iso in _FREE_MOVEMENT)

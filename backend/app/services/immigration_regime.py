@@ -30,6 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
+from .nationality_class import is_free_movement_national
+
 
 # ─── Country / nationality sets ───────────────────────────────────────────────
 
@@ -77,7 +79,19 @@ def _n(s: Optional[str]) -> str:
 
 
 def _is_eu_national(nationality: Optional[str]) -> bool:
-    return _n(nationality) in _EU_EEA_COUNTRIES
+    """Delegates to the single free-movement classifier.
+
+    This used to be `_n(nationality) in _EU_EEA_COUNTRIES`. That set holds country
+    names and ISO codes ("france", "fr") but NO adjectival forms — and adjectival
+    is what production actually stores ("French", "Norwegian", "Austrian"). So a
+    French citizen was classed as a third-country national here and given a
+    work-permit journey, while the requirements engine correctly told them no visa
+    was required. One employee, two contradictory answers.
+
+    `_EU_EEA_COUNTRIES` stays: it is still the right set for `_is_eu_destination`,
+    which asks a different question (is the DESTINATION inside the area).
+    """
+    return is_free_movement_national(nationality)
 
 
 def _is_eu_destination(destination: Optional[str]) -> bool:
