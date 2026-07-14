@@ -62,9 +62,14 @@ def _in_country_move(case_id: str, dest_raw: str, purpose: str) -> CaseRequireme
     relocation_classifier both drop the immigration phase for these.
     """
     where = resolve_catalog_country(dest_raw)
+    # Precise about what is waived. No border is crossed, so nothing IMMIGRATION-related
+    # applies — but a domestic move usually still means re-registering your address with
+    # the local authority (an Anmeldung is required again when moving Berlin -> Munich).
+    # Claiming "no registration applies" would trade one wrong answer for another.
     reason = (
-        f"This is a move within {where.title()} — you are not crossing a border. "
-        "No visa, residence permit or immigration registration applies."
+        f"This is a move within {where.title()} — you are not crossing a border, so no "
+        "visa, residence permit or immigration process applies. You may still need to "
+        "update your address with the local authority."
     )
     return CaseRequirementsDTO(
         caseId=case_id,
@@ -187,6 +192,34 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         sources = crud.list_sources(db, dest_country)
         requirements = crud.list_requirements(db, dest_country, purpose)
+
+        # AN EMPTY LIST MUST NEVER MAKE A CLAIM.
+        #
+        # This used to be a third state: the destination IS catalogued but has no rows
+        # for this purpose ("a catalog gap — covered=True, empty, deliberately not
+        # merged"). The client then had an empty requirements array with covered=True
+        # and rendered "No destination requirements apply to your case."
+        #
+        # For GERMANY + employment — 372 production cases, the single biggest corridor
+        # — that was flatly false. Germany was seeded `[other]` only, so every
+        # employment relocation there found zero rows and was told nothing was required
+        # of them.
+        #
+        # From the employee's side, "we have no catalogue for your country" and "we have
+        # no catalogue for your country and purpose" are the same fact: WE CANNOT TELL
+        # YOU WHAT YOU NEED. The distinction was diagnostic, and keeping it split is what
+        # produced the lie. Fail closed, as the destination half already does.
+        #
+        # Note this cannot swallow a legitimate "nothing required": the only case where
+        # that is true is an in-country move, which short-circuits above and returns a
+        # STATED confirmation — a non-empty list.
+        if not requirements:
+            log.warning(
+                "requirements: catalog gap — no rows for (%s, %s); returning covered=False "
+                "for case %s rather than an empty list that reads as 'nothing required'",
+                dest_country, purpose, case.id,
+            )
+            return _not_covered(case.id, dest_raw, purpose)
 
         base_items = [
             {

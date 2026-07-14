@@ -172,15 +172,24 @@ def _immigration_confirmation(
     nothing rather than invent a right the person does not have.
     """
     where = (dest_country or "the destination").title()
+    # The second sentence is load-bearing. Free movement removes the IMMIGRATION
+    # permission — it does not remove the paperwork. A German national still owes the
+    # Anmeldung; a Dutch one still owes the gemeente/BSN registration. The original
+    # copy said "no visa, residence permit, or immigration REGISTRATION applies" and
+    # then sat directly above a row titled "Residence registration (Anmeldung)" —
+    # flatly contradicting itself, and inviting someone to skip a legal obligation.
+    # Say precisely what is waived, and say that the rest still stands.
     if nationality_class == OWN_NATIONAL:
         reason = (
             f"You are a national of {where}. You have the right of entry and residence in "
-            "your own country — no visa, residence permit, or immigration registration applies."
+            "your own country — no visa or residence permit is required. Any other steps "
+            "listed here (such as local registration) still apply."
         )
     elif nationality_class == EU_EEA:
         reason = (
             f"You are an EU/EEA national moving to {where}. Freedom of movement applies — "
-            "no visa or work permit is required."
+            "no visa or residence permit is required. Any other steps listed here (such as "
+            "local registration) still apply."
         )
     else:
         return None
