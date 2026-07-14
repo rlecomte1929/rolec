@@ -11,8 +11,11 @@ interface ServicesFlowState {
   setAnswers: (next: Record<string, unknown> | ((prev: Record<string, unknown>) => Record<string, unknown>)) => void;
   recommendations: Record<string, RecommendationResponse> | null;
   setRecommendations: (next: Record<string, RecommendationResponse> | null) => void;
-  shortlist: Map<string, string>;
-  setShortlist: (next: Map<string, string>) => void;
+  /** [AIQ-1520] MANY vendors per service category — a real RFQ asks 3 movers, not 1.
+   *  Was Map<category, item_id>. Never leave a category mapped to an empty array:
+   *  ServicesEstimate gates its CTA on `shortlist.size > 0`. */
+  shortlist: Map<string, string[]>;
+  setShortlist: (next: Map<string, string[]>) => void;
   /** ISO 4217 code — used for all service-flow estimates (converted from USD baseline). */
   displayCurrency: string;
   setDisplayCurrency: (code: string) => void;
@@ -29,6 +32,36 @@ interface ServicesFlowState {
 const ServicesFlowContext = createContext<ServicesFlowState | null>(null);
 
 const SAVE_DEBOUNCE_MS = 700;
+
+/**
+ * [AIQ-1520] Hydrate the shortlist from either shape.
+ *
+ * The stored shape (localStorage AND the server-side `services_state` blob) is
+ * `[category, item_id][]`. It is now `[category, item_id[]][]`. Real users have the old one
+ * on disk right now, so hydration must accept both:
+ *
+ *   legacy  ["movers", "m-2"]        -> ["m-2"]
+ *   new     ["movers", ["m-2","m-4"]] -> passes through (idempotent)
+ *   junk                              -> skipped, never throws
+ *
+ * Empty arrays are PRUNED: `ServicesEstimate` gates its "Request quotations" CTA on
+ * `shortlist.size > 0`, so a category left with `[]` after de-selecting its last vendor
+ * would falsely enable it.
+ */
+export const toShortlistMap = (raw: unknown): Map<string, string[]> => {
+  const map = new Map<string, string[]>();
+  if (!Array.isArray(raw)) return map;
+  for (const entry of raw) {
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    const [category, value] = entry as [unknown, unknown];
+    if (typeof category !== 'string' || !category) continue;
+    const ids = (Array.isArray(value) ? value : [value]).filter(
+      (v): v is string => typeof v === 'string' && v.length > 0,
+    );
+    if (ids.length) map.set(category, ids);
+  }
+  return map;
+};
 
 export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceKey>>(() => {
@@ -55,10 +88,10 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return null;
     }
   });
-  const [shortlist, setShortlist] = useState<Map<string, string>>(() => {
+  const [shortlist, setShortlist] = useState<Map<string, string[]>>(() => {
     try {
       const raw = localStorage.getItem('services_shortlist');
-      return raw ? new Map(JSON.parse(raw) as [string, string][]) : new Map();
+      return raw ? toShortlistMap(JSON.parse(raw)) : new Map();
     } catch {
       return new Map();
     }
@@ -121,7 +154,9 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
             );
           }
           if (Array.isArray(s.shortlist)) {
-            setShortlist(new Map(s.shortlist as [string, string][]));
+            // [AIQ-1520] Same tolerant hydration as localStorage — the server blob also
+            // holds the legacy one-vendor-per-category shape for existing cases.
+            setShortlist(toShortlistMap(s.shortlist));
           }
           if (typeof s.displayCurrency === 'string') {
             setDisplayCurrency(s.displayCurrency);

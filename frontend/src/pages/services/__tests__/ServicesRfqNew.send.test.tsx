@@ -41,7 +41,8 @@ vi.mock('../../../features/services/ServicesFlowContext', () => ({
       living_areas: { recommendations: [{ item_id: 'v1', name: 'Acme Housing' }] },
       movers: { recommendations: [{ item_id: 'v2', name: 'Move It' }] },
     },
-    shortlist: new Map([['living_areas', 'v1'], ['movers', 'v2']]),
+    // [AIQ-1520] shortlist is now category -> MANY item_ids.
+    shortlist: new Map([['living_areas', ['v1']], ['movers', ['v2']]]),
   }),
 }));
 
