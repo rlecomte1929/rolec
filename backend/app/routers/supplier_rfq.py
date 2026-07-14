@@ -16,7 +16,7 @@ its full life) — submitting a quote is a financial write and does not get that
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -25,6 +25,7 @@ from sqlalchemy import text
 
 from ...database import db
 from ..auth_deps import require_admin_or_hr
+from ..services.rfq_brief import RESPONSE_EXPECTATIONS, RESPONSE_WINDOW_DAYS, render_brief_lines
 from ..services.supplier_jwt import hash_token, verify_supplier_token
 from ..services.supplier_link_dispatch import dispatch_supplier_links, resolve_rfq_targets
 
@@ -118,14 +119,33 @@ def get_supplier_rfq(recipient: Dict[str, Any] = Depends(require_supplier_link))
         except Exception:
             log.warning("supplier_rfq: could not mark viewed recipient=%s", recipient["id"], exc_info=True)
 
+    # The vendor gets a real BRIEF, not a service name and a shrug: the facts we hold, the gaps
+    # marked "Not specified" rather than guessed, and an explicit statement of what a good answer
+    # looks like. Without it they cannot price the job — and a vendor who cannot price does not
+    # reply, which reads as "suppliers don't respond" when the truth is "we asked badly".
     return {
         "rfq_ref": rfq.get("rfq_ref"),
         "items": [
-            {"service_key": i.get("service_key"), "requirements": i.get("requirements") or {}}
+            {
+                "service_key": i.get("service_key"),
+                "brief": render_brief_lines(i.get("requirements") or {}),
+            }
             for i in (rfq.get("items") or [])
         ],
+        "expectations": RESPONSE_EXPECTATIONS,
+        "respond_by": _respond_by_for(recipient),
         "already_quoted": bool(recipient.get("quote_submitted_at")),
     }
+
+
+def _respond_by_for(recipient: Dict[str, Any]) -> str:
+    """A concrete date, not "soon". Anchored to when the link was sent."""
+    invited = recipient.get("invited_at")
+    try:
+        base = _as_utc(invited) if invited else datetime.now(tz=timezone.utc)
+    except Exception:
+        base = datetime.now(tz=timezone.utc)
+    return (base + timedelta(days=RESPONSE_WINDOW_DAYS)).date().isoformat()
 
 
 @router.post("/rfq/quote")

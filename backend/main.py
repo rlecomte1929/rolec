@@ -9099,11 +9099,34 @@ def create_rfq(
             detail="; ".join(unreachable) or "No reachable suppliers for this request.",
         )
 
+    # AIQ-1521 follow-up: build the vendor's brief SERVER-SIDE from the case.
+    #
+    # The vendor used to receive the word "movers" plus whatever free text the employee happened
+    # to type — while we already knew the route and the date and sent neither. A vendor who can't
+    # see the route can't quote, and if they don't reply we'd wrongly conclude "suppliers don't
+    # respond" when in fact we asked badly.
+    #
+    # The case is the source of truth for the facts (route, date); the client is only trusted for
+    # what the platform cannot know (property, storage, special items).
+    try:
+        case_row = db.get_case_by_id(effective_case_id) or {}
+    except Exception:
+        log.warning("create_rfq: could not load case for the brief case_id=%s", effective_case_id)
+        case_row = {}
+
+    enriched_items = []
+    for item in payload.items:
+        raw = item.model_dump(mode="json")
+        if raw.get("service_key") == "movers":
+            from .app.services.rfq_brief import build_movers_requirements
+            raw["requirements"] = build_movers_requirements(case_row, raw.get("requirements") or {})
+        enriched_items.append(raw)
+
     try:
         result = db.create_rfq(
             case_id=effective_case_id,
             creator_user_id=user.get("id"),
-            items=[i.model_dump(mode="json") for i in payload.items],
+            items=enriched_items,
             vendor_ids=valid_vids,
             request_id=req_id,
         )
