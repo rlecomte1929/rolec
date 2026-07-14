@@ -148,6 +148,15 @@ class EmailBodyTests(unittest.TestCase):
         self.assertIn("Santa Fe", html)
         self.assertIn("#1f8e8b", html)  # DESIGN.md accent, not a stray colour
 
+    def test_a_supplier_name_cannot_inject_markup_into_the_email(self):
+        """suppliers.name is not trusted input — the catalog is part crowd-sourced (HR
+        vendor-curation) and part LLM-scraped, so a name can carry markup."""
+        html = sld.rfq_email_html(
+            '<script>alert(1)</script>', "https://relopass.com/supplier/quote?token=abc"
+        )
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;", html)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
+from html import escape
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -39,13 +40,19 @@ NO_ADDRESS = "no contact email on record"
 
 
 def rfq_email_html(supplier_name: str, link: str) -> str:
+    # Escape before interpolating. `supplier_name` is NOT trusted input: the catalog is partly
+    # crowd-sourced (HR vendor-curation) and partly LLM-scraped, so a name can carry markup. The
+    # blast radius is small — the mail goes to that supplier — but an unescaped f-string into an
+    # HTML body is how this stops being small later.
+    safe_name = escape(supplier_name or "")
+    safe_link = escape(link, quote=True)
     return f"""
       <div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;line-height:1.5">
-        <p>Hello{(' ' + supplier_name) if supplier_name else ''},</p>
+        <p>Hello{(' ' + safe_name) if safe_name else ''},</p>
         <p>A company relocating an employee would like a quote from you.</p>
         <p>You can see what they need and send your price here — there is no account to create
            and nothing to install:</p>
-        <p><a href="{link}"
+        <p><a href="{safe_link}"
               style="display:inline-block;background:#1f8e8b;color:#fff;padding:12px 20px;
                      border-radius:8px;text-decoration:none;font-weight:600">
              View the request and quote
