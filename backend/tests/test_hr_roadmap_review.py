@@ -48,39 +48,63 @@ class TestAnAbsentDecisionMeansReleased:
         assert RoadmapReviewDTO(case_id="c1").released_to_user is True
 
     def test_the_plan_view_falls_open_when_the_lookup_dies(self):
-        """A gate's own query failing must not hide someone's relocation plan.
-
-        NOTE: `session_factory` is a PARAMETER of the plan-view builder, not a module
-        global. My first cut of _resolve_roadmap_release referenced it as a global —
-        inside a try/except, so the NameError would have been swallowed, the gate would
-        have silently never engaged, and every roadmap would have looked released. This
-        test is what surfaced it."""
+        """A gate's own query failing must not hide someone's relocation plan."""
         from backend.app.services import relocation_plan_view_service as svc
 
-        def boom():
-            raise RuntimeError("db down")
+        class _Db:
+            def get_roadmap_release(self, _cid):
+                raise RuntimeError("db down")
 
-        released, notes = svc._resolve_roadmap_release(boom, "c1")
-        assert released is True
-        assert notes is None
+        assert svc._resolve_roadmap_release(_Db(), "c1") is True
+
+    def test_the_plan_view_falls_open_when_the_db_lacks_the_method(self):
+        """Older/fake db handles have no get_roadmap_release. AttributeError -> released,
+        not a 500 and not a hidden plan."""
+        from backend.app.services import relocation_plan_view_service as svc
+
+        assert svc._resolve_roadmap_release(object(), "c1") is True
+
+    def test_no_row_is_released(self):
+        from backend.app.services import relocation_plan_view_service as svc
+
+        class _Db:
+            def get_roadmap_release(self, _cid):
+                return None
+
+        assert svc._resolve_roadmap_release(_Db(), "c1") is True
 
     def test_the_release_is_actually_read_when_the_row_exists(self):
-        """The other half: the gate must ACTUALLY engage, not just fail open."""
-        from contextlib import contextmanager
+        """The other half: the gate must ACTUALLY engage, not just fail open.
 
+        Failing open is the right DEFAULT; failing open because the code is broken is
+        not the same thing. Two earlier cuts of this function passed a `session_factory`
+        that is a parameter of a DIFFERENT function in that module — undefined at the
+        call site. This pins that the gate genuinely holds a plan back."""
         from backend.app.services import relocation_plan_view_service as svc
 
-        class _Session:
-            def get(self, _model, _cid):
-                return _Row(released=False, regen=True, notes="Budget wrong.")
+        class _Db:
+            def get_roadmap_release(self, _cid):
+                return {"released_to_user": False, "regeneration_requested": True}
 
-        @contextmanager
-        def factory():
-            yield _Session()
+        assert svc._resolve_roadmap_release(_Db(), "c1") is False, (
+            "an unreleased roadmap must actually be held back"
+        )
 
-        released, notes = svc._resolve_roadmap_release(factory, "c1")
-        assert released is False, "an unreleased roadmap must actually be held back"
-        assert notes == "Budget wrong."
+
+class TestTheEmployeePayloadNeverCarriesHrsPrivateNotes:
+    """`roadmap_review_status.notes` is HR's internal reason for sending a plan back
+    ("housing budget is wrong") — written for an internal audience. The employee is told
+    THAT their plan is with HR, never HR's private wording. I shipped the notes into the
+    employee's plan-view payload on the first cut; this pins that they stay out."""
+
+    def test_the_plan_view_response_has_no_notes_field(self):
+        from backend.relocation_plan_view_schemas import RelocationPlanViewResponse
+
+        fields = RelocationPlanViewResponse.model_fields
+        assert "roadmap_released" in fields, "the employee UI needs the flag"
+        assert "roadmap_review_notes" not in fields, (
+            "HR's private review notes must not reach the employee's payload"
+        )
 
 
 class TestHrDecisionsAreDistinguishable:

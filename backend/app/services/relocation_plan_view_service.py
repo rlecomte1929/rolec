@@ -442,8 +442,20 @@ def _build_next_action_schema(
     )
 
 
-def _resolve_roadmap_release(session_factory: Any, case_id: str):
-    """HR's decision on this roadmap: (released_to_user, notes).
+def _resolve_roadmap_release(db, case_id: str) -> bool:
+    """Has HR released this roadmap to the employee?
+
+    Takes the same `db` handle as `_resolve_roadmap_validation` right above — do NOT
+    reach for a second session path here. My first two cuts passed a `session_factory`,
+    which is a parameter of a DIFFERENT function in this module; inside
+    `build_relocation_plan_view_response` that name is simply undefined, and the whole
+    plan view 500s.
+
+    Returns the flag ONLY. `roadmap_review_status.notes` is deliberately NOT surfaced
+    here: this is the EMPLOYEE's payload, and the notes are HR's internal reason for
+    sending a plan back ("housing budget is wrong"), written for an internal audience.
+    The employee is told THAT their plan is with HR, never HR's private wording. The
+    notes are read by the HR review panel, behind HR auth.
 
     FAILS OPEN, twice over, and both are deliberate:
 
@@ -457,16 +469,13 @@ def _resolve_roadmap_release(session_factory: Any, case_id: str):
     because we are unsure.
     """
     try:
-        from ..models import RoadmapReviewStatus
-
-        with session_factory() as session:
-            row = session.get(RoadmapReviewStatus, case_id)
-            if row is None:
-                return True, None
-            return bool(row.released_to_user), row.notes
+        row = db.get_roadmap_release(case_id)
     except Exception as exc:  # noqa: BLE001
         log.warning("plan view: roadmap release lookup failed for %s (%s); showing the plan", case_id, exc)
-        return True, None
+        return True
+    if not isinstance(row, dict):
+        return True  # no decision recorded -> released
+    return bool(row.get("released_to_user"))
 
 
 def _resolve_roadmap_validation(db, case_id, summary):
@@ -612,7 +621,7 @@ def build_relocation_plan_view_response(
                 debug_payload.setdefault("derivation_traces", {})[t.task_code] = dbg
 
     rv_validated, rv_at, rv_by = _resolve_roadmap_validation(db, case_id, summary)
-    _released, _review_notes = _resolve_roadmap_release(session_factory, case_id)
+    _released = _resolve_roadmap_release(db, case_id)
 
     return RelocationPlanViewResponse(
         case_id=case_id,
@@ -628,7 +637,6 @@ def build_relocation_plan_view_response(
         roadmap_validated_at=rv_at,
         roadmap_validated_by=rv_by,
         roadmap_released=_released,
-        roadmap_review_notes=_review_notes,
         debug=debug_payload,
     )
 

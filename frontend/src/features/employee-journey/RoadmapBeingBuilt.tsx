@@ -15,8 +15,10 @@ interface RoadmapBeingBuiltProps {
    * - 'generating' (default): plan is still being built — reassuring "preparing" screen.
    * - 'empty': resolved with zero steps — informative, with a "Check again" retry.
    * - 'failed': load/generation error or timeout — error screen with a "Try again" retry.
+   * - 'in_review': the plan IS built, but HR hasn't released it yet. NOT a "not ready"
+   *   state — nothing is being generated and there is nothing to retry.
    */
-  variant?: 'generating' | 'empty' | 'failed';
+  variant?: 'generating' | 'empty' | 'failed' | 'in_review';
   /** Optional CTA — omit to hide the "Message my relocation team" button. */
   onMessageTeam?: () => void;
   /** Retry handler — shown for 'empty' and 'failed' so neither is a dead end. */
@@ -104,6 +106,16 @@ const COPY = {
       'again, or message your relocation team if it keeps happening.',
     retryLabel: 'Try again',
   },
+  // The plan is BUILT and waiting on a human. Say exactly that. We deliberately do not
+  // show HR's review notes — those are HR's internal reason, written for an internal
+  // audience, and the backend does not send them to the employee.
+  in_review: {
+    title: 'Your HR team is reviewing your plan',
+    body:
+      'Your relocation plan is ready and with your HR team for approval. You\'ll be able to ' +
+      "start your tasks as soon as they've signed off — there's nothing you need to do right now.",
+    retryLabel: null as string | null,
+  },
 };
 
 export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({
@@ -113,6 +125,10 @@ export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({
 }) => {
   const copy = COPY[variant];
   const isFailed = variant === 'failed';
+  // The skeleton preview says "Steps will appear here once your plan is ready". On
+  // 'in_review' the plan IS ready — showing skeletons would tell the employee we're
+  // still building something we have already built.
+  const showPreview = variant !== 'failed' && variant !== 'in_review';
   return (
   <div className="space-y-5">
     {/* Centerpiece */}
@@ -171,7 +187,7 @@ export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({
 
     {/* What will appear here — skeleton preview (no fabricated data). Hidden on
         the failed screen (it would read as if a plan is coming when it errored). */}
-    {!isFailed && (
+    {showPreview && (
     <Card padding="lg">
       <h2 className="text-sm font-semibold text-navy-800">What will appear here</h2>
       <ul className="mt-4 space-y-3">

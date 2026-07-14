@@ -308,10 +308,6 @@ class RelocationPlanViewResponse(BaseModel):
         default=True,
         description="False while HR is still reviewing the plan. Absent decision = released.",
     )
-    roadmap_review_notes: Optional[str] = Field(
-        default=None,
-        description="HR's reason when they send the plan back for changes.",
-    )
     debug: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Internal diagnostics; only populated when the client passes debug=true (strip in proxies).",
