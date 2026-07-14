@@ -153,6 +153,54 @@ class TestInCountryMoveIsResolvedByFactNotLabel:
             draft = {"relocationBasics": {"originCountry": origin, "destCountry": dest}}
             assert _is_in_country_move(draft, _Case()) is True, f"{origin} -> {dest}"
 
+    def test_the_write_read_round_trip_preserves_the_sta_signal(self):
+        """The bug the unit tests missed and LIVE verification caught.
+
+        `_canonical_purpose` normalises the purpose column on write, so `sta`
+        becomes `employment` before it is ever stored. `compute_case_requirements`
+        then does `purpose_raw = case.purpose or draft[...]` — the COLUMN wins, so
+        the raw `sta` still sitting in the draft is never consulted, the assignment
+        type is never recovered, and every STA waiver silently dies on newly
+        written cases.
+
+        Every unit test passed, because they all called apply_rules directly and
+        none of them went through the write path. Prod said 9 items for an STA case
+        that should have had 8. This pins the round trip.
+        """
+        from backend.app.routers.cases_write import _assignment_derived, _canonical_purpose
+
+        draft = {  # what the intake actually sends
+            "relocationBasics": {"destCountry": "France", "purpose": "sta"},
+            "assignmentContext": {},
+        }
+
+        canonical = _canonical_purpose(draft["relocationBasics"]["purpose"])
+        derived = _assignment_derived(draft)
+
+        assert canonical == "employment", "purpose is canonicalised for the catalog key"
+        assert derived["assignment_type"] == "STA", "and the STA signal must survive it"
+        assert draft["assignmentContext"]["assignmentType"] == "STA", (
+            "it must land in the DRAFT too — apply_rules reads it from there, and the "
+            "canonicalised column can no longer tell us it was ever an STA"
+        )
+
+    def test_an_explicit_assignment_type_is_never_overridden_by_the_purpose(self):
+        from backend.app.routers.cases_write import _assignment_derived
+
+        draft = {
+            "relocationBasics": {"purpose": "lta"},          # the leaked value says LTA
+            "assignmentContext": {"assignmentType": "STA"},  # the real field says STA
+        }
+        assert _assignment_derived(draft)["assignment_type"] == "STA"
+        assert draft["assignmentContext"]["assignmentType"] == "STA"
+
+    def test_a_real_purpose_leaves_the_assignment_type_alone(self):
+        from backend.app.routers.cases_write import _assignment_derived
+
+        draft = {"relocationBasics": {"purpose": "employment"}, "assignmentContext": {}}
+        assert _assignment_derived(draft)["assignment_type"] is None
+        assert "assignmentType" not in draft["assignmentContext"]
+
     def test_an_unknown_country_is_not_assumed_to_be_in_country(self):
         """Fail safe: if either side doesn't resolve, we must NOT claim there is no
         border and therefore no immigration requirement."""
