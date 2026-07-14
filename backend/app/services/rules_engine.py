@@ -4,6 +4,7 @@ from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
 from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify
+from .requirements_country_key import iso_to_catalog_name, to_iso
 
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
@@ -171,7 +172,12 @@ def _immigration_confirmation(
     must never have. Silence is wrong, but a confident lie is far worse: say
     nothing rather than invent a right the person does not have.
     """
-    where = (dest_country or "the destination").title()
+    # Resolve to the catalog's country NAME before printing it. The draft holds
+    # whatever the intake stored — often the raw ISO code — so `.title()` alone
+    # produced "You are an EU/EEA national moving to De." on the live page.
+    iso = to_iso(dest_country)
+    catalog_name = iso_to_catalog_name(iso) if iso else None
+    where = (catalog_name or dest_country or "the destination").title()
     # The second sentence is load-bearing. Free movement removes the IMMIGRATION
     # permission — it does not remove the paperwork. A German national still owes the
     # Anmeldung; a Dutch one still owes the gemeente/BSN registration. The original

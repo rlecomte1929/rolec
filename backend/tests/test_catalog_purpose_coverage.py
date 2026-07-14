@@ -100,3 +100,26 @@ class TestAnEmptyLookupNeverClaimsNothingIsRequired:
             "rendered as 'nothing is required of you' — a claim we cannot support."
         )
         assert dto.requirements == []
+
+
+class TestTheConfirmationNamesTheCountryProperly:
+    """Live bug: the page said "You are an EU/EEA national moving to De."
+
+    The draft stores whatever the intake put there — usually the raw ISO code — and
+    the confirmation just `.title()`d it. Resolve through the catalog key first."""
+
+    def test_an_iso_code_is_rendered_as_the_country_name(self):
+        from backend.app.services.rules_engine import _immigration_confirmation
+
+        for raw in ("DE", "de", "Germany", "GERMANY"):
+            item = _immigration_confirmation("EU_EEA", raw)
+            assert item is not None
+            assert "Germany" in item["reason"], f"{raw!r} -> {item['reason']}"
+            assert " De." not in item["reason"]
+
+    def test_an_unresolvable_country_still_reads_sensibly(self):
+        from backend.app.services.rules_engine import _immigration_confirmation
+
+        item = _immigration_confirmation("EU_EEA", None)
+        assert item is not None
+        assert "the destination" in item["reason"].lower()
