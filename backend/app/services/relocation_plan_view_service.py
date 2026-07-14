@@ -442,6 +442,33 @@ def _build_next_action_schema(
     )
 
 
+def _resolve_roadmap_release(session_factory: Any, case_id: str):
+    """HR's decision on this roadmap: (released_to_user, notes).
+
+    FAILS OPEN, twice over, and both are deliberate:
+
+      * No review row  -> RELEASED. 47 cases already had a roadmap and none had a review
+        row; treating "no decision recorded" as "not released" would have yanked the plan
+        out from under every one of them the day this shipped.
+      * Lookup errors  -> RELEASED. An employee must never lose their roadmap because a
+        gate's own query fell over.
+
+    The gate's job is to hold back a plan HR has actively sent back — not to hide a plan
+    because we are unsure.
+    """
+    try:
+        from ..models import RoadmapReviewStatus
+
+        with session_factory() as session:
+            row = session.get(RoadmapReviewStatus, case_id)
+            if row is None:
+                return True, None
+            return bool(row.released_to_user), row.notes
+    except Exception as exc:  # noqa: BLE001
+        log.warning("plan view: roadmap release lookup failed for %s (%s); showing the plan", case_id, exc)
+        return True, None
+
+
 def _resolve_roadmap_validation(db, case_id, summary):
     """(validated, validated_at, validated_by). Explicit row wins; otherwise
     grandfather a case that's already in execution (any task completed or in
@@ -585,6 +612,7 @@ def build_relocation_plan_view_response(
                 debug_payload.setdefault("derivation_traces", {})[t.task_code] = dbg
 
     rv_validated, rv_at, rv_by = _resolve_roadmap_validation(db, case_id, summary)
+    _released, _review_notes = _resolve_roadmap_release(session_factory, case_id)
 
     return RelocationPlanViewResponse(
         case_id=case_id,
@@ -599,6 +627,8 @@ def build_relocation_plan_view_response(
         roadmap_validated=rv_validated,
         roadmap_validated_at=rv_at,
         roadmap_validated_by=rv_by,
+        roadmap_released=_released,
+        roadmap_review_notes=_review_notes,
         debug=debug_payload,
     )
 

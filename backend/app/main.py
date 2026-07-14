@@ -50,6 +50,7 @@ from .routers import (
     hr_case_notes,
     coordinator,
     hr_case_detail,
+    hr_roadmap_review,
     compliance,
     gdpr,
     privacy_consents,
@@ -161,6 +162,7 @@ def create_app() -> FastAPI:
     app.include_router(hr_export.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
     app.include_router(hr_case_detail.router)
+    app.include_router(hr_roadmap_review.router)
     # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
     app.include_router(hr_case_audit.router)
     # AIQ-1136 / NAV-HR-2-FU: GET/POST /api/hr/cases/{id}/notes — internal case notes.

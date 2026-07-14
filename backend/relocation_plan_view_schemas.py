@@ -297,6 +297,21 @@ class RelocationPlanViewResponse(BaseModel):
         description="When the roadmap was explicitly validated; null when grandfathered or not validated.",
     )
     roadmap_validated_by: Optional[str] = Field(default=None)
+
+    # HR's decision, which now gates the employee's. Order is:
+    #   intake -> generated -> HR approves (released) -> employee acknowledges (validated)
+    #
+    # Defaults to True on purpose. 47 cases already had a roadmap and none had a review
+    # row; treating "no decision recorded" as "not released" would have yanked the plan
+    # out from under every one of them. An employee never loses a roadmap to a gate.
+    roadmap_released: bool = Field(
+        default=True,
+        description="False while HR is still reviewing the plan. Absent decision = released.",
+    )
+    roadmap_review_notes: Optional[str] = Field(
+        default=None,
+        description="HR's reason when they send the plan back for changes.",
+    )
     debug: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Internal diagnostics; only populated when the client passes debug=true (strip in proxies).",
