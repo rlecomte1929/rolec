@@ -193,7 +193,23 @@ def adapt_milestone_row(row: Mapping[str, Any]) -> EnrichedPlanTask:
         depends_on=lib.depends_on,
         sequence_in_phase=lib.sequence_in_phase,
         auto_completion_hint=lib.auto_completion_hint,
-        why_this_matters=lib.why_this_matters,
+        # `why_this_matters` is the explanatory line the employee actually READS, and it
+        # normally comes from the static task library — the milestone row's own
+        # `description` is never surfaced anywhere.
+        #
+        # That made the requirement overlay invisible: the roadmap's title became
+        # "Residence registration (Anmeldung)" while the text under it still read
+        # "Local registration or residency steps are often time-bound after entry", and
+        # the free-movement step still said "within 3 months" next to Germany's real
+        # 14-day deadline. The specific copy was written and then thrown away.
+        #
+        # Only rows the requirement overlay actually rewrote carry `requirement_copy`,
+        # so nothing else in the library is disturbed.
+        why_this_matters=(
+            str(row.get("description") or "")
+            if row.get("requirement_copy") and row.get("description")
+            else lib.why_this_matters
+        ),
         instructions=lib.instructions,
         required_inputs=inputs,
         target_date=_norm_date_str(row.get("target_date")),

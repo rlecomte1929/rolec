@@ -201,5 +201,11 @@ def enrich_milestones_with_requirements(
         enriched = dict(m)
         enriched["title"] = item.title
         enriched["description"] = item.description
+        # Marks this row as rewritten, so relocation_plan_service surfaces our
+        # description as `why_this_matters` — the line the employee actually reads.
+        # Without it the specific copy is written and then silently thrown away: the
+        # title said "Anmeldung" while the text under it still said "host-country
+        # equivalents".
+        enriched["requirement_copy"] = True
         out.append(enriched)
     return out
