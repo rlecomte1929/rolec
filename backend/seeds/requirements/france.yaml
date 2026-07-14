@@ -18,6 +18,30 @@
 
 verification_status: corpus_grounded
 source_scope: "US->FR corpus (non-EEA salaried route); EEA nationals exempt"
+
+# Every requirement in this file is part of the non-EEA salaried route: each one
+# is either the visa/permit itself or evidence submitted in support of it. The
+# scope note above has said "EEA nationals exempt" since the file was written,
+# but until now nothing enforced it and a French citizen relocating home was
+# served the full VLS-TS track. This line is that scope, made executable.
+#
+# An EU/EEA national therefore matches none of the visa items — and rules_engine
+# emits a stated "no visa or residence permit required" confirmation in their
+# place, so the result is an explicit answer rather than an empty screen.
+#
+# That confirmation alone is not enough. It would leave the person with one line
+# and four empty pillars, and an empty pillar reads as a broken screen. So their
+# substantive French establishment steps (identity document, contract,
+# justificatif de domicile, CPAM) are seeded explicitly at the bottom of this
+# file, scoped [OWN_NATIONAL, EU_EEA]. Do not "fix" the visa items by marking
+# them universal: every one of their descriptions is framed around the long-stay
+# visa file, so serving them to an EU citizen would just swap one wrong answer
+# for another.
+#
+# A requirement that genuinely applies to everyone overrides this default with an
+# explicit `applies_to_nationality_classes: null`.
+default_applies_to_nationality_classes: [THIRD_COUNTRY]
+
 purposes_by_country:
   FRANCE: [employment, other]
 
@@ -131,3 +155,75 @@ requirements:
       FRANCE:
         title: "Multi-year residence card renewal"
         description: "If staying beyond the initial 1-year VLS-TS, apply for the multi-year residence card ~2 months before expiry (~305 days after arrival). Indicative — confirm with the prefecture."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # EU/EEA + own-national establishment steps.
+  #
+  # Everything above is the third-country visa file, and every description above
+  # is framed around it ("supporting the long-stay visa file", "covering the visa
+  # validity period"). Those items are therefore correctly scoped THIRD_COUNTRY —
+  # serving them to a French or EU citizen would be telling them to prepare for a
+  # visa they will never apply for.
+  #
+  # But suppressing them cannot leave the person with a single "no visa required"
+  # line and four empty pillars — an empty pillar reads as a broken screen, or as
+  # "we didn't check". They still have to establish themselves in France; they
+  # just do it without an immigration file. These are those steps, framed for the
+  # people who actually get them.
+  #
+  # Deliberately conservative: only well-established, uncontroversial points, all
+  # flagged for expert review. The right of entry/residence itself is stated by
+  # rules_engine's nothing_to_do confirmation, not duplicated here.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - key: eu_identity_document
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://europa.eu/youreurope/citizens/"]
+    countries:
+      FRANCE:
+        title: "Valid passport or national identity card"
+        description: "As an EU/EEA national you may enter and reside in France on a valid national identity card or passport — no visa is involved. Keep it valid: it is the document every French administrative step (bank, CPAM, lease) will ask for. Indicative — confirm with your consulate or service-public.fr."
+  - key: eu_employment_contract
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://www.service-public.fr"]
+    countries:
+      FRANCE:
+        title: "Signed French employment contract"
+        description: "Your signed French contract (CDI or CDD). It is not needed for immigration — it is what unlocks the rest: social security affiliation, opening a bank account, and passing a landlord's dossier check. Indicative — confirm with your employer."
+  - key: eu_justificatif_de_domicile
+    pillar: HOUSING
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://www.service-public.fr"]
+    countries:
+      FRANCE:
+        title: "Justificatif de domicile (proof of French address)"
+        description: "A proof of address — lease, recent utility bill, or attestation d'hébergement. French administration asks for one at nearly every step, so it is worth obtaining early even though no immigration authority requires it. Indicative — confirm with service-public.fr."
+  - key: eu_health_cover
+    pillar: HEALTHCARE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://www.ameli.fr", "https://europa.eu/youreurope/citizens/"]
+    countries:
+      FRANCE:
+        title: "French health cover (CPAM affiliation)"
+        description: "You are not buying visa-validity insurance — you affiliate to the French system. Employment normally opens the route to CPAM and a social security number; your EHIC covers you in the interim, but it is not a substitute for affiliation. Indicative — confirm with ameli.fr / CPAM."

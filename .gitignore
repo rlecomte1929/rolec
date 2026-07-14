@@ -107,3 +107,7 @@ skills/
 
 # FRIDAY-004e local Lighthouse artifacts (not committed)
 lighthouse-hero-report*
+
+# SQLite artifacts left behind by local pytest runs (see ci_b2.db, AIQ-1487 review)
+ci_*.db
+_probe.db

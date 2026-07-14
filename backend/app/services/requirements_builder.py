@@ -78,6 +78,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     if getattr(item, "applies_to_assignment_types_json", None)
                     else None
                 ),
+                # None ⇒ applies to all nationality classes.
+                "appliesToNationalityClasses": (
+                    json.loads(item.applies_to_nationality_classes_json)
+                    if getattr(item, "applies_to_nationality_classes_json", None)
+                    else None
+                ),
                 "verificationStatus": getattr(item, "verification_status", None),
             }
             for item in requirements
@@ -90,7 +96,11 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         for item in expanded:
             required = item.get("requiredFields", [])
-            status = _status_for_case(required, draft)
+            outcome_type = item.get("outcomeType") or "action"
+            # A 'nothing_to_do' item asks nothing of anyone, so the MISSING /
+            # PROVIDED / NEEDS_REVIEW ladder doesn't apply — running it through
+            # _status_for_case would mark a positive confirmation NEEDS_REVIEW.
+            status = "CONFIRMED" if outcome_type == "nothing_to_do" else _status_for_case(required, draft)
             citations = [
                 _source_dto(source_map[cid])
                 for cid in item.get("citations", [])
@@ -108,6 +118,8 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     statusForCase=status,
                     citations=citations,
                     verificationStatus=item.get("verificationStatus"),
+                    outcomeType=outcome_type,
+                    reason=item.get("reason"),
                 )
             )
 
@@ -126,6 +138,13 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             # assignment, so the UI can explain the shorter list instead of
             # silently dropping items. Empty for LTA/PERMANENT.
             staWaived=sorted({t for t in (flags.get("staWaived") or []) if t}),
+            # Same contract as staWaived, for the nationality gate: the titles we
+            # suppressed because the person's nationality class doesn't need them,
+            # plus the class we resolved. Without these the client gets a shorter
+            # list with no way to explain it — which is the silent-drop failure the
+            # gate exists to prevent. Empty/None when nationality is unknown.
+            nationalityWaived=sorted({t for t in (flags.get("nationalityWaived") or []) if t}),
+            nationalityClass=flags.get("nationalityClass"),
             covered=True,  # AIQ-1473c: destination resolved to a known catalog key
         )
 

@@ -104,6 +104,13 @@ class RequirementItemDTO(BaseModel):
     citations: List[SourceRecordDTO]
     # AIQ-1349: provenance level for this requirement.
     verificationStatus: Optional[str] = None
+    # 'action' (the default — something is required of someone) or
+    # 'nothing_to_do' (a STATED positive confirmation that nothing is required).
+    # A correct answer of "none" must be stated, never implied by an empty list.
+    outcomeType: str = "action"
+    # Why nothing is required. Mandatory when outcomeType == 'nothing_to_do' —
+    # a confirmation without a reason is indistinguishable from a bug.
+    reason: Optional[str] = None
 
 
 class CountryProfileDTO(BaseModel):
@@ -139,6 +146,12 @@ class CaseRequirementsDTO(BaseModel):
     # AIQ-1349: requirement titles waived because this is a short-term (STA)
     # assignment — surfaced so the UI can explain the shorter list.
     staWaived: List[str] = []
+    # Requirement titles waived because the employee's nationality exempts them
+    # (an EU/EEA national needs none of the non-EEA visa track). Surfaced, not
+    # silently dropped, so the shorter list is explainable.
+    nationalityWaived: List[str] = []
+    # OWN_NATIONAL | EU_EEA | THIRD_COUNTRY | None when nationality is unknown.
+    nationalityClass: Optional[str] = None
     # AIQ-1473c: False when the destination doesn't resolve to a known catalog
     # key — the requirements list is then empty because we have no catalogue for
     # that country, NOT because nothing is required. Lets the UI say so instead
