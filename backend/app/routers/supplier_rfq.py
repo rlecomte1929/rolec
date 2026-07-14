@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from html import escape
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -216,26 +217,35 @@ def _rfq_email_html(supplier_name: str, link: str, brief_rows: List[Dict[str, st
     The first version said only "a company would like a quote" — a vendor could not tell the
     route, the date, or the scope without clicking, so there was no reason to. The brief goes in
     the email, and so does what we expect back.
+
+    SECURITY: every interpolated value is HTML-escaped. The brief carries EMPLOYEE free text
+    (special_items, property_size, notes) and supplier_name is HR input — this HTML is sent from
+    our own domain to an EXTERNAL company, so an unescaped value would let a user inject markup,
+    including a link, into mail that appears to come from us. That is a phishing vector, not a
+    rendering bug. `escape(quote=True)` also closes attribute breakout on the href.
     """
     rows = "".join(
         f"""<tr>
-              <td style="padding:4px 12px 4px 0;color:#64748b;white-space:nowrap">{r['label']}</td>
-              <td style="padding:4px 0;color:#0b2b43;font-weight:600">{r['value']}</td>
+              <td style="padding:4px 12px 4px 0;color:#64748b;white-space:nowrap">{escape(r['label'])}</td>
+              <td style="padding:4px 0;color:#0b2b43;font-weight:600">{escape(r['value'])}</td>
             </tr>"""
         for r in brief_rows
     )
-    asks = "".join(f"<li style='margin-bottom:4px'>{e}</li>" for e in RESPONSE_EXPECTATIONS)
+    asks = "".join(f"<li style='margin-bottom:4px'>{escape(e)}</li>" for e in RESPONSE_EXPECTATIONS)
+    safe_name = escape(supplier_name or "")
+    safe_link = escape(link, quote=True)
+    safe_deadline = escape(deadline)
     return f"""
       <div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;line-height:1.5;max-width:560px">
-        <p>Hello{(' ' + supplier_name) if supplier_name else ''},</p>
+        <p>Hello{(' ' + safe_name) if safe_name else ''},</p>
         <p>A company is relocating an employee and would like a quote from you for the move below.</p>
 
         <table style="border-collapse:collapse;margin:16px 0;font-size:14px">{rows}</table>
 
-        <p style="margin-bottom:6px"><strong>What we need back by {deadline}:</strong></p>
+        <p style="margin-bottom:6px"><strong>What we need back by {safe_deadline}:</strong></p>
         <ul style="margin-top:0;padding-left:18px;font-size:14px;color:#334155">{asks}</ul>
 
-        <p><a href="{link}"
+        <p><a href="{safe_link}"
               style="display:inline-block;background:#1f8e8b;color:#fff;padding:12px 20px;
                      border-radius:8px;text-decoration:none;font-weight:600">
              Send your quote

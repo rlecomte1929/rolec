@@ -145,6 +145,49 @@ class LinkGuardTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 401)
 
 
+class EmailInjectionTests(unittest.TestCase):
+    """The RFQ email is sent FROM our domain TO an external company, and it carries EMPLOYEE free
+    text (special_items, property_size, notes) plus HR-supplied supplier_name. Unescaped, a user
+    could inject markup — including a link — into mail that appears to come from us. That is a
+    phishing vector, not a rendering bug."""
+
+    def test_employee_free_text_cannot_inject_markup_into_the_outbound_email(self):
+        from backend.app.routers.supplier_rfq import _rfq_email_html
+
+        html = _rfq_email_html(
+            "Evil<script>alert(1)</script>Movers",
+            "https://relopass.com/supplier/quote?token=abc",
+            [
+                {"label": "Special items", "value": '<a href="https://phish.example">Click here to verify</a>'},
+                {"label": "Anything else", "value": '"><img src=x onerror=alert(1)>'},
+            ],
+            "2026-07-21",
+        )
+        # The payloads must appear as TEXT, never as live markup. Note "onerror=" DOES survive
+        # as characters — inside "&lt;img ... onerror=...&gt;" — and that is correct: it is inert
+        # text, not an attribute. What must never survive is an unescaped tag opener.
+        self.assertNotIn("<script>", html)
+        self.assertNotIn('<a href="https://phish.example"', html)
+        self.assertNotIn("<img", html)
+        self.assertIn("&lt;script&gt;", html)          # escaped, still readable
+        self.assertIn("&lt;img", html)                 # the injected tag is inert text
+        self.assertIn("phish.example", html)           # shown to the vendor, but not clickable
+
+        # The one <a href> in the mail must still be OUR link.
+        self.assertIn('href="https://relopass.com/supplier/quote?token=abc"', html)
+        self.assertEqual(html.count("<a href="), 1)
+
+    def test_the_subject_line_cannot_be_used_to_smuggle_content(self):
+        from backend.app.routers.supplier_rfq import _subject_for
+
+        subject = _subject_for([
+            {"label": "Move from", "value": "Paris, FR"},
+            {"label": "Move to", "value": "Oslo, NO"},
+        ])
+        self.assertEqual(subject, "Quote request: household move, Paris, FR → Oslo, NO")
+        self.assertNotIn("\n", subject)  # no header injection
+
+
 class SendGuardTests(unittest.TestCase):
     def test_sending_is_OPT_IN(self):
         """Minting a link is harmless. Emailing a real company that has never heard of us is
