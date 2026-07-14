@@ -258,3 +258,51 @@ class TestTheGenericDeadlineNeverContradictsTheRealOne:
                              "...within 3 months of arrival.", sort_order=4)]
         after = mod.enrich_milestones_with_requirements("c1", before)[0]
         assert after["description"] == before[0]["description"]
+
+
+class TestTheSpecificCopyActuallyREACHESTheEmployee:
+    """The overlay wrote a `description`. Nothing rendered it.
+
+    `why_this_matters` — the explanatory line under each roadmap task — comes from the
+    static task library, and the milestone row's own `description` is surfaced nowhere.
+    So the title said "Residence registration (Anmeldung)" while the text beneath it
+    still read "Local registration or residency steps are often time-bound after entry",
+    and the free-movement step still said "within 3 months" beside Germany's real 14-day
+    deadline. The copy was written and thrown away.
+
+    Caught only because the live check grepped the RESPONSE for "3 months" rather than
+    trusting that the titles had changed.
+    """
+
+    def test_an_enriched_row_surfaces_its_own_description(self):
+        from backend.relocation_plan_service import adapt_milestone_row
+
+        row = {
+            "id": "m1",
+            "milestone_type": "task_arrival_registration",
+            "title": "Residence registration (Anmeldung)",
+            "description": "Register at the local Bürgeramt, typically within 14 days of moving in.",
+            "status": "pending",
+            "requirement_copy": True,
+        }
+        task = adapt_milestone_row(row)
+        assert "14 days" in task.why_this_matters, (
+            "the specific deadline must reach the employee, not just sit in the DB"
+        )
+
+    def test_an_unenriched_row_keeps_the_library_text(self):
+        """Only rows the overlay rewrote may override the library. Everything else is
+        untouched."""
+        from backend.relocation_plan_service import adapt_milestone_row
+        from backend.relocation_plan_task_library import TASK_BY_MILESTONE_TYPE
+
+        row = {
+            "id": "m2",
+            "milestone_type": "task_arrival_registration",
+            "title": "Complete arrival registration",
+            "description": "Local registration or residency steps required shortly after arrival.",
+            "status": "pending",
+            # no requirement_copy marker
+        }
+        task = adapt_milestone_row(row)
+        assert task.why_this_matters == TASK_BY_MILESTONE_TYPE["task_arrival_registration"].why_this_matters
