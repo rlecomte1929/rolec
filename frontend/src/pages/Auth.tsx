@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Fingerprint } from 'lucide-react';
 import { Alert, Button, Input, Select, LoadingButton } from '../components/antigravity';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +8,7 @@ import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/api
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import { supabase } from '../api/supabase';
+import { env } from '../config/env';
 import { swallow } from '../lib/errorTracking';
 import { GlobeNetwork } from '../components/auth/GlobeNetwork';
 import { useAuthPageConfig } from '../hooks/useAuthPageConfig';
@@ -64,7 +66,7 @@ export const Auth: React.FC = () => {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login, register, loginWithPasskey } = useAuth();
   const authInFlight = useRef(false);
   const { config: authPageConfig } = useAuthPageConfig();
 
@@ -276,6 +278,36 @@ export const Auth: React.FC = () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth?mode=login` },
     });
+  };
+
+  // [AIQ-1491] Passwordless passkey sign-in (POC). signInWithPasskey() runs the WebAuthn
+  // ceremony (Face ID / Touch ID / Windows Hello / security key) → Supabase session →
+  // exchanged for a ReloPass token inside loginWithPasskey. Password login is untouched.
+  const handlePasskeySignIn = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      await loginWithPasskey();
+    } catch (err) {
+      // Two different error shapes reach here. The token-exchange leg is axios
+      // (detail in err.response.data.detail); the WebAuthn leg is a Supabase
+      // AuthError, which has no `.response` at all — so getApiErrorMessage
+      // silently yields its fallback. Fall back to err.message before the
+      // generic hint, or a project with WebAuthn disabled reports "register a
+      // passkey from Settings first" — advice that sends the user to a second
+      // button that fails for the very same reason.
+      const supabaseMessage =
+        typeof (err as { message?: unknown })?.message === 'string'
+          ? (err as { message: string }).message
+          : '';
+      setError(
+        getApiErrorMessage(err, '') ||
+          supabaseMessage ||
+          'Passkey sign-in failed. Use your password instead.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ── Redirect if already logged in ───────────────────────────────────────────
@@ -595,6 +627,18 @@ export const Auth: React.FC = () => {
                   <MicrosoftIcon /> Microsoft SSO
                 </Button>
               </div>
+
+              {/* [AIQ-1491] Passwordless passkey sign-in (POC). Dark by default:
+                  passkeys also need the WebAuthn toggle enabled on the Supabase
+                  project, and until that lands every click here dead-ends. Set
+                  VITE_ENABLE_PASSKEYS=true to light it up on staging. */}
+              {env.enablePasskeys && (
+                <Button type="button" variant="ghost" onClick={() => void handlePasskeySignIn()}
+                  disabled={isLoading} fullWidth
+                  className="flex items-center justify-center gap-2 !py-2.5 mt-3 border border-slate-200 text-sm !text-slate-700 hover:!bg-slate-50 transition-colors">
+                  <Fingerprint className="w-4 h-4" /> Sign in with a passkey
+                </Button>
+              )}
 
               <p className="text-center text-sm text-slate-500 mt-5">
                 New to ReloPass?{' '}

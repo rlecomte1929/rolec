@@ -323,6 +323,17 @@ export const authAPI = {
     const response = await api.post<LoginResponse>('/api/auth/register', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
     return response.data;
   },
+  // [AIQ-1491] Exchange a verified Supabase Auth JWT (from a passkey/WebAuthn sign-in)
+  // for a ReloPass session token — the merged bridge POST /api/auth/exchange-supabase-token
+  // (auth.py). Never auto-provisions: 401 if no matching ReloPass user by email.
+  exchangeSupabaseToken: async (accessToken: string): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>(
+      '/api/auth/exchange-supabase-token',
+      { access_token: accessToken },
+      { timeout: AUTH_ENTRYPOINT_TIMEOUT },
+    );
+    return response.data;
+  },
   // AIQ-1355/1357: set the active role for a multi-role user to one they hold.
   switchRole: async (role: string): Promise<{ roles: string[]; primary_role: string }> => {
     const response = await api.post<{ roles: string[]; primary_role: string }>('/api/auth/switch-role', { role });
