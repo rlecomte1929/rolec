@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
-from .nationality_class import EU_EEA, OWN_NATIONAL, classify
+from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify
 
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
@@ -103,10 +103,33 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
     # case's nationality class — and, critically, STATE the resulting "nothing
     # required" rather than leaving an empty pillar (see _immigration_confirmation).
     nationality_class = classify(profile.get("nationality"), basics.get("destCountry"))
-    if nationality_class:
-        dropped = [r for r in expanded if not _applies_to_nationality_class(r, nationality_class)]
-        if dropped:
-            expanded = [r for r in expanded if _applies_to_nationality_class(r, nationality_class)]
+
+    # An unknown nationality must still be FILTERED, and this is subtle enough to
+    # be worth spelling out.
+    #
+    # "Unknown => don't filter" was safe while a catalog was a single track: not
+    # filtering just kept the full list. It is NOT safe now that a catalog carries
+    # two mutually exclusive tracks (the third-country visa file and the EU/EEA
+    # establishment steps), because "don't filter" then means "serve BOTH" — and
+    # the EU track asserts, in its own copy, that no visa is involved. An Indian
+    # national with an unrecognised nationality string would read "As an EU/EEA
+    # national you may enter and reside in France ... no visa is involved." That
+    # is the fabricated free movement this module exists to prevent, arrived at
+    # from the opposite direction.
+    #
+    # So when we don't know: filter as THIRD_COUNTRY — the most demanding track,
+    # which can only ever OVER-show — but make no claim. No confirmation, no
+    # waived list, no nationalityClass. Over-showing a visa step to an EU citizen
+    # is a bad experience; telling a third-country national they need no visa is
+    # a harm. We take the first every time.
+    effective_class = nationality_class or THIRD_COUNTRY
+
+    dropped = [r for r in expanded if not _applies_to_nationality_class(r, effective_class)]
+    if dropped:
+        expanded = [r for r in expanded if _applies_to_nationality_class(r, effective_class)]
+
+        # Only record and only speak when we actually resolved the nationality.
+        if nationality_class:
             flags["nationalityWaived"] = [r.get("title") for r in dropped if r.get("title")]
             flags["nationalityClass"] = nationality_class
             confirmation = _immigration_confirmation(

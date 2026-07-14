@@ -48,6 +48,21 @@ _EEA = _EU | {"IS", "LI", "NO"}
 # legal instrument, hence the separate constant.
 _FREE_MOVEMENT = _EEA | {"CH"}
 
+# Officially assigned ISO 3166-1 alpha-2 codes. This exists so that a two-letter
+# input is only treated as a country when it IS one — see _nationality_to_iso.
+_ISO_ALPHA2 = frozenset("""
+AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM
+BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX
+CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG
+GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR
+IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV
+LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE
+NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO
+RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF
+TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF
+WS YE YT ZA ZM ZW
+""".split())
+
 # Nationality is stored free-text and is often adjectival. `to_iso` already
 # handles ISO codes, aliases and full country names; these cover the rest.
 _ADJECTIVAL = {
@@ -61,6 +76,32 @@ _ADJECTIVAL = {
     "INDIAN": "IN",
     "SINGAPOREAN": "SG",
     "SWISS": "CH",
+    # The EU/EEA set had only 6 free-movement adjectives, so an Austrian, Italian
+    # or Irish citizen — every bit as entitled to free movement as a French one —
+    # fell through to None and was served the full French work-visa track. That
+    # fails safe (it over-shows), but it made the headline claim "EU citizens skip
+    # the visa track" true for about a fifth of the EU.
+    "AUSTRIAN": "AT", "BELGIAN": "BE", "BULGARIAN": "BG", "CROATIAN": "HR",
+    "CYPRIOT": "CY", "CZECH": "CZ", "DANISH": "DK", "ESTONIAN": "EE",
+    "FINNISH": "FI", "GREEK": "GR", "HUNGARIAN": "HU", "ICELANDIC": "IS",
+    "IRISH": "IE", "ITALIAN": "IT", "LATVIAN": "LV", "LIECHTENSTEINER": "LI",
+    "LITHUANIAN": "LT", "LUXEMBOURGISH": "LU", "MALTESE": "MT", "POLISH": "PL",
+    "PORTUGUESE": "PT", "ROMANIAN": "RO", "SLOVAK": "SK", "SLOVENIAN": "SI",
+    "SPANISH": "ES",
+}
+
+# Full country names for the free-movement set. `to_iso` only knows the seven
+# seeded DESTINATIONS, so "Italy" or "Austria" resolved to None while the bare
+# code "IT"/"AT" resolved fine — the gate worked or didn't depending on how the
+# employee happened to type it.
+_COUNTRY_NAME = {
+    "AUSTRIA": "AT", "BELGIUM": "BE", "BULGARIA": "BG", "CROATIA": "HR",
+    "CYPRUS": "CY", "CZECHIA": "CZ", "CZECH REPUBLIC": "CZ", "DENMARK": "DK",
+    "ESTONIA": "EE", "FINLAND": "FI", "GREECE": "GR", "HUNGARY": "HU",
+    "ICELAND": "IS", "IRELAND": "IE", "ITALY": "IT", "LATVIA": "LV",
+    "LIECHTENSTEIN": "LI", "LITHUANIA": "LT", "LUXEMBOURG": "LU", "MALTA": "MT",
+    "POLAND": "PL", "PORTUGAL": "PT", "ROMANIA": "RO", "SLOVAKIA": "SK",
+    "SLOVENIA": "SI", "SPAIN": "ES", "SWEDEN": "SE", "SWITZERLAND": "CH",
 }
 
 
@@ -72,15 +113,23 @@ def _nationality_to_iso(raw: Optional[str]) -> Optional[str]:
         return None
     if s in _ADJECTIVAL:
         return _ADJECTIVAL[s]
+    if s in _COUNTRY_NAME:
+        return _COUNTRY_NAME[s]
     iso = to_iso(s)
     if iso:
         return iso
     # `to_iso` only knows the seeded DESTINATIONS, but nationality ranges over
-    # every country. Accept any bare alpha-2 code. An unrecognised one falls
-    # through to THIRD_COUNTRY — i.e. the full visa list, which is exactly
-    # today's behaviour, so an unknown code can never produce a false
-    # "nothing required".
-    if len(s) == 2 and s.isalpha():
+    # every country, so we accept a bare alpha-2 code — but ONLY a real one.
+    #
+    # This used to be `if len(s) == 2 and s.isalpha(): return s`, i.e. any two
+    # letters became a country. `nationality` is an unvalidated free-text field
+    # (production already holds 'f', 'gh', 'de', 'asdas', '1212'), and the
+    # free-movement set contains 31 two-letter codes — so a single stray
+    # keystroke landing on 'it', 'ie', 'pl', 'se', 'at', 'cz', 'fi' or 'dk'
+    # resolved to an EU member and told the person "no visa or residence permit
+    # required". A typo could fabricate a right of free movement. Now an
+    # unrecognised code returns None, and None makes no claim.
+    if s in _ISO_ALPHA2:
         return s
     return None
 
