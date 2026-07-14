@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -28,6 +27,7 @@ from sqlalchemy import text
 
 from ...database import db
 from ..auth_deps import require_admin_or_hr
+from ..services.rfq_brief import RESPONSE_EXPECTATIONS, RESPONSE_WINDOW_DAYS, render_brief_lines, respond_by
 from ..services.supplier_jwt import expires_at, generate_supplier_token, hash_token, verify_supplier_token
 
 router = APIRouter(prefix="/api/supplier", tags=["supplier-rfq"])
@@ -123,14 +123,33 @@ def get_supplier_rfq(recipient: Dict[str, Any] = Depends(require_supplier_link))
         except Exception:
             log.warning("supplier_rfq: could not mark viewed recipient=%s", recipient["id"], exc_info=True)
 
+    # The vendor gets a real brief, not a service name and a shrug: the facts we hold, the gaps
+    # marked "Not specified" rather than guessed, and an explicit statement of what a good answer
+    # looks like. Without this they cannot price the job — and a vendor who cannot price does not
+    # reply, which would look like "suppliers don't respond" when it is "we asked badly".
     return {
         "rfq_ref": rfq.get("rfq_ref"),
         "items": [
-            {"service_key": i.get("service_key"), "requirements": i.get("requirements") or {}}
+            {
+                "service_key": i.get("service_key"),
+                "brief": render_brief_lines(i.get("requirements") or {}),
+            }
             for i in (rfq.get("items") or [])
         ],
+        "expectations": RESPONSE_EXPECTATIONS,
+        "respond_by": _respond_by_for(recipient),
         "already_quoted": bool(recipient.get("quote_submitted_at")),
     }
+
+
+def _respond_by_for(recipient: Dict[str, Any]) -> str:
+    """A concrete date, not "soon". Anchored to when the link was sent."""
+    invited = recipient.get("invited_at")
+    try:
+        base = _as_utc(invited) if invited else datetime.now(tz=timezone.utc)
+    except Exception:
+        base = datetime.now(tz=timezone.utc)
+    return (base + timedelta(days=RESPONSE_WINDOW_DAYS)).date().isoformat()
 
 
 @router.post("/rfq/quote")
@@ -191,22 +210,52 @@ class SendSupplierLinksPayload(BaseModel):
     send_email: bool = False
 
 
-def _rfq_email_html(supplier_name: str, link: str) -> str:
+def _rfq_email_html(supplier_name: str, link: str, brief_rows: List[Dict[str, str]], deadline: str) -> str:
+    """The vendor must be able to judge the job BEFORE clicking.
+
+    The first version said only "a company would like a quote" — a vendor could not tell the
+    route, the date, or the scope without clicking, so there was no reason to. The brief goes in
+    the email, and so does what we expect back.
+    """
+    rows = "".join(
+        f"""<tr>
+              <td style="padding:4px 12px 4px 0;color:#64748b;white-space:nowrap">{r['label']}</td>
+              <td style="padding:4px 0;color:#0b2b43;font-weight:600">{r['value']}</td>
+            </tr>"""
+        for r in brief_rows
+    )
+    asks = "".join(f"<li style='margin-bottom:4px'>{e}</li>" for e in RESPONSE_EXPECTATIONS)
     return f"""
-      <div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;line-height:1.5">
+      <div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;line-height:1.5;max-width:560px">
         <p>Hello{(' ' + supplier_name) if supplier_name else ''},</p>
-        <p>A company relocating an employee would like a quote from you.</p>
-        <p>You can see what they need and send your price here — there is no account to create
-           and nothing to install:</p>
+        <p>A company is relocating an employee and would like a quote from you for the move below.</p>
+
+        <table style="border-collapse:collapse;margin:16px 0;font-size:14px">{rows}</table>
+
+        <p style="margin-bottom:6px"><strong>What we need back by {deadline}:</strong></p>
+        <ul style="margin-top:0;padding-left:18px;font-size:14px;color:#334155">{asks}</ul>
+
         <p><a href="{link}"
               style="display:inline-block;background:#1f8e8b;color:#fff;padding:12px 20px;
                      border-radius:8px;text-decoration:none;font-weight:600">
-             View the request and quote
+             Send your quote
            </a></p>
-        <p style="color:#64748b;font-size:13px">The link is unique to you and expires in 14 days.</p>
+        <p style="color:#64748b;font-size:13px">
+          No account to create and nothing to install. The link is unique to you and expires in 14 days.
+        </p>
         <p style="color:#64748b;font-size:13px">ReloPass</p>
       </div>
     """
+
+
+def _subject_for(brief_rows: List[Dict[str, str]]) -> str:
+    """A vendor triages on the subject line alone. Put the route in it, so they can tell at a
+    glance whether this is a job they even cover."""
+    by = {r["label"]: r["value"] for r in brief_rows}
+    frm, to = by.get("Move from"), by.get("Move to")
+    if frm and to and frm != "Not specified" and to != "Not specified":
+        return f"Quote request: household move, {frm} → {to}"
+    return "Quote request from a company relocating an employee"
 
 
 @hr_router.post("/rfqs/{rfq_id}/supplier-links")
@@ -224,6 +273,13 @@ def send_supplier_links(
     rfq = db.get_rfq(rfq_id)
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
+
+    # The brief goes IN the email. A vendor who cannot see the route, the date and the scope
+    # without clicking has no reason to click.
+    brief_rows: List[Dict[str, str]] = []
+    for item in rfq.get("items") or []:
+        brief_rows.extend(render_brief_lines(item.get("requirements") or {}))
+    deadline = respond_by()
 
     resend_key = os.getenv("RESEND_API_KEY")
     results: List[Dict[str, Any]] = []
@@ -272,8 +328,8 @@ def send_supplier_links(
                     json={
                         "from": EMAIL_FROM,
                         "to": [str(target.email)],
-                        "subject": "A relocation company would like a quote from you",
-                        "html": _rfq_email_html(target.supplier_name or "", link),
+                        "subject": _subject_for(brief_rows),
+                        "html": _rfq_email_html(target.supplier_name or "", link, brief_rows, deadline),
                     },
                     timeout=15,
                 )

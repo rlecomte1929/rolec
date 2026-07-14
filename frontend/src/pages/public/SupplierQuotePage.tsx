@@ -12,8 +12,15 @@ import axios from 'axios';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.relopass.com';
 
-type RfqItem = { service_key: string; requirements: Record<string, unknown> };
-type RfqView = { rfq_ref: string; items: RfqItem[]; already_quoted: boolean };
+type BriefRow = { label: string; value: string };
+type RfqItem = { service_key: string; brief: BriefRow[] };
+type RfqView = {
+  rfq_ref: string;
+  items: RfqItem[];
+  expectations: string[];
+  respond_by: string;
+  already_quoted: boolean;
+};
 type Line = { label: string; amount: string };
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -118,19 +125,44 @@ export const SupplierQuotePage: React.FC = () => {
       <h1 className="text-xl font-semibold text-[#0b2b43]">A company would like a quote from you</h1>
       <p className="mt-1 text-sm text-slate-500">Request {rfq?.rfq_ref}</p>
 
-      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-[#0b2b43]">What they need</p>
-        <ul className="mt-2 space-y-2">
-          {(rfq?.items ?? []).map((it) => (
-            <li key={it.service_key} className="text-sm text-slate-700">
-              <span className="font-medium">{SERVICE_LABELS[it.service_key] || it.service_key}</span>
-              {typeof it.requirements?.notes === 'string' && it.requirements.notes ? (
-                <div className="text-slate-500">{it.requirements.notes as string}</div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {(rfq?.items ?? []).map((it) => (
+        <div key={it.service_key} className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-[#0b2b43]">
+            {SERVICE_LABELS[it.service_key] || it.service_key}
+          </p>
+          {/* "Not specified" rows are shown on purpose, not hidden: a vendor needs to see what we
+              did NOT tell them, so they can ask — rather than guess and price it wrong. */}
+          <table className="mt-3 w-full text-sm">
+            <tbody>
+              {it.brief.map((row) => (
+                <tr key={row.label} className="align-top">
+                  <td className="w-40 py-1 pr-3 text-slate-500">{row.label}</td>
+                  <td
+                    className={`py-1 font-medium ${
+                      row.value === 'Not specified' ? 'text-slate-400 italic' : 'text-[#0b2b43]'
+                    }`}
+                  >
+                    {row.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+
+      {rfq?.expectations?.length ? (
+        <div className="mt-4 rounded-xl border border-[#1f8e8b]/30 bg-[#1f8e8b]/5 p-4">
+          <p className="text-sm font-semibold text-[#0b2b43]">
+            What we need back{rfq.respond_by ? ` by ${rfq.respond_by}` : ''}
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+            {rfq.expectations.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="mt-6 space-y-4">
         <div className="flex gap-3">

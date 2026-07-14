@@ -60,6 +60,16 @@ export const ServicesRfqNew: React.FC = () => {
   // record). The RFQ still goes to the rest — but the employee is told who was left out,
   // rather than us silently sending to fewer suppliers than they chose.
   const [unreachable, setUnreachable] = useState<string[]>([]);
+  // [AIQ-1521 follow-up] What a mover needs to price a job and we CANNOT know from the case.
+  // The route, the date and the household come from the case server-side — we don't ask the
+  // employee to re-type what we already hold. This is only the gap.
+  const [movers, setMovers] = useState({
+    property_size: '',
+    floor: '',
+    lift: '' as '' | 'yes' | 'no',
+    storage_needed: '' as '' | 'yes' | 'no',
+    special_items: '',
+  });
 
   // [AIQ-1520] Several vendors may be shortlisted per service — iterate them all.
   const shortlisted = useMemo(() => {
@@ -98,7 +108,17 @@ export const ServicesRfqNew: React.FC = () => {
           .join(' | ');
         // requirements is the per-service brief the supplier quotes against — so the note
         // belongs on ITS service, not smeared across every item.
-        return { service_key: service, requirements: serviceNotes ? { notes: serviceNotes } : {} };
+        const requirements: Record<string, unknown> = serviceNotes ? { notes: serviceNotes } : {};
+        if (service === 'movers') {
+          // Only what the platform cannot know. The backend adds the route, the date and the
+          // household from the case — the employee is never asked to retype those.
+          if (movers.property_size) requirements.property_size = movers.property_size;
+          if (movers.floor) requirements.floor = movers.floor;
+          if (movers.lift) requirements.lift = movers.lift === 'yes';
+          if (movers.storage_needed) requirements.storage_needed = movers.storage_needed === 'yes';
+          if (movers.special_items) requirements.special_items = movers.special_items;
+        }
+        return { service_key: service, requirements };
       });
       const supplierIds = Array.from(new Set(shortlisted.map(({ vendor }) => vendor.item_id)));
 
@@ -205,6 +225,70 @@ export const ServicesRfqNew: React.FC = () => {
         Add an optional note for each, then send. Your HR team requests the quotes from these
         providers on your behalf.
       </p>
+      {/* [AIQ-1521 follow-up] A mover cannot price a job from "someone is moving". The route,
+          the date and the household come from your case automatically — these are the things we
+          can't know. Anything left blank is shown to them as "Not specified", not guessed. */}
+      {shortlisted.some(({ service }) => service === 'movers') && (
+        <div className="mb-4 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+          <p className="text-sm font-semibold text-[#0b2b43]">About your move</p>
+          <p className="mb-3 text-xs text-[#64748b]">
+            The movers already get your route, dates and household size from your case. These are the
+            details they can’t get anywhere else — the more you give, the more accurate the price.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Property size"
+              value={movers.property_size}
+              onChange={(v) => setMovers((p) => ({ ...p, property_size: v }))}
+              placeholder="e.g. 2-bedroom flat"
+              fullWidth
+            />
+            <Input
+              label="Floor"
+              value={movers.floor}
+              onChange={(v) => setMovers((p) => ({ ...p, floor: v }))}
+              placeholder="e.g. 3rd"
+              fullWidth
+            />
+            <label className="text-xs font-semibold text-[#0b2b43]">
+              Is there a lift?
+              <select
+                value={movers.lift}
+                onChange={(e) => setMovers((p) => ({ ...p, lift: e.target.value as '' | 'yes' | 'no' }))}
+                className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm font-normal"
+              >
+                <option value="">Not sure</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-[#0b2b43]">
+              Do you need storage?
+              <select
+                value={movers.storage_needed}
+                onChange={(e) =>
+                  setMovers((p) => ({ ...p, storage_needed: e.target.value as '' | 'yes' | 'no' }))
+                }
+                className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm font-normal"
+              >
+                <option value="">Not sure</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-3">
+            <Input
+              label="Anything unusual to carry?"
+              value={movers.special_items}
+              onChange={(v) => setMovers((p) => ({ ...p, special_items: v }))}
+              placeholder="e.g. piano, artwork, bike"
+              fullWidth
+            />
+          </div>
+        </div>
+      )}
+
       {shortlisted.map(({ service, vendor }) => (
         <div key={`${service}-${vendor.item_id}`} className="border border-[#e2e8f0] rounded-lg p-4 mb-3 bg-white">
           <div className="font-semibold text-[#0b2b43]">{vendor.name}</div>
