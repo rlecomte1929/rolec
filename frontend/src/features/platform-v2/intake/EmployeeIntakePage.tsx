@@ -843,13 +843,20 @@ export function EmployeeIntakePage() {
     if (destCode) {
       setLocks((l) => ({ ...l, dest: true }));
     }
-    // TD-FIX-7 (AIQ-1510): same rule for the origin. A corridor-locked test-drive case
-    // carries home_country/home_city, so both ends pre-fill and lock; a case with no
-    // HR-set origin leaves these fields free, unchanged.
-    if (originCity) {
+    // TD-FIX-7 (AIQ-1510): lock the ORIGIN too — but only on a test drive, where the
+    // corridor genuinely is fixed by us.
+    //
+    // Why the guard: relocation_cases.home_country/host_country are written back from the
+    // EMPLOYEE's own intake answers (db/intake.py apply_wizard_patch_side_effects →
+    // touch_relocation_case_route_from_wizard). So for a real user this effect re-reads
+    // what they typed themselves — and locking it would badge their own answer
+    // "🔒 HR pre-filled", which is simply untrue. Real users keep the origin editable.
+    // (The destination has claimed this since before TD-FIX-7; fixing that needs real
+    // route provenance — HR actually setting the route — and is tracked separately.)
+    if (isTestDrive && originCity) {
       setLocks((l) => ({ ...l, originCity: true }));
     }
-    if (originCode) {
+    if (isTestDrive && originCode) {
       setLocks((l) => ({ ...l, origin: true }));
     }
 
@@ -863,7 +870,7 @@ export function EmployeeIntakePage() {
       lastPersistedStepRef.current = 0;
     }
     hydratedStepRef.current = true;
-  }, [assignmentId, linkedSummaries, TOTAL_STEPS]);
+  }, [assignmentId, linkedSummaries, TOTAL_STEPS, isTestDrive]);
 
   // Keep the autosave closure pointing at the current assignment id.
   useEffect(() => {
@@ -1058,8 +1065,11 @@ export function EmployeeIntakePage() {
                   <FieldWrap label="Destination country" required prefill={locks.dest} onUnlock={routeUnlock('dest')}>
                     <CountryCombo testId="intake-dest_country" value={data.dest_country} onChange={(v) => setField('dest_country', v)} disabled={locks.dest} />
                   </FieldWrap>
+                  {/* destCity: badged as pre-filled but left EDITABLE for real users — that
+                      is the pre-TD-FIX-7 behaviour and the city is often the part HR gets
+                      wrong. Disabled only on a test drive, where the corridor is fixed. */}
                   <FieldWrap label="Destination city" required prefill={locks.destCity} onUnlock={routeUnlock('destCity')}>
-                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} disabled={locks.destCity} />
+                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} disabled={isTestDrive && locks.destCity} />
                   </FieldWrap>
                   <FieldWrap label="Target move date" required>
                     <Input unstyled type="date" data-testid="intake-target_date" aria-label="Target move date" className={inputCls()} value={data.target_date}
