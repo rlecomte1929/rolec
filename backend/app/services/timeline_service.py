@@ -284,6 +284,73 @@ def _parse_move_anchor(case_draft: Optional[Dict[str, Any]], target_move_date: O
     return None
 
 
+# Steps that exist ONLY because an immigration application is being filed. If no
+# application is being filed, they are not "optional" — they do not exist.
+_IMMIGRATION_ONLY_TASKS = frozenset({
+    "task_immigration_review",   # "Book counsel or vendor review as required for the route."
+    "task_visa_docs_prep",       # "Prepare visa / work permit application pack"
+    "task_visa_submit",          # "Submit visa / work permit application"
+    "task_biometrics",           # "Book biometrics / appointment"
+})
+
+# Steps that still apply without an immigration file, but whose default copy is
+# written around one. Reword; do not drop. An EU citizen still needs their ID (for
+# the Anmeldung, the bank, the lease) and still has to book a flight.
+_NON_IMMIGRATION_COPY = {
+    "task_passport_upload": (
+        "Upload passport or national ID",
+        "A clear scan of your passport or national identity card. You will need it for local "
+        "registration, opening a bank account and signing a lease — not for a visa application.",
+    ),
+    "task_travel_plan": (
+        "Plan travel",
+        "Flights and arrival logistics aligned with your start date.",
+    ),
+}
+
+
+def _immigration_applies(
+    *,
+    nationality: Optional[str],
+    destination_country: Optional[str],
+    origin_country: Optional[str],
+    contract_type: Optional[str],
+) -> bool:
+    """True unless we POSITIVELY know no immigration application is required.
+
+    Two ways to know:
+      1. origin == destination. No border is crossed, so no immigration process can
+         apply. A verifiable FACT, not a label — the purpose/move-type fields have
+         proved untrustworthy, but two country codes can be compared.
+      2. The immigration regime resolves to eu_free_movement.
+
+    Anything else — including an unresolvable nationality — returns True and keeps
+    the full visa track. If we cannot positively know, we do not suppress.
+    """
+    from .requirements_country_key import to_iso
+
+    origin_iso = to_iso(origin_country)
+    dest_iso = to_iso(destination_country)
+    if origin_iso and dest_iso and origin_iso == dest_iso:
+        return False
+
+    if not (destination_country or nationality):
+        return True  # nothing to reason from → keep the demanding track
+
+    try:
+        from .immigration_regime import ImmigrationRegimeRouter
+
+        regime = ImmigrationRegimeRouter().detect_regime(
+            nationality=nationality,
+            destination_country=destination_country,
+            origin_country=origin_country,
+            contract_type=contract_type,
+        )
+        return regime.regime_id != "eu_free_movement"
+    except ImportError:
+        return True  # fail safe
+
+
 def compute_default_milestones(
     case_id: str,
     case_draft: Optional[Dict[str, Any]] = None,
@@ -338,6 +405,28 @@ def compute_default_milestones(
             return True   # unknown milestone_type → fail open
         return entry.phase_key in active_phases
 
+    # ── Does an immigration application apply at all? ─────────────────────────
+    #
+    # Resolved BEFORE the operational defaults are laid down, because it decides
+    # whether some of them may exist.
+    #
+    # In production this roadmap told an EU national relocating to Germany, in the
+    # same list: "Register as EU/EEA resident — EU/EEA free movement: no work permit
+    # required" (#4) AND "Submit visa / work permit application" (#45). The generator
+    # knew the regime and served the visa track anyway, because _REGIME_MILESTONE_SPECS
+    # only ever ADDS. Nothing subtracted.
+    #
+    # Asymmetric on purpose: we suppress the visa track ONLY when we positively know
+    # it cannot apply. An unknown or unresolvable nationality keeps it. Over-showing a
+    # visa step to an EU citizen is a poor experience; under-showing one to a person
+    # who genuinely needs it is a harm.
+    immigration_applies = _immigration_applies(
+        nationality=nationality,
+        destination_country=destination_country,
+        origin_country=origin_country,
+        contract_type=contract_type,
+    )
+
     result: List[Dict[str, Any]] = []
     for spec in OPERATIONAL_TASK_DEFAULTS:
         mt = spec["milestone_type"]
@@ -345,6 +434,8 @@ def compute_default_milestones(
             continue
         if not _phase_allowed(mt):
             continue
+        if not immigration_applies and mt in _IMMIGRATION_ONLY_TASKS:
+            continue  # no application is being filed — the step does not exist
         target: Optional[str] = None
         if base:
             dbm = spec.get("days_before_move")
@@ -353,11 +444,20 @@ def compute_default_milestones(
                 target = (base - timedelta(days=int(dbm))).strftime("%Y-%m-%d")
             elif dam is not None:
                 target = (base + timedelta(days=int(dam))).strftime("%Y-%m-%d")
+        title = spec["title"]
+        description = spec.get("description")
+        if not immigration_applies:
+            # These two steps still apply — an EU citizen needs their ID for the
+            # Anmeldung, and still has to book a flight — but their COPY is written
+            # around a visa file they will never open. Reword rather than drop.
+            reworded = _NON_IMMIGRATION_COPY.get(mt)
+            if reworded:
+                title, description = reworded
         result.append(
             {
                 "milestone_type": mt,
-                "title": spec["title"],
-                "description": spec.get("description"),
+                "title": title,
+                "description": description,
                 "sort_order": spec["sort_order"],
                 "target_date": target,
                 "status": "pending",
