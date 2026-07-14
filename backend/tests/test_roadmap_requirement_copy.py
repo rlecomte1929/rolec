@@ -202,3 +202,59 @@ class TestItFailsOpen:
 
     def test_empty_input_is_a_no_op(self):
         assert enrich_milestones_with_requirements("c1", []) == []
+
+
+class TestTheGenericDeadlineNeverContradictsTheRealOne:
+    """Seen live: the roadmap showed, side by side,
+
+        "Register as EU/EEA resident at local authority"
+            ...Registration with local authorities WITHIN 3 MONTHS of arrival.
+        "Residence registration (Anmeldung)"
+            ...typically WITHIN 14 DAYS of moving in.
+
+    The 3-month figure is the EU directive's general rule. Germany's Anmeldung is 14
+    days; the Dutch gemeente registration is 5. An employee who reads the first and
+    misses the second gets fined. The generic step must stop asserting a deadline it
+    does not know."""
+
+    def test_the_free_movement_step_drops_its_generic_deadline(self, monkeypatch):
+        import backend.app.services.roadmap_requirement_copy as mod
+
+        monkeypatch.setattr(
+            "backend.app.services.requirements_builder.compute_case_requirements",
+            lambda cid: _dto("GERMANY", [
+                _item("Residence registration (Anmeldung)",
+                      "Register at the local Bürgeramt, typically within 14 days of moving in."),
+            ]),
+        )
+        before = [
+            _milestone("task_eu_registration", "Register as EU/EEA resident at local authority",
+                       "EU/EEA free movement: no work permit required. Registration with local "
+                       "authorities within 3 months of arrival.", sort_order=4),
+            _milestone("task_arrival_registration", "Complete arrival registration", "generic"),
+        ]
+        after = {m["milestone_type"]: m for m in mod.enrich_milestones_with_requirements("c1", before)}
+
+        eu = after["task_eu_registration"]
+        assert "3 months" not in eu["description"], (
+            "the generic 3-month figure contradicts Germany's 14-day Anmeldung deadline"
+        )
+        # ...but it must still STATE the answer only it can give.
+        assert "no visa and no residence permit" in eu["description"].lower()
+        # ...and the real deadline survives, on the step that owns it.
+        assert "14 days" in after["task_arrival_registration"]["description"]
+
+    def test_without_a_country_specific_step_the_generic_note_is_left_alone(self, monkeypatch):
+        """No specific registration requirement → nothing to contradict → don't touch it."""
+        import backend.app.services.roadmap_requirement_copy as mod
+
+        monkeypatch.setattr(
+            "backend.app.services.requirements_builder.compute_case_requirements",
+            lambda cid: _dto("FRANCE", [
+                _item("Valid passport or national identity card", "x", pillar="IDENTITY"),
+            ]),
+        )
+        before = [_milestone("task_eu_registration", "Register as EU/EEA resident at local authority",
+                             "...within 3 months of arrival.", sort_order=4)]
+        after = mod.enrich_milestones_with_requirements("c1", before)[0]
+        assert after["description"] == before[0]["description"]

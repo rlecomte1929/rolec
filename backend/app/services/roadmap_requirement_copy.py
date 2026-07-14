@@ -108,6 +108,27 @@ _REQUIREMENT_TO_MILESTONE: Dict[Tuple[str, str], str] = {
 }
 
 
+class _FreeMovementStatement:
+    """The free-movement milestone, stripped of a deadline it has no business owning.
+
+    Its default copy comes from ImmigrationRegimeResult.notes and ends "Registration
+    with local authorities within 3 months of arrival" — the EU directive's general
+    rule. Germany's Anmeldung is 14 days. The Netherlands' is 5. Rendered next to the
+    real step, the generic figure is not vague, it is WRONG, and it is the kind of
+    wrong that costs someone a fine.
+
+    So it keeps only what it alone can say: that no permit is required. The
+    destination-specific registration step owns the deadline.
+    """
+
+    title = "No visa or work permit required"
+    description = (
+        "You have EU/EEA freedom of movement, so no visa and no residence permit apply. "
+        "You must still register locally — that step is listed separately, with the "
+        "deadline that actually applies in your destination."
+    )
+
+
 def enrich_milestones_with_requirements(
     case_id: str,
     milestones: List[Dict[str, Any]],
@@ -155,6 +176,18 @@ def enrich_milestones_with_requirements(
         target = _REQUIREMENT_TO_MILESTONE.get((country, item.title))
         if target and target not in overrides:
             overrides[target] = item
+
+    # The free-movement milestone carries the regime's generic note: "Registration with
+    # local authorities within 3 months of arrival." That is the EU directive's general
+    # rule — and it CONTRADICTS the destination's real deadline. Germany's Anmeldung is
+    # 14 days; the Dutch gemeente registration is 5. Shown side by side, the employee
+    # reads "3 months", misses the real deadline, and is fined.
+    #
+    # When we have a country-specific registration step, that step owns the deadline.
+    # The free-movement milestone keeps the part only it can say — the STATED answer
+    # that no permit is required — and stops asserting a timing it does not know.
+    if "task_arrival_registration" in overrides:
+        overrides["task_eu_registration"] = _FreeMovementStatement()
 
     if not overrides:
         return milestones
