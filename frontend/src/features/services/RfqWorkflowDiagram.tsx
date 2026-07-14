@@ -1,10 +1,13 @@
 import React from 'react';
 
 const STEPS = [
+  // [AIQ-1515] Steps 2 and 3 used to read "Ask vendors for formal prices" / "Get proposed
+  // prices back", which told the employee they contact the vendors. They don't — the
+  // request goes to HR, who contacts the vendor and relays the price. Describe the real flow.
   { n: 1, title: 'Shortlist', detail: 'Pick providers for each service' },
-  { n: 2, title: 'Request quotes', detail: 'Ask vendors for formal prices' },
-  { n: 3, title: 'Receive offers', detail: 'Get proposed prices back' },
-  { n: 4, title: 'Choose', detail: 'Compare and pick what fits' },
+  { n: 2, title: 'Send to HR', detail: 'Your HR team gets your picks' },
+  { n: 3, title: 'HR requests quotes', detail: 'They ask the vendors for prices' },
+  { n: 4, title: 'Choose', detail: 'Compare the offers HR brings back' },
 ] as const;
 
 /**

@@ -29,6 +29,14 @@ import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationC
 import { CoordinatorChatPanel } from '../features/coordinator/CoordinatorChatPanel';
 import { isCoordinatorEnabled } from '../featureFlags';
 
+/** [AIQ-1514] One vendor the employee shortlisted. `item_id` is a recommendation-engine
+ *  id, meaningful only alongside its service_category — not a foreign key. */
+type QuoteRequestVendor = {
+  service_category: string;
+  item_id: string;
+  name: string;
+};
+
 type QuoteRequest = {
   id: string;
   case_id: string;
@@ -40,6 +48,9 @@ type QuoteRequest = {
   status: string;
   created_at: string;
   updated_at: string;
+  // [AIQ-1515] Empty for the 51 rows created before AIQ-1514 — their choice was never
+  // captured and is unrecoverable. Render that honestly; never infer a vendor.
+  vendors?: QuoteRequestVendor[];
 };
 
 /**
@@ -450,6 +461,29 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                           </span>
                         ))}
                       </div>
+                      {/* [AIQ-1515] The vendors the employee actually chose. Until AIQ-1514
+                          these were discarded at the API boundary, so HR saw only the
+                          categories above and a free-text notes blob — and could not act on
+                          the employee's choice at all. */}
+                      {qr.vendors && qr.vendors.length > 0 ? (
+                        <div className="mt-1.5 space-y-0.5">
+                          <p className="text-[#64748b] text-xs">Vendors the employee chose:</p>
+                          <ul className="space-y-0.5">
+                            {qr.vendors.map((v) => (
+                              <li key={`${v.service_category}:${v.item_id}`} className="text-xs text-[#0b2b43]">
+                                <span className="font-medium">{v.name}</span>
+                                <span className="text-[#94a3b8]"> · {v.service_category}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        // Honest empty state. A pre-AIQ-1514 request genuinely has no vendor
+                        // on record — do not guess one from the notes.
+                        <p className="text-[#94a3b8] text-xs mt-1.5 italic">
+                          No vendor choice recorded on this request.
+                        </p>
+                      )}
                       {qr.notes && (
                         <p className="text-[#374151] text-xs mt-1 leading-relaxed">{qr.notes}</p>
                       )}
