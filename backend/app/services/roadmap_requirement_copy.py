@@ -122,6 +122,11 @@ class _FreeMovementStatement:
     """
 
     title = "No visa or work permit required"
+    # It is a STATED ANSWER, not a registration task, so it carries no steps. The
+    # library's instructions for this milestone tell you how to register and end with
+    # "Timeline: within 3 months of arrival for most EU countries" — which duplicates the
+    # destination's real registration step and contradicts its deadline (Germany: 14 days).
+    suppress_instructions = True
     description = (
         "You have EU/EEA freedom of movement, so no visa and no residence permit apply. "
         "You must still register locally — that step is listed separately, with the "
@@ -207,5 +212,7 @@ def enrich_milestones_with_requirements(
         # title said "Anmeldung" while the text under it still said "host-country
         # equivalents".
         enriched["requirement_copy"] = True
+        if getattr(item, "suppress_instructions", False):
+            enriched["suppress_instructions"] = True
         out.append(enriched)
     return out

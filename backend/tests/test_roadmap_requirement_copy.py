@@ -306,3 +306,55 @@ class TestTheSpecificCopyActuallyREACHESTheEmployee:
         }
         task = adapt_milestone_row(row)
         assert task.why_this_matters == TASK_BY_MILESTONE_TYPE["task_arrival_registration"].why_this_matters
+
+
+class TestNoContradictoryDeadlineSurvivesAnywhere:
+    """#1459 stripped "within 3 months" from the description. It was still being served
+    from the task library's INSTRUCTIONS list — a place I had not looked:
+
+        instructions[2] = "Timeline: within 3 months of arrival for most EU countries."
+
+    rendered right next to Germany's real 14-day Anmeldung. Removing a wrong sentence
+    from one field is not the same as removing it from the response.
+    """
+
+    def test_the_stated_answer_carries_no_registration_steps(self):
+        from backend.relocation_plan_service import adapt_milestone_row
+
+        row = {
+            "id": "m1",
+            "milestone_type": "task_eu_registration",
+            "title": "No visa or work permit required",
+            "description": "You have EU/EEA freedom of movement...",
+            "status": "pending",
+            "requirement_copy": True,
+            "suppress_instructions": True,
+        }
+        task = adapt_milestone_row(row)
+        assert task.instructions == (), (
+            "a stated answer is not a task — and its library steps end with 'within 3 "
+            "months', contradicting the destination's real deadline"
+        )
+
+    def test_the_library_instructions_do_still_contain_the_contradiction(self):
+        """Pins WHY the suppression exists. If someone fixes the library text, this
+        fails and the suppression can be reconsidered."""
+        from backend.relocation_plan_task_library import TASK_BY_MILESTONE_TYPE
+
+        joined = " ".join(TASK_BY_MILESTONE_TYPE["task_eu_registration"].instructions)
+        assert "3 months" in joined
+
+    def test_an_ordinary_enriched_row_keeps_its_steps(self):
+        from backend.relocation_plan_service import adapt_milestone_row
+        from backend.relocation_plan_task_library import TASK_BY_MILESTONE_TYPE
+
+        row = {
+            "id": "m2",
+            "milestone_type": "task_arrival_registration",
+            "title": "Residence registration (Anmeldung)",
+            "description": "Bürgeramt, within 14 days.",
+            "status": "pending",
+            "requirement_copy": True,
+        }
+        task = adapt_milestone_row(row)
+        assert task.instructions == TASK_BY_MILESTONE_TYPE["task_arrival_registration"].instructions
