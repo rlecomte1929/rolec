@@ -125,37 +125,51 @@ describe('EmployeeCaseRoadmapPage — roadmap orchestration', () => {
   });
 });
 
-// ── AIQ-1525: HR approves the roadmap before the employee acts on it. ─────────
-// The predicate is unit-tested in roadmapReleaseGate.test.ts; these assert the
-// PAGE actually honours it. Getting the logic right and never rendering it is a
-// failure mode I have shipped before — a passing unit test on a value nobody reads.
+// ── AIQ-1526: HR approves the plan before the employee ACTS on it. ────────────
+// The first cut (#1465) hid the whole roadmap while HR reviewed. Too blunt: exploring
+// the plan is reassuring and costs nothing. What waits for HR is ACTION — HR can still
+// send the plan back for regeneration, and work done against a superseded plan is wasted.
+// So: reads open, writes gated. These pin BOTH halves.
 describe('EmployeeCaseRoadmapPage — HR review gate', () => {
-  it('holds back a plan HR has not released, and says so', async () => {
+  it('lets the employee EXPLORE a plan HR has not approved yet', async () => {
     fetchRelocationPlanView.mockResolvedValue({ ...READY_PLAN, roadmap_released: false });
     renderPage();
 
-    expect(await screen.findByText('Your HR team is reviewing your plan')).toBeInTheDocument();
-    // The plan itself must NOT leak through — it is about to change.
-    expect(screen.queryByText('Apply for work visa')).not.toBeInTheDocument();
-    // ...and the employee cannot start tasks on it.
-    expect(screen.queryByText(/Validate & start tasks/)).not.toBeInTheDocument();
-    // We show THAT it's with HR — never HR's internal review notes. The backend
-    // doesn't send them; assert nothing invents them either.
-    expect(screen.queryByText(/housing budget/i)).not.toBeInTheDocument();
+    // The roadmap is fully visible — this is the whole point of the change.
+    expect((await screen.findAllByText('Apply for work visa')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Immigration & visas').length).toBeGreaterThan(0);
+    // ...and they are told why they can't start yet.
+    expect(screen.getByText('Your HR team is reviewing this plan')).toBeInTheDocument();
   });
 
-  it('shows the roadmap once HR has approved it', async () => {
+  it('blocks the ACTIONS while HR is reviewing', async () => {
+    fetchRelocationPlanView.mockResolvedValue({ ...READY_PLAN, roadmap_released: false });
+    renderPage();
+    await screen.findByText('Your HR team is reviewing this plan');
+
+    // Nothing to validate yet — the server would 409 anyway.
+    expect(screen.queryByText(/Validate & start tasks/)).not.toBeInTheDocument();
+    // And every task CTA is disabled.
+    const ctas = screen.queryAllByRole('button', { name: /Start now|Continue/ });
+    expect(ctas.length).toBeGreaterThan(0);
+    ctas.forEach((b) => expect(b).toBeDisabled());
+  });
+
+  it('unlocks everything once HR approves', async () => {
     fetchRelocationPlanView.mockResolvedValue({ ...READY_PLAN, roadmap_released: true });
     renderPage();
 
     expect((await screen.findAllByText('Apply for work visa')).length).toBeGreaterThan(0);
-    expect(screen.queryByText('Your HR team is reviewing your plan')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your HR team is reviewing this plan')).not.toBeInTheDocument();
+    screen
+      .queryAllByRole('button', { name: /Start now|Continue/ })
+      .forEach((b) => expect(b).not.toBeDisabled());
   });
 
-  // THE ONE THAT MATTERS. 47 live cases have a roadmap and no review row, so the
-  // backend omits/None's the flag for them. If the gate were written `!released`,
-  // every one of those employees would open their roadmap tomorrow and find it gone.
-  it('shows the roadmap when the flag is absent (every pre-existing case)', async () => {
+  // THE ONE THAT MATTERS. 47 live cases have a roadmap and no review row, so the backend
+  // omits the flag for them. If the gate were written `!released`, every one of those
+  // employees would be locked out of their own tasks.
+  it('does not gate a case whose flag is absent (every pre-existing case)', async () => {
     const { roadmap_released: _omitted, ...withoutFlag } = {
       ...READY_PLAN,
       roadmap_released: undefined,
@@ -164,7 +178,10 @@ describe('EmployeeCaseRoadmapPage — HR review gate', () => {
     renderPage();
 
     expect((await screen.findAllByText('Apply for work visa')).length).toBeGreaterThan(0);
-    expect(screen.queryByText('Your HR team is reviewing your plan')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your HR team is reviewing this plan')).not.toBeInTheDocument();
+    screen
+      .queryAllByRole('button', { name: /Start now|Continue/ })
+      .forEach((b) => expect(b).not.toBeDisabled());
   });
 });
 

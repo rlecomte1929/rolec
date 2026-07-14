@@ -223,27 +223,18 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   }
 
   // ── HR review gate ──────────────────────────────────────────────────────────
-  // The plan is BUILT (planReady above) but HR hasn't released it. Show an honest
-  // "your HR team is reviewing your plan" rather than a plan that is about to change —
-  // and don't let the employee validate/start tasks on it. This sits AFTER the
-  // not-ready branch on purpose: "still generating" beats "in review", and a held plan
-  // must never enter the retry/poll loop, which would hammer the endpoint for 60s and
-  // then dead-end on "empty".
+  // The plan is BUILT but HR hasn't approved it yet. The employee EXPLORES it freely —
+  // seeing the plan is reassuring and costs nothing. What waits for HR is ACTION: HR can
+  // still send the plan back for regeneration, and work done against a plan that's about
+  // to be replaced is wasted.
   //
-  // The predicate is `=== false`, NOT `!released` — see roadmapReleaseGate.ts. The
-  // backend fails open and the field is optional, so `undefined` means RELEASED.
-  if (isRoadmapHeldForHrReview(data)) {
-    return (
-      <AppShell>
-        <div className="mx-auto max-w-5xl px-6 py-6">
-          <RoadmapBeingBuilt
-            variant="in_review"
-            onMessageTeam={() => navigate(buildRoute('messages'))}
-          />
-        </div>
-      </AppShell>
-    );
-  }
+  // So we render the whole roadmap and pass `pendingReview` down: banner on, task CTAs
+  // disabled, "Validate & start tasks" hidden. The real enforcement is server-side
+  // (assert_roadmap_released -> 409) — this is the UI telling the same truth.
+  //
+  // `=== false`, NOT `!released` — see roadmapReleaseGate.ts. The backend fails open and
+  // the field is optional, so `undefined` means RELEASED.
+  const pendingReview = isRoadmapHeldForHrReview(data);
 
   return (
     <AppShell>
@@ -276,6 +267,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
             validating={validating}
             onValidate={onValidate}
             confidenceByTitle={confidenceByTitle}
+            pendingReview={pendingReview}
           />
         </div>
         {selection && (

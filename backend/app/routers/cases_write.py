@@ -45,6 +45,7 @@ from ..services.case_service import (
     _sql_uuid_gen,
 )
 from ..services.prefill_engine import run_prefill_for_dependents
+from .hr_roadmap_review import assert_roadmap_released
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.requirements_builder import compute_case_requirements
 from ..services.requirements_purpose_key import assignment_type_from_purpose, to_purpose
@@ -272,6 +273,10 @@ def start_research(case_id: str, user: Dict[str, Any] = Depends(get_current_user
 def validate_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     """Employee validates their roadmap (the 'start tasks' checkpoint). Idempotent."""
     _assert_case_access(user, case_id)
+    # [AIQ-1526] HR approves the plan before the employee starts on it. Reading the
+    # roadmap is always allowed; starting tasks against a plan HR may still send back
+    # for regeneration is not. Fails open when no review row exists.
+    assert_roadmap_released(case_id)
     result = main_db.upsert_roadmap_validation(case_id, str(user.get("id") or ""))
     # Invalidate the cached plan view so the validated state shows immediately.
     try:

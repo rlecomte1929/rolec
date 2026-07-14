@@ -207,6 +207,7 @@ from .app.routers import research_requests as research_requests_router  # [AIQ-1
 from .app.routers import hr_vendor_widgets as hr_vendor_widgets_router
 from .app.routers import hr_case_detail as hr_case_detail_router
 from .app.routers import hr_roadmap_review as hr_roadmap_review_router  # HR validates the roadmap before the employee acts on it  # C1-11c-be — per-case detail reads (dual-layer per CLAUDE.md)
+from .app.routers.hr_roadmap_review import assert_roadmap_released  # [AIQ-1526] employee may READ a pending plan, not act on it
 from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_notes as hr_case_notes_router  # AIQ-1136 — case notes (dual-layer per CLAUDE.md)
 from .app.routers import coordinator as coordinator_router  # AIQ-1414 — coordinator respond (dual-layer per CLAUDE.md)
@@ -849,6 +850,7 @@ app.include_router(research_requests_router.router)  # [AIQ-1349 P2] research-re
 app.include_router(hr_vendor_widgets_router.router)  # [B16/AIQ-422] bare-path vendor widget aliases
 app.include_router(hr_case_detail_router.router)
 app.include_router(hr_roadmap_review_router.router)  # dual-layer per CLAUDE.md: prod boots THIS app  # C1-11c-be — 6 per-case detail reads consumed by HR Dashboard
+app.include_router(hr_roadmap_review_router.metrics_router)  # [AIQ-1526] ops metrics — dual-layer per CLAUDE.md
 app.include_router(hr_case_audit_router.router)  # C1-16 — GET /api/hr/cases/{id}/audit chronological lineage
 app.include_router(hr_case_notes_router.router)  # AIQ-1136 — GET/POST /api/hr/cases/{id}/notes (internal case notes)
 app.include_router(coordinator_router.router)  # AIQ-1414 — POST /api/cases/{id}/coordinator/respond (flag-gated)
@@ -6063,15 +6065,42 @@ def _async_seed_and_generate_roadmap(case_id: str, assignment_id: str, request_i
     finished after generation's delete_case_milestones, the seed would be
     written on top of the AI steps, leaving a mixed plan. Both steps are
     independently best-effort; submit has already returned."""
+    seeded = 0
     try:
-        created = _ensure_default_milestones_for_case(case_id, assignment_id, request_id)
-        if created:
-            log.info("submit bg: seeded %d default milestones case_id=%s", created, case_id)
+        seeded = _ensure_default_milestones_for_case(case_id, assignment_id, request_id)
+        if seeded:
+            log.info("submit bg: seeded %d default milestones case_id=%s", seeded, case_id)
     except Exception:
         log.warning(
             "submit bg: default milestone seeding failed case_id=%s", case_id, exc_info=True
         )
     _async_generate_and_persist_roadmap(case_id, request_id)
+
+    # [AIQ-1526] The plan now exists and is HELD for HR approval — the employee can read it
+    # but cannot start tasks. Tell HR, or they'd only find out by opening the case.
+    #
+    # Fires only when we actually seeded (`seeded > 0`), which is the one moment the case
+    # transitions into "pending review": _ensure_default_milestones_for_case is a no-op when
+    # milestones already exist, and it is what writes the unreleased review row. So this
+    # runs once per case, not once per submit.
+    #
+    # It goes LAST, after generation's delete+rewrite, so we never mail HR about a plan that
+    # is still being replaced. And it is best-effort: notify_hr_roadmap_pending never raises,
+    # but belt-and-braces — an email must never cost the employee their roadmap.
+    if seeded:
+        try:
+            from .app.services.roadmap_review_notification import notify_hr_roadmap_pending
+
+            outcome = notify_hr_roadmap_pending(case_id, request_id=request_id)
+            log.info(
+                "submit bg: HR roadmap-review notification case_id=%s status=%s",
+                case_id, outcome.get("status"),
+            )
+        except Exception:
+            log.warning(
+                "submit bg: HR roadmap-review notification failed case_id=%s",
+                case_id, exc_info=True,
+            )
 
 
 @app.post("/api/employee/assignments/{assignment_id}/submit")
@@ -11214,6 +11243,12 @@ def update_case_milestone(
 ):
     """Update a milestone (title, description, target_date, actual_date, status, sort_order)."""
     _ = _require_case_id_assignment_visible(case_id, user)
+    # [AIQ-1526] While HR is still reviewing the plan, the EMPLOYEE may read it but not
+    # act on it — HR can still send it back for regeneration, and progress recorded
+    # against a plan that's about to be replaced is wasted work. HR itself is NOT gated:
+    # curating the timeline is exactly what they're reviewing it to do.
+    if str(user.get("role") or "").upper() == "EMPLOYEE":
+        assert_roadmap_released(case_id)
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     existing = next((m for m in db.list_case_milestones(case_id, request_id=request_id) if m.get("id") == milestone_id), None)
     if not existing:
