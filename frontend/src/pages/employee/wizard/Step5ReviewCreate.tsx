@@ -11,7 +11,8 @@ import type {
   DossierSuggestion,
   DossierSource,
 } from '../../../types';
-import { buildRequirementsFromMissingFields, getRelocationCase } from '../../../api/relocation';
+import { getRelocationCase } from '../../../api/relocation';
+import { getRequirements } from '../../../api/cases';
 import { RequirementList } from '../../../components/requirements/RequirementList';
 import { RequirementsCoverageNotice } from '../../../components/requirements/RequirementsCoverageNotice';
 import { dossierAPI, requirementsAPI } from '../../../api/client';
@@ -104,6 +105,12 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
 }) => {
   const navigate = useNavigate();
   const [requirements, setRequirements] = useState<CaseRequirementsDTO | null>(null);
+  // Four DISTINCT states, deliberately not collapsed into one nullable value.
+  // On this screen an empty list *means* "nothing is required of you" — so a fetch
+  // failure must never be allowed to impersonate an answer. 'failed' is not 'empty'.
+  const [requirementsState, setRequirementsState] =
+    useState<'loading' | 'ready' | 'failed'>('loading');
+  const [requirementsReloadKey, setRequirementsReloadKey] = useState(0);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -137,19 +144,49 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     }
   }, [error]);
 
+  // Two independent fetches, two independent failure modes — they answer different
+  // questions and must not blank each other.
+  //
+  // `missing_fields` is INTAKE COMPLETENESS ("what have you not filled in yet"). It
+  // gates the dossier-suggestion button and the submit flow below, which is its real
+  // job. It was ALSO being reshaped client-side into a fake CaseRequirementsDTO and
+  // rendered as if it were the destination dossier — every item forced to pillar
+  // 'Intake', severity BLOCKER, status MISSING. So this screen has been showing "your
+  // form is incomplete" while implying "here is what the law requires of you".
+  //
+  // `getRequirements` is the real thing: the destination dossier by pillar, with the
+  // nationality gate, the stated "nothing required" confirmations, and provenance.
   useEffect(() => {
     if (!caseId) return;
     getRelocationCase(caseId)
       .then((relocation) => {
-        const missing = Array.isArray(relocation.missing_fields) ? relocation.missing_fields : [];
-        setRequirements(buildRequirementsFromMissingFields(caseId, missing));
-        setMissingFields(missing);
+        setMissingFields(Array.isArray(relocation.missing_fields) ? relocation.missing_fields : []);
+      })
+      .catch(() => setMissingFields([]));
+  }, [caseId]);
+
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    setRequirementsState('loading');
+    getRequirements(caseId)
+      .then((data) => {
+        if (cancelled) return;
+        setRequirements(data);
+        setRequirementsState('ready');
       })
       .catch(() => {
+        if (cancelled) return;
+        // Explicitly NOT `setRequirements(null)` + render nothing. A silent empty
+        // section on this screen reads as "nothing is required of you" — a claim we
+        // would be making by accident, about someone's legal obligations.
         setRequirements(null);
-        setMissingFields([]);
+        setRequirementsState('failed');
       });
-  }, [caseId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId, requirementsReloadKey]);
 
   useEffect(() => {
     if (!caseId) return;
@@ -447,14 +484,73 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         </div>
       )}
 
-      <div className="mt-6 space-y-6">
-        {Object.entries(grouped).map(([pillar, items]) => (
-          <div key={pillar}>
-            <div className="text-sm font-semibold text-[#0b2b43] mb-3">{pillar}</div>
-            <RequirementList items={items} />
+      {/* Only render this when free movement actually waived the visa track.
+          `nationalityWaived` is NOT symmetric: for a THIRD_COUNTRY national it holds
+          the *EU* items, so showing it verbatim would tell an Indian employee
+          "Justificatif de domicile doesn't apply to you" — confusing, and false.
+          Their list didn't shrink; those items were never theirs to lose. */}
+      {(requirements?.nationalityClass === 'OWN_NATIONAL' ||
+        requirements?.nationalityClass === 'EU_EEA') &&
+        requirements?.nationalityWaived &&
+        requirements.nationalityWaived.length > 0 && (
+          <div
+            data-testid="nationality-waived"
+            className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]"
+          >
+            <div className="text-sm font-semibold text-[#0b2b43] mb-1">
+              Not required for your nationality
+            </div>
+            <div className="mb-2">
+              {requirements.nationalityClass === 'OWN_NATIONAL'
+                ? 'Because you are a national of the destination country, these immigration requirements don’t apply:'
+                : 'Because you have EU/EEA freedom of movement, these immigration requirements don’t apply:'}
+            </div>
+            <ul className="list-disc list-inside space-y-1">
+              {requirements.nationalityWaived.map((title) => (
+                <li key={title}>{title}</li>
+              ))}
+            </ul>
           </div>
-        ))}
-      </div>
+        )}
+
+      {/* Four states, kept distinct. A failure must never render as a clean empty
+          section, because on this screen empty means "nothing is required of you". */}
+      {requirementsState === 'loading' && (
+        <div className="mt-6 text-sm text-[#6b7280]">Loading your destination requirements…</div>
+      )}
+
+      {requirementsState === 'failed' && (
+        <div
+          data-testid="requirements-error"
+          className="mt-6 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]"
+        >
+          <div className="font-semibold mb-1">We couldn’t load your destination requirements</div>
+          <div className="mb-2">
+            This is a problem on our side — it does <strong>not</strong> mean nothing is required of
+            you. Please retry before relying on this page.
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setRequirementsReloadKey((k) => k + 1)}>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {requirementsState === 'ready' && Object.keys(grouped).length === 0 && (
+        <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
+          No destination requirements apply to your case.
+        </div>
+      )}
+
+      {requirementsState === 'ready' && (
+        <div className="mt-6 space-y-6">
+          {Object.entries(grouped).map(([pillar, items]) => (
+            <div key={pillar}>
+              <div className="text-sm font-semibold text-[#0b2b43] mb-3">{pillar}</div>
+              <RequirementList items={items} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {DYNAMIC_DOSSIER_ENABLED && (
         <div className="mt-8 space-y-4">
