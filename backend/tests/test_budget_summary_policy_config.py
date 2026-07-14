@@ -43,12 +43,42 @@ def test_maps_published_caps_to_selected_services(monkeypatch):
     by_name = {r["name"]: r for r in rows}
 
     assert by_name["housing"]["cap_amount"] == 2000.0
-    assert by_name["housing"]["status"] == "within_budget"
     assert by_name["immigration"]["cap_amount"] == 1500.0
-    assert by_name["immigration"]["status"] == "within_budget"
+
+    # [AIQ-1527] These used to assert "within_budget" — with NO estimate passed in. The test was
+    # locking in the defect: a green tick derived from nothing. A cap on its own tells you what
+    # you MAY spend, never what you WILL. With no estimate the honest answer is "no_estimate".
+    assert by_name["housing"]["status"] == "no_estimate"
+    assert by_name["immigration"]["status"] == "no_estimate"
+    assert by_name["housing"]["estimated_amount"] is None
+
     # An intake service with no mapped benefit key stays uncapped.
     assert by_name["banking"]["cap_amount"] is None
     assert by_name["banking"]["status"] == "no_cap"
+
+
+def test_a_real_estimate_is_actually_compared_against_the_cap(monkeypatch):
+    """[AIQ-1527] The comparison the endpoint always claimed to be making, and never was."""
+    monkeypatch.setattr(
+        mxs.PolicyConfigMatrixService, "caps_payload",
+        lambda self, company_id, **kw: _bundle([_currency_cap("host_housing_cap", 2000.0)]),
+    )
+    under = cr._budget_categories_from_policy_config(
+        "co-1", ["housing"], None, None, estimates={"housing": {"amount": 1800.0, "currency": "EUR"}},
+    )
+    assert under[0]["status"] == "within_budget"
+    assert under[0]["estimated_amount"] == 1800.0
+
+    over = cr._budget_categories_from_policy_config(
+        "co-1", ["housing"], None, None, estimates={"housing": {"amount": 2400.0, "currency": "EUR"}},
+    )
+    assert over[0]["status"] == "over_budget"
+
+    # A currency mismatch refuses to rank rather than inventing an FX rate.
+    mismatched = cr._budget_categories_from_policy_config(
+        "co-1", ["housing"], None, None, estimates={"housing": {"amount": 1800.0, "currency": "USD"}},
+    )
+    assert mismatched[0]["status"] == "not_comparable"
 
 
 def test_sums_multiple_benefit_keys_for_one_service(monkeypatch):
@@ -66,7 +96,9 @@ def test_sums_multiple_benefit_keys_for_one_service(monkeypatch):
     rows = cr._budget_categories_from_policy_config("co-1", ["moving"], None, None)
     assert rows[0]["name"] == "moving"
     assert rows[0]["cap_amount"] == 4500.0
-    assert rows[0]["status"] == "within_budget"
+    # [AIQ-1527] The cap sums correctly — but no estimate was supplied, so there is nothing to
+    # compare it to. Was "within_budget"; that was the bug.
+    assert rows[0]["status"] == "no_estimate"
 
 
 def test_no_company_yields_all_no_cap(monkeypatch):

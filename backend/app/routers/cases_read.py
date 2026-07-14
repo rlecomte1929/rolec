@@ -2026,11 +2026,67 @@ _INTAKE_SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
 }
 
 
+def _budget_status(
+    cap_total: Optional[float],
+    cap_currency: Optional[str],
+    est_amount: Optional[float],
+    est_currency: Optional[str],
+) -> str:
+    """[AIQ-1527] Compare, or say we can't. Never assert a comparison that did not happen.
+
+    This endpoint used to report "within_budget" whenever a CAP existed — with no estimate at all
+    (it was hardcoded to None on the line above). HR and the employee were shown a green tick
+    derived from nothing, and they act on it.
+    """
+    if cap_total is None:
+        return "no_cap"
+    if est_amount is None:
+        # The honest answer, and the common one: only 3 of 31 case_services rows carry an
+        # estimated_cost in prod. "We don't know yet" is fine. A fake green tick is not.
+        return "no_estimate"
+    if est_currency and cap_currency and est_currency != cap_currency:
+        # The same refusal the cap engine already makes (policy_config_cap_compare returns
+        # supported_comparison=False on a currency mismatch). We do not invent an FX rate.
+        return "not_comparable"
+    return "within_budget" if float(est_amount) <= float(cap_total) else "over_budget"
+
+
+def _case_service_estimates(case_id: str) -> Dict[str, Dict[str, Any]]:
+    """[AIQ-1527] The estimated cost per service, from case_services.
+
+    This is the number the budget summary is supposed to compare against a cap — and it was never
+    read. It is written by the RFQ payer flow (AIQ-1524, on validating a quote) and by the wizard.
+
+    Returns {} on any failure: a missing estimate must degrade to "we don't know", never to a
+    green tick.
+    """
+    if not case_id:
+        return {}
+    try:
+        with main_db.engine.connect() as conn:
+            rows = conn.execute(
+                _sql_text(
+                    "SELECT service_key, estimated_cost, currency FROM case_services "
+                    "WHERE case_id = :cid AND estimated_cost IS NOT NULL"
+                ),
+                {"cid": str(case_id)},
+            ).mappings().all()
+        return {
+            r["service_key"]: {"amount": float(r["estimated_cost"]), "currency": r["currency"]}
+            for r in rows
+            if r.get("service_key") and r.get("estimated_cost") is not None
+        }
+    except Exception:
+        logger.exception("budget-summary: could not read case_services estimates case=%s", case_id)
+        return {}
+
+
 def _budget_categories_from_policy_config(
     company_id: str,
     selected_services: List[str],
     assignment_type: Optional[str],
     family_status: Optional[str],
+    estimates: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Build the per-service budget rows from the company's published policy_config
     caps. Each intake service sums the currency caps of its mapped benefit keys.
@@ -2070,12 +2126,19 @@ def _budget_categories_from_policy_config(
             ):
                 total = (total or 0.0) + float(cap["normalized_amount"])
                 currency = cap.get("currency_code") or currency
+        # [AIQ-1527] Compare, or say we can't. This used to hardcode estimated_amount=None and
+        # then report "within_budget" whenever a CAP existed — a green tick derived from nothing.
+        est = (estimates or {}).get(svc_name) or {}
+        est_amount = est.get("amount")
+        est_currency = est.get("currency")
+
         categories.append({
             "name": svc_name,
             "cap_amount": total,
             "cap_currency": currency,
-            "estimated_amount": None,
-            "status": "within_budget" if total is not None else "no_cap",
+            "estimated_amount": est_amount,
+            "estimated_currency": est_currency,
+            "status": _budget_status(total, currency, est_amount, est_currency),
         })
     return categories
 
@@ -2132,7 +2195,13 @@ def get_budget_summary(
         pass
 
     categories = _budget_categories_from_policy_config(
-        company_id, selected_services, assignment_type, family_status
+        company_id,
+        selected_services,
+        assignment_type,
+        family_status,
+        # [AIQ-1527] The estimates the comparison is supposed to be made against. Without these
+        # the endpoint reported "within_budget" having compared nothing.
+        estimates=_case_service_estimates(case_id),
     )
 
     return {"case_id": case_id, "categories": categories}
