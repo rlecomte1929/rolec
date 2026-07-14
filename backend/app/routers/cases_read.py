@@ -2070,12 +2070,22 @@ def _budget_categories_from_policy_config(
             ):
                 total = (total or 0.0) + float(cap["normalized_amount"])
                 currency = cap.get("currency_code") or currency
+        # fix: AIQ-1527 — compute status honestly; never claim within_budget without comparing
+        estimated_amount: Optional[float] = None  # TODO S2: wire case_services.estimated_cost
+        if total is None:
+            status = "no_cap"
+        elif estimated_amount is None:
+            status = "no_estimate"
+        elif estimated_amount <= total:
+            status = "within_budget"
+        else:
+            status = "over_budget"
         categories.append({
             "name": svc_name,
             "cap_amount": total,
             "cap_currency": currency,
-            "estimated_amount": None,
-            "status": "within_budget" if total is not None else "no_cap",
+            "estimated_amount": estimated_amount,
+            "status": status,
         })
     return categories
 

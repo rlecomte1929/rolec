@@ -3193,6 +3193,7 @@ def get_budget_summary(
                             "cap_amount": cap.get("amount") if isinstance(cap, dict) else cap,
                             "cap_currency": (cap.get("currency", "EUR") if isinstance(cap, dict) else "EUR"),
                             "estimated_amount": None,
+                            # TODO AIQ-1527: same fix needed if this router is ever wired (currently dead code — not registered in backend/main.py)
                             "status": "within_budget",
                         })
         except Exception:
