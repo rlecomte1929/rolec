@@ -396,10 +396,32 @@ class MiscMixin:
         # on a cold start that compounds with pool warm-up to time out the
         # frontend's 15s axios window.
         from ..database import _auto_id_col, _sqlite_ensure_canonical_policy_tenant_columns, _sqlite_ensure_policy_hardening_columns, _sqlite_ensure_policy_import_columns  # lazy: avoid import cycle
-        if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
+        # [AIQ-1528] Postgres now skips the boot DDL BY DEFAULT.
+        #
+        # This escape hatch already existed and was already correct — it was simply gated on an
+        # env var (DISABLE_RUNTIME_DDL) that nobody had set in production. So every boot issued
+        # 248 unguarded DDL statements against prod Postgres, in SQLite shape.
+        #
+        # Mostly they were harmless no-ops (CREATE TABLE IF NOT EXISTS over a table a migration
+        # had already made). The damage was the exception: any table a migration had NOT created
+        # got conjured by the app instead — with text ids, text timestamps, and NO RLS and NO
+        # policies, because an app-issued CREATE TABLE grants none. That is exactly how
+        # `exception_requests` came to exist with `id text` (its migration says uuid) and zero
+        # policies, and why its RLS was lost twice in one day: we kept ALTERing the symptom while
+        # the boot code kept re-asserting the cause.
+        #
+        # Schema on Postgres is owned by supabase/migrations. Full stop. Opting BACK IN is
+        # possible (ALLOW_RUNTIME_DDL=1) but it must be a deliberate act, because a default that
+        # depends on someone remembering an env var is not a guard — it is a coin toss.
+        _pg_ddl_opt_in = os.getenv("ALLOW_RUNTIME_DDL", "").lower() in ("1", "true", "yes")
+        # DISABLE_RUNTIME_DDL is kept for back-compat; it is now redundant but harmless.
+        if not _is_sqlite and not _pg_ddl_opt_in:
             with self.engine.connect() as conn:
                 self._db_healthcheck(conn)
-            log.info("Runtime DDL disabled via DISABLE_RUNTIME_DDL. Skipping init_db DDL.")
+            log.info(
+                "init_db: Postgres detected — schema is owned by migrations; skipping all boot DDL "
+                "(set ALLOW_RUNTIME_DDL=1 to opt back in)."
+            )
             try:
                 self.seed_readiness_templates_if_empty()
             except Exception as e:
