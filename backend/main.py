@@ -9180,8 +9180,11 @@ def accept_quote(
     rfq_id: str,
     quote_id: str,
     req: Request,
-    body: Optional[ValidateQuoteRequest] = None,
+    # NB: `user` stays the 4th parameter — the eval tests call this route function directly
+    # with positional args, so inserting `body` ahead of it would silently bind the user dict
+    # to the body. FastAPI resolves these by type, not position, so the order is free here.
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+    body: Optional[ValidateQuoteRequest] = None,
 ):
     """Validate a quote — HR ONLY. This is the spend approval.
 

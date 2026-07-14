@@ -194,5 +194,33 @@ class ValidateTests(unittest.TestCase):
         self.assertFalse(_Host(_engine()).validate_rfq_quote("rfq-1", "nope", "hr-1", None)["ok"])
 
 
+class AuthWiringTests(unittest.TestCase):
+    """Criterion 1: the employee PROPOSES, HR VALIDATES. Assert it at the dependency, because
+    that is what actually 403s the request — not any check inside the handler."""
+
+    def test_validate_is_HR_only_and_propose_is_not(self):
+        from fastapi.params import Depends as DependsParam
+
+        import backend.main as m
+
+        def _dep_name(fn) -> str:
+            import inspect
+
+            for p in inspect.signature(fn).parameters.values():
+                if isinstance(p.default, DependsParam):
+                    d = p.default.dependency
+                    return getattr(d, "__name__", "") or getattr(d, "__qualname__", "")
+            return ""
+
+        # accept == VALIDATE == the spend approval. require_role(HR) builds a closure, so the
+        # tell is that it is NOT the shared hr-or-employee dependency.
+        self.assertNotEqual(
+            _dep_name(m.accept_quote), "require_hr_or_employee",
+            "validating a quote must not be open to employees — that is approving company money",
+        )
+        # propose stays open to the employee: the model is employee-led.
+        self.assertEqual(_dep_name(m.propose_quote), "require_hr_or_employee")
+
+
 if __name__ == "__main__":
     unittest.main()
