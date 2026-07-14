@@ -21,6 +21,9 @@ export const QuoteRfqDetail: React.FC = () => {
 
   const sessionRole = normalizeStoredRole(getAuthItem('relopass_role'));
   const showHrCapComparison = sessionRole === 'HR' || sessionRole === 'ADMIN';
+  // AIQ-1524: only HR is the PAYER. This drives which action the button offers; the real
+  // enforcement is server-side (the validate endpoint is HR-only and 403s an employee).
+  const isPayer = showHrCapComparison;
 
   const load = useCallback(async (forComparison = false) => {
     if (!rfqId) return;
@@ -80,18 +83,27 @@ export const QuoteRfqDetail: React.FC = () => {
     };
   }, [showHrCapComparison, rfq?.assignment_id]);
 
+  // AIQ-1524: the employee PROPOSES the offer they want; HR (the payer) VALIDATES the spend.
+  // The two are different actions with different authority, so they are different buttons —
+  // an employee pressing "Accept" used to approve the company's money.
   const handleAccept = async (quoteId: string) => {
     if (!rfqId) return;
     setAcceptingId(quoteId);
     try {
-      await rfqAPI.acceptQuote(rfqId, quoteId);
+      if (isPayer) {
+        await rfqAPI.acceptQuote(rfqId, quoteId);
+      } else {
+        await rfqAPI.proposeQuote(rfqId, quoteId);
+      }
       await load();
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : (err as Error)?.message;
-      setError(String(msg || 'Failed to accept quote'));
+      setError(
+        String(msg || (isPayer ? 'Failed to validate this offer' : 'Failed to propose this offer')),
+      );
     } finally {
       setAcceptingId(null);
     }
@@ -200,11 +212,25 @@ export const QuoteRfqDetail: React.FC = () => {
                       disabled={!!acceptingId}
                       onClick={() => handleAccept(q.id)}
                     >
-                      {acceptingId === q.id ? 'Accepting…' : 'Accept'}
+                      {acceptingId === q.id
+                        ? isPayer
+                          ? 'Validating…'
+                          : 'Proposing…'
+                        : isPayer
+                          ? 'Validate this offer'
+                          : 'Propose this offer'}
                     </Button>
                   )}
+                  {q.id === rfq?.preferred_quote_id && q.status !== 'accepted' && (
+                    <div className="mt-2 text-sm text-[#6b7280]">
+                      Proposed by the employee — awaiting HR validation.
+                    </div>
+                  )}
                   {q.status === 'accepted' && (
-                    <div className="mt-2 text-sm font-medium text-green-700">Accepted</div>
+                    <div className="mt-2 text-sm font-medium text-green-700">
+                      Validated by HR
+                      {rfq?.validation_reason ? ` — ${rfq.validation_reason}` : ''}
+                    </div>
                   )}
                 </div>
               ))}

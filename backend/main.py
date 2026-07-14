@@ -9145,26 +9145,75 @@ def list_quotes_for_rfq(
     return {"rfq_id": rfq_id, "quotes": quotes}
 
 
-@app.patch("/api/rfqs/{rfq_id}/quotes/{quote_id}/accept")
-def accept_quote(
+class ValidateQuoteRequest(BaseModel):
+    """AIQ-1524: HR records WHY it validated this offer — required reading for the employee
+    when HR picks something other than what they proposed."""
+    reason: Optional[str] = None
+
+
+@app.patch("/api/rfqs/{rfq_id}/quotes/{quote_id}/propose")
+def propose_quote(
     rfq_id: str,
     quote_id: str,
     req: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """Accept a quote (require case access)."""
-    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    """AIQ-1524: the EMPLOYEE proposes the offer they want.
+
+    The model is employee-led / HR-paid: the employee runs the RFQ and says which offer they
+    want, but a proposal commits no money — it does not change the quote's status. Only HR's
+    validation (below) approves the spend.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    rfq = db.get_rfq(rfq_id, request_id=request_id)
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
     _ = _require_case_id_assignment_visible(rfq["case_id"], user)
-    updated = db.update_quote_status(quote_id, "accepted", request_id=getattr(req.state, "request_id", None))
+    updated = db.set_rfq_preferred_quote(rfq_id, quote_id, user.get("id"), request_id=request_id)
     if not updated:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    return {"ok": True, "rfq": updated}
+
+
+@app.patch("/api/rfqs/{rfq_id}/quotes/{quote_id}/accept")
+def accept_quote(
+    rfq_id: str,
+    quote_id: str,
+    req: Request,
+    body: Optional[ValidateQuoteRequest] = None,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Validate a quote — HR ONLY. This is the spend approval.
+
+    AIQ-1524: this was `require_hr_or_employee`, which let the EMPLOYEE approve the company's
+    money. HR is the payer; the employee proposes (see /propose above) and HR validates. HR
+    may validate a different offer than the employee proposed, with a recorded reason.
+
+    Validation accepts the chosen quote, rejects its siblings, and writes the agreed cost onto
+    case_services — but only where the cost can be attributed to a service honestly (a lump sum
+    covering several services is recorded as un-attributed rather than split by guesswork).
+    """
+    request_id = getattr(req.state, "request_id", None)
+    rfq = db.get_rfq(rfq_id, request_id=request_id)
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_id_assignment_visible(rfq["case_id"], user)
+
+    result = db.validate_rfq_quote(
+        rfq_id,
+        quote_id,
+        user.get("id"),
+        (body.reason if body else None),
+        request_id=request_id,
+    )
+    if not result.get("ok"):
         raise HTTPException(status_code=404, detail="Quote not found")
+
     try:
         from .app.services.analytics_service import emit_event, EVENT_QUOTE_ACCEPTED
         emit_event(
             EVENT_QUOTE_ACCEPTED,
-            request_id=getattr(req.state, "request_id", None),
+            request_id=request_id,
             case_id=rfq.get("case_id"),
             canonical_case_id=rfq.get("canonical_case_id"),
             user_id=user.get("id"),
@@ -9172,12 +9221,12 @@ def accept_quote(
             extra={
                 "rfq_id": rfq_id,
                 "quote_id": quote_id,
-                "vendor_id": updated.get("vendor_id"),
+                "cost_attributed": result.get("cost_attributed"),
             },
         )
     except Exception:
         pass
-    return {"ok": True, "quote": updated}
+    return {"ok": True, "quote": result.get("quote"), "validation": result}
 
 
 # ---------------------------------------------------------------------------

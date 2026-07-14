@@ -3204,8 +3204,19 @@ export const rfqAPI = {
     const response = await api.get<{ rfq_id: string; quotes: QuoteDetail[] }>(`/api/rfqs/${rfqId}/quotes`, { params });
     return response.data;
   },
-  acceptQuote: async (rfqId: string, quoteId: string): Promise<{ ok: boolean; quote: QuoteDetail }> => {
-    const response = await api.patch<{ ok: boolean; quote: QuoteDetail }>(`/api/rfqs/${rfqId}/quotes/${quoteId}/accept`);
+  /** AIQ-1524: HR (the payer) validates the offer the company will pay for. HR-only — an
+   *  employee calling this gets a 403. `reason` is recorded and shown back to the employee,
+   *  and matters most when HR validates something other than what the employee proposed. */
+  acceptQuote: async (rfqId: string, quoteId: string, reason?: string): Promise<{ ok: boolean; quote: QuoteDetail }> => {
+    const response = await api.patch<{ ok: boolean; quote: QuoteDetail }>(
+      `/api/rfqs/${rfqId}/quotes/${quoteId}/accept`,
+      reason ? { reason } : {},
+    );
+    return response.data;
+  },
+  /** AIQ-1524: the EMPLOYEE proposes the offer they want. Commits no spend — HR validates. */
+  proposeQuote: async (rfqId: string, quoteId: string): Promise<{ ok: boolean }> => {
+    const response = await api.patch<{ ok: boolean }>(`/api/rfqs/${rfqId}/quotes/${quoteId}/propose`);
     return response.data;
   },
 };
@@ -3243,6 +3254,13 @@ export interface RfqSummary {
 export interface RfqDetail extends RfqSummary {
   items: Array<{ service_key: string; requirements: Record<string, unknown> }>;
   recipients: Array<{ vendor_id: string; status: string }>;
+  /** AIQ-1524: the offer the EMPLOYEE proposed. A proposal — it commits no spend. */
+  preferred_quote_id?: string | null;
+  /** AIQ-1524: the offer HR (the payer) validated. This is the spend approval. */
+  validated_quote_id?: string | null;
+  /** AIQ-1524: why HR validated this offer — surfaced to the employee, and it matters most
+   *  when HR validated something other than what the employee proposed. */
+  validation_reason?: string | null;
 }
 
 export interface QuoteDetail {
