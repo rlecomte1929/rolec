@@ -228,6 +228,8 @@ export const ROUTE_DEFS = {
   adminSpecialistReview: { path: '/admin/specialist-review/:case_id', roles: ['ADMIN'] as RouteRole[] },
   /** Auth Page Design — live-tune the /auth page's GlobeNetwork canvas (platform-wide, admin-only). */
   adminAuthPageDesign: { path: '/admin/auth-page-design', roles: ['ADMIN'] as RouteRole[] },
+  /** LinkedIn Outreach CRM — admin-only prospect management and message drafting. */
+  adminOutreach: { path: '/admin/outreach', roles: ['ADMIN'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;
