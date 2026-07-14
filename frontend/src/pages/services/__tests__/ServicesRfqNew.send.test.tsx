@@ -1,7 +1,13 @@
 /**
- * ServicesRfqNew — wired "Send quotation requests" button.
- * Clicking Send posts a quote request (case_id + shortlisted service keys) and
- * shows the sent confirmation.
+ * ServicesRfqNew — "Send quotation requests".
+ *
+ * [AIQ-1523] This now creates a REAL RFQ (`POST /api/rfqs` -> rfqs + one rfq_recipients row
+ * per supplier) instead of a `quote_requests` row. quote_requests was a dead end: no supplier
+ * could ever answer it, and the HR payer view reads rfqs/quotes — which nothing wrote to.
+ *
+ * The two shapes matter and are asserted below:
+ *   items         = one per unique SERVICE  (3 movers is ONE item, "movers")
+ *   supplier_ids  = one per unique SUPPLIER (3 movers is THREE recipients)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
@@ -12,10 +18,12 @@ import { MemoryRouter } from 'react-router-dom';
 expect.extend(matchers);
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-const mockCreate = vi.fn();
+const mockCreateRfq = vi.fn();
 
 vi.mock('../../../api/client', () => ({
-  employeeAPI: { createQuoteRequest: (...a: unknown[]): unknown => mockCreate(...a) },
+  servicesAPI: {
+    createRfq: (...a: unknown[]): unknown => mockCreateRfq(...a),
+  },
 }));
 vi.mock('../../../components/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -32,36 +40,67 @@ vi.mock('../../../utils/employeeAssignmentScope', () => ({
   parseAssignmentSearchParam: () => null,
   resolveScopedAssignmentId: () => ({ effectiveId: 'case-1', needsPicker: false }),
   withAssignmentQuery: (p: string) => p,
-  // AIQ-1334: ServicesRfqNew now resolves a case_id for in-flow nav targets.
   caseIdForAssignment: (_rows: unknown, id: string | null) => id,
 }));
 vi.mock('../../../features/services/ServicesFlowContext', () => ({
   useServicesFlow: () => ({
     recommendations: {
       living_areas: { recommendations: [{ item_id: 'v1', name: 'Acme Housing' }] },
-      movers: { recommendations: [{ item_id: 'v2', name: 'Move It' }] },
+      // TWO movers shortlisted — the case that proves items vs recipients are deduped
+      // differently. Getting this wrong sends ["movers","movers"] as two RFQ items.
+      movers: {
+        recommendations: [
+          { item_id: 'v2', name: 'Move It' },
+          { item_id: 'v3', name: 'Haul Co' },
+        ],
+      },
     },
-    // [AIQ-1520] shortlist is now category -> MANY item_ids.
-    shortlist: new Map([['living_areas', ['v1']], ['movers', ['v2']]]),
+    shortlist: new Map([['living_areas', ['v1']], ['movers', ['v2', 'v3']]]),
   }),
 }));
 
 import { ServicesRfqNew } from '../ServicesRfqNew';
 
 describe('ServicesRfqNew send', () => {
-  beforeEach(() => { mockCreate.mockReset(); mockCreate.mockResolvedValue({ id: 'q1', status: 'pending' }); });
+  beforeEach(() => {
+    mockCreateRfq.mockReset();
+    mockCreateRfq.mockResolvedValue({ ok: true, rfq: { id: 'rfq-1', rfq_ref: 'RFQ-1' }, unreachable: [] });
+  });
 
-  it('posts a quote request with the shortlisted service keys and confirms', async () => {
+  it('creates a REAL rfq — one item per service, one recipient per supplier', async () => {
     render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
 
-    const btn = await screen.findByRole('button', { name: /send quotation requests/i });
-    fireEvent.click(btn);
+    fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
+    await waitFor(() => expect(mockCreateRfq).toHaveBeenCalledTimes(1));
 
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    const payload = mockCreate.mock.calls[0][0] as { case_id: string; service_categories: string[] };
-    expect(payload.case_id).toBe('case-1');
-    expect(payload.service_categories).toEqual(['living_areas', 'movers']);
+    const [caseId, items, supplierIds] = mockCreateRfq.mock.calls[0] as [
+      string,
+      Array<{ service_key: string; requirements: Record<string, unknown> }>,
+      string[],
+    ];
+    expect(caseId).toBe('case-1');
+    // two movers collapse into ONE "movers" item...
+    expect(items.map((i) => i.service_key)).toEqual(['living_areas', 'movers']);
+    // ...but stay THREE separate recipients.
+    expect(supplierIds).toEqual(['v1', 'v2', 'v3']);
 
     expect(await screen.findByTestId('rfq-sent')).toBeInTheDocument();
+  });
+
+  it('tells the employee when a supplier they picked could not be reached', async () => {
+    // The RFQ still goes to the rest — but we must not silently send to fewer suppliers
+    // than the employee chose.
+    mockCreateRfq.mockResolvedValue({
+      ok: true,
+      rfq: { id: 'rfq-1', rfq_ref: 'RFQ-1' },
+      unreachable: ['Haul Co: no supplier on record'],
+    });
+    render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
+
+    fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
+
+    const warn = await screen.findByTestId('rfq-unreachable');
+    expect(warn).toHaveTextContent(/Haul Co/);
+    expect(warn).toHaveTextContent(/couldn’t include every vendor/i);
   });
 });

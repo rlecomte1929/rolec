@@ -5,7 +5,7 @@ import { EmployeeScopedAssignmentPicker } from '../../components/employee/Employ
 import { Button, Card, Input } from '../../components/antigravity';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
-import { employeeAPI } from '../../api/client';
+import { servicesAPI } from '../../api/client';
 import { RfqWorkflowDiagram } from '../../features/services/RfqWorkflowDiagram';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
@@ -56,6 +56,10 @@ export const ServicesRfqNew: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // [AIQ-1523] Suppliers the backend could not reach (a catalog item with no supplier on
+  // record). The RFQ still goes to the rest — but the employee is told who was left out,
+  // rather than us silently sending to fewer suppliers than they chose.
+  const [unreachable, setUnreachable] = useState<string[]>([]);
 
   // [AIQ-1520] Several vendors may be shortlisted per service — iterate them all.
   const shortlisted = useMemo(() => {
@@ -75,29 +79,33 @@ export const ServicesRfqNew: React.FC = () => {
     setSending(true);
     setSendError(null);
     try {
-      const combinedNotes =
-        shortlisted
+      // [AIQ-1523] This now creates a REAL RFQ (rfqs + one rfq_recipients row per supplier)
+      // instead of a quote_requests row. That table was a dead end: no supplier could ever
+      // answer it, and the HR payer view reads rfqs/quotes — which nothing wrote to. This is
+      // the call that finally gives them a writer.
+      //
+      // Dedupe both lists: three shortlisted movers are ONE rfq item ("movers") and THREE
+      // recipients, not three items.
+      const services = Array.from(new Set(shortlisted.map(({ service }) => service)));
+      const items = services.map((service) => {
+        const serviceNotes = shortlisted
+          .filter((s) => s.service === service)
           .map(({ vendor }) => {
             const note = (notes[vendor.item_id] || '').trim();
             return note ? `${vendor.name}: ${note}` : null;
           })
           .filter(Boolean)
-          .join(' | ') || undefined;
-      await employeeAPI.createQuoteRequest({
-        case_id: assignmentId,
-        // [AIQ-1520] Dedupe: 3 shortlisted movers would otherwise send
-        // ["movers","movers","movers"] straight into a Postgres text[].
-        service_categories: Array.from(new Set(shortlisted.map(({ service }) => service))),
-        // AIQ-1514: send the vendors the employee actually shortlisted. Previously only
-        // the categories were sent, so the choice survived nowhere but the free-text
-        // notes below — HR never learned who was picked.
-        vendors: shortlisted.map(({ service, vendor }) => ({
-          service_category: service,
-          item_id: vendor.item_id,
-          name: vendor.name,
-        })),
-        notes: combinedNotes,
+          .join(' | ');
+        // requirements is the per-service brief the supplier quotes against — so the note
+        // belongs on ITS service, not smeared across every item.
+        return { service_key: service, requirements: serviceNotes ? { notes: serviceNotes } : {} };
       });
+      const supplierIds = Array.from(new Set(shortlisted.map(({ vendor }) => vendor.item_id)));
+
+      const res = await servicesAPI.createRfq(assignmentId, items, supplierIds);
+      // Tell the employee plainly if a supplier they chose could not be reached, rather than
+      // silently sending to fewer suppliers than they picked.
+      setUnreachable(res.unreachable ?? []);
       setSent(true);
       // AIQ-1436: one rfq_created per shortlisted vendor (mirrors the backend
       // canonical event name; the RFQ is a batch submit over the shortlist).
@@ -218,16 +226,31 @@ export const ServicesRfqNew: React.FC = () => {
           {/* [AIQ-1515] Was "Quotation requests sent", which implied the vendors had been
               contacted. They have not — the request goes to HR, who now sees exactly which
               vendors you picked and requests the quotes. */}
+          {/* [AIQ-1523] The copy stays as-is on purpose. The request now creates a REAL RFQ
+              (rfqs + rfq_recipients), but NO supplier is contacted yet — the magic-link that
+              actually reaches them is AIQ-1521. Claiming "sent to the providers" here would be
+              the same lie AIQ-1515 removed. */}
           ✅ <span>Sent to your HR team — they can see the vendors you picked and will request the quotes. We&apos;ve added this to your roadmap.</span>
         </div>
-      ) : (
+      ) : null}
+      {sent && unreachable.length > 0 ? (
+        <div
+          data-testid="rfq-unreachable"
+          className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          <span className="font-semibold">We couldn’t include every vendor you picked.</span>{' '}
+          {unreachable.join('; ')} — we don’t have supplier contact details on record for them, so
+          they were left out of this request. The rest were included.
+        </div>
+      ) : null}
+      {!sent ? (
         <div className="mt-4 flex flex-col items-end gap-2">
           {sendError && <p className="text-xs text-red-500">{sendError}</p>}
           <Button type="button" onClick={handleSend} disabled={sending}>
             {sending ? 'Sending…' : 'Send quotation requests'}
           </Button>
         </div>
-      )}
+      ) : null}
     </AppShell>
   );
 };

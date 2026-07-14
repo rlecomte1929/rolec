@@ -3152,12 +3152,20 @@ export const servicesAPI = {
     const response = await api.post<{ ok: boolean }>('/api/services/answers', { case_id: caseId, items }, config);
     return response.data;
   },
+  /** Create a real RFQ: one `rfqs` row + one `rfq_recipients` row per supplier.
+   *
+   *  `unreachable` (AIQ-1520) names the suppliers we could NOT reach — a catalog item with no
+   *  supplier on record. The RFQ still goes to everyone who DID resolve; the caller must tell
+   *  the employee who was left out rather than quietly send to fewer suppliers than they chose. */
   createRfq: async (
     caseId: string,
     items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
     supplierIds: string[]
-  ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
-    const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string } }>('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
+  ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string }; unreachable: string[] }> => {
+    const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string }; unreachable: string[] }>(
+      '/api/rfqs',
+      { case_id: caseId, items, supplier_ids: supplierIds },
+    );
     return response.data;
   },
 
