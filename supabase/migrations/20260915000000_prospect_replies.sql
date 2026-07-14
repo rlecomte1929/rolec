@@ -16,8 +16,7 @@ ALTER TABLE public.prospect_replies ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin full access" ON public.prospect_replies;
 CREATE POLICY "Admin full access" ON public.prospect_replies
   FOR ALL TO authenticated
-  USING  (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1));
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 REVOKE ALL ON public.prospect_replies FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.prospect_replies TO authenticated;

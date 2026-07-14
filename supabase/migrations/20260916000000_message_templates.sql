@@ -18,8 +18,7 @@ ALTER TABLE public.message_templates ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin full access" ON public.message_templates;
 CREATE POLICY "Admin full access" ON public.message_templates
   FOR ALL TO authenticated
-  USING  (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1));
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 REVOKE ALL ON public.message_templates FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.message_templates TO authenticated;
