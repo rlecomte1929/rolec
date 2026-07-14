@@ -391,6 +391,26 @@ jobs:
       - name: Run route-auth check
         run: python scripts/check_route_auth.py --root .
 
+  compliance-claims:
+    # [AIQ-1513] Fail the PR if shipped customer-facing copy makes an EU AI Act status
+    # claim ("EU AI Act Ready", "compliant", "certified") or classifies ReloPass as a
+    # high-risk AI system. docs/compliance/AIQ-1487_eu_ai_act_assessment.md found the
+    # opposite (limited-risk) and warns: "A false or premature compliance claim is
+    # itself a legal liability." relopass.com shipped exactly that badge — plus a
+    # downloadable PDF aimed at procurement — until this guard was added.
+    # Always runs: a claim can reach a user through the SPA, a static asset, marketing,
+    # or published content, so it is not gated on the frontend/backend path filters.
+    name: Compliance claim guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Check for prohibited compliance claims
+        run: python scripts/check_compliance_claims.py
+
   rls-coverage:
     # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
     # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.

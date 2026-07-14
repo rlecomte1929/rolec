@@ -166,6 +166,34 @@ Every migration that creates a new table in the `public` schema **must** include
 
 **If you are writing or reviewing a migration and a new table is missing any of the above, stop and add it before proceeding.** This is a hard review gate, not a soft suggestion.
 
+## Compliance claims in customer-facing copy (HARD GATE)
+
+**Never claim an EU AI Act status in shipped copy.** No "EU AI Act Ready", "compliant",
+"certified", or "conformant" — and never describe ReloPass as a **high-risk** AI system.
+
+`docs/compliance/AIQ-1487_eu_ai_act_assessment.md` is the source of truth. It found our AI is
+**limited-risk, not high-risk**, and it is explicit:
+
+> "Do not ship an 'EU AI Act Ready' / 'Compliant' badge. For a limited-risk system there is no
+> certification to be 'ready' for, and the phrasing implies a formal status we don't hold."
+> "A false or premature compliance claim is itself a legal liability."
+
+This is not hypothetical: relopass.com shipped an "EU AI Act Ready" badge, a page `<title>` and
+meta description saying the same, and a **downloadable PDF aimed at compliance and procurement
+teams** — all contradicting our own assessment. Removed in AIQ-1513.
+
+**What you MAY say** — describe what the controls *do*, because those are verifiable product
+facts: a human reviews every AI recommendation; each decision is logged with the AI output that
+informed it; answers are grounded in the customer's own policy and cited; PII is masked before any
+LLM call (`pii_masker.py`). **Describe the controls; claim no status.**
+
+Any *new* compliance claim needs legal sign-off **before** it ships — the assessment itself is
+still `DRAFT — legal review required`. Removing a false claim needs no review; adding one does.
+
+CI enforces this: **`scripts/check_compliance_claims.py`** (job: *Compliance claim guard*) scans
+`frontend/src`, `frontend/public`, `docs/marketing`, and `content/` and fails the PR on a
+prohibited claim. Don't delete the rule to make it pass.
+
 ## Data minimisation — PII in AI prompts (GDPR Art. 28/44)
 
 The product sends user-supplied text to third-party LLM sub-processors (OpenAI and Anthropic, both US-based). Under GDPR these are sub-processors of any personal data included in a prompt, so **raw PII must never leave the platform in an LLM payload**.
