@@ -72,7 +72,8 @@ function getItemCost(item: RecommendationItem, costType: string): number {
 
 interface Props {
   results: Record<string, RecommendationResponse>;
-  selectedPackage: Map<string, string>;
+  /** [AIQ-1520] category -> MANY item_ids. Collapsed to one comparison row per category. */
+  selectedPackage: Map<string, string[]>;
   categoryLabels: Record<string, string>;
   onBack: () => void;
   onStartOver: () => void;
@@ -183,19 +184,28 @@ export const PackageSummary: React.FC<Props> = ({
     };
   }, [assignmentId]);
 
+  // [AIQ-1520] The employee may now shortlist SEVERAL vendors per service (a real RFQ).
+  // Group them by category — the comparison below must still collapse to exactly ONE row per
+  // category, or the totals, the React keys, and the per-category exception button all break.
   const packageItems: { category: string; item: RecommendationItem }[] = [];
   for (const [category, res] of Object.entries(results)) {
-    const itemId = selectedPackage.get(category);
-    if (!itemId) continue;
-    const item = res.recommendations.find((r) => r.item_id === itemId);
-    if (item) packageItems.push({ category, item });
+    const itemIds = selectedPackage.get(category) ?? [];
+    for (const itemId of itemIds) {
+      const item = res.recommendations.find((r) => r.item_id === itemId);
+      if (item) packageItems.push({ category, item });
+    }
   }
 
   type CapStatus = 'within' | 'over' | 'not_capped';
   const comparison: {
     category: string;
     label: string;
+    /** Best case: the cheapest shortlisted option. Drives covered/extra/status and the totals. */
     total: number;
+    /** Dearest shortlisted option. Equals `total` when only one vendor is shortlisted. */
+    totalMax: number;
+    /** How many vendors are shortlisted in this category. */
+    vendorCount: number;
     cap: number;
     covered: number;
     extra: number;
@@ -206,9 +216,20 @@ export const PackageSummary: React.FC<Props> = ({
     status: CapStatus;
   }[] = [];
   if (categoryCaps) {
+    // Group first: one row per category, however many vendors are shortlisted in it.
+    const byCategory = new Map<string, RecommendationItem[]>();
     for (const { category, item } of packageItems) {
+      byCategory.set(category, [...(byCategory.get(category) ?? []), item]);
+    }
+
+    for (const [category, items] of byCategory) {
       const costType = CATEGORY_COST_TYPE[category] || 'one_time';
-      const total = getItemCost(item, costType);
+      const costs = items.map((i) => getItemCost(i, costType));
+      // A shortlist of 3 movers is a REQUEST FOR PRICES, not three purchases. Summing them
+      // would triple-count the spend and apply the cap three times. Compare the range against
+      // the cap, and treat the cheapest as the best case that drives the headline totals.
+      const total = Math.min(...costs);
+      const totalMax = Math.max(...costs);
       // AIQ-280 follow-up #4 — direct category-name lookup instead of the
       // old hardcoded CATEGORY_TO_CAP intermediate. categoryCaps stores
       // USD-normalised caps (currency conversion happened in the adapter).
@@ -218,12 +239,16 @@ export const PackageSummary: React.FC<Props> = ({
       const noPublishedCapForCategory = Boolean(hasPublishedPolicy && !noCapMapping && cap <= 0);
       const covered = Math.min(total, cap);
       const extra = Math.max(0, total - cap);
+      // OVER only when even the CHEAPEST shortlisted option exceeds the cap. If the cheapest
+      // fits, the employee still has an in-policy choice to make.
       const status: CapStatus =
         noCapMapping || cap <= 0 ? 'not_capped' : extra > 0 ? 'over' : 'within';
       comparison.push({
         category,
         label: categoryLabels[category] || category,
         total,
+        totalMax,
+        vendorCount: items.length,
         cap,
         covered,
         extra,
@@ -483,6 +508,12 @@ export const PackageSummary: React.FC<Props> = ({
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm mb-2">
                         <span className="flex items-center gap-2">
                           <span className="font-medium text-[#0b2b43]">{c.label}</span>
+                          {/* [AIQ-1520] Several vendors may be shortlisted for one service. */}
+                          {c.vendorCount > 1 && (
+                            <span className="text-xs text-[#6b7280]">
+                              {c.vendorCount} vendors
+                            </span>
+                          )}
                           <span
                             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${badge.className}`}
                           >
@@ -490,7 +521,11 @@ export const PackageSummary: React.FC<Props> = ({
                           </span>
                         </span>
                         <span>
-                          Total: {fmt(c.total)}
+                          {/* A shortlist is a request for prices, not a purchase — show the
+                              range across the shortlisted options, not a sum. */}
+                          {c.totalMax > c.total
+                            ? `Indicative: ${fmt(c.total)} – ${fmt(c.totalMax)}`
+                            : `Total: ${fmt(c.total)}`}
                           {c.cap > 0 && (
                             <span className="ml-2 text-[#6b7280]">
                               (Cap: {fmt(c.cap)})
@@ -498,6 +533,13 @@ export const PackageSummary: React.FC<Props> = ({
                           )}
                         </span>
                       </div>
+                      {c.vendorCount > 1 && (
+                        <p className="mt-1 text-xs text-[#6b7280]">
+                          {c.status === 'over'
+                            ? 'Every option shortlisted here is over your cap.'
+                            : 'Indicative catalogue prices, not offers — the real figures arrive with the quotes.'}
+                        </p>
+                      )}
                       {c.noCapMapping && hasPublishedPolicy && (
                         <p className="text-xs text-[#475569] mb-2">
                           Not capped by your employer policy in ReloPass — this category is shown as fully out-of-pocket

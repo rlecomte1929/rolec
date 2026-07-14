@@ -432,8 +432,9 @@ function RecCard({
 interface Props {
   results: Record<string, RecommendationResponse>;
   categoryLabels: Record<string, string>;
-  selectedPackage: Map<string, string>;
-  onSelectedPackageChange: (pkg: Map<string, string>) => void;
+  /** [AIQ-1520] category -> MANY item_ids (a real RFQ compares several vendors). */
+  selectedPackage: Map<string, string[]>;
+  onSelectedPackageChange: (pkg: Map<string, string[]>) => void;
   onStartOver: () => void;
   onViewSummary: () => void;
   displayCurrency: string;
@@ -466,13 +467,20 @@ export const RecommendationResults: React.FC<Props> = ({
 
   if (entries.length === 0) return null;
 
+  // [AIQ-1520] Append/remove within the category instead of overwriting. A real RFQ asks
+  // several movers for a price; the old `set(category, itemId)` silently replaced the
+  // previous pick, so a second vendor could never be shortlisted.
   const togglePackage = (category: string, itemId: string) => {
     const next = new Map(selectedPackage);
-    if (next.get(category) === itemId) {
-      next.delete(category);
+    const current = next.get(category) ?? [];
+    const without = current.filter((id) => id !== itemId);
+    if (without.length === current.length) {
+      next.set(category, [...current, itemId]);      // not present -> add
+    } else if (without.length > 0) {
+      next.set(category, without);                   // present -> remove, others remain
     } else {
-      next.set(category, itemId);
-    }
+      next.delete(category);                         // removed the last one -> drop the key,
+    }                                                // so `shortlist.size` stays truthful
     onSelectedPackageChange(next);
   };
 
@@ -517,16 +525,26 @@ export const RecommendationResults: React.FC<Props> = ({
    *   - rank 0 (top match): commit + fire 'accept' log in background.
    *   - rank > 0: open the inline reason-capture; commit happens on Confirm.
    */
-  const handleCardToggle = (category: string, item: RecommendationItem, rank: number) => {
-    const currentlyInPackage = selectedPackage.get(category) === item.item_id;
-    if (currentlyInPackage) {
+  const handleCardToggle = (
+    category: string,
+    item: RecommendationItem,
+    rank: number,
+    topItemId?: string,
+  ) => {
+    const inCategory = selectedPackage.get(category) ?? [];
+    if (inCategory.includes(item.item_id)) {
       togglePackage(category, item.item_id);
       return;
     }
-    if (rank === 0) {
+    // [AIQ-1520] An "override" means the employee passed OVER the AI's top match. Adding a
+    // 2nd or 3rd vendor to compare against a top match they have ALREADY shortlisted is not
+    // an override — it is the point of an RFQ. Without this, every extra vendor would force
+    // the reason-capture modal and log a rejection the employee never made.
+    const topMatchAlreadyPicked = !!topItemId && inCategory.includes(topItemId);
+    if (rank === 0 || topMatchAlreadyPicked) {
       togglePackage(category, item.item_id);
-      logDecision(category, item, 0, null);
-      // AIQ-1436: supplier_selected on committing the top-match pick.
+      logDecision(category, item, rank, null);
+      // AIQ-1436: supplier_selected on committing the pick.
       track('supplier_selected', { supplier_id: item.item_id, service_category: category, case_id: caseId });
       return;
     }
@@ -554,7 +572,8 @@ export const RecommendationResults: React.FC<Props> = ({
     setPendingPick(null);
   };
 
-  const packageCount = selectedPackage.size;
+  // [AIQ-1520] Count VENDORS, not categories — 3 shortlisted movers is 3, not 1.
+  const packageCount = Array.from(selectedPackage.values()).reduce((n, ids) => n + ids.length, 0);
 
   return (
     <div className="space-y-6">
@@ -648,8 +667,8 @@ export const RecommendationResults: React.FC<Props> = ({
                       category={category}
                       criteriaEcho={res.criteria_echo}
                       defaultExpanded={idx === 0}
-                      isInPackage={selectedPackage.get(category) === item.item_id}
-                      onTogglePackage={() => handleCardToggle(category, item, idx)}
+                      isInPackage={(selectedPackage.get(category) ?? []).includes(item.item_id)}
+                      onTogglePackage={() => handleCardToggle(category, item, idx, res.recommendations[0]?.item_id)}
                       displayCurrency={displayCurrency}
                       pendingConfirmActive={isPendingThisCard}
                       pendingConfirmSubmitting={isPendingThisCard && pendingSubmitting}

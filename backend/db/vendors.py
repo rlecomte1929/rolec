@@ -267,7 +267,14 @@ class VendorsMixin:
     def validate_vendor_ids(
         self, vendor_ids: List[str], request_id: Optional[str] = None
     ) -> Tuple[List[str], List[str]]:
-        """Check each vendor_id exists in vendors table. Returns (valid_ids, errors)."""
+        """[AIQ-1520] Check each RFQ recipient id exists in `suppliers`.
+
+        Was `SELECT 1 FROM vendors`. `vendors` is deprecated for writes and holds 8 rows
+        against 90 suppliers, so this gate rejected almost every real recipient. RFQ
+        recipients are suppliers now (migration 20260918000000).
+
+        The name is kept because callers and a test refer to it. Returns (valid_ids, errors).
+        """
         valid: List[str] = []
         errors: List[str] = []
         for vid in vendor_ids:
@@ -278,18 +285,20 @@ class VendorsMixin:
                 with self.engine.connect() as conn:
                     row = self._exec(
                         conn,
-                        "SELECT 1 FROM vendors WHERE id = :vid",
+                        "SELECT 1 FROM suppliers WHERE id = :vid",
                         {"vid": vid},
-                        op_name="validate_vendor_id",
+                        op_name="validate_recipient_supplier_id",
                         request_id=request_id,
                     ).fetchone()
                 if row:
                     valid.append(vid)
                 else:
-                    errors.append(f"Vendor {vid} not found in vendors table. Ensure supplier.vendor_id references an existing vendor.")
+                    errors.append(f"Supplier {vid} is not in the supplier registry.")
             except Exception as e:
-                log.warning("validate_vendor_ids check failed for %s: %s", vid, e)
-                valid.append(vid)  # Best-effort: allow if check fails (e.g. no vendors table)
+                # Was: valid.append(vid) — a silent fail-OPEN. A validation gate that accepts
+                # the id when its own check errored is not a gate. Fail closed, and say so.
+                log.warning("validate_vendor_ids: supplier check failed for %s: %s", vid, e)
+                errors.append(f"Could not verify supplier {vid}; not adding it to the RFQ.")
         return (valid, errors)
 
     def _vendor_names_for_rfq(self, rfq_id: Optional[str]) -> Optional[str]:
@@ -297,10 +306,13 @@ class VendorsMixin:
             return None
         try:
             with self.engine.connect() as conn:
+                # [AIQ-1520] rr.vendor_id holds a suppliers.id now, not a vendors.id.
+                # Joining `vendors` would match nothing and the employee's quote-thread
+                # label would silently degrade to "Service provider".
                 rows = conn.execute(
                     text(
-                        "SELECT v.name AS name FROM rfq_recipients rr "
-                        "LEFT JOIN vendors v ON v.id = rr.vendor_id "
+                        "SELECT s.name AS name FROM rfq_recipients rr "
+                        "LEFT JOIN suppliers s ON s.id = rr.vendor_id "
                         "WHERE rr.rfq_id = :r ORDER BY rr.created_at"
                     ),
                     {"r": str(rfq_id).strip()},

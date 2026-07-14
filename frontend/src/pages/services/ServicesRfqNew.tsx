@@ -57,14 +57,15 @@ export const ServicesRfqNew: React.FC = () => {
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
+  // [AIQ-1520] Several vendors may be shortlisted per service — iterate them all.
   const shortlisted = useMemo(() => {
     if (!recommendations) return [];
     const items: Array<{ service: string; vendor: { item_id: string; name: string } }> = [];
     for (const [category, res] of Object.entries(recommendations)) {
-      const selectedId = shortlist.get(category);
-      if (!selectedId) continue;
-      const vendor = res.recommendations.find((r) => r.item_id === selectedId);
-      if (vendor) items.push({ service: category, vendor });
+      for (const selectedId of shortlist.get(category) ?? []) {
+        const vendor = res.recommendations.find((r) => r.item_id === selectedId);
+        if (vendor) items.push({ service: category, vendor });
+      }
     }
     return items;
   }, [recommendations, shortlist]);
@@ -84,7 +85,9 @@ export const ServicesRfqNew: React.FC = () => {
           .join(' | ') || undefined;
       await employeeAPI.createQuoteRequest({
         case_id: assignmentId,
-        service_categories: shortlisted.map(({ service }) => service),
+        // [AIQ-1520] Dedupe: 3 shortlisted movers would otherwise send
+        // ["movers","movers","movers"] straight into a Postgres text[].
+        service_categories: Array.from(new Set(shortlisted.map(({ service }) => service))),
         // AIQ-1514: send the vendors the employee actually shortlisted. Previously only
         // the categories were sent, so the choice survived nowhere but the free-text
         // notes below — HR never learned who was picked.

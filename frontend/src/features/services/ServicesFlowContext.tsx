@@ -3,6 +3,7 @@ import type { RecommendationResponse } from '../recommendations/types';
 import { getServicesState, saveServicesState } from '../../api/servicesState';
 import type { ServiceKey } from './serviceConfig';
 import { normalizeServicesCurrency, SERVICES_DISPLAY_CURRENCY_STORAGE_KEY } from './servicesCurrency';
+import { toShortlistMap, type Shortlist } from './shortlist';
 
 interface ServicesFlowState {
   selectedServices: Set<ServiceKey>;
@@ -11,8 +12,11 @@ interface ServicesFlowState {
   setAnswers: (next: Record<string, unknown> | ((prev: Record<string, unknown>) => Record<string, unknown>)) => void;
   recommendations: Record<string, RecommendationResponse> | null;
   setRecommendations: (next: Record<string, RecommendationResponse> | null) => void;
-  shortlist: Map<string, string>;
-  setShortlist: (next: Map<string, string>) => void;
+  /** [AIQ-1520] MANY vendors per service category — a real RFQ asks 3 movers, not 1.
+   *  Was Map<category, item_id>. Never leave a category mapped to an empty array:
+   *  ServicesEstimate gates its CTA on `shortlist.size > 0`. */
+  shortlist: Shortlist;
+  setShortlist: (next: Shortlist) => void;
   /** ISO 4217 code — used for all service-flow estimates (converted from USD baseline). */
   displayCurrency: string;
   setDisplayCurrency: (code: string) => void;
@@ -55,10 +59,10 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return null;
     }
   });
-  const [shortlist, setShortlist] = useState<Map<string, string>>(() => {
+  const [shortlist, setShortlist] = useState<Shortlist>(() => {
     try {
       const raw = localStorage.getItem('services_shortlist');
-      return raw ? new Map(JSON.parse(raw) as [string, string][]) : new Map();
+      return raw ? toShortlistMap(JSON.parse(raw)) : new Map();
     } catch {
       return new Map();
     }
@@ -121,7 +125,9 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
             );
           }
           if (Array.isArray(s.shortlist)) {
-            setShortlist(new Map(s.shortlist as [string, string][]));
+            // [AIQ-1520] Same tolerant hydration as localStorage — the server blob also
+            // holds the legacy one-vendor-per-category shape for existing cases.
+            setShortlist(toShortlistMap(s.shortlist));
           }
           if (typeof s.displayCurrency === 'string') {
             setDisplayCurrency(s.displayCurrency);
