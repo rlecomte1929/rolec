@@ -21,6 +21,9 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from backend.app.services.supplier_link_dispatch import (  # noqa: E402
+    NO_ADDRESS,
+    _PERSONAL_DOMAINS,
+    dispatch_supplier_links,
     rfq_email_html,
     rfq_email_subject,
 )
@@ -82,6 +85,63 @@ class EmailInjectionTests(unittest.TestCase):
         html = rfq_email_html("Allied", LINK)
         self.assertIn("<a href=", html)
         self.assertNotIn("None", html)
+
+
+class PersonalDomainGuardTests(unittest.TestCase):
+    """AIQ-1533 — personal/webmail domains in the catalog must never receive RFQ emails."""
+
+    def _targets(self, email):
+        return [{"recipient_id": "r-1", "vendor_id": "v-1", "supplier_name": "Test Mover", "email": email}]
+
+    def test_personal_domain_blocked_not_sent(self):
+        # dispatch_supplier_links must not email a personal inbox even with send_email=True.
+        # (No real email actually goes out here — RESEND_API_KEY is unset in tests.)
+        results = dispatch_supplier_links(
+            rfq_id="rfq-test-1",
+            targets=self._targets("someone@hotmail.com"),
+            send_email=True,
+        )
+        self.assertEqual(len(results), 1)
+        self.assertFalse(results[0]["ok"])
+        self.assertFalse(results[0]["sent"])
+        self.assertIn("hotmail.com", results[0]["error"])
+
+    def test_no_address_still_blocked(self):
+        results = dispatch_supplier_links(
+            rfq_id="rfq-test-2",
+            targets=self._targets(None),
+            send_email=False,
+        )
+        self.assertEqual(len(results), 1)
+        self.assertFalse(results[0]["ok"])
+        self.assertEqual(results[0]["error"], NO_ADDRESS)
+
+    def test_business_domain_passes_the_guard(self):
+        # A real business address should NOT be blocked by the personal-domain guard.
+        # It will mint a token (which needs a DB), so we only check it's NOT rejected
+        # for the domain reason — the token-mint may fail in the test environment.
+        results = dispatch_supplier_links(
+            rfq_id="rfq-test-3",
+            targets=self._targets("rfq@asiantigers-worldwide.com"),
+            send_email=False,
+        )
+        self.assertEqual(len(results), 1)
+        # Must not be rejected due to domain; any failure should be from token-mint, not domain
+        if not results[0]["ok"]:
+            self.assertNotIn("placeholder email", results[0].get("error", ""))
+
+    def test_personal_domains_blocklist_includes_hotmail(self):
+        self.assertIn("hotmail.com", _PERSONAL_DOMAINS)
+        self.assertIn("gmail.com", _PERSONAL_DOMAINS)
+
+    def test_gmail_domain_blocked(self):
+        results = dispatch_supplier_links(
+            rfq_id="rfq-test-4",
+            targets=self._targets("contact@gmail.com"),
+            send_email=True,
+        )
+        self.assertFalse(results[0]["ok"])
+        self.assertIn("gmail.com", results[0]["error"])
 
 
 if __name__ == "__main__":

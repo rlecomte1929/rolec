@@ -38,6 +38,17 @@ APP_BASE_URL = os.getenv("APP_BASE_URL", "https://relopass.com")
 EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@relopass.com")
 
 NO_ADDRESS = "no contact email on record"
+# Personal / webmail domains that should never appear as a supplier contact.
+# These indicate a placeholder was entered during catalog setup. Update the
+# catalog row with the supplier's actual business address instead.
+_PERSONAL_DOMAINS = frozenset({
+    "gmail.com", "googlemail.com",
+    "hotmail.com", "hotmail.fr", "hotmail.co.uk",
+    "outlook.com", "live.com", "msn.com",
+    "yahoo.com", "yahoo.fr", "yahoo.co.uk",
+    "icloud.com", "me.com", "mac.com",
+    "protonmail.com", "pm.me",
+})
 
 
 def rfq_email_html(
@@ -179,6 +190,24 @@ def dispatch_supplier_links(
                 "ok": False,
                 "sent": False,
                 "error": NO_ADDRESS,
+            })
+            continue
+        # Guard: personal/webmail domains are placeholders, not business contacts.
+        # A supplier with a @gmail.com address was set up with a test value.
+        # Null out the catalog row and retry — do not send to a personal inbox.
+        _domain = email.split("@")[-1].lower() if "@" in email else ""
+        if _domain in _PERSONAL_DOMAINS:
+            log.error(
+                "AIQ-1533 dispatch blocked — personal domain in catalog "
+                "rfq=%s recipient=%s email_domain=%s",
+                rfq_id, target.get("recipient_id"), _domain,
+            )
+            results.append({
+                "recipient_id": target.get("recipient_id"),
+                "supplier_name": name,
+                "ok": False,
+                "sent": False,
+                "error": f"placeholder email detected (@{_domain}); update the supplier catalog",
             })
             continue
 
