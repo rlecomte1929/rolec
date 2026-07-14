@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Send, Settings } from 'lucide-react';
 import { useProspects } from '../../hooks/useProspects';
 import { useFollowUpQueue, daysSinceSent } from '../../hooks/useFollowUpQueue';
@@ -45,6 +45,11 @@ export function OutreachPage(): React.ReactElement {
       setDraftWarning('No active initial template — open Settings ⚙ to add one, then regenerate the draft from the prospect drawer.');
     }
   };
+
+  // Auto-clear filter when the follow-up queue drains
+  useEffect(() => {
+    if (followUpQueue.length === 0) setFilterFollowUp(false);
+  }, [followUpQueue.length]);
 
   // Keep selectedProspect in sync when the list updates (e.g. status change from drawer)
   const syncedProspect = selectedProspect
