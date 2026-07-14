@@ -6,7 +6,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { useGeocodedAddress } from '../../../components/geocode';
 import { patchCase } from '../../../api/cases';
-import { emitTestDriveStage } from '../../../api/testDrive';
+import { emitTestDriveStage, getTestDriveSession } from '../../../api/testDrive';
 import { employeeAPI } from '../../../api/client';
 import { track } from '../../../analytics';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
@@ -347,7 +347,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   );
 }
 
-function CityCombo({ country, value, onChange, testId }: { country: string; value: string; onChange: (v: string) => void; testId?: string }) {
+function CityCombo({ country, value, onChange, testId, disabled }: { country: string; value: string; onChange: (v: string) => void; testId?: string; disabled?: boolean }) {
   const opts = CITIES_BY_COUNTRY[country] ?? [];
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -359,15 +359,16 @@ function CityCombo({ country, value, onChange, testId }: { country: string; valu
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
+      <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
         <span className="px-3 text-gray-400 text-sm">📍</span>
         <Input unstyled type="text" data-testid={testId} value={value} placeholder="Select or type a city" autoComplete="off"
-          className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
+          disabled={disabled}
+          className={`flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent ${disabled ? 'text-gray-400 cursor-not-allowed' : ''}`}
           onChange={(v) => onChange(v)}
-          onFocus={() => setOpen(true)} />
+          onFocus={() => { if (!disabled) setOpen(true); }} />
         <span className="px-2 text-gray-400 text-xs">▾</span>
       </div>
-      {open && opts.length > 0 && (
+      {open && !disabled && opts.length > 0 && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
           {opts.map((c) => (
             <div key={c} onClick={() => { onChange(c); setOpen(false); }}
@@ -581,7 +582,11 @@ export function EmployeeIntakePage() {
   // the hydration effect below has actually populated it from the case
   // row. Previously every lock started true, falsely claiming the wizard's
   // hardcoded demo values were HR-controlled.
-  const [locks, setLocks] = useState({ dest: false, destCity: false, email: false, job: false, contractType: false, contractStart: false, salary: false, office: false });
+  // TD-FIX-7 (AIQ-1510): origin/originCity join the lock set — a test-drive case is
+  // pinned to its assigned corridor, so BOTH ends of the route are HR pre-filled, not
+  // just the destination. For real users nothing else in the product writes
+  // home_country today, so these stay unlocked exactly as before.
+  const [locks, setLocks] = useState({ origin: false, originCity: false, dest: false, destCity: false, email: false, job: false, contractType: false, contractStart: false, salary: false, office: false });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savedAt, setSavedAt] = useState(Date.now());
   // Save indicator is bound to the ACTUAL server acknowledgement, not optimistic
@@ -718,6 +723,14 @@ export function EmployeeIntakePage() {
 
   const unlock = (key: keyof typeof locks) => setLocks((l) => ({ ...l, [key]: false }));
 
+  // TD-FIX-7 (AIQ-1510): on a test drive the route is not the tester's to change — the
+  // case is pinned to the corridor their session was assigned, and the server overrides
+  // it on write regardless. So withhold the "unlock" escape hatch on the route fields:
+  // re-opening them would only let the tester enter a value the server then silently
+  // discards. Everything else in intake stays fully editable.
+  const isTestDrive = !!getTestDriveSession();
+  const routeUnlock = (key: keyof typeof locks) => (isTestDrive ? undefined : () => unlock(key));
+
   const international = !!(data.origin_country && data.dest_country && data.origin_country !== data.dest_country);
 
   const partner = data.members.find((m) => m.kind === 'partner');
@@ -829,6 +842,15 @@ export function EmployeeIntakePage() {
     // row — that's the "🔒 HR pre-filled" signal users see.
     if (destCode) {
       setLocks((l) => ({ ...l, dest: true }));
+    }
+    // TD-FIX-7 (AIQ-1510): same rule for the origin. A corridor-locked test-drive case
+    // carries home_country/home_city, so both ends pre-fill and lock; a case with no
+    // HR-set origin leaves these fields free, unchanged.
+    if (originCity) {
+      setLocks((l) => ({ ...l, originCity: true }));
+    }
+    if (originCode) {
+      setLocks((l) => ({ ...l, origin: true }));
     }
 
     const saved = row?.intake_step;
@@ -1019,17 +1041,17 @@ export function EmployeeIntakePage() {
               <>
                 <StepHd title="Where are you moving from and to?" sub="Just the basics — we'll use this to start drafting your roadmap." required />
                 <Grid>
-                  <FieldWrap label="Origin country" required>
-                    <CountryCombo testId="intake-origin_country" value={data.origin_country} onChange={(v) => setField('origin_country', v)} />
+                  <FieldWrap label="Origin country" required prefill={locks.origin} onUnlock={routeUnlock('origin')}>
+                    <CountryCombo testId="intake-origin_country" value={data.origin_country} onChange={(v) => setField('origin_country', v)} disabled={locks.origin} />
                   </FieldWrap>
-                  <FieldWrap label="Origin city" required>
-                    <CityCombo testId="intake-origin_city" country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} />
+                  <FieldWrap label="Origin city" required prefill={locks.originCity} onUnlock={routeUnlock('originCity')}>
+                    <CityCombo testId="intake-origin_city" country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} disabled={locks.originCity} />
                   </FieldWrap>
-                  <FieldWrap label="Destination country" required prefill={locks.dest} onUnlock={() => unlock('dest')}>
+                  <FieldWrap label="Destination country" required prefill={locks.dest} onUnlock={routeUnlock('dest')}>
                     <CountryCombo testId="intake-dest_country" value={data.dest_country} onChange={(v) => setField('dest_country', v)} disabled={locks.dest} />
                   </FieldWrap>
-                  <FieldWrap label="Destination city" required prefill={locks.destCity} onUnlock={() => unlock('destCity')}>
-                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} />
+                  <FieldWrap label="Destination city" required prefill={locks.destCity} onUnlock={routeUnlock('destCity')}>
+                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} disabled={locks.destCity} />
                   </FieldWrap>
                   <FieldWrap label="Target move date" required>
                     <Input unstyled type="date" data-testid="intake-target_date" aria-label="Target move date" className={inputCls()} value={data.target_date}

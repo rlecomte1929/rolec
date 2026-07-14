@@ -2755,6 +2755,53 @@ class CasesMixin:
                 {"host": host_country, "ua": datetime.utcnow().isoformat(), "cid": case_id},
             )
 
+    def set_relocation_case_route(
+        self,
+        relocation_case_id: str,
+        *,
+        home_country: str,
+        home_city: str,
+        host_country: str,
+        host_city: str,
+    ) -> None:
+        """TD-FIX-7 (AIQ-1510): pin a case to a fixed route (test-drive corridor lock).
+
+        Unlike touch_relocation_case_route_from_wizard (which denormalizes what the
+        wizard supplied), this OVERWRITES the route unconditionally — it is the
+        server-side enforcement of an assigned corridor, so a value the client sent
+        must never win.
+
+        Writes both column families on purpose:
+          • home_/host_country + home_/host_city — what the employee intake prefill
+            reads (list_employee_linked_assignment_overview), i.e. what makes the
+            "🔒 HR pre-filled" lock fire.
+          • origin_/dest_country_code + origin_/dest_city — what the HR case overview
+            reads; `corridor` is a generated column derived from the two codes.
+        """
+        rid = (relocation_case_id or "").strip()
+        if not rid:
+            return
+        params: Dict[str, Any] = {
+            "cid": rid,
+            "ua": datetime.utcnow().isoformat(),
+            "home_country": home_country,
+            "host_country": host_country,
+            "origin_country_code": home_country,
+            "dest_country_code": host_country,
+            "home_city": home_city,
+            "host_city": host_city,
+            "origin_city": home_city,
+            "dest_city": host_city,
+        }
+        cols = [c for c in params if c not in ("cid", "ua")]
+        sql = (
+            "UPDATE relocation_cases SET updated_at = :ua, "
+            + ", ".join(f"{c} = :{c}" for c in cols)
+            + " WHERE id::text = :cid"
+        )
+        with self.engine.begin() as conn:
+            conn.execute(text(sql), params)
+
     def touch_relocation_case_route_from_wizard(
         self,
         relocation_case_id: str,

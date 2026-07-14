@@ -58,9 +58,11 @@ describe('TestDrivePage', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText(/Paris → Oslo/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/early coverage/i)).not.toBeInTheDocument();
-    // TD-FIX-5: the HR step names the assigned route so the case can't drift off-corridor.
+    // TD-FIX-5 + TD-FIX-7: the HR step still names the assigned route, but as a statement
+    // of fact — the corridor is now pinned on the case server-side, and the tester has no
+    // route field to set.
     expect(
-      screen.getByText(/Set the case route to your assigned corridor: Paris → Oslo\./i),
+      screen.getByText(/Your route is already set: Paris → Oslo\./i),
     ).toBeInTheDocument();
   });
 
@@ -110,6 +112,14 @@ describe('TestDrivePage', () => {
     // The card shows the login email (login accepts email or username).
     expect(await screen.findByText('hr-alex@probe.test')).toBeInTheDocument();
     expect(screen.getByText('emp-alex@probe.test')).toBeInTheDocument();
+    // TD-FIX-7 (AIQ-1510): the credentials block restates the assigned route at the
+    // moment the tester picks up their logins — and it follows THIS session's corridor
+    // (GB_US), not a hardcoded default. Plain text: no emphasis on any word.
+    const corridorNote = screen.getByText(
+      /Your test: London → New York — already set for you\./i,
+    );
+    expect(corridorNote).toBeInTheDocument();
+    expect(corridorNote.querySelector('strong, b, em')).toBeNull();
   });
 
   it('provisions from a bare /test-drive URL (no token) with invite_token undefined', async () => {
