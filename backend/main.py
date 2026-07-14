@@ -9010,31 +9010,35 @@ def create_rfq(
     effective_case_id = assignment.get("case_id") or payload.case_id
 
     vendor_ids: List[str] = list(payload.vendor_ids or [])
+    # [AIQ-1520] `unreachable` carries the recipients we could NOT resolve. It is returned to
+    # the caller alongside the created RFQ, so the employee is told plainly which vendor was
+    # left out and why. Previously ANY unresolvable id 400'd the whole RFQ — with 2 catalog
+    # items having no supplier on record, that meant one bad vendor killed the entire request.
+    unreachable: List[str] = []
     if payload.supplier_ids:
         from .app.services.rfq_recipient_mapping import resolve_recipient_ids
-        resolved, errors = resolve_recipient_ids(payload.supplier_ids)
-        if errors:
-            raise HTTPException(
-                status_code=400,
-                detail="; ".join(errors),
-            )
+        resolved, unreachable = resolve_recipient_ids(payload.supplier_ids)
         vendor_ids = list(resolved)
     if not vendor_ids:
-        raise HTTPException(status_code=400, detail="At least one vendor_id or supplier_id required")
+        # Nothing resolved at all — now it IS fatal, and we say exactly why.
+        detail = "; ".join(unreachable) if unreachable else "At least one vendor_id or supplier_id required"
+        raise HTTPException(status_code=400, detail=detail)
 
     req_id = getattr(req.state, "request_id", None)
     valid_vids, vid_errors = db.validate_vendor_ids(vendor_ids, request_id=req_id)
     if vid_errors:
+        # [AIQ-1520] Not fatal on its own — collect and report, then send the RFQ to whoever
+        # DID resolve. Only a completely empty recipient list is fatal (below).
         log.warning(
-            "create_rfq vendor validation failed request_id=%s vendor_ids=%s errors=%s",
-            req_id, vendor_ids, vid_errors,
+            "create_rfq: %s recipient(s) unusable request_id=%s errors=%s",
+            len(vid_errors), req_id, vid_errors,
         )
+        unreachable.extend(vid_errors)
+    if not valid_vids:
         raise HTTPException(
             status_code=400,
-            detail="; ".join(vid_errors),
+            detail="; ".join(unreachable) or "No reachable suppliers for this request.",
         )
-    if not valid_vids:
-        raise HTTPException(status_code=400, detail="No valid vendor_ids; each must exist in vendors table")
 
     try:
         result = db.create_rfq(
@@ -9080,7 +9084,9 @@ def create_rfq(
             )
     except Exception:
         pass
-    return {"ok": True, "rfq": result}
+    # [AIQ-1520] Tell the caller who was left out. Silently dropping a vendor the employee
+    # deliberately shortlisted is exactly the kind of quiet data loss this phase exists to end.
+    return {"ok": True, "rfq": result, "unreachable": unreachable}
 
 
 @app.get("/api/employee/assignments/{assignment_id}/rfqs")
