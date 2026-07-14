@@ -74,13 +74,14 @@ def _france_base_items():
 
 
 def _draft(nationality: str, assignment_type: str = "LTA"):
+    # apply_rules reads assignmentType from `assignmentContext`, NOT from
+    # `relocationBasics` (rules_engine.py:16,26). This fixture had it in
+    # relocationBasics, so the assignment_type argument was silently inert — the
+    # fixture looked right and gated nothing.
     return {
         "employeeProfile": {"nationality": nationality},
-        "relocationBasics": {
-            "destCountry": "FRANCE",
-            "purpose": "employment",
-            "assignmentType": assignment_type,
-        },
+        "relocationBasics": {"destCountry": "FRANCE", "purpose": "employment"},
+        "assignmentContext": {"assignmentType": assignment_type},
     }
 
 
