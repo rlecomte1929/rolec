@@ -40,8 +40,15 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
     passed-in stamp."""
     stamp = datetime(2026, 1, 1)  # placeholder; real stamp applied at write time
     purposes_by_country: Dict[str, List[str]] = seed.get("purposes_by_country", {})
-    # AIQ-1349: file-level provenance applies to every requirement in the seed.
-    verification_status = seed.get("verification_status") or "representative"
+    # AIQ-1349: file-level provenance is the DEFAULT for every requirement in the
+    # seed — but a single file can now mix provenance levels, so a requirement may
+    # override it. france.yaml is declared `corpus_grounded` because the visa
+    # track is drawn from the immigration corpus; the EU/EEA establishment steps
+    # in the same file are hand-authored and are NOT corpus-grounded. Inheriting
+    # the file-level label would record drafted content as verified fact in a
+    # legal-adjacent table — exactly the overclaim the provenance model exists to
+    # prevent. Per-item wins; the file-level value remains the default.
+    default_verification_status = seed.get("verification_status") or "representative"
     # A seed file is usually written for one nationality track (france.yaml is
     # the non-EEA salaried route). Declare that once at file level; a requirement
     # that genuinely applies to everyone (a passport) overrides it with an
@@ -79,7 +86,8 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
                     "citations_json": json.dumps(req.get("citations", [])),
                     "applies_to_assignment_types_json": applies_json,
                     "applies_to_nationality_classes_json": nat_classes_json,
-                    "verification_status": verification_status,
+                    "verification_status": req.get("verification_status")
+                    or default_verification_status,
                     "last_verified_at": stamp,
                 })
     return payloads

@@ -32,6 +32,13 @@ _SEED_PATH = os.path.join(
 )
 
 
+def _france_payloads():
+    """The real seed, as the seeder would write it to the DB."""
+    with open(_SEED_PATH, "r", encoding="utf-8") as fh:
+        seed = yaml.safe_load(fh)
+    return [p for p in build_payloads(seed, only_country="FRANCE") if p["purpose"] == "employment"]
+
+
 def _france_base_items():
     """The real seed, mapped the way requirements_builder maps DB rows."""
     with open(_SEED_PATH, "r", encoding="utf-8") as fh:
@@ -259,3 +266,28 @@ class TestNationalityResolutionCannotFabricateFreeMovement:
         for value in ("Austrian", "Italian", "Irish", "Spanish", "Polish",
                       "Portuguese", "Czech", "Danish", "Austria", "Italy", "Ireland"):
             assert classify(value, "FRANCE") == EU_EEA, f"{value} is an EU citizen"
+
+
+class TestProvenanceIsNotOverclaimed:
+    """The visa track is drawn from the immigration corpus; the EU establishment
+    steps are hand-authored. `verification_status` was file-level only, so the
+    drafted content would have been written to a legal-adjacent table labelled
+    `corpus_grounded` — recording an assistant's drafting as verified fact.
+    """
+
+    def test_hand_authored_eu_items_are_not_labelled_corpus_grounded(self):
+        payloads = _france_payloads()
+        for p in payloads:
+            nat = p["applies_to_nationality_classes_json"] or ""
+            if "OWN_NATIONAL" in nat:  # the hand-authored EU track
+                assert p["verification_status"] == "representative", (
+                    f"{p['title']!r} is hand-authored but claims "
+                    f"{p['verification_status']!r} provenance"
+                )
+
+    def test_the_corpus_derived_visa_track_keeps_its_provenance(self):
+        payloads = _france_payloads()
+        visa = [p for p in payloads if (p["applies_to_nationality_classes_json"] or "") == '["THIRD_COUNTRY"]']
+        assert visa, "expected the third-country visa track to be scoped"
+        for p in visa:
+            assert p["verification_status"] == "corpus_grounded"

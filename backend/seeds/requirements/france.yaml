@@ -181,6 +181,11 @@ requirements:
     owner: EMPLOYEE
     applies_to_assignment_types: null
     applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    # Hand-authored, NOT drawn from the immigration corpus like the visa track
+    # above. The file-level `corpus_grounded` would label this drafted content as
+    # verified fact, so it is overridden here. Raise to corpus_grounded/
+    # expert_verified only when a qualified reviewer has signed it off.
+    verification_status: representative
     confidence: medium
     requires_expert_review: true
     citations: ["https://europa.eu/youreurope/citizens/"]
@@ -194,6 +199,11 @@ requirements:
     owner: EMPLOYEE
     applies_to_assignment_types: null
     applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    # Hand-authored, NOT drawn from the immigration corpus like the visa track
+    # above. The file-level `corpus_grounded` would label this drafted content as
+    # verified fact, so it is overridden here. Raise to corpus_grounded/
+    # expert_verified only when a qualified reviewer has signed it off.
+    verification_status: representative
     confidence: medium
     requires_expert_review: true
     citations: ["https://www.service-public.fr"]
@@ -207,6 +217,11 @@ requirements:
     owner: EMPLOYEE
     applies_to_assignment_types: null
     applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    # Hand-authored, NOT drawn from the immigration corpus like the visa track
+    # above. The file-level `corpus_grounded` would label this drafted content as
+    # verified fact, so it is overridden here. Raise to corpus_grounded/
+    # expert_verified only when a qualified reviewer has signed it off.
+    verification_status: representative
     confidence: medium
     requires_expert_review: true
     citations: ["https://www.service-public.fr"]
@@ -220,6 +235,11 @@ requirements:
     owner: EMPLOYEE
     applies_to_assignment_types: null
     applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    # Hand-authored, NOT drawn from the immigration corpus like the visa track
+    # above. The file-level `corpus_grounded` would label this drafted content as
+    # verified fact, so it is overridden here. Raise to corpus_grounded/
+    # expert_verified only when a qualified reviewer has signed it off.
+    verification_status: representative
     confidence: medium
     requires_expert_review: true
     citations: ["https://www.ameli.fr", "https://europa.eu/youreurope/citizens/"]
