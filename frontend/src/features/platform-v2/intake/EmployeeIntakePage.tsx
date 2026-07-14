@@ -951,7 +951,15 @@ export function EmployeeIntakePage() {
         {Object.values(locks).some(Boolean) && (
           <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
             <span className="flex-shrink-0">ℹ</span>
-            <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click &quot;Edit&quot; on any pre-filled field if anything looks wrong.</div>
+            {/* TD-FIX-7 (AIQ-1510): on a test drive the only pre-filled fields are the four
+                route fields, and they carry no "Edit" affordance (the corridor is fixed and
+                the server overrides it anyway) — so the standard "Click Edit" instruction
+                would send the tester looking for a button that isn't there. */}
+            {isTestDrive ? (
+              <div><strong>Your route is fixed for this test</strong> — origin and destination are set to your assigned corridor. Everything else is yours to fill in.</div>
+            ) : (
+              <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click &quot;Edit&quot; on any pre-filled field if anything looks wrong.</div>
+            )}
           </div>
         )}
 
