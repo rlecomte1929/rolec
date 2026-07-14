@@ -47,7 +47,7 @@ from ..services.case_service import (
 from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.requirements_builder import compute_case_requirements
-from ..services.requirements_purpose_key import to_purpose
+from ..services.requirements_purpose_key import assignment_type_from_purpose, to_purpose
 from ..services.research import run_country_research
 from ..services.test_drive_corridor import resolve_test_drive_route
 from ..services.trigger_engine import fire_roadmap_events
@@ -115,10 +115,27 @@ def _assignment_derived(draft: Dict[str, Any]) -> Dict[str, Any]:
     PERMANENT) and coerces ``expectedDurationMonths`` to int. These feed both the
     ``derived`` dict and the new ``public.cases`` columns so the (already
     STA/LTA-aware) policy resolver and roadmap generation can branch on them.
-    Returns ``None`` values when absent so the deep-merge never clobbers."""
+    Returns ``None`` values when absent so the deep-merge never clobbers.
+
+    Also RECOVERS the assignment type when it is hiding in the purpose field. 272
+    production cases store `lta`/`sta`/`permanent` as their relocation purpose
+    while ``assignmentContext.assignmentType`` sits empty — the value is in the
+    wrong axis. Recovering it here writes it to its proper home, so the STA waiver
+    logic (which has never once fired in production) works from now on. An explicit
+    assignmentType always wins; we only fill a hole."""
     ac = draft.get("assignmentContext") or {}
     at = ac.get("assignmentType")
     at = at.strip().upper() if isinstance(at, str) and at.strip() else None
+    if not at:
+        at = assignment_type_from_purpose(
+            (draft.get("relocationBasics", {}) or {}).get("purpose")
+        )
+        if at:
+            # Persist it into the draft, not just the derived column: apply_rules
+            # reads draft["assignmentContext"]["assignmentType"], and the purpose
+            # column is canonicalised on write, so the raw signal would otherwise
+            # be lost the moment it is stored.
+            draft.setdefault("assignmentContext", {})["assignmentType"] = at
     dur = ac.get("expectedDurationMonths")
     try:
         dur = int(dur) if dur is not None and str(dur).strip() != "" else None
