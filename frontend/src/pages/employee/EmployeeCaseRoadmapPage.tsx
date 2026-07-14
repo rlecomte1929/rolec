@@ -33,6 +33,7 @@ import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedPa
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
 import { track } from '../../analytics';
 import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
+import { isRoadmapHeldForHrReview } from './roadmapReleaseGate';
 
 export const EmployeeCaseRoadmapPage: React.FC = () => {
   const caseId = useValidatedParams(caseParamsSchema, {
@@ -215,6 +216,29 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
             variant={variant}
             onMessageTeam={() => navigate(buildRoute('messages'))}
             onRetry={variant === 'failed' ? retryFetch : variant === 'empty' ? retryGeneration : undefined}
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
+  // ── HR review gate ──────────────────────────────────────────────────────────
+  // The plan is BUILT (planReady above) but HR hasn't released it. Show an honest
+  // "your HR team is reviewing your plan" rather than a plan that is about to change —
+  // and don't let the employee validate/start tasks on it. This sits AFTER the
+  // not-ready branch on purpose: "still generating" beats "in review", and a held plan
+  // must never enter the retry/poll loop, which would hammer the endpoint for 60s and
+  // then dead-end on "empty".
+  //
+  // The predicate is `=== false`, NOT `!released` — see roadmapReleaseGate.ts. The
+  // backend fails open and the field is optional, so `undefined` means RELEASED.
+  if (isRoadmapHeldForHrReview(data)) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <RoadmapBeingBuilt
+            variant="in_review"
+            onMessageTeam={() => navigate(buildRoute('messages'))}
           />
         </div>
       </AppShell>

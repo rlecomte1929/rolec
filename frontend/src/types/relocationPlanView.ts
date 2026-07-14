@@ -137,5 +137,15 @@ export interface RelocationPlanViewResponseDTO {
   roadmap_validated?: boolean;
   roadmap_validated_at?: string | null;
   roadmap_validated_by?: string | null;
+  /**
+   * False while HR is still reviewing the plan — the employee sees "your HR team is
+   * reviewing your plan" instead of the roadmap, and cannot start tasks on a plan that
+   * is about to change.
+   *
+   * An ABSENT field means released. The backend fails open (no review row -> released,
+   * lookup error -> released) and so must we: an employee must never lose a roadmap they
+   * already had because a gate was undefined. Read it as `=== false`, never as `!x`.
+   */
+  roadmap_released?: boolean;
   debug?: Record<string, unknown> | null;
 }

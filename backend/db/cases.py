@@ -968,6 +968,27 @@ class CasesMixin:
             return None
         return self._row_to_dict(row) if hasattr(self, "_row_to_dict") else dict(row._mapping)
 
+    def get_roadmap_release(
+        self, case_id: str, *, request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """HR's review decision for a case's roadmap, or None if nobody has decided.
+
+        None means RELEASED to the caller — see `_resolve_roadmap_release`. The 47 cases
+        that had a roadmap before this gate existed have no row here, and must not lose
+        their plans.
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.begin() as conn:
+            row = self._exec(
+                conn,
+                "SELECT case_id, released_to_user, regeneration_requested, reviewer_id, notes "
+                "FROM roadmap_review_status WHERE case_id = :cid",
+                {"cid": cid}, op_name="get_roadmap_release", request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        return self._row_to_dict(row) if hasattr(self, "_row_to_dict") else dict(row._mapping)
+
     def link_milestone_entity(
         self,
         milestone_id: str,

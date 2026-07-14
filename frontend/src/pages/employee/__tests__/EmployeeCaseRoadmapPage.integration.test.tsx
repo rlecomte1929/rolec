@@ -125,6 +125,49 @@ describe('EmployeeCaseRoadmapPage — roadmap orchestration', () => {
   });
 });
 
+// ── AIQ-1525: HR approves the roadmap before the employee acts on it. ─────────
+// The predicate is unit-tested in roadmapReleaseGate.test.ts; these assert the
+// PAGE actually honours it. Getting the logic right and never rendering it is a
+// failure mode I have shipped before — a passing unit test on a value nobody reads.
+describe('EmployeeCaseRoadmapPage — HR review gate', () => {
+  it('holds back a plan HR has not released, and says so', async () => {
+    fetchRelocationPlanView.mockResolvedValue({ ...READY_PLAN, roadmap_released: false });
+    renderPage();
+
+    expect(await screen.findByText('Your HR team is reviewing your plan')).toBeInTheDocument();
+    // The plan itself must NOT leak through — it is about to change.
+    expect(screen.queryByText('Apply for work visa')).not.toBeInTheDocument();
+    // ...and the employee cannot start tasks on it.
+    expect(screen.queryByText(/Validate & start tasks/)).not.toBeInTheDocument();
+    // We show THAT it's with HR — never HR's internal review notes. The backend
+    // doesn't send them; assert nothing invents them either.
+    expect(screen.queryByText(/housing budget/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the roadmap once HR has approved it', async () => {
+    fetchRelocationPlanView.mockResolvedValue({ ...READY_PLAN, roadmap_released: true });
+    renderPage();
+
+    expect((await screen.findAllByText('Apply for work visa')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Your HR team is reviewing your plan')).not.toBeInTheDocument();
+  });
+
+  // THE ONE THAT MATTERS. 47 live cases have a roadmap and no review row, so the
+  // backend omits/None's the flag for them. If the gate were written `!released`,
+  // every one of those employees would open their roadmap tomorrow and find it gone.
+  it('shows the roadmap when the flag is absent (every pre-existing case)', async () => {
+    const { roadmap_released: _omitted, ...withoutFlag } = {
+      ...READY_PLAN,
+      roadmap_released: undefined,
+    };
+    fetchRelocationPlanView.mockResolvedValue(withoutFlag);
+    renderPage();
+
+    expect((await screen.findAllByText('Apply for work visa')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Your HR team is reviewing your plan')).not.toBeInTheDocument();
+  });
+});
+
 // ── AIQ-1377: the plan-view endpoint can transiently 4xx/5xx for a freshly-
 // provisioned employee. A single error must NOT dead-end the page with
 // "We couldn't load your roadmap"; it should keep retrying within the bounded

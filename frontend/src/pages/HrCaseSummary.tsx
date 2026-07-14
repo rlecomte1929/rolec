@@ -25,6 +25,7 @@ import { CaseOperationalSection } from '../features/cases/CaseOperationalSection
 import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
 import { deriveCaseEssentials } from '../features/cases/caseEssentials';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
+import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
 import { CaseVendorsPanel } from '../components/case/CaseVendorsPanel';
 import { CaseBudgetPanel } from '../components/case/CaseBudgetPanel';
@@ -339,6 +340,14 @@ export const HrCaseSummary: React.FC = () => {
               </div>
             </div>
           </Card>
+
+          {/* ── [AIQ-1525] Roadmap review: HR approves the plan before the employee acts
+                 on it. Sits high on the page on purpose — while it is unapproved the
+                 employee is blocked at "Your HR team is reviewing your plan", so it is
+                 the most time-sensitive thing on this screen. ── */}
+          {assignment.caseId && (
+            <RoadmapReviewPanel caseId={assignment.caseId} />
+          )}
 
           {/* ── Exception flags (P3/B6): blockers + warnings from immigration check ── */}
           {assignment.caseId && (

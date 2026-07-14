@@ -442,6 +442,42 @@ def _build_next_action_schema(
     )
 
 
+def _resolve_roadmap_release(db, case_id: str) -> bool:
+    """Has HR released this roadmap to the employee?
+
+    Takes the same `db` handle as `_resolve_roadmap_validation` right above — do NOT
+    reach for a second session path here. My first two cuts passed a `session_factory`,
+    which is a parameter of a DIFFERENT function in this module; inside
+    `build_relocation_plan_view_response` that name is simply undefined, and the whole
+    plan view 500s.
+
+    Returns the flag ONLY. `roadmap_review_status.notes` is deliberately NOT surfaced
+    here: this is the EMPLOYEE's payload, and the notes are HR's internal reason for
+    sending a plan back ("housing budget is wrong"), written for an internal audience.
+    The employee is told THAT their plan is with HR, never HR's private wording. The
+    notes are read by the HR review panel, behind HR auth.
+
+    FAILS OPEN, twice over, and both are deliberate:
+
+      * No review row  -> RELEASED. 47 cases already had a roadmap and none had a review
+        row; treating "no decision recorded" as "not released" would have yanked the plan
+        out from under every one of them the day this shipped.
+      * Lookup errors  -> RELEASED. An employee must never lose their roadmap because a
+        gate's own query fell over.
+
+    The gate's job is to hold back a plan HR has actively sent back — not to hide a plan
+    because we are unsure.
+    """
+    try:
+        row = db.get_roadmap_release(case_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("plan view: roadmap release lookup failed for %s (%s); showing the plan", case_id, exc)
+        return True
+    if not isinstance(row, dict):
+        return True  # no decision recorded -> released
+    return bool(row.get("released_to_user"))
+
+
 def _resolve_roadmap_validation(db, case_id, summary):
     """(validated, validated_at, validated_by). Explicit row wins; otherwise
     grandfather a case that's already in execution (any task completed or in
@@ -585,6 +621,7 @@ def build_relocation_plan_view_response(
                 debug_payload.setdefault("derivation_traces", {})[t.task_code] = dbg
 
     rv_validated, rv_at, rv_by = _resolve_roadmap_validation(db, case_id, summary)
+    _released = _resolve_roadmap_release(db, case_id)
 
     return RelocationPlanViewResponse(
         case_id=case_id,
@@ -599,6 +636,7 @@ def build_relocation_plan_view_response(
         roadmap_validated=rv_validated,
         roadmap_validated_at=rv_at,
         roadmap_validated_by=rv_by,
+        roadmap_released=_released,
         debug=debug_payload,
     )
 
