@@ -16,15 +16,18 @@ import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import {
   complianceContent,
-  PDF_ONEPAGER_PATH,
   ENTERPRISE_CONTACT_EMAIL,
 } from './complianceContent';
 
 export const CompliancePage: React.FC = () => {
+  // [AIQ-1513] Title/description previously read "EU AI Act Ready" and "controls for
+  // high-risk HR AI" — a status claim we cannot support, and a misclassification (our
+  // assessment found limited-risk, not high-risk). This is the most syndicated copy we
+  // have (search results, link previews), so it must describe controls, not status.
   usePageMeta({
-    title: 'EU AI Act Ready · ReloPass',
+    title: 'Trust & AI oversight · ReloPass',
     description:
-      'How ReloPass operates the EU AI Act controls for high-risk HR AI: human oversight on every recommendation, a full audit trail, and source-grounded answers.',
+      'How AI works at ReloPass: a human reviews every recommendation, each decision is logged with the AI output behind it, answers are grounded in your policy, and personal details are masked before any AI sees them.',
     ogUrl: 'https://www.relopass.com/compliance',
   });
 
@@ -47,10 +50,9 @@ export const CompliancePage: React.FC = () => {
           }
           actions={
             <>
-              <CTAButton href={PDF_ONEPAGER_PATH} variant="primary" size="lg">
-                {c.finalCta.pdfCtaLabel}
-              </CTAButton>
-              <CTAButton onClick={() => openDemoBooking('compliance-hero')} variant="outline" size="lg">
+              {/* [AIQ-1513] The downloadable compliance one-pager is gone — that asset made a
+                  regulatory-status claim we cannot support. Demo is now the primary action. */}
+              <CTAButton onClick={() => openDemoBooking('compliance-hero')} variant="primary" size="lg">
                 {c.finalCta.demoCtaLabel}
               </CTAButton>
             </>
@@ -174,13 +176,13 @@ export const CompliancePage: React.FC = () => {
             subtitle={c.finalCta.microCopy}
             variant="surface"
             primaryAction={
-              <CTAButton href={PDF_ONEPAGER_PATH} variant="primary" size="lg">
-                {c.finalCta.pdfCtaLabel}
+              <CTAButton onClick={() => openDemoBooking('compliance-final')} variant="primary" size="lg">
+                {c.finalCta.demoCtaLabel}
               </CTAButton>
             }
             secondaryAction={
-              <CTAButton onClick={() => openDemoBooking('compliance-final')} variant="outline" size="lg">
-                {c.finalCta.demoCtaLabel}
+              <CTAButton href={`mailto:${ENTERPRISE_CONTACT_EMAIL}`} variant="outline" size="lg">
+                {c.finalCta.enterpriseLine}
               </CTAButton>
             }
             tertiaryAction={

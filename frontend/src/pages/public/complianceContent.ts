@@ -1,45 +1,52 @@
 /**
  * Content for the public /compliance page (AIQ-828 · DIGEST-2).
  *
- * Edit copy here without touching layout. Two hard rules from the brief:
- *   1. Say "EU AI Act Ready" — never "Certified" (no certification scheme
- *      exists yet under the EU AI Act).
- *   2. The Human Oversight section must accurately reflect ReloPass's real
- *      flow: AI produces recommendations; a human (HR/Admin) explicitly
- *      accepts / overrides / rejects each one; the decision and the original
- *      AI output are written to an immutable audit log (EU AI Act Art. 14).
- *      This mirrors backend/app/routers/ai_decisions.py.
+ * ⚠️ HARD RULE — [AIQ-1513] DO NOT MAKE AN EU AI ACT STATUS CLAIM HERE.
  *
- * ⚠️ Romain to confirm before production publish: data-residency wording
- * ("EU-hosted"), the contact address, and the simplified-documentation
- * threshold figures. Sources are linked in the AI Work Queue task.
+ * No "EU AI Act Ready", "compliant", "certified", or equivalent. Per
+ * docs/compliance/AIQ-1487_eu_ai_act_assessment.md:
+ *
+ *   "Do not ship an 'EU AI Act Ready' / 'Compliant' badge. For a limited-risk
+ *    system there is no certification to be 'ready' for, and the phrasing
+ *    implies a formal status we don't hold."
+ *   "A false or premature compliance claim is itself a legal liability."
+ *
+ * That assessment also found ReloPass's AI is **limited-risk, NOT high-risk** —
+ * so copy must never imply we are a high-risk HR system either.
+ *
+ * What this page MAY say: what our controls actually do — human review on every
+ * AI recommendation, an audit log pairing each decision with the AI output that
+ * informed it, source-grounded answers, PII masked before any LLM call. Those are
+ * verifiable product facts, not a legal status. Describe the controls; claim no
+ * status. Any NEW compliance claim needs legal sign-off before it ships.
+ *
+ * scripts/check_compliance_claims.py enforces this in CI.
  */
 
-export const PDF_ONEPAGER_PATH = '/relopass-eu-ai-act-ready.pdf';
 export const ENTERPRISE_CONTACT_EMAIL = 'contact@relopass.com';
 
 export const complianceContent = {
   hero: {
-    badge: 'EU AI Act Ready',
-    eyebrow: 'Compliance',
+    badge: 'Human oversight by design',
+    eyebrow: 'Trust',
     headline: 'Mobility AI your auditor will trust.',
     subheadline:
-      'ReloPass is built for the EU AI Act: every AI recommendation is reviewed by a human, every decision is logged with the AI output that informed it, and every answer is grounded in your own policy — and cited.',
+      'Every AI recommendation is reviewed by a human. Every decision is logged with the AI output that informed it. Every answer is grounded in your own policy — and cited.',
     trustMicrocopy:
-      '“Ready,” not “certified” — there is no EU AI Act certification scheme yet. Here is exactly what readiness means at ReloPass.',
+      'We make no compliance certification claim. Below is exactly how the AI works, and what we record — so your compliance team can assess it themselves.',
   },
 
-  // What "Ready" honestly means — sets expectations and avoids overclaiming.
+  // How the AI actually works. Controls, not status claims — see the hard rule above.
   readiness: {
-    sectionHeader: 'What “EU AI Act Ready” means',
-    title: 'Readiness is a posture, not a certificate.',
+    sectionHeader: 'How AI works at ReloPass',
+    title: 'Controls you can inspect, not a badge.',
     body:
-      'The EU AI Act phases in obligations for high-risk HR AI systems over the coming years. No certification body issues an “EU AI Act certificate” today. “EU AI Act Ready” means ReloPass already operates the controls the Act asks for — human oversight, transparency, record-keeping, and data governance — so your compliance team can document them now, as the obligations phase in.',
+      'ReloPass AI answers policy questions, estimates costs, and suggests service providers. It does not make hiring, promotion, or termination decisions, and it does not score or rank people. A human accepts, overrides, or rejects every recommendation it produces. Here is what that means in practice.',
     checklist: [
       'Human oversight on every AI recommendation (accept / override / reject).',
       'A complete, timestamped record of each decision and the AI output behind it.',
       'Source-grounded answers: the AI cites your policy and declines when it is not covered.',
-      'Documentation built in: the record-keeping the Act expects is produced as you operate, not bolted on later.',
+      'Personal details are masked before any text is sent to an AI sub-processor.',
     ],
   },
 
@@ -157,20 +164,19 @@ export const complianceContent = {
     sectionHeader: 'Record-keeping',
     title: 'An audit trail you can hand to a regulator.',
     body:
-      'Decisions, document changes, and AI-assisted actions are recorded with actor, timestamp, and the data they touched. The AI-decision log pairs each human decision with the AI output that informed it — the Art. 14 evidence high-risk HR systems are expected to keep.',
+      'Decisions, document changes, and AI-assisted actions are recorded with actor, timestamp, and the data they touched. The AI-decision log pairs each human decision with the AI output that informed it, so the reasoning behind a case can be reconstructed after the fact.',
   },
 
-  // Final CTA + the explicit enterprise contact + PDF.
+  // Final CTA + the explicit enterprise contact.
   finalCta: {
-    headline: 'Building your EU AI Act file?',
+    headline: 'Assessing AI in your mobility stack?',
     microCopy:
-      'Download the one-page summary for your compliance and procurement teams, or book a walkthrough of the oversight and audit trail.',
-    pdfCtaLabel: 'Download the one-pager (PDF)',
+      'Book a walkthrough of the oversight flow and the audit trail. Your compliance team can review the controls directly.',
     demoCtaLabel: 'Book a demo',
     enterpriseLine: 'For EU enterprise inquiries:',
   },
 
-  // Footer disclaimer — load-bearing for "Ready not Certified".
+  // Footer disclaimer. [AIQ-1513] States what we do NOT claim — no status, no certification.
   disclaimer:
-    '“EU AI Act Ready” describes ReloPass’s readiness posture and documentation. It is not a certification or a legal compliance guarantee — no EU AI Act certification scheme exists yet, and obligations depend on your own deployment and use. This page is informational, not legal advice.',
+    'This page describes how ReloPass’s AI features work and what we record. It is not a certification, a compliance guarantee, or a statement of regulatory status — and it is not legal advice. Your own obligations depend on how you deploy and use the product.',
 };
