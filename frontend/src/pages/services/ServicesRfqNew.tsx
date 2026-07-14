@@ -84,6 +84,14 @@ export const ServicesRfqNew: React.FC = () => {
       await employeeAPI.createQuoteRequest({
         case_id: assignmentId,
         service_categories: shortlisted.map(({ service }) => service),
+        // AIQ-1514: send the vendors the employee actually shortlisted. Previously only
+        // the categories were sent, so the choice survived nowhere but the free-text
+        // notes below — HR never learned who was picked.
+        vendors: shortlisted.map(({ service, vendor }) => ({
+          service_category: service,
+          item_id: vendor.item_id,
+          name: vendor.name,
+        })),
         notes: combinedNotes,
       });
       setSent(true);

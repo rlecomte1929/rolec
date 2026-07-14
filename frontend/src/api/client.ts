@@ -3069,6 +3069,9 @@ export const employeeAPI = {
   createQuoteRequest: async (payload: {
     case_id: string;
     service_categories: string[];
+    // AIQ-1514: the vendors the employee shortlisted. item_id is a recommendation-engine
+    // id, meaningful only alongside its service_category — not a foreign key.
+    vendors?: Array<{ service_category: string; item_id: string; name: string }>;
     notes?: string;
     budget_range?: string;
   }): Promise<CreateQuoteRequestResponse> => {

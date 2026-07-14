@@ -11,6 +11,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -49,11 +50,27 @@ SERVICE_CATEGORIES = [
 # ---------------------------------------------------------------------------
 
 
+class VendorPick(BaseModel):
+    """[AIQ-1514] One vendor the employee shortlisted, for one service.
+
+    `item_id` is a recommendation-engine id, NOT a foreign key — it is
+    service_catalog_items.external_id for a master vendor (ambiguous without the
+    category, hence the pair) or 'hr-custom-<company_vendor_selections.id>' for an
+    HR-added vendor, which has no master row at all. `name` is carried so HR can read
+    the choice without re-resolving an id that may since have moved.
+    """
+    service_category: str = Field(..., min_length=1, max_length=100)
+    item_id: str = Field(..., min_length=1, max_length=200)
+    name: str = Field(..., min_length=1, max_length=300)
+
+
 class QuoteRequestCreate(BaseModel):
     case_id: str = Field(..., min_length=1)
     service_categories: List[str] = Field(..., min_items=1)
     notes: Optional[str] = Field(None, max_length=2000)
     budget_range: Optional[str] = Field(None, max_length=100)
+    # Defaults to [] so a legacy client that sends no vendors still succeeds.
+    vendors: List[VendorPick] = Field(default_factory=list, max_length=50)
 
 
 class QuoteRequestPatch(BaseModel):
@@ -71,6 +88,9 @@ class QuoteRequestRead(BaseModel):
     status: str
     created_at: str
     updated_at: str
+    # [AIQ-1514] Without this the response model would silently strip the vendors the
+    # employee picked — the exact class of bug this task exists to fix.
+    vendors: List[VendorPick] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +119,14 @@ def _caller_company_id(user: Dict[str, Any]) -> str:
     return company_id
 
 
+def _is_postgres() -> bool:
+    """[AIQ-1514] jsonb exists only on Postgres; the SQLite test DB stores TEXT."""
+    try:
+        return db.engine.dialect.name == "postgresql"
+    except Exception:  # noqa: BLE001 — a missing engine must not break the request path
+        return False
+
+
 def _row_to_dict(row: Any) -> Dict[str, Any]:
     d = dict(row)
     for k, v in list(d.items()):
@@ -112,6 +140,17 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
         if k == "service_categories":
             if isinstance(v, str):
                 d[k] = [s.strip() for s in v.split(",") if s.strip()]
+            elif v is None:
+                d[k] = []
+        # [AIQ-1514] Postgres hands back parsed jsonb; SQLite stores the raw JSON
+        # string (the column is TEXT there) — normalise both to a list.
+        if k == "vendors":
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                except (ValueError, TypeError):
+                    parsed = []
+                d[k] = parsed if isinstance(parsed, list) else []
             elif v is None:
                 d[k] = []
     return d
@@ -152,19 +191,28 @@ def create_quote_request(
 
     # Normalise categories: join for SQLite compat, Postgres can store array
     cats_serialised = "{" + ",".join(f'"{c}"' for c in body.service_categories) + "}"
+    # [AIQ-1514] The vendors the employee actually shortlisted. Serialised to a JSON
+    # string and cast per-dialect below — jsonb on Postgres, TEXT on SQLite.
+    vendors_serialised = json.dumps([v.model_dump() for v in body.vendors])
+
+    # jsonb only exists on Postgres. Use the CAST(:param AS type) form — the
+    # bind-then-cast form (colon-param followed by a double-colon type) mis-binds under
+    # SQLAlchemy text() and 500s on Postgres. tests/test_employee_quotes_bind_regression.py
+    # greps this module and fails on that shape, so do not spell it out here either.
+    vendors_expr = "CAST(:vendors AS jsonb)" if _is_postgres() else ":vendors"
 
     with db.engine.begin() as conn:
         conn.execute(
             text(
-                """
+                f"""
                 INSERT INTO quote_requests
                     (id, case_id, employee_id, company_id,
                      service_categories, notes, budget_range,
-                     status, created_at, updated_at)
+                     status, created_at, updated_at, vendors)
                 VALUES
                     (:id, :case_id, :emp, :company,
                      CAST(:cats AS text[]), :notes, :budget,
-                     'pending', :now, :now)
+                     'pending', :now, :now, {vendors_expr})
                 """
             ),
             {
@@ -173,6 +221,7 @@ def create_quote_request(
                 "emp": employee_id,
                 "company": company_id,
                 "cats": cats_serialised,
+                "vendors": vendors_serialised,
                 "notes": body.notes,
                 "budget": body.budget_range,
                 "now": now,
