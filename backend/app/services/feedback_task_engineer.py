@@ -20,6 +20,11 @@ from .llm_client import claude_complete_text_sync
 from .pii_masker import mask_pii
 
 _MODEL = "claude-sonnet-4-6"
+# The reply is a 13-key JSON object, six of whose values are long prose
+# (execution_prompt carries a plan + ordered steps). 2000 truncated real replies in
+# production — the JSON came back cut off mid-string and json.loads blew up, 502ing
+# every dispatch/preview. Cap generously; we pay only for tokens actually emitted.
+_MAX_TOKENS = 8000
 
 _TASK_TYPES = (
     "Frontend Implementation, Backend Implementation, UX Redesign, Database Migration, "
@@ -341,7 +346,18 @@ def _parse_task(raw: str) -> Dict[str, Any]:
     start, end = s.find("{"), s.rfind("}")
     if start == -1 or end <= start:
         raise ValueError("engineer_task: model did not return a JSON object")
-    task = json.loads(s[start:end + 1])
+    try:
+        task = json.loads(s[start:end + 1])
+    except json.JSONDecodeError as exc:
+        # Nearly always a reply cut off at max_tokens: the trailing brace we latched
+        # onto belongs to a nested object, so the slice ends inside an open string.
+        # Say that plainly — the raw JSONDecodeError ("Unterminated string at column
+        # 5880") tells the admin nothing they can act on.
+        raise ValueError(
+            f"engineer_task: model returned malformed JSON — the reply looks truncated "
+            f"({len(s)} chars received). Try again; if it repeats, the task spec is "
+            f"exceeding the {_MAX_TOKENS}-token output cap. ({exc})"
+        ) from exc
     missing = [k for k in _REQUIRED if not task.get(k)]
     if missing:
         raise ValueError(f"engineer_task: missing required fields {missing}")
@@ -383,7 +399,7 @@ def engineer_task(
         f"\nREPRODUCTION SIGNAL (auto-captured diagnostics):\n{masked_diag or '(none)'}\n"
     )
     raw = claude_complete_text_sync(
-        system=_SYSTEM, user=user, model=_MODEL, max_tokens=2000, temperature=0.2,
+        system=_SYSTEM, user=user, model=_MODEL, max_tokens=_MAX_TOKENS, temperature=0.2,
         timeout=timeout, max_retries=max_retries,
     )
     task = _parse_task(raw)
