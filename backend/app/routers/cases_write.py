@@ -47,6 +47,7 @@ from ..services.case_service import (
 from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.requirements_builder import compute_case_requirements
+from ..services.requirements_purpose_key import to_purpose
 from ..services.research import run_country_research
 from ..services.test_drive_corridor import resolve_test_drive_route
 from ..services.trigger_engine import fire_roadmap_events
@@ -83,6 +84,29 @@ from .cases import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
+
+
+def _canonical_purpose(raw: Any) -> Any:
+    """Normalise the relocation purpose ON WRITE.
+
+    `purpose` is the other half of the requirements catalog key, and it is matched
+    with `==`. Nothing validated it: three intakes wrote three vocabularies into a
+    free-text field, and 616 of 780 production cases ended up with a purpose the
+    catalog had never heard of — returning an empty requirements list that reads as
+    "nothing is required of you".
+
+    `_assignment_derived` below has normalised assignmentType on write since
+    AIQ-1349. Purpose never got the same treatment. This is that.
+
+    Keep accepting the messy values (an intake sending "Employment" or "lta" must
+    not 400), but store the canonical one. An unresolvable value is stored AS-IS
+    rather than dropped: the read path fails closed on it (`to_purpose` -> None ->
+    "not covered"), and silently discarding it would destroy the only evidence of a
+    new bad vocabulary.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+    return to_purpose(raw) or raw
 
 
 def _assignment_derived(draft: Dict[str, Any]) -> Dict[str, Any]:
@@ -160,7 +184,7 @@ def patch_case(
             "origin_city": basics.get("originCity"),
             "dest_country": basics.get("destCountry"),
             "dest_city": basics.get("destCity"),
-            "purpose": basics.get("purpose"),
+            "purpose": _canonical_purpose(basics.get("purpose")),
             "target_move_date": basics.get("targetMoveDate"),
             **_assignment_derived(draft),  # AIQ-1349: assignment_type + duration
         }
@@ -316,7 +340,7 @@ def create_case(
                 "id": snapshot_id,
                 "case_id": case_id,
                 "dest_country": basics.get("destCountry"),
-                "purpose": basics.get("purpose"),
+                "purpose": _canonical_purpose(basics.get("purpose")),
                 "created_at": datetime.utcnow(),
                 "snapshot_json": requirements.model_dump_json(),
                 "sources_json": json.dumps([source.model_dump(mode="json") for source in requirements.sources]),
@@ -408,7 +432,7 @@ def update_household(
             "origin_city": basics.get("originCity"),
             "dest_country": basics.get("destCountry"),
             "dest_city": basics.get("destCity"),
-            "purpose": basics.get("purpose"),
+            "purpose": _canonical_purpose(basics.get("purpose")),
             "target_move_date": basics.get("targetMoveDate"),
             **_assignment_derived(draft),  # AIQ-1349: assignment_type + duration
         }

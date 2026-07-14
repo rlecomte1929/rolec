@@ -156,7 +156,7 @@ const INITIAL_DATA: IntakeData = {
   dest_country: '',
   dest_city: '',
   target_date: '',
-  purpose: 'Employment',
+  purpose: 'employment', // must match the <select> option values, lowercase — see below
   full_name: '',
   email: '',
   nationality: '',
@@ -1066,8 +1066,17 @@ export function EmployeeIntakePage() {
                       onChange={(v) => setField('target_date', v)} />
                   </FieldWrap>
                   <FieldWrap label="Purpose of relocation" required>
+                    {/* The values MUST be lowercase. This <select> had no value=
+                        attributes, so the option TEXT was the value and it emitted
+                        Title-Case "Employment". requirement_items.purpose is seeded
+                        lowercase and matched with `==`, so every one of those cases
+                        missed the catalog and got an empty requirements list —
+                        which on that screen reads as "nothing is required of you". */}
                     <select data-testid="intake-purpose" aria-label="Purpose of relocation" className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
-                      <option>Employment</option><option>Study</option><option>Family</option><option>Other</option>
+                      <option value="employment">Employment</option>
+                      <option value="study">Study</option>
+                      <option value="family">Family</option>
+                      <option value="other">Other</option>
                     </select>
                   </FieldWrap>
                 </Grid>
