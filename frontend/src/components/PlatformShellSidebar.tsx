@@ -110,6 +110,7 @@ const SECTIONS: NavSection[] = [
       { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
       { id: 'admin-assignments', group: 'Customers', label: 'Assignments', hint: 'Per-relocation controls', to: ROUTE_DEFS.adminAssignments.path },
       { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
+      { id: 'outreach', group: 'Customers', label: 'Outreach', to: ROUTE_DEFS.adminOutreach.path },
       { id: 'test-drive', group: 'Customers', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
 
       // ── Content (the CMS admins author / maintain) ──

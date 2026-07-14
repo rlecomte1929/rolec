@@ -156,6 +156,7 @@ const AdminAssistantAnalyticsPage = lazy(() => import('./pages/admin/AdminAssist
 const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
 const AdminTestDrive = lazy(() => import('./pages/admin/AdminTestDrive'));
+const OutreachPage = lazy(() => import('./pages/admin/OutreachPage').then((m) => ({ default: m.OutreachPage })));
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
@@ -471,6 +472,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminVettingQueue.path} element={<RequireAdminRoute><AdminVettingQueue /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPrompts.path} element={<RequireAdminRoute><AdminPrompts /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOutreach.path} element={<RequireAdminRoute><OutreachPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMarketingAnalytics.path} element={<RequireAdminRoute><AdminMarketingAnalyticsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminLeads.path} element={<RequireAdminRoute><AdminLeads /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersNew.path} element={<RequireAdminRoute><AdminSupplierNew /></RequireAdminRoute>} />
