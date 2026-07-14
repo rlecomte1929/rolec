@@ -189,9 +189,9 @@ class TestThirdCountryNationalIsUnaffected:
 
 
 class TestUnknownNationalityChangesNothing:
-    def test_unknown_nationality_gates_nothing_and_claims_nothing(self):
+    def test_unknown_nationality_claims_nothing(self):
         """Fail open, never fail confident: if we can't classify, we must not
-        drop anything and must not assert a right the person may not have."""
+        assert a right the person may not have."""
         for nationality in (None, "", "Klingon"):
             _, expanded, flags = apply_rules(
                 _draft(nationality), _france_base_items()  # type: ignore[arg-type]
@@ -200,3 +200,62 @@ class TestUnknownNationalityChangesNothing:
             assert flags.get("nationalityWaived") is None
             nothing = [i for i in expanded if i.get("outcomeType") == "nothing_to_do"]
             assert nothing == [], f"claimed 'nothing to do' for nationality={nationality!r}"
+
+    def test_unknown_nationality_is_NOT_served_the_eu_track(self):
+        """The regression this test file exists for, arrived at from the other side.
+
+        'Unknown => don't filter' was safe when the catalog was one track. With two
+        mutually exclusive tracks, not filtering means serving BOTH — and the EU
+        track's own copy says "no visa is involved". Every real France case in
+        production has nationality=null, so this is not a corner case: it is the
+        default path. A person we cannot classify must get the demanding track and
+        no free-movement claim whatsoever.
+        """
+        for nationality in (None, "", "Klingon", "asdas", "India"):
+            _, expanded, _ = apply_rules(
+                _draft(nationality), _france_base_items()  # type: ignore[arg-type]
+            )
+            for item in expanded:
+                blob = f"{item.get('description') or ''} {item.get('reason') or ''}"
+                assert "EU/EEA national" not in blob, (
+                    f"nationality={nationality!r} was told 'As an EU/EEA national...' — "
+                    "a fabricated right of free movement"
+                )
+                assert "Freedom of movement" not in blob
+                assert "no visa is involved" not in blob
+
+            titles = _titles(expanded)
+            assert not any("national identity card" in t.lower() for t in titles)
+            assert not any("justificatif" in t.lower() for t in titles)
+            # ...and they must still get the full visa track, not a narrowed list.
+            assert any("Long-stay work visa" in t for t in titles)
+
+
+class TestNationalityResolutionCannotFabricateFreeMovement:
+    """A two-letter string used to become a country: `len(s) == 2 and s.isalpha()`.
+
+    `nationality` is unvalidated free text (production holds 'f', 'gh', 'asdas',
+    '1212'), and the free-movement set holds 31 two-letter codes — so a stray
+    keystroke landing on 'xx'-shaped junk could resolve to an EU member and
+    produce "no visa or residence permit required".
+    """
+
+    def test_junk_never_resolves_to_free_movement(self):
+        from backend.app.services.nationality_class import classify
+
+        junk = ["asdas", "1212", "f", "dfgd", "shtfryhdyt", "xx", "qq", "zz",
+                "12", "33", "ewf", "giu", "dze", "sdfsdf"]
+        for value in junk:
+            assert classify(value, "FRANCE") not in ("EU_EEA", "OWN_NATIONAL"), (
+                f"junk nationality {value!r} resolved to free movement"
+            )
+
+    def test_eu_nationalities_beyond_the_original_six_now_resolve(self):
+        """The headline claim was "EU citizens skip the visa track". It was true
+        for about a fifth of the EU: _ADJECTIVAL had 6 free-movement entries, so
+        an Austrian or Italian citizen got the full French work-visa track."""
+        from backend.app.services.nationality_class import EU_EEA, classify
+
+        for value in ("Austrian", "Italian", "Irish", "Spanish", "Polish",
+                      "Portuguese", "Czech", "Danish", "Austria", "Italy", "Ireland"):
+            assert classify(value, "FRANCE") == EU_EEA, f"{value} is an EU citizen"
