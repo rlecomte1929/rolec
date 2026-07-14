@@ -12,8 +12,13 @@
 
 # Which (country, purpose) pairs to seed into — chosen to co-locate with the
 # existing catalog rows so they surface for the same cases.
+#
+# GERMANY was removed from this list: it was declared `[other]` only — the sole country
+# here without `employment` — so every German employment relocation (372 production
+# cases, the biggest corridor) found ZERO rows and was told nothing was required of it.
+# Germany now has its own nationality-scoped catalog in germany.yaml, which owns the
+# same three long-term titles below. Two files must not both write the same rows.
 purposes_by_country:
-  GERMANY: [other]
   NORWAY: [employment, other]
   SINGAPORE: [employment, study]
   "UNITED KINGDOM": [employment, other]

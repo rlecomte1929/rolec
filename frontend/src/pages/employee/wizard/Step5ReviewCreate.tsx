@@ -535,11 +535,24 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         </div>
       )}
 
-      {requirementsState === 'ready' && Object.keys(grouped).length === 0 && (
-        <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
-          No destination requirements apply to your case.
-        </div>
-      )}
+      {/* An empty list must NEVER assert anything.
+          This used to say "No destination requirements apply to your case." — a
+          definitive claim. But an empty list means the catalog has no rows for this
+          (country, purpose), which is "we have no data", not "none apply". For
+          GERMANY + employment that was 372 real cases being told they were all set
+          while relocating abroad for work.
+          The backend now returns covered=false for that state, so
+          RequirementsCoverageNotice (above) speaks instead. This stays only as a
+          belt-and-braces fallback, and it does not claim. */}
+      {requirementsState === 'ready' &&
+        Object.keys(grouped).length === 0 &&
+        requirements?.covered !== false && (
+          <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
+            We don’t have destination requirements for your case yet. This does{' '}
+            <strong>not</strong> mean nothing is required of you — please confirm with your HR
+            contact.
+          </div>
+        )}
 
       {requirementsState === 'ready' && (
         <div className="mt-6 space-y-6">

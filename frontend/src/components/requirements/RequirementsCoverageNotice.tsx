@@ -24,8 +24,13 @@ export const RequirementsCoverageNotice: React.FC<RequirementsCoverageNoticeProp
       role="status"
       className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]"
     >
+      {/* `covered: false` now also covers the case where the destination IS catalogued
+          but has no rows for this relocation purpose — so the heading must not imply the
+          whole country is missing. The body was already honest and stays as-is: the
+          whole point of this notice is that an empty list means "we can't confirm",
+          never "there is nothing". */}
       <div className="text-sm font-semibold text-[#0b2b43] mb-1">
-        No requirements catalogue yet{where}
+        Requirements not available yet{where}
       </div>
       <div>
         We don&apos;t have a verified requirements catalogue{where} yet, so this list is

@@ -1,0 +1,159 @@
+# Requirement seed for Germany.
+#
+# WHY THIS FILE EXISTS: Germany had no `employment` purpose at all. long_term_only.yaml
+# declared `GERMANY: [other]` — the only country in that file without `employment` —
+# while every real relocation resolves to `employment` (work / lta / sta / permanent /
+# transfer all map there). So 372 production cases, the single biggest corridor, looked
+# up (GERMANY, employment), found ZERO rows, and were served an empty requirements list.
+# Which the employee's screen rendered as "No destination requirements apply to your
+# case." They are moving to Germany for work. A great deal is required of them.
+#
+# SCOPE. Nationality-scoped from the start, because Germany is exactly where the split
+# bites:
+#   - EU/EEA/Swiss nationals have free movement: NO residence permit, NO visa. But they
+#     absolutely still owe the Anmeldung, the Sozialversicherung registration and the
+#     rest — those are universal and must NOT be suppressed for them. Hiding a legal
+#     obligation from an EU citizen is the mirror-image of telling them to get a visa.
+#   - Third-country nationals need a residence permit allowing employment (commonly the
+#     EU Blue Card or the skilled-worker permit) BEFORE they start work.
+#
+# PROVENANCE: representative, not corpus-grounded. The six pre-existing rows were already
+# `representative`, and the two new items are hand-authored. Every item is
+# requires_expert_review: true. Raise this only when a qualified reviewer signs it off.
+#
+# TITLES ARE LOAD-BEARING: the seeder's natural key is country_code + purpose + title,
+# and there is no delete path — so changing an existing title INSERTS a duplicate and
+# orphans the old row forever. The six original titles below are byte-identical to what
+# is in production. Likewise the citation UUIDs: crud.create_requirement_item OVERWRITES
+# citations_json, so dropping them would silently sever the source-record links.
+#
+# Reload (idempotent): python backend/scripts/seed_requirements.py --file backend/seeds/requirements/germany.yaml
+
+verification_status: representative
+source_scope: "Germany salaried relocation. EU/EEA/CH free movement vs third-country permit route."
+
+# EU/EEA nationals match none of the permit track and get a stated "no permit required"
+# confirmation in its place, plus every universal step below. A requirement that applies
+# to everyone overrides this default with an explicit `applies_to_nationality_classes: null`.
+default_applies_to_nationality_classes: [THIRD_COUNTRY]
+
+purposes_by_country:
+  GERMANY: [employment, other]
+
+requirements:
+  # ── Universal: an EU citizen owes every one of these too ──────────────────────
+  - key: employment_letter
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: ["fb8ee5c7-50bf-4c28-9cf0-f42ab0b78ab6"]
+    countries:
+      GERMANY:
+        title: "Employment letter"
+        description: "Provide an employment confirmation letter."
+  - key: minimum_lead_time
+    pillar: TIMELINE
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: ["fb8ee5c7-50bf-4c28-9cf0-f42ab0b78ab6", "e5ef31f6-6482-4088-b487-c2f6ec48cbb0"]
+    countries:
+      GERMANY:
+        title: "Minimum lead time"
+        description: "Submit documents at least 30 days before start date."
+  - key: anmeldung
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    # Universal. An EU citizen must register their address just like anyone else — the
+    # Meldebescheinigung is what unlocks a bank account, the tax ID and much else.
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: []
+    countries:
+      GERMANY:
+        title: "Residence registration (Anmeldung)"
+        description: "Register your home address at the local Bürgeramt, typically within 14 days of moving in; the confirmation (Meldebescheinigung) is needed for banking, tax ID and more. Indicative — confirm with the local Bürgeramt."
+  - key: sozialversicherung
+    pillar: SOCIAL_SECURITY
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: [LTA, PERMANENT]
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: []
+    countries:
+      GERMANY:
+        title: "Social security registration (Sozialversicherung)"
+        description: "Register for German social security; the employer typically initiates this and a social security number is issued. Indicative — confirm with the relevant Krankenkasse / authority."
+  - key: mietvertrag
+    pillar: HOUSING
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: []
+    countries:
+      GERMANY:
+        title: "Long-term rental contract (Mietvertrag)"
+        description: "Secure a long-term rental contract; the lease is commonly required for residence registration and opening utilities. Indicative — confirm with your housing provider."
+
+  # ── Third-country permit track ────────────────────────────────────────────────
+  - key: passport
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    # THIRD_COUNTRY: "valid 6+ months beyond entry" is a third-country entry condition.
+    # An EU/EEA national enters on a national identity card and owes no such margin.
+    confidence: medium
+    requires_expert_review: true
+    citations: ["fb8ee5c7-50bf-4c28-9cf0-f42ab0b78ab6"]
+    countries:
+      GERMANY:
+        title: "Valid passport (6+ months)"
+        description: "Passport must be valid for at least 6 months beyond entry."
+  - key: residence_permit_employment
+    pillar: RESIDENCE
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: medium
+    requires_expert_review: true
+    citations: []
+    countries:
+      GERMANY:
+        title: "Work visa / residence permit (Aufenthaltstitel)"
+        description: "As a non-EU/EEA national you need a residence permit that allows employment, in place before you start work. The common routes are the EU Blue Card (Blaue Karte EU — a recognised degree and a qualifying salary) and the skilled-worker permit (Fachkräfte). Depending on nationality you may enter visa-free and apply at the Ausländerbehörde, or you may need a national visa first. Indicative — confirm with the German mission in your country and the local Ausländerbehörde."
+
+  # ── EU/EEA + own-national establishment ───────────────────────────────────────
+  #
+  # The permit track above is correctly THIRD_COUNTRY. But suppressing it must not leave
+  # an EU national with an empty IDENTITY pillar — an empty pillar reads as a broken
+  # screen, or as "we didn't check". Their right of residence itself is stated by
+  # rules_engine's nothing_to_do confirmation, not duplicated here.
+  - key: eu_identity_document
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://europa.eu/youreurope/citizens/"]
+    countries:
+      GERMANY:
+        title: "Valid passport or national identity card"
+        description: "As an EU/EEA or Swiss national you may enter and live in Germany on a valid national identity card or passport — no visa and no residence permit are involved. You will need it for the Anmeldung and to open a bank account. Indicative — confirm with your consulate."
