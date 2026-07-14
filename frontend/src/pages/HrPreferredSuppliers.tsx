@@ -6,6 +6,23 @@ import { AppShell } from '../components/AppShell';
 import { hrPreferredSuppliersAPI } from '../api/client';
 import { suppliersAPI } from '../api/client';
 
+/** A supplier offered in the "Add preferred supplier" picker.
+ *  `service_categories` comes from the list payload (supplier_service_capabilities) and is
+ *  what lets us flag a vendor that covers more than one service. */
+interface CandidateSupplier {
+  id: string;
+  name: string;
+  status: string;
+  service_categories?: string[];
+}
+
+/** AIQ-1511: highlight vendors that can deliver several services, so HR can see at a
+ *  glance that one supplier covers more than the category they're adding it under. */
+const supplierLabel = (s: CandidateSupplier): string => {
+  const n = s.service_categories?.length ?? 0;
+  return n > 1 ? `${s.name} — ${n} services` : s.name;
+};
+
 const SERVICE_CATEGORIES = [
   { value: '', label: 'All categories' },
   { value: 'movers', label: 'Movers' },
@@ -40,9 +57,7 @@ export const HrPreferredSuppliers: React.FC = () => {
   const [addPriorityRank, setAddPriorityRank] = useState(5);
   const [addNotes, setAddNotes] = useState('');
   const [addSaving, setAddSaving] = useState(false);
-  const [candidateSuppliers, setCandidateSuppliers] = useState<
-    Array<{ id: string; name: string; status: string }>
-  >([]);
+  const [candidateSuppliers, setCandidateSuppliers] = useState<CandidateSupplier[]>([]);
   const [removeConfirm, setRemoveConfirm] = useState<{ supplier_id: string; service_category: string | null } | null>(null);
 
   const load = async () => {
@@ -83,12 +98,19 @@ export const HrPreferredSuppliers: React.FC = () => {
   const openAddModal = async () => {
     setAddModalOpen(true);
     setAddSupplierId('');
-    setAddServiceCategory('');
+    // AIQ-1511: inherit the page's category scope so the modal and the candidate list agree.
+    setAddServiceCategory(filterCategory);
     setAddPriorityRank(5);
     setAddNotes('');
     try {
-      const res = await suppliersAPI.list({ status: 'active', limit: 200 });
-      const items = (res as { suppliers?: Array<{ id: string; name: string; status: string }> }).suppliers ?? [];
+      // AIQ-1511: the category filter was never passed, so the candidate list ignored the
+      // page's scope and always listed every active supplier.
+      const res = await suppliersAPI.list({
+        status: 'active',
+        service_category: filterCategory || undefined,
+        limit: 200,
+      });
+      const items = (res as { suppliers?: CandidateSupplier[] }).suppliers ?? [];
       setCandidateSuppliers(items);
     } catch {
       setCandidateSuppliers([]);
@@ -253,7 +275,7 @@ export const HrPreferredSuppliers: React.FC = () => {
                       <option value="">Select supplier</option>
                       {candidateSuppliers.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name}
+                          {supplierLabel(s)}
                         </option>
                       ))}
                     </>

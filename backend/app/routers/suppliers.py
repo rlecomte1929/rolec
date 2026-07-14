@@ -15,6 +15,7 @@ from ..services.audit_log_service import (
     insert_audit_log,
 )
 from ..services.supplier_registry import (
+    DuplicateSupplierError,
     add_capability,
     approve_capability,
     create_supplier,
@@ -132,6 +133,9 @@ def create_supplier_api(
         _audit_supplier(user, "supplier_created", ACTION_INSERT,
                         str(s.get("id")), {"name": s.get("name")})
         return s
+    # [AIQ-1511] Must precede the ValueError arm — DuplicateSupplierError subclasses it.
+    except DuplicateSupplierError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
