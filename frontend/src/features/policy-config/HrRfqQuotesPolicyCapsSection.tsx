@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { QuoteDetail, RfqDetail } from '../../api/client';
-import { buildQuoteCapRowModels, quoteRowsToCompareEstimates } from './buildQuoteEstimatesForCapCompare';
+import { buildQuoteCapAttribution, quoteRowsToCompareEstimates } from './buildQuoteEstimatesForCapCompare';
 import { PolicyCapEstimateRow } from './PolicyCapEstimateRow';
 import type { PolicyCapCompareResultRow } from './policyCapCompareTypes';
 import { usePolicyCapsCompare } from './usePolicyCapsCompare';
@@ -11,7 +11,8 @@ const HrSingleQuoteCapCompare: React.FC<{
   assignmentType?: string | null;
   familyStatus?: string | null;
 }> = ({ quote, rfqItems, assignmentType, familyStatus }) => {
-  const rows = useMemo(() => buildQuoteCapRowModels(quote, rfqItems), [quote, rfqItems]);
+  const attribution = useMemo(() => buildQuoteCapAttribution(quote, rfqItems), [quote, rfqItems]);
+  const rows = attribution.comparable ? attribution.rows : [];
   const estimates = useMemo(() => quoteRowsToCompareEstimates(rows), [rows]);
 
   const { results, loading, error } = usePolicyCapsCompare({
@@ -39,8 +40,12 @@ const HrSingleQuoteCapCompare: React.FC<{
     <div className="mt-3 space-y-2 border-t border-[#e2e8f0] pt-3">
       <div className="text-xs font-semibold text-[#0b2b43]">Policy cap comparison (HR / Admin)</div>
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
-      {rows.length === 0 ? (
-        <p className="text-xs text-[#6b7280]">No RFQ items to compare, or quote has no total.</p>
+      {!attribution.comparable ? (
+        // We refuse to compare rather than invent a per-item split. HR is signing a payment.
+        <p data-testid="quote-cap-not-comparable" className="text-xs text-[#6b7280]">
+          <span className="font-semibold text-[#0b2b43]">Can’t compare this quote to the caps.</span>{' '}
+          {attribution.reason}
+        </p>
       ) : (
         paired.map(({ row, unmapped, result }) => (
           <PolicyCapEstimateRow
