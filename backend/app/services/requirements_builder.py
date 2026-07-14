@@ -138,6 +138,13 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             # assignment, so the UI can explain the shorter list instead of
             # silently dropping items. Empty for LTA/PERMANENT.
             staWaived=sorted({t for t in (flags.get("staWaived") or []) if t}),
+            # Same contract as staWaived, for the nationality gate: the titles we
+            # suppressed because the person's nationality class doesn't need them,
+            # plus the class we resolved. Without these the client gets a shorter
+            # list with no way to explain it — which is the silent-drop failure the
+            # gate exists to prevent. Empty/None when nationality is unknown.
+            nationalityWaived=sorted({t for t in (flags.get("nationalityWaived") or []) if t}),
+            nationalityClass=flags.get("nationalityClass"),
             covered=True,  # AIQ-1473c: destination resolved to a known catalog key
         )
 

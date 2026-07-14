@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
-from .nationality_class import OWN_NATIONAL, classify
+from .nationality_class import EU_EEA, OWN_NATIONAL, classify
 
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
@@ -109,7 +109,11 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
             expanded = [r for r in expanded if _applies_to_nationality_class(r, nationality_class)]
             flags["nationalityWaived"] = [r.get("title") for r in dropped if r.get("title")]
             flags["nationalityClass"] = nationality_class
-            expanded.append(_immigration_confirmation(nationality_class, basics.get("destCountry")))
+            confirmation = _immigration_confirmation(
+                nationality_class, basics.get("destCountry")
+            )
+            if confirmation is not None:
+                expanded.append(confirmation)
 
     return required_fields, expanded, flags
 
@@ -125,13 +129,24 @@ def _applies_to_nationality_class(requirement: Dict[str, Any], nationality_class
     return (not norm) or (nationality_class in norm)
 
 
-def _immigration_confirmation(nationality_class: str, dest_country: Optional[str]) -> Dict[str, Any]:
+def _immigration_confirmation(
+    nationality_class: str, dest_country: Optional[str]
+) -> Optional[Dict[str, Any]]:
     """The anti-silence gate (ReloPass_Fixture_NO-FR.md §3.1).
 
     Suppressing the visa track leaves the immigration pillar empty, and an empty
     pillar reads as a broken screen — or worse, as "we didn't check". A correct
     answer of "none" must be *stated*, with its reason, not implied by omission.
     So we emit a positive confirmation in place of what we removed.
+
+    Returns None when we have no right-to-enter claim to make. `classify` has
+    three outcomes but only two of them confer free movement, and this function
+    is called whenever *anything* was dropped — so an unguarded `else` would tell
+    a third-country national "freedom of movement applies, no visa required" the
+    moment any EU-scoped item was dropped from their list. That is the fabricated
+    "nothing required" nationality_class.py's docstring calls the failure mode we
+    must never have. Silence is wrong, but a confident lie is far worse: say
+    nothing rather than invent a right the person does not have.
     """
     where = (dest_country or "the destination").title()
     if nationality_class == OWN_NATIONAL:
@@ -139,11 +154,13 @@ def _immigration_confirmation(nationality_class: str, dest_country: Optional[str
             f"You are a national of {where}. You have the right of entry and residence in "
             "your own country — no visa, residence permit, or immigration registration applies."
         )
-    else:
+    elif nationality_class == EU_EEA:
         reason = (
             f"You are an EU/EEA national moving to {where}. Freedom of movement applies — "
             "no visa or work permit is required."
         )
+    else:
+        return None
     return {
         "id": "immigration_nothing_to_do",
         "title": "No visa or residence permit required",
