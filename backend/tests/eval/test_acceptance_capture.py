@@ -39,7 +39,10 @@ def captured_events(monkeypatch):
     return events
 
 
-def test_accept_quote_emits_quote_accepted(monkeypatch, captured_events):
+def test_validate_quote_emits_quote_accepted(monkeypatch, captured_events):
+    # AIQ-1524: accepting a quote is the PAYER's spend approval, so it is HR-only. This test
+    # previously drove it as an EMPLOYEE ("emp-1"/"employee") — locking in the very hole that
+    # task removed. The event contract is unchanged; the actor is not.
     monkeypatch.setattr(
         m.db,
         "get_rfq",
@@ -51,22 +54,31 @@ def test_accept_quote_emits_quote_accepted(monkeypatch, captured_events):
     monkeypatch.setattr(m, "_require_case_id_assignment_visible", lambda case_id, user: {"id": "a-1"})
     monkeypatch.setattr(
         m.db,
-        "update_quote_status",
-        lambda quote_id, status, request_id=None: {"id": quote_id, "vendor_id": "v-1", "status": status},
+        "validate_rfq_quote",
+        lambda rfq_id, quote_id, user_id, reason, request_id=None: {
+            "ok": True,
+            "quote_id": quote_id,
+            "rfq_id": rfq_id,
+            "quote": {"id": quote_id, "vendor_id": "v-1", "status": "accepted"},
+            "cost_attributed": True,
+            "cost_not_attributed_reason": None,
+            "services_costed": ["movers"],
+        },
     )
 
-    user = {"id": "emp-1", "role": "employee"}
+    user = {"id": "hr-1", "role": "HR"}
     out = m.accept_quote("rfq-1", "q-1", _FakeReq(), user)
     assert out["ok"] is True
+    assert out["validation"]["cost_attributed"] is True
 
     names = [e[0] for e in captured_events]
     assert analytics_service.EVENT_QUOTE_ACCEPTED in names
     kwargs = dict(captured_events[names.index(analytics_service.EVENT_QUOTE_ACCEPTED)][1])
     assert kwargs["case_id"] == "case-1"
-    assert kwargs["user_id"] == "emp-1"
+    assert kwargs["user_id"] == "hr-1"
     assert kwargs["extra"]["rfq_id"] == "rfq-1"
     assert kwargs["extra"]["quote_id"] == "q-1"
-    assert kwargs["extra"]["vendor_id"] == "v-1"
+    assert kwargs["extra"]["cost_attributed"] is True
 
 
 def test_create_rfq_emits_supplier_selected_per_vendor(monkeypatch, captured_events):

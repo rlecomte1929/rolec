@@ -227,8 +227,14 @@ class VendorsMixin:
         status: str,
         request_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Update quote status (e.g. accepted, rejected)."""
-        with self.engine.connect() as conn:
+        """Update quote status (e.g. accepted, rejected).
+
+        AIQ-1524: this used `engine.connect()`, and `_exec` never commits — so the UPDATE
+        was rolled back on context exit and the status change was silently discarded. It
+        went unnoticed only because `quotes` has never had a row in prod. `engine.begin()`
+        commits on exit, which is what `create_quote` above already does.
+        """
+        with self.engine.begin() as conn:
             self._exec(
                 conn,
                 "UPDATE quotes SET status = :status WHERE id = :id",
@@ -241,6 +247,164 @@ class VendorsMixin:
                 text("SELECT * FROM quotes WHERE id = :id"), {"id": quote_id}
             ).fetchone()
         return self._row_to_dict(row)
+
+    def set_rfq_preferred_quote(
+        self,
+        rfq_id: str,
+        quote_id: str,
+        user_id: Optional[str],
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """AIQ-1524: the EMPLOYEE proposes an offer. A proposal commits no spend, so this
+        deliberately does NOT touch quotes.status — only HR's validation does that."""
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                """UPDATE rfqs
+                      SET preferred_quote_id = :quote_id,
+                          preferred_by_user_id = :user_id,
+                          preferred_at = :now
+                    WHERE id = :rfq_id""",
+                {
+                    "quote_id": quote_id,
+                    "user_id": user_id,
+                    "now": datetime.utcnow().isoformat(),
+                    "rfq_id": rfq_id,
+                },
+                op_name="set_rfq_preferred_quote",
+                request_id=request_id,
+            )
+        return self.get_rfq(rfq_id, request_id=request_id)
+
+    def validate_rfq_quote(
+        self,
+        rfq_id: str,
+        quote_id: str,
+        user_id: Optional[str],
+        reason: Optional[str],
+        request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """AIQ-1524: HR (the payer) validates the offer the company will pay for.
+
+        One transaction, because these must not diverge:
+          * the chosen quote  -> accepted
+          * every sibling     -> rejected  (an RFQ ends with exactly one accepted offer)
+          * the RFQ           -> records who validated, when, and why
+          * case_services     -> the agreed cost, but ONLY where it can be attributed honestly
+
+        Returns a dict describing what was written, including `cost_attributed` and, when it
+        was not, `cost_not_attributed_reason` — we never guess a per-service figure.
+        """
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            quote = conn.execute(
+                text("SELECT * FROM quotes WHERE id = :id AND rfq_id = :rfq_id"),
+                {"id": quote_id, "rfq_id": rfq_id},
+            ).fetchone()
+            if not quote:
+                return {"ok": False, "error": "quote_not_found"}
+            q = self._row_to_dict(quote) or {}
+
+            self._exec(
+                conn,
+                "UPDATE quotes SET status = 'accepted' WHERE id = :id",
+                {"id": quote_id},
+                op_name="validate_quote_accept",
+                request_id=request_id,
+            )
+            self._exec(
+                conn,
+                "UPDATE quotes SET status = 'rejected' WHERE rfq_id = :rfq_id AND id <> :id",
+                {"rfq_id": rfq_id, "id": quote_id},
+                op_name="validate_quote_reject_siblings",
+                request_id=request_id,
+            )
+            self._exec(
+                conn,
+                """UPDATE rfqs
+                      SET validated_quote_id = :quote_id,
+                          validated_by_user_id = :user_id,
+                          validated_at = :now,
+                          validation_reason = :reason,
+                          status = 'closed'
+                    WHERE id = :rfq_id""",
+                {
+                    "quote_id": quote_id,
+                    "user_id": user_id,
+                    "now": now,
+                    "reason": reason,
+                    "rfq_id": rfq_id,
+                },
+                op_name="validate_rfq",
+                request_id=request_id,
+            )
+
+            rfq_row = conn.execute(
+                text("SELECT case_id FROM rfqs WHERE id = :id"), {"id": rfq_id}
+            ).fetchone()
+            case_id = (self._row_to_dict(rfq_row) or {}).get("case_id")
+            items = [
+                self._row_to_dict(r) or {}
+                for r in conn.execute(
+                    text("SELECT service_key FROM rfq_items WHERE rfq_id = :id ORDER BY created_at"),
+                    {"id": rfq_id},
+                ).fetchall()
+            ]
+            lines = [
+                self._row_to_dict(r) or {}
+                for r in conn.execute(
+                    text("SELECT label, amount FROM quote_lines WHERE quote_id = :id"),
+                    {"id": quote_id},
+                ).fetchall()
+            ]
+
+            # Attribute the agreed cost to services ONLY where it is unambiguous. Mirrors the
+            # HR cap comparison (AIQ-1526): a lump sum covering several services cannot be
+            # split across them without inventing numbers, so we record nothing rather than
+            # write a figure nobody quoted.
+            attribution: List[tuple] = []
+            not_attributed: Optional[str] = None
+            if not case_id or not items:
+                not_attributed = "no_case_or_items"
+            elif len(items) == 1:
+                attribution = [(items[0].get("service_key"), q.get("total_amount"))]
+            elif len(lines) == len(items):
+                attribution = [
+                    (items[i].get("service_key"), lines[i].get("amount")) for i in range(len(items))
+                ]
+            else:
+                not_attributed = "lump_sum_across_multiple_services"
+
+            for service_key, amount in attribution:
+                if not service_key or amount is None:
+                    continue
+                self._exec(
+                    conn,
+                    """UPDATE case_services
+                          SET estimated_cost = :amount,
+                              currency = :currency,
+                              updated_at = :now
+                        WHERE case_id = :case_id AND service_key = :service_key""",
+                    {
+                        "amount": amount,
+                        "currency": q.get("currency") or "EUR",
+                        "now": now,
+                        "case_id": case_id,
+                        "service_key": service_key,
+                    },
+                    op_name="validate_quote_write_estimated_cost",
+                    request_id=request_id,
+                )
+
+        return {
+            "ok": True,
+            "quote_id": quote_id,
+            "rfq_id": rfq_id,
+            "quote": {**q, "status": "accepted"},
+            "cost_attributed": bool(attribution),
+            "cost_not_attributed_reason": not_attributed,
+            "services_costed": [sk for sk, _ in attribution],
+        }
 
     def list_rfqs_for_vendor(
         self, vendor_id: str, request_id: Optional[str] = None
