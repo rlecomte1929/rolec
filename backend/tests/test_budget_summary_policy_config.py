@@ -69,6 +69,50 @@ def test_sums_multiple_benefit_keys_for_one_service(monkeypatch):
     assert rows[0]["status"] == "no_estimate"
 
 
+def test_a_real_estimate_is_ACTUALLY_COMPARED_against_the_cap(monkeypatch):
+    """[AIQ-1527] The comparison the endpoint always claimed to make, and never did.
+
+    The honest status vocabulary landed first, but `estimated_amount` was left as a TODO — so the
+    endpoint could only ever answer "no_estimate". It never compared anything. Now it does.
+    """
+    monkeypatch.setattr(
+        mxs.PolicyConfigMatrixService, "caps_payload",
+        lambda self, company_id, **kw: _bundle([_currency_cap("host_housing_cap", 2000.0)]),
+    )
+
+    under = cr._budget_categories_from_policy_config(
+        "co-1", ["housing"], None, None,
+        estimates={"housing": {"amount": 1800.0, "currency": "EUR"}},
+    )
+    assert under[0]["status"] == "within_budget"
+    assert under[0]["estimated_amount"] == 1800.0
+
+    over = cr._budget_categories_from_policy_config(
+        "co-1", ["housing"], None, None,
+        estimates={"housing": {"amount": 2400.0, "currency": "EUR"}},
+    )
+    assert over[0]["status"] == "over_budget"
+
+    # A currency mismatch REFUSES to rank rather than inventing an FX rate — the same refusal
+    # policy_config_cap_compare already makes. There is no FX conversion anywhere in the product.
+    mismatched = cr._budget_categories_from_policy_config(
+        "co-1", ["housing"], None, None,
+        estimates={"housing": {"amount": 1800.0, "currency": "USD"}},
+    )
+    assert mismatched[0]["status"] == "not_comparable"
+
+
+def test_the_estimate_reader_degrades_to_UNKNOWN_never_to_a_green_tick(monkeypatch):
+    from unittest import mock
+
+    db = mock.MagicMock()
+    db.engine.connect.side_effect = RuntimeError("db down")
+    monkeypatch.setattr(cr, "main_db", db)
+    # A DB failure yields {} -> every category becomes "no_estimate", never "within_budget".
+    assert cr._case_service_estimates("case-1") == {}
+    assert cr._case_service_estimates("") == {}
+
+
 def test_no_company_yields_all_no_cap(monkeypatch):
     # No company → never calls the service; every selected service is no_cap.
     def _boom(*a, **k):
