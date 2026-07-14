@@ -24,8 +24,7 @@ ALTER TABLE public.outreach_messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin full access" ON public.outreach_messages;
 CREATE POLICY "Admin full access" ON public.outreach_messages
   FOR ALL TO authenticated
-  USING  (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1));
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 REVOKE ALL ON public.outreach_messages FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.outreach_messages TO authenticated;

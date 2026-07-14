@@ -37,8 +37,7 @@ ALTER TABLE public.linkedin_prospects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin full access" ON public.linkedin_prospects;
 CREATE POLICY "Admin full access" ON public.linkedin_prospects
   FOR ALL TO authenticated
-  USING  (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.admin_allowlist WHERE user_id = auth.uid() AND enabled = 1));
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 REVOKE ALL ON public.linkedin_prospects FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.linkedin_prospects TO authenticated;
