@@ -2,8 +2,6 @@ import type {
   RelocationCase,
   RelocationCaseListItem,
   RelocationRun,
-  RequirementItemDTO,
-  CaseRequirementsDTO,
   CaseClassification,
   NextAction,
 } from '../types';
@@ -67,25 +65,14 @@ export const buildNextActionsFromMissingFields = (missingFields: string[]): Next
   }));
 };
 
-export const buildRequirementsFromMissingFields = (caseId: string, missingFields: string[]): CaseRequirementsDTO => {
-  const requirements: RequirementItemDTO[] = missingFields.map((field) => ({
-    id: `missing:${field}`,
-    pillar: 'Intake',
-    title: missingFieldLabels[field] || toTitleCase(field),
-    description: 'This detail is required to complete your intake.',
-    severity: 'BLOCKER',
-    owner: 'Employee',
-    requiredFields: [field],
-    statusForCase: 'MISSING',
-    citations: [],
-  }));
-
-  return {
-    caseId,
-    destCountry: '',
-    purpose: '',
-    computedAt: new Date().toISOString(),
-    requirements,
-    sources: [],
-  };
-};
+// buildRequirementsFromMissingFields was removed here.
+//
+// It synthesised a fake CaseRequirementsDTO client-side out of `missing_fields`,
+// forcing every item to pillar 'Intake', severity BLOCKER, status MISSING — and
+// Step 5 rendered it as though it were the destination requirements dossier. So the
+// screen showed "your intake form is incomplete" while implying "here is what the
+// law requires of you". Two different claims.
+//
+// Step 5 now calls the real endpoint (api/cases.getRequirements), and
+// `missing_fields` keeps its actual job: intake completeness, which still gates the
+// dossier-suggestion button and the submit flow.

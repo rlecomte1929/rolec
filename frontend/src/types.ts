@@ -475,10 +475,20 @@ export interface RequirementItemDTO {
   severity: string;
   owner: string;
   requiredFields: string[];
-  statusForCase: 'PROVIDED' | 'MISSING' | 'NEEDS_REVIEW';
+  /** CONFIRMED is the status of a `nothing_to_do` item — a positive answer, not a pending task. */
+  statusForCase: 'PROVIDED' | 'MISSING' | 'NEEDS_REVIEW' | 'CONFIRMED';
   citations: SourceRecordDTO[];
   /** AIQ-1349: provenance level. */
   verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | null;
+  /**
+   * 'action' (something is required of someone) or 'nothing_to_do' (a STATED
+   * confirmation that nothing is required — e.g. "No visa or residence permit
+   * required"). A correct answer of "none" must be said out loud, never implied
+   * by an empty list, because an empty pillar reads as a broken screen.
+   */
+  outcomeType?: 'action' | 'nothing_to_do';
+  /** Why nothing is required. The only human-readable payload of a nothing_to_do item. */
+  reason?: string | null;
 }
 
 export interface CountryProfileDTO {
@@ -507,6 +517,17 @@ export interface CaseRequirementsDTO {
   requirements: RequirementItemDTO[];
   sources: SourceRecordDTO[];
   staWaived?: string[];
+  /**
+   * Requirement titles waived because the employee's nationality exempts them
+   * (an EU/EEA national needs none of the non-EEA visa track).
+   *
+   * NOT symmetric — read `nationalityClass` before rendering it. For a
+   * THIRD_COUNTRY national this array holds the *EU* items, so showing it
+   * verbatim would say "Justificatif de domicile doesn't apply to you", which is
+   * confusing and false. Their list didn't shrink; those items were never theirs.
+   */
+  nationalityWaived?: string[];
+  nationalityClass?: 'OWN_NATIONAL' | 'EU_EEA' | 'THIRD_COUNTRY' | null;
   // AIQ-1473c/d: false when the destination isn't in our requirements catalogue —
   // the empty list then means "no catalogue yet", not "nothing required".
   // Undefined from older backends → treat as covered (no notice).

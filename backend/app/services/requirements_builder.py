@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -9,7 +10,14 @@ from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
 from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
 from .requirements_country_key import resolve_catalog_country, to_iso
+from .requirements_purpose_key import (
+    assignment_type_from_purpose,
+    is_known_catalog_gap,
+    to_purpose,
+)
 from .rules_engine import apply_rules
+
+log = logging.getLogger(__name__)
 
 # AIQ-1473 boundary (see docs/specs/requirements-engine-consolidation.md):
 # this path (requirement_items) is the in-country RELOCATION DOSSIER across the
@@ -17,6 +25,73 @@ from .rules_engine import apply_rules
 # destination only. It is distinct-by-design from the immigration ENTRY-VISA
 # checklist (immigration_requirement_service, keyed corridor × visa_type) — the
 # two are documented as non-overlapping, not merged.
+
+
+def _is_in_country_move(draft: Dict[str, Any], case) -> bool:
+    """True when origin and destination are the same country.
+
+    Keyed off a VERIFIABLE FACT, not off the purpose label. 53 production cases
+    say `domestic` or `repatriation`, and those labels sit in a free-text field
+    that has proved unreliable — but every one of them also has
+    originCountry == destCountry, which is checkable. No border crossed means no
+    immigration requirements, as a matter of fact rather than of trust.
+
+    Deliberately NOT triggered by the label: a `repatriation` that genuinely does
+    cross a border (returning home from abroad) must fall through to the normal
+    engine. "No immigration requirements" is only true there if the destination is
+    their country of nationality, and nationality is null on all of them. If we
+    cannot positively know, we make no claim.
+    """
+    basics = draft.get("relocationBasics", {}) or {}
+    origin = to_iso(getattr(case, "origin_country", None) or basics.get("originCountry"))
+    dest = to_iso(getattr(case, "dest_country", None) or basics.get("destCountry"))
+    return bool(origin and dest and origin == dest)
+
+
+def _in_country_move(case_id: str, dest_raw: str, purpose: str) -> CaseRequirementsDTO:
+    """An in-country move has no immigration requirements — and that answer must be
+    STATED, not implied by an empty list.
+
+    An empty requirements screen reads as "nothing is required of you" or, worse,
+    as "we didn't check". This is the same anti-silence contract the nationality
+    gate uses (rules_engine._immigration_confirmation): a correct answer of "none"
+    is a positive result and gets said out loud, with its reason.
+
+    Aligns the requirements engine with what the rest of the product already
+    believes: plan_scope._SUPPRESSED["domestic_move"] = {"immigration"} and
+    relocation_classifier both drop the immigration phase for these.
+    """
+    where = resolve_catalog_country(dest_raw)
+    reason = (
+        f"This is a move within {where.title()} — you are not crossing a border. "
+        "No visa, residence permit or immigration registration applies."
+    )
+    return CaseRequirementsDTO(
+        caseId=case_id,
+        destCountry=where,
+        purpose=purpose,
+        computedAt=datetime.utcnow(),
+        requirements=[
+            RequirementItemDTO(
+                id="immigration_not_applicable_in_country_move",
+                pillar="RESIDENCE",
+                title="No immigration requirements",
+                description=reason,
+                severity="INFO",
+                owner="EMPLOYEE",
+                requiredFields=[],
+                statusForCase="CONFIRMED",
+                citations=[],
+                outcomeType="nothing_to_do",
+                reason=reason,
+            )
+        ],
+        sources=[],
+        disclaimer=IMMIGRATION_DISCLAIMER,
+        verificationStatus=DEFAULT_VERIFICATION_STATUS,
+        staWaived=[],
+        covered=True,
+    )
 
 
 def _not_covered(case_id: str, dest_raw: str, purpose: str) -> CaseRequirementsDTO:
@@ -46,7 +121,23 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         draft = json.loads(case.draft_json)
         dest_raw = case.dest_country or draft.get("relocationBasics", {}).get("destCountry") or "UNKNOWN"
-        purpose = case.purpose or draft.get("relocationBasics", {}).get("purpose") or "employment"
+        purpose_raw = case.purpose or draft.get("relocationBasics", {}).get("purpose") or "employment"
+
+        # The purpose key is matched with `==` against a catalog seeded with only
+        # {employment, other, study, family}. Nothing validated the field, three
+        # intakes wrote three vocabularies into it, and 616 of 780 production cases
+        # (79%) matched NOTHING — returning an empty list that reads as "nothing is
+        # required of you". Resolve through the single shared resolver, exactly as
+        # the destination key already does (requirements_country_key).
+        purpose = to_purpose(purpose_raw)
+
+        # An in-country move crosses no border, so no immigration requirement can
+        # apply. Checked BEFORE the catalog lookup and keyed off origin == dest — a
+        # verifiable fact — rather than off the `domestic`/`repatriation` labels,
+        # which live in the same untrustworthy field. Answered explicitly rather
+        # than by an empty list.
+        if _is_in_country_move(draft, case):
+            return _in_country_move(case.id, dest_raw, purpose or "employment")
 
         # AIQ-1473c: fail closed. If the destination doesn't resolve to a known
         # ISO key (to_iso is None), we have no catalogue for it — return an
@@ -54,7 +145,42 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
         # NOTE: a destination that DOES resolve but has no rows yet is a catalog
         # gap (covered=True, empty) — a different state, deliberately not merged.
         if to_iso(dest_raw) is None:
-            return _not_covered(case.id, dest_raw, purpose)
+            return _not_covered(case.id, dest_raw, purpose or purpose_raw)
+
+        # Same fail-closed contract for the purpose half of the key: an
+        # unrecognised purpose means we cannot say what is required, and we must
+        # not let a zero-row lookup say "nothing".
+        if purpose is None:
+            return _not_covered(case.id, dest_raw, purpose_raw)
+
+        # 272 cases store an assignment type (`lta`/`sta`/`permanent`) in the
+        # purpose field while assignmentContext.assignmentType sits empty — so the
+        # assignment-type gate, and every STA waiver, has never fired for them.
+        # Recover it. Only when the real field is empty: never override a real value.
+        #
+        # Check BOTH the column and the draft. `purpose_raw` prefers the column, and
+        # the column is now canonicalised on write (`sta` -> `employment`) — so for a
+        # freshly written case the assignment signal survives ONLY in the draft.
+        # Reading the column alone silently dropped every STA waiver on new cases;
+        # caught by live verification, not by the unit tests, because the unit tests
+        # never went through the write path.
+        recovered = assignment_type_from_purpose(purpose_raw) or assignment_type_from_purpose(
+            (draft.get("relocationBasics", {}) or {}).get("purpose")
+        )
+        if recovered:
+            assignment_ctx = draft.setdefault("assignmentContext", {})
+            if not (assignment_ctx.get("assignmentType") or "").strip():
+                assignment_ctx["assignmentType"] = recovered
+
+        if is_known_catalog_gap(purpose_raw):
+            # e.g. an intra-company transfer. We serve the employment track because
+            # it is close and an empty list would read as "nothing required" — but
+            # the ICT route is not modelled, and that is a stated approximation.
+            log.info(
+                "requirements: purpose %r has no modelled catalog route; serving 'employment' "
+                "(known gap) for case %s",
+                purpose_raw, case.id,
+            )
 
         # AIQ-1473b: single shared resolver (ISO → catalog name).
         dest_country = resolve_catalog_country(dest_raw)
