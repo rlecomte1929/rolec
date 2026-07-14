@@ -16,28 +16,23 @@ its full life) — submitting a quote is a financial write and does not get that
 from __future__ import annotations
 
 import logging
-import os
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import requests
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 
 from ...database import db
 from ..auth_deps import require_admin_or_hr
-from ..services.supplier_jwt import expires_at, generate_supplier_token, hash_token, verify_supplier_token
+from ..services.supplier_jwt import hash_token, verify_supplier_token
+from ..services.supplier_link_dispatch import dispatch_supplier_links, resolve_rfq_targets
 
 router = APIRouter(prefix="/api/supplier", tags=["supplier-rfq"])
 # The HR/admin side: minting and sending the links. Same module, because the two halves are one
 # feature and reading them apart hides the contract.
 hr_router = APIRouter(prefix="/api/hr", tags=["supplier-rfq"])
 log = logging.getLogger(__name__)
-
-APP_BASE_URL = os.getenv("APP_BASE_URL", "https://relopass.com")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@relopass.com")
 
 
 class SupplierQuoteLine(BaseModel):
@@ -176,11 +171,15 @@ def submit_supplier_quote(
 
 
 class SupplierLinkTarget(BaseModel):
-    """Who to send to. The address is explicit BECAUSE suppliers.contact_email is NULL for all
-    90 suppliers in the catalog — there is nothing to look up. Until supplier contact data
-    exists, the sender supplies it."""
+    """Who to send to.
+
+    `email` is OPTIONAL: dispatch now reads the address from `suppliers.contact_email`. Supplying
+    it here overrides that — the escape hatch for the (common) case where the catalog has no
+    address for a supplier HR knows how to reach. Omit it and the stored address is used; if
+    there is none either, that supplier is reported as not contacted rather than guessed at.
+    """
     recipient_id: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     supplier_name: Optional[str] = None
 
 
@@ -191,24 +190,6 @@ class SendSupplierLinksPayload(BaseModel):
     send_email: bool = False
 
 
-def _rfq_email_html(supplier_name: str, link: str) -> str:
-    return f"""
-      <div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;line-height:1.5">
-        <p>Hello{(' ' + supplier_name) if supplier_name else ''},</p>
-        <p>A company relocating an employee would like a quote from you.</p>
-        <p>You can see what they need and send your price here — there is no account to create
-           and nothing to install:</p>
-        <p><a href="{link}"
-              style="display:inline-block;background:#1f8e8b;color:#fff;padding:12px 20px;
-                     border-radius:8px;text-decoration:none;font-weight:600">
-             View the request and quote
-           </a></p>
-        <p style="color:#64748b;font-size:13px">The link is unique to you and expires in 14 days.</p>
-        <p style="color:#64748b;font-size:13px">ReloPass</p>
-      </div>
-    """
-
-
 @hr_router.post("/rfqs/{rfq_id}/supplier-links")
 def send_supplier_links(
     rfq_id: str,
@@ -217,84 +198,44 @@ def send_supplier_links(
 ):
     """AIQ-1521: mint one magic link per recipient, and (optionally) email it.
 
-    Sending is OPT-IN (`send_email`), and with no RESEND_API_KEY set nothing is sent at all —
-    the links are returned instead. Both are deliberate: this feature's whole purpose is to
-    email real companies who have never heard of us, and that must never happen by accident.
+    HR/admin path. The employee's own RFQ dispatches itself on create (POST /api/rfqs) — both go
+    through the same `dispatch_supplier_links`, so there is one implementation to reason about.
+    This route stays for the cases HR still owns: re-sending a link, or reaching a supplier whose
+    address is not in the catalog.
+
+    Sending is OPT-IN (`send_email`), and with no RESEND_API_KEY set nothing is sent at all — the
+    links are returned instead. Both are deliberate: this feature exists to email real companies
+    who have never heard of us, and that must never happen by accident.
     """
     rfq = db.get_rfq(rfq_id)
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
 
-    resend_key = os.getenv("RESEND_API_KEY")
+    # Recipients of THIS rfq, with the address we hold. Anything the caller names that is not a
+    # recipient of this RFQ is rejected — the token is scoped to the RFQ, so accepting a foreign
+    # recipient_id would mint a link into someone else's request.
+    known = {t["recipient_id"]: t for t in resolve_rfq_targets(rfq_id)}
+
+    targets: List[Dict[str, Any]] = []
     results: List[Dict[str, Any]] = []
-
     for target in payload.targets:
-        with db.engine.connect() as conn:
-            row = conn.execute(
-                text("SELECT id, vendor_id FROM rfq_recipients WHERE id = :id AND rfq_id = :rfq"),
-                {"id": target.recipient_id, "rfq": rfq_id},
-            ).mappings().first()
-        if not row:
-            results.append({"recipient_id": target.recipient_id, "ok": False, "error": "not a recipient of this RFQ"})
+        base = known.get(str(target.recipient_id))
+        if not base:
+            results.append({
+                "recipient_id": target.recipient_id,
+                "ok": False,
+                "sent": False,
+                "error": "not a recipient of this RFQ",
+            })
             continue
-
-        token = generate_supplier_token(
-            recipient_id=str(row["id"]),
-            rfq_id=rfq_id,
-            vendor_id=str(row["vendor_id"]),
-            email=str(target.email),
-        )
-        link = f"{APP_BASE_URL}/supplier/quote?token={token}"
-
-        with db.engine.begin() as conn:
-            conn.execute(
-                text(
-                    "UPDATE rfq_recipients SET token_hash = :h, invited_email = :e, invited_at = :now, "
-                    "expires_at = :exp, revoked_at = NULL, status = 'sent', last_activity_at = :now "
-                    "WHERE id = :id"
-                ),
-                {
-                    "h": hash_token(token),
-                    "e": str(target.email),
-                    "now": datetime.now(tz=timezone.utc).isoformat(),
-                    "exp": expires_at().isoformat(),
-                    "id": str(row["id"]),
-                },
-            )
-
-        sent = False
-        error: Optional[str] = None
-        if payload.send_email and resend_key:
-            try:
-                r = requests.post(
-                    "https://api.resend.com/emails",
-                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
-                    json={
-                        "from": EMAIL_FROM,
-                        "to": [str(target.email)],
-                        "subject": "A relocation company would like a quote from you",
-                        "html": _rfq_email_html(target.supplier_name or "", link),
-                    },
-                    timeout=15,
-                )
-                sent = r.status_code < 300
-                if not sent:
-                    error = f"resend {r.status_code}: {r.text[:160]}"
-            except Exception as e:  # never let a mail failure lose the minted link
-                error = str(e)[:160]
-        elif payload.send_email and not resend_key:
-            error = "RESEND_API_KEY not set — nothing was sent; use the link below"
-
-        results.append({
-            "recipient_id": str(row["id"]),
-            "email": str(target.email),
-            "ok": True,
-            "sent": sent,
-            "error": error,
-            # Returned so a human can review, or open it themselves, before anything goes out.
-            "link": link,
+        targets.append({
+            **base,
+            # An explicitly supplied address wins over the catalog's.
+            "email": str(target.email) if target.email else base.get("email"),
+            "supplier_name": target.supplier_name or base.get("supplier_name"),
         })
 
-    log.info("AIQ-1521 supplier links minted rfq=%s count=%s sent=%s",
-             rfq_id, len(results), sum(1 for r in results if r.get("sent")))
+    results.extend(
+        dispatch_supplier_links(rfq_id=rfq_id, targets=targets, send_email=payload.send_email)
+    )
     return {"ok": True, "rfq_ref": rfq.get("rfq_ref"), "results": results}
