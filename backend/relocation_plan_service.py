@@ -210,7 +210,12 @@ def adapt_milestone_row(row: Mapping[str, Any]) -> EnrichedPlanTask:
             if row.get("requirement_copy") and row.get("description")
             else lib.why_this_matters
         ),
-        instructions=lib.instructions,
+        # A row the overlay turned into a STATED ANSWER ("No visa or work permit
+        # required") is not a task, so it carries no steps. Its library instructions
+        # explain how to register and end with "Timeline: within 3 months of arrival for
+        # most EU countries" — which both duplicates the destination's real registration
+        # step and contradicts its deadline (Germany's Anmeldung is 14 days).
+        instructions=() if row.get("suppress_instructions") else lib.instructions,
         required_inputs=inputs,
         target_date=_norm_date_str(row.get("target_date")),
         notes=_norm_notes(row.get("notes")),
