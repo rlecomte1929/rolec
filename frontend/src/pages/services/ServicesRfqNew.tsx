@@ -21,9 +21,13 @@ const SERVICE_LABELS: Record<string, string> = {
   electricity: 'Electricity',
 };
 
-// [AIQ-1515] Was "you ask shortlisted vendors for formal prices" — you don't; HR does.
+// [AIQ-1515] Was "you ask shortlisted vendors for formal prices" — you didn't; HR did.
+// [AIQ-1521] Now you DO: the request goes to the suppliers you picked, and they answer you
+// directly. HR pre-approved who you may pick and what you may spend, and validates the offer you
+// choose — they are the payer, not your postbox. This sentence describes the model; the banner
+// after you send states what actually happened, which is the only place we assert a fact.
 const RFQ_SUBTITLE =
-  'RFQ means Request For Quotation: your HR team asks your shortlisted vendors for formal prices, then you compare their offers.';
+  'RFQ means Request For Quotation: you ask your shortlisted providers for a formal price and compare their offers. Your HR team validates the one you choose.';
 
 export const ServicesRfqNew: React.FC = () => {
   const navigate = useNavigate();
@@ -60,6 +64,10 @@ export const ServicesRfqNew: React.FC = () => {
   // record). The RFQ still goes to the rest — but the employee is told who was left out,
   // rather than us silently sending to fewer suppliers than they chose.
   const [unreachable, setUnreachable] = useState<string[]>([]);
+  // [AIQ-1521] Who actually received the request, and who did not and why. Never assumed —
+  // always read back from the response, because with supplier dispatch off nobody is emailed.
+  const [contacted, setContacted] = useState<string[]>([]);
+  const [notContacted, setNotContacted] = useState<Array<{ supplier: string; reason: string }>>([]);
 
   // [AIQ-1520] Several vendors may be shortlisted per service — iterate them all.
   const shortlisted = useMemo(() => {
@@ -106,6 +114,8 @@ export const ServicesRfqNew: React.FC = () => {
       // Tell the employee plainly if a supplier they chose could not be reached, rather than
       // silently sending to fewer suppliers than they picked.
       setUnreachable(res.unreachable ?? []);
+      setContacted(res.contacted ?? []);
+      setNotContacted(res.not_contacted ?? []);
       setSent(true);
       // AIQ-1436: one rfq_created per shortlisted vendor (mirrors the backend
       // canonical event name; the RFQ is a batch submit over the shortlist).
@@ -190,20 +200,23 @@ export const ServicesRfqNew: React.FC = () => {
             RFQ
           </abbr>{' '}
           <span className="text-[#64748b]">(Request For Quotation)</span> — you send your requirements to your
-          shortlisted vendors; they reply with <strong>proposed prices</strong>. ReloPass routes them to your HR team,
-          who follow up — and each request is tracked on your roadmap.
+          shortlisted providers; they reply with <strong>proposed prices</strong>. You compare the offers and pick
+          the one that suits you; your <strong>HR team validates it</strong>, because the company pays. Each request
+          is tracked on your roadmap.
         </p>
       </div>
 
       <RfqWorkflowDiagram />
 
       <p className="text-sm font-medium text-[#0b2b43] mt-8 mb-3">Your shortlisted vendors</p>
-      {/* [AIQ-1515] This used to read "These are the providers your requests will go to."
-          Nothing is sent to a provider — the request goes to HR, who contacts the vendor.
-          Say what actually happens. */}
+      {/* [AIQ-1515] Used to read "These are the providers your requests will go to." — nothing
+          was sent to a provider back then, so it was false.
+          [AIQ-1521] It can now be true, but only when supplier dispatch is on, and this text
+          renders BEFORE we send, when we don't yet know. So it promises nothing: the banner
+          after sending is where we state who was actually reached. */}
       <p className="text-xs text-[#64748b] mb-4">
-        Add an optional note for each, then send. Your HR team requests the quotes from these
-        providers on your behalf.
+        Add an optional note for each, then send your request. We&apos;ll tell you exactly who it
+        reached.
       </p>
       {shortlisted.map(({ service, vendor }) => (
         <div key={`${service}-${vendor.item_id}`} className="border border-[#e2e8f0] rounded-lg p-4 mb-3 bg-white">
@@ -218,29 +231,58 @@ export const ServicesRfqNew: React.FC = () => {
           />
         </div>
       ))}
-      {sent ? (
+      {/* [AIQ-1515] Was "Quotation requests sent", which implied the vendors had been contacted.
+          They had not.
+          [AIQ-1523] Kept as "sent to HR", because creating an RFQ still reached no supplier.
+          [AIQ-1521] Now it depends on what actually happened, so we read it off the response
+          instead of hardcoding either claim. `contacted` non-empty = those suppliers really do
+          have the request in their inbox. Empty = nobody outside ReloPass has seen it, and we
+          say exactly that. */}
+      {sent && contacted.length > 0 ? (
         <div
           data-testid="rfq-sent"
           className="mt-4 flex items-start gap-2 rounded-lg border border-green-100 bg-green-50 p-3 text-sm text-green-700"
         >
-          {/* [AIQ-1515] Was "Quotation requests sent", which implied the vendors had been
-              contacted. They have not — the request goes to HR, who now sees exactly which
-              vendors you picked and requests the quotes. */}
-          {/* [AIQ-1523] The copy stays as-is on purpose. The request now creates a REAL RFQ
-              (rfqs + rfq_recipients), but NO supplier is contacted yet — the magic-link that
-              actually reaches them is AIQ-1521. Claiming "sent to the providers" here would be
-              the same lie AIQ-1515 removed. */}
-          ✅ <span>Sent to your HR team — they can see the vendors you picked and will request the quotes. We&apos;ve added this to your roadmap.</span>
+          ✅{' '}
+          <span>
+            Sent to {contacted.length} {contacted.length === 1 ? 'provider' : 'providers'} —{' '}
+            {contacted.join(', ')}. They&apos;ll reply with a price, and you&apos;ll see the offers
+            here to compare. Your HR team validates the one you choose. We&apos;ve added this to
+            your roadmap.
+          </span>
         </div>
       ) : null}
-      {sent && unreachable.length > 0 ? (
+      {sent && contacted.length === 0 ? (
+        <div
+          data-testid="rfq-sent"
+          className="mt-4 flex items-start gap-2 rounded-lg border border-green-100 bg-green-50 p-3 text-sm text-green-700"
+        >
+          ✅{' '}
+          <span>
+            Request recorded — your HR team can see the providers you picked and will follow up.
+            We&apos;ve added this to your roadmap.
+          </span>
+        </div>
+      ) : null}
+      {sent && (unreachable.length > 0 || notContacted.length > 0) ? (
         <div
           data-testid="rfq-unreachable"
           className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
         >
-          <span className="font-semibold">We couldn’t include every vendor you picked.</span>{' '}
-          {unreachable.join('; ')} — we don’t have supplier contact details on record for them, so
-          they were left out of this request. The rest were included.
+          <span className="font-semibold">We couldn’t reach every provider you picked.</span>
+          <ul className="mt-1 list-disc pl-5">
+            {unreachable.map((u) => (
+              <li key={u}>{u}</li>
+            ))}
+            {notContacted.map((n) => (
+              <li key={n.supplier}>
+                {n.supplier} — {n.reason}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1">
+            Your HR team can still reach them for you. Everyone else was included.
+          </p>
         </div>
       ) : null}
       {!sent ? (

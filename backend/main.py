@@ -9114,9 +9114,58 @@ def create_rfq(
             )
     except Exception:
         pass
+
+    # [AIQ-1521] Dispatch the RFQ to the suppliers the employee chose.
+    #
+    # This is the employee-led model's load-bearing line. Before it, creating an RFQ contacted
+    # nobody: HR had to call POST /api/hr/rfqs/{id}/supplier-links by hand, and no UI ever did —
+    # so `token_hash` was NULL on every recipient and `quotes` had never had a row. The employee
+    # picks the suppliers (from HR's approved list) and reaches them directly; HR stays the payer
+    # who validates the winning quote at the end.
+    #
+    # Flag-gated OFF by default. Emailing a real company that has never heard of us must be a
+    # decision, never a side-effect of someone clicking a button in a dev environment.
+    contacted: List[str] = []
+    not_contacted: List[Dict[str, str]] = []
+    try:
+        from .app.services.feature_flags import resolve_flag_safe
+
+        if resolve_flag_safe("SUPPLIER_RFQ_DISPATCH_ENABLED", env_default=False):
+            from .app.services.supplier_link_dispatch import (
+                dispatch_supplier_links,
+                resolve_rfq_targets,
+            )
+
+            targets = resolve_rfq_targets(str(result.get("id")))
+            for r in dispatch_supplier_links(
+                rfq_id=str(result.get("id")),
+                targets=targets,
+                send_email=True,
+                request_id=req_id,
+            ):
+                name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
+                if r.get("sent"):
+                    contacted.append(name)
+                else:
+                    not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+    except Exception:
+        # The RFQ exists and is valid. A dispatch failure must never turn that into a 500 — the
+        # employee would retry and create a duplicate. Report it instead.
+        log.warning("create_rfq: supplier dispatch failed rfq=%s request_id=%s",
+                    result.get("id"), req_id, exc_info=True)
+        not_contacted.append({"supplier": "All suppliers", "reason": "we could not send the requests"})
+
     # [AIQ-1520] Tell the caller who was left out. Silently dropping a vendor the employee
     # deliberately shortlisted is exactly the kind of quiet data loss this phase exists to end.
-    return {"ok": True, "rfq": result, "unreachable": unreachable}
+    # [AIQ-1521] `contacted` / `not_contacted` say what actually reached a supplier, so the UI can
+    # stop guessing: with dispatch off, `contacted` is empty and the copy says HR will follow up.
+    return {
+        "ok": True,
+        "rfq": result,
+        "unreachable": unreachable,
+        "contacted": contacted,
+        "not_contacted": not_contacted,
+    }
 
 
 @app.get("/api/employee/assignments/{assignment_id}/rfqs")

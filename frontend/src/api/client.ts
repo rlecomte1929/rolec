@@ -3104,6 +3104,21 @@ export const employeeAPI = {
   },
 };
 
+/** What POST /api/rfqs actually did.
+ *
+ *  [AIQ-1521] `contacted` is the list of suppliers whose inbox the request reached. It is EMPTY
+ *  when supplier dispatch is turned off — in which case nobody outside ReloPass has seen the
+ *  request, and the UI must say so. `not_contacted` gives the honest reason per supplier
+ *  (typically: we hold no email address for them). */
+export interface RfqCreateResult {
+  ok: boolean;
+  rfq: { id: string; rfq_ref: string };
+  /** Shortlisted items that resolved to no supplier at all (AIQ-1520). */
+  unreachable: string[];
+  contacted?: string[];
+  not_contacted?: Array<{ supplier: string; reason: string }>;
+}
+
 export const servicesAPI = {
   /** Combined load: assignment, case context, services, answers, questions in one request. Use instead of 4 separate calls. */
   getServicesContext: async (
@@ -3156,13 +3171,17 @@ export const servicesAPI = {
    *
    *  `unreachable` (AIQ-1520) names the suppliers we could NOT reach — a catalog item with no
    *  supplier on record. The RFQ still goes to everyone who DID resolve; the caller must tell
-   *  the employee who was left out rather than quietly send to fewer suppliers than they chose. */
+   *  the employee who was left out rather than quietly send to fewer suppliers than they chose.
+   *
+   *  `contacted` / `not_contacted` (AIQ-1521) say what actually reached a supplier's inbox. The
+   *  UI copy MUST be driven off these, not assumed: when supplier dispatch is off, `contacted` is
+   *  empty and nobody was emailed — claiming otherwise would be the same lie AIQ-1515 removed. */
   createRfq: async (
     caseId: string,
     items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
     supplierIds: string[]
-  ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string }; unreachable: string[] }> => {
-    const response = await api.post<{ ok: boolean; rfq: { id: string; rfq_ref: string }; unreachable: string[] }>(
+  ): Promise<RfqCreateResult> => {
+    const response = await api.post<RfqCreateResult>(
       '/api/rfqs',
       { case_id: caseId, items, supplier_ids: supplierIds },
     );
