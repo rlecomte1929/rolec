@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../components/antigravity/Button';
 import { AdminOpsLayout } from '../../../pages/admin/ops/AdminOpsLayout';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
+import { RoadmapReviewMetricsPanel } from './RoadmapReviewMetricsPanel';
 import {
   CountryFlag,
   COUNTRY_NAME,
@@ -221,6 +222,9 @@ export function OpsAnalyticsV2Page() {
           Partial data: {degraded.join(', ')} unavailable.
         </div>
       )}
+
+      {/* [AIQ-1526] Is anyone stuck waiting on an HR roadmap approval — and was HR told? */}
+      <RoadmapReviewMetricsPanel />
 
       {/* KPI strip */}
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">

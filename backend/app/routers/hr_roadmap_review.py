@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from ..auth_deps import require_admin_or_hr
 from ..db import SessionLocal
@@ -73,6 +73,46 @@ def _load_or_create(db, case_id: str) -> RoadmapReviewStatus:
         row = RoadmapReviewStatus(case_id=case_id)
         db.add(row)
     return row
+
+
+def is_roadmap_pending_review(case_id: str) -> bool:
+    """Is this roadmap still waiting on HR?
+
+    FAILS OPEN — no review row, or a lookup error, means NOT pending. Same asymmetry as
+    the read path: we only ever hold something back when we positively know HR withheld
+    it. 47 live cases have a roadmap and no review row; a gate that guessed "pending"
+    would lock every one of those employees out of their own tasks.
+    """
+    try:
+        with SessionLocal() as db:
+            row = db.get(RoadmapReviewStatus, case_id)
+            if row is None:
+                return False
+            return not bool(row.released_to_user)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("roadmap action gate: lookup failed for %s (%s); allowing", case_id, exc)
+        return False
+
+
+def assert_roadmap_released(case_id: str) -> None:
+    """Block an EMPLOYEE action on a roadmap HR hasn't approved yet.
+
+    The employee can freely READ their plan — exploring it is reassuring and costs
+    nothing. What they cannot do is act on a plan that may still change: HR can send it
+    back for regeneration, and work done against a superseded plan is wasted (or worse,
+    wrong). So reads are open and writes wait.
+
+    409 (not 403): this is a state conflict, not a permissions problem. The employee is
+    entitled to act — just not yet.
+    """
+    if is_roadmap_pending_review(case_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Your HR team is still reviewing this plan. You can explore it now — "
+                "your tasks unlock once they approve it."
+            ),
+        )
 
 
 @router.get("/{case_id}/roadmap-review", response_model=RoadmapReviewDTO)
@@ -145,3 +185,91 @@ def _invalidate(case_id: str) -> None:
         invalidate_relocation_plan_cache(case_id)
     except Exception as exc:  # noqa: BLE001 — a stale cache must not fail the decision
         log.warning("hr roadmap review: cache invalidation failed for %s: %s", case_id, exc)
+
+
+# ── Ops metrics ──────────────────────────────────────────────────────────────────────
+
+metrics_router = APIRouter(prefix="/api/admin/roadmap-review", tags=["hr-roadmap-review"])
+
+_METRICS_SQL = text(
+    """
+    SELECT
+      count(*) FILTER (WHERE released_to_user IS FALSE)                              AS pending_review,
+      count(*) FILTER (WHERE released_to_user IS FALSE AND notified_at IS NOT NULL)  AS pending_and_notified,
+      count(*) FILTER (WHERE notify_status = 'unreachable')                          AS unreachable,
+      count(*) FILTER (WHERE notify_status IN ('failed', 'error'))                   AS undelivered,
+      count(*) FILTER (WHERE notify_status = 'no_key')                               AS no_key,
+      count(*) FILTER (WHERE notify_status = 'sent')                                 AS sent,
+      EXTRACT(EPOCH FROM (now() - min(updated_at) FILTER (WHERE released_to_user IS FALSE))) / 3600.0
+                                                                                     AS oldest_pending_age_hours
+    FROM public.roadmap_review_status
+    """
+)
+
+_UNREACHABLE_SQL = text(
+    """
+    SELECT case_id FROM public.roadmap_review_status
+    WHERE notify_status = 'unreachable' ORDER BY updated_at DESC LIMIT 50
+    """
+)
+
+
+class RoadmapReviewMetrics(BaseModel):
+    pending_review: int = 0
+    pending_and_notified: int = 0
+    #: Cases where HR is waiting but was NEVER told — because no HR contact resolves at
+    #: all. The employee is blocked and nobody knows. This is the number that must never
+    #: be hidden: a silent skip looks exactly like a successful send.
+    unreachable: int = 0
+    unreachable_case_ids: list[str] = []
+    #: Send attempted and failed. Not retried (instant-fire has no sweep) — but visible.
+    undelivered: int = 0
+    no_key: int = 0
+    sent: int = 0
+    oldest_pending_age_hours: Optional[float] = None
+    #: pending_review - pending_and_notified: HR is waiting and has NOT been told.
+    pending_unnotified: int = 0
+
+
+@metrics_router.get("/metrics", response_model=RoadmapReviewMetrics)
+def roadmap_review_metrics(
+    _admin: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> RoadmapReviewMetrics:
+    """Does the HR-notification actually work? These are the numbers that answer it."""
+    with SessionLocal() as db:
+        row = db.execute(_METRICS_SQL).fetchone()
+        unreachable_ids = [str(r[0]) for r in db.execute(_UNREACHABLE_SQL).fetchall()]
+
+    m = row._mapping if row else {}
+    pending = int(m.get("pending_review") or 0)
+    notified = int(m.get("pending_and_notified") or 0)
+    age = m.get("oldest_pending_age_hours")
+    return RoadmapReviewMetrics(
+        pending_review=pending,
+        pending_and_notified=notified,
+        pending_unnotified=max(0, pending - notified),
+        unreachable=int(m.get("unreachable") or 0),
+        unreachable_case_ids=unreachable_ids,
+        undelivered=int(m.get("undelivered") or 0),
+        no_key=int(m.get("no_key") or 0),
+        sent=int(m.get("sent") or 0),
+        oldest_pending_age_hours=round(float(age), 1) if age is not None else None,
+    )
+
+
+@metrics_router.post("/notify/{case_id}")
+def trigger_notification(
+    case_id: str,
+    dry_run: bool = False,
+    to_override: Optional[str] = None,
+    _admin: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """Manually (re-)run the HR notification for a case.
+
+    `dry_run=true` resolves the recipient and renders the email without sending — the way
+    to verify the wiring in production without mailing a real person. Mirrors the
+    dry_run/to_override escape hatches on the HR mobility briefing cron.
+    """
+    from ..services.roadmap_review_notification import notify_hr_roadmap_pending
+
+    return notify_hr_roadmap_pending(case_id, dry_run=dry_run, to_override=to_override)
