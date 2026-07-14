@@ -64,8 +64,23 @@ the `pets_via_case` policy still subqueries `cases`.
 
 **Fix (this PR):** move each cross-table lookup into a `SECURITY DEFINER` helper
 (`user_owns_case_row`, `user_provider_ids`; HR path reuses existing `hr_company_ids()`) — the
-same pattern already used by `user_has_case_access` / `my_company_id`. The tenant-scoping
-predicate is copied verbatim, so isolation is unchanged; only the grant mechanism changes.
+same pattern already used by `my_company_id` / `my_role` / `hr_company_ids`.
+
+Isolation is unchanged, but the two paths differ in *how*:
+
+- **`pets`, `case_forms`** — predicate copied verbatim. `x IN (SELECT id FROM cases WHERE P)` is
+  rewritten as the logically equivalent `EXISTS (SELECT 1 FROM cases WHERE id = x AND P)`.
+- **`provider_tasks_hr_all`** — predicate *substituted*, not copied. The original inlined
+  `org_id IN (SELECT hr_users.company_id WHERE profile_id = auth.uid())`; we reuse the existing
+  `hr_company_ids()` helper, which resolves the same set via `profile_id = (select auth.uid())::text`.
+  Same intent, different expression.
+
+The replacement policies are also narrowed to `TO authenticated` (the originals had no `TO` clause,
+i.e. `TO public`). Harmless in practice — the backend connects as `service_role`, which bypasses RLS.
+
+Both helpers `REVOKE ALL ... FROM public` before granting to `authenticated, service_role`, so
+neither becomes an anon-callable PostgREST RPC endpoint.
+
 Migration `supabase/migrations/20260911000000_fix_case_scoped_rls_secdef.sql`.
 
 **Validated (rollback tx):** post-fix, `pets`/`case_forms`/`provider_tasks` reads no longer error;

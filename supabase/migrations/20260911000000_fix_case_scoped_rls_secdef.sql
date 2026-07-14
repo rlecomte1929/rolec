@@ -16,11 +16,19 @@
 -- still fails.
 --
 -- Fix: move each cross-table lookup into a SECURITY DEFINER helper (the pattern
--- already used by user_has_case_access / my_company_id / hr_company_ids), so the
--- lookup runs as the function owner and needs no caller grant. The tenant-scoping
--- PREDICATE is copied verbatim from the original policies — isolation is
--- unchanged, only the mechanism. Validated: C0 HR still sees exactly their own
--- case_forms (46 of 67), zero cross-tenant. Idempotent.
+-- already used by my_company_id / my_role / hr_company_ids), so the lookup runs
+-- as the function owner and needs no caller grant.
+--
+-- Isolation is unchanged. For pets + case_forms the tenant-scoping predicate is
+-- copied verbatim (`x IN (SELECT id FROM cases WHERE P)` is rewritten as the
+-- equivalent `EXISTS (SELECT 1 FROM cases WHERE id = x AND P)`). For
+-- provider_tasks_hr_all the predicate is *substituted*, not copied: the original
+-- inlined `org_id IN (SELECT hr_users.company_id WHERE profile_id = auth.uid())`,
+-- and we reuse the existing hr_company_ids() helper, which resolves the same set
+-- via `profile_id = (select auth.uid())::text`. Same intent, different expression.
+--
+-- Validated: C0 HR still sees exactly their own case_forms (46 of 67), zero
+-- cross-tenant. Idempotent.
 
 -- 1. Case-ownership helper for pets + case_forms (verbatim of the old inline predicate).
 CREATE OR REPLACE FUNCTION public.user_owns_case_row(p_case_id uuid)
@@ -35,7 +43,11 @@ AS $$
                  AND public.my_role() = ANY (ARRAY['hr','admin']) ) )
   );
 $$;
-GRANT EXECUTE ON FUNCTION public.user_owns_case_row(uuid) TO authenticated;
+-- Postgres grants EXECUTE to PUBLIC by default, which would expose this as an
+-- anon-callable PostgREST RPC (/rest/v1/rpc/user_owns_case_row). Revoke first,
+-- then grant narrowly — same shape as hr_company_ids() in 20260531010000.
+REVOKE ALL ON FUNCTION public.user_owns_case_row(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.user_owns_case_row(uuid) TO authenticated, service_role;
 
 -- 2. Provider-membership helper for provider_tasks (verbatim of the old inline predicate).
 CREATE OR REPLACE FUNCTION public.user_provider_ids()
@@ -47,7 +59,8 @@ AS $$
   JOIN public.vendor_users vu ON vu.vendor_id = p.vendor_id
   WHERE vu.user_id = (SELECT auth.uid());
 $$;
-GRANT EXECUTE ON FUNCTION public.user_provider_ids() TO authenticated;
+REVOKE ALL ON FUNCTION public.user_provider_ids() FROM public;
+GRANT EXECUTE ON FUNCTION public.user_provider_ids() TO authenticated, service_role;
 
 -- 3. pets — replace the cases-subquery policy with the helper.
 DROP POLICY IF EXISTS pets_via_case ON public.pets;
