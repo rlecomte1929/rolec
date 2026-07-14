@@ -4710,6 +4710,24 @@ def assign_case(
                 home_country=case.get("home_country"),
             )
 
+        # TD-FIX-7 (AIQ-1510): pin a test-drive case to the corridor its session was
+        # assigned. The tester still creates the company and assigns the case — only the
+        # route is fixed, so the workflow under test stays intact. Resolves via the
+        # acting HR account's test_sessions row; a real HR user has none, so this is a
+        # no-op for them and they keep full freedom of route. Best-effort: a stamp
+        # failure must never break the assignment.
+        try:
+            from .app.services.test_drive_corridor import resolve_test_drive_route
+            td_route = resolve_test_drive_route(effective)
+            if td_route:
+                db.set_relocation_case_route(case_id, **td_route)
+                log.info(
+                    "assign_case: test-drive corridor locked case=%s route=%s->%s",
+                    case_id, td_route["home_country"], td_route["host_country"],
+                )
+        except Exception:
+            log.warning("assign_case: test-drive corridor lock failed case=%s", case_id, exc_info=True)
+
         # [HR-sets-level] Persist an HR-supplied seniority band onto the case profile
         # so benefit comparison can target the employee's level (matrix caps are
         # level-gated; a level-less case shows an empty comparison). Normalized to the

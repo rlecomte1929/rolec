@@ -43,6 +43,7 @@ from sqlalchemy import text
 from ... import db_config
 from ...database import db
 from ...rate_limit import limiter
+from ..services.test_drive_corridor import LOCKED_CORRIDORS
 from .auth import _dispatch_supabase_sync, _pwd_context
 
 router = APIRouter(prefix="/api/test-drive", tags=["test-drive"])
@@ -52,7 +53,9 @@ logger = logging.getLogger(__name__)
 _RATE_LIMIT = os.getenv("RELOPASS_TEST_DRIVE_RATE_LIMIT", "5/minute;60/hour")
 _IS_SQLITE = (db_config.DATABASE_URL or "").startswith("sqlite")
 
-_LOCKED_CORRIDORS = ["FR_NO", "IN_DE", "GB_US", "NL_SG", "ES_AE"]
+# TD-FIX-7 (AIQ-1510): the locked set is defined once, alongside the concrete route each
+# id pins a case to, so the provisioner's whitelist and the corridor guard cannot drift.
+_LOCKED_CORRIDORS = LOCKED_CORRIDORS
 _CORRIDOR_WEIGHTS = {"FR_NO": 0.35, "IN_DE": 0.35, "GB_US": 0.10, "NL_SG": 0.10, "ES_AE": 0.10}
 
 

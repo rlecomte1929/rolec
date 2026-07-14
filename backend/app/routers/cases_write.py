@@ -48,6 +48,7 @@ from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.requirements_builder import compute_case_requirements
 from ..services.research import run_country_research
+from ..services.test_drive_corridor import resolve_test_drive_route
 from ..services.trigger_engine import fire_roadmap_events
 from ...database import db as main_db
 
@@ -119,6 +120,23 @@ def patch_case(
         # Filter out None sections so partial payloads (e.g. from E2E runner) don't
         # overwrite existing draft sections with null.
         incoming = {k: v for k, v in patch.model_dump(mode="json").items() if v is not None}
+        # TD-FIX-7 (AIQ-1510): a test-drive case is pinned to its session's corridor.
+        # This is the real tamper surface — the employee intake submits the route here,
+        # and a UI lock can be bypassed — so whatever the client sent for origin/
+        # destination is overridden server-side. Applied to `incoming` (before the
+        # create-vs-merge branch below) so it also covers the create-on-missing path,
+        # which skips _assert_case_access. resolve_test_drive_route returns None for
+        # every real user, leaving their route untouched.
+        if incoming.get("relocationBasics"):
+            td_route = resolve_test_drive_route(user)
+            if td_route:
+                incoming["relocationBasics"] = {
+                    **incoming["relocationBasics"],
+                    "originCountry": td_route["home_country"],
+                    "originCity": td_route["home_city"],
+                    "destCountry": td_route["host_country"],
+                    "destCity": td_route["host_city"],
+                }
         case = crud.get_case(db, case_id)
         if not case:
             # SEC-CASES-2: create-on-missing path — authentication (above) is the

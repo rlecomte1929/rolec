@@ -395,12 +395,24 @@ export const TestDrivePage: React.FC = () => {
 const CredentialResult: React.FC<{
   result: ProvisionSuccess;
   onComplete: (sessionId: string, link: string) => void;
-}> = ({ result, onComplete }) => (
+}> = ({ result, onComplete }) => {
+  // TD-FIX-7 (AIQ-1510): name the assigned route again right where the tester picks up
+  // their logins. The route is already pinned on the case, so this is a statement of
+  // fact, not an instruction. Plain text — no emphasis on any word.
+  const corridor = TEST_DRIVE_CORRIDORS[result.corridorId];
+  return (
   <div>
     <SectionHeader title={c.credentials.header} align="center" narrow />
     <Alert variant="info" className="mt-6">
       {c.credentials.note}
     </Alert>
+    {corridor && (
+      <p className="mt-4 text-center text-marketing-body text-marketing-text">
+        {c.credentials.corridorNote
+          .replace('{origin}', corridor.origin)
+          .replace('{destination}', corridor.destination)}
+      </p>
+    )}
     <div className="mt-6 grid gap-6 md:grid-cols-2">
       <CredentialCard
         title={c.credentials.hr.title}
@@ -428,7 +440,8 @@ const CredentialResult: React.FC<{
       </CTAButton>
     </div>
   </div>
-);
+  );
+};
 
 const CredentialCard: React.FC<{
   title: string;

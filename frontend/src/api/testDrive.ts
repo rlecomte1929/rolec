@@ -175,6 +175,30 @@ export type TestDriveStage =
   | 'roadmap-reached'
   | 'vendor-selected';
 
+export type TestDriveSlice = {
+  session_id?: string;
+  corridor_id?: string;
+  tester_segment?: string;
+  campaign?: string;
+};
+
+/**
+ * The active test-drive session stashed by TestDrivePage at provision, or null.
+ * Returns null for every real user — this is the app's only client-side signal that
+ * the current browser is running a test drive. Browser-local and therefore NOT a
+ * security control: it gates UI affordances only (TD-FIX-7 suppresses the intake's
+ * "unlock" escape hatch with it). The corridor itself is enforced server-side.
+ */
+export function getTestDriveSession(): TestDriveSlice | null {
+  try {
+    const raw = localStorage.getItem(TEST_DRIVE_LS_KEY);
+    const slice = raw ? (JSON.parse(raw) as TestDriveSlice) : null;
+    return slice?.session_id ? slice : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Emit a mid-journey funnel event for the active test-drive session, if any. The tester
  * runs the HR + employee journeys logged in as the seeded @probe.test accounts in the
@@ -183,19 +207,7 @@ export type TestDriveStage =
  * users this does nothing. Fire-and-forget; best-effort via recordTestDriveEvent.
  */
 export function emitTestDriveStage(stage: TestDriveStage): void {
-  type TestDriveSlice = {
-    session_id?: string;
-    corridor_id?: string;
-    tester_segment?: string;
-    campaign?: string;
-  };
-  let slice: TestDriveSlice | null = null;
-  try {
-    const raw = localStorage.getItem(TEST_DRIVE_LS_KEY);
-    slice = raw ? (JSON.parse(raw) as TestDriveSlice) : null;
-  } catch {
-    slice = null;
-  }
+  const slice = getTestDriveSession();
   if (!slice?.session_id) return; // not a test-drive session — no-op for real users
   void recordTestDriveEvent({
     event_type: stage,

@@ -76,7 +76,10 @@ export const testDriveContent = {
     ],
     // TD-FIX-5 (AIQ-1506): shown inside the HR step once a corridor is assigned, so the
     // case can't drift off the route we measure. Tokenised — one page serves all corridors.
-    corridorInstruction: 'Set the case route to your assigned corridor: {origin} → {destination}.',
+    // TD-FIX-7 (AIQ-1510): the route is now pre-set and locked on the case (server-side),
+    // so this states the fact instead of asking the tester to set a route they have no
+    // field for. Plain text.
+    corridorInstruction: 'Your route is already set: {origin} → {destination}.',
   },
 
   aboutData: {
@@ -130,6 +133,9 @@ export const testDriveContent = {
       "Two logins, one relocation. Start with the HR account to set up the case, then switch to the employee account to run their side. You'll switch between these as you go.",
     hr: { title: 'HR account', caption: 'Start here — configure the case and hand it off.' },
     employee: { title: 'Employee account', caption: 'Then switch to this — complete intake and reach the roadmap.' },
+    // TD-FIX-7 (AIQ-1510): restate the assigned route at the moment the tester is about
+    // to act, so nobody goes looking for a route to choose. Tokenised; plain text.
+    corridorNote: 'Your test: {origin} → {destination} — already set for you.',
     // Testers sign in with the email (login accepts email or username); showing the
     // email keeps the identifier consistent with the sign-in field.
     emailLabel: 'Email',
