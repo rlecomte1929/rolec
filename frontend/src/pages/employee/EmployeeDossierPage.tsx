@@ -31,6 +31,16 @@ const DossierSuggestionsPanel = lazy(() =>
   })),
 );
 
+// Same AIQ-1264 reason: DestinationRequirements imports api/cases → api/client →
+// supabaseAuth → api/supabase, which calls createClient() at module scope and throws
+// "supabaseUrl is required" under jsdom. Static-importing it broke all four of this
+// page's unit tests. Lazy, like the panel above.
+const DestinationRequirements = lazy(() =>
+  import('../../features/platform-v2/dossier/DestinationRequirements').then((m) => ({
+    default: m.DestinationRequirements,
+  })),
+);
+
 type FilterTabKey = 'all' | 'action_needed' | 'blocked' | 'ready' | 'submitted';
 
 const FILTER_TABS: Array<{ key: FilterTabKey; label: string }> = [
@@ -269,6 +279,16 @@ export const EmployeeDossierPage: React.FC = () => {
               </Link>
             </div>
           </div>
+        )}
+
+        {/* What the destination actually requires — the missing half of this page.
+            The forms below are how you SATISFY a requirement; until now nothing said
+            what was required, or why. Nationality-gated, and it states a correct
+            answer of "none" rather than leaving an empty pillar. */}
+        {caseId && (
+          <Suspense fallback={<div className="mb-6 text-sm text-[#6b7280]">Loading requirements…</div>}>
+            <DestinationRequirements caseId={caseId} />
+          </Suspense>
         )}
 
         {/* Content-honesty disclaimer — form templates are representative, not
