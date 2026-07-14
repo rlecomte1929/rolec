@@ -14,16 +14,6 @@ import { ServicesFlowProvider } from './features/services/ServicesFlowContext';
 import { DemoBookingProvider } from './hooks/useDemoBooking';
 import { BookDemoModal } from './components/marketing/BookDemoModal';
 import { ROUTE_DEFS } from './navigation/routes';
-import { Landing } from './pages/Landing';
-import { PlatformPage } from './pages/public/PlatformPage';
-import { HowItWorksPage } from './pages/public/HowItWorksPage';
-import { GetStartedPage } from './pages/public/GetStartedPage';
-import { CompliancePage } from './pages/public/CompliancePage';
-import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
-import { AccessPage } from './pages/public/AccessPage';
-import { SecurityPage } from './pages/public/SecurityPage';
-import { PrivacyPage } from './pages/public/PrivacyPage';
-import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { AdminViewingCompanyProvider } from './features/admin/AdminViewingCompanyContext';
 // V2Gate removed — all promoted flags now render V2 unconditionally
@@ -31,12 +21,27 @@ import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
 import { RequireHrRoute } from './features/hr/RequireHrRoute';
 import { NotFoundRedirect } from './components/NotFoundRedirect';
 import { ROUTES as WIZARD_ROUTES } from './routes';
-import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { DebugAuth } from './pages/DebugAuth';
 import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { PerfPanel } from './components/PerfPanel';
 import { FeatureFlagProvider } from './lib/feature-flags.tsx';
+
+// AIQ-1519: public pages + Auth are lazy so they don't bloat the entry chunk.
+// These all land inside the existing <Suspense fallback={<RouteFallback />}> in App().
+// The async infrastructure is already present (151 other lazy() calls), so this
+// costs zero overhead while removing ~1500 lines of public-page code from the entry.
+const Landing = lazy(() => import('./pages/Landing').then((m) => ({ default: m.Landing })));
+const PlatformPage = lazy(() => import('./pages/public/PlatformPage').then((m) => ({ default: m.PlatformPage })));
+const HowItWorksPage = lazy(() => import('./pages/public/HowItWorksPage').then((m) => ({ default: m.HowItWorksPage })));
+const GetStartedPage = lazy(() => import('./pages/public/GetStartedPage').then((m) => ({ default: m.GetStartedPage })));
+const CompliancePage = lazy(() => import('./pages/public/CompliancePage').then((m) => ({ default: m.CompliancePage })));
+const WhyReloPassPage = lazy(() => import('./pages/public/WhyReloPassPage').then((m) => ({ default: m.WhyReloPassPage })));
+const AccessPage = lazy(() => import('./pages/public/AccessPage').then((m) => ({ default: m.AccessPage })));
+const SecurityPage = lazy(() => import('./pages/public/SecurityPage').then((m) => ({ default: m.SecurityPage })));
+const PrivacyPage = lazy(() => import('./pages/public/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
+const Auth = lazy(() => import('./pages/Auth').then((m) => ({ default: m.Auth })));
+const NavigationAudit = lazy(() => import('./pages/NavigationAudit').then((m) => ({ default: m.NavigationAudit })));
 
 // TD-3/TD-5: lazy-loaded so the public test-drive pages don't bloat the main entry chunk (bundle-size budget).
 const TestDrivePage = lazy(() => import('./pages/public/TestDrivePage').then((module) => ({ default: module.TestDrivePage })));
