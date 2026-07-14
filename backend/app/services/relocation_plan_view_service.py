@@ -40,6 +40,7 @@ from ...relocation_plan_service import (
 from ...relocation_plan_draft_normalize import profile_for_plan_derivation
 from ...relocation_plan_task_library import estimated_effort_for
 from .roadmap_lead_times import lead_time_days_for_phase  # [AIQ-1340]
+from .roadmap_requirement_copy import enrich_milestones_with_requirements
 from ...relocation_plan_status_derivation import (
     DerivationThresholds,
     RelocationPlanDerivationContext,
@@ -670,6 +671,16 @@ def get_relocation_plan_view_for_case_assignment(
             return cached
     milestones_started_at = time.perf_counter()
     milestones = db.list_case_milestones(case_id_effective, request_id=request_id)
+
+    # Overlay destination-specific copy from the requirements dossier: the roadmap said
+    # "Tax ID, social security, or host-country equivalents" while requirement_items,
+    # for this exact case, already knew it was the Sozialversicherung. Copy only —
+    # status/owner/dates/order are untouched — and it fails open, so a generic roadmap
+    # is the worst case. Cached like the rest of this view, so it costs one lookup per
+    # cache miss.
+    milestones = enrich_milestones_with_requirements(
+        case_id_effective, milestones, request_id=request_id
+    )
     milestones_ms = (time.perf_counter() - milestones_started_at) * 1000
 
     mobility_started_at = time.perf_counter()
