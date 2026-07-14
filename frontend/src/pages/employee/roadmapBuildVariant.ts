@@ -12,7 +12,13 @@ export type RoadmapBuildVariant = 'generating' | 'empty' | 'failed';
 export function resolveRoadmapBuildVariant(
   windowElapsed: boolean,
   hasError: boolean,
+  errorStatus?: number | null,
 ): RoadmapBuildVariant {
+  // A permission error will NEVER become a roadmap. Polling it for 60s while
+  // showing "We're building your roadmap — you'll get an email the moment it's
+  // ready, usually within 2 working days" promises something that cannot happen.
+  // 401/403 are terminal on arrival; everything else keeps the bounded retry.
+  if (hasError && (errorStatus === 401 || errorStatus === 403)) return 'failed';
   if (!windowElapsed) return 'generating';
   return hasError ? 'failed' : 'empty';
 }

@@ -203,7 +203,11 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     // Within the bounded window a transient error or empty plan both render as
     // "generating" (we keep retrying). Only after the window elapses do we show a
     // terminal state — persistent error → failed, empty plan → empty (AIQ-1377).
-    const variant = resolveRoadmapBuildVariant(windowElapsed, error != null);
+    // Pass the HTTP status: a 401/403 can never resolve into a roadmap, so it must
+    // not sit in the "we're building it" state for 60s promising an email.
+    const errorStatus =
+      (error as { response?: { status?: number } } | null)?.response?.status ?? null;
+    const variant = resolveRoadmapBuildVariant(windowElapsed, error != null, errorStatus);
     return (
       <AppShell>
         <div className="mx-auto max-w-5xl px-6 py-6">
