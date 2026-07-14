@@ -70,6 +70,10 @@ const STATUS_STYLES: Record<BudgetSummaryStatus, { label: string; className: str
     label: 'No company cap',
     className: 'bg-amber-50 text-amber-700 ring-amber-200',
   },
+  no_estimate: {
+    label: 'Pending estimate',
+    className: 'bg-slate-50 text-slate-600 ring-slate-200',
+  },
 };
 
 function StatusBadge({ status }: { status: BudgetSummaryStatus }) {

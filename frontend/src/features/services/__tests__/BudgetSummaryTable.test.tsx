@@ -31,14 +31,14 @@ const POPULATED_RESPONSE = {
       cap_amount: 2000,
       cap_currency: 'EUR',
       estimated_amount: null,
-      status: 'within_budget' as const,
+      status: 'no_estimate' as const,
     },
     {
       name: 'schools',
       cap_amount: 15000,
       cap_currency: 'EUR',
       estimated_amount: null,
-      status: 'within_budget' as const,
+      status: 'no_estimate' as const,
     },
     {
       name: 'movers',
@@ -97,8 +97,8 @@ describe('BudgetSummaryTable', () => {
     // computes real estimates — placeholder world per the audit spec.
     expect(screen.getAllByText('Not yet estimated').length).toBe(3);
 
-    // Status badges — within_budget x2 + no_cap x1.
-    expect(screen.getAllByText('Within budget').length).toBe(2);
+    // Status badges — no_estimate x2 (cap set, estimate pending) + no_cap x1.
+    expect(screen.getAllByText('Pending estimate').length).toBe(2);
     expect(screen.getByText('No company cap')).toBeInTheDocument();
   });
 

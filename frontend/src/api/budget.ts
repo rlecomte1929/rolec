@@ -12,7 +12,7 @@
 
 import api from './client';
 
-export type BudgetSummaryStatus = 'within_budget' | 'over_budget' | 'no_cap';
+export type BudgetSummaryStatus = 'within_budget' | 'over_budget' | 'no_cap' | 'no_estimate';
 
 export interface BudgetSummaryCategory {
   /** Service category key, e.g. 'housing', 'schools', 'movers'. */
@@ -23,7 +23,7 @@ export interface BudgetSummaryCategory {
   cap_currency: string;
   /** Estimated cost for this category. Backend returns null today (placeholder). */
   estimated_amount: number | null;
-  /** Within/over/no_cap. Defaults to 'within_budget' when cap exists + estimate null. */
+  /** within_budget | over_budget | no_cap | no_estimate (cap set but estimate pending). */
   status: BudgetSummaryStatus;
 }
 
