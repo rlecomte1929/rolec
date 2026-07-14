@@ -713,7 +713,12 @@ def dispatch_preview(
         )
     except Exception as exc:  # noqa: BLE001 — surface LLM failure clearly, never hang/500 opaquely
         log.warning("dispatch_preview engineer_task failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"Could not engineer the task: {exc}") from exc
+        # 422, NOT 502: Cloudflare fronts api.relopass.com and replaces an origin 502
+        # with its own text/plain "error code: 502" page, stripping both our JSON detail
+        # AND the CORS headers. The browser then blocks the cross-origin response and
+        # fetch() rejects, so the admin saw "Unable to reach the server" instead of the
+        # real reason. A 4xx passes through untouched, so the detail below is readable.
+        raise HTTPException(status_code=422, detail=f"Could not engineer the task: {exc}") from exc
 
     # ── Eval gate ────────────────────────────────────────────────────────────
     # Extract confirmed ground-truth signals from the browser diagnostics and
