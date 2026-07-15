@@ -8,11 +8,17 @@ import type { RelocationPlanCtaDTO, RelocationPlanCtaTypeWire } from '../../../t
 import type { RelocationPlanCtaNavigateContext, CtaNavigateTarget, RelocationTaskCtaSemantic } from './relocationPlanCtaTypes';
 import { relocationTaskCtaSemantic } from './relocationTaskCtaSemantic';
 
-// Staged unification (C1): intake-data tasks route to the canonical v2 intake, not
-// the legacy /wizard/:step. The v2 wizard resumes to the first incomplete step.
-// (PR3/D1 will further split upload tasks to a dedicated document surface.)
-function employeeCaseIntakeRoute(routeCaseId: string): string {
-  return buildRoute('employeeCaseIntake', { caseId: routeCaseId });
+// [AIQ-1547] Employee "do the work" surface for form/requirement tasks reached from
+// the roadmap. The roadmap is only shown once intake is submitted, so routing these
+// CTAs back to the intake wizard dead-ended on its last step (BUG-260715-A317: "all
+// the buttons are linked to the last page of the intake wizard … circular connection
+// with limited value"). Dossier & Forms lists the case's forms + destination
+// requirements and is where documents get generated — the useful landing the reporter
+// expected. An optional formHint focuses that form via the page's ?form=<key> param.
+function employeeCaseDossierTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {
+  const base = buildRoute('employeeCaseDossier', { caseId: ctx.routeCaseId.trim() });
+  const hint = (ctx.formHint ?? '').trim();
+  return { kind: 'internal', to: hint ? `${base}?form=${encodeURIComponent(hint)}` : base };
 }
 
 function employeeCaseSummary(routeCaseId: string): string {
@@ -80,9 +86,9 @@ function viewDetailsTargetForRole(ctx: RelocationPlanCtaNavigateContext, sem: Re
   }
 
   if (sem === 'view_requirements') {
-    // Requirements list lives in wizard step 5 today.
-    // TODO(relopass): dedicated employee requirements/compliance page when available.
-    return { kind: 'internal', to: employeeCaseIntakeRoute(aid) };
+    // [AIQ-1547] Requirements land on Dossier & Forms (forms + destination requirements),
+    // not the completed intake wizard's last step.
+    return employeeCaseDossierTarget(ctx);
   }
 
   // Employee "review_case" → intake summary (no separate employee case review route).
@@ -114,8 +120,9 @@ function completeWizardStepTarget(ctx: RelocationPlanCtaNavigateContext): CtaNav
     return { kind: 'internal', to: buildRoute('hrCaseSummary', { caseId: aid }) };
   }
 
-  // Wizard normalizes to first incomplete step when landing on `/wizard/1`.
-  return { kind: 'internal', to: employeeCaseIntakeRoute(aid) };
+  // [AIQ-1547] Employee form/data tasks reached from the roadmap land on Dossier & Forms,
+  // not the completed intake wizard (which dead-ended on its last step).
+  return employeeCaseDossierTarget(ctx);
 }
 
 function contactOrMessagesTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {
