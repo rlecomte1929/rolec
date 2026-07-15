@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Copy, Check, PlayCircle } from 'lucide-react';
 import { PublicLayout } from '../../components/public';
 import { Section, HeroSurface, SectionHeader, CTAButton, FadeIn } from '../../components/marketing';
@@ -413,6 +413,15 @@ const CredentialResult: React.FC<{
           .replace('{destination}', corridor.destination)}
       </p>
     )}
+    {/* AIQ-1539: a direct route to the login page, right beside the credentials. */}
+    <div className="mt-5 text-center">
+      <Link
+        to={c.credentials.signInHref}
+        className="inline-flex items-center justify-center rounded-lg bg-marketing-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2"
+      >
+        {c.credentials.signInCta}
+      </Link>
+    </div>
     <div className="mt-6 grid gap-6 md:grid-cols-2">
       <CredentialCard
         title={c.credentials.hr.title}
@@ -425,7 +434,11 @@ const CredentialResult: React.FC<{
         credential={result.employee}
       />
     </div>
-    <div className="mt-8 text-center">
+    {/* AIQ-1539: plain line — where the test ends, and that the survey is required. */}
+    <p className="mt-8 text-center text-marketing-body text-marketing-text leading-relaxed">
+      {c.credentials.doneNote}
+    </p>
+    <div className="mt-4 text-center">
       <CTAButton
         onClick={() =>
           onComplete(
