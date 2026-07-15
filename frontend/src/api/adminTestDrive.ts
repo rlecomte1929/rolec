@@ -59,18 +59,22 @@ export interface TestDriveOverview {
   testimonials: Testimonial[];
   corridor: string | null;
   segment: string | null;
+  campaign: string | null;
   generated_at: string;
 }
 
 export interface TestDriveSlice {
   corridor?: string;
   segment?: string;
+  // AIQ-1537: scope the dashboard to one campaign (defaults to the live campaign server-side).
+  campaign?: string;
 }
 
 function toQuery(params?: TestDriveSlice): string {
   const qs = new URLSearchParams();
   if (params?.corridor) qs.set('corridor', params.corridor);
   if (params?.segment) qs.set('segment', params.segment);
+  if (params?.campaign) qs.set('campaign', params.campaign);
   const q = qs.toString();
   return q ? `?${q}` : '';
 }

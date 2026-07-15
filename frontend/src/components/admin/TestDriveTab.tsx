@@ -62,19 +62,23 @@ export function TestDriveTab() {
   const [error, setError] = useState<string | null>(null);
   const [corridor, setCorridor] = useState<string>('');
   const [segment, setSegment] = useState<string>('');
+  // AIQ-1537: the dashboard is scoped to one campaign. Defaults to the live campaign so
+  // the just-wiped real campaign reads zero until real testers arrive; type another
+  // campaign (e.g. a qa-* run) to inspect it.
+  const [campaign, setCampaign] = useState<string>('insead-2026');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const slice = { corridor: corridor || undefined, segment: segment || undefined };
+      const slice = { corridor: corridor || undefined, segment: segment || undefined, campaign: campaign || undefined };
       setData(await getTestDriveOverview(slice));
     } catch {
       setError('Failed to load the Test-Drive dashboard.');
     } finally {
       setLoading(false);
     }
-  }, [corridor, segment]);
+  }, [corridor, segment, campaign]);
 
   useEffect(() => {
     void load();
@@ -83,7 +87,7 @@ export function TestDriveTab() {
   const exportContacts = async () => {
     const token = getAuthItem('relopass_token') || '';
     try {
-      const resp = await fetch(testDriveContactsCsvUrl({ corridor: corridor || undefined, segment: segment || undefined }), {
+      const resp = await fetch(testDriveContactsCsvUrl({ corridor: corridor || undefined, segment: segment || undefined, campaign: campaign || undefined }), {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!resp.ok) {
@@ -111,6 +115,17 @@ export function TestDriveTab() {
     <div className="space-y-6">
       {/* Slice controls + export */}
       <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label htmlFor="td-campaign" className="text-xs font-medium text-gray-500">Campaign</label>
+          <input
+            id="td-campaign"
+            type="text"
+            value={campaign}
+            onChange={(e) => setCampaign(e.target.value)}
+            placeholder="insead-2026"
+            className="w-40 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-[#1f8e8b] focus:outline-none focus:ring-2 focus:ring-[#1f8e8b]/30"
+          />
+        </div>
         <FilterRow label="Corridor" options={[{ v: '', l: 'All' }, ...CORRIDOR_IDS.map((id) => ({ v: id, l: corridorLabel(id) }))]}
           value={corridor} onChange={setCorridor} />
         <FilterRow label="Segment" options={[{ v: '', l: 'All' }, { v: 'prospect', l: 'Prospect' }, { v: 'internal', l: 'Internal' }]}

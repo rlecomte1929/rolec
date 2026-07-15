@@ -53,9 +53,19 @@ def _safe(fn: Callable[[], Any], default: Any) -> Any:
         return default
 
 
-def _slice(corridor: Optional[str], segment: Optional[str]) -> Tuple[List[str], Dict[str, Any]]:
-    clauses: List[str] = []
-    params: Dict[str, Any] = {}
+def _resolve_campaign(campaign: Optional[str]) -> str:
+    """AIQ-1537: the campaign every dashboard panel is scoped to. Defaults to the live
+    campaign (RELOPASS_TEST_DRIVE_CAMPAIGN, else 'insead-2026') so the wiped real campaign
+    reads zero until real testers arrive — QA/debug campaigns no longer bleed into it."""
+    return (campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+
+
+def _slice(corridor: Optional[str], segment: Optional[str], campaign: str) -> Tuple[List[str], Dict[str, Any]]:
+    # AIQ-1537: always scope to ONE campaign. The TD tables (test_sessions, funnel_events,
+    # survey_responses) each carry a `campaign` column; without this clause every panel
+    # aggregates all campaigns (real + QA + prior debug runs) into one misleading set.
+    clauses: List[str] = ["campaign = :campaign"]
+    params: Dict[str, Any] = {"campaign": campaign}
     if corridor:
         clauses.append("corridor_id = :corridor")
         params["corridor"] = corridor
@@ -84,9 +94,11 @@ def _rows(sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
 def test_drive_overview(
     corridor: Optional[str] = Query(None),
     segment: Optional[str] = Query(None),
+    campaign: Optional[str] = Query(None),
     _admin: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
-    clauses, params = _slice(corridor, segment)
+    campaign_id = _resolve_campaign(campaign)
+    clauses, params = _slice(corridor, segment, campaign_id)
 
     def count(table: str, extra: str = "", extra_params: Optional[Dict[str, Any]] = None) -> int:
         val = _scalar("SELECT count(*) FROM " + table + _where(clauses, extra), {**params, **(extra_params or {})})
@@ -194,6 +206,7 @@ def test_drive_overview(
         "testimonials": _safe(testimonials, []),
         "corridor": corridor,
         "segment": segment,
+        "campaign": campaign_id,
         "generated_at": datetime.utcnow().isoformat(),
     }
 
@@ -244,10 +257,11 @@ def record_invites_sent(
 def test_drive_contacts_csv(
     corridor: Optional[str] = Query(None),
     segment: Optional[str] = Query(None),
+    campaign: Optional[str] = Query(None),
     _admin: Dict[str, Any] = Depends(require_admin),
 ) -> StreamingResponse:
     """Consented contact list: pilot leads + consented referrals + consented testimonial authors."""
-    clauses, params = _slice(corridor, segment)
+    clauses, params = _slice(corridor, segment, _resolve_campaign(campaign))
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["type", "name", "email_or_contact", "company_role", "sector", "corridor", "interest", "note"])
