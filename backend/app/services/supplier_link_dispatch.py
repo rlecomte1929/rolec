@@ -38,6 +38,11 @@ APP_BASE_URL = os.getenv("APP_BASE_URL", "https://relopass.com")
 EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@relopass.com")
 
 NO_ADDRESS = "no contact email on record"
+# AIQ-1533 — a catalog address is only dispatchable once its provenance is verified.
+# The employee's RFQ carries their move details (route, dates, household); sending that to an
+# unverified, scraped address is a data-protection problem, not just a bounce. HR's explicit
+# override sets verified=True at the call site — a human taking responsibility for the address.
+UNVERIFIED_ADDRESS = "supplier contact not verified"
 # Personal / webmail domains that should never appear as a supplier contact.
 # These indicate a placeholder was entered during catalog setup. Update the
 # catalog row with the supplier's actual business address instead.
@@ -130,7 +135,7 @@ def resolve_rfq_targets(rfq_id: str) -> List[Dict[str, Any]]:
         rows = conn.execute(
             text(
                 "SELECT r.id AS recipient_id, r.vendor_id, s.name AS supplier_name, "
-                "       s.contact_email "
+                "       s.contact_email, s.verified "
                 "  FROM rfq_recipients r "
                 "  LEFT JOIN suppliers s ON s.id = r.vendor_id "
                 " WHERE r.rfq_id = :rfq"
@@ -144,6 +149,7 @@ def resolve_rfq_targets(rfq_id: str) -> List[Dict[str, Any]]:
             "vendor_id": str(r["vendor_id"]),
             "supplier_name": r["supplier_name"] or str(r["vendor_id"]),
             "email": (r["contact_email"] or "").strip() or None,
+            "verified": bool(r["verified"]),
         }
         for r in rows
     ]
@@ -208,6 +214,22 @@ def dispatch_supplier_links(
                 "ok": False,
                 "sent": False,
                 "error": f"placeholder email detected (@{_domain}); update the supplier catalog",
+            })
+            continue
+        # Guard: an address is only dispatchable once its provenance is verified. A scraped or
+        # crowd-sourced address with verified=False stays uncontacted — an honest gap the UI already
+        # surfaces (AIQ-1521 not_contacted) rather than a guess we mail the employee's details to.
+        if not target.get("verified"):
+            log.warning(
+                "AIQ-1533 dispatch skipped — unverified supplier address "
+                "rfq=%s recipient=%s", rfq_id, target.get("recipient_id"),
+            )
+            results.append({
+                "recipient_id": target.get("recipient_id"),
+                "supplier_name": name,
+                "ok": False,
+                "sent": False,
+                "error": UNVERIFIED_ADDRESS,
             })
             continue
 
