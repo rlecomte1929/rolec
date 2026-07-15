@@ -182,6 +182,45 @@ export interface EngineeredTask {
   status: string;
 }
 
+/** Structured result from the eval gate that scores a generated task before Notion dispatch. */
+export interface EvalGateResult {
+  score: number;
+  issues: string[];
+  warnings: string[];
+  passed: boolean;
+}
+
+/**
+ * Thrown by dispatchCreate when the backend eval gate blocks the task (422 quality gate).
+ * Carries the structured EvalGateResult so the UI can render issues and offer remediation.
+ */
+export class EvalGateError extends Error {
+  readonly evalResult: EvalGateResult;
+  constructor(message: string, evalResult: EvalGateResult) {
+    super(message);
+    this.name = 'EvalGateError';
+    this.evalResult = evalResult;
+  }
+}
+
+/**
+ * Extract an EvalGateResult from an API error. The native-fetch client stores the parsed
+ * response body in `err.detail` (via buildApiError). The body is `{detail: {error, eval}}`.
+ */
+function tryExtractEvalGate(err: unknown): EvalGateResult | null {
+  // Native-fetch client puts parsed body into err.detail
+  const detail = (err as { detail?: { eval?: EvalGateResult } }).detail;
+  if (detail?.eval && typeof detail.eval.score === 'number') return detail.eval;
+  // Fallback: err.message might be the stringified detail object
+  if (err instanceof Error) {
+    try {
+      const parsed = JSON.parse(err.message) as { eval?: EvalGateResult };
+      if (parsed.eval && typeof parsed.eval.score === 'number') return parsed.eval;
+    } catch { /* not JSON */ }
+  }
+  return null;
+}
+
 /** Save the admin's per-item dispatch context (required before dispatch). */
 export async function saveDispatchContext(
   stream: FeedbackStream,
@@ -196,21 +235,24 @@ export async function saveDispatchContext(
  * The backend caps at 55 s (single attempt, no retries). We add a 65 s client-side
  * AbortController so the UI receives a clear "timed out" message rather than the
  * generic "Unable to reach the server" that raw fetch throws on a dropped connection.
+ *
+ * Returns the engineered task AND the eval gate result (score, issues, warnings) so the
+ * admin can see quality signals before deciding whether to dispatch.
  */
 export async function dispatchPreview(
   stream: FeedbackStream,
   itemId: string,
   input: { text?: string | null; category?: string },
-): Promise<EngineeredTask> {
+): Promise<{ task: EngineeredTask; evalResult?: EvalGateResult }> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 65_000);
   try {
-    const data = await apiPost<{ task: EngineeredTask }>(
+    const data = await apiPost<{ task: EngineeredTask; eval?: EvalGateResult }>(
       `/api/admin/feedback/${stream}/${itemId}/dispatch/preview`,
       { text: input.text ?? '', category: input.category ?? 'bug' },
       { signal: ac.signal },
     );
-    return data.task;
+    return { task: data.task, evalResult: data.eval };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('Task spec generation timed out — please try again.');
@@ -221,13 +263,34 @@ export async function dispatchPreview(
   }
 }
 
-/** Create the Notion AI Work Queue page from the reviewed task; returns its URL. */
+/** Create the Notion AI Work Queue page from the reviewed task; returns its URL.
+ *
+ * Set `forceDispatch=true` to bypass the eval gate quality check (admin override).
+ * Throws `EvalGateError` when the gate blocks and `forceDispatch` is false — the error
+ * carries the structured eval result so the UI can display issues and offer remediation.
+ */
 export async function dispatchCreate(
   stream: FeedbackStream,
   itemId: string,
   task: EngineeredTask,
+  forceDispatch?: boolean,
 ): Promise<{ dispatched: boolean; url: string; dispatch_ref: string; notion_url?: string; already_exists?: boolean }> {
-  return apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, { task, confirm: true });
+  try {
+    return await apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, {
+      task,
+      confirm: true,
+      force_dispatch: forceDispatch ?? false,
+    });
+  } catch (err) {
+    const evalResult = tryExtractEvalGate(err);
+    if (evalResult && !evalResult.passed) {
+      const errMsg =
+        (err as { detail?: { error?: string } }).detail?.error
+        ?? 'Task did not pass quality gate.';
+      throw new EvalGateError(errMsg, evalResult);
+    }
+    throw err;
+  }
 }
 
 // ── Trigger fix (skill handoff) + Auto-attempt (autofix pipeline) ─────────────
