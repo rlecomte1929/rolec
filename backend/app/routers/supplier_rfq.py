@@ -250,8 +250,11 @@ def send_supplier_links(
             continue
         targets.append({
             **base,
-            # An explicitly supplied address wins over the catalog's.
+            # An explicitly supplied address wins over the catalog's. When HR types an address
+            # here they are the human verification for it, so it clears the dispatch verified-gate
+            # (AIQ-1533); falling back to the catalog keeps the catalog row's own verified flag.
             "email": str(target.email) if target.email else base.get("email"),
+            "verified": True if target.email else base.get("verified", False),
             "supplier_name": target.supplier_name or base.get("supplier_name"),
         })
 
