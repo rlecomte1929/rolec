@@ -227,6 +227,27 @@ def weekly_mobility_status(request: Request) -> Dict[str, Any]:
     return {"ok": True, **result}
 
 
+@router.post("/roadmap-review-notify")
+def roadmap_review_notify(request: Request, dry_run: bool = False) -> Dict[str, Any]:
+    """
+    [AIQ-1526] Safety-net for the instant-fire HR roadmap-review notification
+    (scheduled hourly via GitHub Actions / .github/workflows/roadmap-review-notify.yml).
+
+    A held roadmap normally emails its HR owner the moment it's generated. But if
+    that build HANGS, the notify never fires and the employee sits blocked with
+    nobody told. This sweep finds roadmaps that are held, never successfully
+    notified, and real (have milestones — excludes purged-case E2E orphans), and
+    re-runs the same idempotent notify. An already-notified case is a no-op, so
+    re-runs never re-mail. Never raises; with no RESEND_API_KEY sends are logged.
+    """
+    _verify_cron_secret(request)
+    log.info("roadmap_review_notify cron triggered (dry_run=%s)", dry_run)
+    from ..services.roadmap_review_sweep import run_roadmap_review_notify_sweep
+
+    result = run_roadmap_review_notify_sweep(dry_run=dry_run)
+    return {"ok": True, **result}
+
+
 @router.post("/process-crawl-schedules")
 def process_crawl_schedules(request: Request) -> Dict[str, Any]:
     """

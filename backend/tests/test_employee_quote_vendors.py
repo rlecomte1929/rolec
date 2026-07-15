@@ -1,11 +1,13 @@
-"""[AIQ-1514] The employee's shortlisted vendors must survive the quote request.
+"""[AIQ-1525] The employee `quote_requests` WRITE path is retired.
 
-The bug: ServicesRfqNew.tsx let the employee shortlist specific vendors, then sent only
-`service_categories` plus a free-text `notes` blob. `quote_requests` had no vendor column,
-so the choice was discarded at the API boundary and HR never learned who was picked.
+The employee-led request model is consolidated onto the canonical RFQ system: employees
+now submit a vendor shortlist via POST /api/rfqs (writes rfqs + rfq_recipients). The old
+POST /api/employee/quote-requests write path — including the AIQ-1514 vendor round-trip it
+used to carry — is retired to a 410 tombstone. The table and its historical rows stay
+readable so nothing is orphaned.
 
-These tests pin the contract: the vendors go in, they come back out, and the pre-existing
-empty-selection 422 does not regress.
+These tests pin that contract: the write path returns 410, and the read path still returns
+existing rows.
 """
 from __future__ import annotations
 
@@ -16,7 +18,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker  # noqa: F401 — parity with sibling fixtures
 from sqlalchemy.pool import StaticPool
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -59,79 +61,43 @@ def client(engine, monkeypatch):
     monkeypatch.setattr(employee_quotes.db, "engine", engine, raising=False)
     monkeypatch.setattr(employee_quotes.db, "get_profile_record",
                         lambda uid: {"company_id": "co-1"}, raising=False)
-    monkeypatch.setattr(employee_quotes, "insert_audit_log", lambda *a, **k: None, raising=False)
-    # The roadmap side-effect is best-effort in prod; neutralise it here.
-    monkeypatch.setattr(employee_quotes, "advance_quote_step", lambda *a, **k: None, raising=False)
-
     app = FastAPI()
     app.include_router(employee_quotes.router)
     app.dependency_overrides[get_current_user] = lambda: EMPLOYEE
     return TestClient(app)
 
 
-TWO_VENDORS = [
-    {"service_category": "movers", "item_id": "ext-crown-1", "name": "Crown Relocations"},
-    # An HR-added vendor has no master row — its id is synthesised. Must round-trip too.
-    {"service_category": "housing", "item_id": "hr-custom-abc123", "name": "Local Agent"},
-]
+def _seed_row(engine, *, row_id="qr-legacy-1", employee_id="emp-1"):
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO quote_requests "
+                "(id, case_id, employee_id, company_id, service_categories, notes, "
+                " budget_range, status, created_at, updated_at, vendors) "
+                "VALUES (:id, 'case-1', :emp, 'co-1', 'movers,housing', 'legacy note', "
+                " NULL, 'pending', '2026-06-01T00:00:00', '2026-06-01T00:00:00', '[]')"
+            ),
+            {"id": row_id, "emp": employee_id},
+        )
 
 
-def test_shortlisted_vendors_are_persisted_and_returned(client):
-    """THE regression: the employee picks 2 vendors -> both survive the round trip."""
+def test_write_path_is_retired_410(client):
+    """The employee quote-request write path is retired — submit via POST /api/rfqs."""
     r = client.post("/api/employee/quote-requests", json={
         "case_id": "case-1",
         "service_categories": ["movers", "housing"],
-        "vendors": TWO_VENDORS,
+        "vendors": [{"service_category": "movers", "item_id": "ext-crown-1", "name": "Crown"}],
     })
-    assert r.status_code == 201, r.text
-    body = r.json()
-    assert body["vendors"] == TWO_VENDORS, "the employee's vendor choice was dropped"
+    assert r.status_code == 410, r.text
+    assert "/api/rfqs" in r.json()["detail"]
 
-    # And it is readable back, not just echoed from the request.
+
+def test_existing_rows_remain_readable(client, engine):
+    """Retiring the write must not orphan the 51 legacy rows — the reader still returns them."""
+    _seed_row(engine)
     listed = client.get("/api/employee/quote-requests")
     assert listed.status_code == 200, listed.text
-    assert listed.json()[0]["vendors"] == TWO_VENDORS
-
-
-def test_hr_custom_vendor_id_survives(client):
-    """'hr-custom-<id>' vendors have no service_catalog_items row — the id must not be
-    mangled or dropped in favour of a lookup that would fail."""
-    client.post("/api/employee/quote-requests", json={
-        "case_id": "case-1",
-        "service_categories": ["housing"],
-        "vendors": [TWO_VENDORS[1]],
-    })
-    got = client.get("/api/employee/quote-requests").json()[0]["vendors"]
-    assert got[0]["item_id"] == "hr-custom-abc123"
-
-
-def test_empty_service_categories_still_422(client):
-    """Pre-existing behaviour — an empty selection is blocked. Must not regress."""
-    r = client.post("/api/employee/quote-requests", json={
-        "case_id": "case-1", "service_categories": [], "vendors": [],
-    })
-    assert r.status_code == 422
-
-
-def test_legacy_client_without_vendors_still_succeeds(client):
-    """A client that sends no `vendors` key (i.e. the old frontend) must keep working,
-    and read back as an honest empty list — not a fabricated one."""
-    r = client.post("/api/employee/quote-requests", json={
-        "case_id": "case-1", "service_categories": ["movers"],
-    })
-    assert r.status_code == 201, r.text
-    assert r.json()["vendors"] == []
-
-
-def test_vendors_no_longer_smuggled_through_notes(client):
-    """The choice must live in a structured column, not inside the free-text notes."""
-    r = client.post("/api/employee/quote-requests", json={
-        "case_id": "case-1",
-        "service_categories": ["movers"],
-        "notes": "Crown Relocations: need it by June",
-        "vendors": [TWO_VENDORS[0]],
-    })
-    body = r.json()
-    assert body["vendors"][0]["item_id"] == "ext-crown-1"
-    # notes stays the employee's own words — it is simply no longer the ONLY record.
-    assert body["notes"] == "Crown Relocations: need it by June"
+    body = listed.json()
+    assert len(body) == 1
+    assert body[0]["id"] == "qr-legacy-1"
+    assert body[0]["service_categories"] == ["movers", "housing"]

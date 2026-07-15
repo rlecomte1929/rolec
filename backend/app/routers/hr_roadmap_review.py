@@ -202,14 +202,20 @@ _METRICS_SQL = text(
       count(*) FILTER (WHERE notify_status = 'sent')                                 AS sent,
       EXTRACT(EPOCH FROM (now() - min(updated_at) FILTER (WHERE released_to_user IS FALSE))) / 3600.0
                                                                                      AS oldest_pending_age_hours
-    FROM public.roadmap_review_status
+    FROM public.roadmap_review_status r
+    -- Only real roadmaps. E2E tests leave orphan review rows behind (case purged, no
+    -- FK), which would otherwise inflate pending_review. A real pending roadmap always
+    -- has milestones; an orphan has none.
+    WHERE EXISTS (SELECT 1 FROM public.case_milestones m WHERE m.case_id = r.case_id)
     """
 )
 
 _UNREACHABLE_SQL = text(
     """
-    SELECT case_id FROM public.roadmap_review_status
-    WHERE notify_status = 'unreachable' ORDER BY updated_at DESC LIMIT 50
+    SELECT r.case_id FROM public.roadmap_review_status r
+    WHERE r.notify_status = 'unreachable'
+      AND EXISTS (SELECT 1 FROM public.case_milestones m WHERE m.case_id = r.case_id)
+    ORDER BY r.updated_at DESC LIMIT 50
     """
 )
 

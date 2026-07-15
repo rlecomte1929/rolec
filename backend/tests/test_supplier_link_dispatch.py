@@ -33,12 +33,15 @@ from backend.app.services import supplier_link_dispatch as sld  # noqa: E402
 from backend.app.services.supplier_jwt import verify_supplier_token  # noqa: E402
 
 
-def _target(email=None, name="Santa Fe Relocation"):
+def _target(email=None, name="Santa Fe Relocation", verified=True):
+    # verified defaults True: these tests exercise the happy path of a *verified* catalog address.
+    # The verified-gate itself is pinned separately in test_an_unverified_address_is_not_dispatched.
     return {
         "recipient_id": "rec-1",
         "vendor_id": "sup-1",
         "supplier_name": name,
         "email": email,
+        "verified": verified,
     }
 
 
@@ -63,6 +66,23 @@ class DispatchTests(unittest.TestCase):
         self.assertFalse(results[0]["sent"])
         post.assert_not_called()          # nothing left the building
         self.engine.begin.assert_not_called()  # and no token was minted for them
+
+    def test_an_unverified_address_is_not_dispatched(self):
+        """AIQ-1533: a catalog address with verified=False is an honest gap, not a send target.
+        No token is minted and nothing goes out — the employee's move details never reach an
+        address whose provenance we have not confirmed."""
+        with patch.object(sld.requests, "post") as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1",
+                targets=[_target(email="ops@santafe.example", verified=False)],
+                send_email=True,
+            )
+
+        self.assertFalse(results[0]["ok"])
+        self.assertEqual(results[0]["error"], sld.UNVERIFIED_ADDRESS)
+        self.assertFalse(results[0]["sent"])
+        post.assert_not_called()               # nothing left the building
+        self.engine.begin.assert_not_called()  # and no token was minted
 
     def test_send_email_false_mints_a_link_but_sends_nothing(self):
         """Minting is harmless; emailing a real company is not. They are separate decisions."""
