@@ -13,6 +13,7 @@ from ..app.db import SessionLocal
 from ..app import crud as app_crud
 from ..app.routers import cases as wizard_cases_router
 from ..app.services.requirements_builder import compute_case_requirements
+from ..app.services.case_service import _assert_case_access
 
 router = APIRouter(prefix="/api", tags=["compat"])
 
@@ -127,6 +128,14 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
         row = result.data[0] or {}
     else:
         user = _get_user_from_session_token(token)
+        # [AIQ-1535] Tenant guard. This branch reads through the service-role `db` connection,
+        # which BYPASSES RLS — so without an explicit check `_get_wizard_case_dto` /
+        # `_ensure_wizard_case` / `_get_case_row_for_user` below return ANY company's case to any
+        # authenticated session (cross-tenant IDOR leaking relocation PII). Mirror the safe
+        # cases_read.get_case handler this route shadows: reuse the shared guard, which raises
+        # 403 (case belongs to another tenant) or 404 (unknown/malformed id) BEFORE any case
+        # body is built. (The JWT branch above runs under the caller's JWT, so RLS scopes it.)
+        _assert_case_access(user, case_id)
         # Scope to the requesting user (by id, not role); fall back to the
         # most-recent assignment when the requester has none (HR/admin).
         assignment_status = (
