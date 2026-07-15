@@ -226,6 +226,34 @@ class ServicesCaseScopingTests(unittest.TestCase):
         self.assertIn("movers", called)
         self.assertIn("movers", resp.json()["results"])
 
+    # 8. AIQ-1550: the batch must resolve the HR company via hr_users (get_hr_company_id) — the
+    #    only link that works for legacy text-id HR accounts (profiles.id is a uuid) — BEFORE the
+    #    profile fallback, so HR curation applies instead of being silently skipped.
+    #
+    #    Source-level guard rather than an HTTP-level mock: backend/conftest.py mocks the db via
+    #    `sys.modules.setdefault(...)`, so under full-suite import ordering the router's dynamic
+    #    `from ...database import db` binds the REAL db (unpatchable), making a behavioural
+    #    assertion import-order-fragile (it passes single-file, fails in full-suite discovery).
+    #    The behavioural proof is the post-deploy live check on the recommendations batch.
+    def test_batch_resolves_company_via_hr_users_before_profile(self):
+        import inspect
+        from backend.app.recommendations import router as rec_router
+
+        src = inspect.getsource(rec_router.post_recommendations_batch)
+        # The batch must resolve the company via hr_users, keyed on the assignment's hr_user_id.
+        self.assertIn(
+            'db.get_hr_company_id(assignment["hr_user_id"])', src,
+            "batch must resolve the HR company via hr_users (works for legacy text-id HR)",
+        )
+        # Within the company-resolution block, hr_users must be tried before the profile fallback
+        # (slice from the block start so unrelated earlier get_profile_record calls don't count).
+        block = src[src.index('company_id = assignment.get("company_id")'):]
+        # Compare the actual CALLS (a code comment may also mention get_profile_record).
+        self.assertLess(
+            block.index("db.get_hr_company_id("), block.index("db.get_profile_record("),
+            "hr_users resolution must precede the get_profile_record fallback",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
