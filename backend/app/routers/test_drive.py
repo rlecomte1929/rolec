@@ -532,10 +532,13 @@ def survey(body: SurveyRequest, request: Request):
         )
         # TD-7: turn survey answers into pipeline (best-effort; never breaks the survey write).
         _process_survey_pipeline(body, campaign, corridor_id)
-        # TD-6: email fan-out — notify Romain + thank the tester (best-effort; never breaks the write).
+        # AIQ-1547: notify the admin of the completion IN-APP (admin Inbox / NotificationsBell)
+        # by default — a Resend email per completion won't survive a cohort on the free tier.
+        # Channel is gated by RELOPASS_TEST_DRIVE_NOTIFY_CHANNEL (default 'inapp' → zero email).
+        # Best-effort; never breaks the survey write.
         try:
-            from ..services.test_drive_emails import send_test_drive_survey_emails
-            send_test_drive_survey_emails(
+            from ..services.test_drive_notifications import notify_test_drive_completion
+            notify_test_drive_completion(
                 tester_name=body.tester_name, tester_email=body.tester_email, campaign=campaign,
                 corridor_id=corridor_id, tester_segment=body.tester_segment,
                 company_role=body.tester_company_role, sector=body.tester_sector,
@@ -546,7 +549,7 @@ def survey(body: SurveyRequest, request: Request):
                 referral_consent=body.referral_consent,
             )
         except Exception:  # noqa: BLE001
-            logger.warning("test_drive survey email fan-out failed (suppressed)")
+            logger.warning("test_drive completion notify failed (suppressed)")
 
     logger.info(
         "test_drive_survey response=%s session=%s campaign=%s pilot=%s",

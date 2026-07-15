@@ -9,6 +9,8 @@ export const NOTIFICATION_TYPES = {
   INTAKE_SUBMITTED: 'INTAKE_SUBMITTED',
   // [AIQ-1376] fired to the employee when HR assigns them a relocation case.
   ASSIGNMENT_CREATED: 'ASSIGNMENT_CREATED',
+  // [AIQ-1547] fired to the admin (in-app, no email) when a test-drive tester completes.
+  TEST_DRIVE_COMPLETED: 'TEST_DRIVE_COMPLETED',
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
@@ -33,6 +35,11 @@ export function getNotificationTarget(
   role: 'HR' | 'EMPLOYEE' | 'ADMIN',
   notification: Pick<Notification, 'assignment_id' | 'case_id' | 'type'>
 ): string {
+  // [AIQ-1547] test-drive completion notifications deep-link to the campaign dashboard.
+  if (notification.type === NOTIFICATION_TYPES.TEST_DRIVE_COMPLETED) {
+    return '/admin/test-drive';
+  }
+
   const assignmentId = notification.assignment_id || notification.case_id;
   if (!assignmentId) return '/';
 
