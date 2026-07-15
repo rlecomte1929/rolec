@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -24,7 +23,6 @@ from sqlalchemy import text
 from ..auth_deps import get_current_user, require_hr_or_employee
 from ...database import db
 from ..services.audit_log_service import (
-    ACTION_INSERT,
     ACTION_UPDATE,
     ACTOR_HUMAN,
     insert_audit_log,
@@ -119,14 +117,6 @@ def _caller_company_id(user: Dict[str, Any]) -> str:
     return company_id
 
 
-def _is_postgres() -> bool:
-    """[AIQ-1514] jsonb exists only on Postgres; the SQLite test DB stores TEXT."""
-    try:
-        return db.engine.dialect.name == "postgresql"
-    except Exception:  # noqa: BLE001 — a missing engine must not break the request path
-        return False
-
-
 def _row_to_dict(row: Any) -> Dict[str, Any]:
     d = dict(row)
     for k, v in list(d.items()):
@@ -171,88 +161,27 @@ def _require_employee(user: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@router.post(
-    "/api/employee/quote-requests",
-    response_model=QuoteRequestRead,
-    status_code=201,
-)
+@router.post("/api/employee/quote-requests", status_code=410)
 def create_quote_request(
     body: QuoteRequestCreate,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """
-    Employee submits a vendor quote request for their relocation case.
+    """RETIRED — [AIQ-1525].
+
+    The employee quote-request write path is consolidated onto the canonical RFQ system
+    ("EMPLOYEE-LED RFQ, HR = PAYER — one request model, not three"). Employees now submit
+    via POST /api/rfqs (a vendor shortlist), which writes rfqs + rfq_recipients and reaches
+    the suppliers directly. This endpoint no longer writes `quote_requests`.
+
+    The table and its historical rows stay readable — GET /api/employee/quote-requests and
+    GET /api/hr/quote-requests below are unchanged — so nothing is orphaned; only the write
+    is retired.
     """
     _require_employee(user)
-    company_id = _caller_company_id(user)
-    employee_id = user["id"]
-    new_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
-
-    # Normalise categories: join for SQLite compat, Postgres can store array
-    cats_serialised = "{" + ",".join(f'"{c}"' for c in body.service_categories) + "}"
-    # [AIQ-1514] The vendors the employee actually shortlisted. Serialised to a JSON
-    # string and cast per-dialect below — jsonb on Postgres, TEXT on SQLite.
-    vendors_serialised = json.dumps([v.model_dump() for v in body.vendors])
-
-    # jsonb only exists on Postgres. Use the CAST(:param AS type) form — the
-    # bind-then-cast form (colon-param followed by a double-colon type) mis-binds under
-    # SQLAlchemy text() and 500s on Postgres. tests/test_employee_quotes_bind_regression.py
-    # greps this module and fails on that shape, so do not spell it out here either.
-    vendors_expr = "CAST(:vendors AS jsonb)" if _is_postgres() else ":vendors"
-
-    with db.engine.begin() as conn:
-        conn.execute(
-            text(
-                f"""
-                INSERT INTO quote_requests
-                    (id, case_id, employee_id, company_id,
-                     service_categories, notes, budget_range,
-                     status, created_at, updated_at, vendors)
-                VALUES
-                    (:id, :case_id, :emp, :company,
-                     CAST(:cats AS text[]), :notes, :budget,
-                     'pending', :now, :now, {vendors_expr})
-                """
-            ),
-            {
-                "id": new_id,
-                "case_id": body.case_id,
-                "emp": employee_id,
-                "company": company_id,
-                "cats": cats_serialised,
-                "vendors": vendors_serialised,
-                "notes": body.notes,
-                "budget": body.budget_range,
-                "now": now,
-            },
-        )
-        try:
-            insert_audit_log(
-                conn,
-                entity_type="quote_request",
-                entity_id=new_id,
-                action_type=ACTION_INSERT,
-                actor_type=ACTOR_HUMAN,
-                actor_id=employee_id,
-                new_value={"event": "quote_request_created", "case_id": body.case_id},
-            )
-        except Exception:
-            logger.exception("audit: create_quote_request id=%s", new_id)
-        row = conn.execute(
-            text("SELECT * FROM quote_requests WHERE id = :id"),
-            {"id": new_id},
-        ).mappings().first()
-
-    # Advance the matching service '*_quote' roadmap step to in_progress.
-    # Best-effort — never fail the quote request over a roadmap side-effect.
-    try:
-        from ..services.service_roadmap_bridge import advance_quote_step
-        advance_quote_step(db, body.case_id, body.service_categories, quote_request_id=new_id)
-    except Exception:  # noqa: BLE001 — non-fatal best-effort bridge
-        logger.warning("quote-request: roadmap advance failed for case %s", body.case_id, exc_info=True)
-
-    return _row_to_dict(row)
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is retired. Submit quote requests via POST /api/rfqs.",
+    )
 
 
 @router.get(

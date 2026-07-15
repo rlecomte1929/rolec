@@ -9167,6 +9167,21 @@ def create_rfq(
     except Exception:
         pass
 
+    # [AIQ-1525] Advance the matching service '*_quote' roadmap step, exactly as the retired
+    # POST /api/employee/quote-requests path did. Folding that path into this one must not lose
+    # the roadmap side-effect, or the employee journey would silently stall at the quote step.
+    # Best-effort — a roadmap hiccup must never fail an RFQ the DB already created.
+    try:
+        from .app.services.service_roadmap_bridge import advance_quote_step
+        service_categories = [it.get("service_key") for it in enriched_items if it.get("service_key")]
+        advance_quote_step(
+            db, effective_case_id, service_categories,
+            quote_request_id=result.get("id"), request_id=req_id,
+        )
+    except Exception:  # noqa: BLE001 — non-fatal best-effort bridge
+        log.warning("create_rfq: roadmap advance failed case_id=%s request_id=%s",
+                    effective_case_id, req_id, exc_info=True)
+
     # [AIQ-1521] Dispatch the RFQ to the suppliers the employee chose.
     #
     # This is the employee-led model's load-bearing line. Before it, creating an RFQ contacted
