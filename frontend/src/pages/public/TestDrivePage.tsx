@@ -171,6 +171,75 @@ export const TestDrivePage: React.FC = () => {
         </Section>
       )}
 
+      {/* Start block — form OR the dual-credential result. AIQ-1541: kept high on the
+          page so the name field + Start button (and, after provisioning, the credentials
+          + sign-in link) are reachable without scrolling past the explanatory sections. */}
+      <Section spacing="lg" background="muted">
+        <FadeIn>
+          <div className={result ? 'mx-auto max-w-3xl' : 'mx-auto max-w-xl'}>
+            {result ? (
+              <CredentialResult
+                result={result}
+                onComplete={(sessionId, link) => {
+                  void completeThenSurvey(sessionId, link);
+                }}
+              />
+            ) : (
+              <>
+                <SectionHeader title={c.startBlock.header} align="center" narrow />
+                <form
+                  onSubmit={handleSubmit}
+                  noValidate
+                  className="mt-8 rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8"
+                >
+                  <label
+                    htmlFor="td-first-name"
+                    className="block text-sm font-medium text-marketing-primary"
+                  >
+                    {c.startBlock.fieldLabel}
+                    <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>
+                  </label>
+                  <Input
+                    unstyled
+                    id="td-first-name"
+                    value={firstName}
+                    onChange={setFirstName}
+                    placeholder={c.startBlock.placeholder}
+                    autoComplete="given-name"
+                    disabled={state === 'submitting'}
+                    aria-describedby="td-first-name-helper"
+                    className="mt-1 w-full rounded-lg border border-marketing-border bg-white px-3 py-2 text-sm text-marketing-text transition-colors focus:border-marketing-accent focus:outline-none focus:ring-2 focus:ring-marketing-accent/40 disabled:cursor-not-allowed disabled:bg-marketing-surface-muted"
+                  />
+                  <p id="td-first-name-helper" className="mt-2 text-xs text-marketing-text-muted">
+                    {c.startBlock.helper}
+                  </p>
+
+                  {error && (
+                    <Alert variant="error" className="mt-4">
+                      {error}
+                    </Alert>
+                  )}
+
+                  <div className="mt-6">
+                    <Button
+                      unstyled
+                      type="submit"
+                      disabled={state === 'submitting'}
+                      className="inline-flex w-full items-center justify-center rounded-lg bg-marketing-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {state === 'submitting' ? 'Starting…' : c.startBlock.button}
+                    </Button>
+                    <p className="mt-3 text-center text-[11px] text-marketing-text-muted">
+                      {c.startBlock.legal}
+                    </p>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </FadeIn>
+      </Section>
+
       {/* What ReloPass is (TD-FIX-6 / AIQ-1509) — newcomer intro, above "What
           we're testing". Plain-text paragraphs only — no emphasis on any word. */}
       <Section spacing="lg" background="transparent">
@@ -279,73 +348,6 @@ export const TestDrivePage: React.FC = () => {
             <p className="mt-6 text-marketing-body text-marketing-text leading-relaxed text-center">
               {c.aboutData.body}
             </p>
-          </div>
-        </FadeIn>
-      </Section>
-
-      {/* Start block — form OR the dual-credential result */}
-      <Section spacing="lg" background="muted">
-        <FadeIn>
-          <div className={result ? 'mx-auto max-w-3xl' : 'mx-auto max-w-xl'}>
-            {result ? (
-              <CredentialResult
-                result={result}
-                onComplete={(sessionId, link) => {
-                  void completeThenSurvey(sessionId, link);
-                }}
-              />
-            ) : (
-              <>
-                <SectionHeader title={c.startBlock.header} align="center" narrow />
-                <form
-                  onSubmit={handleSubmit}
-                  noValidate
-                  className="mt-8 rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8"
-                >
-                  <label
-                    htmlFor="td-first-name"
-                    className="block text-sm font-medium text-marketing-primary"
-                  >
-                    {c.startBlock.fieldLabel}
-                    <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>
-                  </label>
-                  <Input
-                    unstyled
-                    id="td-first-name"
-                    value={firstName}
-                    onChange={setFirstName}
-                    placeholder={c.startBlock.placeholder}
-                    autoComplete="given-name"
-                    disabled={state === 'submitting'}
-                    aria-describedby="td-first-name-helper"
-                    className="mt-1 w-full rounded-lg border border-marketing-border bg-white px-3 py-2 text-sm text-marketing-text transition-colors focus:border-marketing-accent focus:outline-none focus:ring-2 focus:ring-marketing-accent/40 disabled:cursor-not-allowed disabled:bg-marketing-surface-muted"
-                  />
-                  <p id="td-first-name-helper" className="mt-2 text-xs text-marketing-text-muted">
-                    {c.startBlock.helper}
-                  </p>
-
-                  {error && (
-                    <Alert variant="error" className="mt-4">
-                      {error}
-                    </Alert>
-                  )}
-
-                  <div className="mt-6">
-                    <Button
-                      unstyled
-                      type="submit"
-                      disabled={state === 'submitting'}
-                      className="inline-flex w-full items-center justify-center rounded-lg bg-marketing-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {state === 'submitting' ? 'Starting…' : c.startBlock.button}
-                    </Button>
-                    <p className="mt-3 text-center text-[11px] text-marketing-text-muted">
-                      {c.startBlock.legal}
-                    </p>
-                  </div>
-                </form>
-              </>
-            )}
           </div>
         </FadeIn>
       </Section>
