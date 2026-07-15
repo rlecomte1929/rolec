@@ -219,9 +219,12 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
 
   it('drafts a task from context, then creates the Notion task and shows the link', async () => {
     vi.mocked(feedbackApi.dispatchPreview).mockResolvedValue({
-      title: 'Fix roadmap', strategic_objective: 'g', execution_prompt: 'p', expected_output: 'o',
-      validation_criteria: 'v', priority: 'P1', complexity: 'Medium',
-      task_type: 'Backend Implementation', layer: 'API', product_area: 'Core Product', status: 'Ready for AI',
+      task: {
+        title: 'Fix roadmap', strategic_objective: 'g', execution_prompt: 'p', expected_output: 'o',
+        validation_criteria: 'v', priority: 'P1', complexity: 'Medium',
+        task_type: 'Backend Implementation', layer: 'API', product_area: 'Core Product', status: 'Ready for AI',
+      },
+      evalResult: { score: 85, issues: [], warnings: [], passed: true },
     });
     vi.mocked(feedbackApi.dispatchCreate).mockResolvedValue({
       dispatched: true, url: 'https://notion.so/task-1', dispatch_ref: 'https://notion.so/task-1',
