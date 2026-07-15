@@ -64,11 +64,19 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes complete_wizard_step (data task) to the canonical v2 intake', () => {
+  it('[AIQ-1547] routes complete_wizard_step (form task) to Dossier & Forms, not the dead-end intake wizard', () => {
     const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/intake`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier`,
+    });
+  });
+
+  it('[AIQ-1547] complete_wizard_step with a formHint deep-links ?form=<key> on Dossier & Forms', () => {
+    const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
+    expect(resolveRelocationTaskCtaTarget({ ...employeeCtx, formHint: 'confirm_family_details' }, cta)).toEqual({
+      kind: 'internal',
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier?form=confirm_family_details`,
     });
   });
 
@@ -80,11 +88,11 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes view_details (requirements) to the canonical v2 intake', () => {
+  it('[AIQ-1547] routes view_details (requirements) to Dossier & Forms, not the dead-end intake wizard', () => {
     const cta: RelocationPlanCtaDTO = { type: 'view_details', label: 'View requirements' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/intake`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier`,
     });
   });
 
