@@ -26,16 +26,22 @@ test('[MSG-09] "employees waiting" widget resolves within 5s (B16)', async ({ pa
   await info.attach('widget', { body: JSON.stringify({ widgetPresent: present, stillSpinningAfter5s: stillSpinning }), contentType: 'application/json' });
 });
 
-test('[VND-03] HR vendor curation + preferred suppliers are logical', async ({ page }, info) => {
+test('[VND-03] HR vendor curation is logical', async ({ page }, info) => {
+  // [AIQ-1532] /hr/preferred-suppliers retired — consolidated into /hr/vendor-curation.
   for (const [route, label] of [
     ['/hr/vendor-curation', '01_vendor_curation'],
-    ['/hr/preferred-suppliers', '02_preferred_suppliers'],
   ] as const) {
     await page.goto(route);
     const v = await assertLogicalPage(page, info, label);
     await shot(page, info, label);
     await info.attach(label, { body: JSON.stringify({ signals: v.signals, heading: v.heading }), contentType: 'application/json' });
   }
+});
+
+test('[VND-03b] /hr/preferred-suppliers redirects to /hr/vendor-curation', async ({ page }) => {
+  await page.goto('/hr/preferred-suppliers');
+  await page.waitForURL('**/hr/vendor-curation');
+  expect(page.url()).toContain('/hr/vendor-curation');
 });
 
 test('[PER-H2] first-time-HR clarity rubric across the must-use screens', async ({ page }, info) => {

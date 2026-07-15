@@ -1516,18 +1516,8 @@ class CompaniesMixin:
                         r["primary_contact_name"] = None
         return result
 
-    def list_company_preferred_suppliers(
-        self, company_id: str, service_category: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            sql = "SELECT * FROM company_preferred_suppliers WHERE company_id = :cid AND status = 'active'"
-            params: Dict[str, Any] = {"cid": company_id}
-            if service_category:
-                sql += " AND (service_category = :svc OR service_category IS NULL)"
-                params["svc"] = service_category
-            sql += " ORDER BY priority_rank ASC, created_at ASC"
-            rows = conn.execute(text(sql), params).fetchall()
-        return self._rows_to_list(rows)
+    # [AIQ-1532] list_company_preferred_suppliers removed — the /hr/preferred-suppliers surface
+    # is retired; HR's signal is company_vendor_selections (see list_company_curated_supplier_ids).
 
     def list_company_curated_supplier_ids(
         self, company_id: str, service_category: Optional[str] = None
@@ -1584,71 +1574,8 @@ class CompaniesMixin:
             has_approved = conn.execute(text(cap_sql), params).fetchone() is not None
         return {"exists": exists, "has_approved": has_approved}
 
-    def add_company_preferred_supplier(
-        self,
-        company_id: str,
-        supplier_id: str,
-        service_category: Optional[str] = None,
-        priority_rank: int = 0,
-        notes: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        now = datetime.utcnow().isoformat()
-        # Guard the unique index (company_id, supplier_id, coalesce(service_category,'')):
-        # a re-add would otherwise raise IntegrityError. Update the existing row instead.
-        with self.engine.begin() as conn:
-            existing = conn.execute(
-                text(
-                    "SELECT id FROM company_preferred_suppliers "
-                    "WHERE company_id = :cid AND supplier_id = :sid "
-                    "AND coalesce(service_category, '') = coalesce(:svc, '') LIMIT 1"
-                ),
-                {"cid": company_id, "sid": supplier_id, "svc": service_category},
-            ).fetchone()
-            if existing is not None:
-                rid = existing._mapping["id"]
-                conn.execute(
-                    text(
-                        "UPDATE company_preferred_suppliers "
-                        "SET priority_rank = :rank, notes = :notes, status = 'active', updated_at = :now "
-                        "WHERE id = :id"
-                    ),
-                    {"rank": priority_rank, "notes": notes or "", "now": now, "id": rid},
-                )
-                return {"id": rid, "company_id": company_id, "supplier_id": supplier_id}
-            rid = str(uuid.uuid4())
-            conn.execute(
-                text("""
-                    INSERT INTO company_preferred_suppliers
-                    (id, company_id, supplier_id, service_category, priority_rank, status, notes, created_at, updated_at)
-                    VALUES (:id, :cid, :sid, :svc, :rank, 'active', :notes, :now, :now)
-                """),
-                {
-                    "id": rid,
-                    "cid": company_id,
-                    "sid": supplier_id,
-                    "svc": service_category,
-                    "rank": priority_rank,
-                    "notes": notes or "",
-                    "now": now,
-                },
-            )
-        return {"id": rid, "company_id": company_id, "supplier_id": supplier_id}
-
-    def remove_company_preferred_supplier(
-        self, company_id: str, supplier_id: str, service_category: Optional[str] = None
-    ) -> int:
-        with self.engine.begin() as conn:
-            if service_category:
-                r = conn.execute(
-                    text("DELETE FROM company_preferred_suppliers WHERE company_id = :cid AND supplier_id = :sid AND service_category = :svc"),
-                    {"cid": company_id, "sid": supplier_id, "svc": service_category},
-                )
-            else:
-                r = conn.execute(
-                    text("DELETE FROM company_preferred_suppliers WHERE company_id = :cid AND supplier_id = :sid AND service_category IS NULL"),
-                    {"cid": company_id, "sid": supplier_id},
-                )
-            return r.rowcount
+    # [AIQ-1532] add_/remove_company_preferred_supplier removed with the /hr/preferred-suppliers
+    # surface. HR curation writes go through vendor_curation (company_vendor_selections).
 
     def get_active_canonical_policy_document_for_company(self, company_id: str) -> Optional[Dict[str, Any]]:
         from ..database import _coerce_json_dict, _coerce_json_list  # lazy: avoid import cycle

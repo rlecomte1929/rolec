@@ -91,16 +91,6 @@ def test_vetting_state_unknown_supplier(tdb):
     assert st["has_approved"] is False
 
 
-def test_duplicate_add_does_not_raise(tdb):
-    tdb.add_company_preferred_supplier("c1", "S1", service_category="movers")
-    # Second add of the same (company, supplier, category) must not raise.
-    tdb.add_company_preferred_supplier("c1", "S1", service_category="movers", notes="updated")
-    rows = tdb.list_company_preferred_suppliers("c1", "movers")
-    assert len(rows) == 1
-
-
-def test_remove_with_service_category_returns_count(tdb):
-    tdb.add_company_preferred_supplier("c1", "S1", service_category="movers")
-    removed = tdb.remove_company_preferred_supplier("c1", "S1", "movers")
-    assert removed == 1
-    assert tdb.list_company_preferred_suppliers("c1", "movers") == []
+# [AIQ-1532] The add/remove_company_preferred_supplier tests were removed with those helpers —
+# the /hr/preferred-suppliers surface is retired. get_supplier_vetting_state (above) is retained:
+# it queries supplier_service_capabilities and is a reusable vetting check, not preferred-specific.
