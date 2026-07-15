@@ -197,6 +197,35 @@ class ServicesCaseScopingTests(unittest.TestCase):
         self.assertEqual(results["living_areas"]["recommendations"], [])
         self.assertEqual(results["living_areas"]["criteria_echo"].get("status"), "unavailable")
 
+    # 7. AIQ-1550: a case with no destination city yet must STILL run movers — HR's
+    #    company-scoped curation is the source of truth, so movers must surface HR's
+    #    picks instead of being skipped into the "HR is finalizing" empty state.
+    def test_batch_movers_runs_when_no_destination_but_company_present(self):
+        from backend.app.recommendations import router as rec_router
+        from backend.app.recommendations.types import RecommendationResponse
+
+        called: list[str] = []
+
+        def _fake_recommend(backend_key, criteria, top_n=10, company_id=None):
+            called.append(backend_key)
+            return RecommendationResponse(
+                category=backend_key, generated_at="2026-01-01T00:00:00Z",
+                criteria_echo={}, recommendations=[],
+            )
+
+        # Blank destination city; case-1 resolves to company co-1.
+        criteria_map = {"movers": {"destination_city": ""}}
+        with mock.patch.object(rec_router, "build_criteria_for_assignment", return_value=criteria_map), \
+                mock.patch.object(rec_router, "recommend", side_effect=_fake_recommend):
+            resp = self.client.post(
+                "/api/recommendations/batch",
+                json={"case_id": "case-1", "selected_services": ["movers"]},
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        # The fix: movers was NOT skipped on the blank destination — recommend() ran for it.
+        self.assertIn("movers", called)
+        self.assertIn("movers", resp.json()["results"])
+
 
 if __name__ == "__main__":
     unittest.main()
