@@ -5985,27 +5985,20 @@ def _ensure_default_milestones_for_case(
                 case_id, m.get("milestone_type"), upsert_exc, exc_info=True,
             )
 
-    # A freshly generated roadmap has not been reviewed by anyone. Record that, so HR
-    # gets a gate: intake -> generated -> HR approves -> employee acknowledges.
+    # [AIQ-1377] A newly generated roadmap is RELEASED by default — the employee can act on it
+    # immediately. HR HOLDS it when they want to intervene (POST .../roadmap-review/request-changes
+    # writes released_to_user=false); an absent review row means released, which the read path
+    # already assumes.
     #
-    # Only for a roadmap we just created. An absent review row means "released" (47 live
-    # cases had no row and must not lose their plan), so we must write the row here or
-    # the gate would silently never engage. Best-effort: a failure here leaves the case
-    # released, which is the safe direction.
-    if created:
-        try:
-            from .app.db import SessionLocal as _SessionLocal
-            from .app.models import RoadmapReviewStatus as _RoadmapReviewStatus
-
-            with _SessionLocal() as _s:
-                if _s.get(_RoadmapReviewStatus, case_id) is None:
-                    _s.add(_RoadmapReviewStatus(case_id=case_id, released_to_user=False))
-                    _s.commit()
-        except Exception as review_exc:  # noqa: BLE001
-            log.warning(
-                "ensure_default_milestones: could not open HR review for case_id=%s: %s",
-                case_id, review_exc,
-            )
+    # This used to write an unreleased row here, so every new case was held pending an HR approval.
+    # But the roadmap-review case_id lives in the wizard engine's id-space, which does not join to
+    # relocation_cases / cases where HR is linked — so most cases resolve to NO HR who could ever
+    # approve, and the employee was locked out of their own tasks with no way forward (AIQ-1377:
+    # the roadmap page rendered "in review" instead of the plan for every freshly provisioned case).
+    # That contradicts the "HR = payer, validates when needed" model: HR intervenes on exception,
+    # they are not a mandatory gate on every plan. The approve/request-changes endpoints still
+    # create the row on demand (_load_or_create), so HR's hold remains fully available — as an
+    # opt-in action, not a default block.
 
     return created
 

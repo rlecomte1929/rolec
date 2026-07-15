@@ -114,6 +114,29 @@ class EnsureDefaultMilestonesTests(unittest.TestCase):
         # One succeeded, one failed — failure must not raise, count reflects success.
         self.assertEqual(created, 1)
 
+    def test_generation_leaves_the_roadmap_released_no_hr_hold(self):
+        # [AIQ-1377] A generated roadmap is RELEASED by default. Generation must NOT create a
+        # roadmap_review_status row: doing so held every new case pending an HR approval that,
+        # for wizard-id cases with no linked HR, never came — the roadmap page rendered
+        # "in review" instead of the plan for every freshly provisioned case. HR still HOLDS a
+        # plan on demand via request-changes; it is an opt-in action, not a default block.
+        import backend.app.models as _models
+
+        with mock.patch.object(M, "db") as db, mock.patch.object(
+            M, "SessionLocal"
+        ), mock.patch.object(M, "app_crud") as app_crud, mock.patch.object(
+            M, "compute_default_milestones",
+            side_effect=lambda **_: [{"milestone_type": "visa", "title": "A"}],
+        ), mock.patch.object(_models, "RoadmapReviewStatus") as RRS:
+            db.list_case_milestones.return_value = []
+            db.list_case_services.return_value = []
+            app_crud.get_case.return_value = _FakeCase(_DRAFT)
+            created = M._ensure_default_milestones_for_case("case1", "asg1")
+
+        self.assertEqual(created, 1)
+        # The regression guard: no HR-review hold row is constructed on generation.
+        RRS.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
