@@ -251,8 +251,11 @@ class ServicesCaseScopingTests(unittest.TestCase):
                 criteria_echo={}, recommendations=[],
             )
 
-        with mock.patch.object(main.db, "get_assignment_by_case_id", side_effect=lambda cid: legacy_asg if cid == "case-1" else None), \
-                mock.patch.object(main.db, "get_assignment_by_id", side_effect=lambda aid: legacy_asg if aid == "asg-1" else None), \
+        # Patch require_assignment_visibility directly so the batch's `assignment` is exactly our
+        # legacy dict (no company_id, legacy hr id) — independent of which db object resolves it
+        # under full-suite import ordering. Company resolution then hits db.get_hr_company_id on
+        # the router's dynamically-imported backend.database.db.
+        with mock.patch.object(rec_router, "require_assignment_visibility", return_value=legacy_asg), \
                 mock.patch.object(_bdb.db, "get_hr_company_id", return_value="co-from-hr-users") as ghc, \
                 mock.patch.object(_bdb.db, "get_profile_record", return_value=None), \
                 mock.patch.object(rec_router, "build_criteria_for_assignment", return_value={"movers": {"destination_city": "Oslo"}}), \
