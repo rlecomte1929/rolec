@@ -4,10 +4,10 @@
  * an HR/partner-handled banner, and collapsible phase sections with rich rows.
  * Pure presentation; data + handlers are passed in by EmployeeCaseRoadmapPage.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useId, useRef } from 'react';
 import {
   Check, Circle, Lock, Loader2, Sparkles, Flag, FileText, ChevronUp, ChevronDown,
-  Clock, ArrowRight, ExternalLink,
+  Clock, ArrowRight, ExternalLink, Info,
 } from 'lucide-react';
 import { CountryFlag } from '../../../components/antigravity/CountryFlag';
 import { getCountryName } from '../../../utils/countries';
@@ -97,6 +97,57 @@ function OwnerPill({ owner }: { owner: RelocationPlanPhaseTaskDTO['owner'] }) {
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
+/**
+ * AIQ-1548: a small accessible info tooltip (hover, focus, or click to open; Escape or an
+ * outside click to close). Reuses the in-repo ConfidenceBadge role="tooltip" pattern rather
+ * than adding a dependency — the codebase has no shared design-system Tooltip component.
+ */
+function InfoTooltip({ label, text }: { label: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  const tipId = useId();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [open]);
+  return (
+    <span ref={wrapRef} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-describedby={open ? tipId : undefined}
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-white/60 transition-colors hover:text-white focus:text-white focus:outline-none"
+      >
+        <Info size={12} aria-hidden="true" />
+      </button>
+      {open && (
+        <span
+          id={tipId}
+          role="tooltip"
+          className="absolute right-0 top-[calc(100%+6px)] z-20 w-max max-w-[260px] rounded-md bg-slate-900 px-2.5 py-2 text-left text-[11.5px] font-normal normal-case leading-snug text-white shadow-lg ring-1 ring-white/10"
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Hero({ data, header, validated, validatedAt }: { data: RelocationPlanViewResponseDTO; header: RoadmapHeaderMeta | null; validated: boolean; validatedAt: string | null }) {
   // One canonical progress definition (shared with the dashboard / Tasks page).
   const { completed, total, pct, blocked, readyNow } = deriveCanonicalProgress(data.summary);
@@ -126,7 +177,15 @@ function Hero({ data, header, validated, validatedAt }: { data: RelocationPlanVi
           )}
         </div>
         <div className="text-right">
-          <div className="text-[11px] uppercase tracking-wide text-white/60">Overall progress</div>
+          {/* AIQ-1548: label the metric + tooltip its scope, so this task-completion % isn't
+              confused with the dossier fields-filled % shown on other pages. */}
+          <div className="flex items-center justify-end text-[11px] uppercase tracking-wide text-white/60">
+            Overall case progress
+            <InfoTooltip
+              label="What does overall case progress measure?"
+              text="The share of your relocation tasks completed across every phase of your case — it rises as you and your HR team finish tasks, so it starts at 0%. Other pages (like your Dossier) may show a different number that tracks how much of your intake forms you've filled in."
+            />
+          </div>
           <div className="text-3xl font-bold leading-none">{pct}%</div>
           <div className="mt-0.5 text-[12px] text-white/70">{completed} of {total} tasks done</div>
           {blocked > 0 && (
