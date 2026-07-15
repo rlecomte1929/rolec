@@ -1,0 +1,70 @@
+name: Roadmap review notify sweep
+
+# [AIQ-1526] Calls POST /api/crons/roadmap-review-notify hourly.
+# Safety-net for the instant-fire HR notification: when a roadmap is generated it is
+# held for HR approval and its HR owner is emailed. If that build hangs, the notify
+# never fires and the employee sits blocked with nobody told. This sweep finds
+# roadmaps that are held, never successfully notified, and real (have milestones —
+# excludes purged-case E2E orphans), and re-runs the same idempotent notify. An
+# already-notified case is a no-op, so re-runs never re-mail.
+#
+# Gated behind `vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED` so this is a no-op until the
+# secrets/vars are configured. Required config to enable:
+#   vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED = 'true'
+#   vars.ROADMAP_REVIEW_NOTIFY_API_BASE     = https://api.relopass.com
+#   secrets.CRON_SECRET                     = (reused — same value the API checks)
+#
+# Test first with workflow_dispatch (dry_run=true) before relying on the schedule.
+
+on:
+  schedule:
+    # 17 minutes past every hour, off the top of the hour to avoid the cron pileup.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Resolve recipients and count, but send nothing"
+        type: boolean
+        default: false
+
+concurrency:
+  group: roadmap-review-notify
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  roadmap-review-notify:
+    name: Roadmap review notify sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.ROADMAP_REVIEW_NOTIFY_API_BASE }}   # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - name: POST /api/crons/roadmap-review-notify
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          url="${API_BASE}/api/crons/roadmap-review-notify"
+          if [ "${DRY_RUN:-}" = "true" ]; then url="${url}?dry_run=true"; fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${url}")
+          echo "$response"
+          {
+            echo "## Roadmap review notify sweep"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -186,6 +186,10 @@ backend/app/routers/crons.py:milestone_reminders
 backend/app/routers/crons.py:weekly_mobility_status
 # CRON (AIQ-1237): _verify_cron_secret(request) inline. Weekly (Mon 08:00 UTC)
 # overdue-steps digest to HR owners, invoked by the weekly-mobility-status workflow.
+backend/app/routers/crons.py:roadmap_review_notify
+# CRON (AIQ-1526): _verify_cron_secret(request) inline. Hourly safety-net that
+# (re)notifies HR about roadmaps stuck pending review, invoked by the
+# roadmap-review-notify workflow, not an end user.
 backend/app/routers/crons.py:recompute_source_reliability
 # CRON (N8/AIQ-848): _verify_cron_secret(request) inline. Nightly source-reliability
 # recompute, invoked by the scheduler, not an end user.
