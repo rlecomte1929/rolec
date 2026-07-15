@@ -2835,13 +2835,6 @@ interface PolicyEnvelopeResponse {
   message?: string;
 }
 
-interface CreateQuoteRequestResponse {
-  id: string;
-  case_id: string;
-  status: string;
-  created_at: string;
-}
-
 interface QuoteRequestListItem {
   id: string;
   case_id: string;
@@ -3068,19 +3061,9 @@ export const employeeAPI = {
   },
 
   // ── Quote requests (AIQ-65) ──────────────────────────────────────────────
-
-  createQuoteRequest: async (payload: {
-    case_id: string;
-    service_categories: string[];
-    // AIQ-1514: the vendors the employee shortlisted. item_id is a recommendation-engine
-    // id, meaningful only alongside its service_category — not a foreign key.
-    vendors?: Array<{ service_category: string; item_id: string; name: string }>;
-    notes?: string;
-    budget_range?: string;
-  }): Promise<CreateQuoteRequestResponse> => {
-    const response = await api.post<CreateQuoteRequestResponse>('/api/employee/quote-requests', payload);
-    return response.data;
-  },
+  // [AIQ-1525] The write path (createQuoteRequest → POST /api/employee/quote-requests) is
+  // retired: employees now request quotes via the canonical RFQ flow (servicesAPI.createRfq →
+  // POST /api/rfqs, a vendor shortlist). The read wrapper below stays for the historical rows.
 
   listMyQuoteRequests: async (): Promise<QuoteRequestListItem[]> => {
     const response = await api.get<QuoteRequestListItem[]>('/api/employee/quote-requests');

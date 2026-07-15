@@ -3223,106 +3223,22 @@ class _QuoteRequestBody(BaseModel):
     budget_range: Optional[str] = None
 
 
-@router.post("/{case_id}/quote-request", status_code=201)
+@router.post("/{case_id}/quote-request", status_code=410)
 def create_case_quote_request(
     case_id: str,
     body: _QuoteRequestBody,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
+    """RETIRED — [AIQ-1525].
+
+    Employee quote requests are consolidated onto the canonical RFQ system; submit via
+    POST /api/rfqs. This router is legacy (not the one serving prod), retained as a 410
+    tombstone so no path writes `quote_requests`. The table's historical rows stay readable.
     """
-    Employee submits a quote request for their relocation case (Step 4 / WZ4).
-    Creates an entry in the quote_requests table and returns the new record.
-    """
-    profile = main_db.get_profile_record(user.get("id"))
-    company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
-    if not company_id:
-        # Fallback: derive company_id from the case itself (employee may be
-        # assigned to a case without having an explicit company in their profile).
-        # Resolves WZ4/B11 — employees assigned via HR portal lack company_id.
-        try:
-            with main_db.engine.connect() as _conn:
-                # Cases created via POST /api/hr/cases are stored in relocation_cases
-                # (via db.create_case). The public.cases table only holds seed data.
-                _case_row = _conn.execute(
-                    _sql_text(
-                        "SELECT company_id FROM public.relocation_cases WHERE id::text = :cid"
-                    ),
-                    {"cid": case_id},
-                ).mappings().first()
-            if _case_row and _case_row.get("company_id"):
-                company_id = str(_case_row["company_id"])
-        except Exception:
-            pass
-    if not company_id:
-        raise HTTPException(status_code=403, detail="No company linked to this account.")
-
-    employee_id: str = str(user["id"])
-    new_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
-
-    # Serialise service categories for Postgres text[] column
-    services = body.services or []
-    cats_serialised = "{" + ",".join(f'"{s}"' for s in services) + "}"
-
-    try:
-        with main_db.engine.begin() as conn:
-            conn.execute(
-                _sql_text(
-                    """
-                    INSERT INTO public.quote_requests
-                        (id, case_id, employee_id, company_id,
-                         service_categories, notes, budget_range,
-                         status, created_at, updated_at)
-                    VALUES
-                        (:id, :case_id, :emp, :company,
-                         CAST(:cats AS text[]), :notes, :budget,
-                         'pending', :now, :now)
-                    """
-                ),
-                {
-                    "id": new_id,
-                    "case_id": case_id,
-                    "emp": employee_id,
-                    "company": company_id,
-                    "cats": cats_serialised,
-                    "notes": body.notes,
-                    "budget": body.budget_range,
-                    "now": now,
-                },
-            )
-            row = conn.execute(
-                _sql_text("SELECT * FROM public.quote_requests WHERE id = :id"),
-                {"id": new_id},
-            ).mappings().first()
-    except Exception:
-        logger.exception("quote-request: insert failed case_id=%s", case_id)
-        raise HTTPException(status_code=500, detail="Failed to create quote request")
-
-    if row is None:
-        raise HTTPException(status_code=500, detail="Quote request not found after insert")
-
-    d = dict(row)
-    # Normalise service_categories: Postgres returns list, text fallback is comma-str
-    sc = d.get("service_categories")
-    if isinstance(sc, str):
-        d["service_categories"] = [s.strip() for s in sc.split(",") if s.strip()]
-    elif sc is None:
-        d["service_categories"] = []
-    # Serialise datetimes
-    for k, v in list(d.items()):
-        if hasattr(v, "isoformat"):
-            try:
-                d[k] = v.isoformat()
-            except Exception:
-                d[k] = str(v)
-
-    return {
-        "rfq_id": d["id"],
-        "case_id": d["case_id"],
-        "status": d["status"],
-        "service_categories": d["service_categories"],
-        "created_at": d["created_at"],
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is retired. Submit quote requests via POST /api/rfqs.",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
