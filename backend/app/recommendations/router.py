@@ -169,7 +169,15 @@ def post_recommendations_batch(
 
     def _run_one(backend_key: str, criteria: Dict[str, Any]) -> tuple[str, Any | None]:
         dest_city_val = (criteria.get("destination_city") or "").strip()
-        if backend_key in ("living_areas", "schools", "movers") and not dest_city_val:
+        # AIQ-1550: living_areas/schools are ranked purely on the destination and stay gated.
+        # movers is different: it's served from HR's company-scoped curation (a hard allowlist),
+        # so a case with no destination city yet must STILL surface HR's curated movers instead
+        # of silently showing the "HR is finalizing" empty state. Only skip movers on a blank
+        # destination when there's no company to curate against (nothing meaningful to show).
+        if not dest_city_val and (
+            backend_key in ("living_areas", "schools")
+            or (backend_key == "movers" and not company_id)
+        ):
             log.warning(
                 "request_id=%s category=%s recommendations_batch skipped_missing_destination",
                 request_id, backend_key,

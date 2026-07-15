@@ -146,6 +146,18 @@ def apply_hr_curation(
         ordered.append(_custom_to_recommendation(c))
 
     if not ordered:
+        # AIQ-1550: distinguish "HR hasn't curated anything" (normal pending) from "HR curated,
+        # but none of their approved masters matched the engine's candidate item_ids" — the
+        # latter is a real defect (e.g. a service_catalog_items external_id backfill gap) worth
+        # surfacing loudly instead of silently showing the same empty state.
+        if approved_master_ids:
+            log.warning(
+                "hr_curation_filter: company=%s has %d approved %s master(s) (city=%s) but NONE "
+                "matched the engine candidates — likely a service_catalog_items external_id "
+                "mismatch. approved_master_ids=%s",
+                company_id, len(approved_master_ids), category, destination_city,
+                sorted(approved_master_ids),
+            )
         # Record the demand signal so HR can see who's waiting on what.
         # Best-effort — never raise on the filter path.
         try:
