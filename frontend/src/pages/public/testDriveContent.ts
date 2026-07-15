@@ -104,7 +104,7 @@ export const testDriveContent = {
   feedback: {
     header: 'See something off?',
     body:
-      'The feedback button sits bottom-right the whole time. Good or bad, one sentence is enough — attach a screenshot if it helps. Everything routes straight to Romain.',
+      'Once you start the test, the feedback button sits bottom-right the whole way through. Good or bad, one sentence is enough — attach a screenshot if it helps. Everything routes straight to Romain.',
   },
 
   // Dedicated, always-available exit to the survey (TD-5). Rendered on /test-drive

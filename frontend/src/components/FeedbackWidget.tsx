@@ -42,6 +42,25 @@ function makeReportId(category: Category): string {
   return `${TYPE_PREFIX[category]}-${date}-${rand}`;
 }
 
+/** TD-9 (AIQ-1544): the test-drive provision flow stashes the run's campaign slice in
+ *  localStorage (key `relopass_test_drive`). Read it so in-session feedback is attributed to
+ *  the tester's campaign + corridor + segment instead of landing unattributed. Best-effort —
+ *  returns {} when there's no session, storage is unavailable, or the value is malformed. */
+function readTestDriveSlice(): { campaign?: string; corridor_id?: string; tester_segment?: string } {
+  try {
+    const raw = window.localStorage.getItem('relopass_test_drive');
+    if (!raw) return {};
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    const out: { campaign?: string; corridor_id?: string; tester_segment?: string } = {};
+    if (typeof p.campaign === 'string' && p.campaign) out.campaign = p.campaign.slice(0, 64);
+    if (typeof p.corridor_id === 'string' && p.corridor_id) out.corridor_id = p.corridor_id.slice(0, 64);
+    if (typeof p.tester_segment === 'string' && p.tester_segment) out.tester_segment = p.tester_segment.slice(0, 32);
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 export function FeedbackWidget({ userId }: { userId: string | null }) {
   const [state, setState]         = useState<WidgetState>('idle');
   const [category, setCategory]   = useState<Category>('bug');
@@ -144,6 +163,8 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
         report_id: rid,
         screenshot_data: screenshot ?? null,
         client_context: collectDiagnostics(),
+        // TD-9 (AIQ-1544): attribute the feedback to the test-drive run when one is active.
+        ...readTestDriveSlice(),
       });
       setStorageNote(res.screenshot_storage ?? null);
       setState('success');
