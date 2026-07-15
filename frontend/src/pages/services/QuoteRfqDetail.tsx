@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { hrAPI, rfqAPI } from '../../api/client';
-import type { RfqDetail, QuoteDetail } from '../../api/client';
+import type { RfqDetail, QuoteDetail, RfqRecommendation, OverrideReasonCategory } from '../../api/client';
 import { HrRfqQuotesPolicyCapsSection } from '../../features/policy-config/HrRfqQuotesPolicyCapsSection';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
@@ -16,6 +16,11 @@ export const QuoteRfqDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [comparison, setComparison] = useState(false);
+  // [AIQ-1516] The best-value recommendation (HR/payer only). null until loaded / for employees.
+  const [recommendation, setRecommendation] = useState<RfqRecommendation | null>(null);
+  // The category HR picks when validating an offer OTHER than the recommendation (server 422s
+  // without it). Empty until chosen.
+  const [overrideCategory, setOverrideCategory] = useState<OverrideReasonCategory | ''>('');
   const [policyAssignmentType, setPolicyAssignmentType] = useState<string | null>(null);
   const [policyFamilyStatus, setPolicyFamilyStatus] = useState<string | null>(null);
 
@@ -37,6 +42,16 @@ export const QuoteRfqDetail: React.FC = () => {
       setRfq(rfqData);
       setQuotes(quotesData.quotes || []);
       if (forComparison) setComparison(true);
+      // [AIQ-1516] HR (the payer) also gets the best-value recommendation. Read-only and
+      // best-effort — a recommendation failure must never hide the quotes themselves.
+      if (isPayer) {
+        try {
+          const pv = await rfqAPI.getPayerView(rfqId);
+          setRecommendation(pv.recommendation);
+        } catch {
+          setRecommendation(null);
+        }
+      }
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -88,10 +103,23 @@ export const QuoteRfqDetail: React.FC = () => {
   // an employee pressing "Accept" used to approve the company's money.
   const handleAccept = async (quoteId: string) => {
     if (!rfqId) return;
+    // [AIQ-1516] Validating an offer OTHER than the recommendation requires a reason category —
+    // the server enforces this (422); we catch it here first so HR gets a clear prompt, not a 422.
+    const isRecommended =
+      !!recommendation?.recommended_quote_id && recommendation.recommended_quote_id === quoteId;
+    if (isPayer && recommendation?.recommended_quote_id && !isRecommended && !overrideCategory) {
+      setError('This is not the recommended offer — choose why you are overriding the recommendation.');
+      return;
+    }
     setAcceptingId(quoteId);
     try {
       if (isPayer) {
-        await rfqAPI.acceptQuote(rfqId, quoteId);
+        await rfqAPI.acceptQuote(
+          rfqId,
+          quoteId,
+          undefined,
+          isRecommended ? undefined : (overrideCategory || undefined),
+        );
       } else {
         await rfqAPI.proposeQuote(rfqId, quoteId);
       }
@@ -169,6 +197,62 @@ export const QuoteRfqDetail: React.FC = () => {
           />
         ) : null}
 
+        {/* [AIQ-1516] Best-value recommendation — HR/payer only. A narrative with cited reasons,
+            never a bare score. REFUSED means ranking would mislead; we show the reason, not a pick. */}
+        {isPayer && recommendation && !hasAccepted ? (
+          <div
+            data-testid="rfq-recommendation"
+            className={`rounded-lg border p-4 ${
+              recommendation.confidence === 'REFUSED'
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-[#1f8e8b] bg-[#f0f9f8]'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-[#0b2b43]">Best-value recommendation</h3>
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-[#1f8e8b] border border-[#1f8e8b]">
+                {recommendation.confidence}
+              </span>
+            </div>
+            <p className="mt-2 text-sm font-medium text-[#0b2b43]">{recommendation.headline}</p>
+            {recommendation.refused_reason ? (
+              <p className="mt-1 text-sm text-amber-800">{recommendation.refused_reason}</p>
+            ) : null}
+            {recommendation.reasons?.length ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[#334155]">
+                {recommendation.reasons.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            ) : null}
+            {recommendation.trade_offs?.length ? (
+              <div className="mt-2 text-sm text-[#64748b]">
+                <span className="font-medium">Trade-offs: </span>
+                {recommendation.trade_offs.join(' ')}
+              </div>
+            ) : null}
+            {recommendation.recommended_quote_id ? (
+              <div className="mt-3 border-t border-[#d1e7e5] pt-3">
+                <label htmlFor="override-reason" className="block text-xs text-[#64748b]">
+                  Validating a different offer than recommended? Choose why:
+                </label>
+                <select
+                  id="override-reason"
+                  data-testid="rfq-override-reason"
+                  value={overrideCategory}
+                  onChange={(e) => setOverrideCategory(e.target.value as OverrideReasonCategory | '')}
+                  className="mt-1 rounded-md border border-[#cbd5e1] px-2 py-1 text-sm"
+                >
+                  <option value="">— select a reason —</option>
+                  <option value="employee_preference">Employee preference</option>
+                  <option value="preferred_supplier">Preferred supplier</option>
+                  <option value="negotiated_terms">Negotiated terms</option>
+                  <option value="policy_exception">Policy exception</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <div>
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-[#0b2b43]">Quotes</h3>
@@ -190,7 +274,17 @@ export const QuoteRfqDetail: React.FC = () => {
                     q.status === 'accepted' ? 'border-green-500 bg-green-50' : 'border-[#e2e8f0]'
                   }`}
                 >
-                  <div className="font-medium">Vendor {q.vendor_id.slice(0, 8)}…</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Vendor {q.vendor_id.slice(0, 8)}…</span>
+                    {isPayer && recommendation?.recommended_quote_id === q.id ? (
+                      <span
+                        data-testid="rfq-recommended-badge"
+                        className="rounded-full bg-[#1f8e8b] px-2 py-0.5 text-xs font-medium text-white"
+                      >
+                        Recommended
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="mt-1 text-lg font-semibold">
                     {q.currency} {q.total_amount.toLocaleString()}
                   </div>

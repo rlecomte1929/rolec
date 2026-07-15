@@ -46,7 +46,9 @@ def _engine():
             "CREATE TABLE rfqs (id TEXT, rfq_ref TEXT, case_id TEXT, created_by_user_id TEXT, "
             "status TEXT, created_at TEXT, canonical_case_id TEXT, preferred_quote_id TEXT, "
             "preferred_by_user_id TEXT, preferred_at TEXT, validated_quote_id TEXT, "
-            "validated_by_user_id TEXT, validated_at TEXT, validation_reason TEXT)"
+            "validated_by_user_id TEXT, validated_at TEXT, validation_reason TEXT, "
+            # [AIQ-1516] frozen recommendation + structured override (jsonb in PG; TEXT is fine here)
+            "recommendation_snapshot TEXT, was_recommended BOOLEAN, override_reason_category TEXT)"
         ))
         c.execute(text("CREATE TABLE rfq_items (id TEXT, rfq_id TEXT, service_key TEXT, requirements TEXT, created_at TEXT)"))
         c.execute(text("CREATE TABLE rfq_recipients (id TEXT, rfq_id TEXT, vendor_id TEXT, status TEXT)"))
@@ -192,6 +194,28 @@ class ValidateTests(unittest.TestCase):
 
     def test_unknown_quote_is_reported_not_silently_accepted(self):
         self.assertFalse(_Host(_engine()).validate_rfq_quote("rfq-1", "nope", "hr-1", None)["ok"])
+
+    def test_recommendation_and_override_are_frozen_onto_the_rfq(self):
+        # [AIQ-1516] The narrative HR signed off on, plus whether they took the engine's pick and
+        # (on override) why, are recorded on the SAME row as the decision — one source of truth.
+        e = _engine()
+        snapshot = {"confidence": "MEDIUM", "headline": "Best value", "reasons": ["cheapest"]}
+        res = _Host(e).validate_rfq_quote(
+            "rfq-1", "q-win", "hr-1", "override reason text",
+            recommendation_snapshot=snapshot,
+            was_recommended=False,
+            override_reason_category="employee_preference",
+        )
+        self.assertTrue(res["ok"])
+        with e.connect() as conn:
+            row = conn.execute(text(
+                "SELECT recommendation_snapshot, was_recommended, override_reason_category "
+                "FROM rfqs WHERE id='rfq-1'"
+            )).fetchone()
+        import json as _json
+        self.assertEqual(_json.loads(row[0])["confidence"], "MEDIUM")  # frozen jsonb payload
+        self.assertIn(row[1], (0, False))  # SQLite stores the bool as 0
+        self.assertEqual(row[2], "employee_preference")
 
 
 class AuthWiringTests(unittest.TestCase):

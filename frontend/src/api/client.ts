@@ -3197,6 +3197,31 @@ export const servicesAPI = {
   },
 };
 
+/** [AIQ-1516] The 5 categories HR must pick from when overriding the recommendation. */
+export type OverrideReasonCategory =
+  | 'employee_preference'
+  | 'preferred_supplier'
+  | 'negotiated_terms'
+  | 'policy_exception'
+  | 'other';
+
+/** [AIQ-1516] Best-value recommendation. `confidence: 'REFUSED'` (with `refused_reason`) means
+ *  ranking would mislead — render the reason, not a pick. Never a bare score. */
+export interface RfqRecommendation {
+  recommended_quote_id: string | null;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'REFUSED';
+  headline: string;
+  reasons: string[];
+  trade_offs: string[];
+  refused_reason?: string;
+}
+
+export interface PayerView {
+  rfq_id: string;
+  quotes: QuoteDetail[];
+  recommendation: RfqRecommendation;
+}
+
 export const rfqAPI = {
   listByAssignment: async (assignmentId: string): Promise<{ rfqs: RfqSummary[] }> => {
     const response = await api.get<{ rfqs: RfqSummary[] }>(`/api/employee/assignments/${assignmentId}/rfqs`);
@@ -3214,13 +3239,30 @@ export const rfqAPI = {
     const response = await api.get<{ rfq_id: string; quotes: QuoteDetail[] }>(`/api/rfqs/${rfqId}/quotes`, { params });
     return response.data;
   },
+  /** [AIQ-1516] The best-value recommendation for an RFQ's offers. Read-only; grounded only in
+   *  signals that exist (price vs market, quality when reviews suffice) and REFUSES to rank when
+   *  that would mislead (currency mismatch, a single offer). HR still validates via acceptQuote. */
+  getPayerView: async (rfqId: string): Promise<PayerView> => {
+    const response = await api.get<PayerView>(`/api/rfqs/${rfqId}/payer-view`);
+    return response.data;
+  },
   /** AIQ-1524: HR (the payer) validates the offer the company will pay for. HR-only — an
    *  employee calling this gets a 403. `reason` is recorded and shown back to the employee,
-   *  and matters most when HR validates something other than what the employee proposed. */
-  acceptQuote: async (rfqId: string, quoteId: string, reason?: string): Promise<{ ok: boolean; quote: QuoteDetail }> => {
+   *  and matters most when HR validates something other than what the employee proposed.
+   *  [AIQ-1516] `overrideReasonCategory` is required by the server (422) when HR validates an
+   *  offer other than the recommendation. */
+  acceptQuote: async (
+    rfqId: string,
+    quoteId: string,
+    reason?: string,
+    overrideReasonCategory?: OverrideReasonCategory,
+  ): Promise<{ ok: boolean; quote: QuoteDetail }> => {
+    const body: Record<string, string> = {};
+    if (reason) body.reason = reason;
+    if (overrideReasonCategory) body.override_reason_category = overrideReasonCategory;
     const response = await api.patch<{ ok: boolean; quote: QuoteDetail }>(
       `/api/rfqs/${rfqId}/quotes/${quoteId}/accept`,
-      reason ? { reason } : {},
+      body,
     );
     return response.data;
   },

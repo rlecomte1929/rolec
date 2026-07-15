@@ -52,10 +52,17 @@ def test_validate_quote_emits_quote_accepted(monkeypatch, captured_events):
         },
     )
     monkeypatch.setattr(m, "_require_case_id_assignment_visible", lambda case_id, user: {"id": "a-1"})
+    # [AIQ-1516] accept_quote now computes a recommendation first (to freeze it + set
+    # was_recommended). With no quotes it REFUSES → recommended_id is None → no override gate.
+    monkeypatch.setattr(
+        m.db,
+        "get_payer_signals",
+        lambda rfq_id, request_id=None: {"quotes": [], "snapshot_by_vendor": {}, "service_category": None},
+    )
     monkeypatch.setattr(
         m.db,
         "validate_rfq_quote",
-        lambda rfq_id, quote_id, user_id, reason, request_id=None: {
+        lambda rfq_id, quote_id, user_id, reason, request_id=None, **kwargs: {
             "ok": True,
             "quote_id": quote_id,
             "rfq_id": rfq_id,
