@@ -164,6 +164,57 @@ class VendorsMixin:
                 q["quote_lines"] = self._rows_to_list(line_rows)
         return quotes
 
+    def get_payer_signals(
+        self, rfq_id: str, request_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """[AIQ-1516] Everything the best-value recommendation needs, in one read.
+
+        Returns quotes enriched with `supplier_name`, plus `snapshot_by_vendor` (the latest
+        vendor_metric_snapshots row per quoting vendor for this RFQ's service) and the RFQ's
+        `service_category`. Signals absent from these tables simply come back missing — the
+        engine degrades rather than imputes.
+        """
+        quotes = self.list_quotes_for_rfq(rfq_id, request_id=request_id)
+        with self.engine.connect() as conn:
+            svc_row = conn.execute(
+                text("SELECT service_key FROM rfq_items WHERE rfq_id = :id ORDER BY created_at LIMIT 1"),
+                {"id": rfq_id},
+            ).fetchone()
+            service_category = (self._row_to_dict(svc_row) or {}).get("service_key")
+
+            vendor_ids = sorted({str(q.get("vendor_id")) for q in quotes if q.get("vendor_id")})
+            names: Dict[str, str] = {}
+            snapshot_by_vendor: Dict[str, Dict[str, Any]] = {}
+            if vendor_ids:
+                for r in conn.execute(
+                    text("SELECT id, name FROM suppliers WHERE id = ANY(:ids)"),
+                    {"ids": vendor_ids},
+                ).fetchall():
+                    d = self._row_to_dict(r) or {}
+                    names[str(d.get("id"))] = d.get("name")
+                # Latest snapshot per vendor for this service. DISTINCT ON keeps the newest row.
+                for r in conn.execute(
+                    text(
+                        "SELECT DISTINCT ON (supplier_id) supplier_id, avg_cost_eur, avg_rating, "
+                        "review_count FROM vendor_metric_snapshots "
+                        "WHERE supplier_id = ANY(:ids) "
+                        "  AND (:svc IS NULL OR service_category = :svc) "
+                        "ORDER BY supplier_id, captured_date DESC"
+                    ),
+                    {"ids": vendor_ids, "svc": service_category},
+                ).fetchall():
+                    d = self._row_to_dict(r) or {}
+                    snapshot_by_vendor[str(d.get("supplier_id"))] = d
+
+        for q in quotes:
+            q["supplier_name"] = names.get(str(q.get("vendor_id")))
+
+        return {
+            "quotes": quotes,
+            "snapshot_by_vendor": snapshot_by_vendor,
+            "service_category": service_category,
+        }
+
     def create_quote(
         self,
         rfq_id: str,
@@ -283,6 +334,10 @@ class VendorsMixin:
         user_id: Optional[str],
         reason: Optional[str],
         request_id: Optional[str] = None,
+        *,
+        recommendation_snapshot: Optional[Dict[str, Any]] = None,
+        was_recommended: Optional[bool] = None,
+        override_reason_category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """AIQ-1524: HR (the payer) validates the offer the company will pay for.
 
@@ -326,6 +381,9 @@ class VendorsMixin:
                           validated_by_user_id = :user_id,
                           validated_at = :now,
                           validation_reason = :reason,
+                          recommendation_snapshot = :rec,
+                          was_recommended = :was_recommended,
+                          override_reason_category = :override_cat,
                           status = 'closed'
                     WHERE id = :rfq_id""",
                 {
@@ -333,6 +391,13 @@ class VendorsMixin:
                     "user_id": user_id,
                     "now": now,
                     "reason": reason,
+                    # [AIQ-1516] Freeze the reasoning HR signed off on — it must survive later
+                    # changes to vendor_metric_snapshots. Bind the JSON string straight into the
+                    # jsonb column with NO cast — Postgres accepts it (verified) and it mirrors
+                    # create_rfq_item; a CAST(... AS jsonb) would coerce to 0 on SQLite in tests.
+                    "rec": json.dumps(recommendation_snapshot) if recommendation_snapshot is not None else None,
+                    "was_recommended": was_recommended,
+                    "override_cat": override_reason_category,
                     "rfq_id": rfq_id,
                 },
                 op_name="validate_rfq",

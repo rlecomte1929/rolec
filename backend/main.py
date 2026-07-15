@@ -9230,10 +9230,47 @@ def list_quotes_for_rfq(
     return {"rfq_id": rfq_id, "quotes": quotes}
 
 
+def _compute_rfq_recommendation(rfq_id: str, request_id: Optional[str] = None) -> Dict[str, Any]:
+    """[AIQ-1516] The best-value recommendation for an RFQ's quotes, grounded in real signals.
+
+    Shared by the read (payer-view) and the write (validation freezes this exact snapshot). Pure
+    once the signals are fetched — see rfq_evaluation_service.recommend."""
+    from .app.services.rfq_evaluation_service import recommend
+    sig = db.get_payer_signals(rfq_id, request_id=request_id)
+    rec = recommend(sig["quotes"], sig.get("snapshot_by_vendor") or {})
+    return {"quotes": sig["quotes"], "recommendation": rec}
+
+
+@app.get("/api/rfqs/{rfq_id}/payer-view")
+def rfq_payer_view(
+    rfq_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """[AIQ-1516] HR (the payer) sees every offer side by side + a best-value recommendation.
+
+    Read-only. The recommendation is a narrative grounded only in signals that exist for these
+    quotes (price vs vendor_metric_snapshots, quality when reviews suffice); it REFUSES to rank
+    when that would mislead (currency mismatch, a single offer, no comparable total). HR still
+    validates via the HR-only /accept path — this endpoint commits nothing.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    rfq = db.get_rfq(rfq_id, request_id=request_id)
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_access(rfq["case_id"], user)
+    out = _compute_rfq_recommendation(rfq_id, request_id=request_id)
+    return {"rfq_id": rfq_id, **out}
+
+
 class ValidateQuoteRequest(BaseModel):
     """AIQ-1524: HR records WHY it validated this offer — required reading for the employee
-    when HR picks something other than what they proposed."""
+    when HR picks something other than what they proposed.
+
+    AIQ-1516: `override_reason_category` is REQUIRED (422 otherwise) when HR validates a quote
+    other than the engine's recommendation — so the override rate is measurable, not guessed."""
     reason: Optional[str] = None
+    override_reason_category: Optional[str] = None
 
 
 @app.patch("/api/rfqs/{rfq_id}/quotes/{quote_id}/propose")
@@ -9287,12 +9324,28 @@ def accept_quote(
         raise HTTPException(status_code=404, detail="RFQ not found")
     _ = _require_case_id_assignment_visible(rfq["case_id"], user)
 
+    # [AIQ-1516] Compute the recommendation now and FREEZE it onto the RFQ, so the reasoning HR
+    # signed off on survives later changes to vendor_metric_snapshots. `was_recommended` powers
+    # the override-rate metric; overriding the recommendation REQUIRES a category (422 otherwise).
+    override_cat = body.override_reason_category if body else None
+    rec = _compute_rfq_recommendation(rfq_id, request_id=request_id).get("recommendation") or {}
+    recommended_id = rec.get("recommended_quote_id")
+    was_recommended = (recommended_id is not None and str(quote_id) == str(recommended_id))
+    if recommended_id is not None and not was_recommended and not override_cat:
+        raise HTTPException(
+            status_code=422,
+            detail="Validating an offer other than the recommendation requires override_reason_category.",
+        )
+
     result = db.validate_rfq_quote(
         rfq_id,
         quote_id,
         user.get("id"),
         (body.reason if body else None),
         request_id=request_id,
+        recommendation_snapshot=rec or None,
+        was_recommended=(was_recommended if recommended_id is not None else None),
+        override_reason_category=override_cat,
     )
     if not result.get("ok"):
         raise HTTPException(status_code=404, detail="Quote not found")
