@@ -45,11 +45,14 @@ class TestTestDriveReferral(unittest.TestCase):
 
     def test_referral_creates_prospect_and_pilot_event(self):
         db = MagicMock()
+        # AIQ-1542: first submit for this session (no prior survey row) → pipeline runs.
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
         session = MagicMock()
         session_local = MagicMock()
         session_local.return_value.__enter__.return_value = session
         with patch.dict(os.environ, _ENABLED, clear=False), \
                 patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._session_context", return_value=(None, None)), \
                 patch("backend.app.routers.test_drive._emit_funnel_event") as emit, \
                 patch("backend.app.db.SessionLocal", session_local):
             resp = self.client.post("/api/test-drive/survey", json=_survey_body())
@@ -81,6 +84,7 @@ class TestTestDriveReferral(unittest.TestCase):
         session_local.return_value.__enter__.return_value = session
         with patch.dict(os.environ, _ENABLED, clear=False), \
                 patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._session_context", return_value=(None, None)), \
                 patch("backend.app.routers.test_drive._emit_funnel_event") as emit, \
                 patch("backend.app.db.SessionLocal", session_local):
             resp = self.client.post(
@@ -92,6 +96,43 @@ class TestTestDriveReferral(unittest.TestCase):
         events = [c.kwargs.get("event_type") for c in emit.call_args_list]
         self.assertNotIn("pilot-interested", events)
         self.assertNotIn("intro", events)
+
+
+    def test_session_context_derives_campaign_and_corridor(self):
+        """AIQ-1546: campaign + corridor are taken from the linked session (source of
+        truth) and override the body's often-absent/stale values, flowing into the
+        funnel events and the prospect row."""
+        db = MagicMock()
+        # AIQ-1542: first submit for this session (no prior survey row) → pipeline runs.
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
+        session = MagicMock()
+        session_local = MagicMock()
+        session_local.return_value.__enter__.return_value = session
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._session_context", return_value=("qa-camp", "IN_DE")), \
+                patch("backend.app.routers.test_drive._emit_funnel_event") as emit, \
+                patch("backend.app.db.SessionLocal", session_local):
+            # Body carries NO corridor and a DIFFERENT campaign — the session must win.
+            resp = self.client.post(
+                "/api/test-drive/survey", json=_survey_body(corridor_id=None, campaign="body-camp"),
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        intro = [c for c in emit.call_args_list if c.kwargs.get("event_type") == "intro"][0]
+        self.assertEqual(intro.kwargs.get("corridor_id"), "IN_DE")
+        self.assertEqual(intro.kwargs.get("campaign"), "qa-camp")
+        raw = json.loads(session.add.call_args.args[0].raw_input_json)
+        self.assertEqual(raw["corridor_id"], "IN_DE")
+        self.assertEqual(raw["campaign"], "qa-camp")
+
+
+    def test_invalid_lead_in_email_rejected(self):
+        """AIQ-1543: a non-empty but malformed lead-in email is rejected server-side (422)."""
+        with patch.dict(os.environ, _ENABLED, clear=False):
+            resp = self.client.post(
+                "/api/test-drive/survey", json=_survey_body(tester_email="notanemail"),
+            )
+        self.assertEqual(resp.status_code, 422, resp.text)
 
 
 if __name__ == "__main__":

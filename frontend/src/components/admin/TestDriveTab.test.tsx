@@ -116,6 +116,7 @@ describe('TestDriveTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'London → New York' }));
 
     await waitFor(() => expect(mockOverview).toHaveBeenCalledTimes(2));
-    expect(mockOverview).toHaveBeenLastCalledWith({ corridor: 'GB_US', segment: undefined });
+    // AIQ-1537: the slice now carries the (default) campaign alongside corridor/segment.
+    expect(mockOverview).toHaveBeenLastCalledWith({ corridor: 'GB_US', segment: undefined, campaign: 'insead-2026' });
   });
 });

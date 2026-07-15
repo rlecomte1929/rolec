@@ -54,6 +54,8 @@ class TestTestDriveSurvey(unittest.TestCase):
 
     def test_valid_submission_persists_row(self):
         db = MagicMock()
+        # AIQ-1542: no prior survey row for this session (first submit) → straight INSERT.
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
         with patch.dict(os.environ, _ENABLED, clear=False), \
                 patch("backend.app.routers.test_drive.db", db):
             resp = self.client.post("/api/test-drive/survey", json=_body())
@@ -61,12 +63,11 @@ class TestTestDriveSurvey(unittest.TestCase):
         data = resp.json()
         self.assertTrue(data["ok"])
         self.assertTrue(data["response_id"])
-        # one INSERT into survey_responses attempted
+        # exactly one INSERT into survey_responses (the AIQ-1542 dedupe SELECT also names the
+        # table, so match the INSERT specifically).
         db.engine.begin.assert_called()
         conn = db.engine.begin.return_value.__enter__.return_value
-        # The survey INSERT shares the mocked engine with TD-7/TD-8 funnel writes, so
-        # find the survey_responses INSERT among the calls rather than asserting exactly once.
-        survey_calls = [c for c in conn.execute.call_args_list if "survey_responses" in str(c.args[0])]
+        survey_calls = [c for c in conn.execute.call_args_list if "INSERT INTO survey_responses" in str(c.args[0])]
         self.assertEqual(len(survey_calls), 1)
         bound = survey_calls[0].args[1]
         self.assertEqual(bound["tester_sector"], "energy")
@@ -117,6 +118,31 @@ class TestTestDriveSurvey(unittest.TestCase):
                 patch("backend.app.routers.test_drive.db", db):
             resp = self.client.post("/api/test-drive/survey", json=_body(q3_problem_fit="maybe"))
         self.assertEqual(resp.status_code, 422, resp.text)
+
+    def test_malformed_session_id_returns_422(self):
+        # AIQ-1540: a non-UUID session_id must 422 (it used to 500 on CAST(:id AS uuid)).
+        db = MagicMock()
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/survey", json=_body(session_id="not-a-uuid"))
+        self.assertEqual(resp.status_code, 422, resp.text)
+
+    def test_resubmit_replaces_row_not_duplicates(self):
+        # AIQ-1542: a second survey for the same session replaces the row (DELETE precedes the
+        # INSERT) rather than duplicating it, and the one-time 'surveyed' event does not re-fire.
+        db = MagicMock()
+        conn = db.engine.begin.return_value.__enter__.return_value
+        conn.execute.return_value.first.return_value = (1,)  # a prior survey row exists
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._emit_funnel_event") as emit:
+            resp = self.client.post("/api/test-drive/survey", json=_body())
+        self.assertEqual(resp.status_code, 200, resp.text)
+        sqls = [str(c.args[0]) for c in conn.execute.call_args_list]
+        self.assertTrue(any("DELETE FROM survey_responses" in s for s in sqls), "expected a dedupe DELETE")
+        self.assertTrue(any("INSERT INTO survey_responses" in s for s in sqls), "expected the replacement INSERT")
+        events = [kw.get("event_type") for _, kw in emit.call_args_list]
+        self.assertNotIn("surveyed", events)  # a re-submit must not re-count the tester
 
     def test_route_registered_in_both_apps(self):
         from backend.main import app as prod_app

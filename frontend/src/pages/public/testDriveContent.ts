@@ -104,7 +104,7 @@ export const testDriveContent = {
   feedback: {
     header: 'See something off?',
     body:
-      'The feedback button sits bottom-right the whole time. Good or bad, one sentence is enough — attach a screenshot if it helps. Everything routes straight to Romain.',
+      'Once you start the test, the feedback button sits bottom-right the whole way through. Good or bad, one sentence is enough — attach a screenshot if it helps. Everything routes straight to Romain.',
   },
 
   // Dedicated, always-available exit to the survey (TD-5). Rendered on /test-drive
@@ -140,6 +140,13 @@ export const testDriveContent = {
     // email keeps the identifier consistent with the sign-in field.
     emailLabel: 'Email',
     passwordLabel: 'Password',
+    // AIQ-1539: the credentials block had no way to actually reach the login page — the
+    // only sign-in affordance was the top nav, screens away. Give testers a direct link,
+    // and one plain line stating where the test ends and that the survey is required.
+    signInCta: 'Sign in →',
+    signInHref: '/auth?mode=login',
+    doneNote:
+      "You're done when the employee reaches the roadmap. Then mark your test complete below and fill in the short survey — it's required, and it's how your feedback reaches me.",
     completeCta: "I've completed my test",
   },
 

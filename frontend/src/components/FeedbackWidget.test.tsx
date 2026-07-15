@@ -51,6 +51,34 @@ describe('FeedbackWidget', () => {
     await waitFor(() => expect(screen.getByText(/received/i)).toBeInTheDocument());
   });
 
+  it('[AIQ-1544] TD-9: attributes feedback to the active test-drive run', async () => {
+    // jsdom exposes no working localStorage here — shim a Map-backed one on window.
+    const store = new Map<string, string>([
+      [
+        'relopass_test_drive',
+        JSON.stringify({ campaign: 'insead-2026', corridor_id: 'GB_US', tester_segment: 'prospect', session_id: 's1' }),
+      ],
+    ]);
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v); },
+        removeItem: (k: string) => { store.delete(k); },
+        clear: () => store.clear(),
+      },
+    });
+    mockSubmit.mockResolvedValue({ ok: true, report_id: 'BUG-x' });
+    render(<FeedbackWidget userId="u1" />);
+    openAndType('lost on the roadmap step');
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalledTimes(1));
+    const arg = mockSubmit.mock.calls[0][0];
+    expect(arg.campaign).toBe('insead-2026');
+    expect(arg.corridor_id).toBe('GB_US');
+    expect(arg.tester_segment).toBe('prospect');
+  });
+
   it('does not submit an empty message', () => {
     render(<FeedbackWidget userId="u1" />);
     fireEvent.click(screen.getByLabelText('Give feedback'));
