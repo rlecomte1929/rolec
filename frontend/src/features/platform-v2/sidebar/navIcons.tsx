@@ -23,7 +23,6 @@ import {
   Layers,
   BrainCircuit,
   ClipboardList,
-  Star,
   Plane,
   Gauge,
   Radar,
@@ -59,7 +58,6 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   documents: Upload,
   dossier: Files,
   'service-providers': Briefcase,
-  'preferred-suppliers': Star,
   'benefit-comparison': BarChart3,
   inbox: MessageSquare,
 

@@ -97,7 +97,6 @@ export const ROUTE_DEFS = {
   caseResources: { path: '/cases/:caseId/resources', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrMessages: { path: '/hr/messages', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrResources: { path: '/hr/resources', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  hrPreferredSuppliers: { path: '/hr/preferred-suppliers', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrVendorCuration: { path: '/hr/vendor-curation', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrProviderGrid: { path: '/hr/provider-grid', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** [NAV-SP-1] Service Providers — grouped surface with Dashboard / Vendor

@@ -3426,28 +3426,6 @@ export interface TimelineMilestone {
   links?: Array<{ id: string; linked_entity_type: string; linked_entity_id: string }>;
 }
 
-export const hrPreferredSuppliersAPI = {
-  list: async (serviceCategory?: string): Promise<{ preferred: Array<Record<string, unknown>> }> => {
-    const params = serviceCategory ? { service_category: serviceCategory } : {};
-    const response = await api.get<{ preferred: Array<Record<string, unknown>> }>('/api/hr/preferred-suppliers', { params });
-    return response.data;
-  },
-  add: async (payload: {
-    supplier_id: string;
-    service_category?: string;
-    priority_rank?: number;
-    notes?: string;
-  }) => {
-    const response = await api.post<unknown>('/api/hr/preferred-suppliers', payload);
-    return response.data;
-  },
-  remove: async (supplierId: string, serviceCategory?: string) => {
-    const params = serviceCategory ? { service_category: serviceCategory } : {};
-    const response = await api.delete<unknown>(`/api/hr/preferred-suppliers/${supplierId}`, { params });
-    return response.data;
-  },
-};
-
 export const hrPolicyAPI = {
   list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: unknown[] }> => {
     const response = await api.get<{ policies: unknown[] }>('/api/hr/policies', { params: params || {} });
