@@ -37,7 +37,7 @@ import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import text
 
 from ... import db_config
@@ -312,6 +312,12 @@ _SURVEY_COLUMNS = (
 ).split()
 
 
+# AIQ-1543: a pragmatic address shape (local@domain.tld). Deliberately not RFC-strict —
+# it rejects the obvious garbage the lead-in used to accept while never blocking a real
+# address. Mirrors the client-side check in TestDriveSurveyPage.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class SurveyRequest(BaseModel):
     session_id: Optional[str] = Field(None, max_length=64)
     campaign: Optional[str] = Field(None, max_length=64)
@@ -337,6 +343,21 @@ class SurveyRequest(BaseModel):
     referral_company_role: Optional[str] = Field(None, max_length=200)
     referral_contact: Optional[str] = Field(None, max_length=300)
     referral_consent: bool = False
+
+    @field_validator("tester_email")
+    @classmethod
+    def _validate_tester_email(cls, v: Optional[str]) -> Optional[str]:
+        # AIQ-1543: the email stays optional — an omitted/blank value is fine — but a
+        # non-empty one must look like an address, so the lead-in no longer accepts
+        # (and the admin thank-you mailto no longer breaks on) garbage like "notanemail".
+        if v is None:
+            return v
+        s = v.strip()
+        if not s:
+            return None
+        if not _EMAIL_RE.match(s):
+            raise ValueError("Enter a valid email address.")
+        return s
 
 
 def _propagate_tester_segment(session_id: Optional[str], tester_segment: Optional[str]) -> None:

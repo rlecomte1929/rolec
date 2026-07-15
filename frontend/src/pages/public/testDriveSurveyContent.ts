@@ -31,7 +31,7 @@ export const testDriveSurveyContent = {
   aboutYou: {
     header: 'About you',
     name: { label: 'Your name' },
-    email: { label: 'Your email', helper: 'For follow-up only.' },
+    email: { label: 'Your email', helper: 'For follow-up only.', invalid: 'Enter a valid email address.' },
     companyRole: { label: 'Company & role', helper: 'Optional; helps me understand whose feedback this is.' },
     sector: {
       label: 'Sector / industry',

@@ -87,6 +87,13 @@ export const TestDriveSurveyPage: React.FC = () => {
       setError(c.segment.required);
       return;
     }
+    // AIQ-1543: validate the optional lead-in email client-side (a blank email is fine).
+    // The server rejects a bad address too; this just surfaces it before the round-trip.
+    const emailTrimmed = form.tester_email.trim();
+    if (emailTrimmed && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrimmed)) {
+      setError(c.aboutYou.email.invalid);
+      return;
+    }
     setState('submitting');
     setError(null);
     const payload: SurveyInput = {

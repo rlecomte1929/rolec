@@ -122,5 +122,14 @@ class TestTestDriveReferral(unittest.TestCase):
         self.assertEqual(raw["campaign"], "qa-camp")
 
 
+    def test_invalid_lead_in_email_rejected(self):
+        """AIQ-1543: a non-empty but malformed lead-in email is rejected server-side (422)."""
+        with patch.dict(os.environ, _ENABLED, clear=False):
+            resp = self.client.post(
+                "/api/test-drive/survey", json=_survey_body(tester_email="notanemail"),
+            )
+        self.assertEqual(resp.status_code, 422, resp.text)
+
+
 if __name__ == "__main__":
     unittest.main()
