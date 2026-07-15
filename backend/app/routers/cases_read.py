@@ -2063,6 +2063,7 @@ def _budget_categories_from_policy_config(
     assignment_type: Optional[str],
     family_status: Optional[str],
     estimates: Optional[Dict[str, Dict[str, Any]]] = None,
+    caps_by_key: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Build the per-service budget rows from the company's published policy_config
     caps. Each intake service sums the currency caps of its mapped benefit keys.
@@ -2070,22 +2071,25 @@ def _budget_categories_from_policy_config(
     cap is set for that service)."""
     services = selected_services or ["housing", "moving", "immigration"]
 
-    caps_by_key: Dict[str, Dict[str, Any]] = {}
-    if company_id:
-        try:
-            from ..services.policy_config_matrix_service import PolicyConfigMatrixService
-            svc = PolicyConfigMatrixService(main_db)
-            bundle = svc.caps_payload(
-                company_id,
-                assignment_type=assignment_type,
-                family_status=family_status,
-                benefit_keys=None,
-            )
-            caps_by_key = {
-                str(c.get("benefit_key")): c for c in (bundle.get("caps") or [])
-            }
-        except Exception:
-            logger.exception("budget-summary: policy_config caps read failed company=%s", company_id)
+    # AIQ-1551: reuse a caller-provided caps map (get_budget_summary resolves it once,
+    # to avoid a second caps_payload). Fetch here only when not supplied.
+    if caps_by_key is None:
+        caps_by_key = {}
+        if company_id:
+            try:
+                from ..services.policy_config_matrix_service import PolicyConfigMatrixService
+                svc = PolicyConfigMatrixService(main_db)
+                bundle = svc.caps_payload(
+                    company_id,
+                    assignment_type=assignment_type,
+                    family_status=family_status,
+                    benefit_keys=None,
+                )
+                caps_by_key = {
+                    str(c.get("benefit_key")): c for c in (bundle.get("caps") or [])
+                }
+            except Exception:
+                logger.exception("budget-summary: policy_config caps read failed company=%s", company_id)
 
     from ..services.policy_config_cap_compare import NORMALIZED_CURRENCY_AMOUNT
 
@@ -2135,6 +2139,67 @@ def _budget_categories_from_policy_config(
             "status": status,
         })
     return categories
+
+
+class HrPolicyCap(BaseModel):
+    """[AIQ-1551] One published HR-policy Cost Allowance Package, employee-facing.
+
+    ``amount`` stays null for a covered-but-unquantified benefit — we never fabricate a
+    number (same honesty rule as the per-service budget rows)."""
+    benefit_key: str
+    name: str
+    category: Optional[str] = None
+    cap_type: Optional[str] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    unit_frequency: Optional[str] = None
+    notes: Optional[str] = None
+
+
+def _published_caps_bundle(
+    company_id: str,
+    assignment_type: Optional[str],
+    family_status: Optional[str],
+) -> Dict[str, Any]:
+    """[AIQ-1551] The company's published policy_config caps bundle (best-effort). One
+    caps_payload call = one published-version lookup + one benefits read, scoped to the
+    given company_id. Returns ``{"caps": []}`` when there's no company / no published
+    config, or on any error — never raises into the estimate response."""
+    if not company_id:
+        return {"caps": []}
+    try:
+        from ..services.policy_config_matrix_service import PolicyConfigMatrixService
+        return PolicyConfigMatrixService(main_db).caps_payload(
+            company_id,
+            assignment_type=assignment_type,
+            family_status=family_status,
+            benefit_keys=None,
+        )
+    except Exception:
+        logger.exception("budget-summary: policy_config caps read failed company=%s", company_id)
+        return {"caps": []}
+
+
+def _shape_hr_policy_caps(caps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """[AIQ-1551] The FULL published HR-policy CAP list for the estimate page — every
+    covered, targeting-matched benefit HR configured, independent of which services the
+    employee selected. Complements the per-service budget rows (which only cover selected
+    services). Company scoping is already applied by caps_payload upstream."""
+    out: List[Dict[str, Any]] = []
+    for c in caps or []:
+        out.append(
+            HrPolicyCap(
+                benefit_key=str(c.get("benefit_key") or ""),
+                name=str(c.get("benefit_label") or c.get("benefit_key") or ""),
+                category=c.get("category"),
+                cap_type=c.get("normalized_cap_type"),
+                amount=c.get("normalized_amount"),
+                currency=c.get("currency_code"),
+                unit_frequency=c.get("unit_frequency"),
+                notes=c.get("notes"),
+            ).model_dump()
+        )
+    return out
 
 
 @router.get("/{case_id}/budget-summary")
@@ -2188,6 +2253,13 @@ def get_budget_summary(
     except Exception:
         pass
 
+    # AIQ-1551: resolve the company's published caps ONCE (a single caps_payload = one
+    # published-version lookup + one benefits read), then reuse for BOTH the per-service
+    # budget rows and the full HR-policy CAP list. No second query / no N+1.
+    caps_bundle = _published_caps_bundle(company_id, assignment_type, family_status)
+    caps_list = caps_bundle.get("caps") or []
+    caps_by_key = {str(c.get("benefit_key")): c for c in caps_list}
+
     categories = _budget_categories_from_policy_config(
         company_id,
         selected_services,
@@ -2196,9 +2268,16 @@ def get_budget_summary(
         # [AIQ-1527] The estimates the comparison is supposed to be made against. Without these
         # the endpoint could only ever answer "no_estimate" — honest, but it never compared.
         estimates=_case_service_estimates(case_id),
+        caps_by_key=caps_by_key,
     )
 
-    return {"case_id": case_id, "categories": categories}
+    return {
+        "case_id": case_id,
+        "categories": categories,
+        # AIQ-1551: the full list of the company's published CAPs, so the estimate page can
+        # surface everything HR configured even when no matching service is selected.
+        "hr_policy_caps": _shape_hr_policy_caps(caps_list),
+    }
 
 
 @router.get("/{case_id}/messages")
