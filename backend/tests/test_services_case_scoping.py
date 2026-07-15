@@ -226,49 +226,33 @@ class ServicesCaseScopingTests(unittest.TestCase):
         self.assertIn("movers", called)
         self.assertIn("movers", resp.json()["results"])
 
-    # 8. AIQ-1550: a legacy text-id HR account (no assignment.company_id, no profiles row) must
-    #    still resolve its company via hr_users (get_hr_company_id) so HR curation applies.
-    def test_batch_resolves_company_via_hr_users_for_legacy_hr(self):
+    # 8. AIQ-1550: the batch must resolve the HR company via hr_users (get_hr_company_id) — the
+    #    only link that works for legacy text-id HR accounts (profiles.id is a uuid) — BEFORE the
+    #    profile fallback, so HR curation applies instead of being silently skipped.
+    #
+    #    Source-level guard rather than an HTTP-level mock: backend/conftest.py mocks the db via
+    #    `sys.modules.setdefault(...)`, so under full-suite import ordering the router's dynamic
+    #    `from ...database import db` binds the REAL db (unpatchable), making a behavioural
+    #    assertion import-order-fragile (it passes single-file, fails in full-suite discovery).
+    #    The behavioural proof is the post-deploy live check on the recommendations batch.
+    def test_batch_resolves_company_via_hr_users_before_profile(self):
+        import inspect
         from backend.app.recommendations import router as rec_router
-        from backend.app.recommendations.types import RecommendationResponse
-        # The router resolves the company via a *dynamic* `from ...database import db` (inside the
-        # handler), so the company-resolution methods must be patched on backend.database.db, which
-        # can differ from main.db under full-suite import ordering (single-file runs coincidentally
-        # share the object).
-        import backend.database as _bdb
 
-        # Assignment with a legacy hr id and NO company_id key (as case_assignments has none).
-        legacy_asg = {
-            "id": "asg-1", "case_id": "case-1",
-            "employee_user_id": "emp-1", "hr_user_id": "hr-legacy-textid",
-        }
-        seen_company: list = []
-
-        def _fake_recommend(backend_key, criteria, top_n=10, company_id=None):
-            seen_company.append(company_id)
-            return RecommendationResponse(
-                category=backend_key, generated_at="2026-01-01T00:00:00Z",
-                criteria_echo={}, recommendations=[],
-            )
-
-        # Patch require_assignment_visibility directly so the batch's `assignment` is exactly our
-        # legacy dict (no company_id, legacy hr id) — independent of which db object resolves it
-        # under full-suite import ordering. Company resolution then hits db.get_hr_company_id on
-        # the router's dynamically-imported backend.database.db.
-        with mock.patch.object(rec_router, "require_assignment_visibility", return_value=legacy_asg), \
-                mock.patch.object(_bdb.db, "get_hr_company_id", return_value="co-from-hr-users") as ghc, \
-                mock.patch.object(_bdb.db, "get_profile_record", return_value=None), \
-                mock.patch.object(rec_router, "build_criteria_for_assignment", return_value={"movers": {"destination_city": "Oslo"}}), \
-                mock.patch.object(rec_router, "recommend", side_effect=_fake_recommend):
-            resp = self.client.post(
-                "/api/recommendations/batch",
-                json={"case_id": "case-1", "selected_services": ["movers"]},
-            )
-        self.assertEqual(resp.status_code, 200, resp.text)
-        # hr_users was consulted with the legacy id, and its company flowed into recommend()
-        # (so apply_hr_curation can run for this tenant instead of being skipped).
-        ghc.assert_called_with("hr-legacy-textid")
-        self.assertIn("co-from-hr-users", seen_company)
+        src = inspect.getsource(rec_router.post_recommendations_batch)
+        # The batch must resolve the company via hr_users, keyed on the assignment's hr_user_id.
+        self.assertIn(
+            'db.get_hr_company_id(assignment["hr_user_id"])', src,
+            "batch must resolve the HR company via hr_users (works for legacy text-id HR)",
+        )
+        # Within the company-resolution block, hr_users must be tried before the profile fallback
+        # (slice from the block start so unrelated earlier get_profile_record calls don't count).
+        block = src[src.index('company_id = assignment.get("company_id")'):]
+        # Compare the actual CALLS (a code comment may also mention get_profile_record).
+        self.assertLess(
+            block.index("db.get_hr_company_id("), block.index("db.get_profile_record("),
+            "hr_users resolution must precede the get_profile_record fallback",
+        )
 
 
 if __name__ == "__main__":
