@@ -231,6 +231,11 @@ class ServicesCaseScopingTests(unittest.TestCase):
     def test_batch_resolves_company_via_hr_users_for_legacy_hr(self):
         from backend.app.recommendations import router as rec_router
         from backend.app.recommendations.types import RecommendationResponse
+        # The router resolves the company via a *dynamic* `from ...database import db` (inside the
+        # handler), so the company-resolution methods must be patched on backend.database.db, which
+        # can differ from main.db under full-suite import ordering (single-file runs coincidentally
+        # share the object).
+        import backend.database as _bdb
 
         # Assignment with a legacy hr id and NO company_id key (as case_assignments has none).
         legacy_asg = {
@@ -248,8 +253,8 @@ class ServicesCaseScopingTests(unittest.TestCase):
 
         with mock.patch.object(main.db, "get_assignment_by_case_id", side_effect=lambda cid: legacy_asg if cid == "case-1" else None), \
                 mock.patch.object(main.db, "get_assignment_by_id", side_effect=lambda aid: legacy_asg if aid == "asg-1" else None), \
-                mock.patch.object(main.db, "get_hr_company_id", return_value="co-from-hr-users") as ghc, \
-                mock.patch.object(main.db, "get_profile_record", return_value=None), \
+                mock.patch.object(_bdb.db, "get_hr_company_id", return_value="co-from-hr-users") as ghc, \
+                mock.patch.object(_bdb.db, "get_profile_record", return_value=None), \
                 mock.patch.object(rec_router, "build_criteria_for_assignment", return_value={"movers": {"destination_city": "Oslo"}}), \
                 mock.patch.object(rec_router, "recommend", side_effect=_fake_recommend):
             resp = self.client.post(
