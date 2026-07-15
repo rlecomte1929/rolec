@@ -45,6 +45,8 @@ class TestTestDriveReferral(unittest.TestCase):
 
     def test_referral_creates_prospect_and_pilot_event(self):
         db = MagicMock()
+        # AIQ-1542: first submit for this session (no prior survey row) → pipeline runs.
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
         session = MagicMock()
         session_local = MagicMock()
         session_local.return_value.__enter__.return_value = session
@@ -101,6 +103,8 @@ class TestTestDriveReferral(unittest.TestCase):
         truth) and override the body's often-absent/stale values, flowing into the
         funnel events and the prospect row."""
         db = MagicMock()
+        # AIQ-1542: first submit for this session (no prior survey row) → pipeline runs.
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
         session = MagicMock()
         session_local = MagicMock()
         session_local.return_value.__enter__.return_value = session

@@ -318,6 +318,23 @@ _SURVEY_COLUMNS = (
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+def _clean_optional_uuid(v: Optional[str]) -> Optional[str]:
+    """AIQ-1540: a blank/absent session_id is fine, but a present one must be a real
+    UUID. The survey/event/complete SQL casts session_id with ``CAST(:id AS uuid)`` on
+    Postgres, so a non-UUID string used to raise an unhandled 500 — reject it as a 422
+    (validation error) instead. SQLite (tests) has no cast, but we validate uniformly."""
+    if v is None:
+        return v
+    s = v.strip()
+    if not s:
+        return None
+    try:
+        uuid.UUID(s)
+    except (ValueError, AttributeError, TypeError):
+        raise ValueError("session_id must be a valid UUID.")
+    return s
+
+
 class SurveyRequest(BaseModel):
     session_id: Optional[str] = Field(None, max_length=64)
     campaign: Optional[str] = Field(None, max_length=64)
@@ -358,6 +375,11 @@ class SurveyRequest(BaseModel):
         if not _EMAIL_RE.match(s):
             raise ValueError("Enter a valid email address.")
         return s
+
+    @field_validator("session_id")
+    @classmethod
+    def _validate_session_id(cls, v: Optional[str]) -> Optional[str]:
+        return _clean_optional_uuid(v)
 
 
 def _propagate_tester_segment(session_id: Optional[str], tester_segment: Optional[str]) -> None:
@@ -473,6 +495,21 @@ def survey(body: SurveyRequest, request: Request):
         [id_expr, session_expr] + [f":{c}" for c in _SURVEY_COLUMNS if c != "session_id"]
     )
     with db.engine.begin() as conn:
+        # AIQ-1542: one survey per session (latest wins). survey_responses had only a
+        # non-unique index on session_id, so a re-submit piled up duplicate rows and
+        # inflated the surveyed count. Replace any prior row for this session; a
+        # NULL-session survey is anonymous and never deduped against others.
+        is_resubmit = False
+        if sid is not None:
+            is_resubmit = conn.execute(
+                text(f"SELECT 1 FROM survey_responses WHERE session_id = {session_expr}"),
+                {"session_id": sid},
+            ).first() is not None
+            if is_resubmit:
+                conn.execute(
+                    text(f"DELETE FROM survey_responses WHERE session_id = {session_expr}"),
+                    {"session_id": sid},
+                )
         conn.execute(text(f"INSERT INTO survey_responses ({col_sql}) VALUES ({val_sql})"), params)
 
     # TD-FIX-2 (AIQ-1503): stamp the self-declared segment back onto the session row.
@@ -484,28 +521,32 @@ def survey(body: SurveyRequest, request: Request):
         params["session_id"], campaign=campaign,
         corridor_id=corridor_id, tester_segment=body.tester_segment,
     )
-    # TD-8: funnel — this session reached the survey.
-    _emit_funnel_event(
-        event_type="surveyed", session_id=params["session_id"], campaign=campaign,
-        corridor_id=corridor_id, tester_segment=body.tester_segment,
-    )
-    # TD-7: turn survey answers into pipeline (best-effort; never breaks the survey write).
-    _process_survey_pipeline(body, campaign, corridor_id)
-    # TD-6: email fan-out — notify Romain + thank the tester (best-effort; never breaks the write).
-    try:
-        from ..services.test_drive_emails import send_test_drive_survey_emails
-        send_test_drive_survey_emails(
-            tester_name=body.tester_name, tester_email=body.tester_email, campaign=campaign,
+    # AIQ-1542: the one-time side effects (funnel 'surveyed', pipeline, email fan-out) fire
+    # only on the FIRST submission for a session — a correction re-submit replaces the row
+    # without re-counting the tester or re-notifying.
+    if not is_resubmit:
+        # TD-8: funnel — this session reached the survey.
+        _emit_funnel_event(
+            event_type="surveyed", session_id=params["session_id"], campaign=campaign,
             corridor_id=corridor_id, tester_segment=body.tester_segment,
-            company_role=body.tester_company_role, sector=body.tester_sector,
-            q1_overall=body.q1_overall, q2_friction=body.q2_friction, q3_problem_fit=body.q3_problem_fit,
-            q4_change=body.q4_change, pilot_interest=body.pilot_interest, pilot_note=body.pilot_note,
-            testimonial=body.testimonial, referral_name=body.referral_name,
-            referral_company_role=body.referral_company_role, referral_contact=body.referral_contact,
-            referral_consent=body.referral_consent,
         )
-    except Exception:  # noqa: BLE001
-        logger.warning("test_drive survey email fan-out failed (suppressed)")
+        # TD-7: turn survey answers into pipeline (best-effort; never breaks the survey write).
+        _process_survey_pipeline(body, campaign, corridor_id)
+        # TD-6: email fan-out — notify Romain + thank the tester (best-effort; never breaks the write).
+        try:
+            from ..services.test_drive_emails import send_test_drive_survey_emails
+            send_test_drive_survey_emails(
+                tester_name=body.tester_name, tester_email=body.tester_email, campaign=campaign,
+                corridor_id=corridor_id, tester_segment=body.tester_segment,
+                company_role=body.tester_company_role, sector=body.tester_sector,
+                q1_overall=body.q1_overall, q2_friction=body.q2_friction, q3_problem_fit=body.q3_problem_fit,
+                q4_change=body.q4_change, pilot_interest=body.pilot_interest, pilot_note=body.pilot_note,
+                testimonial=body.testimonial, referral_name=body.referral_name,
+                referral_company_role=body.referral_company_role, referral_contact=body.referral_contact,
+                referral_consent=body.referral_consent,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("test_drive survey email fan-out failed (suppressed)")
 
     logger.info(
         "test_drive_survey response=%s session=%s campaign=%s pilot=%s",
@@ -589,6 +630,11 @@ class EventRequest(BaseModel):
     invite_token: Optional[str] = Field(None, max_length=200)
     metadata: Optional[Dict[str, Any]] = None
 
+    @field_validator("session_id")
+    @classmethod
+    def _validate_session_id(cls, v: Optional[str]) -> Optional[str]:
+        return _clean_optional_uuid(v)
+
 
 @router.post("/event")
 @limiter.limit(_RATE_LIMIT)
@@ -665,6 +711,19 @@ def _check_completion_reached(hr_username: Optional[str]) -> "tuple[bool, Option
 class CompleteRequest(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=64)
 
+    @field_validator("session_id")
+    @classmethod
+    def _validate_session_id(cls, v: str) -> str:
+        # AIQ-1540: required, and must be a UUID — guards the CAST(:sid AS uuid) in complete().
+        s = (v or "").strip()
+        if not s:
+            raise ValueError("session_id is required.")
+        try:
+            uuid.UUID(s)
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError("session_id must be a valid UUID.")
+        return s
+
 
 @router.post("/complete")
 @limiter.limit(_RATE_LIMIT)
@@ -686,14 +745,22 @@ def complete(body: CompleteRequest, request: Request):
         if row is None:
             raise HTTPException(status_code=404, detail="Unknown session")
         reached, nudge = _check_completion_reached(row.get("hr_username"))
-        conn.execute(
-            text(f"UPDATE test_sessions SET status='completed', completed_at=CURRENT_TIMESTAMP WHERE id = {sid_expr}"),
+        result = conn.execute(
+            text(
+                f"UPDATE test_sessions SET status='completed', completed_at=CURRENT_TIMESTAMP "
+                f"WHERE id = {sid_expr} AND completed_at IS NULL"
+            ),
             {"sid": body.session_id},
         )
-    _emit_funnel_event(
-        event_type="completed", session_id=body.session_id, campaign=row.get("campaign"),
-        corridor_id=row.get("corridor_id"), tester_segment=row.get("tester_segment"),
-        metadata={"reached": reached},
-    )
+    # AIQ-1536: emit the 'completed' funnel event only on the started→completed transition.
+    # A double-click (or the survey backfill having already completed the session) leaves
+    # completed_at set, so rowcount is 0 and we don't double-count the headline metric.
+    # The response stays 200 + honest either way (idempotent).
+    if getattr(result, "rowcount", 0):
+        _emit_funnel_event(
+            event_type="completed", session_id=body.session_id, campaign=row.get("campaign"),
+            corridor_id=row.get("corridor_id"), tester_segment=row.get("tester_segment"),
+            metadata={"reached": reached},
+        )
     logger.info("test_drive_complete session=%s reached=%s", body.session_id, reached)
     return {"ok": True, "reached": reached, "nudge": nudge}
