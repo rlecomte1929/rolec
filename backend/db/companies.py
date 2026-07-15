@@ -1529,6 +1529,38 @@ class CompaniesMixin:
             rows = conn.execute(text(sql), params).fetchall()
         return self._rows_to_list(rows)
 
+    def list_company_curated_supplier_ids(
+        self, company_id: str, service_category: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """HR's curated suppliers for a company, in HR's ranking order.
+
+        [AIQ-1530] The recommendation "+15 preferred" boost used to read the retired
+        company_preferred_suppliers table. HR's real signal is now company_vendor_selections
+        (CVS): selected=true is a hard visibility gate, and display_order is the ranking intent.
+        CVS points at admin catalog rows via master_item_id; service_catalog_items.supplier_id
+        (added by AIQ-1520) resolves each to a supplier. Custom HR vendors (custom_item_json,
+        no master_item_id) have no supplier to boost and are correctly excluded.
+
+        Returns [{"supplier_id": str, "display_order": int}] ordered by display_order — HR's
+        first pick first. Category tokens match across CVS/service_catalog_items (movers,
+        living_areas, schools), so the caller's svc_key filters directly.
+        """
+        with self.engine.connect() as conn:
+            sql = (
+                "SELECT sci.supplier_id AS supplier_id, cvs.display_order AS display_order "
+                "FROM company_vendor_selections cvs "
+                "JOIN service_catalog_items sci ON sci.id = cvs.master_item_id "
+                "WHERE cvs.company_id = :cid AND cvs.selected = true "
+                "AND sci.supplier_id IS NOT NULL"
+            )
+            params: Dict[str, Any] = {"cid": company_id}
+            if service_category:
+                sql += " AND cvs.category = :svc"
+                params["svc"] = service_category
+            sql += " ORDER BY cvs.display_order ASC, cvs.created_at ASC"
+            rows = conn.execute(text(sql), params).fetchall()
+        return self._rows_to_list(rows)
+
     def get_supplier_vetting_state(
         self, supplier_id: str, service_category: Optional[str] = None
     ) -> Dict[str, bool]:

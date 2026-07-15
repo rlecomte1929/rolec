@@ -237,6 +237,58 @@ class EmployeeRecommendationsFilterTests(unittest.TestCase):
         )
         self.assertEqual([i.item_id for i in out], ["m-1"])
 
+    # ------------------------------------------------------------------
+    # [AIQ-1530] The employee sees HR's curated vendors in HR's display_order,
+    # NOT the engine's score order. "A vendor HR ranked first sorts first."
+    # ------------------------------------------------------------------
+    def _set_display_order(self, company: str, master_id: str, order: int) -> None:
+        # upsert_master_selection doesn't expose display_order; set it directly.
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE company_vendor_selections SET display_order = :o "
+                    "WHERE company_id = :co AND master_item_id = :mid"
+                ),
+                {"o": order, "co": company, "mid": master_id},
+            )
+
+    def test_orders_by_hr_display_order_not_engine_score(self) -> None:
+        masters = self._seed_three_movers()
+        company = str(uuid.uuid4())
+        for ext_id in ("m-1", "m-2", "m-3"):
+            vendor_curation.upsert_master_selection(
+                company_id=company, category="movers",
+                master_item_id=masters[ext_id]["id"], selected=True,
+            )
+        # HR's ranking: Gamma(1st), Acme(2nd), Beta(3rd).
+        self._set_display_order(company, masters["m-3"]["id"], 0)
+        self._set_display_order(company, masters["m-1"]["id"], 1)
+        self._set_display_order(company, masters["m-2"]["id"], 2)
+        # Engine hands them back in a DIFFERENT order (by its own score).
+        items = [_rec("m-1", "Acme", 95.0), _rec("m-2", "Beta", 90.0), _rec("m-3", "Gamma", 50.0)]
+        out, status = flt.apply_hr_curation(
+            category="movers", items=items, company_id=company, destination_city=None,
+        )
+        # HR's display_order wins — Gamma first even though it scored lowest.
+        self.assertEqual([i.item_id for i in out], ["m-3", "m-1", "m-2"])
+        self.assertIsNone(status)
+
+    def test_equal_display_order_preserves_engine_order(self) -> None:
+        # The default (all display_order=0) must not reshuffle — engine order is the tie-break,
+        # so behavior for un-ranked curation is unchanged.
+        masters = self._seed_three_movers()
+        company = str(uuid.uuid4())
+        for ext_id in ("m-1", "m-2", "m-3"):
+            vendor_curation.upsert_master_selection(
+                company_id=company, category="movers",
+                master_item_id=masters[ext_id]["id"], selected=True,
+            )
+        items = [_rec("m-2", "Beta"), _rec("m-1", "Acme"), _rec("m-3", "Gamma")]
+        out, _ = flt.apply_hr_curation(
+            category="movers", items=items, company_id=company, destination_city=None,
+        )
+        self.assertEqual([i.item_id for i in out], ["m-2", "m-1", "m-3"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -231,17 +231,21 @@ def build_criteria_for_assignment(
         criteria = _apply_service_shaping(svc_key, criteria)
         result[backend_key] = criteria
 
-    # Company preferred suppliers: resolve per service category (includes NULL = all categories)
+    # [AIQ-1530] The "+15 preferred" boost now reads HR's curation (company_vendor_selections
+    # via service_catalog_items.supplier_id), not the retired company_preferred_suppliers table.
+    # This marks curated suppliers as preferred (the boost + the company_preferred UI flag +
+    # marketplace); HR's display_order ordering for the employee is applied downstream in
+    # employee_recommendations_filter.apply_hr_curation, where only selected items remain.
     if company_id:
         try:
             from ...database import db
             for svc_key in selected_services:
                 backend_key = SERVICE_KEY_TO_BACKEND.get(svc_key)
-                if not backend_key:
+                if not backend_key or backend_key not in result:
                     continue
-                prefs = db.list_company_preferred_suppliers(company_id, svc_key)
-                supplier_ids = [str(p.get("supplier_id", "")) for p in prefs if p.get("supplier_id")]
-                if supplier_ids and backend_key in result:
+                curated = db.list_company_curated_supplier_ids(company_id, svc_key)
+                supplier_ids = [str(c.get("supplier_id", "")) for c in curated if c.get("supplier_id")]
+                if supplier_ids:
                     result[backend_key]["_preferred_supplier_ids"] = supplier_ids
         except Exception:
             pass

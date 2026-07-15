@@ -104,6 +104,15 @@ def apply_hr_curation(
         for s in selections
         if s.get("master_item_id") and s.get("selected")
     }
+    # [AIQ-1530] HR's display_order is the ranking intent. selected=true is already a hard gate
+    # (only approved items survive step 2), so ordering the survivors by display_order is what
+    # makes "the vendor HR ranked first sorts first for the employee" true. This is the employee
+    # path; the engine's global sort is left untouched.
+    order_by_master = {
+        s["master_item_id"]: s.get("display_order", 0)
+        for s in selections
+        if s.get("master_item_id") and s.get("selected")
+    }
     customs = [
         s
         for s in selections
@@ -114,7 +123,7 @@ def apply_hr_curation(
     # the approved set. Items that don't have a master row at all (e.g.
     # legacy datasets that haven't been backfilled) are dropped — HR
     # can't curate what isn't in the master.
-    kept: List[RecommendationItem] = []
+    kept: List[Tuple[int, RecommendationItem]] = []
     for rec in items:
         master = service_catalog.find_master_by_external_id(category, rec.item_id)
         if not master:
@@ -126,13 +135,17 @@ def apply_hr_curation(
             )
             continue
         if master["id"] in approved_master_ids:
-            kept.append(rec)
+            kept.append((order_by_master.get(master["id"], 0), rec))
 
-    # 3. Append HR custom vendors as synthesized recommendations.
-    for c in customs:
-        kept.append(_custom_to_recommendation(c))
+    # Order by HR's display_order (stable: engine order breaks ties within the same rank).
+    kept.sort(key=lambda pair: pair[0])
+    ordered: List[RecommendationItem] = [rec for _, rec in kept]
 
-    if not kept:
+    # 3. Append HR custom vendors (display_order-ordered) after the master picks.
+    for c in sorted(customs, key=lambda s: s.get("display_order", 0)):
+        ordered.append(_custom_to_recommendation(c))
+
+    if not ordered:
         # Record the demand signal so HR can see who's waiting on what.
         # Best-effort — never raise on the filter path.
         try:
@@ -146,4 +159,4 @@ def apply_hr_curation(
         except Exception:
             log.exception("record_demand dispatch failed")
         return [], "hr_pending"
-    return kept, None
+    return ordered, None
