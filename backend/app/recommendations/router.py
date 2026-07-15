@@ -155,8 +155,16 @@ def post_recommendations_batch(
 
     company_id = assignment.get("company_id")
     if not company_id and assignment.get("hr_user_id"):
-        profile = db.get_profile_record(assignment["hr_user_id"])
-        company_id = profile.get("company_id") if profile else None
+        # AIQ-1550: resolve the HR's company for curation. Try hr_users FIRST — it's the
+        # authoritative link and the only one that works for legacy text-id HR accounts.
+        # profiles.id is a uuid, so get_profile_record never matched a legacy hr_user_id,
+        # leaving company_id None and silently skipping HR curation entirely (movers/etc.
+        # showed the "HR is finalizing" empty state even though HR had curated). Fall back to
+        # the profile for UUID-native accounts whose company lives there.
+        company_id = db.get_hr_company_id(assignment["hr_user_id"])
+        if not company_id:
+            profile = db.get_profile_record(assignment["hr_user_id"])
+            company_id = profile.get("company_id") if profile else None
     criteria_map = build_criteria_for_assignment(
         assignment_id=req.assignment_id,
         case_id=case_id,

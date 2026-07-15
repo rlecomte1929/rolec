@@ -226,6 +226,42 @@ class ServicesCaseScopingTests(unittest.TestCase):
         self.assertIn("movers", called)
         self.assertIn("movers", resp.json()["results"])
 
+    # 8. AIQ-1550: a legacy text-id HR account (no assignment.company_id, no profiles row) must
+    #    still resolve its company via hr_users (get_hr_company_id) so HR curation applies.
+    def test_batch_resolves_company_via_hr_users_for_legacy_hr(self):
+        from backend.app.recommendations import router as rec_router
+        from backend.app.recommendations.types import RecommendationResponse
+
+        # Assignment with a legacy hr id and NO company_id key (as case_assignments has none).
+        legacy_asg = {
+            "id": "asg-1", "case_id": "case-1",
+            "employee_user_id": "emp-1", "hr_user_id": "hr-legacy-textid",
+        }
+        seen_company: list = []
+
+        def _fake_recommend(backend_key, criteria, top_n=10, company_id=None):
+            seen_company.append(company_id)
+            return RecommendationResponse(
+                category=backend_key, generated_at="2026-01-01T00:00:00Z",
+                criteria_echo={}, recommendations=[],
+            )
+
+        with mock.patch.object(main.db, "get_assignment_by_case_id", side_effect=lambda cid: legacy_asg if cid == "case-1" else None), \
+                mock.patch.object(main.db, "get_assignment_by_id", side_effect=lambda aid: legacy_asg if aid == "asg-1" else None), \
+                mock.patch.object(main.db, "get_hr_company_id", return_value="co-from-hr-users") as ghc, \
+                mock.patch.object(main.db, "get_profile_record", return_value=None), \
+                mock.patch.object(rec_router, "build_criteria_for_assignment", return_value={"movers": {"destination_city": "Oslo"}}), \
+                mock.patch.object(rec_router, "recommend", side_effect=_fake_recommend):
+            resp = self.client.post(
+                "/api/recommendations/batch",
+                json={"case_id": "case-1", "selected_services": ["movers"]},
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        # hr_users was consulted with the legacy id, and its company flowed into recommend()
+        # (so apply_hr_curation can run for this tenant instead of being skipped).
+        ghc.assert_called_with("hr-legacy-textid")
+        self.assertIn("co-from-hr-users", seen_company)
+
 
 if __name__ == "__main__":
     unittest.main()
