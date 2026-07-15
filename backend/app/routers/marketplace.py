@@ -109,8 +109,12 @@ def _get_covered_benefit_keys(assignment_id: str) -> set:
 def _get_preferred_supplier_ids(company_id: str) -> set:
     """Return supplier IDs preferred for this company — the union of globally
     preferred partners (supplier_scoring_metadata.preferred_partner) and this
-    company's own HR-curated picks (company_preferred_suppliers). The sort_key in
-    get_marketplace ranks preferred suppliers first, so both surface at the top."""
+    company's own HR-curated picks. The sort_key in get_marketplace ranks preferred
+    suppliers first, so both surface at the top.
+
+    [AIQ-1530] The company-scoped branch now reads HR's curation
+    (company_vendor_selections via service_catalog_items.supplier_id), not the retired
+    company_preferred_suppliers table. The global preferred_partner branch is unchanged."""
     preferred: set = set()
     try:
         from ..services.supabase_client import get_supabase_admin_client
@@ -127,19 +131,12 @@ def _get_preferred_supplier_ids(company_id: str) -> set:
         logger.debug("Could not fetch global preferred suppliers")
     if company_id:
         try:
-            from ..services.supabase_client import get_supabase_admin_client
-            sb = get_supabase_admin_client()
-            cps = (
-                sb.table("company_preferred_suppliers")
-                .select("supplier_id")
-                .eq("company_id", company_id)
-                .eq("status", "active")
-                .execute()
-            )
-            if cps and cps.data:
-                preferred.update(row["supplier_id"] for row in cps.data)
+            for row in main_db.list_company_curated_supplier_ids(company_id):
+                sid = row.get("supplier_id")
+                if sid:
+                    preferred.add(sid)
         except Exception:
-            logger.debug("Could not fetch company preferred suppliers for %s", company_id)
+            logger.debug("Could not fetch company-curated suppliers for %s", company_id)
     return preferred
 
 

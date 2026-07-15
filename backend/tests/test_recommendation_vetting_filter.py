@@ -132,11 +132,19 @@ class _FakeSupabase:
 
 def test_preferred_ids_union_company_and_global(monkeypatch):
     import backend.app.services.supabase_client as sc
-    fake = _FakeSupabase({
-        "supplier_scoring_metadata": [{"supplier_id": "global-1"}],
-        "company_preferred_suppliers": [{"supplier_id": "company-1"}, {"supplier_id": "company-2"}],
-    })
+    # Global preferred_partner still comes from supabase.
+    fake = _FakeSupabase({"supplier_scoring_metadata": [{"supplier_id": "global-1"}]})
     monkeypatch.setattr(sc, "get_supabase_admin_client", lambda: fake)
+    # [AIQ-1530] The company branch now reads HR's curation via the DB reader, not the
+    # retired company_preferred_suppliers table. The union with the global flag is preserved.
+    monkeypatch.setattr(
+        marketplace_router.main_db,
+        "list_company_curated_supplier_ids",
+        lambda company_id: [
+            {"supplier_id": "company-1", "display_order": 0},
+            {"supplier_id": "company-2", "display_order": 1},
+        ],
+    )
     ids = marketplace_router._get_preferred_supplier_ids("c1")
     assert ids == {"global-1", "company-1", "company-2"}
 
