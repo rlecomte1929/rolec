@@ -9,6 +9,7 @@ import { ServicesContextBanner } from '../../features/services/ServicesContextBa
 import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
+import { HrPolicyCapsSection } from '../../features/services/HrPolicyCapsSection';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
@@ -73,6 +74,9 @@ export const ServicesEstimate: React.FC = () => {
             className="mb-6"
           />
         )}
+        {/* AIQ-1551: the full list of the company's published CAPs — visible even before any
+            service is selected, so testers/employees see everything HR configured. */}
+        {assignmentId && <HrPolicyCapsSection caseId={assignmentId} className="mb-6" />}
         <Card padding="lg">
           {/* Stage 5 (audit): outcome-described empty state per docs/product-copy-rules.md
               ("Empty states: No X yet. [Reason or guidance] → [CTA]") */}
@@ -141,6 +145,8 @@ export const ServicesEstimate: React.FC = () => {
           className="mb-6"
         />
       )}
+      {/* AIQ-1551: full published CAP list (all of them, independent of shortlist state). */}
+      {assignmentId && <HrPolicyCapsSection caseId={assignmentId} className="mb-6" />}
       <PackageSummary
         results={recommendations}
         selectedPackage={shortlist}

@@ -27,9 +27,32 @@ export interface BudgetSummaryCategory {
   status: BudgetSummaryStatus;
 }
 
+/** [AIQ-1551] One published HR-policy Cost Allowance Package (CAP). */
+export interface HrPolicyCap {
+  /** Stable benefit key from the policy config, e.g. 'host_housing_cap'. */
+  benefit_key: string;
+  /** Human label, e.g. 'Housing allowance'. */
+  name: string;
+  category: string | null;
+  /** normalized_cap_type: 'currency_amount' | 'percentage' | 'no_monetary_cap' | … */
+  cap_type: string | null;
+  /** Cap amount in `currency`; null for a covered-but-unquantified benefit. */
+  amount: number | null;
+  currency: string | null;
+  /** e.g. 'yearly' | 'monthly' | 'one_time' | 'per_trip'. */
+  unit_frequency: string | null;
+  notes: string | null;
+}
+
 export interface BudgetSummaryResponse {
   case_id: string;
   categories: BudgetSummaryCategory[];
+  /**
+   * [AIQ-1551] The FULL list of the company's published CAPs — all of them, not just the
+   * caps for the services the employee selected. Optional for backward-compat with older
+   * responses that predate the field.
+   */
+  hr_policy_caps?: HrPolicyCap[];
 }
 
 export const budgetAPI = {
