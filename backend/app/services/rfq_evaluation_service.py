@@ -120,17 +120,22 @@ def recommend(
     reasons.append(f"{_name(q)} quoted {_money(q)} — "
                    + ("the lowest total" if winner is cheapest else "competitive on price")
                    + " (quotes.total_amount).")
+    trade_offs: List[str] = []
     if winner["price_vs_bench"] is not None:
         pct = winner["price_vs_bench"]
-        side = "below" if pct >= 0 else "above"
-        reasons.append(f"{abs(pct):.0f}% {side} the market benchmark of "
-                       f"{winner['bench']:.0f} EUR (vendor_metric_snapshots.avg_cost_eur).")
+        bench_txt = (f"the market benchmark of {winner['bench']:.0f} EUR "
+                     "(vendor_metric_snapshots.avg_cost_eur)")
+        # Below/at market is a reason FOR the pick; above market is a trade-off AGAINST it —
+        # never dress an above-benchmark price up as a positive.
+        if pct >= 0:
+            reasons.append(f"{pct:.0f}% below {bench_txt}.")
+        else:
+            trade_offs.append(f"{abs(pct):.0f}% above {bench_txt}.")
     if winner["quality"] is not None:
         snap = snapshot_by_vendor.get(str(q.get("vendor_id"))) or {}
         reasons.append(f"Rated {snap.get('avg_rating')} over {snap.get('review_count')} reviews "
                        f"(vendor_metric_snapshots).")
 
-    trade_offs: List[str] = []
     if winner is not cheapest:
         trade_offs.append(f"{_name(cheapest['q'])} is cheaper at {_money(cheapest['q'])}, "
                           "but scored lower on the available signals.")

@@ -71,6 +71,17 @@ class RecommendTests(unittest.TestCase):
         self.assertEqual(r["recommended_quote_id"], "q1")
         self.assertIn("market", r["headline"].lower())
 
+    def test_above_market_is_a_tradeoff_not_a_reason(self):
+        # The winner can still be cheapest of the offers yet above the market benchmark. That is a
+        # mark AGAINST it, never dressed up as a reason to pick it.
+        snaps = {"v1": _snap(avg_cost_eur=1375, avg_rating=4.4, review_count=98),
+                 "v2": _snap(avg_cost_eur=1375, avg_rating=4.6, review_count=120)}
+        r = recommend([_q("q1", "v1", 4250), _q("q2", "v2", 5120)], snaps)
+        self.assertEqual(r["recommended_quote_id"], "q1")
+        joined_reasons = " ".join(r["reasons"]).lower()
+        self.assertNotIn("above", joined_reasons)
+        self.assertTrue(any("above the market" in t.lower() for t in r["trade_offs"]))
+
     def test_thin_reviews_do_not_count_as_quality(self):
         # review_count < 5 -> quality absent -> LOW, not MEDIUM.
         snaps = {"v1": _snap(avg_cost_eur=2100, avg_rating=5.0, review_count=2)}
