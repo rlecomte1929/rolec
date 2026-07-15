@@ -22,11 +22,13 @@ import {
   deleteFeedback,
   triggerFix,
   autoAttempt,
+  EvalGateError,
   type UnifiedFeedbackItem,
   type FeedbackStream,
   type TriageStatus,
   type EngineeredTask,
   type FixTriggerResult,
+  type EvalGateResult,
 } from '../../api/adminFeedback';
 import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
@@ -76,6 +78,69 @@ function FixSkillCallout({ result }: { result: FixTriggerResult }) {
         </Button>
       </div>
       <p className="text-[10px] text-gray-500">Routes to {result.routes_to}</p>
+    </div>
+  );
+}
+
+/**
+ * EvalGatePanel — shown when the backend quality gate blocks a dispatch (score < 70).
+ * Displays the score, specific issues, and two remediation paths: fix the task type in the
+ * review form above, or force-dispatch (admin override).
+ */
+function EvalGatePanel({
+  result,
+  onForce,
+  forcing,
+}: {
+  result: EvalGateResult;
+  onForce: () => void;
+  forcing?: boolean;
+}) {
+  const scoreColor =
+    result.score >= 70
+      ? 'text-green-700 bg-green-50 border-green-200'
+      : result.score >= 50
+        ? 'text-amber-700 bg-amber-50 border-amber-200'
+        : 'text-red-700 bg-red-50 border-red-200';
+  return (
+    <div className="rounded border border-amber-300 bg-amber-50 p-3 space-y-2 text-[11px]">
+      <div className="flex items-center gap-2">
+        <span className={`text-xs font-bold px-2 py-0.5 rounded border ${scoreColor}`}>
+          {result.score}/100
+        </span>
+        <span className="font-semibold text-amber-800">Quality gate blocked — task not dispatched</span>
+      </div>
+      {result.issues.length > 0 && (
+        <ul className="space-y-1">
+          {result.issues.map((issue, i) => (
+            <li key={i} className="text-red-700 flex gap-1.5">
+              <span className="shrink-0">⚠</span>
+              <span>{issue}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {result.warnings.length > 0 && (
+        <ul className="space-y-0.5">
+          {result.warnings.map((w, i) => (
+            <li key={i} className="text-amber-700 flex gap-1.5">
+              <span className="shrink-0">ℹ</span>
+              <span>{w}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-amber-700">
+        <strong>Fix:</strong> change <em>Task type</em> to &ldquo;Research&rdquo; (or <em>Status</em> to &ldquo;Needs Human Clarification&rdquo;) in the form above, then re-submit — or force dispatch to override.
+      </p>
+      <Button
+        unstyled
+        disabled={forcing}
+        onClick={onForce}
+        className="text-[11px] font-medium px-3 py-1 rounded border border-amber-400 text-amber-900 bg-white hover:bg-amber-100 disabled:opacity-50"
+      >
+        {forcing ? 'Dispatching…' : 'Force dispatch (override gate)'}
+      </Button>
     </div>
   );
 }
@@ -212,7 +277,10 @@ export function FeedbackTab() {
   const [previewTask, setPreviewTask]           = useState<EngineeredTask | null>(null);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [creatingId, setCreatingId]             = useState<string | null>(null);
+  const [forceCreatingId, setForceCreatingId]   = useState<string | null>(null);
   const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
+  /** Structured eval gate results per row — set when dispatch_create is blocked by the quality gate. */
+  const [evalResults, setEvalResults]           = useState<Record<string, EvalGateResult>>({});
   // Trigger fix / Auto-attempt (on dispatched rows).
   const [triggerResults, setTriggerResults]     = useState<Record<string, FixTriggerResult>>({});
   const [fixBusyId, setFixBusyId]               = useState<string | null>(null);
@@ -287,12 +355,15 @@ export function FeedbackTab() {
   /** Generate the engineered task for review (no side effects). */
   const openPreview = useCallback(async (row: UnifiedFeedbackItem) => {
     setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    setEvalResults((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
     setPreviewLoadingId(row.id);
     setPreviewFor(row.id);
     setPreviewTask(null);
     try {
-      const task = await dispatchPreview(row.stream, row.id, { text: row.text, category: row.verdict ?? 'bug' });
+      const { task, evalResult } = await dispatchPreview(row.stream, row.id, { text: row.text, category: row.verdict ?? 'bug' });
       setPreviewTask(task);
+      // Store the preview eval score so the admin can see quality signals before dispatching.
+      if (evalResult) setEvalResults((prev) => ({ ...prev, [row.id]: evalResult }));
     } catch (err) {
       // Surface the real reason (LLM failure/timeout → backend detail, else axios message).
       const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Failed to generate spec';
@@ -304,22 +375,32 @@ export function FeedbackTab() {
   }, []);
 
   /** Create the Notion Work Queue page from the reviewed task. */
-  const createTask = useCallback(async (row: UnifiedFeedbackItem) => {
+  const createTask = useCallback(async (row: UnifiedFeedbackItem, force = false) => {
     if (!previewTask) return;
-    setCreatingId(row.id);
+    if (force) setForceCreatingId(row.id);
+    else setCreatingId(row.id);
     setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
+    // Clear previous eval gate block so the panel shows fresh results.
+    if (!force) setEvalResults((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
     try {
-      const res = await dispatchCreate(row.stream, row.id, previewTask);
+      const res = await dispatchCreate(row.stream, row.id, previewTask, force);
       const notionUrl = res.notion_url ?? res.url;
       setRows((prev) => prev.map((r) => r.id === row.id
         ? { ...r, dispatch_status: 'dispatched', dispatch_ref: notionUrl } : r));
       setPreviewFor(null);
       setPreviewTask(null);
+      setEvalResults((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not create the Notion task.';
-      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+      if (err instanceof EvalGateError) {
+        // Store structured result — EvalGatePanel will render below the dispatch button.
+        setEvalResults((prev) => ({ ...prev, [row.id]: err.evalResult }));
+      } else {
+        const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Could not create the Notion task.';
+        setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+      }
     } finally {
       setCreatingId(null);
+      setForceCreatingId(null);
     }
   }, [previewTask]);
 
@@ -803,7 +884,23 @@ export function FeedbackTab() {
                           status={row.dispatch_status ?? 'new'}
                           tier={row.autonomy_tier}
                         />
-                        {dispatchErr && <p className="text-[11px] text-red-600">{dispatchErr}</p>}
+                        {dispatchErr && (() => {
+                          // If the error is raw JSON from the eval gate (pre-EvalGateError path),
+                          // parse and render it as a structured panel rather than unreadable JSON.
+                          try {
+                            const parsed = JSON.parse(dispatchErr) as { eval?: EvalGateResult; error?: string };
+                            if (parsed.eval && typeof parsed.eval.score === 'number' && !parsed.eval.passed) {
+                              return (
+                                <EvalGatePanel
+                                  result={parsed.eval}
+                                  onForce={() => void createTask(row, true)}
+                                  forcing={forceCreatingId === row.id}
+                                />
+                              );
+                            }
+                          } catch { /* not JSON — fall through */ }
+                          return <p className="text-[11px] text-red-600">{dispatchErr}</p>;
+                        })()}
                       </div>
 
                       {/* AIQ-1478: screenshot (left) + diagnostics & recent activity (right). */}
@@ -950,17 +1047,59 @@ export function FeedbackTab() {
                                     />
                                   </div>
                                 ))}
+                                {/* Editable metadata — task_type and status are key levers
+                                    for the eval gate (D4: question→impl task check). */}
+                                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                  <div>
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Task type</span>
+                                    <select
+                                      value={previewTask.task_type}
+                                      onChange={(e) => setPreviewTask((t) => t ? { ...t, task_type: e.target.value } : t)}
+                                      className="w-full text-[11px] rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] bg-white"
+                                    >
+                                      {['Frontend Implementation','Backend Implementation','UX Redesign','Database Migration','Prompt Engineering','RAG Improvement','Performance Optimization','Research','Competitive Analysis'].map((t) => (
+                                        <option key={t} value={t}>{t}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Status</span>
+                                    <select
+                                      value={previewTask.status}
+                                      onChange={(e) => setPreviewTask((t) => t ? { ...t, status: e.target.value } : t)}
+                                      className="w-full text-[11px] rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] bg-white"
+                                    >
+                                      {['Ready for AI','Needs Human Clarification','Needs Decomposition'].map((s) => (
+                                        <option key={s} value={s}>{s}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
                                 <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
                                   <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">Priority: {previewTask.priority}</span>
                                   <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">Complexity: {previewTask.complexity}</span>
-                                  <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">{previewTask.task_type}</span>
                                   <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">{previewTask.layer}</span>
-                                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">{previewTask.status}</span>
+                                  {/* Eval score badge from preview — gives quality signal before dispatch.
+                                      Saved to const so TypeScript narrows the type correctly. */}
+                                  {(() => {
+                                    const er = evalResults[row.id];
+                                    if (!er) return null;
+                                    const scoreClass = er.passed
+                                      ? 'bg-green-50 text-green-700 border-green-200'
+                                      : er.score >= 50
+                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                        : 'bg-red-50 text-red-700 border-red-200';
+                                    return (
+                                      <span className={`px-1.5 py-0.5 rounded border font-medium ${scoreClass}`}>
+                                        Eval: {er.score}/100 {er.passed ? '✓' : '✗'}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="flex gap-2">
                                   <Button
                                     unstyled
-                                    disabled={creatingId === row.id}
+                                    disabled={creatingId === row.id || forceCreatingId === row.id}
                                     onClick={() => void createTask(row)}
                                     className="text-[11px] font-medium px-3 py-1 rounded bg-[#0b2b43] text-white hover:bg-[#0b3b5c] disabled:opacity-50"
                                   >
@@ -968,12 +1107,28 @@ export function FeedbackTab() {
                                   </Button>
                                   <Button
                                     unstyled
-                                    onClick={() => { setPreviewFor(null); setPreviewTask(null); }}
+                                    onClick={() => {
+                                      setPreviewFor(null);
+                                      setPreviewTask(null);
+                                      setEvalResults((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                                    }}
                                     className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
                                   >
                                     Cancel
                                   </Button>
                                 </div>
+                                {/* Eval gate block panel — appears when dispatch_create returns 422 */}
+                                {(() => {
+                                  const er = evalResults[row.id];
+                                  if (!er || er.passed) return null;
+                                  return (
+                                    <EvalGatePanel
+                                      result={er}
+                                      onForce={() => void createTask(row, true)}
+                                      forcing={forceCreatingId === row.id}
+                                    />
+                                  );
+                                })()}
                               </div>
                             ) : (
                               <Button

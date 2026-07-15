@@ -38,6 +38,18 @@ _SYSTEM = (
     "Supabase/Postgres). Given a user-submitted feedback item (bug/idea/other) and "
     "the admin's added context, produce ONE fully-specified engineering task that an "
     "AI coding agent can execute without further clarification.\n\n"
+    "TASK TYPE SELECTION — read this before setting task_type and status:\n"
+    "• Choose 'Research' (not an implementation type) when the user message:\n"
+    "  - ends with '?' or is phrased as a question\n"
+    "  - expresses uncertainty ('I think', 'I'm not sure', 'whether this', 'could it be', "
+    "'is it possible', 'maybe')\n"
+    "  - asks for verification ('could you verify', 'can you check', 'can you confirm')\n"
+    "  - describes a symptom without a clear root cause ('I cannot see X', 'Y seems missing')\n"
+    "• Only choose an implementation type (Frontend/Backend/etc.) when the bug is clearly "
+    "described AND the fix direction is unambiguous. If there is any uncertainty about "
+    "the root cause, choose 'Research' — an engineer promotes it to implementation "
+    "after confirming. When in doubt, Research is always safe; a wrong impl task "
+    "silently ships a broken change.\n\n"
     "Rules:\n"
     "- Be concrete and implementable. Never use vague language like 'fix it' or "
     "'improve X'. State exactly what to change and why.\n"
@@ -182,14 +194,28 @@ def _hallucinated_paths(text: str) -> list:
     return [p.pattern for p in _HALLUCINATED_PATH_PATTERNS if p.search(text or "")]
 
 
-# Interrogative patterns that signal the user is asking a question rather than
-# reporting a confirmed fact. A question should not auto-generate an executable
-# implementation task — it needs human clarification first.
+# Interrogative / uncertainty patterns that signal the user is asking a question
+# or expressing uncertainty rather than reporting a confirmed, reproducible bug.
+# A question should not auto-generate an executable implementation task — it needs
+# human clarification first.
 _QUESTION_RE = re.compile(
-    r"\b(do we|does this|should we|is this|are we|"
+    r"\b("
+    # Direct questions
+    r"do we|does this|should we|is this|are we|"
     r"why (?:is|are|does|do)|or is it|or does|"
     r"what (?:is|are|does)|how (?:does|do|is)|"
-    r"would it|could it)\b",
+    r"would it|could it|"
+    # Uncertainty / speculation
+    r"whether (?:this|it|there)|"
+    r"I(?:'m| am) not sure|"
+    r"I think (?:it|this|there)|"
+    r"it (?:might|could|should) be|"
+    r"maybe it|perhaps it|"
+    # Verification requests
+    r"could you (?:verify|check|confirm|look)|"
+    r"can you (?:verify|check|confirm|look)|"
+    r"is it possible"
+    r")\b",
     re.IGNORECASE,
 )
 
@@ -408,6 +434,20 @@ def engineer_task(
     # override this with the real path from extract_confirmed_signals().
     task["files_to_touch"] = "RECON_REQUIRED"
     task["status"] = status_from_complexity(task.get("complexity"))
+
+    # Belt-and-suspenders: if the user's text is question-like (ends with '?' or
+    # matches uncertainty patterns) but the LLM chose an implementation task type,
+    # auto-correct to Research + Needs Human Clarification. This prevents D4 from
+    # blocking at the eval gate — the system prompt instructs the LLM to do this, but
+    # the post-processing step ensures correctness even when the model doesn't comply.
+    _text_stripped = (text or "").strip()
+    if (
+        (_text_stripped.endswith("?") or bool(_QUESTION_RE.search(_text_stripped)))
+        and task.get("task_type") in _IMPL_TASK_TYPES
+    ):
+        task["task_type"] = "Research"
+        task["status"] = "Needs Human Clarification"
+
     task["autonomy_tier"] = compute_autonomy_tier(
         task_type=task.get("task_type"), complexity=task.get("complexity"),
         layer=task.get("layer"), product_area=task.get("product_area"),
