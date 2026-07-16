@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { supabase } from '../api/supabase';
+import { listMessages, createMessageApi, updateMessageApi } from '../api/outreach';
 import type { OutreachMessage, MessageInsert } from '../types/outreach';
 
 export interface UseMessagesResult {
@@ -13,44 +13,21 @@ export interface UseMessagesResult {
 
 export function useMessages(): UseMessagesResult {
   const getDraftForProspect = useCallback(async (prospectId: string): Promise<OutreachMessage | null> => {
-    const resp = await supabase
-      .from('outreach_messages')
-      .select('*')
-      .eq('prospect_id', prospectId)
-      .eq('status', 'draft')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (resp.error) throw new Error(resp.error.message);
-    return resp.data as OutreachMessage | null;
+    // Server returns drafts newest-first; take the most recent (or null).
+    const drafts = await listMessages(prospectId, 'draft');
+    return drafts?.[0] ?? null;
   }, []);
 
   const getMessagesForProspect = useCallback(async (prospectId: string): Promise<OutreachMessage[]> => {
-    const resp = await supabase
-      .from('outreach_messages')
-      .select('*')
-      .eq('prospect_id', prospectId)
-      .order('created_at', { ascending: false });
-    if (resp.error) throw new Error(resp.error.message);
-    return (resp.data as OutreachMessage[]) ?? [];
+    return (await listMessages(prospectId)) ?? [];
   }, []);
 
   const createMessage = useCallback(async (payload: MessageInsert): Promise<OutreachMessage> => {
-    const resp = await supabase
-      .from('outreach_messages')
-      .insert(payload)
-      .select()
-      .single();
-    if (resp.error) throw new Error(resp.error.message);
-    return resp.data as OutreachMessage;
+    return createMessageApi(payload);
   }, []);
 
   const updateMessage = useCallback(async (id: string, patch: Partial<OutreachMessage>): Promise<void> => {
-    const resp = await supabase
-      .from('outreach_messages')
-      .update(patch)
-      .eq('id', id);
-    if (resp.error) throw new Error(resp.error.message);
+    await updateMessageApi(id, patch);
   }, []);
 
   const markSent = useCallback((id: string): Promise<void> =>

@@ -285,6 +285,7 @@ def create_app() -> FastAPI:
         admin_workflow_analytics,
         admin_collaboration,
         admin_prospects,
+        admin_outreach,
         admin_form_templates,
     )
     from .routers.policy_config import admin_policy_config_router  # noqa: PLC0415
@@ -302,6 +303,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_workflow_analytics.router, prefix="/api/admin")
     app.include_router(admin_collaboration.router, prefix="/api/admin")
     app.include_router(admin_prospects.router, prefix="/api/admin")
+    app.include_router(admin_outreach.router, prefix="/api/admin")
     app.include_router(admin_form_templates.router, prefix="/api/admin")
     app.include_router(admin_policy_config_router)
 

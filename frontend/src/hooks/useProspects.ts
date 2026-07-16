@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../api/supabase';
+import {
+  listProspects,
+  createProspect as createProspectApi,
+  updateProspectApi,
+  deleteProspectApi,
+} from '../api/outreach';
 import type { LinkedInProspect, ProspectInsert, ProspectStatus } from '../types/outreach';
 
 export interface UseProspectsResult {
@@ -21,38 +26,26 @@ export function useProspects(): UseProspectsResult {
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
-      .from('linkedin_prospects')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (err) {
-      setError(err.message);
-    } else {
-      setProspects((data as LinkedInProspect[]) ?? []);
+    try {
+      const data = await listProspects();
+      setProspects(data ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load prospects');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { void fetch(); }, [fetch]);
 
   const createProspect = useCallback(async (data: ProspectInsert): Promise<LinkedInProspect> => {
-    const resp = await supabase
-      .from('linkedin_prospects')
-      .insert(data)
-      .select()
-      .single();
-    if (resp.error) throw new Error(resp.error.message);
-    const prospect = resp.data as LinkedInProspect;
+    const prospect = await createProspectApi(data);
     setProspects((prev) => [prospect, ...prev]);
     return prospect;
   }, []);
 
   const updateProspect = useCallback(async (id: string, patch: Partial<LinkedInProspect>): Promise<void> => {
-    const { error: err } = await supabase
-      .from('linkedin_prospects')
-      .update(patch)
-      .eq('id', id);
-    if (err) throw new Error(err.message);
+    await updateProspectApi(id, patch);
     setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }, []);
 
@@ -65,11 +58,7 @@ export function useProspects(): UseProspectsResult {
   }, [updateProspect]);
 
   const deleteProspect = useCallback(async (id: string): Promise<void> => {
-    const { error: err } = await supabase
-      .from('linkedin_prospects')
-      .delete()
-      .eq('id', id);
-    if (err) throw new Error(err.message);
+    await deleteProspectApi(id);
     setProspects((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
