@@ -180,6 +180,21 @@ def create_ai_decision(
 
     if row is None:
         raise HTTPException(status_code=500, detail="Failed to read back ai_decisions row")
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph:
+            ph.capture(
+                distinct_id=actor_id,
+                event="ai_decision_recorded",
+                properties={
+                    "decision": body.decision,
+                    "feature": body.feature,
+                    "has_reason": bool(body.reason and body.reason.strip()),
+                },
+            )
+    except Exception:
+        pass
     return _row_to_dict(row)
 
 

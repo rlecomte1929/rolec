@@ -338,6 +338,21 @@ def register(body: RegisterRequest, request: Request):
             role=role.value,
             principal_fingerprint=principal_fingerprint(email, username),
         )
+        try:
+            from ..posthog_client import get_posthog_client
+            ph = get_posthog_client()
+            if ph:
+                ph.capture(
+                    distinct_id=user_id,
+                    event="user_signed_up",
+                    properties={
+                        "role": role.value,
+                        "has_company": bool(company_id),
+                        "signup_method": "form",
+                    },
+                )
+        except Exception:
+            pass
         log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
         _audit_auth(entity_type="user", entity_id=user_id, action_type=ACTION_INSERT, actor_id=user_id)
         if email:
@@ -526,6 +541,17 @@ def login(body: LoginRequest, request: Request):
         role=effective_role.value,
         principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
     )
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph:
+            ph.capture(
+                distinct_id=user["id"],
+                event="user_logged_in",
+                properties={"role": effective_role.value},
+            )
+    except Exception:
+        pass
     log.info("auth_login success user_id=%s", user["id"][:8])
     _audit_auth(entity_type="session", entity_id=user["id"], action_type=ACTION_INSERT, actor_id=user["id"])
     if user.get("email"):
@@ -726,9 +752,22 @@ def logout(
     if authorization:
         token = authorization.replace("Bearer ", "").strip()
         if token:
+            _logout_user = db.get_user_by_token(token)
             db.delete_session_by_token(token)
             log.info("auth_logout legacy_token_invalidated")
             _audit_auth(entity_type="session", entity_id=token[:8] + "***", action_type=ACTION_DELETE)
+            if _logout_user:
+                try:
+                    from ..posthog_client import get_posthog_client
+                    ph = get_posthog_client()
+                    if ph:
+                        ph.capture(
+                            distinct_id=_logout_user["id"],
+                            event="user_logged_out",
+                            properties={"role": _logout_user.get("role", "unknown")},
+                        )
+                except Exception:
+                    pass
 
     supabase_access_token = (payload or {}).get("supabase_access_token") if isinstance(payload, dict) else None
     if supabase_access_token and isinstance(supabase_access_token, str):

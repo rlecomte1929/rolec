@@ -382,6 +382,21 @@ def publish_policy_version(
         )
         raise HTTPException(status_code=500, detail="Failed to publish version")
 
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph:
+            ph.capture(
+                distinct_id=actor["id"],
+                event="policy_published",
+                properties={
+                    "version_number": new_number,
+                    "has_expiry": payload.expiry_date is not None,
+                    "archived_previous": archived_id is not None,
+                },
+            )
+    except Exception:
+        pass
     return PublishResponse(
         version=_row_to_dto(refreshed or {"id": payload.version_id, "policy_id": ""}),
         archived_version_id=archived_id,

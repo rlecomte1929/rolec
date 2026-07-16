@@ -262,6 +262,23 @@ def post_recommendations_batch(
         )
     except Exception:
         pass
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph and user.get("id"):
+            total_count = sum(len(r.get("items", [])) for r in results.values())
+            ph.capture(
+                distinct_id=user["id"],
+                event="recommendations_requested",
+                properties={
+                    "service_count": len(results),
+                    "service_categories": list(results.keys()),
+                    "total_items": total_count,
+                    "duration_ms": round(dur_ms, 1),
+                },
+            )
+    except Exception:
+        pass
     return {"results": results}
 
 
