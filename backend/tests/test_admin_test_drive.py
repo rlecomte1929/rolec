@@ -142,6 +142,43 @@ class TestAdminTestDrive(unittest.TestCase):
         self.assertEqual(t2["reached_to"], 1)
         self.assertEqual(t2["drop_off_pct"], 50.0)
 
+    def test_follow_up_queue_unions_and_ranks(self):
+        """TD-M5 (AIQ-1561): pilot + value-rejecter + early dropout, deduped, pilot-yes first."""
+        self._as(True)
+
+        def fake_scalar(sql, params):
+            return 0
+
+        def fake_rows(sql, params):
+            if "pilot_interest IN ('yes', 'maybe') OR q3_problem_fit = 'no'" in sql:
+                return [
+                    {"tester_name": "Pilot Y", "tester_email": "y@x.test", "tester_company_role": "Head",
+                     "corridor_id": "GB_US", "tester_segment": "prospect", "pilot_interest": "yes",
+                     "pilot_note": "keen", "q3_problem_fit": "yes", "q3_why": "", "created_at": "2026-07-05"},
+                    {"tester_name": "Rejecter", "tester_email": "n@x.test", "tester_company_role": "Mgr",
+                     "corridor_id": "IN_DE", "tester_segment": "internal", "pilot_interest": "no",
+                     "pilot_note": "", "q3_problem_fit": "no", "q3_why": "not for us", "created_at": "2026-07-04"},
+                ]
+            if "status <> 'completed'" in sql:
+                return [
+                    {"tester_name": "Dropout", "tester_email": "d@x.test", "corridor_id": "FR_NO",
+                     "tester_segment": "prospect", "created_at": "2026-07-03"},
+                ]
+            return []
+
+        with patch("backend.app.routers.admin_test_drive._scalar", side_effect=fake_scalar), \
+                patch("backend.app.routers.admin_test_drive._rows", side_effect=fake_rows):
+            resp = self.client.get("/api/admin/test-drive/overview")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        q = resp.json()["follow_up"]
+        self.assertEqual({e["tester_email"] for e in q}, {"y@x.test", "n@x.test", "d@x.test"})
+        self.assertEqual(q[0]["tester_email"], "y@x.test")  # pilot-yes ranked first
+        self.assertIn("pilot_yes", q[0]["reasons"])
+        rejecter = next(e for e in q if e["tester_email"] == "n@x.test")
+        self.assertIn("problem_fit_no", rejecter["reasons"])
+        dropout = next(e for e in q if e["tester_email"] == "d@x.test")
+        self.assertIn("dropout", dropout["reasons"])
+
     def test_record_invites_forbidden_for_non_admin(self):
         self._as(False)
         resp = self.client.post("/api/admin/test-drive/invites", json={"count": 5, "channel": "email"})

@@ -49,6 +49,11 @@ _REFERRAL_PRESENT = (
 _TIMING_STAGES = ["start", "hr-handoff", "intake-start", "intake-completed", "roadmap-reached", "vendor-selected"]
 
 
+# TD-M5 (AIQ-1561): follow-up queue ranking — pilot-yes first, then maybe, then the
+# value-rejecter, then the early dropout (all reachable via the W0 contact email).
+_FOLLOWUP_PRIORITY = {"pilot_yes": 0, "pilot_maybe": 1, "problem_fit_no": 2, "dropout": 3}
+
+
 def _parse_ts(v: Any) -> Optional[datetime]:
     """Coerce a funnel_events.created_at to datetime (PG returns datetime, SQLite text)."""
     if v is None:
@@ -271,11 +276,69 @@ def test_drive_overview(
             })
         return out
 
+    def follow_up_queue() -> List[Dict[str, Any]]:
+        # TD-M5 (AIQ-1561): union of the three high-signal triggers, one row per person
+        # (deduped by email, reasons merged), ranked pilot-yes first. Every entry is
+        # reachable because TD-M0 captures the contact at provision.
+        by_email: Dict[str, Dict[str, Any]] = {}
+
+        def add(base: Dict[str, Any], reason: str) -> None:
+            email = (base.get("tester_email") or "").strip()
+            if not email:
+                return
+            e = by_email.setdefault(email, {**base, "reasons": []})
+            if reason not in e["reasons"]:
+                e["reasons"].append(reason)
+
+        # (a) pilot + (b) value-rejecter, from survey_responses.
+        sr = _rows(
+            "SELECT tester_name, tester_email, tester_company_role, corridor_id, tester_segment, "
+            "pilot_interest, pilot_note, q3_problem_fit, q3_why, created_at FROM survey_responses"
+            + _where(clauses, "(pilot_interest IN ('yes', 'maybe') OR q3_problem_fit = 'no')")
+            + " ORDER BY created_at DESC",
+            params,
+        )
+        for r in sr:
+            base = {
+                "tester_name": r.get("tester_name"), "tester_email": r.get("tester_email"),
+                "tester_company_role": r.get("tester_company_role"), "corridor_id": r.get("corridor_id"),
+                "tester_segment": r.get("tester_segment"), "pilot_interest": r.get("pilot_interest"),
+                "note": r.get("pilot_note") or r.get("q3_why"),
+            }
+            pi = r.get("pilot_interest")
+            if pi in ("yes", "maybe"):
+                add(base, f"pilot_{pi}")
+            if r.get("q3_problem_fit") == "no":
+                add(base, "problem_fit_no")
+
+        # (c) early dropout: started, not completed, has the W0 contact, no survey submitted.
+        drop = _rows(
+            "SELECT tester_name, tester_email, corridor_id, tester_segment, created_at FROM test_sessions"
+            + _where(
+                clauses,
+                "status <> 'completed' AND tester_email IS NOT NULL AND tester_email <> '' "
+                "AND id NOT IN (SELECT session_id FROM survey_responses WHERE session_id IS NOT NULL)",
+            )
+            + " ORDER BY created_at DESC",
+            params,
+        )
+        for r in drop:
+            add({
+                "tester_name": r.get("tester_name"), "tester_email": r.get("tester_email"),
+                "tester_company_role": None, "corridor_id": r.get("corridor_id"),
+                "tester_segment": r.get("tester_segment"), "pilot_interest": None, "note": None,
+            }, "dropout")
+
+        out = list(by_email.values())
+        out.sort(key=lambda e: min(_FOLLOWUP_PRIORITY.get(x, 9) for x in e["reasons"]))
+        return out[:200]
+
     fn = _safe(funnel, {})
     return {
         "funnel": fn,
         "scorecard": {**_safe(scorecard, {}), "totals": fn},
         "stage_timing": _safe(stage_timing, []),
+        "follow_up": _safe(follow_up_queue, []),
         "pilot_leads": _safe(pilot_leads, []),
         "completions": _safe(completions, []),
         "testimonials": _safe(testimonials, []),

@@ -34,6 +34,15 @@ function thankYouMailto(email: string, name: string | null): string {
   return `mailto:${email}?subject=${encodeURIComponent(THANK_YOU_SUBJECT)}&body=${encodeURIComponent(body)}`;
 }
 
+// TD-M5 (AIQ-1561): follow-up reason chips.
+const FOLLOWUP_LABEL: Record<string, string> = {
+  pilot_yes: 'Pilot: yes', pilot_maybe: 'Pilot: maybe', problem_fit_no: 'Rejects value', dropout: 'Dropped early',
+};
+const FOLLOWUP_BADGE: Record<string, string> = {
+  pilot_yes: 'bg-green-100 text-green-700', pilot_maybe: 'bg-amber-100 text-amber-700',
+  problem_fit_no: 'bg-rose-100 text-rose-700', dropout: 'bg-gray-200 text-gray-700',
+};
+
 function corridorLabel(id: string | null): string {
   if (!id) return '—';
   const c = TEST_DRIVE_CORRIDORS[id];
@@ -244,6 +253,52 @@ export function TestDriveTab() {
               <span key={k} className="ml-2">{k} <strong className="text-gray-900">{data.scorecard.trust_intent?.[k] ?? 0}</strong></span>
             ))}</span>
           </div>
+
+          {/* TD-M5 (AIQ-1561): follow-up queue — pilot-yes first, then maybe, value-rejecters,
+              early dropouts. Every entry is reachable via the W0 contact; one-click outreach. */}
+          <Section title={`Follow up (${data.follow_up.length})`}>
+            {data.follow_up.length === 0 ? (
+              <EmptyRow text="No follow-ups yet — pilot interest, value-rejecters and early dropouts surface here." />
+            ) : (
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Name</span><span>Why follow up</span><span>Corridor</span><span>Segment</span><span>Reach out</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {data.follow_up.map((r, idx) => (
+                    <div
+                      key={r.tester_email ?? idx}
+                      className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] items-center px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-gray-900">{r.tester_name || '—'}</div>
+                        <div className="truncate text-[11px] text-gray-400">{r.tester_email}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {r.reasons.map((reason) => (
+                          <span
+                            key={reason}
+                            className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${FOLLOWUP_BADGE[reason] ?? 'bg-gray-100 text-gray-600'}`}
+                          >
+                            {FOLLOWUP_LABEL[reason] ?? reason}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-gray-600">{r.corridor_id || '—'}</span>
+                      <span className="text-gray-600">{r.tester_segment || '—'}</span>
+                      {r.tester_email ? (
+                        <a href={thankYouMailto(r.tester_email, r.tester_name)} className="font-semibold text-[#1f8e8b] hover:underline">
+                          Email →
+                        </a>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Section>
 
           {/* Funnel */}
           <Section title="Funnel">
