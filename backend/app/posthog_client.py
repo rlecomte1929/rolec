@@ -30,7 +30,13 @@ def init_posthog() -> None:
         _client = Posthog(
             project_api_key=token,
             host=host,
-            enable_exception_autocapture=True,
+            # Exception autocapture is deliberately OFF: it ships server-side stack
+            # traces and local variables (which can contain raw PII — SQL params,
+            # request bodies, user data in locals) to PostHog, an external
+            # sub-processor. That would bypass our data-minimisation controls
+            # (GDPR Art. 28/44). Only the explicit, PII-free events captured via
+            # ph.capture() below are sent. See docs/security/PRIV-004.
+            enable_exception_autocapture=False,
         )
         atexit.register(_client.shutdown)
         log.info("PostHog client initialized (host=%s).", host)

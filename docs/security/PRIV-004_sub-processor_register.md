@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.4 · **Last verified:** 2026-07-16 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.5 · **Last verified:** 2026-07-16 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -19,9 +19,27 @@
 | **Anthropic** | LLM — Policy Assistant, roadmap, entity resolution | **US** | DPA (Commercial Terms) + SCCs | ⬜ Confirm Commercial plan | `anthropic==0.39.0`; `llm_client.py`, `policy_assistant_llm_client.py`, `roadmap_generator.py` |
 | **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
-| **PostHog** | Product analytics + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx` |
+| **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
 
-## Notes & corrections (v1.1 → v1.4)
+## Notes & corrections (v1.1 → v1.5)
+
+- **PostHog backend server-side events added (v1.5, #1504).** `backend/app/posthog_client.py`
+  initialises the `posthog` Python SDK in the app lifespan and captures eight product-analytics
+  events server-side: `user_signed_up`, `user_logged_in`, `user_logged_out` (`auth.py`),
+  `ai_decision_recorded` (`ai_decisions.py`), `recommendations_requested` (`recommendations/router.py`),
+  `policy_published` (`policy_publish.py`), `case_created`, `case_assigned` (`main.py`). Unlike the
+  frontend replay (test-drive-only, synthetic identities), this flow fires for **real HR / employee /
+  admin users** in production, so the personal-data posture matters. Two controls keep it
+  data-minimised: (1) **event properties are PII-free** — booleans, counts, enums, category names and
+  durations only (e.g. `role`, `has_company`, `decision`, `feature`, `service_count`, `duration_ms`);
+  no names, emails, free-text (`reason`/notes are sent only as `has_reason` booleans), or case
+  contents leave the platform. `distinct_id` is the internal **user id** (a pseudonymous identifier),
+  not the email. (2) **Exception autocapture is disabled** (`enable_exception_autocapture=False`) —
+  server-side stack traces + local variables (which can contain raw PII: SQL params, request bodies)
+  are **not** shipped; only the explicit events above are sent. The whole flow is gated on
+  `POSTHOG_PROJECT_TOKEN`, so dev/CI (and any env without the token) is a silent no-op. Same EU host
+  (`eu.i.posthog.com`) as the frontend — EU residency, no transfer. DPA on the PostHog EU project
+  still needs signing (human action).
 
 - **PostHog moved to EU + replay gated to test-drive (v1.4, TD-M2 / AIQ-1560).** `analytics.ts` now
   defaults `posthogHost` to `https://eu.i.posthog.com` (Render also sets `VITE_POSTHOG_HOST` to it), so
