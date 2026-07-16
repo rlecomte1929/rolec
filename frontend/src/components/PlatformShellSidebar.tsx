@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, LogOut, Pencil, Check, RotateCcw } from 'lucide-react';
-import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
+import { NavIcon, type NavIconId } from '../features/platform-v2/sidebar/navIcons';
 import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { authAPI } from '../api/client';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
@@ -46,7 +46,10 @@ interface SidebarVisibilityCtx {
 }
 
 interface SectionItem {
-  id: string;
+  // NavIconId (not string) so a nav item whose id has no NAV_ICONS entry fails
+  // tsc rather than silently rendering without an icon. `children[].id` below
+  // stays `string` — child links render as text only.
+  id: NavIconId;
   label: string;
   /** Optional themed sub-group within a section (Admin only today). A small sub-group
    *  label renders at each group boundary; items without a group render flat. */

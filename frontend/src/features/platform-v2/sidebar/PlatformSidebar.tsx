@@ -10,14 +10,15 @@ import {
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { buildRoute, type RouteKey } from '../../../navigation/routes';
-import { NAV_ICONS } from './navIcons';
+import { NAV_ICONS, type NavIconId } from './navIcons';
 
 const COLLAPSE_KEY = 'platform_sidebar_collapsed';
 
 type Badge = { label: string; tone?: 'accent' | 'new' | 'live' | 'count' };
 
 type NavItem = {
-  id: string;
+  // NavIconId (not string) so an item with no NAV_ICONS entry fails tsc.
+  id: NavIconId;
   name: string;
   to: string;
   badge?: Badge;
