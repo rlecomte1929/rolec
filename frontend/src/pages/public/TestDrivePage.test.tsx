@@ -98,6 +98,7 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=GB_US&token=invite-xyz');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Alex' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
@@ -105,6 +106,7 @@ describe('TestDrivePage', () => {
     // at provision (resolved later by the survey one-tap), never silently 'prospect'.
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Alex',
+      tester_email: 'tester@example.com',
       corridor_id: 'GB_US',
       tester_segment: undefined,
       invite_token: 'invite-xyz',
@@ -134,11 +136,13 @@ describe('TestDrivePage', () => {
     renderAt('');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Romain',
+      tester_email: 'tester@example.com',
       tester_segment: undefined,
       invite_token: undefined,
     });
@@ -156,11 +160,13 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=FR_NO&token=t&segment=internal');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Dana' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Dana',
+      tester_email: 'tester@example.com',
       corridor_id: 'FR_NO',
       tester_segment: 'internal',
       invite_token: 't',
@@ -180,6 +186,7 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=GB_US&token=invite-xyz');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Alex' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     const cta = await screen.findByRole('button', { name: /i've completed my test/i });
@@ -194,6 +201,7 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=FR_NO');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Sam' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     expect(await screen.findByText(/invite link is invalid/i)).toBeInTheDocument();

@@ -53,6 +53,7 @@ export const TestDrivePage: React.FC = () => {
     rawSegment === 'internal' ? 'internal' : rawSegment === 'prospect' ? 'prospect' : undefined;
 
   const [firstName, setFirstName] = useState('');
+  const [email, setEmail] = useState('');
   const [state, setState] = useState<SubmitState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionSuccess | null>(null);
@@ -94,10 +95,21 @@ export const TestDrivePage: React.FC = () => {
       setError(c.errors.firstNameRequired);
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail.length < 1) {
+      setError(c.errors.emailRequired);
+      return;
+    }
+    // Same light check the backend applies — a real address, not full RFC validation.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+      setError(c.errors.emailInvalid);
+      return;
+    }
     setState('submitting');
     setError(null);
     const res = await provisionTestDrive({
       first_name: firstName.trim(),
+      tester_email: trimmedEmail,
       ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
       tester_segment: segment,
       invite_token: inviteToken || undefined,
@@ -105,6 +117,7 @@ export const TestDrivePage: React.FC = () => {
     if (res.ok) {
       setAssignedCorridorId(res.corridorId);
       // TD-9: stash the campaign slice for the FeedbackWidget to stamp in-session feedback.
+      // TD-M0: also stash the contact so the survey pre-fills it instead of re-asking.
       try {
         localStorage.setItem(
           TEST_DRIVE_LS_KEY,
@@ -113,6 +126,8 @@ export const TestDrivePage: React.FC = () => {
             corridor_id: res.corridorId,
             tester_segment: segment,
             session_id: res.sessionId,
+            tester_name: firstName.trim(),
+            tester_email: trimmedEmail,
           }),
         );
       } catch {
@@ -212,6 +227,30 @@ export const TestDrivePage: React.FC = () => {
                   />
                   <p id="td-first-name-helper" className="mt-2 text-xs text-marketing-text-muted">
                     {c.startBlock.helper}
+                  </p>
+
+                  {/* TD-M0: real contact, captured at the start so every session is reachable. */}
+                  <label
+                    htmlFor="td-email"
+                    className="mt-4 block text-sm font-medium text-marketing-primary"
+                  >
+                    {c.startBlock.emailLabel}
+                    <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>
+                  </label>
+                  <Input
+                    unstyled
+                    id="td-email"
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder={c.startBlock.emailPlaceholder}
+                    autoComplete="email"
+                    disabled={state === 'submitting'}
+                    aria-describedby="td-email-helper"
+                    className="mt-1 w-full rounded-lg border border-marketing-border bg-white px-3 py-2 text-sm text-marketing-text transition-colors focus:border-marketing-accent focus:outline-none focus:ring-2 focus:ring-marketing-accent/40 disabled:cursor-not-allowed disabled:bg-marketing-surface-muted"
+                  />
+                  <p id="td-email-helper" className="mt-2 text-xs text-marketing-text-muted">
+                    {c.startBlock.emailHelper}
                   </p>
 
                   {error && (

@@ -85,7 +85,7 @@ export const testDriveContent = {
   aboutData: {
     header: 'About the data',
     body:
-      "Every account and case here is synthetic. Nothing you enter is personal data, and nothing connects to a live relocation. Use the sample details provided — there's nothing to protect, and nothing to clean up afterward.",
+      "The relocation is synthetic: every account, company and case here is made up, so use the sample details and there's nothing to protect. The one real thing we ask for is your email — only so Romain can send your two logins and follow up on your feedback. It's never used for anything else, and it never touches the sample relocation data.",
   },
 
   videos: {
@@ -122,8 +122,11 @@ export const testDriveContent = {
     fieldLabel: 'First name',
     placeholder: 'e.g. Alex',
     helper: "We'll generate your HR and employee test accounts from this.",
+    emailLabel: 'Email',
+    emailPlaceholder: 'e.g. alex@company.com',
+    emailHelper: 'So Romain can send your two logins and follow up — nothing else.',
     button: 'Start the test',
-    legal: 'Sample data only. No personal data is stored from this test.',
+    legal: 'Your email is kept only to send your logins and follow up. Everything else here is sample data.',
   },
 
   credentials: {
@@ -152,5 +155,7 @@ export const testDriveContent = {
 
   errors: {
     firstNameRequired: 'Please enter your first name.',
+    emailRequired: 'Please enter your email so we can send your logins.',
+    emailInvalid: 'Please enter a valid email address.',
   },
 } as const;

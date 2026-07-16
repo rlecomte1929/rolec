@@ -46,6 +46,7 @@ def _db_mock() -> MagicMock:
 def _body(**overrides):
     body = {
         "first_name": "Alice",
+        "tester_email": "alice@example.com",
         "invite_token": "secret-token",
         "tester_segment": "prospect",
     }
@@ -149,6 +150,44 @@ class TestTestDriveProvision(unittest.TestCase):
         with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
                 patch("backend.app.routers.test_drive.db", db):
             resp = self.client.post("/api/test-drive/provision", json=_body(tester_segment="bogus"))
+        self.assertEqual(resp.status_code, 422, resp.text)
+
+    def test_persists_tester_contact(self):
+        """TD-M0 (AIQ-1556): provision stores the tester's real name + email on the session row."""
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post(
+                "/api/test-drive/provision",
+                json=_body(first_name="Alice", tester_email="alice@example.com"),
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sess_inserts = [
+            c for c in conn.execute.call_args_list if "INSERT INTO test_sessions" in str(c.args[0])
+        ]
+        self.assertEqual(len(sess_inserts), 1)
+        params = sess_inserts[0].args[1]
+        self.assertEqual(params["tester_name"], "Alice")
+        self.assertEqual(params["tester_email"], "alice@example.com")
+
+    def test_missing_email_returns_422(self):
+        """TD-M0: email is required — a provision without it is rejected."""
+        db = _db_mock()
+        body = _body()
+        body.pop("tester_email", None)
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/provision", json=body)
+        self.assertEqual(resp.status_code, 422, resp.text)
+
+    def test_invalid_email_returns_422(self):
+        """TD-M0: a malformed email is rejected before any account is created."""
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/provision", json=_body(tester_email="notanemail"))
         self.assertEqual(resp.status_code, 422, resp.text)
 
     def test_no_corridor_auto_assigns(self):

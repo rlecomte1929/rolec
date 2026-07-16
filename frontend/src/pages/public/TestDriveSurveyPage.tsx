@@ -70,7 +70,22 @@ export const TestDriveSurveyPage: React.FC = () => {
   const sessionId = searchParams.get('session') || '';
   const corridorId = (searchParams.get('corridor') || '').toUpperCase();
 
-  const [form, setForm] = useState<SurveyForm>(EMPTY);
+  // TD-M0 (AIQ-1556): pre-fill the tester's contact from what they entered at the
+  // start (stashed under 'relopass_test_drive' by TestDrivePage) instead of re-asking.
+  const [form, setForm] = useState<SurveyForm>(() => {
+    try {
+      const raw = localStorage.getItem('relopass_test_drive');
+      if (raw) {
+        const p = JSON.parse(raw) as { tester_name?: string; tester_email?: string };
+        if (p.tester_name || p.tester_email) {
+          return { ...EMPTY, tester_name: p.tester_name || '', tester_email: p.tester_email || '' };
+        }
+      }
+    } catch {
+      /* private-mode / storage disabled — fall through to empty */
+    }
+    return EMPTY;
+  });
   const [state, setState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [sectorOther, setSectorOther] = useState(false);

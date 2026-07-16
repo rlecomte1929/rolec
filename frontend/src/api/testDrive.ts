@@ -9,6 +9,9 @@ import { apiPost } from './client';
 
 export interface ProvisionInput {
   first_name: string;
+  // TD-M0 (AIQ-1556): the tester's real contact, captured at the start so every
+  // session (incl. dropouts) is reachable. Required.
+  tester_email: string;
   corridor_id?: string;
   // TD-FIX-2 (AIQ-1503): optional — omitted for the single-link flow (segment is
   // captured later via the survey's one-tap self-ID), set only for explicit ?segment=.

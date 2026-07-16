@@ -154,6 +154,11 @@ def _assign_corridor(campaign: str) -> str:
 
 class ProvisionRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=40)
+    # TD-M0 (AIQ-1556): the tester's REAL contact, captured at the start so every
+    # session (incl. dropouts) is reachable. Required + lightly validated. This is
+    # real PII — stored only on the admin-read test_sessions row, never logged,
+    # never sent to an LLM. tester_name reuses first_name (one-extra-field flow).
+    tester_email: str = Field(..., min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     corridor_id: Optional[str] = Field(None, max_length=64)
     invite_token: Optional[str] = Field(None, max_length=200)
     # TD-FIX-2 (AIQ-1503): single-link model can't tag the segment at provision, so
@@ -264,9 +269,10 @@ def provision(body: ProvisionRequest, request: Request):
         conn.execute(
             text(
                 f"INSERT INTO test_sessions "
-                f"(id, campaign, corridor_id, tester_segment, first_name_label, hr_username, emp_username, status) "
+                f"(id, campaign, corridor_id, tester_segment, first_name_label, "
+                f"tester_name, tester_email, hr_username, emp_username, status) "
                 f"VALUES ({id_expr}, :campaign, :corridor_id, :tester_segment, :first_name_label, "
-                f":hr_username, :emp_username, 'started')"
+                f":tester_name, :tester_email, :hr_username, :emp_username, 'started')"
             ),
             {
                 "id": session_id,
@@ -274,6 +280,9 @@ def provision(body: ProvisionRequest, request: Request):
                 "corridor_id": resolved_corridor,
                 "tester_segment": body.tester_segment,
                 "first_name_label": first_name,
+                # TD-M0: tester_name reuses the real first name; tester_email is the new field.
+                "tester_name": first_name,
+                "tester_email": body.tester_email.strip(),
                 "hr_username": hr_username,
                 "emp_username": emp_username,
             },
