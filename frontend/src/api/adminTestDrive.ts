@@ -63,7 +63,12 @@ export interface StageTiming {
 
 export interface TestDriveOverview {
   funnel: TestDriveFunnel;
-  scorecard: { avg_overall: number | null; problem_fit: Record<string, number>; totals: TestDriveFunnel };
+  scorecard: {
+    avg_overall: number | null;
+    problem_fit: Record<string, number>;
+    trust_intent: Record<string, number>;
+    totals: TestDriveFunnel;
+  };
   stage_timing: StageTiming[];
   pilot_leads: PilotLead[];
   completions: Completion[];

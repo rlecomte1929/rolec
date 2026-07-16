@@ -179,6 +179,10 @@ export function TestDriveTab() {
             <span>Problem fit: {(['yes', 'somewhat', 'no'] as const).map((k) => (
               <span key={k} className="ml-2">{k} <strong className="text-gray-900">{data.scorecard.problem_fit?.[k] ?? 0}</strong></span>
             ))}</span>
+            {/* TD-M4 (AIQ-1559): trust/intent — segment-split via the corridor/segment filter above. */}
+            <span>Trust: {(['yes', 'maybe', 'no'] as const).map((k) => (
+              <span key={k} className="ml-2">{k} <strong className="text-gray-900">{data.scorecard.trust_intent?.[k] ?? 0}</strong></span>
+            ))}</span>
           </div>
 
           {/* Funnel */}

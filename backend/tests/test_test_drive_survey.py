@@ -74,6 +74,31 @@ class TestTestDriveSurvey(unittest.TestCase):
         self.assertTrue(bound["testimonial_consent"])
         self.assertEqual(bound["pilot_interest"], "maybe")
 
+    def test_trust_intent_persists(self):
+        """TD-M4 (AIQ-1559): trust_intent + why are written to the survey_responses INSERT."""
+        db = MagicMock()
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post(
+                "/api/test-drive/survey",
+                json=_body(trust_intent="yes", trust_intent_why="clear roadmap"),
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        survey_calls = [c for c in conn.execute.call_args_list if "INSERT INTO survey_responses" in str(c.args[0])]
+        self.assertEqual(len(survey_calls), 1)
+        self.assertIn("trust_intent", str(survey_calls[0].args[0]))
+        bound = survey_calls[0].args[1]
+        self.assertEqual(bound["trust_intent"], "yes")
+        self.assertEqual(bound["trust_intent_why"], "clear roadmap")
+
+    def test_bad_trust_intent_returns_422(self):
+        """TD-M4: the enum (yes|maybe|no) is validated at the API — garbage is rejected."""
+        with patch.dict(os.environ, _ENABLED, clear=False):
+            resp = self.client.post("/api/test-drive/survey", json=_body(trust_intent="definitely"))
+        self.assertEqual(resp.status_code, 422, resp.text)
+
     def test_segment_propagates_to_session(self):
         """TD-FIX-2 (AIQ-1503): the self-declared segment is written back onto test_sessions."""
         db = MagicMock()

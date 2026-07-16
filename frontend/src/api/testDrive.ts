@@ -97,6 +97,9 @@ export interface SurveyInput {
   q3_problem_fit?: 'yes' | 'somewhat' | 'no';
   q3_why?: string;
   q4_change?: string;
+  // TD-M4 (AIQ-1559): trust / intent-to-use.
+  trust_intent?: 'yes' | 'maybe' | 'no';
+  trust_intent_why?: string;
   testimonial?: string;
   testimonial_consent?: boolean;
   pilot_interest?: 'yes' | 'maybe' | 'no';

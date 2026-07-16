@@ -319,7 +319,8 @@ def provision(body: ProvisionRequest, request: Request):
 _SURVEY_COLUMNS = (
     "session_id campaign corridor_id tester_segment tester_name tester_email "
     "tester_company_role tester_sector q1_overall q2_friction q3_problem_fit q3_why "
-    "q4_change testimonial testimonial_consent pilot_interest pilot_note referral_name "
+    "q4_change trust_intent trust_intent_why "  # TD-M4 (AIQ-1559)
+    "testimonial testimonial_consent pilot_interest pilot_note referral_name "
     "referral_company_role referral_contact referral_consent"
 ).split()
 
@@ -363,6 +364,9 @@ class SurveyRequest(BaseModel):
     q3_problem_fit: Optional[str] = Field(None, pattern="^(yes|somewhat|no)$")
     q3_why: Optional[str] = None
     q4_change: Optional[str] = None
+    # TD-M4 (AIQ-1559): trust / intent-to-use — the predictive signal. One tap + optional why.
+    trust_intent: Optional[str] = Field(None, pattern="^(yes|maybe|no)$")
+    trust_intent_why: Optional[str] = None
     # Q5 testimonial (+ quote consent), Q6 pilot interest, Q7 referral (+ consent)
     testimonial: Optional[str] = None
     testimonial_consent: bool = False

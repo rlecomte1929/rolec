@@ -26,6 +26,8 @@ interface SurveyForm {
   q3_problem_fit: ProblemFit;
   q3_why: string;
   q4_change: string;
+  trust_intent: PilotInterest;
+  trust_intent_why: string;
   testimonial: string;
   testimonial_consent: boolean;
   pilot_interest: PilotInterest;
@@ -47,6 +49,8 @@ const EMPTY: SurveyForm = {
   q3_problem_fit: '',
   q3_why: '',
   q4_change: '',
+  trust_intent: '',
+  trust_intent_why: '',
   testimonial: '',
   testimonial_consent: false,
   pilot_interest: '',
@@ -124,6 +128,8 @@ export const TestDriveSurveyPage: React.FC = () => {
       q3_problem_fit: form.q3_problem_fit || undefined,
       q3_why: clean(form.q3_why),
       q4_change: clean(form.q4_change),
+      trust_intent: form.trust_intent || undefined,
+      trust_intent_why: clean(form.trust_intent_why),
       testimonial: clean(form.testimonial),
       testimonial_consent: form.testimonial_consent,
       pilot_interest: form.pilot_interest || undefined,
@@ -335,6 +341,24 @@ export const TestDriveSurveyPage: React.FC = () => {
               value={form.q4_change}
               onChange={(v) => set('q4_change', v)}
             />
+
+            {/* TD-M4 (AIQ-1559): trust / intent-to-use — one tap + optional why */}
+            <div>
+              <p className="text-sm font-medium text-marketing-primary">{c.trust.label}</p>
+              <TapGroup
+                options={c.trust.options}
+                value={form.trust_intent}
+                onSelect={(v) => set('trust_intent', v as PilotInterest)}
+              />
+              <div className="mt-3">
+                <TextField
+                  id="s-trust-why"
+                  label={c.trust.whyLabel}
+                  value={form.trust_intent_why}
+                  onChange={(v) => set('trust_intent_why', v)}
+                />
+              </div>
+            </div>
 
             <p className="text-[13px] italic text-marketing-text-muted">{c.highValueIntro}</p>
 

@@ -190,9 +190,18 @@ def test_drive_overview(
             + " GROUP BY q3_problem_fit",
             params,
         )
+        # TD-M4 (AIQ-1559): trust/intent breakdown — the predictive signal, segment-split
+        # for free (respects the same slice as every panel).
+        trust_rows = _rows(
+            "SELECT trust_intent AS ti, count(*) AS n FROM survey_responses"
+            + _where(clauses, "trust_intent IS NOT NULL")
+            + " GROUP BY trust_intent",
+            params,
+        )
         return {
             "avg_overall": round(float(avg_q1), 2) if avg_q1 is not None else None,
             "problem_fit": {r["fit"]: int(r["n"]) for r in fit_rows},
+            "trust_intent": {r["ti"]: int(r["n"]) for r in trust_rows},
         }
 
     def pilot_leads() -> List[Dict[str, Any]]:
