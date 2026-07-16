@@ -40,18 +40,24 @@ import {
   ScrollText,
   Rocket,
   Megaphone,
+  MessageCircleQuestion,
   type LucideIcon,
 } from 'lucide-react';
 
 /**
  * Single source of truth for platform sidebar icons.
  *
- * Both `AdminLayout` (production admin shell) and `PlatformSidebar` (new
- * platform-v2 nav) read from this map. Add a new nav item: add it here once,
- * reference its id from both sidebars. Keys mirror the prototype IDs at
+ * `PlatformShellSidebar` (production shell) and `PlatformSidebar` (platform-v2
+ * nav) read from this map. Add a new nav item: add it here once, reference its
+ * id from both sidebars. Keys mirror the prototype IDs at
  * `frontend/public/design-preview/platform-shell.jsx`.
+ *
+ * `satisfies` (rather than a `Record<string, LucideIcon>` annotation) keeps the
+ * keys literal, so `NavIconId` below is a real union and a nav item whose id has
+ * no icon here fails `tsc` instead of silently rendering nothing — which is how
+ * the Outreach and Immigration Q&A items shipped icon-less.
  */
-export const NAV_ICONS: Record<string, LucideIcon> = {
+export const NAV_ICONS = {
   // Employee
   intake: Sparkles,
   'detailed-intake': UserRound,
@@ -60,6 +66,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   dossier: Files,
   'service-providers': Briefcase,
   'benefit-comparison': BarChart3,
+  'immigration-qa': MessageCircleQuestion,
   inbox: MessageSquare,
 
   // AI Engine
@@ -108,12 +115,12 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   outreach: Megaphone,
   integrations: Layers,
   'vetting-queue': ShieldCheck,
-};
+} satisfies Record<string, LucideIcon>;
 
 export type NavIconId = keyof typeof NAV_ICONS;
 
 interface NavIconProps {
-  id: string;
+  id: NavIconId;
   size?: number;
   className?: string;
   strokeWidth?: number;
