@@ -101,13 +101,12 @@ export const TestDrivePage: React.FC = () => {
       setError(c.errors.firstNameRequired);
       return;
     }
+    // AIQ-1556 correction: the email is OPTIONAL — a blank one is a valid choice, not an
+    // error. The relocation data is synthetic, so nothing here should force real PII; the
+    // only reason to leave an address is consenting to a follow-up. Validate the format
+    // only when the tester actually typed something.
     const trimmedEmail = email.trim();
-    if (trimmedEmail.length < 1) {
-      setError(c.errors.emailRequired);
-      return;
-    }
-    // Same light check the backend applies — a real address, not full RFC validation.
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+    if (trimmedEmail.length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
       setError(c.errors.emailInvalid);
       return;
     }
@@ -115,7 +114,9 @@ export const TestDrivePage: React.FC = () => {
     setError(null);
     const res = await provisionTestDrive({
       first_name: firstName.trim(),
-      tester_email: trimmedEmail,
+      // AIQ-1556: omitted entirely when blank — declining contact is a valid choice.
+      ...(trimmedEmail ? { tester_email: trimmedEmail } : {}),
+      // AIQ-1563: forward ?campaign= so QA runs stay out of the real cohort.
       ...(campaign ? { campaign } : {}),
       ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
       tester_segment: segment,
@@ -134,6 +135,7 @@ export const TestDrivePage: React.FC = () => {
             tester_segment: segment,
             session_id: res.sessionId,
             tester_name: firstName.trim(),
+            // May be '' — the survey lead-in then simply has nothing to pre-fill.
             tester_email: trimmedEmail,
           }),
         );
@@ -236,13 +238,14 @@ export const TestDrivePage: React.FC = () => {
                     {c.startBlock.helper}
                   </p>
 
-                  {/* TD-M0: real contact, captured at the start so every session is reachable. */}
+                  {/* TD-M0 (AIQ-1556, corrected): OPTIONAL contact — captured at the start so a
+                      tester who consents is reachable even if they drop out. No required marker:
+                      leaving it blank is a valid choice and the full test still runs. */}
                   <label
                     htmlFor="td-email"
                     className="mt-4 block text-sm font-medium text-marketing-primary"
                   >
                     {c.startBlock.emailLabel}
-                    <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>
                   </label>
                   <Input
                     unstyled

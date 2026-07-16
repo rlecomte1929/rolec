@@ -279,8 +279,10 @@ def test_drive_overview(
 
     def follow_up_queue() -> List[Dict[str, Any]]:
         # TD-M5 (AIQ-1561): union of the three high-signal triggers, one row per person
-        # (deduped by email, reasons merged), ranked pilot-yes first. Every entry is
-        # reachable because TD-M0 captures the contact at provision.
+        # (deduped by email, reasons merged), ranked pilot-yes first.
+        # AIQ-1556 correction: the provision email is OPTIONAL, so this queue holds only
+        # testers who consented to be contacted — `add()` skips contact-less rows below.
+        # A tester who declined stays anonymous by design and will not appear here.
         by_email: Dict[str, Dict[str, Any]] = {}
 
         def add(base: Dict[str, Any], reason: str) -> None:

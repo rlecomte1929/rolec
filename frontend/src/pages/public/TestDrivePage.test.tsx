@@ -181,6 +181,46 @@ describe('TestDrivePage', () => {
     });
   });
 
+  it('provisions with NO email — declining contact is a valid choice (AIQ-1556)', async () => {
+    // The relocation data is synthetic, so nothing here may force real PII. A tester who
+    // does not consent to a follow-up must still get the full test: no error, no block,
+    // and tester_email simply omitted from the payload (stored NULL server-side).
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 's3',
+      corridorId: 'FR_NO',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-r-1a2b', email: 'hr-r@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-r-1a2b', email: 'emp-r@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    renderAt('');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    // Email deliberately left untouched.
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith({
+      first_name: 'Romain',
+      tester_segment: undefined,
+      invite_token: undefined,
+    });
+    // The tester still gets their logins on screen — nothing is gated behind the email.
+    expect(await screen.findByText('hr-r@probe.test')).toBeInTheDocument();
+    expect(screen.getByText('emp-r@probe.test')).toBeInTheDocument();
+  });
+
+  it('still rejects a malformed email that was actually typed (AIQ-1556)', async () => {
+    // Optional does not mean unvalidated: if they opt in, the address must be usable.
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'notanemail' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    expect(await screen.findByText(/valid email address/i)).toBeInTheDocument();
+    expect(mockProvision).not.toHaveBeenCalled();
+  });
+
   it('honours an explicit ?segment=internal at provision (TD-FIX-2)', async () => {
     mockProvision.mockResolvedValue({
       ok: true,

@@ -172,18 +172,50 @@ class TestTestDriveProvision(unittest.TestCase):
         self.assertEqual(params["tester_name"], "Alice")
         self.assertEqual(params["tester_email"], "alice@example.com")
 
-    def test_missing_email_returns_422(self):
-        """TD-M0: email is required — a provision without it is rejected."""
+    def test_missing_email_is_allowed_and_stored_as_null(self):
+        """AIQ-1556 correction: the email is OPTIONAL — declining it must not block the test.
+
+        The relocation data is synthetic, so nothing here forces real PII. A tester who
+        does not consent to be contacted still gets the full run; the session simply
+        carries no contact and stays anonymous (and is skipped by the TD-M5 follow-up
+        queue). This inverts the original TD-M0 assertion, which required the email.
+        """
         db = _db_mock()
         body = _body()
         body.pop("tester_email", None)
         with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
-                patch("backend.app.routers.test_drive.db", db):
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
             resp = self.client.post("/api/test-drive/provision", json=body)
-        self.assertEqual(resp.status_code, 422, resp.text)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sess_inserts = [
+            c for c in conn.execute.call_args_list if "INSERT INTO test_sessions" in str(c.args[0])
+        ]
+        self.assertEqual(len(sess_inserts), 1)
+        # A true NULL, not '' — the follow-up queue filters on IS NOT NULL / <> ''.
+        self.assertIsNone(sess_inserts[0].args[1]["tester_email"])
+
+    def test_blank_email_is_normalised_to_null(self):
+        """AIQ-1556: an empty string is the same choice as omitting it — store NULL, not ''."""
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(tester_email="   "))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sess_inserts = [
+            c for c in conn.execute.call_args_list if "INSERT INTO test_sessions" in str(c.args[0])
+        ]
+        self.assertIsNone(sess_inserts[0].args[1]["tester_email"])
 
     def test_invalid_email_returns_422(self):
-        """TD-M0: a malformed email is rejected before any account is created."""
+        """A malformed address that was actually typed is still rejected (unchanged).
+
+        Optional does not mean unvalidated: if the tester opts in, the address has to be
+        usable — otherwise the follow-up they consented to would silently never arrive.
+        """
         db = _db_mock()
         with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
                 patch("backend.app.routers.test_drive.db", db):
