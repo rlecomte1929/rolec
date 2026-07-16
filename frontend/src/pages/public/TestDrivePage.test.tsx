@@ -17,7 +17,7 @@ vi.mock('../../components/public', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-import { provisionTestDrive, completeTestDrive } from '../../api/testDrive';
+import { provisionTestDrive, completeTestDrive, recordTestDriveEvent } from '../../api/testDrive';
 import { TestDrivePage } from './TestDrivePage';
 
 // jsdom has no matchMedia; the marketing FadeIn reads it on mount.
@@ -36,6 +36,13 @@ if (!window.matchMedia) {
 
 const mockProvision = provisionTestDrive as unknown as ReturnType<typeof vi.fn>;
 const mockComplete = completeTestDrive as unknown as ReturnType<typeof vi.fn>;
+const mockRecordEvent = recordTestDriveEvent as unknown as ReturnType<typeof vi.fn>;
+
+const OK_RESULT = {
+  ok: true as const, sessionId: 's-qa', corridorId: 'FR_NO', campaign: 'qa-posthog',
+  hr: { username: 'HR-qa', email: 'hr-qa@probe.test', password: 'p', role: 'HR' as const },
+  employee: { username: 'EMP-qa', email: 'emp-qa@probe.test', password: 'p', role: 'EMPLOYEE' as const },
+};
 
 function renderAt(search: string) {
   return render(
@@ -51,6 +58,32 @@ afterEach(() => {
 });
 
 describe('TestDrivePage', () => {
+  it('[AIQ-1563] forwards ?campaign= to provision and the funnel click event', async () => {
+    mockProvision.mockResolvedValue(OK_RESULT);
+    renderAt('?campaign=qa-posthog');
+    // the click event fires on mount, tagged with the campaign
+    await waitFor(() => expect(mockRecordEvent).toHaveBeenCalled());
+    expect(mockRecordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: 'click', campaign: 'qa-posthog' }),
+    );
+    // and provision carries it
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'QA' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'qa@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith(expect.objectContaining({ campaign: 'qa-posthog' }));
+  });
+
+  it('[AIQ-1563] omits campaign when ?campaign= is absent (plain cohort link unchanged)', async () => {
+    mockProvision.mockResolvedValue({ ...OK_RESULT, campaign: 'insead-2026' });
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Plain' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'plain@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect('campaign' in mockProvision.mock.calls[0][0]).toBe(false);
+  });
+
   it('renders the hero + corridor label for a Tier-A corridor, no early-coverage note', () => {
     renderAt('?corridor=FR_NO&token=t');
     expect(
@@ -98,6 +131,7 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=GB_US&token=invite-xyz');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Alex' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
@@ -105,6 +139,7 @@ describe('TestDrivePage', () => {
     // at provision (resolved later by the survey one-tap), never silently 'prospect'.
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Alex',
+      tester_email: 'tester@example.com',
       corridor_id: 'GB_US',
       tester_segment: undefined,
       invite_token: 'invite-xyz',
@@ -134,6 +169,34 @@ describe('TestDrivePage', () => {
     renderAt('');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith({
+      first_name: 'Romain',
+      tester_email: 'tester@example.com',
+      tester_segment: undefined,
+      invite_token: undefined,
+    });
+  });
+
+  it('provisions with NO email — declining contact is a valid choice (AIQ-1556)', async () => {
+    // The relocation data is synthetic, so nothing here may force real PII. A tester who
+    // does not consent to a follow-up must still get the full test: no error, no block,
+    // and tester_email simply omitted from the payload (stored NULL server-side).
+    mockProvision.mockResolvedValue({
+      ok: true,
+      sessionId: 's3',
+      corridorId: 'FR_NO',
+      campaign: 'insead-2026',
+      hr: { username: 'HR-r-1a2b', email: 'hr-r@probe.test', password: 'pw-hr', role: 'HR' },
+      employee: { username: 'EMP-r-1a2b', email: 'emp-r@probe.test', password: 'pw-emp', role: 'EMPLOYEE' },
+    });
+    renderAt('');
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    // Email deliberately left untouched.
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
@@ -142,6 +205,20 @@ describe('TestDrivePage', () => {
       tester_segment: undefined,
       invite_token: undefined,
     });
+    // The tester still gets their logins on screen — nothing is gated behind the email.
+    expect(await screen.findByText('hr-r@probe.test')).toBeInTheDocument();
+    expect(screen.getByText('emp-r@probe.test')).toBeInTheDocument();
+  });
+
+  it('still rejects a malformed email that was actually typed (AIQ-1556)', async () => {
+    // Optional does not mean unvalidated: if they opt in, the address must be usable.
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'notanemail' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    expect(await screen.findByText(/valid email address/i)).toBeInTheDocument();
+    expect(mockProvision).not.toHaveBeenCalled();
   });
 
   it('honours an explicit ?segment=internal at provision (TD-FIX-2)', async () => {
@@ -156,11 +233,13 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=FR_NO&token=t&segment=internal');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Dana' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
     expect(mockProvision).toHaveBeenCalledWith({
       first_name: 'Dana',
+      tester_email: 'tester@example.com',
       corridor_id: 'FR_NO',
       tester_segment: 'internal',
       invite_token: 't',
@@ -180,6 +259,7 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=GB_US&token=invite-xyz');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Alex' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     const cta = await screen.findByRole('button', { name: /i've completed my test/i });
@@ -194,6 +274,7 @@ describe('TestDrivePage', () => {
     renderAt('?corridor=FR_NO');
 
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Sam' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'tester@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
 
     expect(await screen.findByText(/invite link is invalid/i)).toBeInTheDocument();

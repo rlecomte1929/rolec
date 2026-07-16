@@ -51,8 +51,14 @@ export const TestDrivePage: React.FC = () => {
   const rawSegment = searchParams.get('segment');
   const segment: 'internal' | 'prospect' | undefined =
     rawSegment === 'internal' ? 'internal' : rawSegment === 'prospect' ? 'prospect' : undefined;
+  // AIQ-1563: forward ?campaign= so a QA link (e.g. ?campaign=qa-posthog) provisions AND
+  // records its funnel under a separate campaign, never contaminating the real cohort.
+  // Absent → undefined, so the backend default (RELOPASS_TEST_DRIVE_CAMPAIGN → insead-2026)
+  // applies and the plain cohort link is unchanged. Respect the backend's 64-char cap.
+  const campaign = (searchParams.get('campaign') || '').trim().slice(0, 64) || undefined;
 
   const [firstName, setFirstName] = useState('');
+  const [email, setEmail] = useState('');
   const [state, setState] = useState<SubmitState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProvisionSuccess | null>(null);
@@ -64,6 +70,7 @@ export const TestDrivePage: React.FC = () => {
   useEffect(() => {
     void recordTestDriveEvent({
       event_type: 'click',
+      campaign,
       corridor_id: assignedCorridorId ?? undefined,
       tester_segment: segment,
       invite_token: inviteToken || undefined,
@@ -94,10 +101,23 @@ export const TestDrivePage: React.FC = () => {
       setError(c.errors.firstNameRequired);
       return;
     }
+    // AIQ-1556 correction: the email is OPTIONAL — a blank one is a valid choice, not an
+    // error. The relocation data is synthetic, so nothing here should force real PII; the
+    // only reason to leave an address is consenting to a follow-up. Validate the format
+    // only when the tester actually typed something.
+    const trimmedEmail = email.trim();
+    if (trimmedEmail.length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+      setError(c.errors.emailInvalid);
+      return;
+    }
     setState('submitting');
     setError(null);
     const res = await provisionTestDrive({
       first_name: firstName.trim(),
+      // AIQ-1556: omitted entirely when blank — declining contact is a valid choice.
+      ...(trimmedEmail ? { tester_email: trimmedEmail } : {}),
+      // AIQ-1563: forward ?campaign= so QA runs stay out of the real cohort.
+      ...(campaign ? { campaign } : {}),
       ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
       tester_segment: segment,
       invite_token: inviteToken || undefined,
@@ -105,6 +125,7 @@ export const TestDrivePage: React.FC = () => {
     if (res.ok) {
       setAssignedCorridorId(res.corridorId);
       // TD-9: stash the campaign slice for the FeedbackWidget to stamp in-session feedback.
+      // TD-M0: also stash the contact so the survey pre-fills it instead of re-asking.
       try {
         localStorage.setItem(
           TEST_DRIVE_LS_KEY,
@@ -113,6 +134,9 @@ export const TestDrivePage: React.FC = () => {
             corridor_id: res.corridorId,
             tester_segment: segment,
             session_id: res.sessionId,
+            tester_name: firstName.trim(),
+            // May be '' — the survey lead-in then simply has nothing to pre-fill.
+            tester_email: trimmedEmail,
           }),
         );
       } catch {
@@ -212,6 +236,31 @@ export const TestDrivePage: React.FC = () => {
                   />
                   <p id="td-first-name-helper" className="mt-2 text-xs text-marketing-text-muted">
                     {c.startBlock.helper}
+                  </p>
+
+                  {/* TD-M0 (AIQ-1556, corrected): OPTIONAL contact — captured at the start so a
+                      tester who consents is reachable even if they drop out. No required marker:
+                      leaving it blank is a valid choice and the full test still runs. */}
+                  <label
+                    htmlFor="td-email"
+                    className="mt-4 block text-sm font-medium text-marketing-primary"
+                  >
+                    {c.startBlock.emailLabel}
+                  </label>
+                  <Input
+                    unstyled
+                    id="td-email"
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder={c.startBlock.emailPlaceholder}
+                    autoComplete="email"
+                    disabled={state === 'submitting'}
+                    aria-describedby="td-email-helper"
+                    className="mt-1 w-full rounded-lg border border-marketing-border bg-white px-3 py-2 text-sm text-marketing-text transition-colors focus:border-marketing-accent focus:outline-none focus:ring-2 focus:ring-marketing-accent/40 disabled:cursor-not-allowed disabled:bg-marketing-surface-muted"
+                  />
+                  <p id="td-email-helper" className="mt-2 text-xs text-marketing-text-muted">
+                    {c.startBlock.emailHelper}
                   </p>
 
                   {error && (

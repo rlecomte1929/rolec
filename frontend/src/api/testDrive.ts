@@ -9,6 +9,10 @@ import { apiPost } from './client';
 
 export interface ProvisionInput {
   first_name: string;
+  // TD-M0 (AIQ-1556, corrected): the tester's real contact, captured at the start so a
+  // tester who consents is reachable even if they drop out. OPTIONAL — the relocation
+  // data is synthetic, so nothing here forces real PII; omitted when left blank.
+  tester_email?: string;
   corridor_id?: string;
   // TD-FIX-2 (AIQ-1503): optional — omitted for the single-link flow (segment is
   // captured later via the survey's one-tap self-ID), set only for explicit ?segment=.
@@ -94,6 +98,9 @@ export interface SurveyInput {
   q3_problem_fit?: 'yes' | 'somewhat' | 'no';
   q3_why?: string;
   q4_change?: string;
+  // TD-M4 (AIQ-1559): trust / intent-to-use.
+  trust_intent?: 'yes' | 'maybe' | 'no';
+  trust_intent_why?: string;
   testimonial?: string;
   testimonial_consent?: boolean;
   pilot_interest?: 'yes' | 'maybe' | 'no';
@@ -218,5 +225,34 @@ export function emitTestDriveStage(stage: TestDriveStage): void {
         ? slice.tester_segment
         : undefined,
     campaign: slice.campaign,
+  });
+}
+
+// ── TD-M1 (AIQ-1557): dropout / friction capture ──────────────────────────────
+/**
+ * Record a `friction` funnel event for the active test-drive session — the stage the
+ * tester stalled on or left, plus a one-tap reason and optional free text. No-op (and
+ * never throws) for real users (no test-drive session). metadata is short scalar strings
+ * only, matching the backend record_event filter. Never sent to an LLM.
+ */
+export function emitTestDriveFriction(stage: string, reason: string, text?: string): void {
+  const slice = getTestDriveSession();
+  if (!slice?.session_id) return; // not a test-drive session — no-op for real users
+  const metadata: Record<string, string> = {
+    stage: (stage || 'unknown').slice(0, 64),
+    reason: (reason || 'other').slice(0, 40),
+  };
+  const t = (text || '').trim();
+  if (t) metadata.text = t.slice(0, 200);
+  void recordTestDriveEvent({
+    event_type: 'friction',
+    session_id: slice.session_id,
+    corridor_id: slice.corridor_id,
+    tester_segment:
+      slice.tester_segment === 'internal' || slice.tester_segment === 'prospect'
+        ? slice.tester_segment
+        : undefined,
+    campaign: slice.campaign,
+    metadata,
   });
 }
