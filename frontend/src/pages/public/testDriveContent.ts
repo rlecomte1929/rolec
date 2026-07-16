@@ -84,8 +84,12 @@ export const testDriveContent = {
 
   aboutData: {
     header: 'About the data',
+    // AIQ-1556 correction: the campaign's promise is that the tester enters nothing real,
+    // and it must stay literally true. The email is OPTIONAL and consent-based — the only
+    // reason to leave it is so Romain can come back to you about your feedback. Nothing is
+    // ever emailed to the tester (the logins render on screen), so don't claim otherwise.
     body:
-      "Every account and case here is synthetic. Nothing you enter is personal data, and nothing connects to a live relocation. Use the sample details provided — there's nothing to protect, and nothing to clean up afterward.",
+      "Every account, company and case here is synthetic — nothing you enter about the move is personal data, and nothing connects to a live relocation. Use the sample details provided; there's nothing to protect, and nothing to clean up afterward. The email field is optional: leave it only if you're happy for Romain to contact you about your feedback and anything that didn't work. It's used for nothing else, and it never touches the sample relocation data.",
   },
 
   videos: {
@@ -122,8 +126,12 @@ export const testDriveContent = {
     fieldLabel: 'First name',
     placeholder: 'e.g. Alex',
     helper: "We'll generate your HR and employee test accounts from this.",
+    emailLabel: 'Email (optional)',
+    emailPlaceholder: 'e.g. alex@company.com',
+    emailHelper:
+      "Only if you're happy for Romain to come back to you about your feedback and what didn't work. Your two logins appear on this page either way.",
     button: 'Start the test',
-    legal: 'Sample data only. No personal data is stored from this test.',
+    legal: 'Sample data only, apart from your email — kept solely so Romain can follow up on your feedback, and only if you choose to leave one.',
   },
 
   credentials: {
@@ -152,5 +160,8 @@ export const testDriveContent = {
 
   errors: {
     firstNameRequired: 'Please enter your first name.',
+    // No emailRequired: the email is optional by design (AIQ-1556 correction). Only a
+    // malformed address that was actually typed is an error.
+    emailInvalid: 'Please enter a valid email address.',
   },
 } as const;

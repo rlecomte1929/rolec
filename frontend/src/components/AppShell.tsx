@@ -17,6 +17,7 @@ import { Breadcrumb } from './Breadcrumb';
 import { Button } from './antigravity/Button';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
+import { TestDriveFrictionPrompt } from './TestDriveFrictionPrompt';
 import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';
 import { PlatformShellSidebar, type SidebarRole } from './PlatformShellSidebar';
 import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
@@ -301,6 +302,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
       </div>
 
       <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
+
+      {/* TD-M1 (AIQ-1557): dropout / friction capture — no-op for real users (only
+          arms inside a test-drive session), fires at most once per stage. */}
+      <TestDriveFrictionPrompt />
 
       {/* Setup & Help Assistant — HR only. FAB opens a fixed-overlay drawer
           (SetupAssistantDrawer) that is always above content on all

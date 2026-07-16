@@ -35,6 +35,15 @@ function thankYouMailto(email: string, name: string | null): string {
   return `mailto:${email}?subject=${encodeURIComponent(THANK_YOU_SUBJECT)}&body=${encodeURIComponent(body)}`;
 }
 
+// TD-M5 (AIQ-1561): follow-up reason chips.
+const FOLLOWUP_LABEL: Record<string, string> = {
+  pilot_yes: 'Pilot: yes', pilot_maybe: 'Pilot: maybe', problem_fit_no: 'Rejects value', dropout: 'Dropped early',
+};
+const FOLLOWUP_BADGE: Record<string, string> = {
+  pilot_yes: 'bg-green-100 text-green-700', pilot_maybe: 'bg-amber-100 text-amber-700',
+  problem_fit_no: 'bg-rose-100 text-rose-700', dropout: 'bg-gray-200 text-gray-700',
+};
+
 // TD-M2 (AIQ-1560): deep-link a completion to its PostHog replay. The recording is
 // identified by the test_sessions session_id (posthog.identify), so the person page
 // lists it. Ingest host is eu.i.posthog.com; the app (where replays are viewed) is
@@ -66,8 +75,35 @@ const FUNNEL_STAGES: { key: keyof TestDriveOverview['funnel']; label: string }[]
   { key: 'intro', label: 'Intros' },
 ];
 
+/** TD-M3: compact human-readable duration for the time-on-stage column. */
+function fmtDuration(sec: number | null): string {
+  if (sec == null) return '—';
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
+
+/** TD-M6 (AIQ-1562): key metrics for one segment, for the default prospect-vs-internal split. */
+function keyMetrics(o: TestDriveOverview | null) {
+  return {
+    provisioned: o?.funnel.provisioned ?? 0,
+    completed: o?.funnel.completed ?? 0,
+    surveyed: o?.funnel.surveyed ?? 0,
+    avg: o?.scorecard.avg_overall ?? null,
+    fitYes: o?.scorecard.problem_fit?.yes ?? 0,
+    trustYes: o?.scorecard.trust_intent?.yes ?? 0,
+    pilot: o?.funnel.pilot ?? 0,
+  };
+}
+
 export function TestDriveTab() {
   const [data, setData] = useState<TestDriveOverview | null>(null);
+  // TD-M6: prospect + internal overviews, shown side by side by default (no filter change).
+  const [split, setSplit] = useState<{ prospect: TestDriveOverview | null; internal: TestDriveOverview | null }>({
+    prospect: null,
+    internal: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [corridor, setCorridor] = useState<string>('');
@@ -81,8 +117,16 @@ export function TestDriveTab() {
     setLoading(true);
     setError(null);
     try {
-      const slice = { corridor: corridor || undefined, segment: segment || undefined, campaign: campaign || undefined };
-      setData(await getTestDriveOverview(slice));
+      const base = { corridor: corridor || undefined, campaign: campaign || undefined };
+      // TD-M6: when no segment filter is applied, also fetch prospect + internal so the
+      // default view shows both side by side (never a blended number that hides friend bias).
+      const [overall, prospect, internal] = await Promise.all([
+        getTestDriveOverview({ ...base, segment: segment || undefined }),
+        segment ? Promise.resolve(null) : getTestDriveOverview({ ...base, segment: 'prospect' }),
+        segment ? Promise.resolve(null) : getTestDriveOverview({ ...base, segment: 'internal' }),
+      ]);
+      setData(overall);
+      setSplit({ prospect, internal });
     } catch {
       setError('Failed to load the Test-Drive dashboard.');
     } finally {
@@ -161,6 +205,40 @@ export function TestDriveTab() {
 
       {data && !loading && !error && (
         <>
+          {/* TD-M6 (AIQ-1562): default prospect-vs-internal split so a blended number never
+              hides friendly bias at small n. Hidden when a specific segment filter is active. */}
+          {!segment && (split.prospect || split.internal) && (
+            <Section title="Prospect vs internal">
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Metric</span><span>Prospect</span><span>Internal</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(() => {
+                    const p = keyMetrics(split.prospect);
+                    const i = keyMetrics(split.internal);
+                    const rows: { label: string; p: number | string; i: number | string }[] = [
+                      { label: 'Provisioned', p: p.provisioned, i: i.provisioned },
+                      { label: 'Completed', p: p.completed, i: i.completed },
+                      { label: 'Surveyed', p: p.surveyed, i: i.surveyed },
+                      { label: 'Avg experience / 5', p: p.avg ?? '—', i: i.avg ?? '—' },
+                      { label: 'Problem fit: yes', p: p.fitYes, i: i.fitYes },
+                      { label: 'Trust: yes', p: p.trustYes, i: i.trustYes },
+                      { label: 'Pilot interest', p: p.pilot, i: i.pilot },
+                    ];
+                    return rows.map((r) => (
+                      <div key={r.label} className="grid grid-cols-[1.4fr_1fr_1fr] px-3 py-2 text-sm">
+                        <span className="text-gray-500">{r.label}</span>
+                        <span className="font-semibold text-gray-900">{r.p}</span>
+                        <span className="font-semibold text-gray-900">{r.i}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </Section>
+          )}
+
           {/* Scorecard */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {([
@@ -180,7 +258,57 @@ export function TestDriveTab() {
             <span>Problem fit: {(['yes', 'somewhat', 'no'] as const).map((k) => (
               <span key={k} className="ml-2">{k} <strong className="text-gray-900">{data.scorecard.problem_fit?.[k] ?? 0}</strong></span>
             ))}</span>
+            {/* TD-M4 (AIQ-1559): trust/intent — segment-split via the corridor/segment filter above. */}
+            <span>Trust: {(['yes', 'maybe', 'no'] as const).map((k) => (
+              <span key={k} className="ml-2">{k} <strong className="text-gray-900">{data.scorecard.trust_intent?.[k] ?? 0}</strong></span>
+            ))}</span>
           </div>
+
+          {/* TD-M5 (AIQ-1561): follow-up queue — pilot-yes first, then maybe, value-rejecters,
+              early dropouts. Every entry is reachable via the W0 contact; one-click outreach. */}
+          <Section title={`Follow up (${(data.follow_up ?? []).length})`}>
+            {(data.follow_up ?? []).length === 0 ? (
+              <EmptyRow text="No follow-ups yet — pilot interest, value-rejecters and early dropouts surface here." />
+            ) : (
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Name</span><span>Why follow up</span><span>Corridor</span><span>Segment</span><span>Reach out</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(data.follow_up ?? []).map((r, idx) => (
+                    <div
+                      key={r.tester_email ?? idx}
+                      className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] items-center px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-gray-900">{r.tester_name || '—'}</div>
+                        <div className="truncate text-[11px] text-gray-400">{r.tester_email}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {r.reasons.map((reason) => (
+                          <span
+                            key={reason}
+                            className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${FOLLOWUP_BADGE[reason] ?? 'bg-gray-100 text-gray-600'}`}
+                          >
+                            {FOLLOWUP_LABEL[reason] ?? reason}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-gray-600">{r.corridor_id || '—'}</span>
+                      <span className="text-gray-600">{r.tester_segment || '—'}</span>
+                      {r.tester_email ? (
+                        <a href={thankYouMailto(r.tester_email, r.tester_name)} className="font-semibold text-[#1f8e8b] hover:underline">
+                          Email →
+                        </a>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Section>
 
           {/* Funnel */}
           <Section title="Funnel">
@@ -209,6 +337,35 @@ export function TestDriveTab() {
                 );
               })}
             </div>
+          </Section>
+
+          {/* TD-M3 (AIQ-1558): median time-on-stage + per-stage drop-off (respects the
+              corridor/segment slice above). Move from "N dropped at intake" to
+              "N stalled between intake-start and intake-completed for 4 minutes". */}
+          <Section title="Time on stage & drop-off">
+            {(data.stage_timing ?? []).length === 0 ? (
+              <EmptyRow text="No stage transitions recorded yet." />
+            ) : (
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="grid grid-cols-[1.7fr_110px_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Stage</span><span>Median time</span><span>Drop-off</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(data.stage_timing ?? []).map((t) => (
+                    <div
+                      key={`${t.from_stage}-${t.to_stage}`}
+                      className="grid grid-cols-[1.7fr_110px_90px] px-3 py-2 text-sm"
+                    >
+                      <span className="text-gray-700">{t.from_stage} → {t.to_stage}</span>
+                      <span className="text-gray-900">{fmtDuration(t.median_seconds)}</span>
+                      <span className={t.drop_off_pct && t.drop_off_pct > 0 ? 'font-medium text-amber-600' : 'text-gray-400'}>
+                        {t.drop_off_pct == null ? '—' : `${t.drop_off_pct}%`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Section>
 
           {/* Pilot leads */}

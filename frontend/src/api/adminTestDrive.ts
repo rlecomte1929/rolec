@@ -53,9 +53,38 @@ export interface Completion {
   created_at: string | null;
 }
 
+// TD-M3 (AIQ-1558): median time-on-stage + per-stage drop-off, derived from funnel_events.
+export interface StageTiming {
+  from_stage: string;
+  to_stage: string;
+  reached_from: number;
+  reached_to: number;
+  drop_off_pct: number | null;
+  median_seconds: number | null;
+}
+
+// TD-M5 (AIQ-1561): follow-up queue entry — one high-signal tester to reach out to.
+export interface FollowUpEntry {
+  tester_name: string | null;
+  tester_email: string | null;
+  tester_company_role: string | null;
+  corridor_id: string | null;
+  tester_segment: string | null;
+  pilot_interest: string | null;
+  note: string | null;
+  reasons: string[];
+}
+
 export interface TestDriveOverview {
   funnel: TestDriveFunnel;
-  scorecard: { avg_overall: number | null; problem_fit: Record<string, number>; totals: TestDriveFunnel };
+  scorecard: {
+    avg_overall: number | null;
+    problem_fit: Record<string, number>;
+    trust_intent: Record<string, number>;
+    totals: TestDriveFunnel;
+  };
+  stage_timing: StageTiming[];
+  follow_up: FollowUpEntry[];
   pilot_leads: PilotLead[];
   completions: Completion[];
   testimonials: Testimonial[];

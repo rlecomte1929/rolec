@@ -76,6 +76,17 @@ export const testDriveSurveyContent = {
   },
   q4: { label: 'If you could change one thing, what would it be?' },
 
+  // TD-M4 (AIQ-1559): trust / intent-to-use — the signal that forecasts a pilot.
+  trust: {
+    label: 'Would you trust ReloPass with a real relocation?',
+    options: [
+      { value: 'yes', label: 'Yes, I think so' },
+      { value: 'maybe', label: 'Maybe' },
+      { value: 'no', label: 'Not yet' },
+    ],
+    whyLabel: 'What would it take?',
+  },
+
   highValueIntro: 'The next three are the ones that make this worth running. Kept last, on purpose.',
 
   q5: {

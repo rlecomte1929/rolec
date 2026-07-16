@@ -61,6 +61,28 @@ class TestTestDriveFunnel(unittest.TestCase):
                 )
                 self.assertEqual(resp.status_code, 200, f"{et}: {resp.text}")
 
+    def test_friction_event_accepted_with_metadata(self):
+        """TD-M1 (AIQ-1557): 'friction' is allow-listed and its {stage, reason, text}
+        metadata (short scalar strings) is persisted on the funnel_events row."""
+        db = MagicMock()
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post(
+                "/api/test-drive/event",
+                json={
+                    "event_type": "friction",
+                    "session_id": "11111111-1111-1111-1111-111111111111",
+                    "metadata": {"stage": "intake", "reason": "confusing", "text": "lost me here"},
+                },
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        params = conn.execute.call_args.args[1]
+        self.assertEqual(params["event_type"], "friction")
+        self.assertIn("intake", params["metadata"])
+        self.assertIn("confusing", params["metadata"])
+        self.assertIn("lost me here", params["metadata"])
+
     def test_unknown_event_type_returns_400(self):
         db = MagicMock()
         with patch.dict(os.environ, _ENABLED, clear=False), \

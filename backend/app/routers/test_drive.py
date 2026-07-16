@@ -74,6 +74,9 @@ def _slugify(name: str) -> str:
 _ALLOWED_FUNNEL_EVENTS = {
     "invite-sent", "click", "start", "hr-handoff", "intake-start", "intake-completed",
     "roadmap-reached", "vendor-selected", "completed", "surveyed", "intro", "pilot-interested",
+    # TD-M1 (AIQ-1557): friction captured when a tester stalls or leaves without advancing.
+    # metadata = {stage, reason, text} (all short scalar strings — filtered by record_event).
+    "friction",
 }
 
 
@@ -154,7 +157,30 @@ def _assign_corridor(campaign: str) -> str:
 
 class ProvisionRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=40)
+    # TD-M0 (AIQ-1556, corrected): the tester's REAL contact, captured at the start so a
+    # tester who CONSENTS is reachable even if they drop out. OPTIONAL by design — the
+    # relocation data is synthetic, so nothing here forces real PII; leaving it blank is a
+    # valid choice and the full test still runs (the logins render on screen; nothing is
+    # ever emailed to the tester). This is real PII — stored only on the admin-read
+    # test_sessions row, never logged, never sent to an LLM. tester_name reuses first_name.
+    tester_email: Optional[str] = Field(None, max_length=254)
     corridor_id: Optional[str] = Field(None, max_length=64)
+
+    @field_validator("tester_email")
+    @classmethod
+    def _validate_tester_email(cls, v: Optional[str]) -> Optional[str]:
+        # Same contract the survey already uses (AIQ-1543): omitted/blank is fine, but a
+        # non-empty value must look like an address. Normalising blank -> None here keeps
+        # the INSERT storing a true NULL rather than an empty string, which is what the
+        # follow-up queue filters on.
+        if v is None:
+            return v
+        s = v.strip()
+        if not s:
+            return None
+        if not _EMAIL_RE.match(s):
+            raise ValueError("Enter a valid email address.")
+        return s
     invite_token: Optional[str] = Field(None, max_length=200)
     # TD-FIX-2 (AIQ-1503): single-link model can't tag the segment at provision, so
     # default to NULL (not 'prospect') — the survey one-tap is the source of truth.
@@ -264,9 +290,10 @@ def provision(body: ProvisionRequest, request: Request):
         conn.execute(
             text(
                 f"INSERT INTO test_sessions "
-                f"(id, campaign, corridor_id, tester_segment, first_name_label, hr_username, emp_username, status) "
+                f"(id, campaign, corridor_id, tester_segment, first_name_label, "
+                f"tester_name, tester_email, hr_username, emp_username, status) "
                 f"VALUES ({id_expr}, :campaign, :corridor_id, :tester_segment, :first_name_label, "
-                f":hr_username, :emp_username, 'started')"
+                f":tester_name, :tester_email, :hr_username, :emp_username, 'started')"
             ),
             {
                 "id": session_id,
@@ -274,6 +301,11 @@ def provision(body: ProvisionRequest, request: Request):
                 "corridor_id": resolved_corridor,
                 "tester_segment": body.tester_segment,
                 "first_name_label": first_name,
+                # TD-M0: tester_name reuses the real first name; tester_email is the new field.
+                "tester_name": first_name,
+                # Already stripped and blank-normalised to None by the validator, so this
+                # binds a true NULL when the tester declined to leave contact details.
+                "tester_email": body.tester_email,
                 "hr_username": hr_username,
                 "emp_username": emp_username,
             },
@@ -307,7 +339,8 @@ def provision(body: ProvisionRequest, request: Request):
 _SURVEY_COLUMNS = (
     "session_id campaign corridor_id tester_segment tester_name tester_email "
     "tester_company_role tester_sector q1_overall q2_friction q3_problem_fit q3_why "
-    "q4_change testimonial testimonial_consent pilot_interest pilot_note referral_name "
+    "q4_change trust_intent trust_intent_why "  # TD-M4 (AIQ-1559)
+    "testimonial testimonial_consent pilot_interest pilot_note referral_name "
     "referral_company_role referral_contact referral_consent"
 ).split()
 
@@ -351,6 +384,9 @@ class SurveyRequest(BaseModel):
     q3_problem_fit: Optional[str] = Field(None, pattern="^(yes|somewhat|no)$")
     q3_why: Optional[str] = None
     q4_change: Optional[str] = None
+    # TD-M4 (AIQ-1559): trust / intent-to-use — the predictive signal. One tap + optional why.
+    trust_intent: Optional[str] = Field(None, pattern="^(yes|maybe|no)$")
+    trust_intent_why: Optional[str] = None
     # Q5 testimonial (+ quote consent), Q6 pilot interest, Q7 referral (+ consent)
     testimonial: Optional[str] = None
     testimonial_consent: bool = False
