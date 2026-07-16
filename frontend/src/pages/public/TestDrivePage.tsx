@@ -51,6 +51,11 @@ export const TestDrivePage: React.FC = () => {
   const rawSegment = searchParams.get('segment');
   const segment: 'internal' | 'prospect' | undefined =
     rawSegment === 'internal' ? 'internal' : rawSegment === 'prospect' ? 'prospect' : undefined;
+  // AIQ-1563: forward ?campaign= so a QA link (e.g. ?campaign=qa-posthog) provisions AND
+  // records its funnel under a separate campaign, never contaminating the real cohort.
+  // Absent → undefined, so the backend default (RELOPASS_TEST_DRIVE_CAMPAIGN → insead-2026)
+  // applies and the plain cohort link is unchanged. Respect the backend's 64-char cap.
+  const campaign = (searchParams.get('campaign') || '').trim().slice(0, 64) || undefined;
 
   const [firstName, setFirstName] = useState('');
   const [state, setState] = useState<SubmitState>('idle');
@@ -64,6 +69,7 @@ export const TestDrivePage: React.FC = () => {
   useEffect(() => {
     void recordTestDriveEvent({
       event_type: 'click',
+      campaign,
       corridor_id: assignedCorridorId ?? undefined,
       tester_segment: segment,
       invite_token: inviteToken || undefined,
@@ -98,6 +104,7 @@ export const TestDrivePage: React.FC = () => {
     setError(null);
     const res = await provisionTestDrive({
       first_name: firstName.trim(),
+      ...(campaign ? { campaign } : {}),
       ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
       tester_segment: segment,
       invite_token: inviteToken || undefined,
