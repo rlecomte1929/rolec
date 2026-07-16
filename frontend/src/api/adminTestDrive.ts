@@ -51,9 +51,20 @@ export interface Completion {
   created_at: string | null;
 }
 
+// TD-M3 (AIQ-1558): median time-on-stage + per-stage drop-off, derived from funnel_events.
+export interface StageTiming {
+  from_stage: string;
+  to_stage: string;
+  reached_from: number;
+  reached_to: number;
+  drop_off_pct: number | null;
+  median_seconds: number | null;
+}
+
 export interface TestDriveOverview {
   funnel: TestDriveFunnel;
   scorecard: { avg_overall: number | null; problem_fit: Record<string, number>; totals: TestDriveFunnel };
+  stage_timing: StageTiming[];
   pilot_leads: PilotLead[];
   completions: Completion[];
   testimonials: Testimonial[];

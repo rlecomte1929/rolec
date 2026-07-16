@@ -56,6 +56,15 @@ const FUNNEL_STAGES: { key: keyof TestDriveOverview['funnel']; label: string }[]
   { key: 'intro', label: 'Intros' },
 ];
 
+/** TD-M3: compact human-readable duration for the time-on-stage column. */
+function fmtDuration(sec: number | null): string {
+  if (sec == null) return '—';
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
+
 export function TestDriveTab() {
   const [data, setData] = useState<TestDriveOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -199,6 +208,35 @@ export function TestDriveTab() {
                 );
               })}
             </div>
+          </Section>
+
+          {/* TD-M3 (AIQ-1558): median time-on-stage + per-stage drop-off (respects the
+              corridor/segment slice above). Move from "N dropped at intake" to
+              "N stalled between intake-start and intake-completed for 4 minutes". */}
+          <Section title="Time on stage & drop-off">
+            {data.stage_timing.length === 0 ? (
+              <EmptyRow text="No stage transitions recorded yet." />
+            ) : (
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="grid grid-cols-[1.7fr_110px_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Stage</span><span>Median time</span><span>Drop-off</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {data.stage_timing.map((t) => (
+                    <div
+                      key={`${t.from_stage}-${t.to_stage}`}
+                      className="grid grid-cols-[1.7fr_110px_90px] px-3 py-2 text-sm"
+                    >
+                      <span className="text-gray-700">{t.from_stage} → {t.to_stage}</span>
+                      <span className="text-gray-900">{fmtDuration(t.median_seconds)}</span>
+                      <span className={t.drop_off_pct && t.drop_off_pct > 0 ? 'font-medium text-amber-600' : 'text-gray-400'}>
+                        {t.drop_off_pct == null ? '—' : `${t.drop_off_pct}%`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Section>
 
           {/* Pilot leads */}

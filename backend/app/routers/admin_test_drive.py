@@ -44,6 +44,33 @@ _REFERRAL_PRESENT = (
 )
 
 
+# TD-M3 (AIQ-1558): ordered mid-journey stages (all already emitted as funnel_events).
+# Time-on-stage + drop-off between consecutive stages is derived from these — no new capture.
+_TIMING_STAGES = ["start", "hr-handoff", "intake-start", "intake-completed", "roadmap-reached", "vendor-selected"]
+
+
+def _parse_ts(v: Any) -> Optional[datetime]:
+    """Coerce a funnel_events.created_at to datetime (PG returns datetime, SQLite text)."""
+    if v is None:
+        return None
+    if hasattr(v, "timestamp"):
+        return v  # already a datetime
+    if isinstance(v, str):
+        try:
+            return datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _median(values: List[float]) -> Optional[float]:
+    if not values:
+        return None
+    s = sorted(values)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
 def _safe(fn: Callable[[], Any], default: Any) -> Any:
     """Run one panel; degrade to `default` on any error (never 500 the dashboard)."""
     try:
@@ -197,10 +224,49 @@ def test_drive_overview(
             params,
         )
 
+    def stage_timing() -> List[Dict[str, Any]]:
+        # TD-M3 (AIQ-1558): median time-on-stage + per-stage drop-off %, scoped by the same
+        # slice (so it's per-corridor + per-segment). Stage names are module constants, not
+        # user input, so inlining them in the IN() is safe. Median is computed in Python to
+        # stay dialect-agnostic (SQLite has no percentile_cont).
+        in_list = ", ".join("'" + s + "'" for s in _TIMING_STAGES)
+        rows = _rows(
+            "SELECT session_id, event_type, MIN(created_at) AS ts FROM funnel_events"
+            + _where(clauses, "event_type IN (" + in_list + ") AND session_id IS NOT NULL")
+            + " GROUP BY session_id, event_type",
+            params,
+        )
+        by_session: Dict[str, Dict[str, datetime]] = {}
+        for r in rows:
+            ts = _parse_ts(r.get("ts"))
+            if ts is None:
+                continue
+            by_session.setdefault(str(r["session_id"]), {})[str(r["event_type"])] = ts
+        reached = {st: sum(1 for s in by_session.values() if st in s) for st in _TIMING_STAGES}
+        out: List[Dict[str, Any]] = []
+        for a, b in zip(_TIMING_STAGES, _TIMING_STAGES[1:]):
+            durations = [
+                (s[b] - s[a]).total_seconds()
+                for s in by_session.values()
+                if a in s and b in s and (s[b] - s[a]).total_seconds() >= 0
+            ]
+            med = _median(durations)
+            ra = reached[a]
+            out.append({
+                "from_stage": a,
+                "to_stage": b,
+                "reached_from": ra,
+                "reached_to": reached[b],
+                "drop_off_pct": round((ra - reached[b]) / ra * 100, 1) if ra else None,
+                "median_seconds": round(med, 1) if med is not None else None,
+            })
+        return out
+
     fn = _safe(funnel, {})
     return {
         "funnel": fn,
         "scorecard": {**_safe(scorecard, {}), "totals": fn},
+        "stage_timing": _safe(stage_timing, []),
         "pilot_leads": _safe(pilot_leads, []),
         "completions": _safe(completions, []),
         "testimonials": _safe(testimonials, []),
