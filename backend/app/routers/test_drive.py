@@ -74,6 +74,9 @@ def _slugify(name: str) -> str:
 _ALLOWED_FUNNEL_EVENTS = {
     "invite-sent", "click", "start", "hr-handoff", "intake-start", "intake-completed",
     "roadmap-reached", "vendor-selected", "completed", "surveyed", "intro", "pilot-interested",
+    # TD-M1 (AIQ-1557): friction captured when a tester stalls or leaves without advancing.
+    # metadata = {stage, reason, text} (all short scalar strings — filtered by record_event).
+    "friction",
 }
 
 

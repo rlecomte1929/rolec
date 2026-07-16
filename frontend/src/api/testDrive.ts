@@ -223,3 +223,32 @@ export function emitTestDriveStage(stage: TestDriveStage): void {
     campaign: slice.campaign,
   });
 }
+
+// ── TD-M1 (AIQ-1557): dropout / friction capture ──────────────────────────────
+/**
+ * Record a `friction` funnel event for the active test-drive session — the stage the
+ * tester stalled on or left, plus a one-tap reason and optional free text. No-op (and
+ * never throws) for real users (no test-drive session). metadata is short scalar strings
+ * only, matching the backend record_event filter. Never sent to an LLM.
+ */
+export function emitTestDriveFriction(stage: string, reason: string, text?: string): void {
+  const slice = getTestDriveSession();
+  if (!slice?.session_id) return; // not a test-drive session — no-op for real users
+  const metadata: Record<string, string> = {
+    stage: (stage || 'unknown').slice(0, 64),
+    reason: (reason || 'other').slice(0, 40),
+  };
+  const t = (text || '').trim();
+  if (t) metadata.text = t.slice(0, 200);
+  void recordTestDriveEvent({
+    event_type: 'friction',
+    session_id: slice.session_id,
+    corridor_id: slice.corridor_id,
+    tester_segment:
+      slice.tester_segment === 'internal' || slice.tester_segment === 'prospect'
+        ? slice.tester_segment
+        : undefined,
+    campaign: slice.campaign,
+    metadata,
+  });
+}
