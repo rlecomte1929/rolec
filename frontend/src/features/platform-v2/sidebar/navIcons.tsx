@@ -39,6 +39,7 @@ import {
   Fingerprint,
   ScrollText,
   Rocket,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -104,6 +105,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   'data-rights': Fingerprint,
   'audit-log': ScrollText,
   prospects: Users,
+  outreach: Megaphone,
   integrations: Layers,
   'vetting-queue': ShieldCheck,
 };
