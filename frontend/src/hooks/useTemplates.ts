@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../api/supabase';
+import {
+  listTemplates,
+  createTemplateApi,
+  updateTemplateApi,
+  deleteTemplateApi,
+} from '../api/outreach';
 import type { MessageTemplate, TemplateInsert } from '../types/outreach';
 
 export interface UseTemplatesResult {
@@ -20,47 +25,31 @@ export function useTemplates(): UseTemplatesResult {
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
-      .from('message_templates')
-      .select('*')
-      .order('created_at', { ascending: true });
-    if (err) {
-      setError(err.message);
-    } else {
-      setTemplates((data as MessageTemplate[]) ?? []);
+    try {
+      const data = await listTemplates();
+      setTemplates(data ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load templates');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { void fetch(); }, [fetch]);
 
   const createTemplate = useCallback(async (data: TemplateInsert): Promise<MessageTemplate> => {
-    const resp = await supabase
-      .from('message_templates')
-      .insert(data)
-      .select()
-      .single();
-    if (resp.error) throw new Error(resp.error.message);
-    const t = resp.data as MessageTemplate;
+    const t = await createTemplateApi(data);
     setTemplates((prev) => [...prev, t]);
     return t;
   }, []);
 
   const updateTemplate = useCallback(async (id: string, patch: Partial<MessageTemplate>): Promise<void> => {
-    const { error: err } = await supabase
-      .from('message_templates')
-      .update(patch)
-      .eq('id', id);
-    if (err) throw new Error(err.message);
+    await updateTemplateApi(id, patch);
     setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
 
   const deleteTemplate = useCallback(async (id: string): Promise<void> => {
-    const { error: err } = await supabase
-      .from('message_templates')
-      .delete()
-      .eq('id', id);
-    if (err) throw new Error(err.message);
+    await deleteTemplateApi(id);
     setTemplates((prev) => prev.filter((t) => t.id !== id));
   }, []);
 

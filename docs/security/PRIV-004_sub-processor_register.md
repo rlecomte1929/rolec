@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.3 · **Last verified:** 2026-07-06 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.4 · **Last verified:** 2026-07-16 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -19,7 +19,22 @@
 | **Anthropic** | LLM — Policy Assistant, roadmap, entity resolution | **US** | DPA (Commercial Terms) + SCCs | ⬜ Confirm Commercial plan | `anthropic==0.39.0`; `llm_client.py`, `policy_assistant_llm_client.py`, `roadmap_generator.py` |
 | **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
-| **PostHog** | Product analytics **+ session replay** | **US host by default** (`us.i.posthog.com`) | EU Cloud option or SCCs | ⬜ Conditional — see note | `frontend/src/analytics.ts` (`posthog-js`) |
+| **PostHog** | Product analytics + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx` |
+
+## Notes & corrections (v1.1 → v1.4)
+
+- **PostHog moved to EU + replay gated to test-drive (v1.4, TD-M2 / AIQ-1560).** `analytics.ts` now
+  defaults `posthogHost` to `https://eu.i.posthog.com` (Render also sets `VITE_POSTHOG_HOST` to it), so
+  EU personal data no longer transfers to the US host — the earlier hard gate is resolved on residency.
+  The SDK still loads for behavioural analytics, but **session recording is OFF by default**
+  (`disable_session_recording: true`) and is started **only inside a test-drive session**
+  (`ensureTestDriveReplay()` fires only when the browser holds the provision-stashed session, via
+  `TestDriveReplayGate`) — so **no real HR/employee/admin user is ever recorded**. Within the recordings
+  we do capture: the on-screen relocation/case data is **synthetic** (test-drive uses seeded `@probe.test`
+  identities + made-up case data), and the only real PII — the tester's name + email — is entered into
+  **form inputs**, which are masked (`maskAllInputs: true`). Recordings are identified by the
+  `test_sessions` session_id (`posthog.identify`) so the admin dashboard deep-links to each replay. DPA
+  on the PostHog EU project still needs signing (human action).
 
 ## Notes & corrections (v1.1 → v1.3)
 

@@ -7,6 +7,7 @@ import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { ResilientRoute } from './components/ResilientRoute';
 import { NavigationLogger } from './components/NavigationLogger';
 import { ScrollToTop } from './components/ScrollToTop';
+import { TestDriveReplayGate } from './components/TestDriveReplayGate';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
 import { HrCompanyContextProvider } from './contexts/HrCompanyContext';
@@ -262,6 +263,9 @@ function App() {
       <FeatureFlagProvider>
       <ScrollToTop />
       <NavigationLogger />
+      {/* TD-M2 (AIQ-1560): start PostHog session replay only inside a test-drive session
+          (no-op for real users on every normal HR/employee/admin page). */}
+      <TestDriveReplayGate />
       <DemoBookingProvider>
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>

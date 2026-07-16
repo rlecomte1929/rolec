@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { logger } from './lib/logger';
 import App from './App';
-import { initAnalytics } from './analytics';
+import { initAnalytics, ensureTestDriveReplay } from './analytics';
 import { initErrorTracking } from './lib/errorTracking';
 // Self-hosted Inter (replaces the Google Fonts @import in index.css).
 // GDPR: avoids sending every visitor's IP to Google's font CDN. Family name
@@ -23,6 +23,9 @@ import '@fontsource/jetbrains-mono/700.css';
 import './index.css';
 
 initAnalytics();
+// TD-M2 (AIQ-1560): a returning tester lands with the session already stashed — start
+// replay at boot. Sessions provisioned mid-visit are caught by TestDriveReplayGate.
+ensureTestDriveReplay();
 initErrorTracking();
 
 const rootEl = document.getElementById('root');

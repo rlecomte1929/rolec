@@ -40,6 +40,8 @@ export interface Testimonial {
 
 /** TD-12 — every surveyed tester with a contact email, for the per-completer thank-you. */
 export interface Completion {
+  // TD-M2 (AIQ-1560): the test-drive session id — deep-links the row to its PostHog replay.
+  session_id: string | null;
   tester_name: string | null;
   tester_email: string | null;
   tester_company_role: string | null;

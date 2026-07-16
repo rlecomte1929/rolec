@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { supabase } from '../api/supabase';
+import { listReplies, createReply } from '../api/outreach';
 import type { ProspectReply, ReplyInsert } from '../types/outreach';
 
 export interface UseRepliesResult {
@@ -9,23 +9,11 @@ export interface UseRepliesResult {
 
 export function useReplies(): UseRepliesResult {
   const logReply = useCallback(async (data: ReplyInsert): Promise<ProspectReply> => {
-    const resp = await supabase
-      .from('prospect_replies')
-      .insert(data)
-      .select()
-      .single();
-    if (resp.error) throw new Error(resp.error.message);
-    return resp.data as ProspectReply;
+    return createReply(data);
   }, []);
 
   const getRepliesForProspect = useCallback(async (prospectId: string): Promise<ProspectReply[]> => {
-    const resp = await supabase
-      .from('prospect_replies')
-      .select('*')
-      .eq('prospect_id', prospectId)
-      .order('replied_at', { ascending: false });
-    if (resp.error) throw new Error(resp.error.message);
-    return (resp.data as ProspectReply[]) ?? [];
+    return (await listReplies(prospectId)) ?? [];
   }, []);
 
   return { logReply, getRepliesForProspect };

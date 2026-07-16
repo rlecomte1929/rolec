@@ -178,6 +178,7 @@ from .app.routers import admin_workflow_analytics as admin_workflow_analytics_ro
 from .app.routers import admin_marketing_analytics as admin_marketing_analytics_router
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .app.routers import admin_prospects as admin_prospects_router
+from .app.routers import admin_outreach as admin_outreach_router
 from .app.routers import admin_leads as admin_leads_router
 from .app.routers import lead_capture as lead_capture_router  # [audos-P1] public lead-capture (no /api/admin prefix)
 from .app.routers import admin_form_templates as admin_form_templates_router
@@ -907,6 +908,7 @@ app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_marketing_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
+app.include_router(admin_outreach_router.router, prefix="/api/admin")
 app.include_router(admin_leads_router.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD
 app.include_router(lead_capture_router.router)  # [audos-P1] public lead-capture — NO prefix (path baked into route)
 app.include_router(admin_form_templates_router.router, prefix="/api/admin")

@@ -65,7 +65,7 @@ describe('TestDriveTab', () => {
 
     expect(await screen.findByText(/Coordinates the handoffs/)).toBeInTheDocument();
     expect(screen.getAllByText('Provisioned').length).toBeGreaterThan(0); // scorecard + funnel
-    expect(screen.getByText(/4\.2/)).toBeInTheDocument();
+    expect(screen.getAllByText(/4\.2/).length).toBeGreaterThan(0); // overall + segment-split cards
     expect(screen.getAllByText(/Head of Mobility/).length).toBeGreaterThan(0); // pilot + testimonial
     expect(screen.getByText(/Pilot leads \(1\)/)).toBeInTheDocument();
     expect(screen.getByText(/Testimonials \(1\)/)).toBeInTheDocument();
@@ -96,27 +96,30 @@ describe('TestDriveTab', () => {
     mockRecord.mockResolvedValue({ ok: true, recorded: 25 });
     render(<TestDriveTab />);
     await screen.findByText(/Coordinates the handoffs/);
-    expect(mockOverview).toHaveBeenCalledTimes(1);
+    // TD-M6: each load fetches overall + prospect + internal (segment split), so 3 calls.
+    expect(mockOverview).toHaveBeenCalledTimes(3);
 
     fireEvent.change(screen.getByLabelText('Invites sent'), { target: { value: '25' } });
     fireEvent.click(screen.getByRole('button', { name: /Record invites sent/i }));
 
     await waitFor(() => expect(mockRecord).toHaveBeenCalledWith({ count: 25, channel: 'whatsapp' }));
     expect(await screen.findByText(/Recorded 25 invites\./)).toBeInTheDocument();
-    // onRecorded reloads the overview.
-    await waitFor(() => expect(mockOverview).toHaveBeenCalledTimes(2));
+    // onRecorded reloads the overview — another 3-call fetch.
+    await waitFor(() => expect(mockOverview).toHaveBeenCalledTimes(6));
   });
 
   it('re-fetches when a corridor slice is selected', async () => {
     mockOverview.mockResolvedValue(OVERVIEW);
     render(<TestDriveTab />);
     await screen.findByText(/Coordinates the handoffs/);
-    expect(mockOverview).toHaveBeenCalledTimes(1);
+    // TD-M6: 3 calls per load (overall + prospect + internal split).
+    expect(mockOverview).toHaveBeenCalledTimes(3);
 
     fireEvent.click(screen.getByRole('button', { name: 'London → New York' }));
 
-    await waitFor(() => expect(mockOverview).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockOverview).toHaveBeenCalledTimes(6));
     // AIQ-1537: the slice now carries the (default) campaign alongside corridor/segment.
-    expect(mockOverview).toHaveBeenLastCalledWith({ corridor: 'GB_US', segment: undefined, campaign: 'insead-2026' });
+    // TD-M6: the overall (no-segment) call of the reload carries segment: undefined.
+    expect(mockOverview).toHaveBeenCalledWith({ corridor: 'GB_US', segment: undefined, campaign: 'insead-2026' });
   });
 });

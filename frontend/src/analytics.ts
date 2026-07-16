@@ -1,7 +1,9 @@
 import posthog from 'posthog-js';
 import { env } from './config/env';
+import { getTestDriveSession } from './api/testDrive';
 
 let enabled = false;
+let replayStarted = false;
 
 export function initAnalytics(): void {
   const key = env.posthogKey;
@@ -13,13 +15,42 @@ export function initAnalytics(): void {
     capture_pageview: true,
     persistence: 'localStorage+cookie',
     autocapture: false,
-    // Session replay for the testing phase (AIQ-1434). maskAllInputs redacts every
-    // input value (passwords, tokens, PII typed into fields). Rendered text is left
-    // unmasked (the default — posthog-js 1.393 has no maskAllText; maskTextSelector
-    // would opt into masking) so replays stay legible for diagnosing UI friction.
+    // TD-M2 (AIQ-1560): the SDK stays loaded for product/marketing analytics, but
+    // session RECORDING is OFF by default so real HR/employee/admin users are never
+    // recorded. Recording is started ONLY inside a test-drive session (see
+    // ensureTestDriveReplay). maskAllInputs redacts every input value (the tester's
+    // survey name/email, plus any password/token) in the replays we do capture.
+    disable_session_recording: true,
     session_recording: { maskAllInputs: true },
   });
   enabled = true;
+}
+
+/**
+ * TD-M2 (AIQ-1560): start session replay ONLY when the current browser is running a
+ * test drive (getTestDriveSession reads the localStorage slice stashed at provision —
+ * null for every real user). Idempotent: starts once per browser session. Tags the
+ * recording with the test_sessions session_id (as the PostHog distinct_id + a
+ * super-property) so an /admin/test-drive row can deep-link to the replay. No-op when
+ * PostHog is disabled (no key) or there is no test-drive session — so it never records
+ * a normal HR/employee/admin page.
+ */
+export function ensureTestDriveReplay(): void {
+  if (!enabled || replayStarted) return;
+  const slice = getTestDriveSession();
+  if (!slice?.session_id) return; // not a test-drive session — never record
+  try {
+    posthog.identify(slice.session_id, {
+      test_drive_session_id: slice.session_id,
+      test_drive_campaign: slice.campaign,
+      test_drive_corridor: slice.corridor_id,
+    });
+    posthog.register({ test_drive_session_id: slice.session_id });
+    posthog.startSessionRecording();
+    replayStarted = true;
+  } catch {
+    /* replay is best-effort — never surface to the tester */
+  }
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {

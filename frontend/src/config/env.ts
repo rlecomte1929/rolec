@@ -79,7 +79,9 @@ export const env = {
   supabaseUrl: data.VITE_SUPABASE_URL,
   supabaseAnonKey: data.VITE_SUPABASE_ANON_KEY,
   posthogKey: data.VITE_POSTHOG_KEY,
-  posthogHost: data.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+  // TD-M2 (AIQ-1560): EU ingest host for GDPR fit (compliance-first brand). Render sets
+  // VITE_POSTHOG_HOST=https://eu.i.posthog.com; the default matches so it's EU either way.
+  posthogHost: data.VITE_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
   /**
    * [AIQ-1491] Passkey sign-in + registration. OFF unless explicitly set to
    * 'true'. Passkeys additionally require the WebAuthn toggle to be enabled on

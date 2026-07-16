@@ -10,6 +10,7 @@ import { Mail } from 'lucide-react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
 import { getAuthItem } from '../../utils/demo';
+import { env } from '../../config/env';
 import {
   getTestDriveOverview,
   testDriveContactsCsvUrl,
@@ -42,6 +43,15 @@ const FOLLOWUP_BADGE: Record<string, string> = {
   pilot_yes: 'bg-green-100 text-green-700', pilot_maybe: 'bg-amber-100 text-amber-700',
   problem_fit_no: 'bg-rose-100 text-rose-700', dropout: 'bg-gray-200 text-gray-700',
 };
+
+// TD-M2 (AIQ-1560): deep-link a completion to its PostHog replay. The recording is
+// identified by the test_sessions session_id (posthog.identify), so the person page
+// lists it. Ingest host is eu.i.posthog.com; the app (where replays are viewed) is
+// eu.posthog.com — derive one from the other.
+function replayUrl(sessionId: string): string {
+  const appHost = (env.posthogHost || 'https://eu.i.posthog.com').replace('.i.posthog.com', '.posthog.com');
+  return `${appHost}/person/${encodeURIComponent(sessionId)}`;
+}
 
 function corridorLabel(id: string | null): string {
   if (!id) return '—';
@@ -256,8 +266,8 @@ export function TestDriveTab() {
 
           {/* TD-M5 (AIQ-1561): follow-up queue — pilot-yes first, then maybe, value-rejecters,
               early dropouts. Every entry is reachable via the W0 contact; one-click outreach. */}
-          <Section title={`Follow up (${data.follow_up.length})`}>
-            {data.follow_up.length === 0 ? (
+          <Section title={`Follow up (${(data.follow_up ?? []).length})`}>
+            {(data.follow_up ?? []).length === 0 ? (
               <EmptyRow text="No follow-ups yet — pilot interest, value-rejecters and early dropouts surface here." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
@@ -265,7 +275,7 @@ export function TestDriveTab() {
                   <span>Name</span><span>Why follow up</span><span>Corridor</span><span>Segment</span><span>Reach out</span>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {data.follow_up.map((r, idx) => (
+                  {(data.follow_up ?? []).map((r, idx) => (
                     <div
                       key={r.tester_email ?? idx}
                       className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] items-center px-3 py-2 text-sm"
@@ -333,7 +343,7 @@ export function TestDriveTab() {
               corridor/segment slice above). Move from "N dropped at intake" to
               "N stalled between intake-start and intake-completed for 4 minutes". */}
           <Section title="Time on stage & drop-off">
-            {data.stage_timing.length === 0 ? (
+            {(data.stage_timing ?? []).length === 0 ? (
               <EmptyRow text="No stage transitions recorded yet." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
@@ -341,7 +351,7 @@ export function TestDriveTab() {
                   <span>Stage</span><span>Median time</span><span>Drop-off</span>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {data.stage_timing.map((t) => (
+                  {(data.stage_timing ?? []).map((t) => (
                     <div
                       key={`${t.from_stage}-${t.to_stage}`}
                       className="grid grid-cols-[1.7fr_110px_90px] px-3 py-2 text-sm"
@@ -400,7 +410,19 @@ export function TestDriveTab() {
                       <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
                       <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
                       <span className="text-gray-600">{r.q1_overall ?? '—'}</span>
-                      <ThankYouButton email={r.tester_email} name={r.tester_name} />
+                      <div className="flex flex-col items-start gap-0.5">
+                        <ThankYouButton email={r.tester_email} name={r.tester_name} />
+                        {r.session_id && (
+                          <a
+                            href={replayUrl(r.session_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-gray-400 hover:text-[#1f8e8b] hover:underline"
+                          >
+                            Replay ↗
+                          </a>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

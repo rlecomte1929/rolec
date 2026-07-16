@@ -231,7 +231,8 @@ def test_drive_overview(
         # one-click thank-you mailto per completed response. Only rows that left a contact
         # email are actionable, so scope to those.
         return _rows(
-            "SELECT tester_name, tester_email, tester_company_role, tester_sector, "
+            # TD-M2 (AIQ-1560): session_id lets each row deep-link to its PostHog replay.
+            "SELECT session_id, tester_name, tester_email, tester_company_role, tester_sector, "
             "q1_overall, pilot_interest, corridor_id, tester_segment, created_at FROM survey_responses"
             + _where(clauses, "tester_email IS NOT NULL AND tester_email <> ''")
             + " ORDER BY created_at DESC LIMIT 200",
