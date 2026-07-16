@@ -56,6 +56,16 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
             d["custom_item_json"] = None
     if isinstance(d.get("selected"), int):
         d["selected"] = bool(d["selected"])
+    # [AIQ-1553] Coerce uuid columns to str, exactly as service_catalog._row_to_item does.
+    # On Postgres, psycopg2 returns uuid columns as uuid.UUID objects; service_catalog
+    # stringifies its master id, so the employee-recommendations filter compared
+    # str(master["id"]) against a set of UUID objects — set membership always failed and
+    # HR-approved masters were silently dropped to hr_pending (AIQ-1550 layer 3). SQLite
+    # returns uuids as text, which is why the tests never caught it. Stringify here so all
+    # consumers (and the master_item_id match) see consistent string ids.
+    for k in ("id", "company_id", "master_item_id", "created_by_user_id"):
+        if d.get(k) is not None:
+            d[k] = str(d[k])
     for k in ("created_at", "updated_at"):
         v = d.get(k)
         if hasattr(v, "isoformat"):

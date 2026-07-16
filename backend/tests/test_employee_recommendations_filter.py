@@ -273,6 +273,33 @@ class EmployeeRecommendationsFilterTests(unittest.TestCase):
         self.assertEqual([i.item_id for i in out], ["m-3", "m-1", "m-2"])
         self.assertIsNone(status)
 
+    # ------------------------------------------------------------------
+    # [AIQ-1553] Postgres returns uuid columns as uuid.UUID objects, while
+    # service_catalog._row_to_item stringifies the master id. The curation row
+    # mapper must ALSO stringify, or `str(master_id) in {UUID(master_item_id)}`
+    # is always False and every HR-approved master is dropped to hr_pending
+    # (the AIQ-1550 layer-3 defect). SQLite returns uuids as text, so only an
+    # explicit UUID-object row reproduces the prod mismatch.
+    # ------------------------------------------------------------------
+    def test_row_to_dict_stringifies_uuid_columns(self) -> None:
+        rid, cid, mid, uid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        row = {
+            "id": rid, "company_id": cid, "master_item_id": mid,
+            "created_by_user_id": uid, "category": "movers",
+            "destination_city": None, "custom_item_json": None,
+            "selected": 1, "display_order": 0,
+        }
+        d = vendor_curation._row_to_dict(row)
+        self.assertIsInstance(d["master_item_id"], str)
+        self.assertEqual(d["master_item_id"], str(mid))
+        self.assertEqual(d["company_id"], str(cid))
+        self.assertEqual(d["id"], str(rid))
+        self.assertEqual(d["created_by_user_id"], str(uid))
+        # The str master_item_id now matches service_catalog's stringified master id,
+        # so the set-membership test in apply_hr_curation keeps the approved master.
+        self.assertIn(str(mid), {d["master_item_id"]})
+        self.assertIs(d["selected"], True)
+
     def test_equal_display_order_preserves_engine_order(self) -> None:
         # The default (all display_order=0) must not reshuffle — engine order is the tie-break,
         # so behavior for un-ranked curation is unchanged.
