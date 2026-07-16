@@ -17,7 +17,7 @@ vi.mock('../../components/public', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-import { provisionTestDrive, completeTestDrive } from '../../api/testDrive';
+import { provisionTestDrive, completeTestDrive, recordTestDriveEvent } from '../../api/testDrive';
 import { TestDrivePage } from './TestDrivePage';
 
 // jsdom has no matchMedia; the marketing FadeIn reads it on mount.
@@ -36,6 +36,13 @@ if (!window.matchMedia) {
 
 const mockProvision = provisionTestDrive as unknown as ReturnType<typeof vi.fn>;
 const mockComplete = completeTestDrive as unknown as ReturnType<typeof vi.fn>;
+const mockRecordEvent = recordTestDriveEvent as unknown as ReturnType<typeof vi.fn>;
+
+const OK_RESULT = {
+  ok: true as const, sessionId: 's-qa', corridorId: 'FR_NO', campaign: 'qa-posthog',
+  hr: { username: 'HR-qa', email: 'hr-qa@probe.test', password: 'p', role: 'HR' as const },
+  employee: { username: 'EMP-qa', email: 'emp-qa@probe.test', password: 'p', role: 'EMPLOYEE' as const },
+};
 
 function renderAt(search: string) {
   return render(
@@ -51,6 +58,30 @@ afterEach(() => {
 });
 
 describe('TestDrivePage', () => {
+  it('[AIQ-1563] forwards ?campaign= to provision and the funnel click event', async () => {
+    mockProvision.mockResolvedValue(OK_RESULT);
+    renderAt('?campaign=qa-posthog');
+    // the click event fires on mount, tagged with the campaign
+    await waitFor(() => expect(mockRecordEvent).toHaveBeenCalled());
+    expect(mockRecordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: 'click', campaign: 'qa-posthog' }),
+    );
+    // and provision carries it
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'QA' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect(mockProvision).toHaveBeenCalledWith(expect.objectContaining({ campaign: 'qa-posthog' }));
+  });
+
+  it('[AIQ-1563] omits campaign when ?campaign= is absent (plain cohort link unchanged)', async () => {
+    mockProvision.mockResolvedValue({ ...OK_RESULT, campaign: 'insead-2026' });
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Plain' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+    await waitFor(() => expect(mockProvision).toHaveBeenCalledTimes(1));
+    expect('campaign' in mockProvision.mock.calls[0][0]).toBe(false);
+  });
+
   it('renders the hero + corridor label for a Tier-A corridor, no early-coverage note', () => {
     renderAt('?corridor=FR_NO&token=t');
     expect(
