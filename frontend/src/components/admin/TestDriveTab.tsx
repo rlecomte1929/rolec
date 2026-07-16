@@ -65,8 +65,26 @@ function fmtDuration(sec: number | null): string {
   return s ? `${m}m ${s}s` : `${m}m`;
 }
 
+/** TD-M6 (AIQ-1562): key metrics for one segment, for the default prospect-vs-internal split. */
+function keyMetrics(o: TestDriveOverview | null) {
+  return {
+    provisioned: o?.funnel.provisioned ?? 0,
+    completed: o?.funnel.completed ?? 0,
+    surveyed: o?.funnel.surveyed ?? 0,
+    avg: o?.scorecard.avg_overall ?? null,
+    fitYes: o?.scorecard.problem_fit?.yes ?? 0,
+    trustYes: o?.scorecard.trust_intent?.yes ?? 0,
+    pilot: o?.funnel.pilot ?? 0,
+  };
+}
+
 export function TestDriveTab() {
   const [data, setData] = useState<TestDriveOverview | null>(null);
+  // TD-M6: prospect + internal overviews, shown side by side by default (no filter change).
+  const [split, setSplit] = useState<{ prospect: TestDriveOverview | null; internal: TestDriveOverview | null }>({
+    prospect: null,
+    internal: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [corridor, setCorridor] = useState<string>('');
@@ -80,8 +98,16 @@ export function TestDriveTab() {
     setLoading(true);
     setError(null);
     try {
-      const slice = { corridor: corridor || undefined, segment: segment || undefined, campaign: campaign || undefined };
-      setData(await getTestDriveOverview(slice));
+      const base = { corridor: corridor || undefined, campaign: campaign || undefined };
+      // TD-M6: when no segment filter is applied, also fetch prospect + internal so the
+      // default view shows both side by side (never a blended number that hides friend bias).
+      const [overall, prospect, internal] = await Promise.all([
+        getTestDriveOverview({ ...base, segment: segment || undefined }),
+        segment ? Promise.resolve(null) : getTestDriveOverview({ ...base, segment: 'prospect' }),
+        segment ? Promise.resolve(null) : getTestDriveOverview({ ...base, segment: 'internal' }),
+      ]);
+      setData(overall);
+      setSplit({ prospect, internal });
     } catch {
       setError('Failed to load the Test-Drive dashboard.');
     } finally {
@@ -160,6 +186,40 @@ export function TestDriveTab() {
 
       {data && !loading && !error && (
         <>
+          {/* TD-M6 (AIQ-1562): default prospect-vs-internal split so a blended number never
+              hides friendly bias at small n. Hidden when a specific segment filter is active. */}
+          {!segment && (split.prospect || split.internal) && (
+            <Section title="Prospect vs internal">
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                  <span>Metric</span><span>Prospect</span><span>Internal</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(() => {
+                    const p = keyMetrics(split.prospect);
+                    const i = keyMetrics(split.internal);
+                    const rows: { label: string; p: number | string; i: number | string }[] = [
+                      { label: 'Provisioned', p: p.provisioned, i: i.provisioned },
+                      { label: 'Completed', p: p.completed, i: i.completed },
+                      { label: 'Surveyed', p: p.surveyed, i: i.surveyed },
+                      { label: 'Avg experience / 5', p: p.avg ?? '—', i: i.avg ?? '—' },
+                      { label: 'Problem fit: yes', p: p.fitYes, i: i.fitYes },
+                      { label: 'Trust: yes', p: p.trustYes, i: i.trustYes },
+                      { label: 'Pilot interest', p: p.pilot, i: i.pilot },
+                    ];
+                    return rows.map((r) => (
+                      <div key={r.label} className="grid grid-cols-[1.4fr_1fr_1fr] px-3 py-2 text-sm">
+                        <span className="text-gray-500">{r.label}</span>
+                        <span className="font-semibold text-gray-900">{r.p}</span>
+                        <span className="font-semibold text-gray-900">{r.i}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </Section>
+          )}
+
           {/* Scorecard */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {([
