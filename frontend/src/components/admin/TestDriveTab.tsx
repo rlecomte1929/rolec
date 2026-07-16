@@ -10,6 +10,7 @@ import { Mail } from 'lucide-react';
 import { Button } from '../antigravity/Button';
 import { Badge } from '../antigravity/Badge';
 import { getAuthItem } from '../../utils/demo';
+import { env } from '../../config/env';
 import {
   getTestDriveOverview,
   testDriveContactsCsvUrl,
@@ -32,6 +33,15 @@ function thankYouMailto(email: string, name: string | null): string {
     "it held and where it broke is genuinely useful. I'll act on what you flagged.\n\n" +
     '— Romain';
   return `mailto:${email}?subject=${encodeURIComponent(THANK_YOU_SUBJECT)}&body=${encodeURIComponent(body)}`;
+}
+
+// TD-M2 (AIQ-1560): deep-link a completion to its PostHog replay. The recording is
+// identified by the test_sessions session_id (posthog.identify), so the person page
+// lists it. Ingest host is eu.i.posthog.com; the app (where replays are viewed) is
+// eu.posthog.com — derive one from the other.
+function replayUrl(sessionId: string): string {
+  const appHost = (env.posthogHost || 'https://eu.i.posthog.com').replace('.i.posthog.com', '.posthog.com');
+  return `${appHost}/person/${encodeURIComponent(sessionId)}`;
 }
 
 function corridorLabel(id: string | null): string {
@@ -243,7 +253,19 @@ export function TestDriveTab() {
                       <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
                       <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
                       <span className="text-gray-600">{r.q1_overall ?? '—'}</span>
-                      <ThankYouButton email={r.tester_email} name={r.tester_name} />
+                      <div className="flex flex-col items-start gap-0.5">
+                        <ThankYouButton email={r.tester_email} name={r.tester_name} />
+                        {r.session_id && (
+                          <a
+                            href={replayUrl(r.session_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-gray-400 hover:text-[#1f8e8b] hover:underline"
+                          >
+                            Replay ↗
+                          </a>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
