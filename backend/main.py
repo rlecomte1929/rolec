@@ -477,6 +477,8 @@ def _run_runtime_startup_initialization() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from .app.posthog_client import init_posthog, shutdown_posthog
+    init_posthog()
     await asyncio.to_thread(_run_runtime_startup_initialization)
     if not DISABLE_STARTUP_SEED:
         asyncio.create_task(_background_seed_task())
@@ -484,6 +486,7 @@ async def lifespan(app: FastAPI):
         # Non-blocking: a slow/hung warm-up must never delay startup or /health.
         asyncio.create_task(asyncio.to_thread(_warmup_cold_paths))
     yield
+    shutdown_posthog()
 
 log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
 
@@ -4013,6 +4016,17 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
             status_code=502,
             detail="Failed to create case. Please retry.",
         )
+    try:
+        from .app.posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph and effective.get("id"):
+            ph.capture(
+                distinct_id=effective["id"],
+                event="case_created",
+                properties={"has_company": bool(company_id)},
+            )
+    except Exception:
+        pass
     return CreateCaseResponse(caseId=case_id)
 
 
@@ -4798,6 +4812,20 @@ def assign_case(
             company_id=hr_company_id,
             properties={"case_id": case_id, "request_id": request_id},
         )
+        try:
+            from .app.posthog_client import get_posthog_client
+            ph = get_posthog_client()
+            if ph and effective.get("id"):
+                ph.capture(
+                    distinct_id=effective["id"],
+                    event="case_assigned",
+                    properties={
+                        "has_invite_token": bool(invite_token),
+                        "employee_resolved": bool(employee_user),
+                    },
+                )
+        except Exception:
+            pass
         return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
     except HTTPException:
         # Let explicit 4xx/404 propagate as-is.
