@@ -749,7 +749,12 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         <Alert variant={messageVariant}>{message}</Alert>
       )}
 
-      {/* Compact: Policy selector + actions */}
+      {/* Compact: Policy selector + actions.
+          AIQ-1575: only render once there is a policy/version to act on. For a
+          first-time HR (no company policies, no loaded version) this block is an
+          empty "Select policy" dropdown — pure clutter — so it's hidden. Returning
+          HR keep the version switcher, metadata, and source download. */}
+      {(policies.length > 0 || normalized?.version) && (
       <Card padding="lg">
         <div className="text-sm font-semibold text-[#0b2b43] mb-2">Policy & version</div>
         <div className="flex flex-wrap gap-3 items-center">
@@ -821,6 +826,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           </div>
         )}
       </Card>
+      )}
 
       {/* Parker-J: extractive TL;DR of the uploaded source document */}
       {/* AIQ-1107: hidden (reversible via aiq1107Flags) */}

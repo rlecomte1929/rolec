@@ -636,18 +636,15 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           feature from the app-shell "?" Setup & Help assistant (product
           how-to help) — they are not duplicate Q&A. See
           docs/qa-consolidation-recommendation.md. */}
-      {assistantOpen ? null : (
+      {/* AIQ-1575: hide "Ask about this policy" entirely until a policy is live —
+          the Q&A only answers from a published policy, so showing it (even greyed
+          out) before one exists is a premature control. */}
+      {assistantOpen || !hasLivePolicy ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {!hasLivePolicy && (
-            <span className="text-xs text-slate-500">
-              Publish your policy to ask questions about it.
-            </span>
-          )}
           <Button
             type="button"
             variant="outline"
             onClick={() => setAssistantOpen(true)}
-            disabled={!hasLivePolicy}
             aria-expanded={false}
             aria-controls="hr-policy-assistant-shell-title"
           >
