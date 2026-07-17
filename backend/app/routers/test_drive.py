@@ -5,12 +5,16 @@ needs (an HR user + an Employee user), seeds a per-session company and links bot
 so a corridor case is later creatable, and writes a ``test_sessions`` row that
 anchors the campaign funnel.
 
-Security posture — this is a PUBLIC (unauthenticated) surface, so it is defended
-in depth:
+Security posture — this is a PUBLIC (unauthenticated) surface. Provisioning is
+OPEN BY DESIGN (a marketing test-drive anyone with the link can start); abuse is
+*bounded*, not gated (AIQ-1592, Option A):
   * Campaign gate: 404 unless ``RELOPASS_TEST_DRIVE_ENABLED`` is truthy
     (dark-shipped; ramped per environment, exactly like predictions.py).
-  * Invite token: 403 unless the body's ``invite_token`` matches
-    ``RELOPASS_TEST_DRIVE_INVITE_TOKEN`` (constant-time compare).
+  * Invite token: OPTIONAL. A missing token is allowed — public self-serve. If
+    ``RELOPASS_TEST_DRIVE_INVITE_TOKEN`` is configured AND the caller supplies a
+    token, it must match (constant-time): a dormant lever to reject a specific or
+    leaked link, NOT a hard gate. (Left unset in prod, so the check is inert.)
+    See the ``provision()`` docstring + ``test_test_drive_provision.py``.
   * Rate limit: slowapi per-IP, ``RELOPASS_TEST_DRIVE_RATE_LIMIT``
     (default ``5/minute;60/hour`` — configurable because campaign testers may sit
     behind a single campus NAT).
