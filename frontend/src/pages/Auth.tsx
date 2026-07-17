@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { Fingerprint } from 'lucide-react';
+import { Fingerprint, Globe } from 'lucide-react';
 import { Alert, Button, Input, Select, LoadingButton } from '../components/antigravity';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -403,25 +403,25 @@ export const Auth: React.FC = () => {
           </div>
         </div>
 
-        {/* Live ticker */}
+        {/* What the platform does. Deliberately makes no volume, corridor-count or
+            customer claim: we are pre-launch, so any figure here would be invented.
+            See AIQ-1574 — the previous ticker named a fictitious customer and badged
+            him LIVE. Do not reintroduce counts without a real data source. */}
         <div className="relative z-10 px-6 pb-7">
           <div className="rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm px-5 py-4">
-            <p className="text-[10px] font-semibold tracking-widest text-emerald-400 uppercase mb-2">
-              · Live across 47 corridors
+            <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase mb-2">
+              Built for cross-border moves
             </p>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white font-semibold shrink-0">
-                MB
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                <Globe className="w-4 h-4 text-slate-300" aria-hidden="true" />
               </div>
               <div>
-                <p className="text-sm text-white font-medium flex items-center gap-2">
-                  Marc B. · FR → NO
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    LIVE
-                  </span>
+                <p className="text-sm text-white font-medium">
+                  One record per relocation
                 </p>
                 <p className="text-xs text-slate-400">
-                  visa approved · 2,882 active relocations across 47 corridors
+                  Guided intake, your policy applied automatically, and suppliers in one place.
                 </p>
               </div>
             </div>

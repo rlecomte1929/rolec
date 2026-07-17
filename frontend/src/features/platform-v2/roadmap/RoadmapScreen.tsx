@@ -396,7 +396,7 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successSco
           Your Roadmap
         </h1>
         <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
-          Track every step of your relocation journey.
+          Track every step of your relocation.
         </p>
         {caseId && <RoadmapActions caseId={caseId} hasRoadmap={tracks.some(t => t.steps.length > 0)} />}
       </div>
