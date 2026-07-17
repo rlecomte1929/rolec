@@ -10,9 +10,12 @@ Coverage model:
     to every undecorated route by ``SlowAPIMiddleware`` (see backend/main.py).
   - Sensitive groups carry stricter explicit decorators: AUTH on auth endpoints,
     UPLOAD on file uploads, ADMIN on admin endpoints, AI on LLM-backed routes.
-  - AI routes key on the authenticated principal (``user_key_func``) instead of
-    IP so one tenant can't exhaust a shared NAT/proxy IP bucket, and so cost is
-    attributed per user.
+  - AI **and ADMIN** routes key on the authenticated principal (``user_key_func``)
+    instead of IP so one tenant can't exhaust a shared NAT/proxy IP bucket, and so
+    cost/quota is attributed per user. Uploads stay IP-keyed.
+  - The ADMIN bucket is ONE bucket spanning every ``/api/admin/*`` route, so its
+    ceiling has to cover a whole admin page-load (several calls) plus the sidebar
+    notification poll — not a single endpoint's traffic. See AIQ-1564.
 
 Disabled wholesale when RELOPASS_DISABLE_RATE_LIMITS=1 (the limiter's
 ``enabled`` flag short-circuits both the decorators and the middleware).
@@ -28,7 +31,12 @@ from slowapi.util import get_remote_address
 AUTH_LIMIT = "5/minute"
 STANDARD_LIMIT = "100/minute"
 UPLOAD_LIMIT = "10/minute"
-ADMIN_LIMIT = "20/minute"
+# AIQ-1564: was 20/minute, keyed by IP. One bucket covers EVERY /api/admin/* route, so an
+# admin browsing normally (6 pages in ~43s, each firing its own admin calls) drained it and
+# got 429s — the executive dashboard then rendered every tile as "unavailable". 60/minute
+# per authenticated admin fits real navigation while still bounding a stolen-token scrape;
+# these routes are already behind require_admin, so this bucket is defence-in-depth.
+ADMIN_LIMIT = "60/minute"
 AI_LIMIT = "20/minute"
 # Parker-I document translation (DeepL/NLLB-backed, per-character billed). Keyed per
 # authenticated user so one tenant can't drain a shared NAT/proxy IP bucket.
@@ -137,7 +145,10 @@ def path_limit(path: str, ip: str, user_key: str):
             return str(UPLOAD_RATE_LIMIT_ITEM)
         return None
     if path.startswith("/api/admin/"):
-        if not _path_rate_limiter.hit(ADMIN_RATE_LIMIT_ITEM, "sec004-admin", ip):
+        # AIQ-1564: keyed on the authenticated admin, not the IP — same rationale the AI
+        # bucket already uses above. Keying by IP put every admin behind a shared office
+        # NAT/proxy into ONE 60/min bucket, so colleagues throttled each other.
+        if not _path_rate_limiter.hit(ADMIN_RATE_LIMIT_ITEM, "sec004-admin", user_key):
             return str(ADMIN_RATE_LIMIT_ITEM)
         return None
     return None

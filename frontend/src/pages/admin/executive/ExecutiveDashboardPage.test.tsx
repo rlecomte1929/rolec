@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import React from 'react';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
 
 expect.extend(matchers);
 
@@ -55,5 +55,41 @@ describe('ExecutiveDashboardPage', () => {
     mock.mockResolvedValue({ ...OVERVIEW, growth: { available: false, data_source: 'unavailable' } });
     render(<ExecutiveDashboardPage />);
     await waitFor(() => expect(screen.getByTestId('kpi-companies')).toHaveTextContent(/unavailable/i));
+  });
+
+  // ── AIQ-1564 (BUG-260716-D23E) ────────────────────────────────────────────────
+  // A failed fetch used to leave `data` null, so every panel read as undefined and
+  // EVERY tile printed "unavailable" — a claim about the data. The reporter read that
+  // as "the dashboard isn't connected to its endpoints" and filed it as such. A load
+  // failure must never be dressed up as a data-provenance verdict.
+
+  it('a failed load never renders tiles as "unavailable" — it says so and offers retry', async () => {
+    mock.mockRejectedValueOnce(new Error('network'));
+    render(<ExecutiveDashboardPage />);
+
+    expect(await screen.findByTestId('exec-load-error')).toBeInTheDocument();
+    expect(screen.getByTestId('exec-retry')).toBeInTheDocument();
+    // The regression itself: no tile may claim the DATA is unavailable.
+    expect(screen.getByTestId('kpi-companies')).not.toHaveTextContent(/unavailable/i);
+    expect(screen.getByTestId('kpi-cost')).not.toHaveTextContent(/unavailable/i);
+    expect(screen.getByTestId('exec-kpis')).not.toHaveTextContent(/unavailable/i);
+  });
+
+  it('names a 429 as a rate limit rather than missing data', async () => {
+    mock.mockRejectedValueOnce({ response: { status: 429 } });
+    render(<ExecutiveDashboardPage />);
+    expect(await screen.findByTestId('exec-load-error')).toHaveTextContent(/rate limit, not missing data/i);
+  });
+
+  it('Retry refetches and recovers the tiles', async () => {
+    mock.mockRejectedValueOnce({ response: { status: 429 } }).mockResolvedValueOnce(OVERVIEW);
+    render(<ExecutiveDashboardPage />);
+
+    const retry = await screen.findByTestId('exec-retry');
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(screen.getByTestId('kpi-companies')).toHaveTextContent('3'));
+    expect(screen.queryByTestId('exec-load-error')).not.toBeInTheDocument();
+    expect(mock).toHaveBeenCalledTimes(2);
   });
 });
