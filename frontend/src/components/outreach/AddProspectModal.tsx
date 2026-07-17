@@ -30,12 +30,26 @@ interface AddProspectModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (data: ProspectInsert) => Promise<void>;
+  /** AIQ-1566: seed the form (e.g. from a test-campaign referral) so the admin doesn't
+   *  re-type what the survey already captured. Optional — omit for a blank form. */
+  prefill?: Partial<FormState>;
+  /** Provenance written to `linkedin_prospects.source`. Defaults to 'linkedin'. */
+  source?: string;
 }
 
-export function AddProspectModal({ open, onClose, onSave }: AddProspectModalProps): React.ReactElement {
+export function AddProspectModal({ open, onClose, onSave, prefill, source }: AddProspectModalProps): React.ReactElement {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Seed on open. Keyed on the prefill identity so re-opening for a DIFFERENT referral
+  // reseeds, while typing into the form is never clobbered mid-edit.
+  const prefillKey = prefill ? JSON.stringify(prefill) : '';
+  React.useEffect(() => {
+    if (!open) return;
+    setForm(prefill ? { ...EMPTY, ...prefill } : EMPTY);
+    setError(null);
+  }, [open, prefillKey]); // eslint-disable-line react-hooks/exhaustive-deps -- prefillKey is the stable identity of `prefill`
 
   const set = (field: keyof FormState) => (value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -68,7 +82,7 @@ export function AddProspectModal({ open, onClose, onSave }: AddProspectModalProp
         job_title: form.job_title.trim(),
         corridor_relevance: form.corridor_relevance || null,
         notes: form.notes.trim() || null,
-        source: 'linkedin',
+        source: source ?? 'linkedin',
         status: 'flagged',
         message_sent_at: null,
         last_reply_at: null,

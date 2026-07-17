@@ -440,3 +440,44 @@ def test_drive_contacts_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@router.get("/test-drive/referrals")
+def test_drive_referrals(
+    corridor: Optional[str] = Query(None),
+    segment: Optional[str] = Query(None),
+    campaign: Optional[str] = Query(None),
+    _admin: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """AIQ-1566 (BUG-260717-3D77): people a tester recommended, for the Outreach page.
+
+    Read-only. Surfaces every referral the survey captured so the admin doesn't have to
+    re-type a recommended contact into the prospect list by hand.
+
+    Unlike contacts.csv — which filters to `referral_consent = true` — this returns ALL
+    referrals and exposes the flag, so the admin can see the full picture and decide who
+    to contact. Consent gates OUTREACH, not visibility: nothing here messages anyone, and
+    `consent=false` rows are labelled as such in the UI. This is the referrer's confirmation
+    that the person is happy to be contacted; treat a false as "do not contact yet".
+    """
+    clauses, params = _slice(corridor, segment, _resolve_campaign(campaign))
+    rows = _safe(lambda: _rows(
+        "SELECT referral_name, referral_contact, referral_company_role, referral_consent, "
+        "corridor_id, tester_name, created_at FROM survey_responses"
+        + _where(clauses, _REFERRAL_PRESENT) + " ORDER BY created_at DESC", params), [])
+    return {
+        "referrals": [
+            {
+                "referral_name": r.get("referral_name"),
+                "referral_contact": r.get("referral_contact"),
+                "referral_company_role": r.get("referral_company_role"),
+                # Coerce to a real bool: NULL means "not answered", which is not consent.
+                "referral_consent": bool(r.get("referral_consent")),
+                "corridor_id": r.get("corridor_id"),
+                "referred_by": r.get("tester_name"),
+                # PG hands back a datetime, SQLite a string; FastAPI's encoder handles both.
+                "created_at": r.get("created_at"),
+            }
+            for r in rows
+        ],
+    }

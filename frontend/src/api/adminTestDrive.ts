@@ -125,6 +125,27 @@ export function testDriveContactsCsvUrl(params?: TestDriveSlice): string {
   return `${API_BASE_URL}/api/admin/test-drive/contacts.csv${toQuery(params)}`;
 }
 
+// AIQ-1566 (BUG-260717-3D77): people a tester recommended, surfaced on /admin/outreach so
+// a referred contact never has to be re-typed by hand. Read-only; nothing here contacts
+// anyone. `referral_consent` is the REFERRER's confirmation that the person is happy to
+// hear from us — false means "do not contact yet", and the UI must say so.
+export interface TestDriveReferral {
+  referral_name: string | null;
+  referral_contact: string | null;
+  referral_company_role: string | null;
+  referral_consent: boolean;
+  corridor_id: string | null;
+  referred_by: string | null;
+  created_at: string | null;
+}
+
+export async function getTestDriveReferrals(params?: TestDriveSlice): Promise<TestDriveReferral[]> {
+  const data = await apiGet<{ referrals?: TestDriveReferral[] }>(
+    `/api/admin/test-drive/referrals${toQuery(params)}`,
+  );
+  return data.referrals ?? [];
+}
+
 // TD-FIX-3 (AIQ-1504): record invites sent so the funnel has a denominator.
 export type InviteChannel = 'whatsapp' | 'email' | 'other';
 
