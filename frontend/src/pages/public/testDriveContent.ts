@@ -153,6 +153,15 @@ export const testDriveContent = {
     // and one plain line stating where the test ends and that the survey is required.
     signInCta: 'Sign in →',
     signInHref: '/auth?mode=login',
+    // AIQ-1569 (TD-BUG-2): the page assumed a logged-out visitor. Anyone with an active
+    // ReloPass session — Romain demoing it, or a tester who already has an account —
+    // clicked 'Sign in' and dropped straight into their OWN account, not the test HR
+    // login. Tokenised {email} so the guard names the account they're actually in.
+    signedInNotice:
+      "You're already signed in as {email}. The two test logins above are separate accounts — "
+      + "signing in now would just drop you back into your own. Sign out first.",
+    signedInCta: 'Sign out and use my test account',
+    signedOutBusy: 'Signing out…',
     doneNote:
       "You're done when the employee reaches the roadmap. Then mark your test complete below and fill in the short survey — it's required, and it's how your feedback reaches me.",
     completeCta: "I've completed my test",
