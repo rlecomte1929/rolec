@@ -277,8 +277,16 @@ export const BenefitComparisonDashboard: React.FC<{
           caseId={caseId}
           category={exceptionFor.serviceKey}
           categoryLabel={exceptionFor.label}
-          requestedAmountUsd={exceptionFor.ask ?? 0}
-          capAmountUsd={exceptionFor.policyCap ?? 0}
+          // These are the policy's own numbers, in the policy's own currency — NOT USD.
+          // They were previously passed through props named `…Usd` into a modal that sent a
+          // hardcoded 'USD', so a 25,000 NOK cap reached HR as $25,000.
+          requestedAmount={exceptionFor.ask ?? 0}
+          capAmount={exceptionFor.policyCap ?? 0}
+          currency={exceptionFor.currency}
+          // The engine already told us which this is; don't re-infer it from the cap value.
+          // 'partial' = exceeds_envelope (a cap exists and is exceeded) -> cap_override.
+          // 'uncovered' = excluded (no such benefit in the package)     -> new_category.
+          exceptionType={exceptionFor.coverage === 'uncovered' ? 'new_category' : 'cap_override'}
           displayRequested={formatMoney(exceptionFor.ask, exceptionFor.currency)}
           displayCap={formatMoney(exceptionFor.policyCap, exceptionFor.currency)}
           onClose={() => setExceptionFor(null)}
@@ -296,8 +304,11 @@ export const BenefitComparisonDashboard: React.FC<{
           caseId={caseId}
           category="other"
           categoryLabel="Other / general request"
-          requestedAmountUsd={0}
-          capAmountUsd={0}
+          // A general ask names no benefit and no amounts by design; the reason carries it.
+          requestedAmount={0}
+          capAmount={0}
+          currency="USD"
+          exceptionType="new_category"
           displayRequested="—"
           displayCap="—"
           generalRequest

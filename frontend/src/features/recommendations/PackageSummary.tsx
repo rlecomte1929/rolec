@@ -22,6 +22,7 @@ import {
   SERVICES_CURRENCY_FOOTNOTE,
 } from '../services/servicesCurrency';
 import { budgetAPI, type BudgetSummaryCategory } from '../../api/budget';
+import { backendKeysForCanonical, canonicalServiceKey } from '../services/serviceConfig';
 import type { RecommendationResponse, RecommendationItem } from './types';
 
 // AIQ-280 follow-up #4 — replaced the hardcoded CATEGORY_TO_CAP map with
@@ -58,6 +59,12 @@ function budgetSummaryToCategoryCaps(
     // Accept the 'moving' alias the backend can emit alongside 'movers'.
     if (c.name === 'moving') out.set('movers', usd);
     if (c.name === 'movers') out.set('moving', usd);
+    // /budget-summary keys caps by the CANONICAL service key ('housing'), but this page
+    // groups shortlisted vendors by backendKey ('living_areas' — serviceConfig.ts). Without
+    // this alias `categoryCaps.get('living_areas')` is undefined → noCapMapping →
+    // 'not_capped' → the over-cap CTA can never render for housing, the single biggest
+    // over-cap category. It never has: `git log -S "living_areas"` on this file is empty.
+    for (const backendKey of backendKeysForCanonical(c.name)) out.set(backendKey, usd);
   }
   return out;
 }
@@ -111,6 +118,17 @@ export const PackageSummary: React.FC<Props> = ({
         queryAssignmentId,
       }),
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
+
+  // The REAL case id for the assignment actually in scope. The exception endpoints are
+  // case-scoped: require_case_access resolves via canonical_case_id/case_id, so an
+  // assignment id matches nothing and 404s for an employee — which is why this page's
+  // Request-exception button has never once succeeded (df815f4c shipped it that way).
+  // Derived from the scoped assignment rather than the context's primaryCaseId, because
+  // ?assignment= can scope this page to a non-primary case.
+  const scopedCaseId = useMemo(
+    () => linkedSummaries.find((s) => s.assignment_id === assignmentId)?.case_id ?? null,
+    [linkedSummaries, assignmentId],
   );
 
   useEffect(() => {
@@ -280,16 +298,20 @@ export const PackageSummary: React.FC<Props> = ({
   const [exceptionRows, setExceptionRows] = useState<ExceptionRequest[]>([]);
   const [exceptionsRefreshNonce, setExceptionsRefreshNonce] = useState(0);
   useEffect(() => {
-    if (!assignmentId) return;
+    if (!scopedCaseId) return;
     let cancelled = false;
-    listExceptionRequestsForCase(assignmentId)
+    listExceptionRequestsForCase(scopedCaseId)
       .then((rows) => {
         if (cancelled) return;
         setExceptionRows(rows);
         const next = new Map<string, ExceptionRequest>();
-        // Most recent (server returns DESC) wins per category.
+        // Most recent (server returns DESC) wins per category. Keyed canonically so a
+        // request filed from the Benefit-comparison page ('housing') is recognised here,
+        // where categories are backendKeys ('living_areas') — otherwise the same employee
+        // could file the same ask twice and HR would see two rows for one benefit.
         for (const row of rows) {
-          if (!next.has(row.category)) next.set(row.category, row);
+          const key = canonicalServiceKey(row.category);
+          if (!next.has(key)) next.set(key, row);
         }
         setExceptionsByCategory(next);
       })
@@ -299,7 +321,7 @@ export const PackageSummary: React.FC<Props> = ({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, exceptionsRefreshNonce]);
+  }, [scopedCaseId, exceptionsRefreshNonce]);
 
   // Re-fetch when the user comes back to this tab so HR's decisions show
   // up without requiring a hard refresh.
@@ -579,7 +601,14 @@ export const PackageSummary: React.FC<Props> = ({
                         </div>
                       ) : (
                         <div className="h-8 flex items-center justify-end rounded-lg bg-[#f1f5f9] px-2">
-                          <span className="text-xs font-medium text-[#475569]">No cap published</span>
+                          {/* Two different facts used to share this label. `noCapMapping`
+                              means we could not find a cap for this category — not that the
+                              company published none. Telling an employee their employer
+                              budgeted nothing, when we simply failed to look it up, is the
+                              kind of claim this product must not make. */}
+                          <span className="text-xs font-medium text-[#475569]">
+                            {c.noPublishedCapForCategory ? 'No cap published' : 'Not compared to a cap'}
+                          </span>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-[#6b7280] mt-1">
@@ -588,7 +617,7 @@ export const PackageSummary: React.FC<Props> = ({
                           <span className="text-[#f97316] font-medium">You pay: {fmt(c.extra)}</span>
                         )}
                         {(() => {
-                          const existing = exceptionsByCategory.get(c.category);
+                          const existing = exceptionsByCategory.get(canonicalServiceKey(c.category));
                           if (existing) {
                             const badge = EXCEPTION_BADGE[existing.status];
                             return (
@@ -600,7 +629,7 @@ export const PackageSummary: React.FC<Props> = ({
                               </span>
                             );
                           }
-                          if (isEmployeeViewer && c.status === 'over' && assignmentId) {
+                          if (isEmployeeViewer && c.status === 'over' && scopedCaseId) {
                             return (
                               <Button unstyled
                                 type="button"
@@ -636,23 +665,30 @@ export const PackageSummary: React.FC<Props> = ({
                 })}
               </div>
 
-              {modalState && assignmentId && (
+              {modalState && scopedCaseId && (
                 <RequestExceptionModal
                   open
                   onClose={() => setModalState(null)}
                   onSuccess={(req) => {
                     setExceptionsByCategory((prev) => {
                       const next = new Map(prev);
-                      next.set(req.category, req);
+                      next.set(canonicalServiceKey(req.category), req);
                       return next;
                     });
                     setModalState(null);
                   }}
-                  caseId={assignmentId}
-                  category={modalState.category}
+                  caseId={scopedCaseId}
+                  // Canonical ('housing'), not the page's backendKey ('living_areas'), so
+                  // this and the Benefit-comparison page file one vocabulary.
+                  category={canonicalServiceKey(modalState.category)}
                   categoryLabel={modalState.label}
-                  requestedAmountUsd={modalState.requestedUsd}
-                  capAmountUsd={modalState.capUsd}
+                  requestedAmount={modalState.requestedUsd}
+                  capAmount={modalState.capUsd}
+                  // Genuinely USD here: budgetSummaryToCategoryCaps ran convertToUsd and the
+                  // vendor prices are estimated_cost_usd.
+                  currency="USD"
+                  // This CTA only renders when status === 'over', which requires cap > 0.
+                  exceptionType="cap_override"
                   displayRequested={fmt(modalState.requestedUsd)}
                   displayCap={fmt(modalState.capUsd)}
                 />

@@ -8,20 +8,39 @@ import { Button, Card } from '../../components/antigravity';
 import {
   createExceptionRequest,
   type ExceptionRequest,
+  type ExceptionCategory,
 } from '../../api/exceptions';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: (req: ExceptionRequest) => void;
-  /** Stable identifier the backend stores on the row. We pass assignment id for now. */
+  /** The case id the backend keys the row on. Must be a real case id — an assignment id
+   *  fails require_case_access and 404s for an employee. */
   caseId: string;
   category: string;
-  /** Human-friendly category label (e.g. "Living Areas"). */
+  /** Human-friendly category label (e.g. "Housing"). */
   categoryLabel: string;
-  requestedAmountUsd: number;
-  capAmountUsd: number;
-  /** Display amounts (already converted from USD) so the modal shows familiar numbers. */
+  /**
+   * The amounts, expressed in `currency`. This modal does NO conversion and makes NO
+   * assumption about the unit — it files exactly what the caller passes. These props were
+   * previously named `…Usd` while the backend was sent a hardcoded 'USD', so a caller
+   * handing over native-currency values (BenefitComparisonDashboard did) filed a 25,000 NOK
+   * cap as $25,000 — ~10x, in the one field HR decides on.
+   */
+  requestedAmount: number;
+  capAmount: number;
+  /** ISO-4217 code the two amounts above are denominated in. Stored on the row; HR's inbox
+   *  renders whatever this says, so it must be true. */
+  currency: string;
+  /**
+   * Declared by the caller, never inferred. This used to be derived from `capAmount === 0`,
+   * which silently mistyped any request whose cap simply hadn't resolved as a
+   * 'new_category' ask. Only the caller knows whether the benefit is capped-and-exceeded
+   * or absent from the package.
+   */
+  exceptionType: ExceptionCategory;
+  /** Display amounts, pre-formatted by the caller in its own currency. */
   displayRequested: string;
   displayCap: string;
   /**
@@ -39,8 +58,10 @@ export const RequestExceptionModal: React.FC<Props> = ({
   caseId,
   category,
   categoryLabel,
-  requestedAmountUsd,
-  capAmountUsd,
+  requestedAmount,
+  capAmount,
+  currency,
+  exceptionType,
   displayRequested,
   displayCap,
   generalRequest = false,
@@ -59,20 +80,15 @@ export const RequestExceptionModal: React.FC<Props> = ({
     setSubmitting(true);
     setError(null);
     try {
-      // Q3-A: derive the exception-type axis from the cap shape:
-      //   cap = 0 → benefit not in the package, so this is a 'new_category' request
-      //   cap > 0 → asking to exceed an existing cap → 'cap_override'
-      // RequestExceptionModal only opens for over-cap or new-benefit service
-      // estimates; timeline_extension / additional_coverage flow through other
-      // surfaces (assignment-scoped, not this case-scoped endpoint).
-      const exceptionType: 'new_category' | 'cap_override' =
-        capAmountUsd === 0 ? 'new_category' : 'cap_override';
+      // File exactly what the caller declared. Both `exceptionType` and `currency` used to
+      // be decided here — the type inferred from `cap === 0`, the currency hardcoded 'USD' —
+      // and both were wrong for any caller not working in USD. The caller owns the truth.
       const created = await createExceptionRequest(caseId, {
         category,
         exception_type: exceptionType,
-        requested_amount: requestedAmountUsd,
-        cap_amount: capAmountUsd,
-        currency: 'USD',
+        requested_amount: requestedAmount,
+        cap_amount: capAmount,
+        currency,
         reason: reason.trim(),
       });
       onSuccess(created);
