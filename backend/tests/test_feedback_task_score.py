@@ -259,3 +259,191 @@ class TestScoreTask:
         assert not result["passed"]
         assert len(result["issues"]) >= 2
         assert result["score"] <= 30
+
+
+# ── AIQ-1567 — the generator asserted unverified root causes as fact ──────────
+#
+# Four tasks in one day shipped false premises. In every case the reporter's words were
+# accurate; what was false was what the generator added. These tests replay the two real
+# reports and pin the mechanisms that produced them, so the failure cannot return
+# silently. Each fixture below is the ACTUAL captured telemetry, not a sketch.
+
+# BUG-260716-D23E → AIQ-1564. The reporter browsed 6 admin pages in ~43s, blew a shared
+# 20/min rate-limit bucket, and every executive tile rendered "unavailable". The generator
+# read the first 3 rows of the failed-request buffer as "the dashboard's endpoints" and
+# asserted the dashboard was hammering them. All false: the page makes ONE call, never
+# polls, and its real endpoint (/api/admin/exec-overview) is 4th in the buffer.
+_D23E_CTX = {
+    "route": "/admin/executive",
+    "breadcrumbs": [
+        {"message": "/admin/review-queue"}, {"message": "/admin"},
+        {"message": "/admin/rag-quality"}, {"message": "/admin/executive"},
+        {"message": "/admin"}, {"message": "/admin/executive"},
+    ],
+    "recentErrors": [{
+        "message": "[swallowed] PlatformShellSidebar: admin notification poll: Too many requests.",
+        "fingerprint": "1k525lk",
+        "failingFrame": "",          # NB: no frame — nothing confirms a cause
+    }],
+    "recentFailedRequests": [
+        {"status": 429, "path": "/api/admin/ops/sla/overview"},
+        {"status": 429, "path": "/api/admin/assignments"},
+        {"status": 429, "path": "/api/admin/rag-eval/metrics"},
+        {"status": 429, "path": "/api/admin/exec-overview"},          # the real one
+        {"status": 429, "path": "/api/admin/catalog/notification-counts"},
+    ],
+}
+
+# BUG-260717-3D77 → AIQ-1566. Every complaint was about /admin/outreach; the reporter had
+# left it 21s before pressing the feedback button. The generator took `route` at face
+# value and aimed all three fixes at the wrong page.
+_3D77_CTX = {
+    "route": "/admin/test-drive",
+    "breadcrumbs": [
+        {"message": "/admin/outreach"},     # what the report is actually about
+        {"message": "/admin/test-drive"},   # where the button was pressed
+    ],
+}
+
+
+class TestAIQ1567FailedRequestBufferIsNotEvidence:
+    def test_the_real_endpoint_is_no_longer_truncated_away(self):
+        """AIQ-1564's endpoint sat 4th and the old [:3] slice dropped it silently."""
+        out = format_diagnostics(_D23E_CTX)
+        assert "/api/admin/exec-overview" in out, (
+            "the page's own endpoint must survive the slice — cutting at 3 is precisely "
+            "how the generator never saw it"
+        )
+
+    def test_the_buffer_is_labelled_a_lead_not_evidence(self):
+        out = format_diagnostics(_D23E_CTX).lower()
+        assert "unfiltered" in out and "lead" in out
+        assert "session-wide" in out
+
+    def test_a_truncated_buffer_says_so_rather_than_hiding_it(self):
+        ctx = {"recentFailedRequests": [{"status": 500, "path": f"/api/x/{i}"} for i in range(9)]}
+        out = format_diagnostics(ctx)
+        assert "showing 5 of 9" in out, "a silent cut is what lost the real endpoint"
+
+    def test_failed_paths_do_not_count_as_a_confirmed_cause(self):
+        sig = extract_confirmed_signals(_D23E_CTX)
+        assert sig["failed_api_paths"], "still surfaced as leads"
+        assert sig["has_error_evidence"] is True, "something demonstrably failed"
+        assert sig["has_confirmed_cause"] is False, (
+            "a ring-buffer row is correlation; only a stack frame confirms a cause"
+        )
+
+    def test_a_stack_frame_does_confirm_a_cause(self):
+        sig = extract_confirmed_signals({
+            "recentErrors": [{"message": "boom", "failingFrame": "frontend/src/x/Y.tsx:1:2"}]
+        })
+        assert sig["has_confirmed_cause"] is True
+
+
+class TestAIQ1567NavigationTrail:
+    def test_breadcrumbs_reach_the_prompt(self):
+        """Never read before — the single omission that produced AIQ-1566."""
+        out = format_diagnostics(_3D77_CTX)
+        assert "/admin/outreach" in out, (
+            "without the trail there is no way to know the report is about the previous page"
+        )
+
+    def test_route_is_labelled_submit_time_not_subject(self):
+        out = format_diagnostics(_3D77_CTX).lower()
+        assert "/admin/test-drive" in out
+        assert "not necessarily the page being described" in out
+
+
+class TestAIQ1567D6AssertedCause:
+    """D4 catches the question-shaped premise. AIQ-1564's report was a flat statement of
+    symptom, so D4 never fired — D6 covers the gap."""
+
+    def _task(self, **over):
+        base = {
+            "task_type": "Backend Implementation",
+            "status": "Ready for AI",
+            "priority": "P1",
+            "strategic_objective": "Restore live data on /admin/executive.",
+            "execution_prompt": "Investigate why the tiles render unavailable.",
+            "files_to_touch": "RECON_REQUIRED",
+        }
+        base.update(over)
+        return base
+
+    def test_aiq_1564s_real_text_is_blocked(self):
+        task = self._task(
+            strategic_objective=(
+                "Restore live data on the /admin/executive dashboard by eliminating "
+                "rate-limit hammering on the three confirmed failing endpoints."
+            ),
+            execution_prompt=(
+                "The dashboard (and possibly the sidebar notification poller) is making "
+                "too-frequent concurrent requests."
+            ),
+        )
+        result = score_task(
+            task,
+            confirmed_signals=extract_confirmed_signals(_D23E_CTX),
+            user_text="most tiles are showing a status as 'unavailable'",   # not a question
+        )
+        assert not result["passed"], "an impl task built on an invented mechanism must not auto-dispatch"
+        assert any("Root cause asserted without evidence" in i for i in result["issues"])
+
+    def test_stating_the_symptom_is_fine(self):
+        """The fix must not make every task vague — only cause-claims are penalised."""
+        result = score_task(
+            self._task(),
+            confirmed_signals=extract_confirmed_signals(_D23E_CTX),
+            user_text="most tiles are showing a status as 'unavailable'",
+        )
+        assert result["passed"], f"symptom-only task should pass: {result['issues']}"
+
+    def test_a_confirmed_frame_licenses_a_cause(self):
+        """With a stack trace we DO know where — asserting it is legitimate."""
+        result = score_task(
+            self._task(
+                strategic_objective="The crash is caused by the null case in HrCasesPage.",
+                execution_prompt="Fix frontend/src/features/hr/pages/HrCasesPage.tsx.",
+            ),
+            confirmed_signals=extract_confirmed_signals({
+                "recentErrors": [{
+                    "message": "Cannot read 'data'",
+                    "failingFrame": "frontend/src/features/hr/pages/HrCasesPage.tsx:142:18",
+                }]
+            }),
+            user_text="the HR cases page crashes",
+        )
+        assert result["passed"], f"evidence-backed cause must not be blocked: {result['issues']}"
+
+    def test_research_type_is_not_penalised_for_a_theory(self):
+        """Research is the safe lane the prompt already recommends — don't punish it."""
+        result = score_task(
+            self._task(
+                task_type="Research",
+                strategic_objective="Investigate whether the dashboard is hammering the API.",
+            ),
+            confirmed_signals=extract_confirmed_signals(_D23E_CTX),
+            user_text="most tiles are showing a status as 'unavailable'",
+        )
+        assert result["passed"], f"Research may hypothesise: {result['issues']}"
+
+
+class TestAIQ1567D3NoLongerRewardsTheBuffer:
+    def test_omitting_an_unrelated_buffered_endpoint_is_not_an_issue(self):
+        """D3 used to call these 'Confirmed' and nudge the model to weave them in."""
+        result = score_task(
+            {
+                "task_type": "Research",
+                "status": "Ready for AI",
+                "priority": "P2",
+                "strategic_objective": "Find out why the tiles show unavailable.",
+                "execution_prompt": "Read the executive dashboard page and its endpoint.",
+                "files_to_touch": "RECON_REQUIRED",
+            },
+            confirmed_signals=extract_confirmed_signals(_D23E_CTX),
+            user_text="most tiles are showing a status as 'unavailable'",
+        )
+        assert result["passed"]
+        assert not any("Confirmed failing API endpoint" in w for w in result["warnings"]), (
+            "a session-wide buffer row is not a confirmed endpoint"
+        )

@@ -27,7 +27,14 @@ from . import autopilot_events as ev
 from . import notion_work_queue as nwq
 from .ai_trace_logger import TraceSession
 from .autopilot_governor import gate, nightly_cap, stage_feature_key
-from .feedback_task_engineer import engineer_task, status_from_complexity, format_diagnostics
+from .feedback_task_engineer import (
+    _FAILED_REQUEST_LIMIT,
+    engineer_task,
+    extract_confirmed_signals,
+    format_diagnostics,
+    score_task,
+    status_from_complexity,
+)
 from .feedback_triage import classify
 
 log = logging.getLogger(__name__)
@@ -119,7 +126,7 @@ def build_failure_evidence(row: Dict[str, Any], cluster_size: int) -> str:
     for err in (ctx.get("recentErrors") or [])[:3]:
         lines.append(f"Failing function: {err.get('failingFrame') or '?'} | {err.get('message') or ''} "
                      f"(fingerprint {err.get('fingerprint') or '?'})")
-    for fr in (ctx.get("recentFailedRequests") or [])[:5]:
+    for fr in (ctx.get("recentFailedRequests") or [])[:_FAILED_REQUEST_LIMIT]:
         lines.append(f"Failed request: {fr.get('method')} {fr.get('path')} → {fr.get('status')} "
                      f"· req {fr.get('requestId')}")
     if ctx.get("appVersion"):
@@ -164,6 +171,33 @@ def _dispatch_one(session: Any, rep: Dict[str, Any], size: int, *, dry_run: bool
             latency_ms=int((time.time() - t0) * 1000),
         )
         tracer.flush()
+
+    # ── Eval gate (AIQ-1567) ──────────────────────────────────────────────────
+    # The manual path (admin_feedback.dispatch/create) has always scored the task before
+    # writing to Notion and 422s the admin when it fails. This path never did — so the
+    # nightly run (up to AUTOPILOT_MAX_DISPATCH_PER_NIGHT tasks) wrote unscored specs
+    # straight into the queue, with nobody in the loop to notice. That is the lane most
+    # in need of the gate, not least.
+    #
+    # There is no admin to 422 here, so a failing task is skipped rather than dispatched,
+    # and the reason is returned for the run log. Skipping is the safe default: the
+    # feedback row keeps its status and the next run can retry it. Dispatching a spec we
+    # know is unsound would put a false premise in front of an executor at 03:00.
+    signals = extract_confirmed_signals(rep.get("client_context"))
+    eval_result = score_task(task, confirmed_signals=signals, user_text=rep.get("message") or "")
+    if not eval_result["passed"]:
+        log.warning(
+            "autopilot dispatch skipped (feedback_id=%s): task failed the eval gate "
+            "(score=%s) — %s",
+            rep["id"], eval_result["score"], "; ".join(eval_result["issues"]) or "no issues listed",
+        )
+        return {
+            "feedback_id": rep["id"],
+            "dispatched": False,
+            "skipped_reason": "eval_gate_failed",
+            "eval": eval_result,
+            "cluster_size": size,
+        }
 
     url = nwq.create_work_queue_task(task, failure_evidence=failure_evidence, context_links=context_links)
     now = datetime.utcnow().isoformat()

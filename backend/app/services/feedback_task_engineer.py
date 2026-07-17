@@ -32,6 +32,15 @@ _TASK_TYPES = (
 )
 _PRODUCT_AREAS = "Core Product, AI Layer, Integrations, UX, Infrastructure, GTM"
 
+# AIQ-1567: how many rows of the recentFailedRequests ring buffer we surface. One
+# constant because the same buffer was being sliced at three different depths —
+# format_diagnostics [:3], extract_confirmed_signals [:3], and
+# autopilot_ingest.build_failure_evidence [:5] — so the prompt, the eval gate and the
+# Notion Failure Evidence field each saw a different truncation of the same list.
+# Whatever the depth, the cut is now stated ("showing N of M") rather than silent:
+# in AIQ-1564 the page's own endpoint sat 4th and vanished without a trace.
+_FAILED_REQUEST_LIMIT = 5
+
 _SYSTEM = (
     "You are a senior engineering task author for ReloPass — a cross-border "
     "relocation SaaS (TypeScript/React + Vite frontend, Python FastAPI backend, "
@@ -50,20 +59,46 @@ _SYSTEM = (
     "the root cause, choose 'Research' — an engineer promotes it to implementation "
     "after confirming. When in doubt, Research is always safe; a wrong impl task "
     "silently ships a broken change.\n\n"
+    "YOU CANNOT SEE THE CODEBASE — read this before writing any field:\n"
+    "You have the user's words and some browser telemetry. You do NOT have the repo. So "
+    "you can state WHAT was reported and WHAT must be true once it's fixed. You cannot "
+    "know WHY it is broken, WHICH component is at fault, or WHICH page the user meant. "
+    "The agent executing this task CAN read the code — leave the diagnosis to it.\n"
+    "• NEVER assert a root cause, a mechanism, or a culprit component/endpoint/page as "
+    "fact. Not in strategic_objective, not in execution_prompt, not anywhere.\n"
+    "• If the telemetry suggests a cause, put it in leads_unverified as a QUESTION for "
+    "the agent to check ('Is the 429 on X related?'), never as an instruction.\n"
+    "• expected_output, validation_criteria, technical_constraints and test_command are "
+    "BINDING — the agent treats them as requirements. Derive them ONLY from the user's "
+    "own words and confirmed signals. Never invent a constraint the user did not state: "
+    "a fabricated 'X is required by default' ships a product decision nobody asked for.\n"
+    "• The user's report is the ground truth. Your inference is not. When they conflict, "
+    "the user wins.\n\n"
     "Rules:\n"
-    "- Be concrete and implementable. Never use vague language like 'fix it' or "
-    "'improve X'. State exactly what to change and why.\n"
-    "- execution_prompt: the engineered prompt — a one-line goal, a short plan, then "
-    "precise ordered steps.\n"
-    "- validation_criteria: explicit, testable pass criteria (how we know it's done).\n"
+    "- Be concrete about the OBSERVED problem and the desired end state. Never use vague "
+    "language like 'fix it' or 'improve X'. State exactly what the user saw and what "
+    "should be true instead — not why it happens.\n"
+    "- execution_prompt: a one-line goal, then what to investigate. Order the steps by "
+    "what to verify FIRST, not by a fix you have already decided on.\n"
+    "- validation_criteria: explicit, testable pass criteria (how we know it's done), "
+    "phrased as user-observable outcomes. If the user's desired outcome may be "
+    "impossible (e.g. showing data that isn't collected), say so as a criterion the "
+    "agent must confirm — never demand a number be displayed that may not exist.\n"
     "- test_command: concrete command(s) to verify, or '' if none applies.\n"
     "- A data-isolation issue is always priority P0 and layer=Isolation.\n"
     "- REPRODUCTION SIGNAL rules (critical — follow exactly):\n"
-    "  • If REPRODUCTION SIGNAL contains 'failingFrame=<path>', that path is a "
-    "confirmed stack-trace reference. Reference it verbatim in execution_prompt. "
-    "Do NOT substitute any other path.\n"
-    "  • If REPRODUCTION SIGNAL contains 'Failed request: <status> <path>', "
-    "reference that exact API endpoint path in execution_prompt.\n"
+    "  • 'failingFrame=<path>' IS confirmed — the browser caught the error and named "
+    "the file. Reference it verbatim in execution_prompt. Do NOT substitute any other "
+    "path.\n"
+    "  • 'Failed request: <status> <path>' is NOT confirmed. That buffer is an "
+    "unfiltered, session-wide list of recent failures — it includes calls made by other "
+    "pages earlier in the session, and it is truncated. It never proves the reported "
+    "page called that endpoint, and it never establishes a cause. Treat every row as a "
+    "lead: mention it in leads_unverified as something to check, never as the target.\n"
+    "  • 'Route at submit time' is where the feedback button was pressed. The user "
+    "commonly describes the page they were on moments earlier — check the navigation "
+    "trail before naming any page, and if the trail is ambiguous, say so in "
+    "leads_unverified rather than picking one.\n"
     "  • Never invent file paths from framework conventions. If no confirmed paths "
     "appear in REPRODUCTION SIGNAL, omit file references entirely — the agent will "
     "locate them via repo recon.\n\n"
@@ -72,6 +107,8 @@ _SYSTEM = (
     '{"title": str (<=12 words), "strategic_objective": str, "execution_prompt": str, '
     '"expected_output": str, "validation_criteria": str, "test_command": str, '
     '"technical_constraints": str, "risk_rollback": str, '
+    '"leads_unverified": str (hypotheses phrased as questions for the agent to verify, '
+    'or "" if none — NEVER instructions, and never a cause stated as fact), '
     '"priority": one of ["P0","P1","P2","P3"], '
     '"complexity": one of ["Trivial","Low","Medium","High","Very High"], '
     f'"task_type": one of [{_TASK_TYPES}], '
@@ -104,6 +141,24 @@ def format_diagnostics(client_context: Any) -> str:
     IMPORTANT: includes failingFrame (first user-code stack frame) when present.
     This is a confirmed source file path from the browser stack trace — the LLM
     is instructed to treat it as ground truth, not a guess.
+
+    AIQ-1567 — everything else here is a LEAD, and this function must say so.
+    Two real failures came from presenting circumstantial context as evidence:
+
+      * recentFailedRequests is a session-wide ring buffer. It was rendered as bare
+        "Failed request: <status> <path>" lines beside failingFrame — same shape,
+        same apparent authority — and silently sliced to the first 3. In AIQ-1564
+        the buffer held 5 rows; the first 3 belonged to pages the reporter had
+        already left, and the page's own endpoint sat 4th, outside the slice. The
+        model dutifully reported those 3 as "the dashboard's endpoints".
+      * breadcrumbs and route were captured by the frontend, stored on
+        client_context, and dropped here. Without them the model cannot tell that a
+        report may describe a page visited seconds earlier — which is exactly how
+        AIQ-1566 pinned every complaint on the wrong page.
+
+    So: pass the navigation trail through, label the route as submit-time only, and
+    render the failed-request buffer as what it is — unfiltered, session-wide, and
+    not proof that the reported page called anything.
     """
     ctx = client_context
     if isinstance(ctx, str):
@@ -123,8 +178,38 @@ def format_diagnostics(client_context: Any) -> str:
             parts.append(f"failingFrame={frame}")
         parts.append(f"fingerprint={e0.get('fingerprint', '?')}")
         lines.append(" | ".join(parts))
-    for r in (ctx.get("recentFailedRequests") or [])[:3]:
-        lines.append(f"Failed request: {r.get('status', '?')} {r.get('path', '?')}")
+
+    # The navigation trail. The report is often about the page BEFORE the last one —
+    # the reporter navigates, then hunts for the feedback button.
+    crumbs = [
+        str(c.get("message") or "").strip()
+        for c in (ctx.get("breadcrumbs") or [])
+        if isinstance(c, dict) and (c.get("message") or "").strip()
+    ]
+    route = str(ctx.get("route") or "").strip()
+    if route:
+        lines.append(
+            f"Route at submit time: {route} — this is where the feedback button was "
+            f"pressed, NOT necessarily the page being described. Check the trail below."
+        )
+    if crumbs:
+        lines.append(
+            "Navigation trail (oldest -> newest, last = route at submit time): "
+            + " -> ".join(crumbs[-8:])
+        )
+
+    reqs = [r for r in (ctx.get("recentFailedRequests") or []) if isinstance(r, dict)]
+    if reqs:
+        shown = reqs[:_FAILED_REQUEST_LIMIT]
+        more = f" (showing {len(shown)} of {len(reqs)})" if len(reqs) > len(shown) else ""
+        lines.append(
+            f"Recent failed requests{more} — UNFILTERED session-wide buffer, most recent "
+            f"first. These are LEADS, not evidence: they include calls made by other pages "
+            f"earlier in the session, and none of them proves the reported page called it."
+        )
+        for r in shown:
+            lines.append(f"  - Failed request: {r.get('status', '?')} {r.get('path', '?')}")
+
     fn = ctx.get("failingFunction") or ctx.get("failing_function")
     if fn:
         lines.append(f"Failing function: {fn}")
@@ -132,15 +217,28 @@ def format_diagnostics(client_context: Any) -> str:
 
 
 def extract_confirmed_signals(client_context: Any) -> Dict[str, Any]:
-    """Extract structured ground-truth signals from client_context for the eval gate.
+    """Extract structured signals from client_context for the eval gate.
+
+    AIQ-1567 — only ONE of these is ground truth, and conflating them cost us four
+    false-premise tasks. A failingFrame is a stack trace: the browser caught an error
+    and named the file, so it confirms where. A failed API path is a row from a
+    session-wide ring buffer: it confirms only that *something* failed *recently* —
+    not that the reported page called it, and certainly not why. Treating the second
+    like the first is what let AIQ-1564 assert three unrelated endpoints as "the
+    dashboard's". Named accordingly below; do not promote a lead to evidence.
 
     Returns:
-      failing_frame: str | None  — confirmed source file from stack trace (line
+      failing_frame: str | None  — CONFIRMED source file from the stack trace (line
                                    numbers stripped), e.g.
                                    "frontend/src/features/hr/pages/HrCasesPage.tsx"
-      failed_api_paths: list[str]  — API paths that returned 4xx/5xx, e.g.
-                                     ["/api/hr/assign"]
-      has_error_evidence: bool  — True when at least one confirmed signal exists
+      failed_api_paths: list[str]  — LEADS: paths that returned 4xx/5xx anywhere in the
+                                     session, e.g. ["/api/hr/assign"]. NOT scoped to the
+                                     reported page.
+      has_error_evidence: bool  — True when any signal exists (confirmed OR lead). Used
+                                  only to sanity-check a P0, where "something demonstrably
+                                  broke" is the question — not to justify a root cause.
+      has_confirmed_cause: bool  — True ONLY for a failingFrame. This is the one that may
+                                   justify an implementation task built on a stated cause.
     """
     ctx = client_context
     if isinstance(ctx, str):
@@ -161,14 +259,16 @@ def extract_confirmed_signals(client_context: Any) -> Dict[str, Any]:
 
     reqs = ctx.get("recentFailedRequests") or []
     failed_api_paths = [
-        r.get("path", "") for r in reqs[:3]
-        if r.get("path") and str(r.get("status", 0)).startswith(("4", "5"))
+        r.get("path", "") for r in reqs[:_FAILED_REQUEST_LIMIT]
+        if isinstance(r, dict) and r.get("path") and str(r.get("status", 0)).startswith(("4", "5"))
     ]
 
     return {
         "failing_frame": failing_frame,
         "failed_api_paths": [p for p in failed_api_paths if p],
         "has_error_evidence": bool(failing_frame or failed_api_paths),
+        # A stack trace names a file; a ring-buffer row names only a coincidence.
+        "has_confirmed_cause": bool(failing_frame),
     }
 
 
@@ -225,6 +325,46 @@ _IMPL_TASK_TYPES = frozenset({
     "UX Redesign",
     "Database Migration",
 })
+
+# AIQ-1567 — phrasings that assert WHY something is broken, for D6.
+#
+# Deliberately narrow. This fires only when there is no confirmed failingFrame AND the
+# task is queued for automatic implementation, so a false positive costs a re-type to
+# Research, not a lost fix. Every pattern below is drawn from a task that actually
+# shipped a false premise — e.g. AIQ-1564's "the dashboard is making too-frequent
+# concurrent requests" and "eliminating rate-limit hammering on the three confirmed
+# failing endpoints".
+#
+# NOT included, on purpose: bare "because", "so that", "to fix" — they carry no claim
+# about a mechanism and appear constantly in legitimate prose ("retire the tab because
+# the user finds it redundant" asserts nothing about a cause).
+_ASSERTED_CAUSE_RE = re.compile(
+    r"\b("
+    # Explicit causal claims
+    r"root cause (?:is|of)|"
+    r"(?:is|are|was|were) caused by|"
+    r"caused by the|"
+    r"due to the|"
+    r"(?:this|the) (?:issue|bug|problem|failure) (?:is|stems|arises|results)|"
+    r"the (?:reason|culprit) (?:is|being)|"
+    # Asserted mechanisms — the AIQ-1564 family
+    r"(?:is|are) (?:hammering|flooding|spamming|thrashing)|"
+    r"(?:is|are) (?:making|firing|issuing) too (?:many|frequent)|"
+    r"too[- ]frequent (?:concurrent )?requests|"
+    r"(?:is|are) polling too|"
+    r"rate[- ]limit hammering|"
+    # Asserting a component is at fault
+    r"(?:is|are) (?:the )?(?:culprit|at fault|to blame)|"
+    r"confirmed failing endpoints?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _asserted_causes(text: str) -> list:
+    """Distinct causal assertions found in `text` (D6). Empty list = nothing asserted."""
+    found = {m.group(0).strip().lower() for m in _ASSERTED_CAUSE_RE.finditer(text or "")}
+    return sorted(found)
 
 
 def score_task(
@@ -288,17 +428,22 @@ def score_task(
             )
             score -= 20
 
-    # ── D3: Confirmed API path not referenced ─────────────────────────────────
+    # ── D3: A failed API path went unmentioned ────────────────────────────────
+    # AIQ-1567: this used to call the path "Confirmed" and nudge the model to weave it
+    # into execution_prompt — which is how AIQ-1564 turned three unrelated ring-buffer
+    # rows into "the dashboard's endpoints". These paths are LEADS. Not mentioning one is
+    # now perfectly fine (no warning); the note below fires only as an FYI when the task
+    # ignores a lead entirely AND has no confirmed frame to work from.
     failed_paths = confirmed_signals.get("failed_api_paths") or []
-    if failed_paths:
+    if failed_paths and not confirmed_signals.get("has_confirmed_cause"):
         primary = failed_paths[0]
         segment = primary.rstrip("/").rsplit("/", 1)[-1]
         search_blob = (execution_field + " " + files_field).lower()
         if segment and segment.lower() not in search_blob and primary.lower() not in search_blob:
             warnings.append(
-                f"Confirmed failing API endpoint ({primary!r}) is not mentioned in "
-                f"execution_prompt or files_to_touch. Verify the task targets the "
-                f"right layer."
+                f"A failed request ({primary!r}) was captured in the session but the task "
+                f"does not mention it. That is fine if it is unrelated — the buffer is "
+                f"session-wide. Noted only so the lead is not lost."
             )
 
     # ── D4: Question treated as executable implementation task (GAP-9) ────────
@@ -326,6 +471,39 @@ def score_task(
             "Priority P0 with no captured error evidence (no stack trace or failed "
             "request in diagnostics). Confirm the severity is correct before dispatch."
         )
+
+    # ── D6: Root cause asserted without a confirmed cause (AIQ-1567) ──────────
+    # D4 catches the question-shaped version of this ("can you check X?" → impl task).
+    # It could not catch AIQ-1564, whose report was a flat statement of symptom ("most
+    # tiles are showing unavailable") — no question mark, no hedging. The generator
+    # nonetheless asserted a mechanism ("the dashboard is hammering these endpoints"),
+    # inferred purely from a session-wide failed-request buffer, and typed it as an
+    # implementation task. Every claim was false; the real endpoint was not even in the
+    # buffer's visible slice.
+    #
+    # A stack frame confirms WHERE. Nothing in this telemetry confirms WHY. So: an
+    # implementation task queued for automatic execution may not assert a cause unless a
+    # failingFrame backs it. Same remedy the prompt already prescribes and D4 already
+    # enforces for questions — Research, which an engineer promotes after confirming.
+    if (
+        not confirmed_signals.get("has_confirmed_cause")
+        and task.get("task_type") in _IMPL_TASK_TYPES
+        and task.get("status") == "Ready for AI"
+    ):
+        asserted = _asserted_causes(
+            f"{task.get('strategic_objective') or ''} {execution_field}"
+        )
+        if asserted:
+            issues.append(
+                f"Root cause asserted without evidence: {asserted}. No failingFrame was "
+                f"captured, so nothing here confirms WHY the problem happens — a "
+                f"session-wide failed-request buffer shows correlation, not cause. This "
+                f"is queued as '{task.get('task_type')}' + 'Ready for AI', so an agent "
+                f"would implement against that guess. Set task_type='Research', or state "
+                f"the symptom and move the theory into leads_unverified."
+            )
+            # Same weight as D4: a wrong impl task silently ships a broken change.
+            score -= 40
 
     return {
         "score": max(0, score),
@@ -416,11 +594,18 @@ def engineer_task(
     masked_reporter = _scrub(reporter_name) if reporter_name else ""
     masked_diag = _scrub(diagnostics) if diagnostics else ""
     user = (
-        f"FEEDBACK ({category}) reported on page {page_url or '?'}"
+        # AIQ-1567: page_url used to read "reported on page X" — flat, unqualified, and
+        # taken by the model as the subject of the report. It is only where the button
+        # was pressed. In AIQ-1566 the reporter was describing the page they had left
+        # 21s earlier, and every field came out aimed at the wrong one.
+        f"FEEDBACK ({category}) submitted FROM page {page_url or '?'} (the page the "
+        f"feedback button was pressed on — the report may describe a different page; "
+        f"check the navigation trail in REPRODUCTION SIGNAL before naming one)"
         f"{' [screenshot attached]' if has_screenshot else ''}"
-        f"{f' by {masked_reporter}' if masked_reporter else ''}.\n"
+        f"{f', by {masked_reporter}' if masked_reporter else ''}.\n"
         f"Auto-classified: severity={severity or '?'}, area={area or '?'}.\n\n"
-        f"USER MESSAGE:\n{masked_bug or '(none)'}\n\n"
+        f"USER MESSAGE (this is the ground truth — your inference is not):\n"
+        f"{masked_bug or '(none)'}\n\n"
         f"ADMIN CONTEXT (extra detail for the fix):\n{masked_ctx or '(none)'}\n"
         f"\nREPRODUCTION SIGNAL (auto-captured diagnostics):\n{masked_diag or '(none)'}\n"
     )
@@ -434,6 +619,22 @@ def engineer_task(
     # override this with the real path from extract_confirmed_signals().
     task["files_to_touch"] = "RECON_REQUIRED"
     task["status"] = status_from_complexity(task.get("complexity"))
+
+    # AIQ-1567: fold the leads into execution_prompt under a heading that names them as
+    # unverified. The Notion property map is 1:1 from the LLM's keys, so an unmapped key
+    # would be silently dropped — and a lead the executor never sees is worse than no
+    # lead at all. Appending keeps it visible without a schema change, and the heading is
+    # what makes it non-binding: the executor reads it as questions, not instructions.
+    leads = str(task.get("leads_unverified") or "").strip()
+    if leads:
+        task["execution_prompt"] = (
+            f"{task.get('execution_prompt', '')}\n\n"
+            f"## Leads — UNVERIFIED, verify before implementing\n"
+            f"Not requirements, and not a diagnosis. These were inferred from browser "
+            f"telemetry by a step that could not read the code. Confirm or disprove each "
+            f"against the repo before acting on it; if one is false, say so and rescope.\n"
+            f"{leads}"
+        ).strip()
 
     # Belt-and-suspenders: if the user's text is question-like (ends with '?' or
     # matches uncertainty patterns) but the LLM chose an implementation task type,
