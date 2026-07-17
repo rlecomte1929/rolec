@@ -97,8 +97,13 @@ export function AddProspectModal({ open, onClose, onSave }: AddProspectModalProp
     onClose();
   };
 
+  // BUG-260717-3D77: the panel carried no padding, so the title and inputs ran flush to the
+  // rounded edge and read as cropped; max-w-lg also squeezed the 2-column grid, and with no
+  // max-height a tall form clipped top/bottom on a short viewport (reported at 1512x827).
+  // Padding is per-caller here by convention (cf. NewFeedbackModal's `p-5`) — the shared
+  // Modal base styles are deliberately untouched.
   return (
-    <Modal open={open} onClose={handleClose} title="Add prospect" className="w-full max-w-lg">
+    <Modal open={open} onClose={handleClose} title="Add prospect" className="w-full max-w-2xl p-6 max-h-[85vh] overflow-y-auto">
       <form onSubmit={handleSubmit} className="space-y-4 mt-2">
         {error && <Alert variant="error">{error}</Alert>}
 

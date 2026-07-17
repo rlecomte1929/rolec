@@ -9,6 +9,7 @@ import { ProspectDrawer } from '../../components/outreach/ProspectDrawer';
 import { TemplateManager } from '../../components/outreach/TemplateManager';
 import { personaliseMessage, pickBestTemplate } from '../../utils/messagePersonaliser';
 import type { LinkedInProspect, ProspectInsert, ProspectStatus } from '../../types/outreach';
+import { AdminLayout } from './AdminLayout';
 
 export function OutreachPage(): React.ReactElement {
   const { prospects, loading, error, createProspect, updateProspect, updateStatus } = useProspects();
@@ -63,14 +64,16 @@ export function OutreachPage(): React.ReactElement {
       : prospects.filter((p) => p.status !== 'archived' && p.status !== 'not_interested');
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Send className="w-5 h-5 text-navy-600" />
-          <h1 className="text-xl font-semibold text-navy-900">LinkedIn Outreach</h1>
-          <span className="text-sm text-gray-400">{prospects.length} total</span>
-        </div>
+    // BUG-260717-3D77: this page rendered standalone — the only admin surface with no
+    // sidebar and no breadcrumb, so there was no way to tell where you were or navigate
+    // out. AdminLayout supplies both (sidebar + "ReloPass admin / Outreach"), plus the
+    // page container and PageHeader, so the local p-6/max-w-6xl wrapper and the duplicate
+    // <h1> are dropped and the actions move to the layout's headerRight slot. Same shape
+    // as AdminTestDrive.tsx.
+    <AdminLayout
+      title="Outreach"
+      subtitle={`LinkedIn Outreach CRM — prospects, drafts and follow-ups. ${prospects.length} total.`}
+      headerRight={
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowTemplates(true)}
@@ -86,7 +89,8 @@ export function OutreachPage(): React.ReactElement {
             + Add prospect
           </button>
         </div>
-      </div>
+      }
+    >
 
       {/* Follow-up banner */}
       {followUpQueue.length > 0 && (
@@ -189,7 +193,7 @@ export function OutreachPage(): React.ReactElement {
         onUpdateProspect={updateProspect}
         onUpdateStatus={(id, status, extra) => updateStatus(id, status, extra)}
       />
-    </div>
+    </AdminLayout>
   );
 }
 
