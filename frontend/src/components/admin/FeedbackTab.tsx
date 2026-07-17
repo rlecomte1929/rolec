@@ -352,6 +352,13 @@ export function FeedbackTab() {
     finally { setSavingContextId(null); }
   }, []);
 
+  /** Prefill the dispatch context with the feedback's own text and persist it (same path as on-blur). */
+  const copyIssueToContext = useCallback((row: UnifiedFeedbackItem) => {
+    const value = row.text ?? '';
+    setContextDrafts((p) => ({ ...p, [row.id]: value }));
+    void saveContext(row, value);
+  }, [saveContext]);
+
   /** Generate the engineered task for review (no side effects). */
   const openPreview = useCallback(async (row: UnifiedFeedbackItem) => {
     setDispatchErrors((prev) => ({ ...prev, [row.id]: '' }));
@@ -1013,9 +1020,20 @@ export function FeedbackTab() {
                         ) : (
                           <div className="space-y-2">
                             <p className="text-[10.5px] font-semibold text-gray-500">Dispatch to AI Work Queue</p>
-                            <span className="block text-[10.5px] text-gray-400">
-                              Context (required — repro steps, expected behaviour, constraints)
-                            </span>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10.5px] text-gray-400">
+                                Context (required — repro steps, expected behaviour, constraints)
+                              </span>
+                              <Button
+                                unstyled
+                                disabled={!row.text}
+                                onClick={() => copyIssueToContext(row)}
+                                title="Prefill the context with this feedback's own text"
+                                className="shrink-0 text-[10.5px] font-medium px-2 py-0.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                              >
+                                Copy issue to context
+                              </Button>
+                            </div>
                             <textarea
                               value={ctxValue(row)}
                               onChange={(e) => setContextDrafts((p) => ({ ...p, [row.id]: e.target.value }))}
