@@ -1241,6 +1241,22 @@ export interface RecommendationGroup {
   thisWeekend: PublicEvent[];
 }
 
+/**
+ * AIQ-1581: LLM-generated "things to do" suggestion for a destination city.
+ * Non-personal, generated on the fly — not persisted, not a live web search.
+ */
+export interface CityActivity {
+  title: string;
+  description: string;
+  category?: string;
+}
+
+export interface CityActivitiesResponse {
+  city: string;
+  country: string;
+  activities: CityActivity[];
+}
+
 export interface ResourcesPagePayload {
   context: ResourceContext;
   categories: ResourceCategory[];

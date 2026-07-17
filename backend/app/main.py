@@ -23,6 +23,7 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    resources_activities,
     auth_page_config,
     assistant_router,
     policy_helpfulness,
@@ -217,6 +218,8 @@ def create_app() -> FastAPI:
     app.include_router(benefit_optimizer.router)
     # [Parker-E] RLHF-lite human-feedback capture
     app.include_router(ai_feedback.router)
+    # [AIQ-1581] city-level activity suggestions for the Resources page
+    app.include_router(resources_activities.router)
     # [WS-E] end-user "was this answer helpful?" capture for policy answers
     app.include_router(policy_helpfulness.router)
     app.include_router(admin_ocr_shadow.router)

@@ -4075,6 +4075,22 @@ export const resourcesAPI = {
     return response.data;
   },
 
+  /**
+   * AIQ-1581: LLM-generated "things to do" suggestions for a destination city.
+   * City + country are non-personal. The backend is fail-soft (empty list on
+   * generation failure), so this never throws for a missing feed.
+   */
+  getCityActivities: async (
+    city: string,
+    country: string
+  ): Promise<import('../types').CityActivity[]> => {
+    const response = await api.get<import('../types').CityActivitiesResponse>(
+      '/api/resources/city-activities',
+      { params: { city, country } }
+    );
+    return Array.isArray(response.data?.activities) ? response.data.activities : [];
+  },
+
   getResources: async (
     assignmentOrCaseId: string,
     filters?: Record<string, string | number | boolean | null>,
