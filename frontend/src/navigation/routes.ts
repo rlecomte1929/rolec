@@ -21,6 +21,8 @@ export const ROUTE_DEFS = {
   login: { path: '/login', roles: ['PUBLIC'] as RouteRole[] },
   employeeJourney: { path: '/employee/journey', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeDashboard: { path: '/employee/dashboard', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** First-login orientation, shown once per user (welcomeSeen). */
+  employeeWelcome: { path: '/employee/welcome', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeQuoteRequest: { path: '/employee/quote-request', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Employee document vault — categorised uploads with expiry & deadline tracking. */
   employeeDocuments: { path: '/employee/documents', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
@@ -47,6 +49,8 @@ export const ROUTE_DEFS = {
   // [P2-3] Form Editor — per-form field editing
   employeeCaseFormEditor: { path: '/employee/case/:caseId/forms/:formId/edit', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** First-login orientation, shown once per user (welcomeSeen). */
+  hrWelcome: { path: '/hr/welcome', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAnalytics: { path: '/hr/analytics', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenter: { path: '/hr/command-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrRisk: { path: '/hr/risk', roles: ['HR', 'ADMIN'] as RouteRole[] },
