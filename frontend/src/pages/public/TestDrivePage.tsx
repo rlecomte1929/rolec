@@ -5,6 +5,8 @@ import { PublicLayout } from '../../components/public';
 import { Section, HeroSurface, SectionHeader, CTAButton, FadeIn } from '../../components/marketing';
 import { Card, Alert, Button, Input } from '../../components/antigravity';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import { authAPI } from '../../api/client';
+import { getAuthItem } from '../../utils/demo';
 import {
   provisionTestDrive,
   recordTestDriveEvent,
@@ -442,6 +444,84 @@ export const TestDrivePage: React.FC = () => {
   );
 };
 
+/**
+ * AIQ-1569 (TD-BUG-2): the "Sign in" affordance beside the test credentials.
+ *
+ * The page assumed a logged-out visitor. It never was for the people who matter most —
+ * Romain demoing this to an investor, or any tester who already has a ReloPass account.
+ * They clicked "Sign in →", the browser carried their existing session to /auth, and they
+ * landed in their OWN account (an admin dashboard, in the reported walkthrough) rather
+ * than the test HR login. The only way through was to know to sign out first.
+ *
+ * So: read the session at render. Logged out — nothing changes, same link as before.
+ * Logged in — name the account they're in and offer one click to leave it. This is a UX
+ * guard only; it grants nothing and blocks nothing a user couldn't already do.
+ */
+const SignInAction: React.FC = () => {
+  // Read once at mount: this block renders after provisioning, and a session cannot
+  // change underneath it without a navigation.
+  //
+  // Guarded because this is a PUBLIC page: storage access throws outright in some
+  // private-browsing modes, and getAuthItem does a bare localStorage.getItem. An
+  // unguarded read here would crash the whole credentials block — taking the tester's
+  // logins down with it — over an optional convenience. Same reason the prior-session
+  // read above is wrapped. Fail closed to "logged out": that renders the plain link,
+  // which is exactly the pre-AIQ-1569 behaviour.
+  const [signedInAs] = useState<string | null>(() => {
+    try {
+      if (!getAuthItem('relopass_token')) return null;
+      return getAuthItem('relopass_email') || getAuthItem('relopass_username') || 'another account';
+    } catch {
+      return null;
+    }
+  });
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signInClasses =
+    'inline-flex items-center justify-center rounded-lg bg-marketing-primary px-5 py-2.5 ' +
+    'text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted ' +
+    'focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 ' +
+    'disabled:cursor-not-allowed disabled:opacity-60';
+
+  if (!signedInAs) {
+    return (
+      <Link to={c.credentials.signInHref} className={signInClasses}>
+        {c.credentials.signInCta}
+      </Link>
+    );
+  }
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      // Canonical sign-out: server logout + supabase + clearAuthItems. Never raises.
+      await authAPI.logout();
+    } catch {
+      /* logout swallows its own errors; fall through to the login page regardless */
+    }
+    // Hard navigation, not react-router: every context in the tree still holds the old
+    // session, and the login page must mount clean. Mirrors AppShell's sign-out.
+    window.location.assign(c.credentials.signInHref);
+  };
+
+  return (
+    <div data-testid="td-signed-in-guard" className="mx-auto max-w-md">
+      <Alert variant="warning">
+        {c.credentials.signedInNotice.replace('{email}', signedInAs)}
+      </Alert>
+      <Button
+        onClick={handleSignOut}
+        disabled={signingOut}
+        className={`mt-3 ${signInClasses}`}
+        data-testid="td-sign-out"
+      >
+        {signingOut ? c.credentials.signedOutBusy : c.credentials.signedInCta}
+      </Button>
+    </div>
+  );
+};
+
 /** Dual-credential display shown after a successful provision. */
 const CredentialResult: React.FC<{
   result: ProvisionSuccess;
@@ -464,14 +544,10 @@ const CredentialResult: React.FC<{
           .replace('{destination}', corridor.destination)}
       </p>
     )}
-    {/* AIQ-1539: a direct route to the login page, right beside the credentials. */}
+    {/* AIQ-1539: a direct route to the login page, right beside the credentials.
+        AIQ-1569 (TD-BUG-2): but only when the visitor is actually logged out. */}
     <div className="mt-5 text-center">
-      <Link
-        to={c.credentials.signInHref}
-        className="inline-flex items-center justify-center rounded-lg bg-marketing-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marketing-primary-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2"
-      >
-        {c.credentials.signInCta}
-      </Link>
+      <SignInAction />
     </div>
     <div className="mt-6 grid gap-6 md:grid-cols-2">
       <CredentialCard

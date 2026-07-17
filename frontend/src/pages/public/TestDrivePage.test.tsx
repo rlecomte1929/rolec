@@ -12,6 +12,9 @@ vi.mock('../../api/testDrive', () => ({
 // The marketing barrel transitively imports api/supabase, whose createClient throws
 // in jsdom when VITE_SUPABASE_* are unset — neutralise it (known vitest trap).
 vi.mock('../../api/supabase', () => ({ supabase: { functions: { invoke: vi.fn() } } }));
+// AIQ-1569: the signed-in guard calls the canonical sign-out.
+const mockLogout = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../api/client', () => ({ authAPI: { logout: () => mockLogout() } }));
 // Passthrough layout — avoids pulling PublicHeader/Footer providers into the unit test.
 vi.mock('../../components/public', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -22,7 +25,7 @@ import { TestDrivePage } from './TestDrivePage';
 
 // jsdom has no matchMedia; the marketing FadeIn reads it on mount.
 if (!window.matchMedia) {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -31,7 +34,26 @@ if (!window.matchMedia) {
     addEventListener: () => {},
     removeEventListener: () => {},
     dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
+  });
+}
+
+// AIQ-1569: this jsdom setup has NO window.localStorage — a bare getItem throws, which is
+// how the signed-in guard first crashed the whole credentials block here. Shim a
+// Map-backed one (same spirit as the matchMedia shim above) so the session can be staged.
+// The product code guards its own reads regardless: private-browsing modes throw for real.
+if (!window.localStorage) {
+  const store = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => void store.set(k, String(v)),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+      key: (i: number) => [...store.keys()][i] ?? null,
+      get length() { return store.size; },
+    },
+  });
 }
 
 const mockProvision = provisionTestDrive as unknown as ReturnType<typeof vi.fn>;
@@ -54,6 +76,7 @@ function renderAt(search: string) {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.clearAllMocks();
 });
 
@@ -279,5 +302,59 @@ describe('TestDrivePage', () => {
 
     expect(await screen.findByText(/invite link is invalid/i)).toBeInTheDocument();
     expect(screen.queryByText(/Your two test logins/i)).not.toBeInTheDocument();
+  });
+
+  // ── AIQ-1569 (TD-BUG-2) ──────────────────────────────────────────────────────
+  // The page assumed a logged-out visitor. Anyone with a live ReloPass session —
+  // Romain demoing to an investor, or a tester who already has an account — clicked
+  // "Sign in →" and landed in their OWN account, not the test HR login.
+
+  it('logged out: the Sign in link is unchanged', async () => {
+    mockProvision.mockResolvedValue(OK_RESULT);
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Plain' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+    await screen.findByText('hr-qa@probe.test');
+    expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('td-signed-in-guard')).toBeNull();
+  });
+
+  it('already signed in: names the account and offers sign-out instead of a silent login', async () => {
+    window.localStorage.setItem('relopass_token', 'tok-123');
+    window.localStorage.setItem('relopass_email', 'admin@relopass.com');
+    mockProvision.mockResolvedValue(OK_RESULT);
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    expect(await screen.findByTestId('td-signed-in-guard')).toHaveTextContent('admin@relopass.com');
+    // The bare link is what dropped the user into their own account — it must be gone.
+    expect(screen.queryByRole('link', { name: /^Sign in/i })).toBeNull();
+  });
+
+  it('the sign-out button calls the canonical logout', async () => {
+    window.localStorage.setItem('relopass_token', 'tok-123');
+    window.localStorage.setItem('relopass_email', 'admin@relopass.com');
+    mockProvision.mockResolvedValue(OK_RESULT);
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Romain' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+
+    fireEvent.click(await screen.findByTestId('td-sign-out'));
+    await waitFor(() => expect(mockLogout).toHaveBeenCalled());
+  });
+
+  it('storage throwing (private mode) degrades to the plain link, never a crash', async () => {
+    const spy = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError: storage disabled');
+    });
+    mockProvision.mockResolvedValue(OK_RESULT);
+    renderAt('');
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Priv' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the test/i }));
+    // The credentials block must still render — the tester's logins are the whole point.
+    expect(await screen.findByText('hr-qa@probe.test')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    spy.mockRestore();
   });
 });
