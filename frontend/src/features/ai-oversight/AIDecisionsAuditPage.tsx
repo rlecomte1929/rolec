@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
+import { Card } from '../../components/antigravity/Card';
 import { AppShell } from '../../components/AppShell';
 import { Breadcrumb } from '../../components/Breadcrumb';
 import { listAIDecisions } from '../../api/aiDecisions';
@@ -22,6 +23,15 @@ const DECISION_BADGE: Record<AIDecisionAction, string> = {
   override: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   reject: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
 };
+
+// At-a-glance stat tiles. `key` maps to the `counts` object below; the dot colour
+// ties each tile back to its decision badge in the table (navy = the running total).
+const STAT_TILES = [
+  { key: 'total', label: 'Total decisions', dot: 'bg-navy-800', value: 'text-slate-900' },
+  { key: 'accept', label: 'Accepted', dot: 'bg-emerald-500', value: 'text-emerald-700' },
+  { key: 'override', label: 'Overridden', dot: 'bg-amber-500', value: 'text-amber-700' },
+  { key: 'reject', label: 'Rejected', dot: 'bg-rose-500', value: 'text-rose-700' },
+] as const;
 
 function formatTimestamp(iso: string): string {
   try {
@@ -178,9 +188,6 @@ export function AIDecisionsAuditPage() {
         <div className="flex items-end gap-3">
           <h1 className="text-xl font-semibold text-slate-900">AI decisions audit</h1>
           <div className="flex-1" />
-          <span className="text-xs text-slate-500">
-            {counts.total} decisions · {counts.accept} accepted · {counts.override} overridden · {counts.reject} rejected
-          </span>
           <Button unstyled
             type="button"
             onClick={handleExport}
@@ -190,14 +197,44 @@ export function AIDecisionsAuditPage() {
             Export AI decisions log (CSV)
           </Button>
         </div>
-        <p className="mt-1 text-sm text-slate-500 leading-relaxed">
-          ReloPass AI reviews each relocation case and recommends — it never decides alone. It suggests the{' '}
-          <strong className="font-medium text-slate-700">policy tier</strong> that applies to the employee, the{' '}
-          <strong className="font-medium text-slate-700">service providers</strong> best suited to the destination and case,
-          and the <strong className="font-medium text-slate-700">immigration pathway</strong> for the move. Every recommendation
-          lands here for your team to accept, override, or reject with a reason. This append-only log is your human-oversight
-          record, required by EU AI Act Art. 14(4)(c).
-        </p>
+        <details className="mt-2 group">
+          <summary className="inline-flex items-center gap-1.5 cursor-pointer list-none text-sm font-medium text-slate-600 hover:text-navy-800 [&::-webkit-details-marker]:hidden">
+            <span className="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
+            How this works
+          </summary>
+          <div className="mt-2 max-w-3xl space-y-2 text-sm text-slate-500 leading-relaxed">
+            <p>
+              ReloPass AI reviews each relocation case and suggests the{' '}
+              <strong className="font-medium text-slate-700">policy tier</strong> that applies to the employee, the{' '}
+              <strong className="font-medium text-slate-700">service providers</strong> best suited to the destination, and
+              the <strong className="font-medium text-slate-700">immigration pathway</strong> for the move. It only ever
+              recommends — a person on your team accepts, overrides, or rejects every suggestion before it takes effect.
+            </p>
+            <p>
+              This page is the record of those decisions. Each row is one AI recommendation and what your team decided about
+              it, with the reason they gave. Rows are only ever added — never edited or deleted — so the log stays a faithful
+              history. It is your human-oversight record under EU AI Act Art. 14(4)(c).
+            </p>
+          </div>
+        </details>
+      </div>
+
+      <div className="px-6 py-5 border-b border-slate-100">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {STAT_TILES.map((t) => (
+            <Card key={t.key} padding="sm">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${t.dot}`} aria-hidden="true" />
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{t.label}</span>
+              </div>
+              {loading ? (
+                <div className="mt-2 h-7 w-12 animate-pulse rounded bg-slate-100" />
+              ) : (
+                <p className={`mt-1 text-2xl font-semibold tabular-nums ${t.value}`}>{counts[t.key]}</p>
+              )}
+            </Card>
+          ))}
+        </div>
       </div>
 
       <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-center">
@@ -246,7 +283,11 @@ export function AIDecisionsAuditPage() {
 
       <div className="px-6 py-5">
         {loading && (
-          <p className="text-sm text-slate-500">Loading AI decisions…</p>
+          <div className="space-y-2" aria-busy="true" aria-label="Loading AI decisions">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-11 animate-pulse rounded bg-slate-100" />
+            ))}
+          </div>
         )}
         {error && !loading && (
           <p className="text-sm text-rose-600">{error}</p>
@@ -264,7 +305,7 @@ export function AIDecisionsAuditPage() {
                 <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
                   <th className="text-left py-2 pr-3 font-medium">When</th>
                   <th className="text-left py-2 pr-3 font-medium">Feature</th>
-                  <th className="text-left py-2 pr-3 font-medium">Recommendation</th>
+                  <th className="text-left py-2 pr-3 font-medium">Recommendation ID</th>
                   <th className="text-left py-2 pr-3 font-medium">Decision</th>
                   <th className="text-left py-2 pr-3 font-medium">Reason</th>
                 </tr>
