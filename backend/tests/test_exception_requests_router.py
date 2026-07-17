@@ -228,6 +228,65 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         self.assertEqual(rows[0]["action_type"], "insert")
         self.assertEqual(rows[0]["actor_id"], emp["id"])
 
+    def test_create_notifies_assigned_hr(self) -> None:
+        """[AIQ-1570] The guardrail's missing half: filing an over-cap request must
+        tell HR. Before this, the row was written and nobody was told."""
+        company = _company_id()
+        emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company)
+        case_id = str(uuid.uuid4())
+        hr_id = str(uuid.uuid4())
+        body = ExceptionRequestCreate(
+            category="housing",
+            exception_type="cap_override",
+            requested_amount=32000,
+            cap_amount=25000,
+            currency="nok",
+            reason="Family of 4, Oslo.",
+        )
+
+        with mock.patch.object(
+            router_module.db,
+            "get_assignment_by_case_id",
+            return_value={"id": "assign-1", "hr_user_id": hr_id},
+        ), mock.patch.object(
+            router_module.db, "create_notification_with_preferences"
+        ) as notify:
+            create_exception_request(case_id=case_id, body=body, user=emp)
+
+        notify.assert_called_once()
+        kwargs = notify.call_args.kwargs
+        self.assertEqual(kwargs["user_id"], hr_id)
+        self.assertEqual(kwargs["type_"], "POLICY_EXCEPTION_REQUESTED")
+        self.assertEqual(kwargs["case_id"], case_id)
+        # The amounts HR needs to triage must be in the body, not just metadata.
+        self.assertIn("32,000 NOK", kwargs["body"])
+        self.assertIn("25,000 NOK", kwargs["body"])
+        self.assertEqual(kwargs["metadata"]["exception_type"], "cap_override")
+
+    def test_create_succeeds_when_notification_raises(self) -> None:
+        """A broken bell must never cost the employee their request."""
+        company = _company_id()
+        emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company)
+        body = ExceptionRequestCreate(
+            category="housing",
+            exception_type="cap_override",
+            requested_amount=3500,
+            cap_amount=3000,
+            currency="eur",
+            reason="reason",
+        )
+
+        with mock.patch.object(
+            router_module.db,
+            "get_assignment_by_case_id",
+            side_effect=RuntimeError("db down"),
+        ):
+            result = create_exception_request(
+                case_id=str(uuid.uuid4()), body=body, user=emp
+            )
+
+        self.assertEqual(result["status"], "pending")
+
     def test_create_rejects_caller_with_no_company(self) -> None:
         emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company_id="")
         emp["company"] = None  # no company linked
@@ -509,6 +568,82 @@ class ExceptionSelectJoinGuardTests(unittest.TestCase):
         self.assertIn("LEFT JOIN relocation_cases rc2 ON rc2.id::text = pcr.case_id", sql)
         self.assertIn("COALESCE(mc.origin_country, wc.origin_country, rc2.home_country)", sql)
         self.assertIn("COALESCE(mc.destination_country, wc.dest_country, rc2.host_country)", sql)
+
+
+class HrNotificationHelperTests(unittest.TestCase):
+    """[AIQ-1570] `_notify_hr_of_exception_request` — the recipient-resolution and
+    skip paths, which decide whether the guardrail actually reaches a human."""
+
+    def _body(self) -> ExceptionRequestCreate:
+        return ExceptionRequestCreate(
+            category="housing",
+            exception_type="cap_override",
+            requested_amount=32000,
+            cap_amount=25000,
+            currency="NOK",
+            reason="reason",
+        )
+
+    def _notify(self) -> None:
+        router_module._notify_hr_of_exception_request(
+            request_id="req-1", case_id="case-1", body=self._body()
+        )
+
+    def test_no_hr_on_case_skips_quietly(self) -> None:
+        with mock.patch.object(
+            router_module.db, "get_assignment_by_case_id", return_value={}
+        ), mock.patch.object(
+            router_module.db, "create_notification_with_preferences"
+        ) as notify:
+            self._notify()
+        notify.assert_not_called()
+
+    def test_legacy_non_uuid_hr_is_skipped_not_faked(self) -> None:
+        """notifications.user_id is `uuid NOT NULL` while users.id is `text`. 27 of 239
+        prod assignments still carry a legacy hr_user_id (e.g. seed-hr-testingapril);
+        the INSERT would fail the uuid cast. Skip + warn — never pretend it was sent."""
+        with mock.patch.object(router_module, "_is_sqlite_engine", return_value=False), \
+             mock.patch.object(
+                 router_module.db,
+                 "get_assignment_by_case_id",
+                 return_value={"id": "a1", "hr_user_id": "seed-hr-testingapril"},
+             ), \
+             mock.patch.object(
+                 router_module.db, "create_notification_with_preferences"
+             ) as notify, \
+             self.assertLogs(router_module.logger, level="WARNING") as logs:
+            self._notify()
+
+        notify.assert_not_called()
+        self.assertIn("HR NOT NOTIFIED", "\n".join(logs.output))
+
+    def test_uuid_hr_is_notified_on_postgres_tier(self) -> None:
+        hr_id = str(uuid.uuid4())
+        with mock.patch.object(router_module, "_is_sqlite_engine", return_value=False), \
+             mock.patch.object(
+                 router_module.db,
+                 "get_assignment_by_case_id",
+                 return_value={"id": "a1", "hr_user_id": hr_id},
+             ), \
+             mock.patch.object(
+                 router_module.db, "create_notification_with_preferences"
+             ) as notify:
+            self._notify()
+
+        notify.assert_called_once()
+        self.assertEqual(notify.call_args.kwargs["user_id"], hr_id)
+
+    def test_notification_failure_is_swallowed(self) -> None:
+        with mock.patch.object(
+            router_module.db,
+            "get_assignment_by_case_id",
+            return_value={"id": "a1", "hr_user_id": str(uuid.uuid4())},
+        ), mock.patch.object(
+            router_module.db,
+            "create_notification_with_preferences",
+            side_effect=RuntimeError("uuid cast failed"),
+        ):
+            self._notify()  # must not raise
 
 
 if __name__ == "__main__":

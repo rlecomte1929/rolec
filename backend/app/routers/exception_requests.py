@@ -19,6 +19,7 @@ in local dev).
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
@@ -312,6 +313,111 @@ def _audit(
         logger.exception("audit_log write failed exception_requests id=%s", request_id)
 
 
+# [AIQ-1570] HR bell notification for a new over-cap request. Mirrored in
+# frontend/src/constants/notificationTypes.ts (no CHECK constraint on
+# notifications.type — the string is the contract).
+NOTIFICATION_TYPE_EXCEPTION_REQUESTED = "POLICY_EXCEPTION_REQUESTED"
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def _is_sqlite_engine() -> bool:
+    """
+    True when the bound engine is the SQLite dev/test tier, where notifications.user_id
+    is TEXT and any id inserts fine. On Postgres it is `uuid NOT NULL`.
+
+    Reads the dialect off the live engine rather than taking a module-level
+    DATABASE_URL snapshot (the `_IS_SQLITE` pattern used elsewhere in this package):
+    callers swap `db.engine` for an in-memory SQLite engine, which an import-time env
+    snapshot cannot see — it would report Postgres while the code talks to SQLite.
+    """
+    try:
+        return db.engine.dialect.name == "sqlite"
+    except Exception:
+        return False
+
+
+def _fmt_amount(amount: float, currency: str) -> str:
+    """'32000.0' + 'NOK' -> '32,000 NOK'. Whole numbers only — these are caps/estimates."""
+    return f"{amount:,.0f} {currency}"
+
+
+def _notify_hr_of_exception_request(
+    *,
+    request_id: str,
+    case_id: str,
+    body: "ExceptionRequestCreate",
+) -> None:
+    """
+    [AIQ-1570] Tell the assigned HR, in-app, that an employee filed an over-cap
+    exception. Before this, the row was written and nobody was told — HR found out
+    only by happening to open /hr/exceptions.
+
+    Best-effort by design: a notification failure must never fail the employee's
+    request (same contract as _audit above, and the same pattern as the
+    CASE_STATUS_CHANGED notify in routers/cases_write.py).
+
+    Recipient resolution: case_assignments via case_id. Verified against prod —
+    policy_cap_requests.case_id matches case_assignments.case_id, NOT .id.
+
+    Known limit, deliberately surfaced rather than hidden: notifications.user_id is
+    `uuid NOT NULL` while users.id is `text`. 27 of 239 assignments still carry a
+    legacy non-uuid hr_user_id (e.g. the seed-hr-* demo accounts) and CANNOT receive
+    an in-app notification — the INSERT would fail the uuid cast. We log those at
+    WARNING instead of pretending they were notified. Resolving such an id to its
+    Supabase auth uuid would not help: the bell reads by ReloPass users.id, so the
+    row would be written and unreadable.
+    """
+    try:
+        assignment = db.get_assignment_by_case_id(case_id) or {}
+        hr_user_id = assignment.get("hr_user_id")
+        if not hr_user_id:
+            logger.info(
+                "exception_requests: no HR on case, skipping notify case_id=%s id=%s",
+                case_id, request_id,
+            )
+            return
+
+        # Order matters: the regex is free and matches the overwhelming majority of
+        # ids, so a uuid recipient never touches db.engine at all.
+        if not _UUID_RE.match(str(hr_user_id)) and not _is_sqlite_engine():
+            # Not an error in our code — a data-migration debt. Greppable on purpose.
+            logger.warning(
+                "exception_requests: HR NOT NOTIFIED (legacy non-uuid hr_user_id) "
+                "hr_user_id=%s case_id=%s id=%s — notifications.user_id is uuid NOT NULL",
+                hr_user_id, case_id, request_id,
+            )
+            return
+
+        requested = _fmt_amount(body.requested_amount, body.currency.upper())
+        cap = _fmt_amount(body.cap_amount, body.currency.upper())
+        label = body.type_label or body.category
+        db.create_notification_with_preferences(
+            user_id=hr_user_id,
+            type_=NOTIFICATION_TYPE_EXCEPTION_REQUESTED,
+            title="Policy exception requested",
+            body=f"{label}: {requested} requested against a {cap} cap.",
+            assignment_id=str(assignment.get("id") or "") or None,
+            case_id=case_id,
+            metadata={
+                "event": "policy_exception_requested",
+                "request_id": request_id,
+                "category": body.category,
+                "exception_type": body.exception_type,
+                "requested_amount": body.requested_amount,
+                "cap_amount": body.cap_amount,
+                "currency": body.currency.upper(),
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "exception_requests: HR notification failed case_id=%s id=%s error=%s",
+            case_id, request_id, str(exc), exc_info=True,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -388,6 +494,9 @@ def create_exception_request(
             "status": "pending",
         },
     )
+    # [AIQ-1570] The guardrail's missing half: HR is now told, not left to discover
+    # the request by opening the inbox. Never raises — see the helper's docstring.
+    _notify_hr_of_exception_request(request_id=new_id, case_id=case_id, body=body)
     return _row_to_dict(row)
 
 
