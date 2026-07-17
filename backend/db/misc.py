@@ -1654,7 +1654,10 @@ class MiscMixin:
                     status TEXT NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending','approved','rejected','countered')),
                     hr_note TEXT,
-                    counter_amount REAL,
+                    -- AIQ-1587: match prod (which has exception_type, not counter_amount).
+                    -- The employee flow + the compliance writer both set exception_type; the
+                    -- old mirror lacked it, so a SQLite-seeded INSERT referencing it broke.
+                    exception_type TEXT,
                     requested_by_user_id TEXT NOT NULL,
                     resolved_by_user_id TEXT,
                     created_at TEXT NOT NULL,

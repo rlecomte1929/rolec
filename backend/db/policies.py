@@ -2270,32 +2270,50 @@ class PoliciesMixin:
         except Exception as ex:
             log.warning("compensation_allowance policy_config ensure failed (run Supabase migration): %s", ex)
 
-    def list_policy_exceptions(self, assignment_id: str) -> List[Dict[str, Any]]:
+    def list_policy_exceptions(self, case_id: str) -> List[Dict[str, Any]]:
+        # AIQ-1587: the HR compliance page's exception store is `policy_cap_requests`
+        # (the live employee→HR over-cap flow). The legacy `policy_exceptions` table was
+        # replaced by the platform_redesign migration and holds 0 rows, so its old shape
+        # (assignment_id/category/reason) raised undefined_column against prod. Key on
+        # case_id — the same key the employee exception-requests flow uses.
         with self.engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT * FROM policy_exceptions WHERE assignment_id = :aid ORDER BY created_at DESC"
-            ), {"aid": assignment_id}).fetchall()
+                "SELECT * FROM policy_cap_requests WHERE case_id = :cid ORDER BY created_at DESC"
+            ), {"cid": case_id}).fetchall()
         return self._rows_to_list(rows)
 
     def create_policy_exception(
         self,
         exception_id: str,
-        assignment_id: str,
+        case_id: str,
         category: str,
-        status: str,
         reason: Optional[str],
         requested_amount: Optional[float],
         requested_by: str,
+        organization_id: str,
+        *,
+        currency: str = "EUR",
+        cap_amount: Optional[float] = None,
+        exception_type: str = "cap_override",
     ) -> None:
+        # AIQ-1587: write into `policy_cap_requests` (the unified exception store).
+        # It requires requested_amount/cap_amount/currency/reason NOT NULL and
+        # status IN ('pending','approved','rejected','countered') — supply safe defaults
+        # for the fields the HR request model doesn't carry (the compliance page never
+        # reads cap_amount/currency).
         now = datetime.utcnow().isoformat()
+        amt = requested_amount if requested_amount is not None else 0
+        cap = cap_amount if cap_amount is not None else amt
         with self.engine.begin() as conn:
             conn.execute(text(
-                "INSERT INTO policy_exceptions "
-                "(id, assignment_id, category, status, reason, requested_amount, requested_by, created_at, updated_at) "
-                "VALUES (:id, :aid, :cat, :status, :reason, :amount, :by, :ca, :ua)"
+                "INSERT INTO policy_cap_requests "
+                "(id, case_id, organization_id, category, exception_type, requested_amount, "
+                " cap_amount, currency, reason, status, requested_by_user_id, created_at, updated_at) "
+                "VALUES (:id, :cid, :org, :cat, :exc, :amt, :cap, :cur, :reason, 'pending', :by, :ca, :ua)"
             ), {
-                "id": exception_id, "aid": assignment_id, "cat": category,
-                "status": status, "reason": reason, "amount": requested_amount,
+                "id": exception_id, "cid": case_id, "org": organization_id, "cat": category,
+                "exc": exception_type, "amt": amt, "cap": cap,
+                "cur": (currency or "EUR").upper(), "reason": reason or "",
                 "by": requested_by, "ca": now, "ua": now,
             })
 
