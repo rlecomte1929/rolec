@@ -24,6 +24,7 @@ import { trackFirstCaseCreated } from '../perf/hrOnboardingInstrumentation';
 import { useVariant } from '../lib/feature-flags';
 import { registerSuperProperties } from '../analytics';
 import { InferredOnboardingPanel } from '../features/platform-v2/InferredOnboardingPanel';
+import { useWelcomeRedirect } from '../hooks/useWelcomeRedirect';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -49,6 +50,8 @@ function CasesEmptyState({ onCreateCase }: { onCreateCase: () => void }) {
 }
 
 export const HrDashboard: React.FC = () => {
+  // First-login: send brand-new HR users to their welcome page once.
+  useWelcomeRedirect('/hr/welcome');
   const { setSelectedCaseId } = useSelectedCase();
   // AIQ-1223e: A/B arm for inference-based onboarding. 'inferred' shows the
   // suggested-setup surface; anything else (control / error / disabled) keeps

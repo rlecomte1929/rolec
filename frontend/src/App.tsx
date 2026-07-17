@@ -50,7 +50,9 @@ const TestDriveSurveyPage = lazy(() => import('./pages/public/TestDriveSurveyPag
 const Journey = lazy(() => import('./pages/Journey').then((module) => ({ default: module.Journey })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const EmployeeJourney = lazy(() => import('./pages/EmployeeJourney').then((module) => ({ default: module.EmployeeJourney })));
+const EmployeeWelcomePage = lazy(() => import('./pages/employee/EmployeeWelcomePage').then((module) => ({ default: module.EmployeeWelcomePage })));
 const HrDashboard = lazy(() => import('./pages/HrDashboard').then((module) => ({ default: module.HrDashboard })));
+const HrWelcomePage = lazy(() => import('./pages/hr/HrWelcomePage').then((module) => ({ default: module.HrWelcomePage })));
 const HrCaseSummary = lazy(() => import('./pages/HrCaseSummary').then((module) => ({ default: module.HrCaseSummary })));
 const HrCaseEstimatePage = lazy(() => import('./pages/hr/HrCaseEstimatePage').then((module) => ({ default: module.HrCaseEstimatePage })));
 const HrAssignmentReview = lazy(() => import('./pages/HrAssignmentReview').then((module) => ({ default: module.HrAssignmentReview })));
@@ -308,6 +310,7 @@ function App() {
             dashboard is the case hub where the case-scoped roadmap is reachable. */}
         <Route path="/employee/roadmap" element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeDashboard.path} element={<RequireEmployeeRoute><EmployeeJourney /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeWelcome.path} element={<RequireEmployeeRoute><EmployeeWelcomePage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<RequireEmployeeRoute><QuoteRequestPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeTaskPage.path} element={<RequireEmployeeRoute><EmployeeTaskPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeRichProfile.path} element={<RequireEmployeeRoute><EmployeeRichProfilePage /></RequireEmployeeRoute>} />
@@ -316,6 +319,7 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseIntake.path} element={<RequireEmployeeRoute><EmployeeIntakePage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<RequireHrRoute><HrDashboard /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrWelcome.path} element={<RequireHrRoute><HrWelcomePage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAnalytics.path} element={<RequireHrRoute><HrAnalytics /></RequireHrRoute>} />
         {/* /hr/command-center: gated by mobility_control flag. ON → new
             MobilityControlCenterV2Page (mock-aligned). OFF → legacy

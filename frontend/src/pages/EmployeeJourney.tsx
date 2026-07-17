@@ -10,6 +10,8 @@ import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeN
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
+import { hasSeenWelcome } from '../utils/welcomeSeen';
+import { useWelcomeRedirect } from '../hooks/useWelcomeRedirect';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
 import { formatDestinationLabel, formatCaseReference, caseNavId } from '../types/employeeAssignmentOverview';
@@ -137,6 +139,8 @@ function EmployeeAssignmentBootstrapCard({ title, detail }: { title: string; det
 }
 
 export const EmployeeJourney: React.FC = () => {
+  // First-login: send brand-new employees to their welcome page once.
+  useWelcomeRedirect('/employee/welcome');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const {
@@ -181,12 +185,16 @@ export const EmployeeJourney: React.FC = () => {
   useEffect(() => {
     setWelcomeDismissed(primaryRow?.assignment_id ? isWelcomeDismissed(primaryRow.assignment_id) : false);
   }, [primaryRow?.assignment_id]);
+  // Suppress the per-assignment welcome card once the user has seen the global
+  // first-login welcome page, so a new employee never gets two welcomes back-to-back.
+  const seenGlobalWelcome = hasSeenWelcome(getAuthItem('relopass_user_id') ?? '');
   const showWelcomeCard =
     !assignmentLoading &&
     !!primaryRow &&
     (primaryRow.status === 'assigned' || primaryRow.status === 'awaiting_intake') &&
     (primaryRow.intake_step ?? 0) === 0 &&
-    !welcomeDismissed;
+    !welcomeDismissed &&
+    !seenGlobalWelcome;
   const handleDismissWelcomeCard = () => {
     if (primaryRow?.assignment_id) dismissWelcomeCard(primaryRow.assignment_id);
     setWelcomeDismissed(true);
