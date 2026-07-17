@@ -11,6 +11,10 @@ export const NOTIFICATION_TYPES = {
   ASSIGNMENT_CREATED: 'ASSIGNMENT_CREATED',
   // [AIQ-1547] fired to the admin (in-app, no email) when a test-drive tester completes.
   TEST_DRIVE_COMPLETED: 'TEST_DRIVE_COMPLETED',
+  // [AIQ-1570] fired to the assigned HR when an employee files an over-cap exception
+  // request from the estimate page. Must match the backend string in
+  // backend/app/routers/exception_requests.py.
+  POLICY_EXCEPTION_REQUESTED: 'POLICY_EXCEPTION_REQUESTED',
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
@@ -38,6 +42,12 @@ export function getNotificationTarget(
   // [AIQ-1547] test-drive completion notifications deep-link to the campaign dashboard.
   if (notification.type === NOTIFICATION_TYPES.TEST_DRIVE_COMPLETED) {
     return '/admin/test-drive';
+  }
+
+  // [AIQ-1570] An over-cap request is actioned in the exceptions inbox — the default
+  // employee-dashboard target below has no approve/reject flow.
+  if (notification.type === NOTIFICATION_TYPES.POLICY_EXCEPTION_REQUESTED) {
+    return '/hr/exceptions';
   }
 
   const assignmentId = notification.assignment_id || notification.case_id;

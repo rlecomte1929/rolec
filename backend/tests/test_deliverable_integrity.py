@@ -51,6 +51,32 @@ class ExtractDeliverablePathsTests(unittest.TestCase):
         text = "- MODIFIED: `backend/main.py` — registered the router"
         self.assertEqual(cdi.extract_deliverable_paths(text), ["backend/main.py"])
 
+    def test_deleted_marker_is_not_a_claim(self):
+        # A retirement task's deliverable is the file's ABSENCE. Counting it as a
+        # claim reports "Done but NOT in the repo" for a task that did its job.
+        text = "- DELETED: `frontend/src/pages/admin/mission-control/WorkBoard.tsx`"
+        self.assertEqual(cdi.extract_deliverable_paths(text), [])
+
+    def test_deleted_bullet_inside_files_changed_section(self):
+        # The real AIQ-1565 shape that broke the guard repo-wide: DELETED bullets
+        # sit under the same "## Files changed" heading as their MODIFIED siblings,
+        # so the section rule alone would claim them. The MODIFIED path must still
+        # be claimed — this must not become a blanket escape hatch.
+        text = (
+            "## Files changed\n"
+            "- MODIFIED: frontend/src/pages/admin/AdminFeedback.tsx — removed the toggle\n"
+            "- DELETED: frontend/src/pages/admin/mission-control/WorkBoard.tsx\n"
+            "- DELETED: frontend/src/pages/admin/mission-control/WorkBoard.test.tsx\n"
+        )
+        self.assertEqual(
+            cdi.extract_deliverable_paths(text),
+            ["frontend/src/pages/admin/AdminFeedback.tsx"],
+        )
+
+    def test_removed_marker_is_not_a_claim(self):
+        text = "## Files changed\n- REMOVED: `backend/app/routers/legacy.py`"
+        self.assertEqual(cdi.extract_deliverable_paths(text), [])
+
     def test_multiple_paths_deduped_and_ordered(self):
         text = (
             "CREATED: `backend/a.py`\n"

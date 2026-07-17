@@ -75,6 +75,22 @@ _PATH_RE = re.compile(
 # as deliverable claims (the Execution-Notes "Files changed" convention).
 _CLAIM_MARKER_RE = re.compile(r"\b(CREATED|MODIFIED|ADDED|NEW FILE)\b", re.IGNORECASE)
 
+# A line declaring a file the task REMOVED. For a retirement task the deliverable
+# IS the file's absence, so such a path must never count as a claim. This wins over
+# the section rule below: a "DELETED: x" bullet lives under the same
+# "## Files changed" heading as its MODIFIED siblings, so without this the guard
+# fails exactly the tasks that did their job — a Done retirement is reported as
+# "claimed but NOT in the repo", which is the intended end state, not a leak.
+# (AIQ-1565 retired WorkBoard.tsx/.test.tsx and broke this check repo-wide.)
+#
+# Anchored to the line's leading bullet marker, NOT matched anywhere in the line:
+# a sibling "- MODIFIED: foo.tsx — removed the toggle" mentions "removed" in prose
+# and must stay a claim. An unanchored \b(DELETED|REMOVED)\b silently disables the
+# guard for any such line.
+_ANTI_CLAIM_MARKER_RE = re.compile(
+    r"^\s*[-*+]?\s*\**\s*(DELETED|REMOVED)\b\s*\**\s*:", re.IGNORECASE
+)
+
 # A markdown heading line, and the subset of headings that open a "claimed
 # deliverables" section. Cowork lists its outputs as numbered bullets under a
 # "What was built" / "Files created" heading WITHOUT a CREATED: marker (e.g.
@@ -102,6 +118,9 @@ def extract_deliverable_paths(note_text: str) -> List[str]:
       * under a "What was built" / "Files created" / "Deliverables" heading — the
         Cowork numbered-bullet convention (``1. outputs/foo.md — ...``) that carries
         no marker. A subsequent non-claim heading closes the section.
+    A line marked ``DELETED:``/``REMOVED:`` is never a claim, even inside a claim
+    section: the task's deliverable is that the file is GONE, so its absence is
+    success, not a missing deliverable.
     Paths mentioned anywhere else — reviewer-steps prose like "move X into
     `scripts/Y`", example commands, or "see also `path`" — are NOT claims and were
     the dominant false-positive source on the first live run (a file that landed at
@@ -114,6 +133,9 @@ def extract_deliverable_paths(note_text: str) -> List[str]:
     for line in (note_text or "").splitlines():
         if _HEADING_RE.match(line):
             in_claim_section = bool(_CLAIM_SECTION_RE.search(line))
+        # Checked before the claim rules: a removal is the opposite of a claim.
+        if _ANTI_CLAIM_MARKER_RE.search(line):
+            continue
         if not (in_claim_section or _CLAIM_MARKER_RE.search(line)):
             continue
         for m in _PATH_RE.finditer(line):
