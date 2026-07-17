@@ -1,21 +1,20 @@
 /**
- * Merged "Feedback & Work" tab — the Inbox | Work board toggle picks the sub-view and
- * ?view=work deep-links straight to the board (so the old /admin/mission-control
- * redirect lands correctly). FeedbackTab + WorkBoard are stubbed to keep their APIs
+ * "Feedback & Work" tab — the Inbox is now the only view.
+ *
+ * AIQ-1565 (BUG-260716-BB94) retired the Work board sub-view and its toggle. These tests
+ * pin the new contract: no tabs, Inbox always, and a stale `?view=work` bookmark still
+ * lands on the Inbox rather than a blank screen. FeedbackTab is stubbed to keep its API
  * and the supabase client out of jsdom.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 expect.extend(matchers);
 
 vi.mock('../../components/admin/FeedbackTab', () => ({
   FeedbackTab: () => <div data-testid="inbox-view">inbox</div>,
-}));
-vi.mock('./mission-control/WorkBoard', () => ({
-  WorkBoard: () => <div data-testid="work-view">work board</div>,
 }));
 vi.mock('./AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -34,23 +33,21 @@ function renderAt(path: string) {
 }
 
 describe('AdminFeedback (Feedback & Work)', () => {
-  it('defaults to the Inbox sub-view', () => {
+  it('renders the Inbox', () => {
     renderAt('/admin/feedback');
     expect(screen.getByTestId('inbox-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('work-view')).toBeNull();
   });
 
-  it('?view=work opens the Work board sub-view', () => {
+  it('shows no sub-view tabs — the Inbox is the only view', () => {
+    renderAt('/admin/feedback');
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByText(/work board/i)).toBeNull();
+  });
+
+  it('a stale ?view=work bookmark still lands on the Inbox, not a blank screen', () => {
     renderAt('/admin/feedback?view=work');
-    expect(screen.getByTestId('work-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('inbox-view')).toBeNull();
-  });
-
-  it('the toggle switches between sub-views', () => {
-    renderAt('/admin/feedback');
-    fireEvent.click(screen.getByRole('tab', { name: 'Work board' }));
-    expect(screen.getByTestId('work-view')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }));
     expect(screen.getByTestId('inbox-view')).toBeInTheDocument();
+    expect(screen.queryByText(/work board/i)).toBeNull();
   });
 });

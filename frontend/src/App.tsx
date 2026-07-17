@@ -439,9 +439,11 @@ function App() {
         <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPermissions.path} element={<RequireAdminRoute><AdminPermissionsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminExecutive.path} element={<RequireAdminRoute><ExecutiveDashboardPage /></RequireAdminRoute>} />
-        {/* Mission Control merged into the "Feedback & Work" tab (2026-07-06). Redirect
-            the old route to the work-board sub-view so existing links keep working. */}
-        <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><Navigate to={`${ROUTE_DEFS.adminFeedback.path}?view=work`} replace /></RequireAdminRoute>} />
+        {/* Mission Control merged into the "Feedback & Work" tab (2026-07-06), then the
+            work-board sub-view itself was retired (AIQ-1565) — the Inbox already carries
+            the same information and is where triage-to-Notion happens. The legacy route
+            still resolves, now landing on the Inbox rather than 404-ing a stale bookmark. */}
+        <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminFeedback.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiControls.path} element={<RequireAdminRoute><AdminAiControlsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />

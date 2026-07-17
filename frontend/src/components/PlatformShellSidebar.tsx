@@ -105,8 +105,9 @@ const SECTIONS: NavSection[] = [
       // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
       // link to the Queue tab of the same page was removed to end the false split).
       { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
-      // Feedback & Work surfaced in Overview (moved from Queues) so pilot feedback + the
-      // work board sit alongside the at-a-glance dashboards.
+      // Feedback & Work surfaced in Overview (moved from Queues) so pilot feedback sits
+      // alongside the at-a-glance dashboards. (AIQ-1565 retired the work-board sub-view;
+      // the tab is the Inbox only. Label kept — it's the established nav name.)
       { id: 'feedback-console', group: 'Overview', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
 
       // ── Customers (live accounts + sales pipeline) ──
