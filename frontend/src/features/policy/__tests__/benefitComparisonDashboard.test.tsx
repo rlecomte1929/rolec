@@ -5,6 +5,9 @@ import '@testing-library/jest-dom/vitest';
 // Sever the api/exceptions → supabase client chain (needs env we don't set in unit tests).
 vi.mock('../../../api/exceptions', () => ({
   createExceptionRequest: vi.fn(),
+  // The dashboard now reads existing requests from the server so a pending ask — and HR's
+  // decision — survive a remount. Default to none: these tests cover the table, not status.
+  listExceptionRequestsForCase: vi.fn(() => Promise.resolve([])),
 }));
 
 import { BenefitComparisonDashboard } from '../BenefitComparisonDashboard';

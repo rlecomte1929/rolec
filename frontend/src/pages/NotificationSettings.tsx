@@ -20,6 +20,7 @@ const TYPE_LABELS: Record<string, string> = {
   [NOTIFICATION_TYPES.CASE_STATUS_CHANGED]: 'Case status changed',
   [NOTIFICATION_TYPES.INTAKE_SUBMITTED]: 'Employee submitted their intake',
   [NOTIFICATION_TYPES.POLICY_EXCEPTION_REQUESTED]: 'Employee requested a policy exception',
+  [NOTIFICATION_TYPES.POLICY_EXCEPTION_DECIDED]: 'HR decided on your policy exception',
 };
 
 const SUPPORTED_TYPES = [
@@ -28,6 +29,7 @@ const SUPPORTED_TYPES = [
   NOTIFICATION_TYPES.EMPLOYEE_SAVED,
   NOTIFICATION_TYPES.HR_FEEDBACK_POSTED,
   NOTIFICATION_TYPES.POLICY_EXCEPTION_REQUESTED,
+  NOTIFICATION_TYPES.POLICY_EXCEPTION_DECIDED,
 ];
 
 export const NotificationSettings: React.FC = () => {

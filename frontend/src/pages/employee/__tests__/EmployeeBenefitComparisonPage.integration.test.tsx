@@ -59,6 +59,14 @@ vi.mock('../../../api/client', () => ({
   },
 }));
 
+// The dashboard now reads existing exception requests so a pending ask and HR's decision
+// survive a remount. api/exceptions imports apiGet/apiPost from api/client, which the mock
+// above deliberately does not provide — so stub the surface the dashboard actually uses.
+vi.mock('../../../api/exceptions', () => ({
+  createExceptionRequest: vi.fn(),
+  listExceptionRequestsForCase: vi.fn(() => Promise.resolve([])),
+}));
+
 function linkedCtx(): AssignmentCtx {
   return {
     assignmentId: 'a1',

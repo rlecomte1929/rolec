@@ -6,12 +6,13 @@
  * `employeeAPI.getPolicyServiceComparison`; this component is presentational
  * and never fabricates numbers (see benefitComparisonModel).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/antigravity/Button';
 import { Badge, Card } from '../../components/antigravity';
 import type { EffectiveServiceComparisonRow } from '../../types';
 import { RequestExceptionModal } from '../exceptions/RequestExceptionModal';
-import type { ExceptionRequest } from '../../api/exceptions';
+import { listExceptionRequestsForCase, type ExceptionRequest } from '../../api/exceptions';
+import { EXCEPTION_BADGE } from '../exceptions/exceptionBadge';
 import {
   buildKpis,
   formatMoney,
@@ -83,9 +84,52 @@ export const BenefitComparisonDashboard: React.FC<{
   const expired = isPolicyExpired(policy?.expiryDate, now ?? new Date());
 
   const [exceptionFor, setExceptionFor] = useState<ComparisonRow | null>(null);
-  const [requested, setRequested] = useState<Set<string>>(new Set());
   // AIQ-1477: page-level "ask for more" request, not tied to a specific over-cap row.
   const [generalOpen, setGeneralOpen] = useState(false);
+
+  // Existing requests on this case, keyed by service. This replaces a local Set of
+  // "requested" keys that died on unmount: an employee who filed an ask, navigated away and
+  // came back saw a fresh "Request exception" button and no trace of their pending request —
+  // and no trace of HR's decision either, since nothing rendered it. Server state is the only
+  // honest source, and it is also the fallback for the one legacy-id employee who cannot
+  // receive the POLICY_EXCEPTION_DECIDED notification.
+  const [exceptionsByService, setExceptionsByService] = useState<Map<string, ExceptionRequest>>(
+    new Map(),
+  );
+  const [exceptionsNonce, setExceptionsNonce] = useState(0);
+
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    listExceptionRequestsForCase(caseId)
+      .then((rows) => {
+        if (cancelled) return;
+        const next = new Map<string, ExceptionRequest>();
+        // Server returns newest-first; the most recent per service wins.
+        for (const row of rows) {
+          if (!next.has(row.category)) next.set(row.category, row);
+        }
+        setExceptionsByService(next);
+      })
+      .catch(() => {
+        // Non-fatal — the table still renders without exception status.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId, exceptionsNonce]);
+
+  // HR can decide while this tab sits open. Re-fetch when the employee comes back to it, so
+  // the decision appears without a reload — same pattern as the estimate page.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setExceptionsNonce((n) => n + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   if (!mapped.length) {
     return (
@@ -206,21 +250,35 @@ export const BenefitComparisonDashboard: React.FC<{
                           : formatMoney(row.delta, row.currency)}
                     </td>
                     <td className="px-4 py-3">
-                      {row.canRequestException ? (
-                        requested.has(row.serviceKey) ? (
-                          <span className="text-xs text-[#1f8e8b]">Request sent</span>
-                        ) : (
-                          <Button unstyled
-                            type="button"
-                            onClick={() => setExceptionFor(row)}
-                            className="rounded-md border border-[#0b2b43] px-3 py-1.5 text-xs font-medium text-[#0b2b43] transition-colors hover:bg-[#0b2b43] hover:text-white"
-                          >
-                            Request exception
-                          </Button>
-                        )
-                      ) : (
-                        <span className="text-xs text-[#cbd5e1]">—</span>
-                      )}
+                      {(() => {
+                        // An existing request pre-empts the CTA — and, once HR has decided,
+                        // this is where the employee finally learns the outcome. HR's note is
+                        // the tooltip: for a rejection the reason IS the answer.
+                        const existing = exceptionsByService.get(row.serviceKey);
+                        if (existing) {
+                          const badge = EXCEPTION_BADGE[existing.status];
+                          return (
+                            <span
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                              title={existing.hr_note || undefined}
+                            >
+                              {badge.label}
+                            </span>
+                          );
+                        }
+                        if (row.canRequestException) {
+                          return (
+                            <Button unstyled
+                              type="button"
+                              onClick={() => setExceptionFor(row)}
+                              className="rounded-md border border-[#0b2b43] px-3 py-1.5 text-xs font-medium text-[#0b2b43] transition-colors hover:bg-[#0b2b43] hover:text-white"
+                            >
+                              Request exception
+                            </Button>
+                          );
+                        }
+                        return <span className="text-xs text-[#cbd5e1]">—</span>;
+                      })()}
                     </td>
                   </tr>
                 );
@@ -290,8 +348,8 @@ export const BenefitComparisonDashboard: React.FC<{
           displayRequested={formatMoney(exceptionFor.ask, exceptionFor.currency)}
           displayCap={formatMoney(exceptionFor.policyCap, exceptionFor.currency)}
           onClose={() => setExceptionFor(null)}
-          onSuccess={(_req: ExceptionRequest) => {
-            setRequested((prev) => new Set(prev).add(exceptionFor.serviceKey));
+          onSuccess={(req: ExceptionRequest) => {
+            setExceptionsByService((prev) => new Map(prev).set(exceptionFor.serviceKey, req));
             setExceptionFor(null);
           }}
         />
