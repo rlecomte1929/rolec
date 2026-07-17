@@ -34,4 +34,7 @@ def test_policy_chunk_wrapped_with_citation_preserved():
 
 def test_policy_system_prompt_has_injection_rule_and_bumped_version():
     assert "<untrusted_source>" in pol.SYSTEM_PROMPT
-    assert pol.SYSTEM_PROMPT_VERSION == "v2-2026-06-10"
+    # AIQ-1585: bumped when the language-mirroring rule was added.
+    assert pol.SYSTEM_PROMPT_VERSION == "v3-2026-07-17"
+    # Language-mirroring rule present; the exact-match English refusal is carved out.
+    assert "LANGUAGE" in pol.SYSTEM_PROMPT
