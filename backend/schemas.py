@@ -474,6 +474,11 @@ class AssignCaseRequest(BaseModel):
 class AssignCaseResponse(BaseModel):
     assignmentId: str
     inviteToken: Optional[str] = None
+    # AIQ-1572: whether an invite email was actually queued. The HR UI used to state
+    # flatly that one "has been sent" off the mere presence of an assignmentId — true
+    # while every assignment emailed, false the moment test-drive assignments stopped.
+    # Defaults True (the pre-existing behaviour) so nothing else has to change.
+    inviteEmailSent: bool = True
 
 
 class UpdateAssignmentIdentifierRequest(BaseModel):

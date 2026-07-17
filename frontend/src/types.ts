@@ -807,6 +807,10 @@ export interface ComplianceCheck {
 export interface AssignCaseResponse {
   assignmentId: string;
   inviteToken?: string | null;
+  /** AIQ-1572: whether an invite email was queued. False for is_test (test-drive)
+   *  assignments, which no longer email. Optional + defaulted true at the call site so
+   *  an older payload keeps today's copy. */
+  inviteEmailSent?: boolean;
 }
 
 export interface EmployeeAssignmentResponse {
