@@ -3717,7 +3717,7 @@ class CasesMixin:
         try:
             with self.engine.connect() as conn:
                 sql = """
-                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                    SELECT id, case_id, employee_id, org_id, task_type, title, description,
                            due_date, status, required_file_upload, submission_data,
                            file_url, submitted_at, reviewed_at, reviewed_by, review_note,
                            created_at, updated_at
@@ -3885,13 +3885,18 @@ class CasesMixin:
             new_id = str(uuid.uuid4())
             now = datetime.utcnow().isoformat()
             with self.engine.begin() as conn:
+                # AIQ-1591: column is `task_type` (renamed from `type` in migration
+                # 20260513280000). The old INSERT into `type` raised `column "type" does not
+                # exist`, swallowed by the except → returned None → the endpoint 500'd for
+                # every task type. get_employee_task / list_employee_tasks_for_case_hr had the
+                # same stale name; all now use task_type (matching the EmployeeTask contract).
                 conn.execute(
                     text("""
                         INSERT INTO employee_tasks
-                            (id, case_id, employee_id, org_id, type, title, description,
+                            (id, case_id, employee_id, org_id, task_type, title, description,
                              due_date, status, required_file_upload, created_at, updated_at)
                         VALUES
-                            (:id, :cid, :eid, :oid, :type, :title, :desc,
+                            (:id, :cid, :eid, :oid, :task_type, :title, :desc,
                              :due, 'pending', :req_file, :now, :now)
                     """),
                     {
@@ -3899,7 +3904,7 @@ class CasesMixin:
                         "cid": case_id,
                         "eid": employee_id,
                         "oid": org_id,
-                        "type": task_type,
+                        "task_type": task_type,
                         "title": title,
                         "desc": description,
                         "due": due_date,
@@ -3934,7 +3939,7 @@ class CasesMixin:
         try:
             with self.engine.connect() as conn:
                 sql = """
-                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                    SELECT id, case_id, employee_id, org_id, task_type, title, description,
                            due_date, status, required_file_upload, submission_data,
                            file_url, submitted_at, reviewed_by, reviewed_at, review_note,
                            created_at, updated_at

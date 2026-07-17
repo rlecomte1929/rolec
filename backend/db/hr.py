@@ -643,7 +643,12 @@ class HrMixin:
             with self.engine.connect() as conn:
                 rows = conn.execute(text(
                     """
-                    SELECT t.id, t.case_id, t.employee_id, t.org_id, t.type, t.title,
+                    -- AIQ-1591: column was renamed `type` → `task_type` (migration
+                    -- 20260513280000). Alias back to `type` so the HrBacklogTask contract
+                    -- (frontend expects `type`) is unchanged; the pre-fix `t.type` raised
+                    -- `column "type" does not exist`, which forced the fallback below —
+                    -- and the fallback used `type` too, so the HR backlog was always empty.
+                    SELECT t.id, t.case_id, t.employee_id, t.org_id, t.task_type AS type, t.title,
                            t.description, t.due_date, t.status, t.required_file_upload,
                            t.submitted_at, t.reviewed_at, t.created_at, t.updated_at,
                            p.full_name AS employee_name, p.email AS employee_email
@@ -677,7 +682,7 @@ class HrMixin:
             with self.engine.connect() as conn:
                 rows = conn.execute(text(
                     """
-                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                    SELECT id, case_id, employee_id, org_id, task_type AS type, title, description,
                            due_date, status, required_file_upload, submitted_at,
                            reviewed_at, created_at, updated_at
                     FROM employee_tasks
