@@ -142,10 +142,31 @@ def test_upload_path_blocks_after_10_per_minute(fresh_buckets):
     assert res[10] is not None, "11th upload throttled"
 
 
-def test_admin_path_blocks_after_20_per_minute(fresh_buckets):
-    res = _drive("/api/admin/companies", 22)
-    assert all(x is None for x in res[:20]), "first 20 admin calls allowed"
-    assert res[20] is not None, "21st admin call throttled"
+def test_admin_path_blocks_after_60_per_minute(fresh_buckets):
+    # AIQ-1564: raised 20 -> 60. One bucket spans every /api/admin/* route, so the ceiling
+    # must cover a whole admin page-load (several calls) plus the sidebar notification
+    # poll. At 20 an admin browsing 6 pages in ~43s got 429s and the executive dashboard
+    # rendered every tile "unavailable".
+    res = _drive("/api/admin/companies", 62)
+    assert all(x is None for x in res[:60]), "first 60 admin calls allowed"
+    assert res[60] is not None, "61st admin call throttled"
+
+
+def test_admin_bucket_is_per_user_not_per_ip(fresh_buckets):
+    # AIQ-1564: the admin bucket used to key on IP, so two admins behind one office
+    # NAT/proxy throttled each other. Same rationale the AI bucket already applies.
+    for _ in range(60):
+        path_limit("/api/admin/companies", "9.9.9.9", "admin-a")
+    # 61st for admin A throttled...
+    assert path_limit("/api/admin/companies", "9.9.9.9", "admin-a") is not None
+    # ...a different admin on the SAME IP is unaffected.
+    assert path_limit("/api/admin/companies", "9.9.9.9", "admin-b") is None
+
+
+def test_admin_rate_limit_still_enforced(fresh_buckets):
+    """Guard: raising the ceiling must not become removing the limit (SEC-004)."""
+    res = _drive("/api/admin/companies", 200)
+    assert any(x is not None for x in res), "admin routes must still be rate-limited"
 
 
 def test_ai_path_blocks_after_20(fresh_buckets):
@@ -180,7 +201,7 @@ def test_named_constants_have_expected_values():
     assert AUTH_LIMIT == "5/minute"
     assert STANDARD_LIMIT == "100/minute"
     assert UPLOAD_LIMIT == "10/minute"
-    assert ADMIN_LIMIT == "20/minute"
+    assert ADMIN_LIMIT == "60/minute"  # AIQ-1564: raised from 20 — see rate_limits.py
     assert AI_LIMIT == "20/minute"
 
 
