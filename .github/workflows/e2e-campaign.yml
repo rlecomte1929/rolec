@@ -252,8 +252,17 @@ jobs:
 
       # Optional per-run auto-delete of the is_test data this run created (gated).
       # The report artifact preserves all evidence, so purging keeps the DB lean.
+      #
+      # AIQ-1593: this runs on every push to main. --min-age-hours protects is_test data
+      # younger than N hours so a LIVE test-drive tester (their @probe.test account + case)
+      # is never wiped mid-run by an unrelated merge. Default 24h; override with the
+      # E2E_PURGE_MIN_AGE_HOURS repo var. The manual full teardown (e2e-purge.yml) keeps
+      # the un-guarded purge (no --min-age-hours) for a complete wipe.
       - name: Auto-delete is_test data
         if: ${{ always() && vars.E2E_AUTODELETE_ENABLED == 'true' && env.DATABASE_URL != '' }}
+        env:
+          # repo var (admin-controlled), default 24h — passed via env, not inline in run:
+          MIN_AGE_HOURS: ${{ vars.E2E_PURGE_MIN_AGE_HOURS || '24' }}
         run: |
           pip install --quiet psycopg2-binary
-          python3 scripts/e2e_purge.py --apply
+          python3 scripts/e2e_purge.py --apply --min-age-hours "$MIN_AGE_HOURS"

@@ -19,9 +19,16 @@ SAFE BY DEFAULT: runs in --dry-run mode (counts only). Pass --apply to delete.
 Deletes children before parents (no FK CASCADE in this schema), inside one
 transaction, then verifies the is_test + test-domain user counts are 0.
 
+AGE GUARD (AIQ-1593): --min-age-hours N protects is_test rows younger than N hours, so
+the push-triggered E2E campaign (which runs this on every merge to main) never wipes a
+live test-drive tester's account/case mid-run. Default 0 = purge everything, for the
+manual full teardown (e2e-purge.yml). It only ANDs a restrictive condition, so a guarded
+run never deletes MORE than an unguarded one.
+
 Usage:
-    DATABASE_URL=postgres://... python3 scripts/e2e_purge.py            # dry-run
-    DATABASE_URL=postgres://... python3 scripts/e2e_purge.py --apply    # delete
+    DATABASE_URL=postgres://... python3 scripts/e2e_purge.py                      # dry-run, purge-all
+    DATABASE_URL=postgres://... python3 scripts/e2e_purge.py --apply              # delete everything
+    DATABASE_URL=postgres://... python3 scripts/e2e_purge.py --apply --min-age-hours 24  # keep <24h
 """
 import argparse
 import os
@@ -129,17 +136,40 @@ def referencing_fks(cur, referenced):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="actually delete (default: dry-run)")
+    ap.add_argument(
+        "--min-age-hours", type=int, default=0, metavar="N",
+        help="protect is_test data younger than N hours (in-flight test-drive testers). "
+             "0 (default) = purge everything, for the manual full teardown; the push-triggered "
+             "E2E campaign passes a positive value so a live tester is never wiped mid-run.",
+    )
     args = ap.parse_args()
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         sys.exit("DATABASE_URL not set")
 
+    # AIQ-1593: age guard. The E2E campaign runs this on every push to main; without a
+    # guard it deletes a live test-drive tester's account + case mid-run (a session was
+    # observed deleted ~7 min old). --min-age-hours>0 appends a restrictive
+    # `created_at < cutoff` to each base is_test selector so recently-created rows survive.
+    # It only ever ANDs a condition, so a guarded run can never delete MORE than an
+    # unguarded one. N is an int (argparse) → inlining the interval is injection-safe.
+    # Applied to companies/profiles/users/auth.users and both case tables (all have
+    # created_at, verified). The manual teardown (e2e-purge.yml) keeps the default 0.
+    # created_at is timestamptz on companies/profiles/users/auth.users but TEXT (ISO strings)
+    # on relocation_cases/cases — so cast to ::timestamptz (no-op on real timestamps, parses
+    # the ISO text). A NULL/unparseable created_at makes the comparison NULL → the row is
+    # EXCLUDED from the delete (protected) — the fail-safe direction.
+    AGE = ""
+    if args.min_age_hours and args.min_age_hours > 0:
+        AGE = f" AND created_at::timestamptz < now() - make_interval(hours => {int(args.min_age_hours)})"
+        print(f"age guard: protecting is_test rows newer than {args.min_age_hours}h")
+
     conn = psycopg2.connect(dsn)
     conn.autocommit = False
     cur = conn.cursor()
 
-    test_companies = scalar(cur, "SELECT count(*) FROM companies WHERE COALESCE(is_test,false)")
-    test_profiles = scalar(cur, "SELECT count(*) FROM profiles WHERE COALESCE(is_test,false)")
+    test_companies = scalar(cur, f"SELECT count(*) FROM companies WHERE COALESCE(is_test,false){AGE}")
+    test_profiles = scalar(cur, f"SELECT count(*) FROM profiles WHERE COALESCE(is_test,false){AGE}")
     # test cases = owned by a test company OR created/owned by a test profile
     # cast to ::text on both sides — relocation_cases.company_id is text while
     # companies.id is uuid (and the profile FKs vary), so a bare IN raises
@@ -147,22 +177,22 @@ def main():
     # There are TWO case tables — relocation_cases (hr_user_id) and public.cases
     # (hr_owner_id). Collect is_test-owned ids from BOTH (::text both sides).
     cur.execute(
-        """SELECT id::text FROM relocation_cases
-             WHERE company_id::text IN (SELECT id::text FROM companies WHERE COALESCE(is_test,false))
+        f"""SELECT id::text FROM relocation_cases
+             WHERE (company_id::text IN (SELECT id::text FROM companies WHERE COALESCE(is_test,false))
                 OR hr_user_id::text  IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))
-                OR employee_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))
+                OR employee_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))){AGE}
            UNION
            SELECT id::text FROM cases
-             WHERE company_id::text  IN (SELECT id::text FROM companies WHERE COALESCE(is_test,false))
+             WHERE (company_id::text  IN (SELECT id::text FROM companies WHERE COALESCE(is_test,false))
                 OR hr_owner_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))
-                OR employee_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))""")
+                OR employee_id::text IN (SELECT id::text FROM profiles  WHERE COALESCE(is_test,false))){AGE}""")
     case_ids = [r[0] for r in cur.fetchall()]
     # [AIQ-1383] testco COMPANIES are not is_test-flagged (only profiles/people are), so the
     # is_test-only companies delete below misses them → orphan accumulation. Capture them by their
     # @testco.com profile link NOW, before the profiles are deleted (companies are deleted last).
     cur.execute(
         f"SELECT DISTINCT company_id::text FROM profiles "
-        f"WHERE company_id IS NOT NULL AND {TEST_EMAIL_PREDICATE}")
+        f"WHERE company_id IS NOT NULL AND {TEST_EMAIL_PREDICATE}{AGE}")
     testco_company_ids = [r[0] for r in cur.fetchall()]
     print(f"is_test companies={test_companies}  profiles={test_profiles}  test cases (both tables)={len(case_ids)}"
           f"  testco companies (by email link)={len(testco_company_ids)}")
@@ -186,8 +216,8 @@ def main():
         # public.users + auth.users test accounts (matched by reserved domains, not
         # is_test — those tables have no such column). auth.users may read as n/a if
         # the role can't see the auth schema (the elevated one-time purge handles it).
-        users_test = scalar_guarded(cur, f"SELECT count(*) FROM public.users WHERE {TEST_EMAIL_PREDICATE}")
-        auth_test = scalar_guarded(cur, f"SELECT count(*) FROM auth.users WHERE {TEST_EMAIL_PREDICATE}")
+        users_test = scalar_guarded(cur, f"SELECT count(*) FROM public.users WHERE {TEST_EMAIL_PREDICATE}{AGE}")
+        auth_test = scalar_guarded(cur, f"SELECT count(*) FROM auth.users WHERE {TEST_EMAIL_PREDICATE}{AGE}")
         print(f"  public.users (test domains)  {users_test if users_test is not None else 'n/a'}")
         print(f"  auth.users (test domains)    {auth_test if auth_test is not None else 'n/a (no auth-schema perm)'}")
         conn.rollback()
@@ -205,9 +235,9 @@ def main():
     # and every table referencing the is_test profiles/companies (from the live FK
     # graph). Run them all in ONE fixed-point loop — guarded() tolerates an FK
     # violation, so an op simply retries on a later pass once its children are gone.
-    prof_q = "SELECT id::text FROM profiles WHERE COALESCE(is_test,false)"
-    comp_q = "SELECT id::text FROM companies WHERE COALESCE(is_test,false)"
-    users_q = f"SELECT id::text FROM users WHERE {TEST_EMAIL_PREDICATE}"
+    prof_q = f"SELECT id::text FROM profiles WHERE COALESCE(is_test,false){AGE}"
+    comp_q = f"SELECT id::text FROM companies WHERE COALESCE(is_test,false){AGE}"
+    users_q = f"SELECT id::text FROM users WHERE {TEST_EMAIL_PREDICATE}{AGE}"
     ops = []
     for table, col, src in CASE_CHILDREN:
         if src == "case":
@@ -237,11 +267,13 @@ def main():
             break
 
     # finally the profiles + companies themselves (best effort — tolerate residual FK).
-    bump("profiles", guarded(cur, "DELETE FROM profiles WHERE COALESCE(is_test,false)"))
+    bump("profiles", guarded(cur, f"DELETE FROM profiles WHERE COALESCE(is_test,false){AGE}"))
     # [AIQ-1383] is_test-flagged OR a testco company captured by email link above (empty ANY → no-op).
+    # AGE binds tighter than OR, so this is (is_test AND old) OR (testco id); testco_company_ids
+    # is itself already age-filtered above, so recent testers survive both branches.
     bump("companies", guarded(
         cur,
-        "DELETE FROM companies WHERE COALESCE(is_test,false) OR id::text = ANY(%s)",
+        f"DELETE FROM companies WHERE COALESCE(is_test,false){AGE} OR id::text = ANY(%s)",
         (testco_company_ids,),
     ))
 
@@ -250,13 +282,15 @@ def main():
     # auth.users also cascades auth.* (identities/sessions) + any test profile.
     # guarded(): a no-perm auth delete (app role) is a tolerated no-op — the
     # elevated one-time purge clears auth.users.
-    bump("users", guarded(cur, f"DELETE FROM public.users WHERE {TEST_EMAIL_PREDICATE}"))
-    bump("auth.users", guarded(cur, f"DELETE FROM auth.users WHERE {TEST_EMAIL_PREDICATE}"))
+    bump("users", guarded(cur, f"DELETE FROM public.users WHERE {TEST_EMAIL_PREDICATE}{AGE}"))
+    bump("auth.users", guarded(cur, f"DELETE FROM auth.users WHERE {TEST_EMAIL_PREDICATE}{AGE}"))
 
-    left_c = scalar(cur, "SELECT count(*) FROM companies WHERE COALESCE(is_test,false)")
-    left_p = scalar(cur, "SELECT count(*) FROM profiles WHERE COALESCE(is_test,false)")
-    left_u = scalar_guarded(cur, f"SELECT count(*) FROM public.users WHERE {TEST_EMAIL_PREDICATE}")
-    left_a = scalar_guarded(cur, f"SELECT count(*) FROM auth.users WHERE {TEST_EMAIL_PREDICATE}")
+    # Verify against the SAME scope we deleted (age-guarded), so "0 remaining" means
+    # "every row we intended to delete is gone" — recent protected rows are expected to stay.
+    left_c = scalar(cur, f"SELECT count(*) FROM companies WHERE COALESCE(is_test,false){AGE}")
+    left_p = scalar(cur, f"SELECT count(*) FROM profiles WHERE COALESCE(is_test,false){AGE}")
+    left_u = scalar_guarded(cur, f"SELECT count(*) FROM public.users WHERE {TEST_EMAIL_PREDICATE}{AGE}")
+    left_a = scalar_guarded(cur, f"SELECT count(*) FROM auth.users WHERE {TEST_EMAIL_PREDICATE}{AGE}")
     conn.commit()
     print("\n✔ purged is_test data:")
     for t, n in sorted(deleted.items(), key=lambda kv: -kv[1]):
