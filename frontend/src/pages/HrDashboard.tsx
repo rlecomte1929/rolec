@@ -50,8 +50,14 @@ function CasesEmptyState({ onCreateCase }: { onCreateCase: () => void }) {
 }
 
 export const HrDashboard: React.FC = () => {
-  // First-login: send brand-new HR users to their welcome page once.
-  useWelcomeRedirect('/hr/welcome');
+  // AIQ-1568 (TD-BUG-1): `?new=1` means the user pressed an explicit "create a case"
+  // CTA elsewhere (the command-center empty state) and is being routed here to the one
+  // real form. Read it before the welcome hook so a first-login redirect cannot swallow
+  // that intent: a fresh test-drive HR who clicks "Add your first relocation" must land
+  // on the form, not on the onboarding wizard. The welcome page still shows on a plain
+  // first login — it just no longer overrides a deliberate destination.
+  const wantsNewCase = new URLSearchParams(window.location.search).get('new') === '1';
+  useWelcomeRedirect('/hr/welcome', { skip: wantsNewCase });
   const { setSelectedCaseId } = useSelectedCase();
   // AIQ-1223e: A/B arm for inference-based onboarding. 'inferred' shows the
   // suggested-setup surface; anything else (control / error / disabled) keeps
@@ -201,6 +207,26 @@ export const HrDashboard: React.FC = () => {
     setEmployeeLevel('');
     setFormOpen(true);
   };
+
+  // AIQ-1568 (TD-BUG-1): honour the ?new=1 deep link from the command-center CTA, which
+  // used to navigate to the non-existent '/employees/new'. The form is local state, so a
+  // caller cannot route straight to it — this is the seam. Consume the param once so a
+  // refresh or a back-nav doesn't re-open the form behind the user.
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    openNewCaseForm();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('new');
+        return next;
+      },
+      { replace: true },
+    );
+    // Mount-only: the param is consumed immediately, so re-running on every
+    // searchParams change would fight the delete above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAssign = async () => {
     if (!employeeIdentifier.trim()) {
