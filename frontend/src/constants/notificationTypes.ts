@@ -15,6 +15,9 @@ export const NOTIFICATION_TYPES = {
   // request from the estimate page. Must match the backend string in
   // backend/app/routers/exception_requests.py.
   POLICY_EXCEPTION_REQUESTED: 'POLICY_EXCEPTION_REQUESTED',
+  // fired to the EMPLOYEE when HR approves/rejects their exception. The other half of the
+  // loop — before this, HR decided and nobody told the person who asked.
+  POLICY_EXCEPTION_DECIDED: 'POLICY_EXCEPTION_DECIDED',
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
@@ -48,6 +51,13 @@ export function getNotificationTarget(
   // employee-dashboard target below has no approve/reject flow.
   if (notification.type === NOTIFICATION_TYPES.POLICY_EXCEPTION_REQUESTED) {
     return '/hr/exceptions';
+  }
+
+  // The decision lands on the employee's Benefit comparison — the page they asked from, and
+  // the only one that shows the request's status. The case-summary default below shows
+  // nothing about exceptions.
+  if (notification.type === NOTIFICATION_TYPES.POLICY_EXCEPTION_DECIDED) {
+    return '/employee/benefits';
   }
 
   const assignmentId = notification.assignment_id || notification.case_id;

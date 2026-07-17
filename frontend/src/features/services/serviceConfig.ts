@@ -87,3 +87,33 @@ export const CATEGORY_LABELS: Record<string, string> = {
   insurances: 'Insurances',
   electricity: 'Electricity',
 };
+
+/**
+ * backendKey → canonical service key (e.g. 'living_areas' → 'housing').
+ *
+ * The recommendations/estimate surfaces speak `backendKey`, while the policy engine, the
+ * /budget-summary caps and the Benefit-comparison page all speak the canonical `key`. Two
+ * surfaces writing exception requests in two vocabularies would file 'living_areas' and
+ * 'housing' as separate asks for the same benefit, and the duplicate-request badge — which
+ * matches on category — would not see across them.
+ *
+ * Derived from SERVICE_CONFIG so it cannot drift from the one table that owns the mapping.
+ */
+const BACKEND_KEY_TO_CANONICAL: Record<string, string> = Object.fromEntries(
+  SERVICE_CONFIG.filter((s) => s.backendKey).map((s) => [s.backendKey as string, s.key]),
+);
+
+/** Canonical service key for a category that may be expressed as a backendKey.
+ *  Unknown/already-canonical values pass through unchanged. */
+export function canonicalServiceKey(category: string): string {
+  return BACKEND_KEY_TO_CANONICAL[category] ?? category;
+}
+
+/** The backendKey(s) a canonical key is known by — the inverse of canonicalServiceKey.
+ *  Used to alias a canonical-keyed cap onto the backendKey the estimate page looks up.
+ *  Returns [] when the canonical key has no distinct backendKey (they're the same string). */
+export function backendKeysForCanonical(canonicalKey: string): string[] {
+  return SERVICE_CONFIG.filter(
+    (s) => s.key === canonicalKey && s.backendKey && s.backendKey !== s.key,
+  ).map((s) => s.backendKey as string);
+}

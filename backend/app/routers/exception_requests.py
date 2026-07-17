@@ -317,6 +317,9 @@ def _audit(
 # frontend/src/constants/notificationTypes.ts (no CHECK constraint on
 # notifications.type — the string is the contract).
 NOTIFICATION_TYPE_EXCEPTION_REQUESTED = "POLICY_EXCEPTION_REQUESTED"
+# The other half of the loop: HR has decided, tell the employee who asked. Mirrored in
+# frontend/src/constants/notificationTypes.ts.
+NOTIFICATION_TYPE_EXCEPTION_DECIDED = "POLICY_EXCEPTION_DECIDED"
 
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -415,6 +418,84 @@ def _notify_hr_of_exception_request(
         logger.warning(
             "exception_requests: HR notification failed case_id=%s id=%s error=%s",
             case_id, request_id, str(exc), exc_info=True,
+        )
+
+
+def _notify_employee_of_decision(
+    *,
+    request_id: str,
+    existing: Dict[str, Any],
+    status: str,
+    hr_note: Optional[str],
+) -> None:
+    """
+    Close the loop: tell the employee what HR decided.
+
+    Until now this endpoint wrote an audit row and returned. Nothing told the employee —
+    not in-app, not by email. The only feedback anywhere was a pull-based badge on the
+    services-estimate page, i.e. the employee learned the outcome only by wandering back to
+    a page they had no reason to revisit. The modal's own copy promises "you'll see the
+    decision on this page"; this (plus the badge on the benefits page) is what makes that true.
+
+    HR's note is carried deliberately: for a rejection the reason IS the message. An
+    "approved"/"declined" with no explanation is what makes people email their HR manager,
+    which is the coordination cost this product exists to remove.
+
+    Amount is rendered in the row's OWN currency — never assume USD. Best-effort: a
+    notification must never fail HR's decision. Same uuid guard as the create side
+    (notifications.user_id is uuid NOT NULL, users.id is text); 244/245 employees are
+    uuid-castable, only the legacy seed-emp-* demo account cannot receive one.
+    """
+    try:
+        employee_id = existing.get("requested_by_user_id")
+        if not employee_id:
+            logger.info(
+                "exception_requests: no requester on row, skipping notify id=%s", request_id
+            )
+            return
+
+        if not _UUID_RE.match(str(employee_id)) and not _is_sqlite_engine():
+            logger.warning(
+                "exception_requests: EMPLOYEE NOT NOTIFIED (legacy non-uuid user id) "
+                "user_id=%s id=%s — notifications.user_id is uuid NOT NULL",
+                employee_id, request_id,
+            )
+            return
+
+        category = existing.get("category") or "Your request"
+        currency = (existing.get("currency") or "USD").upper()
+        try:
+            amount = _fmt_amount(float(existing.get("requested_amount") or 0), currency)
+        except (TypeError, ValueError):
+            amount = ""
+
+        approved = status == "approved"
+        verb = "approved" if approved else "declined"
+        detail = f"{category}"
+        if amount:
+            detail += f" — {amount}"
+        note = (hr_note or "").strip()
+        body_text = f"{detail}. {('HR noted: ' + note) if note else 'No note was left.'}"
+
+        db.create_notification_with_preferences(
+            user_id=str(employee_id),
+            type_=NOTIFICATION_TYPE_EXCEPTION_DECIDED,
+            title=f"Your policy exception was {verb}",
+            body=body_text,
+            case_id=existing.get("case_id"),
+            metadata={
+                "event": "policy_exception_decided",
+                "request_id": request_id,
+                "status": status,
+                "category": category,
+                "currency": currency,
+                "hr_note": note or None,
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "exception_requests: employee decision notification failed id=%s error=%s",
+            request_id, str(exc), exc_info=True,
         )
 
 
@@ -662,6 +743,13 @@ def resolve_exception_request(
             "hr_note": body.hr_note,
             "resolved_by_user_id": actor_id,
         },
+    )
+    # Close the loop back to the employee. Never raises — see the helper.
+    _notify_employee_of_decision(
+        request_id=request_id,
+        existing=dict(existing),
+        status=body.status,
+        hr_note=body.hr_note,
     )
     return _row_to_dict(row)
 

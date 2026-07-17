@@ -287,6 +287,100 @@ class ExceptionRequestRouterTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "pending")
 
+    def test_resolve_notifies_the_employee_in_their_own_currency(self) -> None:
+        """The other half of the loop: HR decided, so tell the person who asked — and quote
+        the amount in the currency they asked in, not a hardcoded USD."""
+        company = _company_id()
+        emp_id = str(uuid.uuid4())
+        emp = _make_user(emp_id, "EMPLOYEE", company)
+        hr = _make_user(str(uuid.uuid4()), "HR", company)
+        created = create_exception_request(
+            case_id=str(uuid.uuid4()),
+            body=ExceptionRequestCreate(
+                category="housing",
+                exception_type="cap_override",
+                requested_amount=32000,
+                cap_amount=25000,
+                currency="NOK",
+                reason="Central Oslo, family of 4.",
+            ),
+            user=emp,
+        )
+
+        with mock.patch.object(
+            router_module.db, "create_notification_with_preferences"
+        ) as notify:
+            resolve_exception_request(
+                request_id=created["id"],
+                body=ExceptionRequestPatch(status="approved", hr_note="Approved — tight market."),
+                user=hr,
+            )
+
+        notify.assert_called_once()
+        kwargs = notify.call_args.kwargs
+        self.assertEqual(kwargs["user_id"], emp_id)
+        self.assertEqual(kwargs["type_"], "POLICY_EXCEPTION_DECIDED")
+        self.assertIn("approved", kwargs["title"])
+        # NOK, not $ — the whole point of the currency fix.
+        self.assertIn("32,000 NOK", kwargs["body"])
+        # HR's note is the answer, especially on a rejection.
+        self.assertIn("Approved — tight market.", kwargs["body"])
+        self.assertEqual(kwargs["metadata"]["status"], "approved")
+
+    def test_resolve_notifies_on_rejection_with_the_reason(self) -> None:
+        company = _company_id()
+        emp_id = str(uuid.uuid4())
+        emp = _make_user(emp_id, "EMPLOYEE", company)
+        hr = _make_user(str(uuid.uuid4()), "HR", company)
+        created = create_exception_request(
+            case_id=str(uuid.uuid4()),
+            body=ExceptionRequestCreate(
+                category="housing", exception_type="cap_override",
+                requested_amount=32000, cap_amount=25000, currency="NOK", reason="r",
+            ),
+            user=emp,
+        )
+
+        with mock.patch.object(
+            router_module.db, "create_notification_with_preferences"
+        ) as notify:
+            resolve_exception_request(
+                request_id=created["id"],
+                body=ExceptionRequestPatch(status="rejected", hr_note="Outside policy this year."),
+                user=hr,
+            )
+
+        kwargs = notify.call_args.kwargs
+        self.assertIn("declined", kwargs["title"])
+        self.assertIn("Outside policy this year.", kwargs["body"])
+
+    def test_resolve_succeeds_when_employee_notification_raises(self) -> None:
+        """A broken bell must never cost HR their decision."""
+        company = _company_id()
+        emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company)
+        hr = _make_user(str(uuid.uuid4()), "HR", company)
+        created = create_exception_request(
+            case_id=str(uuid.uuid4()),
+            body=ExceptionRequestCreate(
+                category="housing", exception_type="cap_override",
+                requested_amount=1, cap_amount=0, currency="USD", reason="r",
+            ),
+            user=emp,
+        )
+
+        with mock.patch.object(
+            router_module.db,
+            "create_notification_with_preferences",
+            side_effect=RuntimeError("uuid cast failed"),
+        ):
+            resolved = resolve_exception_request(
+                request_id=created["id"],
+                body=ExceptionRequestPatch(status="approved"),
+                user=hr,
+            )
+
+        self.assertEqual(resolved["status"], "approved")
+
     def test_create_rejects_caller_with_no_company(self) -> None:
         emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company_id="")
         emp["company"] = None  # no company linked
@@ -632,6 +726,49 @@ class HrNotificationHelperTests(unittest.TestCase):
 
         notify.assert_called_once()
         self.assertEqual(notify.call_args.kwargs["user_id"], hr_id)
+
+    def test_legacy_non_uuid_employee_is_skipped_not_faked(self) -> None:
+        """Mirror of the HR guard, for the decision half. 244/245 prod employees are
+        uuid-castable; the legacy seed-emp-* account cannot receive an in-app notification
+        (notifications.user_id is uuid NOT NULL). Skip + warn — never pretend it was sent."""
+        row = {
+            "requested_by_user_id": "seed-emp-testingapril",
+            "category": "housing",
+            "currency": "NOK",
+            "requested_amount": 32000,
+            "case_id": "case-1",
+        }
+        with mock.patch.object(router_module, "_is_sqlite_engine", return_value=False), \
+             mock.patch.object(
+                 router_module.db, "create_notification_with_preferences"
+             ) as notify, \
+             self.assertLogs(router_module.logger, level="WARNING") as logs:
+            router_module._notify_employee_of_decision(
+                request_id="req-1", existing=row, status="approved", hr_note=None
+            )
+
+        notify.assert_not_called()
+        self.assertIn("EMPLOYEE NOT NOTIFIED", "\n".join(logs.output))
+
+    def test_decision_notification_without_hr_note_says_so(self) -> None:
+        """Silence is not an explanation — say plainly that no note was left rather than
+        sending a bare verdict."""
+        row = {
+            "requested_by_user_id": str(uuid.uuid4()),
+            "category": "housing",
+            "currency": "NOK",
+            "requested_amount": 32000,
+            "case_id": "case-1",
+        }
+        with mock.patch.object(router_module, "_is_sqlite_engine", return_value=False), \
+             mock.patch.object(
+                 router_module.db, "create_notification_with_preferences"
+             ) as notify:
+            router_module._notify_employee_of_decision(
+                request_id="req-1", existing=row, status="rejected", hr_note=None
+            )
+
+        self.assertIn("No note was left", notify.call_args.kwargs["body"])
 
     def test_notification_failure_is_swallowed(self) -> None:
         with mock.patch.object(
