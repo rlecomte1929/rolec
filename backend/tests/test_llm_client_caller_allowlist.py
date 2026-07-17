@@ -85,6 +85,9 @@ _ALLOWLIST = {
     "backend/app/services/feedback_task_engineer.py": (
         "MASKED", "mask_pii(bug text) + mask_pii(admin context) before claude_complete() — "
                   "engineers a Work Queue task from feedback; both free-text inputs masked."),
+    "backend/app/services/city_activities_service.py": (
+        "EXEMPT", "prompt = destination city + country only (non-personal); no user "
+                  "free-text; fail-soft returns [] (AIQ-1581)."),
 }
 
 
