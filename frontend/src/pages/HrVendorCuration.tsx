@@ -149,6 +149,28 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
   const masterCardRef = useRef<HTMLDivElement | null>(null);
   const [flashMaster, setFlashMaster] = useState(false);
 
+  // AIQ-1576: one-time "how this page works" banner, dismissed per browser.
+  const [instructionsDismissed, setInstructionsDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('relopass_sp_instructions_dismissed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const dismissInstructions = () => {
+    try {
+      localStorage.setItem('relopass_sp_instructions_dismissed', '1');
+    } catch {
+      // ignore — storage blocked; banner just reappears next load
+    }
+    setInstructionsDismissed(true);
+  };
+  const scrollToMasterCard = () => {
+    setFlashMaster(true);
+    masterCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => setFlashMaster(false), 1800);
+  };
+
   // "Request a new destination" modal state
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [newCity, setNewCity] = useState('');
@@ -216,10 +238,12 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         selectedDestinationKey
         && !list.find((d) => destinationKey(d) === selectedDestinationKey)
       ) {
+        // Current selection disappeared (e.g. destination removed) — fall back to first.
         setSelectedDestinationKey(first ? destinationKey(first) : '');
-      } else if (!selectedDestinationKey && first) {
-        setSelectedDestinationKey(destinationKey(first));
       }
+      // AIQ-1577: do NOT auto-select the first destination on mount. HR should start
+      // from an empty "Select a country / city" state and choose deliberately, rather
+      // than landing on a pre-filled destination that looks like a made choice.
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load destinations.';
       setError(msg);
@@ -591,6 +615,30 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
 
   const inner = (
     <>
+      {/* AIQ-1576: first-visit orientation for HR — what this page is for and how to use it. */}
+      {!instructionsDismissed && (
+        <Card padding="lg" className="mb-6 border border-accent-200 bg-accent-50">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-navy-800">
+                Choose the vendors your employees can use
+              </h2>
+              <p className="text-sm text-slate-600 mt-1 max-w-2xl">
+                Pick a destination and a service category, then review the vendor list below and
+                tick the ones you approve. Employees only ever see vendors you have approved here.
+                Use “Find vendors with AI” to add real, review-verified vendors for a destination.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button onClick={scrollToMasterCard}>Start reviewing</Button>
+              <Button variant="outline" onClick={dismissInstructions}>
+                Got it
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card padding="lg" className="mb-6 border border-[#fde68a] bg-[#fffbeb]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -712,14 +760,14 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               title={
                 !city || !country
                   ? 'Pick a destination first'
-                  : `Populate every service category for ${city}, ${country} with AI`
+                  : `Find real, review-verified vendors across every service category for ${city}, ${country}`
               }
             >
               {populating
                 ? (populateProgress
-                    ? `Populating ${populateProgress.label}… (${populateProgress.done + 1}/${populateProgress.total})`
+                    ? `Finding ${populateProgress.label} vendors… (${populateProgress.done + 1}/${populateProgress.total})`
                     : 'Asking the AI…')
-                : 'Populate all services with AI'}
+                : 'Find vendors with AI'}
             </Button>
             <Button onClick={() => void load()} disabled={loading} variant="outline">
               {loading ? 'Loading…' : 'Reload'}
@@ -898,8 +946,9 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               No master vendors yet for {category} in {city || 'this destination'}.{' '}
               {city && country ? (
                 <>
-                  Use <strong>Populate all services with AI</strong> at the top of the page to
-                  populate every category in one click, or add your own preferred vendors below.
+                  Use <strong>Find vendors with AI</strong> at the top of the page to add
+                  real vendors across every category in one click, or add your own preferred
+                  vendors below.
                 </>
               ) : (
                 <>Pick a destination at the top to begin, or add your own preferred vendors below.</>
