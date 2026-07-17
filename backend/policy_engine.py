@@ -54,7 +54,9 @@ class PolicyEngine:
         exceptions: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         spend = self.compute_spend(assignment_id, profile, policy)
-        pending_exceptions = [exc for exc in exceptions if exc.get("status") == "PENDING"]
+        # AIQ-1587: exceptions now come from policy_cap_requests, whose status is
+        # lowercase ('pending'); compare case-insensitively so pending requests still gate.
+        pending_exceptions = [exc for exc in exceptions if str(exc.get("status") or "").upper() == "PENDING"]
         over_limit = [item for item in spend.values() if item["status"] == "OVER_LIMIT"]
 
         gating = {
@@ -287,7 +289,7 @@ class PolicyEngine:
 
     def _policy_spend_check(self, category: str, item: Dict[str, Any], exceptions: List[Dict[str, Any]]) -> Dict[str, Any]:
         status = item["status"]
-        pending = any(exc for exc in exceptions if exc.get("category") == category and exc.get("status") == "PENDING")
+        pending = any(exc for exc in exceptions if exc.get("category") == category and str(exc.get("status") or "").upper() == "PENDING")
         if status == "OVER_LIMIT":
             return self._check(
                 f"{category}_cap",

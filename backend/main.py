@@ -14929,7 +14929,10 @@ def get_hr_policy(caseId: str = Query(...), user: Dict[str, Any] = Depends(requi
         profile = RelocationProfile(userId=caseId).model_dump()
 
     policy = policy_engine.load_policy()
-    exceptions = db.list_policy_exceptions(caseId)
+    # AIQ-1587: key exceptions on the canonical case_id (policy_cap_requests' key),
+    # consistent with the writer + the compliance reads so a POSTed exception is
+    # readable back for the same id the UI passes.
+    exceptions = db.list_policy_exceptions(assignment.get("case_id") or caseId)
     return policy_engine.build_policy_response(caseId, profile, policy, exceptions)
 
 
@@ -14949,14 +14952,19 @@ def create_policy_exception(
     if not request.category:
         raise HTTPException(status_code=400, detail="Category required")
     exception_id = str(uuid.uuid4())
+    # AIQ-1587: write into policy_cap_requests, keyed on the canonical case_id so both
+    # read endpoints find it. organization_id is the case's company (NOT NULL tenant).
+    organization_id = db.get_company_id_for_assignment_id(assignment.get("id"))
+    if not organization_id:
+        raise HTTPException(status_code=400, detail="No company is linked to this case.")
     db.create_policy_exception(
         exception_id,
-        case_id,
+        assignment.get("case_id") or case_id,
         request.category,
-        "PENDING",
         request.reason,
         request.amount,
         effective["id"],
+        organization_id,
     )
     return {"success": True, "exceptionId": exception_id}
 
@@ -14983,7 +14991,7 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
 
     def _build_report():
         policy = policy_engine.load_policy()
-        exceptions = db.list_policy_exceptions(assignment_id)
+        exceptions = db.list_policy_exceptions(assignment.get("case_id") or case_id)  # AIQ-1587
         spend = policy_engine.compute_spend(case_id, profile, policy)
         return policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
 
@@ -15012,7 +15020,7 @@ def run_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
         profile = RelocationProfile(userId=case_id).model_dump()
 
     policy = policy_engine.load_policy()
-    exceptions = db.list_policy_exceptions(case_id)
+    exceptions = db.list_policy_exceptions(assignment.get("case_id") or case_id)  # AIQ-1587
     spend = policy_engine.compute_spend(case_id, profile, policy)
     report = policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
     db.save_compliance_run(str(uuid.uuid4()), case_id, report)
