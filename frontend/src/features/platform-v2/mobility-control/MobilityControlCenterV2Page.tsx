@@ -650,7 +650,10 @@ export function MobilityControlCenterV2Page() {
               </select>
               <Button unstyled
                 type="button"
-                onClick={() => navigate('/employees/new')}
+                // AIQ-1568: same dead '/employees/new' path — the tester reported this
+                // button "also does nothing". It lands on the Cases page, where the case
+                // list and the New-case form both live.
+                onClick={() => navigate(buildRoute('hrDashboard'))}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
               >
                 Manage cases
@@ -736,7 +739,14 @@ export function MobilityControlCenterV2Page() {
                 heading="Ready to set up your first relocation?"
                 body="Add your first employee's move and ReloPass builds their roadmap, policy, and supplier options automatically — no blank spreadsheets to fill in."
                 actions={[
-                  { label: 'Add your first relocation', onClick: () => navigate('/employees/new') },
+                  // AIQ-1568 (TD-BUG-1): this pointed at '/employees/new', which is not a
+                  // route. React Router fell through to <Route path="*"> -> NotFoundRedirect
+                  // -> roleHomePath('HR') = /hr/dashboard -> useWelcomeRedirect -> /hr/welcome.
+                  // That is the exact loop the tester hit 3x: the most prominent CTA on the HR
+                  // side silently bounced to onboarding. Send them to the ONE real case form
+                  // (HrDashboard's openNewCaseForm) via ?new=1, and use buildRoute like the
+                  // sibling actions below — a typed key cannot rot into a dead path.
+                  { label: 'Add your first relocation', onClick: () => navigate(`${buildRoute('hrDashboard')}?new=1`) },
                   { label: 'Import your team roster', onClick: () => navigate(buildRoute('hrEmployees')) },
                   { label: 'Set up your relocation policy', onClick: () => navigate(buildRoute('hrPolicy')) },
                 ]}
