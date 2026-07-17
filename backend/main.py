@@ -150,6 +150,7 @@ from .app.routers import test_drive as test_drive_router  # [AIQ-1420] TD-2 — 
 from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parker-B] dual-layer registration (PR #207 §9)
 from .app.routers import admin_prompts as admin_prompts_router  # [Parker-D] dual-layer registration (PR #207 §9)
 from .app.routers import ai_feedback as ai_feedback_router  # [Parker-E] dual-layer registration (PR #207 §9)
+from .app.routers import resources_activities as resources_activities_router  # [AIQ-1581] dual-layer registration
 from .app.routers import policy_helpfulness as policy_helpfulness_router  # [WS-E] dual-layer registration
 from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
 from .app.routers import ocr as ocr_router  # [AIQ-1148] general document OCR endpoint
@@ -829,6 +830,7 @@ app.include_router(test_drive_router.router)  # [AIQ-1420] TD-2 test-drive provi
 app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
 app.include_router(admin_prompts_router.router, prefix="/api/admin")  # [Parker-D] PR #207 §9 — dual-layer registration
 app.include_router(ai_feedback_router.router)  # [Parker-E] PR #207 §9 — dual-layer registration
+app.include_router(resources_activities_router.router)  # [AIQ-1581] city activity suggestions — dual-layer registration
 app.include_router(policy_helpfulness_router.router)  # [WS-E] dual-layer registration — end-user helpfulness
 app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
 app.include_router(ocr_router.router)  # [AIQ-1148] /api/ocr/process — general document OCR

@@ -1,11 +1,13 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Button, Input } from '../../components/antigravity';
+import { resourcesAPI } from '../../api/client';
 import { getCountryName } from '../../utils/countries';
 import type {
   ResourcesPagePayload,
   PublicResource,
   PublicEvent,
   RecommendationGroup,
+  CityActivity,
 } from '../../types';
 
 export const SECTIONS = [
@@ -130,6 +132,12 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
   }, [filters]);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
+  // AIQ-1581: city-level "things to do" feed. Generated on the fly from the
+  // (non-personal) city + country via the LLM — replaces the old dead-end
+  // "city items are thin" banner. Fail-soft: empty on any error.
+  const [cityActivities, setCityActivities] = useState<CityActivity[]>([]);
+  const [cityActivitiesLoading, setCityActivitiesLoading] = useState(false);
+
   const context = payload?.context ?? null;
   // AIQ-1272: fall back to the resolved full country name when the API didn't
   // send countryName, so the hero never shows a bare ISO code.
@@ -137,6 +145,32 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
   const destination = context
     ? [context.cityName, destCountryName].filter(Boolean).join(', ') || destCountryName || 'Your destination'
     : null;
+
+  const cityName = context?.cityName ?? '';
+  const countryForActivities = destCountryName ?? '';
+  useEffect(() => {
+    // Only fetch when we have a city — this feed is city-level by design.
+    if (!cityName) {
+      setCityActivities([]);
+      return;
+    }
+    let cancelled = false;
+    setCityActivitiesLoading(true);
+    resourcesAPI
+      .getCityActivities(cityName, countryForActivities)
+      .then((list) => {
+        if (!cancelled) setCityActivities(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCityActivities([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCityActivitiesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cityName, countryForActivities]);
 
   const categoryKeyById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -519,22 +553,61 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
             </Card>
           )}
         </section>
-      </div>
 
-      {/* Country fallback notice */}
-      {context?.cityName &&
-        payload?.resources &&
-        payload.resources.length > 0 &&
-        !payload.resources.some(
-          (r) => (r.cityName || '').toLowerCase() === (context.cityName || '').toLowerCase()
-        ) && (
-          <Card padding="md" className="mt-6 border-[#fef3c7] bg-[#fffbeb]">
-            <p className="text-sm text-[#92400e]">City-specific items are thin; showing country-level resources.</p>
-          </Card>
+        {/* Things to do — AIQ-1581. City-level activity suggestions replace the
+            old "city items are thin" dead-end banner. Only rendered while
+            loading or when we actually have suggestions. */}
+        {cityName && (cityActivitiesLoading || cityActivities.length > 0) && (
+          <section aria-labelledby="things-to-do-heading">
+            <h2
+              id="things-to-do-heading"
+              className="text-lg font-semibold text-navy-800 mb-1 flex items-center gap-2"
+            >
+              <span aria-hidden>🧭</span>
+              Things to do in {cityName}
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Ideas to help you settle in and explore. AI-generated suggestions — verify details locally.
+            </p>
+            {cityActivitiesLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[0, 1, 2].map((i) => (
+                  <Card key={i} padding="md" className="animate-pulse">
+                    <div className="h-4 w-2/3 rounded bg-slate-200 mb-2" />
+                    <div className="h-3 w-full rounded bg-slate-100 mb-1" />
+                    <div className="h-3 w-4/5 rounded bg-slate-100" />
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {cityActivities.map((a, i) => (
+                  <CityActivityCard key={`${a.title}-${i}`} activity={a} />
+                ))}
+              </div>
+            )}
+          </section>
         )}
+      </div>
     </>
   );
 };
+
+function CityActivityCard({ activity }: { activity: CityActivity }) {
+  return (
+    <Card padding="md" className="flex flex-col h-full">
+      {activity.category && (
+        <span className="self-start text-xs px-2 py-0.5 rounded-full bg-accent-50 text-accent-700 mb-2">
+          {activity.category.replace(/_/g, ' ')}
+        </span>
+      )}
+      <h3 className="font-medium text-navy-800">{activity.title}</h3>
+      {activity.description && (
+        <p className="text-sm text-slate-600 mt-1">{activity.description}</p>
+      )}
+    </Card>
+  );
+}
 
 function ResourceSection({
   sectionId,
