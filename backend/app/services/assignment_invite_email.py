@@ -150,6 +150,33 @@ def _resend_send(
         return {"status": "error", "from": from_addr}
 
 
+def should_send_invite_email(employee_identifier_raw: Optional[str]) -> bool:
+    """AIQ-1572: does this assignment warrant a Resend invite email?
+
+    Two callers must agree: the background hook that actually sends, and the assign
+    response that tells the HR UI what to say. Splitting that decision between them is
+    how a UI ends up claiming an email was sent when none was — so it lives here, once,
+    beside the sender it guards.
+
+    False for synthetic (is_test) assignments. The completion notice was moved off Resend
+    to protect the free tier, but every assignment still emailed — so a test-drive cohort
+    quietly reintroduced the volume, one send per assignment. For a test drive the email
+    is redundant anyway: the same person is both HR and employee and already has both
+    logins on screen at /test-drive.
+
+    `looks_like_test_email` is the SAME predicate that stamps profiles.is_test at
+    registration (db/users.py), so this cannot drift from the platform's own notion of a
+    test account. Real-customer invites are unaffected.
+    """
+    ident = employee_identifier_raw or ""
+    if "@" not in ident:
+        return False          # not an email address — nothing to send to (pre-existing)
+    # Lazy: keeps this module free of the db package at import time.
+    from ...db.test_data_filter import looks_like_test_email
+
+    return not looks_like_test_email(ident)
+
+
 def send_assignment_invite_email(
     *,
     to_email: str,

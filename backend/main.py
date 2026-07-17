@@ -4328,6 +4328,15 @@ def remove_company_logo(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
 # migrated + the table write-deprecated in S3 (AIQ-1531). Frontend redirects the old route.
 
 
+def _assign_invite_will_send(employee_identifier_raw: Optional[str]) -> bool:
+    """AIQ-1572: thin lazy wrapper so the assign response and the background sender read
+    the SAME decision (assignment_invite_email.should_send_invite_email). Lazy import
+    keeps main.py's module import graph unchanged."""
+    from .app.services.assignment_invite_email import should_send_invite_email
+
+    return should_send_invite_email(employee_identifier_raw)
+
+
 # /api/hr/cases/{case_id}/assign previously held the response open while running
 # ~15 sequential DB ops against the Supabase pooler — ensuring mobility/case
 # person/passport sync rows, writing a case event, drafting an invite message.
@@ -4398,8 +4407,23 @@ def _dispatch_hr_assign_side_effects(
         # an email failure must never roll it back. account_exists drives login vs
         # register link; employee_user_id resolved upstream from users/profiles.
         try:
-            if "@" in (employee_identifier_raw or ""):
-                from .app.services.assignment_invite_email import send_assignment_invite_email
+            # AIQ-1572: skip the Resend invite for synthetic (is_test) assignments. The
+            # completion notice was moved off Resend to protect the free tier, but every
+            # assignment still emailed — so a test-drive cohort quietly reintroduced the
+            # volume, one send per assignment. For a test drive the email is redundant
+            # anyway: the same person is both HR and employee and already has the two
+            # logins on screen at /test-drive.
+            #
+            # Reuses looks_like_test_email — the SAME predicate that stamps
+            # profiles.is_test at registration (db/users.py) — rather than a second
+            # hand-rolled domain check that could drift from it. Real-customer invites
+            # are untouched.
+            from .app.services.assignment_invite_email import (
+                send_assignment_invite_email,
+                should_send_invite_email,
+            )
+
+            if should_send_invite_email(employee_identifier_raw):
 
                 _company = db.get_company(hr_company_id) if hr_company_id else None
                 _hr = db.get_user_by_id(hr_user_id) if hr_user_id else None
@@ -4826,7 +4850,15 @@ def assign_case(
                 )
         except Exception:
             pass
-        return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
+        # AIQ-1572: report whether an invite email was queued, so the HR UI states what
+        # actually happened instead of asserting a send off the presence of an
+        # assignmentId. The send itself is a background best-effort, so this reflects the
+        # decision (will we send?), not delivery — which is exactly what the copy claims.
+        return AssignCaseResponse(
+            assignmentId=assignment_id,
+            inviteToken=invite_token,
+            inviteEmailSent=_assign_invite_will_send(request.employeeIdentifier),
+        )
     except HTTPException:
         # Let explicit 4xx/404 propagate as-is.
         raise

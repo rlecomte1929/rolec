@@ -134,3 +134,49 @@ class TestSmokeTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ── AIQ-1572 (TD-BUG-5): no Resend invite for synthetic assignments ───────────
+# The completion notice was moved off Resend to protect the free tier, but every
+# assignment still emailed — so a test-drive cohort quietly reintroduced the volume,
+# one send per assignment. For a test drive the email is redundant anyway: the same
+# person is both HR and employee and already has both logins on screen at /test-drive.
+
+class ShouldSendInviteEmailTests(unittest.TestCase):
+    """The single decision both the background sender and the assign response read."""
+
+    def _f(self):
+        from backend.app.services.assignment_invite_email import should_send_invite_email as _f
+        return _f
+
+    def test_test_drive_employee_gets_no_email(self):
+        # The test-drive stamps its accounts @probe.test (test_drive.py).
+        self.assertFalse(self._f()("emp-a1b2@probe.test"))
+
+    def test_e2e_runner_employee_gets_no_email(self):
+        # The E2E runner registers @testco.com accounts every run.
+        self.assertFalse(self._f()("emp_run_123@testco.com"))
+
+    def test_real_customer_still_gets_the_invite(self):
+        # The whole point: real-product invites must be untouched.
+        self.assertTrue(self._f()("marie.dupont@acme-corp.com"))
+
+    def test_non_email_identifier_sends_nothing(self):
+        # Pre-existing behaviour: the old guard was `"@" in identifier`.
+        self.assertFalse(self._f()("admin-created"))
+        self.assertFalse(self._f()(""))
+        self.assertFalse(self._f()(None))
+
+    def test_decision_matches_the_is_test_stamp(self):
+        """Must not drift from the platform's own notion of a test account.
+
+        looks_like_test_email is what stamps profiles.is_test at registration
+        (db/users.py). If the two ever disagree, an account marked is_test would still
+        be emailed — the exact leak this task closes.
+        """
+        from backend.db.test_data_filter import looks_like_test_email
+        for ident in ("emp@probe.test", "x@testco.com", "real@acme.com"):
+            self.assertEqual(
+                self._f()(ident), not looks_like_test_email(ident),
+                f"invite decision disagrees with the is_test stamp for {ident!r}",
+            )

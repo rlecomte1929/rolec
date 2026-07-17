@@ -74,6 +74,8 @@ export const HrDashboard: React.FC = () => {
   const [employeeLevel, setEmployeeLevel] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  // AIQ-1572: did the backend actually queue an invite email for this assignment?
+  const [inviteEmailSent, setInviteEmailSent] = useState(true);
   // New-case form is opened locally; the case is NOT created until the HR user
   // submits a valid employee identifier (prevents orphan empty cases on open).
   const [formOpen, setFormOpen] = useState(false);
@@ -262,6 +264,10 @@ export const HrDashboard: React.FC = () => {
         level: employeeLevel || undefined,
       });
       setAssignmentId(response.assignmentId);
+      // AIQ-1572: test-drive assignments no longer send a Resend invite, so the panel
+      // must not keep asserting one was sent. Default true — an older payload without
+      // the field keeps the previous copy.
+      setInviteEmailSent(response.inviteEmailSent !== false);
       if (response.inviteToken) {
         setInviteToken(response.inviteToken);
       }
@@ -525,11 +531,22 @@ export const HrDashboard: React.FC = () => {
               {assignmentId && (
                 <Alert variant="info" title="Assignment created">
                   <div className="space-y-3 text-[#0b2b43]">
-                    <p className="text-sm leading-relaxed">
-                      An <strong>invite email</strong> has been sent to <strong>{employeeIdentifier.trim()}</strong> with
-                      a link to get started — they can <strong>register</strong> with that email (or <strong>sign in</strong>{' '}
-                      if they already have an account), and the case attaches automatically when the login matches.
-                    </p>
+                    {/* AIQ-1572: say what actually happened. Test-drive assignments no
+                        longer send a Resend invite, and this panel previously asserted a
+                        send purely because an assignmentId existed. */}
+                    {inviteEmailSent ? (
+                      <p className="text-sm leading-relaxed">
+                        An <strong>invite email</strong> has been sent to <strong>{employeeIdentifier.trim()}</strong> with
+                        a link to get started — they can <strong>register</strong> with that email (or <strong>sign in</strong>{' '}
+                        if they already have an account), and the case attaches automatically when the login matches.
+                      </p>
+                    ) : (
+                      <p className="text-sm leading-relaxed" data-testid="assign-no-invite-email">
+                        <strong>No invite email was sent</strong> — <strong>{employeeIdentifier.trim()}</strong> is a test
+                        account, and its login is already shown on the test-drive page. Sign in with that email (or{' '}
+                        <strong>register</strong> it) and the case attaches automatically when the login matches.
+                      </p>
+                    )}
                     {caseId && (
                       <Button onClick={() => navigate(buildRoute('hrCaseSummary', { caseId }))}>
                         Open case →
