@@ -58,4 +58,35 @@ describe('useWelcomeRedirect', () => {
     renderHook(() => useWelcomeRedirect('/hr/welcome', { skip: false }));
     expect(mockNavigate).toHaveBeenCalledWith('/hr/welcome', { replace: true });
   });
+
+  // AIQ-1590: `skip` is one of the redirect effect's deps, so the effect re-runs whenever it
+  // changes. A caller that recomputes `skip` from a URL param on every render — and then strips
+  // that param — flips `skip` true→false mid-mount and re-fires the redirect, bouncing a
+  // first-login HR to /hr/welcome AFTER the CTA sent them to the form. That is exactly the
+  // HrDashboard bug: `?new=1` was read on every render instead of latched once at mount.
+  // These two tests pin the mechanism, so the reason HrDashboard must latch the intent stays
+  // documented and a future refactor can't silently reopen it.
+  it('re-fires the redirect if skip flips true→false on a rerender (the trap the caller must avoid)', () => {
+    mockGetAuthItem.mockReturnValue('user-1');
+    mockHasSeen.mockReturnValue(false); // brand-new HR — would redirect once unsuppressed
+    const { rerender } = renderHook(
+      ({ skip }) => useWelcomeRedirect('/hr/welcome', { skip }),
+      { initialProps: { skip: true } },
+    );
+    expect(mockNavigate).not.toHaveBeenCalled(); // suppressed while the intent is present
+    rerender({ skip: false }); // e.g. ?new=1 stripped from the URL and skip recomputed
+    expect(mockNavigate).toHaveBeenCalledWith('/hr/welcome', { replace: true });
+  });
+
+  it('never redirects while a latched skip stays true across rerenders (the fix)', () => {
+    mockGetAuthItem.mockReturnValue('user-1');
+    mockHasSeen.mockReturnValue(false);
+    const { rerender } = renderHook(
+      ({ skip }) => useWelcomeRedirect('/hr/welcome', { skip }),
+      { initialProps: { skip: true } },
+    );
+    rerender({ skip: true });
+    rerender({ skip: true });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
