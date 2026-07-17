@@ -218,6 +218,65 @@ class TestAdminTestDrive(unittest.TestCase):
             paths = [r.path for r in a.routes if "admin/test-drive" in getattr(r, "path", "")]
             self.assertIn("/api/admin/test-drive/overview", paths, f"overview missing in {label}")
             self.assertIn("/api/admin/test-drive/invites", paths, f"invites missing in {label}")
+            # AIQ-1566 — prod serves backend.main, so a route only in the modular app 405s.
+            self.assertIn("/api/admin/test-drive/referrals", paths, f"referrals missing in {label}")
+
+    # ── AIQ-1566 (BUG-260717-3D77) — referrals for the Outreach page ────────────────
+
+    def test_referrals_non_admin_forbidden(self):
+        self._as(False)
+        resp = self.client.get("/api/admin/test-drive/referrals")
+        self.assertEqual(resp.status_code, 403, resp.text)
+
+    def test_referrals_returns_all_and_flags_unconsented(self):
+        """Unlike contacts.csv, this must NOT filter on consent — it flags instead.
+
+        Romain's call: show every referral and mark the ones the referrer didn't confirm,
+        so he can see the full picture and decide. Consent gates OUTREACH, not visibility;
+        nothing on this path contacts anyone.
+        """
+        self._as(True)
+        sql_calls = []
+
+        def fake_rows(sql, params):
+            sql_calls.append(sql)
+            return [
+                {"referral_name": "Marie Dupont", "referral_contact": "marie@x.test",
+                 "referral_company_role": "Head of Mobility", "referral_consent": True,
+                 "corridor_id": "FR_NO", "tester_name": "Alex", "created_at": "2026-07-16"},
+                {"referral_name": "Jan Novak", "referral_contact": "+420 555 111",
+                 "referral_company_role": "HRBP", "referral_consent": None,  # never answered
+                 "corridor_id": "FR_NO", "tester_name": "Priya", "created_at": "2026-07-15"},
+            ]
+
+        with patch("backend.app.routers.admin_test_drive._rows", side_effect=fake_rows):
+            resp = self.client.get("/api/admin/test-drive/referrals?corridor=FR_NO")
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        rows = resp.json()["referrals"]
+        self.assertEqual(len(rows), 2, "both referrals returned — consent must not filter")
+        self.assertTrue(rows[0]["referral_consent"])
+        # NULL consent is "not answered", which is not consent — must coerce to False, not None.
+        self.assertIs(rows[1]["referral_consent"], False)
+        self.assertEqual(rows[0]["referred_by"], "Alex")
+        self.assertEqual(rows[1]["referral_contact"], "+420 555 111")
+
+        sql = sql_calls[0]
+        self.assertNotIn("referral_consent = :consent", sql,
+                         "must not inherit contacts.csv's consent filter — flag, don't hide")
+        self.assertIn("referral_name IS NOT NULL", sql, "must only return rows that have a referral")
+
+    def test_referrals_soft_fail_returns_empty(self):
+        """A referral outage must never break the Outreach page."""
+        self._as(True)
+
+        def boom(sql, params):
+            raise RuntimeError("db down")
+
+        with patch("backend.app.routers.admin_test_drive._rows", side_effect=boom):
+            resp = self.client.get("/api/admin/test-drive/referrals")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["referrals"], [])
 
 
 if __name__ == "__main__":

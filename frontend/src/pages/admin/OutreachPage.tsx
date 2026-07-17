@@ -9,6 +9,8 @@ import { ProspectDrawer } from '../../components/outreach/ProspectDrawer';
 import { TemplateManager } from '../../components/outreach/TemplateManager';
 import { personaliseMessage, pickBestTemplate } from '../../utils/messagePersonaliser';
 import type { LinkedInProspect, ProspectInsert, ProspectStatus } from '../../types/outreach';
+import { getTestDriveReferrals, type TestDriveReferral } from '../../api/adminTestDrive';
+import { AdminLayout } from './AdminLayout';
 
 export function OutreachPage(): React.ReactElement {
   const { prospects, loading, error, createProspect, updateProspect, updateStatus } = useProspects();
@@ -22,6 +24,42 @@ export function OutreachPage(): React.ReactElement {
   const [filterFollowUp, setFilterFollowUp] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [draftWarning, setDraftWarning] = useState<string | null>(null);
+
+  // AIQ-1566 (BUG-260717-3D77): people a tester recommended during the test campaign.
+  // Read-only — soft-fails to an empty list so a referral outage never blocks outreach.
+  const [referrals, setReferrals] = useState<TestDriveReferral[]>([]);
+  const [prefill, setPrefill] = useState<Record<string, string> | undefined>(undefined);
+  useEffect(() => {
+    let active = true;
+    getTestDriveReferrals()
+      .then((r) => { if (active) setReferrals(r); })
+      .catch(() => { if (active) setReferrals([]); });
+    return () => { active = false; };
+  }, []);
+
+  // A referral has no LinkedIn URL or company name (both required on linkedin_prospects),
+  // so it can't become a prospect row on its own — the admin still supplies those. We match
+  // on the name (the only field the two share; the table has no email/phone column) purely
+  // to mark what's already been added, never to hide or auto-merge anything.
+  const prospectNames = new Set(prospects.map((p) => p.full_name.trim().toLowerCase()));
+  const referralAdded = (r: TestDriveReferral): boolean =>
+    !!r.referral_name && prospectNames.has(r.referral_name.trim().toLowerCase());
+
+  const addReferralAsProspect = (r: TestDriveReferral): void => {
+    setPrefill({
+      full_name: r.referral_name ?? '',
+      job_title: r.referral_company_role ?? '',
+      notes: [
+        `Referred by ${r.referred_by ?? 'a tester'} in the test-drive survey.`,
+        r.referral_contact ? `Contact given: ${r.referral_contact}` : null,
+        r.referral_consent
+          ? 'The referrer confirmed they are happy to be contacted.'
+          : 'NOT CONSENTED — the referrer did not confirm contact. Do not reach out yet.',
+      ].filter(Boolean).join(' '),
+      corridor_relevance: '',
+    });
+    setShowAdd(true);
+  };
 
   const handleAddProspect = async (data: ProspectInsert): Promise<void> => {
     const prospect = await createProspect(data);
@@ -63,14 +101,16 @@ export function OutreachPage(): React.ReactElement {
       : prospects.filter((p) => p.status !== 'archived' && p.status !== 'not_interested');
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Send className="w-5 h-5 text-navy-600" />
-          <h1 className="text-xl font-semibold text-navy-900">LinkedIn Outreach</h1>
-          <span className="text-sm text-gray-400">{prospects.length} total</span>
-        </div>
+    // BUG-260717-3D77: this page rendered standalone — the only admin surface with no
+    // sidebar and no breadcrumb, so there was no way to tell where you were or navigate
+    // out. AdminLayout supplies both (sidebar + "ReloPass admin / Outreach"), plus the
+    // page container and PageHeader, so the local p-6/max-w-6xl wrapper and the duplicate
+    // <h1> are dropped and the actions move to the layout's headerRight slot. Same shape
+    // as AdminTestDrive.tsx.
+    <AdminLayout
+      title="Outreach"
+      subtitle={`LinkedIn Outreach CRM — prospects, drafts and follow-ups. ${prospects.length} total.`}
+      headerRight={
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowTemplates(true)}
@@ -86,7 +126,8 @@ export function OutreachPage(): React.ReactElement {
             + Add prospect
           </button>
         </div>
-      </div>
+      }
+    >
 
       {/* Follow-up banner */}
       {followUpQueue.length > 0 && (
@@ -171,10 +212,78 @@ export function OutreachPage(): React.ReactElement {
         </div>
       )}
 
+      {/* AIQ-1566: referrals from the test campaign — so a recommended contact never has to
+          be re-typed. Read-only; "Add as prospect" pre-fills the form (the admin still
+          supplies the LinkedIn URL + company, which a referral simply doesn't carry). */}
+      {referrals.length > 0 && (
+        <div className="mt-8" data-testid="td-referrals">
+          <div className="mb-2 flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold text-navy-900">Referrals from the test campaign</h2>
+            <span className="text-xs text-gray-400">{referrals.length} recommended</span>
+          </div>
+          <p className="mb-3 text-xs text-gray-500">
+            People a tester recommended you contact. Nothing here has been messaged — adding one
+            just pre-fills the prospect form.
+          </p>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact given</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Referred by</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Consent</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {referrals.map((r, idx) => {
+                  const added = referralAdded(r);
+                  return (
+                    <tr key={`${r.referral_name ?? 'anon'}-${idx}`} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-navy-900">{r.referral_name || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{r.referral_company_role || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{r.referral_contact || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{r.referred_by || '—'}</td>
+                      <td className="px-4 py-3">
+                        {r.referral_consent ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                            Happy to be contacted
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800">
+                            Not consented — don&apos;t contact yet
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {added ? (
+                          <span className="text-xs text-gray-400">Already a prospect</span>
+                        ) : (
+                          <button
+                            onClick={() => addReferralAsProspect(r)}
+                            className="text-xs font-medium text-navy-700 hover:text-navy-900 underline"
+                          >
+                            Add as prospect →
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <AddProspectModal
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={() => { setShowAdd(false); setPrefill(undefined); }}
         onSave={handleAddProspect}
+        prefill={prefill}
+        source={prefill ? 'test-drive-referral' : undefined}
       />
 
       <TemplateManager
@@ -189,7 +298,7 @@ export function OutreachPage(): React.ReactElement {
         onUpdateProspect={updateProspect}
         onUpdateStatus={(id, status, extra) => updateStatus(id, status, extra)}
       />
-    </div>
+    </AdminLayout>
   );
 }
 

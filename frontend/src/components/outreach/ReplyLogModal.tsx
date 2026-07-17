@@ -55,7 +55,7 @@ export function ReplyLogModal({ open, onClose, prospectId, messageId, onSave }: 
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="Log a reply" className="w-full max-w-md">
+    <Modal open={open} onClose={handleClose} title="Log a reply" className="w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
       <form onSubmit={handleSubmit} className="space-y-4 mt-2">
         {error && <Alert variant="error">{error}</Alert>}
 

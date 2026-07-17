@@ -102,7 +102,7 @@ export function TemplateManager({ open, onClose }: TemplateManagerProps): React.
   const isFormOpen = creating || editing !== null;
 
   return (
-    <Modal open={open} onClose={onClose} title="Message templates" className="w-full max-w-2xl">
+    <Modal open={open} onClose={onClose} title="Message templates" className="w-full max-w-2xl p-6 max-h-[85vh] overflow-y-auto">
       <div className="mt-2 space-y-4">
         {error && <Alert variant="error">{error}</Alert>}
 
