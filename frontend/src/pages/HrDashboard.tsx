@@ -56,7 +56,13 @@ export const HrDashboard: React.FC = () => {
   // that intent: a fresh test-drive HR who clicks "Add your first relocation" must land
   // on the form, not on the onboarding wizard. The welcome page still shows on a plain
   // first login — it just no longer overrides a deliberate destination.
-  const wantsNewCase = new URLSearchParams(window.location.search).get('new') === '1';
+  //
+  // AIQ-1590: latch it ONCE at mount (lazy init). The openNewCaseForm effect below strips
+  // `?new=1` from the URL, so recomputing from window.location.search on every render would
+  // flip this false → flip `skip` false → re-fire useWelcomeRedirect (skip is one of its
+  // effect deps) → bounce the first-login HR to /hr/welcome after all. A latched value keeps
+  // `skip` stable for the whole mount, so the redirect stays suppressed.
+  const [wantsNewCase] = useState(() => new URLSearchParams(window.location.search).get('new') === '1');
   useWelcomeRedirect('/hr/welcome', { skip: wantsNewCase });
   const { setSelectedCaseId } = useSelectedCase();
   // AIQ-1223e: A/B arm for inference-based onboarding. 'inferred' shows the
