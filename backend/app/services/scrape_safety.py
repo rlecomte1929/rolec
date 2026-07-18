@@ -263,6 +263,21 @@ def open_destination_request(
         actor_id=requested_by_user_id,
         new_value={"city": city_n, "country": country_n, "category": category, "company_id": company_id},
     )
+    # AIQ-1602: email admins that a NEW gap request was opened (only reached for
+    # fresh rows — the dedup branch above returns early, so duplicates don't spam).
+    # Fail-soft: a notification failure must never break the request.
+    try:
+        from .admin_notify import notify_admins_gap_request
+
+        notify_admins_gap_request(
+            city=city_n,
+            country=country_n,
+            category=category,
+            company_id=company_id,
+            requested_by=requested_by_user_id,
+        )
+    except Exception:  # noqa: BLE001 — notification must never break the request
+        log.warning("open_destination_request: admin gap-request email failed (suppressed)")
     return _ticket_to_dict(new_row)
 
 
