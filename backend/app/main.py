@@ -99,6 +99,8 @@ from .routers import (
     admin_admins,
     admin_audit_log,
     public_analytics,
+    product_track,
+    admin_product_metrics,
     public_corridor,
 )
 from .recommendations.router import router as recommendations_router
@@ -203,6 +205,7 @@ def create_app() -> FastAPI:
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
+    app.include_router(product_track.router)  # authenticated POST /api/track (product events → analytics_events)
     app.include_router(public_corridor.router)   # [audos] public GET /api/public/corridor-requirements
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
@@ -239,6 +242,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
     app.include_router(admin_marketing_analytics.router, prefix="/api/admin")  # [audos-P2] pre-signup funnel
+    app.include_router(admin_product_metrics.router, prefix="/api/admin")  # in-product event metrics (Feedback → Product metrics tab)
     app.include_router(admin_leads.router, prefix="/api/admin")  # [audos-P1] Lead CRM CRUD
     app.include_router(lead_capture.router)  # [audos-P1] public lead-capture — NO prefix (path baked into route)
     app.include_router(relocation_routes.router)

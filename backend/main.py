@@ -263,6 +263,8 @@ from .app.routers import admin_feedback as admin_feedback_router  # [Task-6] uni
 from .app.routers import admin_admins as admin_admins_router  # [Task-7] admin lifecycle management
 from .app.routers import admin_audit_log as admin_audit_log_router  # [Task-7] platform audit-log viewer
 from .app.routers import public_analytics as public_analytics_router  # [audos-P2] public funnel event ingest
+from .app.routers import product_track as product_track_router  # authenticated product-event sink → analytics_events
+from .app.routers import admin_product_metrics as admin_product_metrics_router  # admin Product-metrics tab
 from .app.routers import public_corridor as public_corridor_router  # [audos] public corridor requirements read model
 from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
@@ -894,6 +896,7 @@ app.include_router(immigration_documents_router.router)  # BL-OCR.2/AIQ-748 — 
 app.include_router(immigration_retrieve_router.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
 app.include_router(analytics_router.router)
 app.include_router(public_analytics_router.router)  # [audos-P2] public POST /api/public/track (no prefix)
+app.include_router(product_track_router.router)  # authenticated POST /api/track (no prefix)
 app.include_router(public_corridor_router.router)  # [audos] public GET /api/public/corridor-requirements
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
@@ -911,6 +914,7 @@ app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_marketing_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_product_metrics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
 app.include_router(admin_outreach_router.router, prefix="/api/admin")
@@ -4029,6 +4033,13 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
             )
     except Exception:
         pass
+    # Mirror into analytics_events for the admin Product-metrics tab (best-effort).
+    try:
+        from .app.services.analytics_service import emit_event
+        emit_event("case_created", user_id=effective.get("id"), case_id=case_id,
+                   extra={"has_company": bool(company_id)})
+    except Exception:
+        pass
     return CreateCaseResponse(caseId=case_id)
 
 
@@ -4850,6 +4861,14 @@ def assign_case(
                         "employee_resolved": bool(employee_user),
                     },
                 )
+        except Exception:
+            pass
+        # Mirror into analytics_events for the admin Product-metrics tab (best-effort).
+        try:
+            from .app.services.analytics_service import emit_event
+            emit_event("case_assigned", user_id=effective.get("id"), case_id=case_id,
+                       extra={"has_invite_token": bool(invite_token),
+                              "employee_resolved": bool(employee_user)})
         except Exception:
             pass
         # AIQ-1572: report whether an invite email was queued, so the HR UI states what

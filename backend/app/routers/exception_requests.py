@@ -600,6 +600,18 @@ def create_exception_request(
             )
     except Exception:
         pass
+    # Mirror into analytics_events for the admin Product-metrics tab (best-effort).
+    try:
+        from ..services.analytics_service import emit_event
+        _over2 = None
+        if body.requested_amount is not None and body.cap_amount is not None:
+            _over2 = body.requested_amount - body.cap_amount
+        emit_event("exception_request_submitted", user_id=str(actor_id), case_id=case_id,
+                   extra={"category": body.category, "exception_type": body.exception_type,
+                          "amount_over": _over2, "currency": body.currency.upper(),
+                          "has_reason": bool((body.reason or "").strip())})
+    except Exception:
+        pass
     return _row_to_dict(row)
 
 
@@ -790,6 +802,16 @@ def resolve_exception_request(
                     "amount_over": (_req - _cap) if (_req is not None and _cap is not None) else None,
                 },
             )
+    except Exception:
+        pass
+    # Mirror into analytics_events for the admin Product-metrics tab (best-effort).
+    try:
+        from ..services.analytics_service import emit_event
+        _req2 = existing["requested_amount"]
+        _cap2 = existing["cap_amount"]
+        emit_event("exception_request_decided", user_id=str(actor_id), case_id=existing.get("case_id"),
+                   extra={"decision": body.status, "category": existing["category"],
+                          "amount_over": (_req2 - _cap2) if (_req2 is not None and _cap2 is not None) else None})
     except Exception:
         pass
     return _row_to_dict(row)

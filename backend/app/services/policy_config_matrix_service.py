@@ -1179,6 +1179,14 @@ class PolicyConfigMatrixService:
                 )
         except Exception:
             pass
+        # Mirror into analytics_events for the admin Product-metrics tab (best-effort).
+        try:
+            from .analytics_service import emit_event
+            emit_event("policy_published", user_id=str(created_by) if created_by else None,
+                       counts={"benefit_count": len(benefits)},
+                       extra={"policy_version_id": vid})
+        except Exception:
+            pass
         return self.build_payload(company_id, version=pub, benefits=benefits, editable=False, source="published")
 
     # ------------------------------------------------------------------
