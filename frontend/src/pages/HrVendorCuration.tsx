@@ -34,6 +34,7 @@ import {
   type ScrapeQuotaState,
 } from '../api/hrCatalog';
 import { serviceTypeOptions, filterByServiceType } from './hrVendorServiceTypes';
+import { HrPreferredSupplierCard } from './HrPreferredSupplierCard';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living areas / Housing',
@@ -1121,6 +1122,9 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           </Button>
         </div>
       </Card>
+
+      {/* AIQ-1602 Seg 4: propose a supplier to the shared ReloPass catalog. */}
+      <HrPreferredSupplierCard />
     </>
   );
 

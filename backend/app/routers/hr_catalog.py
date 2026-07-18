@@ -914,3 +914,65 @@ def employees_waiting_count(
     except Exception:
         logger.exception("employees_waiting_count failed company_id=%s", company_id)
         return {"count": 0}
+
+
+# ---------------------------------------------------------------------------
+# HR preferred-supplier submissions (AIQ-1602 Seg 4) — HR proposes a supplier
+# into an admin moderation queue; an admin approves it into public.suppliers.
+# ---------------------------------------------------------------------------
+
+
+class SupplierSubmissionBody(BaseModel):
+    name: str
+    service_category: str
+    coverage_scope_type: Optional[str] = "country"
+    country_code: Optional[str] = None
+    city_name: Optional[str] = None
+    contact_email: Optional[str] = None
+
+
+@router.post("/supplier-submissions")
+def create_supplier_submission(
+    body: SupplierSubmissionBody,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """HR proposes a preferred supplier for the ReloPass catalog → a pending row
+    for admin review. Admins are emailed (fail-soft)."""
+    from ..services import hr_supplier_submissions
+    from ..services.admin_notify import notify_admins_supplier_submission
+
+    company_id = _caller_company_id(user)
+    try:
+        submission = hr_supplier_submissions.create(
+            company_id=company_id,
+            submitted_by=user.get("id"),
+            name=body.name,
+            service_category=body.service_category,
+            coverage_scope_type=body.coverage_scope_type or "country",
+            country_code=body.country_code,
+            city_name=body.city_name,
+            contact_email=body.contact_email,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    try:
+        notify_admins_supplier_submission(
+            name=submission.get("name") or body.name,
+            service_category=submission.get("service_category") or body.service_category,
+            city=body.city_name,
+            country=body.country_code,
+            company_id=company_id,
+        )
+    except Exception:  # noqa: BLE001 — notification must never break the submit
+        logger.warning("supplier_submission: admin email failed (suppressed)")
+    return submission
+
+
+@router.get("/supplier-submissions")
+def list_my_supplier_submissions(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    from ..services import hr_supplier_submissions
+
+    company_id = _caller_company_id(user)
+    return {"submissions": hr_supplier_submissions.list_for_company(company_id)}

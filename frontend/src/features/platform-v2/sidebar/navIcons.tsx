@@ -115,6 +115,7 @@ export const NAV_ICONS = {
   outreach: Megaphone,
   integrations: Layers,
   'vetting-queue': ShieldCheck,
+  'supplier-submissions': ShieldCheck,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconId = keyof typeof NAV_ICONS;

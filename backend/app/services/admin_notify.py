@@ -92,17 +92,46 @@ def notify_admins_gap_request(
         "allowlist the destination or source vendors as appropriate."
     )
 
+    return _send_to_admins(recipients, subject, plain, context="admin_gap_request")
+
+
+def notify_admins_supplier_submission(
+    *,
+    name: str,
+    service_category: str,
+    city: Optional[str] = None,
+    country: Optional[str] = None,
+    company_id: Optional[str] = None,
+) -> Dict[str, str]:
+    """Email admins that HR proposed a preferred supplier awaiting review
+    (AIQ-1602 Seg 4). Fail-soft; content is non-PII (vendor business data)."""
+    recipients = resolve_admin_emails()
+    if not recipients:
+        return {}
+    where = ", ".join([p for p in (city, country) if p]) or "—"
+    subject = f"[ReloPass] HR proposed a supplier: {name} ({service_category})"
+    plain = (
+        "An HR user has proposed a preferred supplier for the ReloPass catalog. "
+        "It is pending your review.\n\n"
+        f"Supplier:  {name}\n"
+        f"Category:  {service_category}\n"
+        f"Coverage:  {where}\n"
+        f"Company id: {company_id or '—'}\n\n"
+        "Review it in Admin → Supplier submissions, then approve it into the "
+        "registry or reject it."
+    )
+    return _send_to_admins(recipients, subject, plain, context="admin_supplier_submission")
+
+
+def _send_to_admins(
+    recipients: List[str], subject: str, plain: str, *, context: str
+) -> Dict[str, str]:
     results: Dict[str, str] = {}
     for to in recipients:
         try:
-            res = _resend_send(
-                to_email=to,
-                subject=subject,
-                plain=plain,
-                context="admin_gap_request",
-            )
+            res = _resend_send(to_email=to, subject=subject, plain=plain, context=context)
             results[to] = str(res.get("status", "error"))
         except Exception:  # noqa: BLE001 — delivery must never break the caller
-            log.warning("admin_notify: gap-request email failed (suppressed) to=%s", to)
+            log.warning("admin_notify: %s email failed (suppressed) to=%s", context, to)
             results[to] = "error"
     return results
