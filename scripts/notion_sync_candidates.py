@@ -14,6 +14,11 @@ Idempotent + conservative:
   - On update it appends a run note; it reopens Status to "Ready for AI" ONLY if the
     task is in a terminal state (Done/Rejected/Archived) — i.e. a real regression —
     otherwise it leaves a human-set Status untouched.
+  - A GREEN (passing) run NEVER resurrects a human-closed task: on a healthy run a
+    terminal task is skipped entirely (no reopen, no note). This closes the
+    AIQ-1377 loop where a single transient flap on an otherwise-passing deploy-window
+    run re-opened a Done P0 (the sentinel job is `continue-on-error`, so its
+    conclusion is always "success" and can't gate this — the report health band can).
 
 SAFE BY DEFAULT: --dry-run (prints the plan). Pass --apply to write to Notion.
 
@@ -60,6 +65,25 @@ def _title_text(page, title_prop):
 def _status_of(page):
     s = page.get("properties", {}).get("Status", {}).get("select")
     return s.get("name") if s else None
+
+
+def terminal_action(cur_status, health_band):
+    """Decide what to do with an EXISTING matched task, given the run's health band.
+
+    Returns one of:
+      - "skip"      terminal (human-closed) task on a GREEN/passing run → do nothing.
+                    A healthy run has no real regression to justify resurrecting a
+                    human's Done/Rejected/Archived decision (the AIQ-1377 re-open loop).
+      - "reopen"    terminal task on a non-passing run (AMBER/RED/INCONCLUSIVE/unknown)
+                    → a genuine regression; flip Status back to "Ready for AI" + note.
+      - "note-only" already-open task → just append the run note, leave Status alone.
+
+    Unknown/missing band is treated conservatively as non-passing (reopen) so a real
+    regression is never silently dropped when the band can't be read.
+    """
+    if cur_status in TERMINAL:
+        return "skip" if health_band == "GREEN" else "reopen"
+    return "note-only"
 
 
 def latest_report():
@@ -126,6 +150,7 @@ def main():
         sys.exit("no campaign_report_*.json found (run campaign_scorer.py first)")
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
     candidates = report.get("notion_candidates", []) or []
+    health_band = report.get("health_band")  # GREEN / AMBER / RED / INCONCLUSIVE / N/A
 
     # Phase 2: persist this run's candidate ids for next run's confirm-twice comparison
     # (before filtering — next run compares against everything that failed THIS run).
@@ -168,16 +193,23 @@ def main():
 
         if match:
             cur = _status_of(match)
-            reopen = cur in TERMINAL
+            action = terminal_action(cur, health_band)
+            if action == "skip":
+                # Passing (GREEN) run: don't resurrect or even annotate a human-closed
+                # task on a transient flap — this is the AIQ-1377 re-open loop.
+                print(f"  SKIP(passing)  [{tid}] (status={cur}, band={health_band}) → "
+                      f"{_title_text(match, title_prop)[:50]}")
+                skipped += 1
+                continue
             props = {}
             if has_notes:
                 prev = "".join(t.get("plain_text", "") for t in
                                match.get("properties", {}).get("Execution Notes", {}).get("rich_text", []))
                 merged = (note + "\n" + prev)[:1900]
                 props["Execution Notes"] = {"rich_text": [{"type": "text", "text": {"content": merged}}]}
-            if reopen:
+            if action == "reopen":
                 props["Status"] = {"select": {"name": "Ready for AI"}}
-            verb = "UPDATE+REOPEN" if reopen else "UPDATE"
+            verb = "UPDATE+REOPEN" if action == "reopen" else "UPDATE"
             print(f"  {verb:14} [{tid}] (status={cur}) → {_title_text(match, title_prop)[:50]}")
             if args.apply and props:
                 _req("PATCH", f"{API}/pages/{match['id']}", token, {"properties": props})
