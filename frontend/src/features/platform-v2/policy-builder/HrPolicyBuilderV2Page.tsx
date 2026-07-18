@@ -14,7 +14,8 @@ import { Breadcrumb } from '../../../components/Breadcrumb';
 import { policyConfigMatrixAPI, policyDocumentsAPI } from '../../../api/client';
 import { PolicyAssistantDockedShell } from '../../../features/policy/PolicyAssistantDockedShell';
 import { HrPolicyAssistantPanel } from '../../../features/policy/HrPolicyAssistantPanel';
-import { HrNoCompanyOnboarding, isNoCompanyError } from '../../../features/policy/hrNoCompanyOnboarding';
+import { HrNoCompanyOnboarding, isNoCompanyError, httpStatusOf } from '../../../features/policy/hrNoCompanyOnboarding';
+import { useQueryClient } from '@tanstack/react-query';
 import { ConfidenceBadge } from '../roadmap/ConfidenceBadge';
 import type { ConfidenceLevel } from '../roadmap/confidence.tokens';
 import { trackPolicyPublished } from '../../../perf/hrOnboardingInstrumentation';
@@ -380,6 +381,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
     } finally { setSaving(false); }
   };
 
+  const queryClient = useQueryClient();
   const handlePublish = async () => {
     if (tiers.length === 0) return;
     setPublishing(true); setBanner(null);
@@ -395,9 +397,20 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       setVersion('published');
       setSavedAt(Date.now());
       setDraftVersionId(null); // next edit starts a fresh draft
+      // [AIQ-1616] Publish changed the canonical state — invalidate it so the Published-
+      // policy tab agrees (no "Published" badge here vs "No policy" there).
+      void queryClient.invalidateQueries({ queryKey: ['hr', 'policy-published'] });
       setBanner({ kind: 'success', msg: 'Published. Employees can now see this policy, and the Policy Assistant can answer about it.' });
     } catch (e) {
-      setBanner({ kind: 'error', msg: errMsg(e, 'Publish failed.') });
+      // [AIQ-1615] A 409 means it was already published (e.g. a concurrent publish from the
+      // Published-policy tab) — the policy IS live, so reflect that instead of a raw error.
+      if (httpStatusOf(e) === 409) {
+        setVersion('published');
+        void queryClient.invalidateQueries({ queryKey: ['hr', 'policy-published'] });
+        setBanner({ kind: 'info', msg: 'This policy was already published (possibly from the Published-policy tab). It is live.' });
+      } else {
+        setBanner({ kind: 'error', msg: errMsg(e, 'Publish failed.') });
+      }
     } finally { setPublishing(false); }
   };
 

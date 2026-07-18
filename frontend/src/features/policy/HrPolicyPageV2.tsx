@@ -44,6 +44,8 @@ import { PolicyDiffView } from './PolicyDiffView';
 import { PolicyTemplatePicker } from './PolicyTemplatePicker';
 import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
 import { shouldOfferFreshPolicyBuild } from './hrPolicyWorkspaceState';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePolicyPublished } from '../../hooks/usePolicyPublished';
 
 // --- Types ------------------------------------------------------------------
 
@@ -549,7 +551,14 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
 
   const bump = useCallback(() => setWorkspaceRefreshTrigger((t) => t + 1), []);
 
+  // [AIQ-1616] Canonical published-state read (GET /api/hr/policy-config/published) — the
+  // single source of truth this tab and the Policy Builder now agree on, killing the
+  // contradiction where the Builder badge said "Published" while this tab said "No policy".
+  const queryClient = useQueryClient();
+  const canonicalPublished = usePolicyPublished();
+
   const hasLivePolicy =
+    canonicalPublished === true ||
     String(normalized?.version?.status || '').toLowerCase() === 'published' ||
     matrixPayload?.status === 'published';
 
@@ -598,22 +607,34 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
     setPublishError(null);
     try {
       await policyConfigMatrixAPI.hrPublish({}, adminCompanyId ?? undefined);
-      // Bump refreshes both the matrix payload and the workspace state so
-      // the topic accordion flips from "Your draft preview" to "What
-      // employees see today" without a hard reload.
+      // [AIQ-1616] The canonical published-state just changed — refetch it so this tab and
+      // the Policy Builder badge agree immediately. Bump also refreshes the matrix payload
+      // and workspace so the accordion flips to "What employees see today" without a reload.
+      void queryClient.invalidateQueries({ queryKey: ['hr', 'policy-published'] });
       bump();
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail;
-      setPublishError(
-        typeof detail === 'string' && detail
-          ? detail
-          : 'Could not publish your draft. Try the legacy publish controls in the Detailed review section, or contact support.'
-      );
+      // [AIQ-1615] A 409 means the policy was already published (e.g. a concurrent publish
+      // from the Policy Builder tab). Surface a readable message and refresh to the live
+      // state rather than leaving a stuck spinner with a raw conflict error.
+      if (httpStatusOf(err) === 409) {
+        void queryClient.invalidateQueries({ queryKey: ['hr', 'policy-published'] });
+        bump();
+        setPublishError(
+          'This policy was just published (possibly from another tab) — your changes are live. Refreshing.'
+        );
+      } else {
+        const detail = (err as { response?: { data?: { detail?: string } } })
+          ?.response?.data?.detail;
+        setPublishError(
+          typeof detail === 'string' && detail
+            ? detail
+            : 'Could not publish your draft. Try the legacy publish controls in the Detailed review section, or contact support.'
+        );
+      }
     } finally {
       setPublishBusy(false);
     }
-  }, [matrixHasUnpublishedChanges, adminCompanyId, bump]);
+  }, [matrixHasUnpublishedChanges, adminCompanyId, bump, queryClient]);
 
   const handleImportClick = () => {
     // Scroll to the workspace; the Document intake card lives at the top
