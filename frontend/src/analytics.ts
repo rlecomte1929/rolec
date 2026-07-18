@@ -48,12 +48,19 @@ export function revokeAnalyticsConsent(): void {
   if (enabled) posthog.opt_out_capturing();
 }
 
-// Property keys that must never reach PostHog even if a caller passes them by
-// mistake. Belt-and-suspenders on top of the typed analyticsEvents.ts wrappers.
+// PII property keys stripped from every event before it leaves the browser, as a
+// backstop for the untyped track()/emitMarketingEvent() paths (the typed wrappers
+// in analyticsEvents.ts are the primary PII guarantee). Applied via posthog's
+// native `property_denylist` — NOT a custom sanitize_properties.
+//
+// ⚠️ Never add 'token' (or other posthog-reserved keys) here: posthog-js carries
+// the project api_key through the event payload under a colliding 'token' key, so
+// denylisting it strips the api_key and every capture 401s with "event submitted
+// without an api_key". (This was the AIQ-16xx client-capture outage.)
 const PII_KEYS = [
-  'password', 'token', 'secret', 'passport_number', 'passport_no',
+  'password', 'passport_number', 'passport_no',
   'salary', 'salary_exact', 'date_of_birth', 'dob', 'ssn', 'tax_id',
-  'bank_account', 'iban', 'email', 'full_name', 'display_name', 'name',
+  'bank_account', 'iban', 'email', 'full_name', 'display_name',
 ];
 
 export function initAnalytics(): void {
@@ -71,15 +78,8 @@ export function initAnalytics(): void {
     // opted in. Test-drive sessions opt themselves in (see ensureTestDriveReplay) —
     // testers consent as part of the provisioning flow.
     opt_out_capturing_by_default: getAnalyticsConsent() !== 'granted',
-    // Strip any PII that slips into event properties before it leaves the browser.
-    sanitize_properties: (props) => {
-      if (!props) return props;
-      const clean: Record<string, unknown> = { ...props };
-      for (const k of PII_KEYS) {
-        if (k in clean) delete clean[k];
-      }
-      return clean;
-    },
+    // PII backstop via posthog's native denylist (safe — never strips the api_key).
+    property_denylist: PII_KEYS,
     // TD-M2 (AIQ-1560): the SDK stays loaded for product/marketing analytics, but
     // session RECORDING is OFF by default so real HR/employee/admin users are never
     // recorded. Recording is started ONLY inside a test-drive session (see
