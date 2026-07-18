@@ -943,7 +943,8 @@ export const RelocationTimeline: React.FC<RelocationTimelineProps> = ({
           await import('../../api/client').then(({ timelineAPI: tAPI }) =>
             tAPI.getByAssignment(assignmentId, { ensureDefaults: true, includeLinks: false })
           );
-          const refreshed = await fetchRelocationPlanView(assignmentId, { role: effectiveViewRole });
+          // forceFresh: read back the just-seeded tasks, not the cached pre-seed view.
+          const refreshed = await fetchRelocationPlanView(assignmentId, { role: effectiveViewRole, forceFresh: true });
           setData(refreshed);
         } else {
           setData(view);
