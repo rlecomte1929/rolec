@@ -613,7 +613,9 @@ const CopyRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
     <div className="flex items-center justify-between gap-3 rounded-lg border border-marketing-border bg-white px-3 py-2">
       <div className="min-w-0">
         <p className="text-[11px] uppercase tracking-wide text-marketing-text-muted">{label}</p>
-        <p className="truncate font-mono text-sm text-marketing-text">{value}</p>
+        {/* AIQ-1622 (F1): break-all + title so the full credential email/password is
+            readable, not truncated behind a Copy-only affordance. */}
+        <p className="break-all font-mono text-sm text-marketing-text" title={value}>{value}</p>
       </div>
       <button
         type="button"
