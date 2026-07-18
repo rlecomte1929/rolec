@@ -22,6 +22,6 @@ def test_coerces_duration_to_int():
 
 def test_absent_yields_none_so_deep_merge_never_clobbers():
     empty = _assignment_derived({})
-    assert empty == {"assignment_type": None, "expected_duration_months": None}
+    assert empty == {"assignment_type": None, "expected_duration_months": None, "commute_preference": None}
     blank = _assignment_derived({"assignmentContext": {"assignmentType": "  "}})
     assert blank["assignment_type"] is None
