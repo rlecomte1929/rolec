@@ -80,6 +80,9 @@ export const HrDashboard: React.FC = () => {
   const [employeeLevel, setEmployeeLevel] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  // [AIQ-1617] Immediate, prominent success confirmation on assign. The info panel below
+  // was easy to miss — testers read the greyed button + still-populated form as a failure.
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
   // AIQ-1572: did the backend actually queue an invite email for this assignment?
   const [inviteEmailSent, setInviteEmailSent] = useState(true);
   // New-case form is opened locally; the case is NOT created until the HR user
@@ -236,6 +239,13 @@ export const HrDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // [AIQ-1617] Auto-dismiss the success confirmation after a few seconds.
+  useEffect(() => {
+    if (!assignSuccess) return;
+    const t = setTimeout(() => setAssignSuccess(null), 7000);
+    return () => clearTimeout(t);
+  }, [assignSuccess]);
+
   const handleAssign = async () => {
     if (!employeeIdentifier.trim()) {
       // CASE-3: show the error on the field itself and focus it, not as a far-away banner.
@@ -249,6 +259,7 @@ export const HrDashboard: React.FC = () => {
     }
     setIdentifierError('');
     setError('');
+    setAssignSuccess(null);
     setInviteToken(null);
     setAssignmentId(null);
     setSubmitting(true);
@@ -277,6 +288,10 @@ export const HrDashboard: React.FC = () => {
       if (response.inviteToken) {
         setInviteToken(response.inviteToken);
       }
+      // [AIQ-1617] Unmistakable success confirmation, so the greyed button is never read
+      // as a failure. reloadAssignments() below refreshes the list so the new case row
+      // appears immediately.
+      setAssignSuccess(`Case created and assigned to ${employeeIdentifier.trim()}. It's now in your cases below.`);
       await reloadAssignments();
     } catch (err) {
       const e = err as { response?: { data?: { detail?: string; error?: string } } };
@@ -531,11 +546,16 @@ export const HrDashboard: React.FC = () => {
                   { value: 'c_suite', label: 'C-suite' },
                 ]}
               />
+              {assignSuccess && (
+                <Alert variant="success" title="Case created ✓">
+                  <span className="text-sm">{assignSuccess}</span>
+                </Alert>
+              )}
               <Button onClick={handleAssign} disabled={submitting || !!assignmentId}>
                 {submitting ? 'Assigning…' : 'Assign'}
               </Button>
               {assignmentId && (
-                <Alert variant="info" title="Assignment created">
+                <Alert variant="success" title="Assignment created">
                   <div className="space-y-3 text-[#0b2b43]">
                     {/* AIQ-1572: say what actually happened. Test-drive assignments no
                         longer send a Resend invite, and this panel previously asserted a
