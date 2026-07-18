@@ -174,6 +174,39 @@ class RoadmapEndpointGatingTests(_DBTest):
         self.assertNotIn("requires_specialist_review", res)
         self.assertNotIn("ai_roadmap_eligible", res)
 
+    # ── [AIQ-1614] test-drive auto-release ─────────────────────────────────────
+    def _seed_profile(self, account_id, *, is_test):
+        with self.engine.begin() as conn:
+            conn.exec_driver_sql(
+                "CREATE TABLE IF NOT EXISTS profiles (id TEXT PRIMARY KEY, is_test INTEGER)"
+            )
+            conn.exec_driver_sql(
+                "INSERT INTO profiles (id, is_test) VALUES (?, ?)",
+                (account_id, 1 if is_test else 0),
+            )
+
+    def test_test_drive_employee_gets_all_steps_auto_released(self):
+        # An is_test (test-drive) employee: the AI roadmap is auto-released in-session —
+        # even MEDIUM/LOW steps show, and there is no specialist hold. The review row is
+        # still NOT released (released=False) — the is_test branch bypasses it entirely.
+        self._seed_profile("acct", is_test=True)
+        rm = _ai_roadmap([_step(1, "high"), _step(2, "medium"), _step(3, "low")])
+        res = self._call("acct", ai_roadmap=rm, released=False)
+        self.assertEqual(len(res["steps"]), 3)
+        self.assertFalse(res.get("requires_specialist_review"))
+        self.assertTrue(res["ai_roadmap_eligible"])
+
+    def test_real_case_gate_still_fires_for_non_test_employee(self):
+        # REGRESSION (the whole point of AIQ-1614): a NON-is_test employee keeps the
+        # fail-closed confidence gate — a MEDIUM step stays withheld pending specialist
+        # release — even with a profiles table present.
+        self._seed_profile("acct", is_test=False)
+        rm = _ai_roadmap([_step(1, "high"), _step(2, "medium")])
+        res = self._call("acct", ai_roadmap=rm, released=False)
+        self.assertEqual([s["order"] for s in res["steps"]], [1])
+        self.assertTrue(res["requires_specialist_review"])
+        self.assertTrue(res["ai_roadmap_eligible"])
+
 
 if __name__ == "__main__":
     unittest.main()

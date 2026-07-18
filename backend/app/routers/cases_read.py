@@ -44,7 +44,7 @@ from ..services.roadmap_projection import project_tracks, track_label_for_form
 from ..services.confidence_mapping import tier_to_confidence
 from ..services.roadmap_lead_times import lead_time_days_for
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
-from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
+from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case, gate_ai_roadmap
 from ..services.roadmap_staleness import annotate_staleness
 from ..services.case_roadmap_profile import generate_ai_roadmap_for_case
 from ..services.plan_versions_service import persist_generated_plan
@@ -942,6 +942,26 @@ def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_curre
 # GAP 2 / GAP 5: Multi-track roadmap endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _is_test_drive_employee(db, user_id: Optional[str]) -> bool:
+    """[AIQ-1614] True when the requester is a test-drive participant (profiles.is_test).
+
+    Test-drive employees are provisioned with @probe.test emails, which auto-stamp
+    profiles.is_test=true (see test_drive.py / test_data_filter.py). Used to auto-release
+    the AI roadmap in-session for testers only — real cases keep the specialist gate.
+    Fails closed (any error → False) so a lookup problem can never release a real case.
+    """
+    if not user_id:
+        return False
+    try:
+        row = db.execute(
+            _sql_text("SELECT is_test FROM profiles WHERE id = :uid LIMIT 1"),
+            {"uid": str(user_id)},
+        ).fetchone()
+        return bool(row and row[0])
+    except Exception:  # noqa: BLE001
+        return False
+
+
 @router.get("/{case_id}/roadmap")
 def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     """
@@ -976,7 +996,17 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
             )
             candidate = None
         if is_ai_roadmap(candidate) and candidate.get("result") == "OK":
-            candidate = gate_roadmap_for_case(case_id, candidate)
+            # [AIQ-1614] Test-drive (is_test) employees get the roadmap AUTO-RELEASED
+            # in-session — a 20-minute tester must reach their payoff, and the specialist-
+            # review confidence gate protects nothing for synthetic data. REAL cases are
+            # UNCHANGED: gate_roadmap_for_case stays fail-closed, withholding non-HIGH-
+            # confidence / expert-flagged steps until a specialist releases the case.
+            with SessionLocal() as db:
+                _test_drive = _is_test_drive_employee(db, user.get("id"))
+            if _test_drive:
+                candidate = gate_ai_roadmap(candidate, released_to_user=True)
+            else:
+                candidate = gate_roadmap_for_case(case_id, candidate)
             candidate = annotate_staleness(candidate, now=_dt.datetime.now(_dt.timezone.utc))
             candidate["ai_roadmap_eligible"] = True
             # W1-2: durably record the generated roadmap as an immutable plan
