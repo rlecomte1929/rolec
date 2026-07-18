@@ -5,12 +5,12 @@ import { NotificationsBell } from '../NotificationsBell';
 
 // Mock the in-app notifications API (no network, no supabase). vi.mock is hoisted
 // above the imports above by vitest, so these run before NotificationsBell loads.
+// [AIQ-1618] The badge is now derived from the fetched list (single source of truth),
+// so getUnreadCount is no longer consulted — it's not mocked here.
 const listNotifications = vi.fn();
-const getUnreadCount = vi.fn();
 const markNotificationRead = vi.fn();
 vi.mock('../../api/notifications', () => ({
   listNotifications: (...a: unknown[]) => listNotifications(...a),
-  getUnreadCount: (...a: unknown[]) => getUnreadCount(...a),
   markNotificationRead: (...a: unknown[]) => markNotificationRead(...a),
 }));
 // Realtime subscriber is lazy-imported inside an effect; stub it so no supabase loads.
@@ -38,27 +38,38 @@ function renderBell() {
 describe('NotificationsBell', () => {
   beforeEach(() => {
     listNotifications.mockReset();
-    getUnreadCount.mockReset();
     markNotificationRead.mockReset().mockResolvedValue(undefined);
   });
 
-  it('shows the unread badge from getUnreadCount', async () => {
-    listNotifications.mockResolvedValue([item()]);
-    getUnreadCount.mockResolvedValue(3);
+  it('shows the unread badge derived from the unread items in the list', async () => {
+    // [AIQ-1618] 3 unread items in the list → badge 3.
+    listNotifications.mockResolvedValue([item({ id: 'a' }), item({ id: 'b' }), item({ id: 'c' })]);
     renderBell();
     await waitFor(() => expect(screen.getByTestId('notifications-bell-badge')).toHaveTextContent('3'));
   });
 
   it('caps the badge at 9+', async () => {
-    listNotifications.mockResolvedValue([item()]);
-    getUnreadCount.mockResolvedValue(42);
+    listNotifications.mockResolvedValue(
+      Array.from({ length: 12 }, (_v, i) => item({ id: `n${i}` }))
+    );
     renderBell();
     await waitFor(() => expect(screen.getByTestId('notifications-bell-badge')).toHaveTextContent('9+'));
   });
 
+  it('shows NO badge when every listed notification is already read (no false dot)', async () => {
+    // [AIQ-1618] The exact reported bug: a red dot over a panel that has nothing unread.
+    // Read items (read_at set) must not raise the badge.
+    listNotifications.mockResolvedValue([
+      item({ id: 'a', read_at: new Date().toISOString() }),
+      item({ id: 'b', read_at: new Date().toISOString() }),
+    ]);
+    renderBell();
+    await waitFor(() => expect(listNotifications).toHaveBeenCalled());
+    expect(screen.queryByTestId('notifications-bell-badge')).not.toBeInTheDocument();
+  });
+
   it('opens the dropdown and lists notifications', async () => {
     listNotifications.mockResolvedValue([item()]);
-    getUnreadCount.mockResolvedValue(1);
     renderBell();
     await waitFor(() => expect(screen.getByTestId('notifications-bell-badge')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /notifications/i }));
@@ -67,7 +78,6 @@ describe('NotificationsBell', () => {
 
   it('marks an item read on click', async () => {
     listNotifications.mockResolvedValue([item()]);
-    getUnreadCount.mockResolvedValue(1);
     renderBell();
     await waitFor(() => expect(screen.getByTestId('notifications-bell-badge')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /notifications/i }));
@@ -77,7 +87,6 @@ describe('NotificationsBell', () => {
 
   it('renders the empty state with no badge when there are no notifications', async () => {
     listNotifications.mockResolvedValue([]);
-    getUnreadCount.mockResolvedValue(0);
     renderBell();
     await waitFor(() => expect(listNotifications).toHaveBeenCalled());
     expect(screen.queryByTestId('notifications-bell-badge')).not.toBeInTheDocument();
