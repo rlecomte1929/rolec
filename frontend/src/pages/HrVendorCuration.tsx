@@ -453,7 +453,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         setNewCity('');
         setNewCountry('');
         setInfo(
-          `Request sent for ${c}, ${co}. Once admin allowlists it, it'll appear in the destination dropdown.`,
+          `Request sent for ${c}, ${co} — we've emailed the ReloPass team. Once they source and allowlist it, it'll appear in the destination dropdown.`,
         );
       } else {
         // Backend says it's already allowlisted — refresh and select it.
@@ -696,6 +696,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         </Card>
 
       <Card padding="lg" className="mb-6">
+        <h2 className="text-lg font-semibold text-[#0b2b43] mb-3">1. Find providers</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Country</span>
@@ -826,8 +827,8 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         )}
         {pendingTicket && (
           <Alert variant="info" className="mt-3">
-            Ticket opened for {pendingTicket.city}, {pendingTicket.country}. Waiting on admin to
-            allowlist this destination.
+            Request sent for {pendingTicket.city}, {pendingTicket.country} — the ReloPass team has
+            been emailed and will source providers for this destination.
           </Alert>
         )}
       </Card>
@@ -849,8 +850,8 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
           <Card padding="lg" className="w-full max-w-md bg-white">
             <h3 className="text-lg font-semibold text-[#0b2b43]">Request a new destination</h3>
             <p className="mt-2 text-sm text-[#4b5563]">
-              Tell us where your employee is moving. Admin reviews and approves
-              new destinations to keep AI usage controlled — once approved you can
+              Tell us where your employee is moving. We will email the ReloPass team to
+              source and approve providers for this destination — once approved you can
               populate every service category with one click.
             </p>
             <label className="mt-4 block text-sm font-medium text-[#0b2b43]">
@@ -914,7 +915,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
       >
         <div ref={masterCardRef} className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
-            <h2 className="text-lg font-semibold text-[#0b2b43]">Admin master vendors</h2>
+            <h2 className="text-lg font-semibold text-[#0b2b43]">2. Approve providers for employees</h2>
             <p className="text-sm text-[#6b7280] mt-1">
               {(() => {
                 const selectedMasters = masters.filter((r) => effectiveSelected(r)).length;
@@ -963,6 +964,24 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                   Pulls the top-rated, review-verified vendors for this service in {city}.
                 </p>
                 {discoverError && <p className="mt-2 text-sm text-[#b91c1c]">{discoverError}</p>}
+                {/* Seg 3: gap request — no providers here, ask the ReloPass team to source them. */}
+                <div className="mt-4 border-t border-[#e2e8f0] pt-3">
+                  <p className="text-sm text-[#4b5563]">
+                    Still nothing suitable? Ask the ReloPass team to source vetted providers for
+                    this destination.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => {
+                      setNewCity(city);
+                      setNewCountry(country);
+                      setRequestModalOpen(true);
+                    }}
+                  >
+                    Request the ReloPass team to source providers
+                  </Button>
+                </div>
               </div>
             )}
           </div>
