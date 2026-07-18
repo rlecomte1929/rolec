@@ -20,8 +20,16 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
+from ..auth_deps import (
+    get_current_user,
+    get_org_id_for_hr_user,
+    require_admin_or_hr,
+    require_case_access,
+)
 from ...database import db
+from ..db import SessionLocal
+from ..services.relocation_plan_view_service import load_profile_draft_for_case
+from ..services.wizard_draft_mapper import extract_profile_from_wizard_draft
 from ..services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -308,6 +316,32 @@ def get_profile_employee(
             pass  # Return encrypted form if decryption fails
 
     return {"profile": p}
+
+
+@router.get("/employee/cases/{case_id}/intake-nationality")
+def get_intake_nationality_employee(
+    case_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """AIQ-1552: the employee's nationality from the intake wizard draft
+    (``wizard_cases.draft_json`` → ``employeeProfile.nationality``), to pre-fill
+    the Relocation Assistant's nationality selector.
+
+    Reads the wizard draft (NOT ``cases.intake_data``, which drops nationality —
+    verified in prod). Deliberately NOT behind the immigration-consent gate that
+    guards the PII vault (get_profile_employee): nationality is the employee's own
+    intake entry, not vault PII, so the pre-fill must work before/without consent.
+    Scoped by require_case_access — the employee may read only their own case
+    (cross-employee → 403); HR/admin by company.
+    """
+    require_case_access(case_id, current_user)
+    with SessionLocal() as session:
+        draft = load_profile_draft_for_case(session, case_id)
+    profile = extract_profile_from_wizard_draft(draft or {})
+    return {
+        "nationality": profile.get("nationality"),
+        "second_nationality": profile.get("second_nationality"),
+    }
 
 
 # ---------------------------------------------------------------------------
