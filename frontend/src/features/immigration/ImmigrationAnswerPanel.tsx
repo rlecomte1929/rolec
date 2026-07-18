@@ -188,6 +188,9 @@ export function ImmigrationAnswerPanel(
         <div className="mt-1">
           <CountryMultiSelect value={nationalities} onChange={setNationalities} />
         </div>
+        <p className="mt-1 text-xs text-slate-400">
+          Pre-filled from your intake — add more if you hold multiple nationalities.
+        </p>
       </div>
       <div>
         <Button

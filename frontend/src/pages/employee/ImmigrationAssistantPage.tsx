@@ -29,18 +29,19 @@ export const ImmigrationAssistantPage: React.FC = () => {
     }
     void (async () => {
       try {
-        // AIQ-1476: resolve the corridor AND the employee's nationality from intake
-        // (already persisted + consent-gated) so the assistant doesn't ask the employee
-        // to re-type what they gave in the intake form.
+        // AIQ-1476 + AIQ-1552: resolve the corridor AND the employee's nationality so
+        // the assistant doesn't re-ask what intake already captured. AIQ-1552 reads
+        // nationality from the intake-sourced, case-scoped endpoint (NOT the
+        // consent-gated /profile) so the pre-fill works before immigration consent.
         const [ctx, nationalities] = await Promise.all([
           servicesAPI.getServicesContext(assignmentId),
           primaryCaseId
             ? api
-                .get<{ profile: { nationality?: string | null; second_nationality?: string | null } | null }>(
-                  `/api/employee/cases/${primaryCaseId}/profile`,
+                .get<{ nationality?: string | null; second_nationality?: string | null }>(
+                  `/api/employee/cases/${primaryCaseId}/intake-nationality`,
                 )
                 .then((r) =>
-                  [r.data.profile?.nationality, r.data.profile?.second_nationality]
+                  [r.data.nationality, r.data.second_nationality]
                     .map((n) => (n ?? '').trim())
                     .filter(Boolean),
                 )
