@@ -6,6 +6,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { SegmentedOptionCards } from '../../../components/antigravity/SegmentedOptionCards';
 import { useGeocodedAddress } from '../../../components/geocode';
+import { AddressAutocompleteInput } from '../../../components/AddressAutocompleteInput';
 import { patchCase } from '../../../api/cases';
 import { emitTestDriveStage, getTestDriveSession } from '../../../api/testDrive';
 import { employeeAPI } from '../../../api/client';
@@ -1285,7 +1286,7 @@ export function EmployeeIntakePage() {
                   </FieldWrap>
                   <FieldWrap label="Office address at destination" required className="sm:col-span-2" prefill={locks.office} onUnlock={() => unlock('office')}
                     why="Anchors commute analysis. We'll show neighborhoods within your time radius.">
-                    <Input unstyled className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
+                    <AddressAutocompleteInput className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
                       placeholder="Start typing…" onChange={(v) => setField('office_address', v)} />
                     {data.office_address && (
                       <div className={`flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-lg text-xs ${

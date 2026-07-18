@@ -102,6 +102,7 @@ from .routers import (
     product_track,
     admin_product_metrics,
     public_corridor,
+    geocoding,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -207,6 +208,7 @@ def create_app() -> FastAPI:
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
     app.include_router(product_track.router)  # authenticated POST /api/track (product events → analytics_events)
     app.include_router(public_corridor.router)   # [audos] public GET /api/public/corridor-requirements
+    app.include_router(geocoding.router)   # [AIQ-1607] GET /api/employee/geocode/autocomplete
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
     # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
