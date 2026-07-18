@@ -10,6 +10,7 @@ import { hrAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
+import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
 import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
@@ -224,6 +225,15 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* ── AIQ-1605: roadmap validation surface on the page HR actually reaches from
+             the command center. The approve / request-changes panel previously lived only
+             on /hr/cases/:caseId (HrCaseSummary), so an HR user arriving here saw no
+             validation request. Mounted high on purpose — it is the most time-sensitive
+             action when a roadmap is awaiting sign-off. Keyed on the relocation case id
+             (detail.caseId), same id-space as the roadmap-review endpoints; falls back to
+             the assignment PK when absent (mirrors the immigration panels below). ── */}
+        <RoadmapReviewPanel caseId={detail.caseId ?? detail.id} />
 
         {/* ── AIQ-1136 slice 3: EU AI Act Art. 14 oversight on the AI risk verdict.
             The risk status is an AI-derived recommendation shown above as a passive

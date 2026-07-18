@@ -140,8 +140,10 @@ class TestTheEmailSaysWhatIsAtStake:
 
         assert "Lucas Martin" in email["subject"]
         assert "FR → DE" in email["subject"]
-        # The consequence is the whole point — HR needs to know someone is blocked.
-        assert "cannot start any tasks" in email["plain"]
+        # AIQ-1605: roadmaps are released-by-default (AIQ-1377), so the email invites review
+        # (approve / request changes) rather than falsely claiming the employee is blocked.
+        assert "review it" in email["plain"].lower()
+        assert "keep preparing" in email["plain"].lower()
         assert "/hr/cases/c1" in email["plain"], "HR needs a way to act, not just be told"
 
     def test_a_missing_corridor_is_omitted_not_invented(self):
