@@ -8,6 +8,7 @@ import { ResilientRoute } from './components/ResilientRoute';
 import { NavigationLogger } from './components/NavigationLogger';
 import { ScrollToTop } from './components/ScrollToTop';
 import { TestDriveReplayGate } from './components/TestDriveReplayGate';
+import { ConsentBanner } from './components/ConsentBanner';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
 import { HrCompanyContextProvider } from './contexts/HrCompanyContext';
@@ -268,6 +269,8 @@ function App() {
       {/* TD-M2 (AIQ-1560): start PostHog session replay only inside a test-drive session
           (no-op for real users on every normal HR/employee/admin page). */}
       <TestDriveReplayGate />
+      {/* GDPR: opt-in analytics consent gate (analytics is opted out by default). */}
+      <ConsentBanner />
       <DemoBookingProvider>
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>

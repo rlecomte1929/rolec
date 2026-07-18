@@ -10,6 +10,7 @@ import { patchCase } from '../../../api/cases';
 import { emitTestDriveStage, getTestDriveSession } from '../../../api/testDrive';
 import { employeeAPI } from '../../../api/client';
 import { track } from '../../../analytics';
+import { trackWizardStepCompleted, trackWizardCompleted, type WizardStepName } from '../../../analyticsEvents';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidatedParams';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
@@ -35,6 +36,18 @@ const RichCommuteMap = lazy(() =>
 );
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+// Analytics: map the 1-indexed wizard step to a stable snake_case event name,
+// aligned to INTAKE_STEP_LABELS (['Move details','About You','My People',
+// 'Work & Place','Review']). Index 0 is unused (steps are 1-indexed).
+const WIZARD_STEP_NAMES: readonly (WizardStepName | undefined)[] = [
+  undefined,
+  'move_details',
+  'about_you',
+  'my_people',
+  'work_and_place',
+  'review',
+];
 
 type MemberKind = 'self' | 'partner' | 'child' | 'pet' | 'adult';
 
@@ -488,7 +501,7 @@ function PartnerCard({ m, onChange, onRemove, international, expanded, onToggle 
       expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
       <Grid>
         <FieldWrap label="Full name" required>
-          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
+          <Input unstyled className={`${inputCls()} ph-no-capture`} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
             onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Employment status">
@@ -529,11 +542,11 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
       status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
       <Grid>
         <FieldWrap label="First name" required>
-          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Léo"
+          <Input unstyled className={`${inputCls()} ph-no-capture`} value={m.name ?? ''} placeholder="e.g. Léo"
             onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Date of birth" required why="We compute age automatically for school search and enrollment timing.">
-          <Input unstyled type="date" className={inputCls()} value={m.dob ?? ''}
+          <Input unstyled type="date" className={`${inputCls()} ph-no-capture`} value={m.dob ?? ''}
             onChange={(v) => onChange({ ...m, dob: v })} />
           {age != null && (
             <div className="text-[10px] text-accent-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
@@ -664,6 +677,10 @@ export function EmployeeIntakePage() {
   const routeCaseId = useValidatedParams(caseParamsSchema)?.caseId;
   // Stable case ID for the duration of this intake session.
   const caseIdRef = useRef<string>(routeCaseId ?? crypto.randomUUID());
+  // Analytics timing: wizard start (for total duration) and per-step start (reset
+  // on each forward advance) so wizard_step_completed carries an accurate duration.
+  const wizardStartRef = useRef<number>(Date.now());
+  const stepStartRef = useRef<number>(Date.now());
   // AIQ-1435: journey funnel — mark the intake step reached (once per mount).
   useEffect(() => {
     track('journey_step_started', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
@@ -822,6 +839,19 @@ export function EmployeeIntakePage() {
     // — retry") so navigation never silently drops unsaved data.
     const ok = await flushSave();
     if (!ok) return;
+    // Analytics: only count a step as "completed" when advancing forward past it.
+    if (s > step) {
+      const name = WIZARD_STEP_NAMES[step];
+      if (name) {
+        trackWizardStepCompleted({
+          case_id: caseIdRef.current,
+          step_number: step,
+          step_name: name,
+          duration_seconds: Math.max(0, Math.round((Date.now() - stepStartRef.current) / 1000)),
+        });
+      }
+    }
+    stepStartRef.current = Date.now();
     setStep(s);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1163,11 +1193,11 @@ export function EmployeeIntakePage() {
                 <StepHd title="A bit about you" sub="Your passport details kick off the immigration track." />
                 <Grid>
                   <FieldWrap label="Full name" required>
-                    <Input unstyled data-testid="intake-full_name" className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
+                    <Input unstyled data-testid="intake-full_name" className={`${inputCls()} ph-no-capture`} value={data.full_name} placeholder="As shown on your passport"
                       onChange={(v) => setField('full_name', v)} />
                   </FieldWrap>
                   <FieldWrap label="Email" required prefill={locks.email} onUnlock={() => unlock('email')}>
-                    <Input unstyled type="email" data-testid="intake-email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
+                    <Input unstyled type="email" data-testid="intake-email" className={`${inputCls(locks.email)} ph-no-capture`} value={data.email} disabled={locks.email}
                       onChange={(v) => setField('email', v)} />
                   </FieldWrap>
                   <FieldWrap label="Nationality" required>
@@ -1177,7 +1207,7 @@ export function EmployeeIntakePage() {
                     <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} options={ALL_COUNTRY_OPTIONS} />
                   </FieldWrap>
                   <FieldWrap label="Passport expiry" required>
-                    <Input unstyled type="date" data-testid="intake-passport_expiry" className={inputCls()} value={data.passport_expiry}
+                    <Input unstyled type="date" data-testid="intake-passport_expiry" className={`${inputCls()} ph-no-capture`} value={data.passport_expiry}
                       onChange={(v) => setField('passport_expiry', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
@@ -1429,6 +1459,18 @@ export function EmployeeIntakePage() {
                       }
                       // AIQ-1435: journey funnel — intake completed on successful submit.
                       track('journey_step_completed', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
+                      // Typed funnel event with PII-free household shape (no names).
+                      {
+                        const nonSelf = data.members.filter((m) => m.kind !== 'self' && m.kind !== 'pet');
+                        const partner = data.members.find((m) => m.kind === 'partner');
+                        trackWizardCompleted({
+                          case_id: caseIdRef.current,
+                          total_duration_seconds: Math.max(0, Math.round((Date.now() - wizardStartRef.current) / 1000)),
+                          has_family: nonSelf.length > 0,
+                          household_size: data.members.filter((m) => m.kind !== 'pet').length,
+                          partner_needs_work_permit: partner?.needs_work_permit === 'yes',
+                        });
+                      }
                       // TD-FIX-4 (AIQ-1505): test-drive funnel — intake completed.
                       emitTestDriveStage('intake-completed');
                       // B5: land on the roadmap the submit just unlocked, not a

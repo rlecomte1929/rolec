@@ -16,7 +16,8 @@
 // `estimated_amount` is null in the backend today (no quote pipeline wired);
 // surfaced honestly as 'Not yet estimated' rather than a fake number.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { trackEstimateReviewOpened } from '../../analyticsEvents';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
   budgetAPI,
@@ -156,6 +157,8 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
+  // Analytics: fire estimate_review_opened once per case (not on every retry).
+  const reportedCaseRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +169,23 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({
       .then((res) => {
         if (cancelled) return;
         setData(res);
+        // Analytics: policy-vs-estimate health, once per case view. PII-free —
+        // category status counts only (no names, no cost amounts).
+        if (reportedCaseRef.current !== caseId) {
+          reportedCaseRef.current = caseId;
+          const cats = res.categories ?? [];
+          const count = (s: BudgetSummaryStatus) => cats.filter((c) => c.status === s).length;
+          trackEstimateReviewOpened({
+            case_id: caseId,
+            categories_count: cats.length,
+            any_line_over_policy: count('over_budget') > 0,
+            lines_over_policy_count: count('over_budget'),
+            lines_within_policy_count: count('within_budget'),
+            lines_no_cap_count: count('no_cap'),
+            lines_no_estimate_count: count('no_estimate'),
+            hr_policy_caps_count: res.hr_policy_caps?.length ?? 0,
+          });
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
