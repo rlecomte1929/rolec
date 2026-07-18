@@ -5,16 +5,24 @@ export type FetchRelocationPlanViewOptions = {
   /** Optional lens; must match the authenticated user. */
   role?: 'employee' | 'hr';
   debug?: boolean;
+  /**
+   * Skip the short dedup window and force a fresh network fetch. Used after
+   * seeding default tasks, where we must read back the newly-created data rather
+   * than a cached pre-seed view. The fresh result repopulates the window cache.
+   */
+  forceFresh?: boolean;
 };
 
-// In-flight request dedup. The employee Roadmap mounts several independent
+// Short-window request dedup. The employee Roadmap mounts several independent
 // consumers (timeline, task tracker, canonical tasks, page-data hook) that each
-// fetch this view on mount — ~7 identical GETs per page load. Share the promise
-// only WHILE it is in flight (keyed by the exact request path), so concurrent
-// mounts collapse to a single network request. It is cleared as soon as the
-// request settles, so a genuine later refetch (e.g. the timeline's refresh after
-// roadmap generation) still hits the network fresh — no result staleness.
-const _inflight = new Map<string, Promise<RelocationPlanViewResponseDTO>>();
+// fetch this view within ~1–2s of each other, and a status poll repeats it — ~7
+// identical GETs per page load. Share one request (in-flight OR just-resolved)
+// across a brief window keyed by the exact request path, so the mount/poll burst
+// collapses to a single network call. The window is intentionally short so a real
+// refetch (the ~6s status poll, or the post-seed refetch below) still gets fresh
+// data; failures are evicted immediately so retries proceed and errors never cache.
+const DEDUP_WINDOW_MS = 2500;
+const _window = new Map<string, { at: number; promise: Promise<RelocationPlanViewResponseDTO> }>();
 
 /**
  * GET /api/relocation-plans/{case_id}/view
@@ -30,14 +38,17 @@ export async function fetchRelocationPlanView(
   const qs = params.toString();
   const path = `/api/relocation-plans/${encodeURIComponent(caseId)}/view${qs ? `?${qs}` : ''}`;
 
-  const existing = _inflight.get(path);
-  if (existing) return existing;
+  const now = Date.now();
+  if (!options?.forceFresh) {
+    const hit = _window.get(path);
+    if (hit && now - hit.at < DEDUP_WINDOW_MS) return hit.promise;
+  }
 
   const promise = apiGet<RelocationPlanViewResponseDTO>(path);
-  _inflight.set(path, promise);
-  // Clear once settled (success or failure) so retries/refetches aren't cached.
-  void promise.finally(() => {
-    if (_inflight.get(path) === promise) _inflight.delete(path);
+  _window.set(path, { at: now, promise });
+  // Evict on failure so an error is never cached and a retry can proceed.
+  void promise.catch(() => {
+    if (_window.get(path)?.promise === promise) _window.delete(path);
   });
   return promise;
 }
