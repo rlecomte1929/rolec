@@ -5,6 +5,51 @@ import { getTestDriveSession } from './api/testDrive';
 let enabled = false;
 let replayStarted = false;
 
+/** localStorage key holding the visitor's analytics consent decision. */
+const CONSENT_KEY = 'relopass_analytics_consent';
+
+/**
+ * Read the stored analytics consent decision. `null` = the visitor has not yet
+ * chosen (the ConsentBanner is shown until they do).
+ */
+export function getAnalyticsConsent(): 'granted' | 'denied' | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const val = window.localStorage.getItem(CONSENT_KEY);
+    return val === 'granted' || val === 'denied' ? val : null;
+  } catch {
+    return null; // localStorage unavailable (private mode / SSR) — treat as undecided
+  }
+}
+
+/** Grant consent: persist and start capturing. Called by the ConsentBanner. */
+export function grantAnalyticsConsent(): void {
+  try {
+    window.localStorage.setItem(CONSENT_KEY, 'granted');
+  } catch {
+    /* best-effort */
+  }
+  if (enabled) posthog.opt_in_capturing();
+}
+
+/** Revoke consent: persist and stop capturing (also stops any active replay). */
+export function revokeAnalyticsConsent(): void {
+  try {
+    window.localStorage.setItem(CONSENT_KEY, 'denied');
+  } catch {
+    /* best-effort */
+  }
+  if (enabled) posthog.opt_out_capturing();
+}
+
+// Property keys that must never reach PostHog even if a caller passes them by
+// mistake. Belt-and-suspenders on top of the typed analyticsEvents.ts wrappers.
+const PII_KEYS = [
+  'password', 'token', 'secret', 'passport_number', 'passport_no',
+  'salary', 'salary_exact', 'date_of_birth', 'dob', 'ssn', 'tax_id',
+  'bank_account', 'iban', 'email', 'full_name', 'display_name', 'name',
+];
+
 export function initAnalytics(): void {
   const key = env.posthogKey;
   if (!key) return;
@@ -15,6 +60,20 @@ export function initAnalytics(): void {
     capture_pageview: true,
     persistence: 'localStorage+cookie',
     autocapture: false,
+    // GDPR: opt OUT of all capturing (events + cookies) until the visitor grants
+    // consent via the ConsentBanner. A returning visitor who already granted stays
+    // opted in. Test-drive sessions opt themselves in (see ensureTestDriveReplay) —
+    // testers consent as part of the provisioning flow.
+    opt_out_capturing_by_default: getAnalyticsConsent() !== 'granted',
+    // Strip any PII that slips into event properties before it leaves the browser.
+    sanitize_properties: (props) => {
+      if (!props) return props;
+      const clean: Record<string, unknown> = { ...props };
+      for (const k of PII_KEYS) {
+        if (k in clean) delete clean[k];
+      }
+      return clean;
+    },
     // TD-M2 (AIQ-1560): the SDK stays loaded for product/marketing analytics, but
     // session RECORDING is OFF by default so real HR/employee/admin users are never
     // recorded. Recording is started ONLY inside a test-drive session (see
@@ -40,6 +99,11 @@ export function ensureTestDriveReplay(): void {
   const slice = getTestDriveSession();
   if (!slice?.session_id) return; // not a test-drive session — never record
   try {
+    // Testers consent to recording as part of the test-drive provisioning flow, so
+    // opt this synthetic session in explicitly (real users stay opted out until they
+    // Accept in the ConsentBanner). Without this, opt_out_capturing_by_default would
+    // suppress the replay we intentionally capture here.
+    posthog.opt_in_capturing();
     posthog.identify(slice.session_id, {
       test_drive_session_id: slice.session_id,
       test_drive_campaign: slice.campaign,
