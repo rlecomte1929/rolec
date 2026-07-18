@@ -301,7 +301,11 @@ export const ServicesQuestions: React.FC = () => {
 
   const destinationCity = ((initialAnswers.dest_city as string | null | undefined) ?? '').trim();
   const destinationCountry = String(caseContext?.destCountry ?? '').trim();
-  const missingDestination = caseDetailsLoaded && (!destinationCity || !destinationCountry);
+  // [AIQ-1613] Only block when the BOUND case has NO destination at all. Requiring both a
+  // city AND a country fired a false "destination missing" dead-end right after intake
+  // (F15) — e.g. country-only intake, or the phantom-case binding fixed in AIQ-1612. A
+  // city or a country is enough to proceed into Services.
+  const missingDestination = caseDetailsLoaded && !destinationCity && !destinationCountry;
 
   const loadRecommendations = async () => {
     if (missingDestination) {
