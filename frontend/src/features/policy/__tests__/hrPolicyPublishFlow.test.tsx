@@ -145,9 +145,11 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
 
-    // Primary at-a-glance CTA for ready_to_publish; retry click + modal in one waitFor to absorb load/review races.
+    // AIQ-1600: the card's "Publish policy" CTA was removed; publish now runs
+    // from the "Publish version" control. Retry click + modal in one waitFor to
+    // absorb load/review races.
     await waitFor(() => {
-      const primary = screen.getByRole('button', { name: /^publish policy$/i });
+      const primary = screen.getByRole('button', { name: /^publish version$/i });
       expect(primary).not.toBeDisabled();
       fireEvent.click(primary);
       expect(screen.getByTestId('publish-preflight-modal')).toBeInTheDocument();
@@ -171,7 +173,9 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
 
-    expect(await screen.findByTestId('hr-policy-replacement-warning')).toBeInTheDocument();
+    // AIQ-1600: the replacement warning moved out with the removed card; the
+    // "Replacement draft (not live)" working-draft panel is the surviving signal.
+    expect(await screen.findByText(/Replacement draft \(not live\)/i)).toBeInTheDocument();
     await waitFor(() => {
       const b = screen.getByRole('button', { name: /^publish version$/i });
       expect(b).not.toBeDisabled();
@@ -180,7 +184,7 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /confirm publish/i }));
 
-    await waitFor(() => expect(screen.queryByTestId('hr-policy-replacement-warning')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/Replacement draft \(not live\)/i)).not.toBeInTheDocument());
   });
 
   it('does not call publish when review payload is missing (publish stays disabled until data ready)', async () => {
@@ -189,9 +193,9 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
 
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
 
-    expect(await screen.findByRole('button', { name: /publish policy/i })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: /publish policy/i })).toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: /publish policy/i }));
+    expect(await screen.findByRole('button', { name: /^publish version$/i })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /^publish version$/i })).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: /^publish version$/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(policyClientMocks.publishLatestVersion).not.toHaveBeenCalled();
   });

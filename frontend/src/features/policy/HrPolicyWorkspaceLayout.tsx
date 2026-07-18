@@ -7,16 +7,12 @@ import { AIQ1107_HIDE_SECTIONS } from './aiq1107Flags';
 import type { HrPolicyLifecycleContext } from './hrPolicyLifecycle';
 import {
   COMPARISON_SUMMARY_COPY,
-  HR_POLICY_WORKSPACE_COPY,
   HrPolicyWorkspaceResolved,
-  deriveHrPolicyPrimaryAction,
 } from './hrPolicyWorkspaceState';
-import { publishImpactSentence } from './policyWorkflowCopy';
 import { comparisonBlockerMessage } from './comparisonBlockerCopy';
 import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
 import type { StarterTemplateKey } from './starterPolicyCopy';
 import type { EmployeePreviewCompareModel } from './hrPolicyEmployeePreviewCompare';
-import { COMPARISON_TIER_HEADLINE } from './hrPolicyEmployeePreviewCompare';
 
 export type HrPolicyWorkspaceLayoutProps = {
   resolved: HrPolicyWorkspaceResolved;
@@ -52,132 +48,21 @@ export type HrPolicyWorkspaceLayoutProps = {
   onScrollToDraftReviewPanel?: () => void;
 };
 
-function Badge({
-  children,
-  tone = 'neutral',
-}: {
-  children: React.ReactNode;
-  tone?: 'neutral' | 'success' | 'warning' | 'danger';
-}) {
-  const cls =
-    tone === 'success'
-      ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-      : tone === 'warning'
-        ? 'bg-amber-50 text-amber-900 border-amber-200'
-        : tone === 'danger'
-          ? 'bg-red-50 text-red-900 border-red-200'
-          : 'bg-slate-100 text-slate-800 border-slate-200';
-  return <span className={`text-xs font-medium px-2 py-0.5 rounded border ${cls}`}>{children}</span>;
-}
-
-function formatEntitlementRow(row: Record<string, unknown>): string {
-  const rawSk = row.service_key ?? row.canonical_service_key ?? row.benefit_key;
-  const sk = typeof rawSk === 'string' ? rawSk : null;
-  const rawLabel = row.label ?? row.summary ?? row.service_label;
-  const label = typeof rawLabel === 'string' ? rawLabel : sk;
-  const rawCap = row.numeric_max ?? row.max_value ?? row.standard_value;
-  const cap: string | number | null =
-    typeof rawCap === 'number' || typeof rawCap === 'string' ? rawCap : null;
-  const cur = typeof row.currency === 'string' ? row.currency : 'USD';
-  const parts = [label, cap != null ? `${cur} ${cap}` : null].filter((v): v is string => v != null && v !== '');
-  return parts.join(' · ') || (sk ?? 'Benefit');
-}
-
-function EmployeeViewComparePanels({
-  model,
-  loading,
-}: {
-  model: EmployeePreviewCompareModel;
-  loading: boolean;
-}) {
-  const Panel = ({
-    label,
-    panel,
-    testId,
-  }: {
-    label: string;
-    panel: EmployeePreviewCompareModel['current'];
-    testId: string;
-  }) => (
-    <div
-      className="rounded-lg border border-[#e5e7eb] bg-white p-4 min-h-[140px]"
-      data-testid={testId}
-    >
-      <div className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">{label}</div>
-      <div className="flex flex-wrap gap-2 mb-2">
-        <Badge tone={panel.policyVisibleToEmployees ? 'success' : 'neutral'}>
-          {panel.policyVisibleToEmployees ? 'Visible to employees' : 'Not visible to employees yet'}
-        </Badge>
-        <Badge
-          tone={
-            panel.tier === 'full' ? 'success' : panel.tier === 'partial' ? 'warning' : 'neutral'
-          }
-        >
-          {COMPARISON_TIER_HEADLINE[panel.tier]}
-        </Badge>
-      </div>
-      <p className="text-xs text-[#6b7280] mb-2">{panel.visibilityLine}</p>
-      <p className="text-sm text-[#374151] mb-2">{panel.summaryLine}</p>
-      <p className="text-xs text-[#4b5563] mb-2">{panel.tierBody}</p>
-      {panel.previewRows.length > 0 ? (
-        <ul className="space-y-1 text-sm text-[#374151] border-t border-[#f3f4f6] pt-2 mt-2">
-          {panel.previewRows.map((row, i) => (
-            <li key={i} className="flex gap-2">
-              <span className="text-[#9ca3af]">•</span>
-              <span>{formatEntitlementRow(row)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-[#9ca3af] italic mt-1">No sample rows shown.</p>
-      )}
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <div
-        className="grid md:grid-cols-2 gap-4 animate-pulse"
-        data-testid="hr-policy-employee-compare-loading"
-        aria-busy="true"
-      >
-        <div className="h-48 rounded-lg bg-slate-100 border border-slate-200" />
-        <div className="h-48 rounded-lg bg-slate-100 border border-slate-200" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`grid gap-4 ${model.showFuturePanel ? 'md:grid-cols-2' : 'md:grid-cols-1 max-w-xl'}`}
-      data-testid="hr-policy-employee-compare"
-    >
-      <Panel label="Current employee view" panel={model.current} testId="hr-policy-panel-current-employee" />
-      {model.showFuturePanel && model.future && (
-        <Panel label="If you publish this draft" panel={model.future} testId="hr-policy-panel-if-publish" />
-      )}
-    </div>
-  );
-}
-
 export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = ({
+  // AIQ-1600: the "What this means for employees" card (impact summary, primary
+  // CTA row, per-employee compare, replacement-draft warning) was removed per
+  // admin feedback. The props that only fed that card (lifecycle,
+  // documentsCount, loading, reviewUnavailable, onReviewDraftReplacement,
+  // onScrollToStarterBaselines, onRequestPublishPreflight, publishBusy,
+  // publishDataReady, employeePreviewCompare) stay in the props type so callers
+  // compile unchanged, but are no longer consumed here.
   resolved,
-  lifecycle,
-  documentsCount,
-  loading,
-  reviewUnavailable = false,
   starterTemplateBusy,
   starterError,
   onSelectStarterTemplate,
   onUploadDocument,
   onReviewDraft,
-  onReviewDraftReplacement,
-  onScrollToStarterBaselines,
   onAdjustBenefits,
-  onRequestPublishPreflight,
-  publishBusy = false,
-  publishDataReady = true,
-  employeePreviewCompare,
   onScrollToDraftReviewPanel,
   hasPublishedMatrix = false,
 }) => {
@@ -186,193 +71,16 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
   // shown above), so suppress the onboarding "get started" framing here — the
   // "Create a new policy version" section above is the correct add-a-version path.
   const matrixOnlyLive = resolved.phase === 'no_policy' && hasPublishedMatrix;
-  const copy = matrixOnlyLive
-    ? {
-        headline: 'Your compensation matrix is live',
-        subline:
-          'Employees already see your published matrix policy (shown above). There’s no separate document-based policy version here yet — use “Create a new policy version” above only if you want to add one.',
-      }
-    : HR_POLICY_WORKSPACE_COPY[resolved.phase];
-  const primaryAction = deriveHrPolicyPrimaryAction(resolved);
   const [showAllIssues, setShowAllIssues] = useState(false);
   const issueLimit = showAllIssues ? 50 : 3;
   const visibleIssues = resolved.highlightIssues.slice(0, issueLimit);
 
-
-  const renderPrimaryCta = () => {
-    switch (primaryAction) {
-      case 'start_baseline_or_upload':
-        return (
-          <Button
-            onClick={onScrollToStarterBaselines ?? onUploadDocument}
-            disabled={starterTemplateBusy !== null}
-          >
-            Choose a standard baseline
-          </Button>
-        );
-      case 'review_draft':
-        return (
-          <Button onClick={onReviewDraft} disabled={loading}>
-            Review draft
-          </Button>
-        );
-      case 'publish':
-        return (
-          <Button
-            onClick={() => onRequestPublishPreflight?.()}
-            disabled={publishBusy || loading || !publishDataReady || !onRequestPublishPreflight}
-          >
-            {publishBusy ? 'Publishing…' : 'Publish policy'}
-          </Button>
-        );
-      case 'review_replacement_draft':
-        return (
-          <Button onClick={onReviewDraftReplacement ?? onReviewDraft} disabled={loading}>
-            Review new draft
-          </Button>
-        );
-      case 'adjust_values':
-      default:
-        return (
-          <Button onClick={onAdjustBenefits} disabled={loading}>
-            Adjust policy values
-          </Button>
-        );
-    }
-  };
-
   return (
     <div className="space-y-6" data-hr-policy-workspace-layout>
-      {/* A — Status + next step.
-          Slice 3c collapses the previous 5-in-1 into one tight module
-          that answers the only question HR opens this card to ask:
-          "if I publish right now, what changes for employees?"
-          The detail surfaces (per-employee compare, visibility rules)
-          stay one click away via <details>. */}
-      <Card padding="lg" className="border-[#0b2b43]/12">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-[#0b2b43]">What this means for employees</h2>
-            <p className="text-sm text-[#4b5563] mt-1 max-w-3xl">{copy.headline}</p>
-          </div>
-          {loading && (
-            <span className="text-sm text-[#6b7280]" role="status" aria-live="polite">
-              Updating…
-            </span>
-          )}
-        </div>
-
-        {/* Phase-aware impact summary — derived from existing fields,
-            no new API call. The number-laden version
-            ("change 12 caps, add 1 benefit, no impact for DE/FR") needs
-            a per-jurisdiction breakdown from the backend; that's queued
-            as a follow-up. For now, lean on the existing copy + a
-            count-based hint from highlightIssues. */}
-        {!loading && (
-          <p className="text-sm text-[#374151] mt-3 leading-relaxed">
-            <strong className="text-[#0b2b43]">If you publish right now:</strong>{' '}
-            {publishImpactSentence(resolved, lifecycle)}
-          </p>
-        )}
-
-        {resolved.phase === 'no_policy' && documentsCount > 0 && (
-          <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-3">
-            You have {documentsCount} uploaded file{documentsCount === 1 ? '' : 's'}—finish processing in{' '}
-            <strong>Documents &amp; processing</strong> above, then return here.
-          </p>
-        )}
-
-        {reviewUnavailable && resolved.phase !== 'no_policy' && (
-          <Alert variant="info" className="mt-3">
-            The detailed policy review summary could not be loaded. You can still use the benefit table and publish
-            controls below—try refreshing if this persists.
-          </Alert>
-        )}
-
-        {resolved.hasUnpublishedDraftAhead && lifecycle.draftReplacement && (
-          <div data-testid="hr-policy-replacement-warning" className="mt-3">
-            <Alert variant="warning">
-              <div className="space-y-1">
-                <strong className="text-[#92400e]">{lifecycle.draftReplacement.title}</strong>
-                {lifecycle.draftReplacement.versionLabel && (
-                  <span className="text-xs text-[#78350f] ml-2">({lifecycle.draftReplacement.versionLabel})</span>
-                )}
-                <p className="text-sm text-[#78350f] mt-1">{lifecycle.draftReplacement.body}</p>
-              </div>
-            </Alert>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {/* AIQ-1078: when the matrix is already live, the no_policy onboarding
-              CTAs ("Start from a baseline" / "Upload company policy") duplicate
-              the "Create a new policy version" section above and re-introduce the
-              misleading first-run framing — suppress them here. */}
-          {!matrixOnlyLive && renderPrimaryCta()}
-          {!matrixOnlyLive && primaryAction === 'start_baseline_or_upload' && (
-            <Button variant="outline" onClick={onUploadDocument} disabled={starterTemplateBusy !== null}>
-              Upload company policy
-            </Button>
-          )}
-          {primaryAction === 'review_draft' && (
-            <Button variant="outline" onClick={onUploadDocument}>
-              Upload a different file
-            </Button>
-          )}
-          {primaryAction === 'publish' && (
-            <Button variant="outline" onClick={onAdjustBenefits} disabled={loading}>
-              Adjust benefits first
-            </Button>
-          )}
-          {primaryAction === 'review_replacement_draft' && (
-            <>
-              <Button variant="outline" onClick={onAdjustBenefits} disabled={loading}>
-                Adjust live policy
-              </Button>
-              <Button variant="outline" onClick={onUploadDocument}>
-                Upload another file
-              </Button>
-            </>
-          )}
-          {primaryAction === 'adjust_values' && (
-            <Button variant="outline" onClick={onUploadDocument} disabled={loading}>
-              Upload newer policy
-            </Button>
-          )}
-        </div>
-
-        {/* Per-employee compare → audit case, hidden by default. */}
-        {employeePreviewCompare && (
-          <details className="mt-4 border border-[#e5e7eb] rounded-lg bg-[#fafbfc]">
-            <summary className="cursor-pointer list-none px-4 py-2.5 text-sm font-medium text-[#0b2b43] [&::-webkit-details-marker]:hidden">
-              ▸ Show what each employee would see (today vs if you publish)
-            </summary>
-            <div className="px-4 pb-4">
-              <EmployeeViewComparePanels model={employeePreviewCompare} loading={loading} />
-            </div>
-          </details>
-        )}
-
-        {/* Visibility rules + version-history hint → reference content,
-            hidden by default. The headline + impact sentence above
-            already tell HR what they need to act. */}
-        <details className="mt-3">
-          <summary className="cursor-pointer list-none text-xs text-[#64748b] hover:text-[#0b2b43] [&::-webkit-details-marker]:hidden">
-            ▸ How visibility works
-          </summary>
-          <div className="mt-2 border-t border-[#e5e7eb] pt-3">
-            <ul className="text-xs text-[#64748b] space-y-1 list-disc list-inside">
-              {lifecycle.employeeVisibilityLines.map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
-            {lifecycle.templateUploadHint && (
-              <p className="text-xs text-[#4b5563] mt-2">{lifecycle.templateUploadHint}</p>
-            )}
-            <p className="text-xs text-[#9ca3af] mt-2">{lifecycle.versionHistoryHint}</p>
-          </div>
-        </details>
-      </Card>
+      {/* AIQ-1600: the "What this means for employees" card was removed here per
+          admin feedback (BUG-260718-C624). The sticky status strip + "Preview &
+          compare" on the policy landing carry the at-a-glance signal; canonical
+          publish stays reachable via the publish controls below. */}
 
       {/* Starter onboarding (no policy) — primary path. AIQ-1078: hidden when a
           matrix policy is already live (the "Create a new policy version"
