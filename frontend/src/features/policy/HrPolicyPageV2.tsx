@@ -74,7 +74,50 @@ type PolicyDocumentListItem = {
 
 type HrPolicyPageV2Props = {
   adminCompanyId?: string | null;
+  /** AIQ-1600: switches the parent tab bar to the Policy builder tab. Absent in
+   *  admin company-scoped mode (no tab bar there). */
+  onNavigateToBuilder?: () => void;
 };
+
+// --- Landing welcome banner (AIQ-1600) --------------------------------------
+// The /hr/policy landing opens with a status message telling HR whether a
+// policy is established. Driven by the same `hasLivePolicy` signal the rest of
+// the page uses (matrix published OR canonical version published) — no new API.
+const PolicyWelcomeBanner: React.FC<{
+  hasLivePolicy: boolean;
+  onNavigateToBuilder?: () => void;
+}> = ({ hasLivePolicy, onNavigateToBuilder }) => (
+  <Card padding="md" data-testid="hr-policy-welcome">
+    {hasLivePolicy ? (
+      <div>
+        <h2 className="text-base font-semibold text-[#0b2b43]">
+          A relocation policy is set up for your company
+        </h2>
+        <p className="text-sm text-slate-600 mt-1">
+          Preview how employees read it, and review any pending changes, in “Preview &amp; compare”
+          below.
+        </p>
+      </div>
+    ) : (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-[#0b2b43]">
+            No relocation policy is set up yet
+          </h2>
+          <p className="text-sm text-slate-600 mt-1">
+            Head to the Policy builder tab to start with a standard baseline, then publish it to
+            activate it for every new case.
+          </p>
+        </div>
+        {onNavigateToBuilder && (
+          <Button size="sm" onClick={onNavigateToBuilder} className="shrink-0">
+            Go to Policy builder
+          </Button>
+        )}
+      </div>
+    )}
+  </Card>
+);
 
 // --- Status strip -----------------------------------------------------------
 
@@ -433,7 +476,7 @@ const VersionHistorySection: React.FC<{
 
 // --- Main page --------------------------------------------------------------
 
-export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }) => {
+export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, onNavigateToBuilder }) => {
   // `setNormalized` is intentionally kept unused in this PR: the canonical
   // version is loaded inside the Detailed review drawer only. A follow-up
   // can hoist it back up here once the diff view ships.
@@ -619,6 +662,10 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       {loadError && <Alert variant="error">{loadError}</Alert>}
       {publishError && <Alert variant="error">{publishError}</Alert>}
 
+      {/* AIQ-1600: landing welcome/status message — states whether a policy is
+          established for the company. */}
+      <PolicyWelcomeBanner hasLivePolicy={hasLivePolicy} onNavigateToBuilder={onNavigateToBuilder} />
+
       {/* Sprint 2 trigger — replaces the old PolicyAssistantFab. Sits
           flush-right above the status strip so it's discoverable
           without competing with the page heading. The docked shell
@@ -667,18 +714,22 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           "Preview your draft" / "See draft vs live changes" / "See policy rules
           from your documents" accordions + the "Preview employee view" button.
           Tabs: Preview (rendered employee view) · Changes (draft-vs-live diff,
-          with the document-rules diff folded in). Data is still pre-fetched. */}
-      <PreviewCompareSection
-        matrixPayload={matrixPayload}
-        hasLivePolicy={hasLivePolicy}
-        hasDocuments={documents.length > 0}
-        adminCompanyId={adminCompanyId ?? null}
-        refreshTrigger={workspaceRefreshTrigger}
-        onRequestDetails={() => {
-          const el = document.getElementById('hr-policy-detailed-review');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
-      />
+          with the document-rules diff folded in). Data is still pre-fetched.
+          AIQ-1600: only shown once a policy is established — before that there is
+          nothing to preview or compare, so the welcome banner stands alone. */}
+      {hasLivePolicy && (
+        <PreviewCompareSection
+          matrixPayload={matrixPayload}
+          hasLivePolicy={hasLivePolicy}
+          hasDocuments={documents.length > 0}
+          adminCompanyId={adminCompanyId ?? null}
+          refreshTrigger={workspaceRefreshTrigger}
+          onRequestDetails={() => {
+            const el = document.getElementById('hr-policy-detailed-review');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      )}
 
       {/* 3. Build your next version (only shown when there is no live policy
           OR no draft in progress — once HR has a working version, the matrix

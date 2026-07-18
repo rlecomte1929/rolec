@@ -15,7 +15,7 @@ import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
 import { HrPolicyAssistantPanel } from '../features/policy/HrPolicyAssistantPanel';
 import { HrNoCompanyOnboarding, httpStatusOf } from '../features/policy/hrNoCompanyOnboarding';
-import { PolicyBenefitsSummary } from '../features/policy/PolicyBenefitsSummary';
+import { PolicyBuilderStarterTab } from '../features/policy/PolicyBuilderStarterTab';
 import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/HrPolicyBuilderV2Page';
 import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
 import { HrBenefitMixOptimizerPage } from '../features/policy/HrBenefitMixOptimizerPage';
@@ -179,9 +179,11 @@ export const HrPolicy: React.FC = () => {
         </div>
       )}
 
-      {/* Guided next-step CTA — points HR to the natural next action per tab.
-          Does not alter the tab content below. (NAV-POL-1) */}
-      {!adminCompanyId && activeTab !== 'exceptions' && activeTab !== 'qa' && activeTab !== 'optimize' && activeTab !== 'describe' && (
+      {/* Guided next-step CTA — points HR to the natural next action.
+          Does not alter the tab content below. (NAV-POL-1)
+          AIQ-1600: only on the 'policy' tab now — the reorganized builder/summary
+          tabs carry their own guidance (starter card / full builder). */}
+      {!adminCompanyId && activeTab === 'policy' && (
         <PolicyNextStepCta
           activeTab={activeTab}
           setTab={setTab}
@@ -196,19 +198,22 @@ export const HrPolicy: React.FC = () => {
             <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
           </p>
         )}
+        {/* AIQ-1600: 'builder' tab now opens with "Start with a standard baseline"
+            first; the full authoring UI moved to the 'summary' (Benefits summary)
+            tab. */}
         {(!adminCompanyId && activeTab === 'describe' && isNlPolicyBuilderEnabled())
-          ? <DescribePolicyPanel onSavedGoToBuilder={() => setTab('builder')} />
+          ? <DescribePolicyPanel onSavedGoToBuilder={() => setTab('summary')} />
           : (!adminCompanyId && activeTab === 'builder')
-          ? <HrPolicyBuilderV2Page embedded />
+          ? <PolicyBuilderStarterTab onOpenFullBuilder={() => setTab('summary')} />
           : (!adminCompanyId && activeTab === 'summary')
-          ? <PolicyBenefitsSummary />
+          ? <HrPolicyBuilderV2Page embedded />
           : (!adminCompanyId && activeTab === 'exceptions')
           ? <HrExceptionsPage embedded />
           : (!adminCompanyId && activeTab === 'qa')
           ? <HrPolicyQaTab />
           : (!adminCompanyId && activeTab === 'optimize')
           ? <HrBenefitMixOptimizerPage embedded />
-          : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
+          : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} onNavigateToBuilder={() => setTab('builder')} />
         }
       </div>
     </AppShell>

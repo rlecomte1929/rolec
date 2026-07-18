@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
   mockPolicyState,
@@ -19,13 +19,19 @@ afterEach(() => {
   cleanup();
 });
 
+// AIQ-1600: the "What this means for employees" card (impact summary, primary
+// CTA row, per-employee compare panels, replacement-draft warning) was removed
+// from HrPolicyWorkspaceLayout per admin feedback. These tests now assert the
+// surviving sections: the starter onboarding card (no_policy), the "Working
+// draft" / "Replacement draft (not live)" panel (section C), and the "Active
+// policy (live)" card (section B). Publish wiring is exercised where it now
+// lives (HrPolicyReviewWorkspace), not in this presentational layout.
 describe('HR policy lifecycle (product states)', () => {
   describe('A. no_policy', () => {
     it('shows starter onboarding, no publish CTA, no employee comparison block', () => {
       const model = resolveLayoutModelFromState('no_policy');
       expect(model.resolved.phase).toBe('no_policy');
       render(renderHrPolicyLayout(model));
-      expect(screen.getByText(/Get your relocation policy in place/i)).toBeInTheDocument();
       expect(document.getElementById('hr-policy-starter-onboarding')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^publish policy$/i })).not.toBeInTheDocument();
       expect(screen.queryByTestId('hr-policy-employee-compare')).not.toBeInTheDocument();
@@ -33,15 +39,13 @@ describe('HR policy lifecycle (product states)', () => {
   });
 
   describe('B. draft_not_publishable', () => {
-    it('shows draft-phase headline, Review draft as primary, future preview, no replacement warning without live published row', () => {
+    it('shows the Working draft panel, no publish CTA, no replacement warning without live published row', () => {
       const model = resolveLayoutModelFromState('draft_not_publishable');
       expect(model.resolved.phase).toBe('draft_not_publishable');
       render(renderHrPolicyLayout(model));
-      expect(screen.getByText(/Draft saved\. Check the benefit values below/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /review draft/i })).toBeInTheDocument();
+      expect(screen.getByText(/Working draft/i)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^publish policy$/i })).not.toBeInTheDocument();
-      expect(screen.getByTestId('hr-policy-panel-if-publish')).toBeInTheDocument();
-      expect(screen.queryByTestId('hr-policy-replacement-warning')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('hr-policy-employee-compare')).not.toBeInTheDocument();
     });
 
     it('when a published policy exists, replacement path is distinct (published + replacement state)', () => {
@@ -49,57 +53,28 @@ describe('HR policy lifecycle (product states)', () => {
       expect(replacement.resolved.hasUnpublishedDraftAhead).toBe(true);
       expect(replacement.resolved.phase).toBe('published');
       render(renderHrPolicyLayout(replacement));
-      expect(screen.getByTestId('hr-policy-replacement-warning')).toBeInTheDocument();
-    });
-  });
-
-  describe('C. ready_to_publish', () => {
-    it('shows publish CTA and opens preflight when callback provided', () => {
-      // The redundant "Ready to publish—not live yet" phase badge was
-      // dropped in slice 2 of the IA simplification — that signal is on
-      // the sticky status strip now. CTA + preflight wiring still tested.
-      const onPreflight = vi.fn();
-      const model = resolveLayoutModelFromState('ready_to_publish');
-      expect(model.resolved.phase).toBe('ready_to_publish');
-      render(
-        renderHrPolicyLayout(model, {
-          onRequestPublishPreflight: onPreflight,
-        })
-      );
-      fireEvent.click(screen.getByRole('button', { name: /publish policy/i }));
-      expect(onPreflight).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/Replacement draft \(not live\)/i)).toBeInTheDocument();
     });
   });
 
   describe('D. published (no replacement draft)', () => {
-    it('shows live policy card and employee compare without replacement messaging', () => {
+    it('shows live policy card without replacement messaging', () => {
       const model = resolveLayoutModelFromState('published');
       expect(model.resolved.phase).toBe('published');
       expect(model.resolved.hasUnpublishedDraftAhead).toBe(false);
       render(renderHrPolicyLayout(model));
       expect(screen.getByText(/Active policy \(live\)/i)).toBeInTheDocument();
-      // Slice 3c replaced the verbose "This published version is what relocating
-      // employees see today..." subline with a tight "If you publish right now: …"
-      // impact sentence. For the published-no-replacement case it reads "no
-      // immediate change". The longer copy is gone by design.
-      expect(screen.getByText(/no immediate change/i)).toBeInTheDocument();
-      expect(screen.getByTestId('hr-policy-employee-compare')).toBeInTheDocument();
-      expect(screen.getByTestId('hr-policy-panel-current-employee')).toBeInTheDocument();
-      expect(screen.queryByTestId('hr-policy-panel-if-publish')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('hr-policy-replacement-warning')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('hr-policy-employee-compare')).not.toBeInTheDocument();
       expect(screen.queryByText(/Replacement draft/i)).not.toBeInTheDocument();
     });
   });
 
   describe('E. published + replacement draft', () => {
-    it('shows replacement warning, both compare panels, Review new draft CTA', () => {
+    it('shows the Replacement draft (not live) panel', () => {
       const model = resolveLayoutModelFromState('published_replacement_draft');
       expect(model.resolved.hasUnpublishedDraftAhead).toBe(true);
       render(renderHrPolicyLayout(model));
-      expect(screen.getByTestId('hr-policy-replacement-warning')).toBeInTheDocument();
-      expect(screen.getByTestId('hr-policy-panel-current-employee')).toBeInTheDocument();
-      expect(screen.getByTestId('hr-policy-panel-if-publish')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /review new draft/i })).toBeInTheDocument();
+      expect(screen.getByText(/Replacement draft \(not live\)/i)).toBeInTheDocument();
     });
   });
 
@@ -125,8 +100,8 @@ describe('Operational copy hygiene (no internal jargon in HR workspace strings)'
   });
 });
 
-describe('Edge: partial resolver output still drives draft headline', () => {
-  it('shows draft banner when phase stays draft_not_publishable', () => {
+describe('Edge: partial resolver output still drives the draft panel', () => {
+  it('shows the Working draft panel when phase stays draft_not_publishable', () => {
     const synthetic: HrPolicyWorkspaceResolved = {
       phase: 'draft_not_publishable',
       hasUnpublishedDraftAhead: false,
@@ -175,6 +150,6 @@ describe('Edge: partial resolver output still drives draft headline', () => {
         employeePreviewCompare={employeePreviewCompare}
       />
     );
-    expect(screen.getByText(/Draft saved\. Check the benefit values below/i)).toBeInTheDocument();
+    expect(screen.getByText(/Working draft/i)).toBeInTheDocument();
   });
 });
