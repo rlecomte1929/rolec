@@ -11,9 +11,16 @@ export function posthogAppHost(): string {
   return (env.posthogHost || 'https://eu.i.posthog.com').replace('.i.posthog.com', '.posthog.com');
 }
 
-/** A person's PostHog page (their events + session recordings). Needs no project id. */
+/**
+ * A person's PostHog page (their events + session recordings). PostHog person pages
+ * are project-scoped, so include the project id when configured; otherwise fall back
+ * to the bare /person path (PostHog resolves it against the default project).
+ */
 export function posthogPersonUrl(distinctId: string): string {
-  return `${posthogAppHost()}/person/${encodeURIComponent(distinctId)}`;
+  const host = posthogAppHost();
+  const pid = env.posthogProjectId;
+  const id = encodeURIComponent(distinctId);
+  return pid ? `${host}/project/${encodeURIComponent(pid)}/person/${id}` : `${host}/person/${id}`;
 }
 
 /**
