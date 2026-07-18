@@ -138,21 +138,22 @@ describe('EmployeeCaseRoadmapPage — HR review gate', () => {
     // The roadmap is fully visible — this is the whole point of the change.
     expect((await screen.findAllByText('Apply for work visa')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Immigration & visas').length).toBeGreaterThan(0);
-    // ...and they are told why they can't start yet.
+    // ...and they're told HR is reviewing (AIQ-1606: non-blocking — they can still act).
     expect(screen.getByText('Your HR team is reviewing this plan')).toBeInTheDocument();
   });
 
-  it('blocks the ACTIONS while HR is reviewing', async () => {
+  it('stays fully interactive while HR is reviewing (AIQ-1606 non-blocking tag)', async () => {
     fetchRelocationPlanView.mockResolvedValue({ ...READY_PLAN, roadmap_released: false });
     renderPage();
     await screen.findByText('Your HR team is reviewing this plan');
 
-    // Nothing to validate yet — the server would 409 anyway.
-    expect(screen.queryByText(/Validate & start tasks/)).not.toBeInTheDocument();
-    // And every task CTA is disabled.
+    // AIQ-1606: under-review is a non-blocking, informational tag — the employee can
+    // validate and start tasks immediately. The validate footer is shown...
+    expect(screen.getByText(/Validate & start tasks/)).toBeInTheDocument();
+    // ...and every task CTA is enabled.
     const ctas = screen.queryAllByRole('button', { name: /Start now|Continue/ });
     expect(ctas.length).toBeGreaterThan(0);
-    ctas.forEach((b) => expect(b).toBeDisabled());
+    ctas.forEach((b) => expect(b).not.toBeDisabled());
   });
 
   it('unlocks everything once HR approves', async () => {
