@@ -67,4 +67,4 @@ services:
         value: camera=(), microphone=(), geolocation=()
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' https://us-assets.i.posthog.com; worker-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.relopass.com https://us.i.posthog.com https://us-assets.i.posthog.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        value: "default-src 'self'; script-src 'self' https://eu-assets.i.posthog.com; worker-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.relopass.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
