@@ -54,16 +54,53 @@ def _app_base_url() -> str:
 
 # ── Recipient ────────────────────────────────────────────────────────────────────────
 
-_RECIPIENT_SQL = _sql_text(
-    """
-    SELECT u.email                                   AS email,
-           COALESCE(NULLIF(TRIM(u.name), ''), u.email) AS hr_name,
+# An HR id (case_assignments.hr_user_id / hr_users.profile_id) can resolve an email from any
+# of three id systems — legacy `users`, `profiles`, or Supabase `auth.users` — and which one
+# holds it varies per HR (prod: 61 via users, 40 via profiles, 6 via auth, mostly disjoint).
+# So every lookup COALESCEs across all three rather than betting on `users` alone.
+_EMAIL_EXPR = (
+    "COALESCE(NULLIF(TRIM(u.email), ''), NULLIF(TRIM(p.email), ''), NULLIF(TRIM(au.email), ''))"
+)
+_NAME_EXPR = (
+    "COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(p.full_name), ''), "
+    "NULLIF(TRIM(u.email), ''), NULLIF(TRIM(p.email), ''), NULLIF(TRIM(au.email), ''))"
+)
+_HR_EMAIL_JOINS = (
+    "LEFT JOIN public.users u    ON u.id::text  = {hr}\n"
+    "    LEFT JOIN public.profiles p ON p.id::text  = {hr}\n"
+    "    LEFT JOIN auth.users au      ON au.id::text = {hr}"
+)
+
+# Tier 1 — the HR actually assigned to the case (matched on either id-space).
+_ASSIGNED_HR_SQL = _sql_text(
+    f"""
+    SELECT {_EMAIL_EXPR} AS email,
+           {_NAME_EXPR}  AS hr_name,
            TRIM(COALESCE(ca.employee_first_name, '') || ' ' ||
-                COALESCE(ca.employee_last_name, ''))   AS employee_name
+                COALESCE(ca.employee_last_name, '')) AS employee_name
     FROM public.case_assignments ca
-    JOIN public.users u ON u.id::text = ca.hr_user_id::text
+    {_HR_EMAIL_JOINS.format(hr='ca.hr_user_id::text')}
     WHERE (ca.case_id::text = :cid OR ca.canonical_case_id::text = :cid)
-      AND COALESCE(NULLIF(TRIM(u.email), ''), NULL) IS NOT NULL
+      AND {_EMAIL_EXPR} IS NOT NULL
+    ORDER BY ca.created_at
+    LIMIT 1
+    """
+)
+
+# Tier 2 — no assignment resolved an emailable HR: fall back to the case's COMPANY and its
+# earliest-created HR who has an email. Deterministic (ORDER BY created_at) so ">1 HR" always
+# picks the same person. Keyed on public.cases.id (the canonical/wizard case id).
+_COMPANY_HR_SQL = _sql_text(
+    f"""
+    SELECT {_EMAIL_EXPR} AS email,
+           {_NAME_EXPR}  AS hr_name,
+           '' AS employee_name
+    FROM public.cases c
+    JOIN public.hr_users hu ON hu.company_id::text = c.company_id::text
+    {_HR_EMAIL_JOINS.format(hr='hu.profile_id::text')}
+    WHERE c.id::text = :cid
+      AND {_EMAIL_EXPR} IS NOT NULL
+    ORDER BY hu.created_at
     LIMIT 1
     """
 )
@@ -72,12 +109,17 @@ _RECIPIENT_SQL = _sql_text(
 def resolve_hr_recipient(case_id: str) -> Optional[Dict[str, Any]]:
     """The HR owner to email for a case, or None when nobody can be reached.
 
-    None is a real, expected answer — not an error. The caller records it as
-    ``unreachable`` so it shows up in the metrics instead of vanishing.
+    Two tiers: (1) the HR assigned to the case; (2) failing that, the case's company's
+    earliest-created HR with an email. Each tier resolves the email across users/profiles/
+    auth.users. None is a real, expected answer — the caller records it as ``unreachable``
+    so it shows up in the metrics instead of vanishing.
     """
+    cid = str(case_id)
     try:
         with _engine().connect() as conn:
-            row = conn.execute(_RECIPIENT_SQL, {"cid": str(case_id)}).fetchone()
+            row = conn.execute(_ASSIGNED_HR_SQL, {"cid": cid}).fetchone()
+            if row is None:
+                row = conn.execute(_COMPANY_HR_SQL, {"cid": cid}).fetchone()
     except Exception as exc:  # noqa: BLE001
         log.warning("roadmap notify: recipient lookup failed for %s: %s", case_id, exc)
         return None
