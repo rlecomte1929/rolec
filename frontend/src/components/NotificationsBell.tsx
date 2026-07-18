@@ -16,7 +16,6 @@ import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import {
   listNotifications,
-  getUnreadCount,
   markNotificationRead,
   type NotificationListItem,
 } from '../api/notifications';
@@ -50,12 +49,14 @@ export const NotificationsBell: React.FC = () => {
 
   const refresh = useCallback(async () => {
     try {
-      const [list, count] = await Promise.all([
-        listNotifications({ limit: 20 }),
-        getUnreadCount(),
-      ]);
+      const list = await listNotifications({ limit: 20 });
       setItems(list);
-      setUnread(count);
+      // [AIQ-1618] Reconcile the badge with the list actually shown (single source of
+      // truth): derive the unread count from the fetched notifications, so the badge can
+      // never appear over an empty "No notifications yet" panel. The separate
+      // /unread-count aggregate could over-count rows the list endpoint filters out,
+      // producing a red dot with nothing behind it.
+      setUnread(list.filter((n) => !n.read_at).length);
     } catch {
       /* transient — keep last good state */
     }
