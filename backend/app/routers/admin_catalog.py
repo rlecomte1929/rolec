@@ -596,3 +596,56 @@ def import_discovered(
             except ValueError:
                 continue  # skip individual invalid rows, keep importing the rest
     return {"created": created, "requested": len(body.items)}
+
+
+# ---------------------------------------------------------------------------
+# HR supplier-submission moderation queue (AIQ-1602 Seg 4) — admin reviews and
+# approves HR-proposed suppliers into public.suppliers, or rejects them.
+# ---------------------------------------------------------------------------
+
+
+class ResolveSubmissionBody(BaseModel):
+    action: str  # 'approve' | 'reject'
+    notes: Optional[str] = None
+
+
+@router.get("/supplier-submissions")
+def list_supplier_submissions(
+    status: Optional[str] = Query(default=None),
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    from ..services import hr_supplier_submissions
+
+    return {"submissions": hr_supplier_submissions.list_all(status=status)}
+
+
+@router.patch("/supplier-submissions/{submission_id}")
+def resolve_supplier_submission(
+    submission_id: str,
+    body: ResolveSubmissionBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    from ..services import hr_supplier_submissions
+    from ..services.supplier_registry import DuplicateSupplierError
+
+    action = (body.action or "").strip().lower()
+    try:
+        if action == "approve":
+            return hr_supplier_submissions.approve(
+                submission_id=submission_id, reviewed_by=user.get("id")
+            )
+        if action == "reject":
+            return hr_supplier_submissions.reject(
+                submission_id=submission_id,
+                reviewed_by=user.get("id"),
+                notes=body.notes or "",
+            )
+        raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
+    except hr_supplier_submissions.SubmissionNotFound:
+        raise HTTPException(status_code=404, detail="submission not found")
+    except hr_supplier_submissions.SubmissionNotPending as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except DuplicateSupplierError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
