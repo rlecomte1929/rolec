@@ -1,10 +1,12 @@
 /**
- * "Feedback & Work" tab — the Inbox is now the only view.
+ * "Feedback & Work" — Inbox + Product metrics tabs.
  *
- * AIQ-1565 (BUG-260716-BB94) retired the Work board sub-view and its toggle. These tests
- * pin the new contract: no tabs, Inbox always, and a stale `?view=work` bookmark still
- * lands on the Inbox rather than a blank screen. FeedbackTab is stubbed to keep its API
- * and the supabase client out of jsdom.
+ * AIQ-1565 (BUG-260716-BB94) retired the old Work board sub-view. The page later
+ * gained two content tabs — Inbox (default) and Product metrics (mirrored PostHog
+ * events). These tests pin: Inbox renders by default, both content tabs exist, the
+ * Work board stays retired, and a stale `?view=work` bookmark still lands on the
+ * Inbox. FeedbackTab and ProductMetricsTab are stubbed to keep their APIs — and the
+ * supabase client — out of jsdom.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
@@ -15,6 +17,9 @@ expect.extend(matchers);
 
 vi.mock('../../components/admin/FeedbackTab', () => ({
   FeedbackTab: () => <div data-testid="inbox-view">inbox</div>,
+}));
+vi.mock('../../components/admin/ProductMetricsTab', () => ({
+  ProductMetricsTab: () => <div data-testid="metrics-view">metrics</div>,
 }));
 vi.mock('./AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -33,15 +38,18 @@ function renderAt(path: string) {
 }
 
 describe('AdminFeedback (Feedback & Work)', () => {
-  it('renders the Inbox', () => {
+  it('renders the Inbox by default', () => {
     renderAt('/admin/feedback');
     expect(screen.getByTestId('inbox-view')).toBeInTheDocument();
+    // Product metrics tab exists but its panel is not the default view.
+    expect(screen.queryByTestId('metrics-view')).toBeNull();
   });
 
-  it('shows no sub-view tabs — the Inbox is the only view', () => {
+  it('exposes Inbox + Product metrics tabs; the Work board stays retired', () => {
     renderAt('/admin/feedback');
-    expect(screen.queryByRole('tablist')).toBeNull();
-    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getByRole('tablist')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /inbox/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /product metrics/i })).toBeInTheDocument();
     expect(screen.queryByText(/work board/i)).toBeNull();
   });
 
