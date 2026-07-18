@@ -130,6 +130,9 @@ def request_changes(
     reviewer_id = str(hr_user.get("id") or "")
     with SessionLocal() as db:
         row = _load_or_create(db, case_id)
+        # AIQ-1608: capture prior state to dedupe an identical re-request (see below).
+        prior_released = row.released_to_user
+        prior_notes = (row.notes or "").strip()
         row.released_to_user = False
         row.regeneration_requested = True
         row.reviewer_id = reviewer_id
@@ -141,7 +144,27 @@ def request_changes(
 
     _invalidate(case_id)
     log.info("hr roadmap review: case %s sent back by %s", case_id, reviewer_id)
+
+    # AIQ-1608: close the loop with the employee — email + in-app carrying the HR note.
+    # Idempotent: skip an identical re-request (already-not-released AND same note) so a
+    # double-click doesn't double-notify; a NEW round (different note, or after approve)
+    # notifies again. Fail-soft: a notification problem must NEVER fail the HR decision.
+    if _is_new_change_round(prior_released, prior_notes, notes):
+        try:
+            from ..services.roadmap_review_notification import notify_employee_roadmap_changes
+
+            notify_employee_roadmap_changes(case_id, notes)
+        except Exception as exc:  # noqa: BLE001 — notify must not fail the decision
+            log.warning("hr roadmap review: employee change-notify failed for %s: %s", case_id, exc)
     return dto
+
+
+def _is_new_change_round(prior_released, prior_notes, new_notes: str) -> bool:
+    """AIQ-1608 idempotency: notify the employee only on a genuine change-request round.
+    An identical re-request (already not-released AND same note) is a no-op — don't
+    re-notify. A first request, a changed note, or a request after an approve → new round.
+    """
+    return not (prior_released is False and (prior_notes or "").strip() == (new_notes or "").strip())
 
 
 def _invalidate(case_id: str) -> None:

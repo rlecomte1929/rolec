@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Dict, Optional
 
 from sqlalchemy import text as _sql_text
@@ -300,3 +301,130 @@ def notify_hr_roadmap_pending(
         log.error("roadmap notify: unexpected failure for case %s: %s", case_id, exc, exc_info=True)
         _record(case_id, _STATUS_ERROR, None)
         return {"status": _STATUS_ERROR, "case_id": case_id}
+
+
+# ── AIQ-1608: notify the EMPLOYEE when HR requests roadmap changes ─────────────────────
+# Sibling of notify_hr_roadmap_pending, but the recipient is the employee. Email always;
+# in-app is guarded because notifications.user_id is uuid until #1543 lands in prod, so a
+# legacy-text employee id would 500 the insert (mirrors exception_requests._notify_...).
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+# Employee-keyed clone of the assigned-HR lookup: resolve the employee's email + id across
+# users / profiles / auth.users (same COALESCE strategy as the HR recipient).
+_EMPLOYEE_RECIPIENT_SQL = _sql_text(
+    f"""
+    SELECT {_EMAIL_EXPR} AS email,
+           {_NAME_EXPR}  AS employee_name,
+           ca.employee_user_id::text AS employee_user_id
+    FROM public.case_assignments ca
+    {_HR_EMAIL_JOINS.format(hr='ca.employee_user_id::text')}
+    WHERE (ca.case_id::text = :cid OR ca.canonical_case_id::text = :cid)
+    ORDER BY ca.created_at
+    LIMIT 1
+    """
+)
+
+
+def _resolve_employee_recipient(case_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        with _engine().connect() as conn:
+            row = conn.execute(_EMPLOYEE_RECIPIENT_SQL, {"cid": str(case_id)}).fetchone()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("roadmap change-notify: employee lookup failed for %s: %s", case_id, exc)
+        return None
+    if not row:
+        return None
+    m = row._mapping
+    return {
+        "email": (m["email"] or "").strip() or None,
+        "employee_name": (m["employee_name"] or "").strip() or "there",
+        "employee_user_id": (m["employee_user_id"] or "").strip() or None,
+    }
+
+
+def _render_change_email(*, employee_name: str, corridor: str, notes: str, case_id: str) -> Dict[str, str]:
+    where = f" ({corridor})" if corridor else ""
+    link = f"{_app_base_url()}/employee/case/{case_id}/roadmap"
+    subject = "Your relocation roadmap needs an update"
+    plain = (
+        f"Hi {employee_name},\n\n"
+        f"Your HR team reviewed your relocation roadmap{where} and asked for some changes "
+        f"before it's finalised.\n\n"
+        f"What they noted:\n{notes}\n\n"
+        f"Your roadmap stays visible in the meantime, marked \"Under HR review\" — keep "
+        f"preparing, and we'll let you know when the updated version is ready.\n\n"
+        f"View your roadmap: {link}\n"
+    )
+    return {"subject": subject, "plain": plain}
+
+
+def notify_employee_roadmap_changes(
+    case_id: str,
+    notes: str,
+    *,
+    dry_run: bool = False,
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Tell the employee HR requested roadmap changes, carrying the HR note. Email
+    (Resend) + in-app (guarded). NEVER RAISES — a notification problem must never fail
+    the HR decision. Does not log the raw note."""
+    result: Dict[str, Any] = {"case_id": case_id, "email_status": "skipped", "inapp": "skipped"}
+    try:
+        recipient = _resolve_employee_recipient(case_id)
+        if not recipient:
+            log.info("roadmap change-notify: no employee recipient for %s", case_id)
+            return {**result, "status": "unreachable"}
+
+        # ── email ──
+        if recipient["email"] and not dry_run:
+            from .assignment_invite_email import _resend_send
+
+            msg = _render_change_email(
+                employee_name=recipient["employee_name"],
+                corridor=_corridor(case_id),
+                notes=notes,
+                case_id=case_id,
+            )
+            res = _resend_send(
+                to_email=recipient["email"],
+                subject=msg["subject"],
+                plain=msg["plain"],
+                request_id=request_id,
+                context="roadmap_changes_employee",
+            )
+            result["email_status"] = str(res.get("status", "error"))
+        elif not recipient["email"]:
+            result["email_status"] = "no_email"
+
+        # ── in-app (guarded: notifications.user_id is uuid until #1543) ──
+        emp_id = recipient["employee_user_id"]
+        if emp_id and _UUID_RE.match(str(emp_id)):
+            try:
+                from ...database import db
+
+                db.create_notification_with_preferences(
+                    user_id=str(emp_id),
+                    type_="roadmap_changes_requested",
+                    title="Your HR team requested roadmap changes",
+                    body=f"HR asked for changes to your relocation roadmap. Note: {notes}",
+                    case_id=str(case_id),
+                    metadata={"event": "roadmap_changes_requested"},
+                )
+                result["inapp"] = "written"
+            except Exception:  # noqa: BLE001 — in-app must not fail the decision
+                log.warning("roadmap change-notify: in-app write failed for %s (suppressed)", case_id)
+                result["inapp"] = "error"
+        elif emp_id:
+            log.warning(
+                "roadmap change-notify: EMPLOYEE IN-APP SKIPPED (legacy non-uuid id) case=%s — "
+                "notifications.user_id is uuid until #1543",
+                case_id,
+            )
+            result["inapp"] = "skipped_legacy_id"
+        return {**result, "status": "ok"}
+    except Exception as exc:  # noqa: BLE001 — must never fail the HR decision
+        log.warning("roadmap change-notify failed for %s (suppressed): %s", case_id, exc)
+        return {**result, "status": "error"}
