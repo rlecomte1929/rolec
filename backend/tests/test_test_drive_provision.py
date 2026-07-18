@@ -127,6 +127,44 @@ class TestTestDriveProvision(unittest.TestCase):
         db.engine.begin.assert_called()
         self.assertEqual(sync.call_count, 2)
 
+    def test_provision_seeds_published_policy(self):
+        # [AIQ-1621] Provisioning a test-drive pair seeds a PUBLISHED default policy for the
+        # new company, so the employee benefit flow is active without the tester building one.
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"), \
+                patch("backend.app.routers.test_drive._seed_default_published_policy") as seed:
+            resp = self.client.post("/api/test-drive/provision", json=_body())
+        self.assertEqual(resp.status_code, 200, resp.text)
+        seed.assert_called_once()
+        self.assertEqual(seed.call_args.args[0], "company-1")  # company_id
+
+    def test_seed_helper_publishes_the_canonical_default(self):
+        # [AIQ-1621] The seed helper ensures a draft (auto-seeds the canonical default matrix)
+        # then publishes it — so GET /api/hr/policy-config/published returns a live policy.
+        from backend.app.routers import test_drive as td
+        with patch.object(td, "db", MagicMock()), \
+                patch(
+                    "backend.app.services.policy_config_matrix_service.PolicyConfigMatrixService"
+                ) as Svc:
+            td._seed_default_published_policy("company-1", "hr-1")
+        svc = Svc.return_value
+        svc.ensure_draft.assert_called_once_with("company-1", created_by="hr-1")
+        svc.publish_draft.assert_called_once_with(
+            "company-1", policy_version_id=None, created_by="hr-1"
+        )
+
+    def test_seed_helper_never_raises_on_failure(self):
+        # Best-effort: a seed failure must never break provisioning.
+        from backend.app.routers import test_drive as td
+        with patch.object(td, "db", MagicMock()), \
+                patch(
+                    "backend.app.services.policy_config_matrix_service.PolicyConfigMatrixService",
+                    side_effect=RuntimeError("boom"),
+                ):
+            td._seed_default_published_policy("company-1", "hr-1")  # must not raise
+
     def test_no_segment_defaults_null_not_prospect(self):
         """TD-FIX-2 (AIQ-1503): single-link provision with no segment writes NULL to
         test_sessions, not a silent 'prospect'."""
