@@ -3,9 +3,10 @@ import {
   ClipboardCheck, Plane, Search, Filter, ChevronRight, ChevronLeft,
   Calendar, Shield, Briefcase, User, Building2, Users, AlertTriangle,
   CheckCircle2, Clock, Circle, XCircle, ArrowUpRight, FileCheck,
-  Globe, Package, Scale, Home, GraduationCap, ArrowRight,
+  Globe, Package, Scale, Home, GraduationCap, ArrowRight, Route, LayoutList,
 } from 'lucide-react';
 import { tw } from '../../lib/colors';
+import CorridorCheck from './CorridorCheck';
 import {
   DEMO_CASES,
   MARCUS_OBI_DETAIL,
@@ -432,7 +433,19 @@ function CaseDetailPanel({ detail, onBack }: { detail: CaseDetail; onBack?: () =
 
 // ─── Main App ────────────────────────────────────────────────────────────────
 
+type CaseCommandView = 'cases' | 'check';
+
+/** Default to the corridor check when returning from a Stripe payment redirect. */
+function initialView(): CaseCommandView {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success' && params.get('caseId')) return 'check';
+  } catch { /* ignore */ }
+  return 'cases';
+}
+
 export default function CaseCommand() {
+  const [view, setView] = useState<CaseCommandView>(initialView);
   const [cases] = useState(DEMO_CASES);
   const [selectedId, setSelectedId] = useState(MARCUS_OBI_DETAIL.case.id);
   const [filterStatus, setFilterStatus] = useState<'all' | CaseStatus>('all');
@@ -483,12 +496,40 @@ export default function CaseCommand() {
               </p>
             </div>
           </div>
-          <span className="hidden sm:inline px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]">
-            Live demo
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-[var(--space-border-default)] overflow-hidden">
+              <button
+                onClick={() => setView('cases')}
+                className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${
+                  view === 'cases' ? tw.button.primary : 'bg-[var(--space-surface-card)] text-[var(--space-text-secondary)] hover:bg-[var(--space-surface-muted)]'
+                }`}
+                title="Case dashboard"
+              >
+                <LayoutList className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Cases</span>
+              </button>
+              <button
+                onClick={() => setView('check')}
+                className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${
+                  view === 'check' ? tw.button.primary : 'bg-[var(--space-surface-card)] text-[var(--space-text-secondary)] hover:bg-[var(--space-surface-muted)]'
+                }`}
+                title="France → Norway corridor check"
+              >
+                <Route className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Corridor check</span>
+              </button>
+            </div>
+            <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]">
+              {view === 'check' ? 'FR → NO' : 'Live demo'}
+            </span>
+          </div>
         </div>
       </div>
 
+      {view === 'check' ? (
+        <div className="flex-1 overflow-y-auto">
+          <CorridorCheck />
+        </div>
+      ) : (
+      <>
       {/* Metrics strip */}
       <div className="px-5 py-3 border-b border-[var(--space-border-default)] bg-[var(--space-surface-panel)]">
         <div className="grid grid-cols-4 gap-3 max-w-2xl">
@@ -592,6 +633,8 @@ export default function CaseCommand() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

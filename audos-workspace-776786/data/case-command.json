@@ -1,0 +1,28 @@
+{
+  "defaultCaseId": "case-sarah-chen",
+  "primaryCase": {
+    "employeeName": "Sarah Chen",
+    "role": "Senior Product Manager",
+    "origin": "Singapore",
+    "originCode": "SG",
+    "destination": "London",
+    "destinationCode": "UK",
+    "status": "At Risk",
+    "moveDate": "2026-08-15",
+    "coordinator": "Thomas Keller",
+    "riskNote": "IR21 tax clearance at risk — may block departure payroll"
+  },
+  "secondaryCase": {
+    "employeeName": "Camille Dubois",
+    "origin": "France",
+    "originCode": "FR",
+    "destination": "Oslo",
+    "destinationCode": "NO",
+    "caseReference": "GIQ-2024-FR-NO-00001",
+    "obligationsSource": "workspace-db:case_obligations (case_id 1)"
+  },
+  "caseCount": 8,
+  "views": ["cases", "corridor-check"],
+  "caseTabs": ["overview", "obligations"],
+  "corridor": "france-norway"
+}

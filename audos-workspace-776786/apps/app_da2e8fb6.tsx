@@ -8,38 +8,39 @@ interface NavLink {
   href: string;
 }
 
-interface Benefit {
+interface ProblemCard {
   title: string;
   description: string;
-  metric: string;
-  icon: string;
+  tag: string;
 }
 
-interface Feature {
+interface Capability {
   title: string;
   description: string;
-  steps: string[];
   badge: string;
 }
 
-interface FAQ {
-  question: string;
-  answer: string;
+interface CaseRow {
+  id: string;
+  corridor: string;
+  stage: string;
+  status: 'On track' | 'Action needed' | 'Blocked';
+  due: string;
+}
+
+interface TimelineStep {
+  label: string;
+  state: 'done' | 'active' | 'upcoming';
+}
+
+interface AudienceMention {
+  title: string;
+  description: string;
 }
 
 interface FooterLink {
   label: string;
   href: string;
-}
-
-interface PricingTier {
-  name: string;
-  price: string;
-  description: string;
-  items: string[];
-  cta: string;
-  href: string;
-  featured?: boolean;
 }
 
 interface Stat {
@@ -49,7 +50,7 @@ interface Stat {
 
 // === SECTION 2: CONSTANTS AND CONFIGURATION ===
 const WORKSPACE_BRAND_NAME = 'ReloPass';
-const WORKSPACE_TAGLINE = 'Global moves, intelligently managed.';
+const WORKSPACE_TAGLINE = 'Global mobility. Structured.';
 const WORKSPACE_PRIMARY_COLOR = '#2a93e0';
 const WORKSPACE_HIGHLIGHT_COLOR = '#38c6de';
 const WORKSPACE_CONTRAST_COLOR = '#2a93e0';
@@ -74,6 +75,13 @@ const WORKSPACE_LOGO_ON_DARK_URL = 'https://storage.googleapis.com/audos-images/
 const WORKSPACE_SPACE_URL = '/space/workspace-776786';
 const WORKSPACE_HERO_VIDEO_URL = 'https://storage.googleapis.com/audos-images/generated-videos/openrouter-l90i9EtMD6gCM1CCicN7-1782744970847.mp4';
 
+const CONTACT_EMAIL = 'contact@relopass.com';
+const DEMO_HREF = 'mailto:contact@relopass.com?subject=Book%20a%20demo';
+const CONVERSATION_HREF = 'mailto:contact@relopass.com?subject=How%20our%20relocations%20run%20today';
+const BRAND_PROMISE = 'Every relocation case is visible, compliant, on-time.';
+const POSITIONING_LINE = 'Structure every relocation.';
+const CONVERSATIONAL_CTA = 'Tell us how your relocations run today';
+
 const VISUAL_CONFIG = {
   radius: 'rounded-xl',
   cardShadow: 'shadow-md',
@@ -83,176 +91,180 @@ const VISUAL_CONFIG = {
 
 // === SECTION 3: STRUCTURED CONTENT DATA ===
 const NAV_LINKS: NavLink[] = [
-  { label: 'Platform', href: '#features' },
-  { label: 'Why', href: '#faq' },
-  { label: 'Trust', href: '#hero' },
-  { label: 'Access', href: WORKSPACE_SPACE_URL },
-];
-
-const BENEFITS: Benefit[] = [
-  {
-    title: 'Replace scattered spreadsheets',
-    description: 'Centralize every move, approval, vendor touchpoint, deadline, and document so HR teams stop chasing status updates across tools.',
-    metric: '1 command center',
-    icon: '◎',
-  },
-  {
-    title: 'Lower compliance exposure',
-    description: 'Keep immigration, tax, policy, and audit checkpoints visible throughout each employee relocation journey.',
-    metric: 'Always audit-ready',
-    icon: '✓',
-  },
-  {
-    title: 'Move faster with confidence',
-    description: 'Automated roadmaps turn days of manual specialist coordination into a guided workflow your team can trust.',
-    metric: 'Days saved per case',
-    icon: '↗',
-  },
-];
-
-const FEATURES: Feature[] = [
-  {
-    title: 'Move Roadmaps',
-    description:
-      'Generate a personalized step-by-step relocation roadmap for each employee move, including policy decisions, deadlines, vendors, documents, immigration, tax, and compliance checkpoints.',
-    steps: ['Policy fit confirmed', 'Documents requested', 'Tax and immigration checkpoints mapped', 'Vendor tasks sequenced'],
-    badge: 'Personalized journey',
-  },
-  {
-    title: 'Case Command',
-    description:
-      'Track every active relocation from one command center. Surface delays, missing documents, upcoming deadlines, and compliance risks across all cases — without chasing status updates by email.',
-    steps: ['Live case status', 'Deadline monitoring', 'Vendor and approval visibility', 'Risk flags before they escalate'],
-    badge: 'Operational control',
-  },
-  {
-    title: 'Relocation Tasks',
-    description:
-      'Turn every roadmap into assigned, trackable work. ReloPass automates reminders, routes approvals, and triggers compliance checks so nothing slips between HR, vendors, and the employee on the move.',
-    steps: ['Auto-assigned next actions', 'Automated reminders', 'Approval and document routing', 'Full audit trail per case'],
-    badge: 'Automated follow-through',
-  },
-];
-
-const FAQS: FAQ[] = [
-  {
-    question: 'Can we start using ReloPass without a complex implementation?',
-    answer:
-      'Yes. ReloPass is designed for SME mobility teams that need clarity quickly. You can start with a guided move roadmap, add employee details, and build a compliant relocation plan without rebuilding your HR stack.',
-  },
-  {
-    question: 'What does the free plan include?',
-    answer:
-      'The free experience helps you explore structured relocation planning, create an initial move roadmap, and understand how ReloPass organizes policy decisions, documents, vendors, and compliance checkpoints.',
-  },
-  {
-    question: 'When should we upgrade to a paid plan?',
-    answer:
-      'Upgrade when your team is managing multiple active moves, coordinating vendors, or needs stronger oversight across deadlines, approvals, documents, and compliance risks. Start free, upgrade when you are ready.',
-  },
-  {
-    question: 'Does ReloPass replace immigration or tax advisors?',
-    answer:
-      'ReloPass does not replace licensed advisors. It helps HR and mobility teams coordinate the process, track requirements, and keep expert inputs organized inside a clear relocation workflow.',
-  },
-  {
-    question: 'How does ReloPass reduce compliance risk?',
-    answer:
-      'ReloPass makes every relocation step visible, assigns checkpoints, tracks required documents, and highlights risk areas before small oversights become costly delays.',
-  },
-];
-
-const FOOTER_LINKS: FooterLink[] = [
-  { label: 'Platform', href: '#features' },
-  { label: 'Why', href: '#faq' },
-  { label: 'Trust', href: '#hero' },
-  { label: 'Access', href: '#access' },
-  { label: 'Login', href: '/login' },
-  { label: 'Register', href: '/register' },
-  { label: 'Contact', href: 'mailto:contact@relopass.com' },
-  { label: 'Start free', href: WORKSPACE_SPACE_URL },
+  { label: 'Problem', href: '#problem' },
+  { label: 'Solution', href: '#system' },
+  { label: 'Platform', href: '#product' },
+  { label: 'Customers', href: '#proof' },
 ];
 
 const HERO_CONTENT = {
-  eyebrow: 'The relocation platform for global mobility teams',
-  title: 'Your cross-border moves still run on spreadsheets and follow-up emails.',
-  subtitle: WORKSPACE_TAGLINE,
-  description:
-    'ReloPass replaces scattered spreadsheets and manual chasing with a single, automated relocation platform that keeps every cross-border case compliant, on schedule, and fully auditable.',
-  primaryCta: 'Get Started Free',
-  secondaryCta: 'See how it works',
+  eyebrow: 'For HR & Global Mobility teams',
+  title: 'Global mobility. Structured.',
+  subtitle:
+    'ReloPass is the coordination layer for cross-border relocation. Every case runs through one system — compliance, timelines, vendors, and approvals in a single source of truth.',
+  promise: BRAND_PROMISE,
+  primaryCta: 'Book a demo',
+  secondaryCta: 'See the platform',
 };
+
+const HERO_STATS: Stat[] = [
+  { value: 'Compliance', label: 'checkpoints on every case' },
+  { value: 'Timelines', label: 'tracked in real time' },
+  { value: 'Approvals', label: 'routed automatically' },
+];
+
+const PROBLEM_CONTENT = {
+  eyebrow: 'The problem',
+  title: 'Relocation still runs on emails and spreadsheets.',
+  description:
+    'Global Mobility and HR teams coordinate high-stakes moves across inboxes, shared sheets, and disconnected vendor portals. Status lives in threads, deadlines slip unnoticed, and compliance gaps stay invisible until they become problems.',
+};
+
+const PROBLEM_CARDS: ProblemCard[] = [
+  {
+    title: 'Fragmented tools',
+    description: 'Every case is stitched together across spreadsheets, inboxes, and disconnected vendor portals. Nothing shares a single record.',
+    tag: 'No source of truth',
+  },
+  {
+    title: 'Manual follow-ups',
+    description: 'Progress depends on someone remembering to email a vendor, chase a document, or nudge an approver. Status lives in threads, not a system.',
+    tag: 'Endless chasing',
+  },
+  {
+    title: 'Compliance blind spots',
+    description: 'Immigration, tax, and policy requirements shift by corridor. Without checkpoints, gaps stay invisible until they become problems.',
+    tag: 'Hidden risk',
+  },
+];
+
+const COST_OF_FAILURE: string[] = [
+  'Delayed start dates',
+  'Failed assignments',
+  'Budget leakage',
+  'Compliance exposure',
+  'Overloaded HR teams',
+];
+
+const SYSTEM_CONTENT = {
+  eyebrow: 'The system',
+  title: 'One system coordinating every relocation.',
+  description:
+    'ReloPass is the coordination layer that sits over your entire mobility program. Every case runs through one structured record — compliance, timelines, vendors, and approvals in a single source of truth.',
+};
+
+const SYSTEM_CAPABILITIES: Capability[] = [
+  {
+    title: 'Structured relocation roadmaps',
+    description: 'Enter the employee, corridor, and policy — ReloPass assembles a step-by-step roadmap with deadlines, documents, vendor touchpoints, and required approvals in minutes instead of days.',
+    badge: 'Pillar 01 · Roadmaps',
+  },
+  {
+    title: 'Live case tracking',
+    description: 'One command center for every active relocation. See status, owners, delays, and next actions across all cases in real time — no more chasing updates by email.',
+    badge: 'Pillar 02 · Tracking',
+  },
+  {
+    title: 'Compliance checkpoints',
+    description: 'Immigration, tax, and policy requirements are built into each corridor as checkpoints, surfacing risks early and keeping a complete, audit-ready trail behind every case.',
+    badge: 'Pillar 03 · Compliance',
+  },
+];
+
+const PRODUCT_CONTENT = {
+  eyebrow: 'The product',
+  title: 'Structure every relocation.',
+  description:
+    'A data-forward surface for mobility operators: cases, timelines, and workflows in one structured operational record.',
+  tableTitle: 'Active cases',
+  tableSubtitle: 'One live record across every corridor.',
+  timelineTitle: 'Case timeline',
+  timelineSubtitle: 'Case #2041 · DE → US',
+};
+
+const PRODUCT_CASES: CaseRow[] = [
+  { id: 'Case #2041', corridor: 'DE → US', stage: 'Immigration', status: 'On track', due: 'Aug 12' },
+  { id: 'Case #2042', corridor: 'UK → SG', stage: 'Housing', status: 'Action needed', due: 'Aug 09' },
+  { id: 'Case #2043', corridor: 'FR → CA', stage: 'Schooling', status: 'On track', due: 'Aug 20' },
+  { id: 'Case #2044', corridor: 'IN → DE', stage: 'Logistics', status: 'Blocked', due: 'Aug 05' },
+];
+
+const PRODUCT_TIMELINE: TimelineStep[] = [
+  { label: 'Case created', state: 'done' },
+  { label: 'Policy applied', state: 'done' },
+  { label: 'Documents collected', state: 'done' },
+  { label: 'Immigration filed', state: 'active' },
+  { label: 'Housing secured', state: 'upcoming' },
+  { label: 'Arrival confirmed', state: 'upcoming' },
+];
+
+const AUDIENCE_CONTENT = {
+  eyebrow: 'Built for mobility operators',
+  title: 'For the people who own the move.',
+  description:
+    'ReloPass is built for HR and Global Mobility managers at growing companies of 50 to 250 employees running 10 or more cross-border relocations a year.',
+  promise: 'Every relocation runs through a visible, policy-driven workflow.',
+};
+
+const AUDIENCE_SECONDARY: AudienceMention[] = [
+  {
+    title: 'Employees',
+    description: 'A clear view of what happens next, so the move feels predictable instead of uncertain.',
+  },
+  {
+    title: 'Providers',
+    description: 'Structured handoffs and shared timelines, so vendor work stays coordinated with the case.',
+  },
+];
+
+const NOT_CONTENT = {
+  eyebrow: 'What ReloPass is',
+  title: 'Coordination infrastructure — not a service.',
+  description: 'ReloPass sells control over complexity. It is the layer that keeps every relocation structured.',
+};
+
+const NOT_ITEMS: { not: string; is: string }[] = [
+  { not: 'Not a relocation agency', is: 'The system your agencies and providers plug into.' },
+  { not: 'Not a marketplace', is: 'A single operational record, not a vendor directory.' },
+  { not: 'Not an HR add-on', is: 'Coordination infrastructure for the entire relocation.' },
+];
 
 const PROOF_CONTENT = {
-  eyebrow: 'Trusted by global mobility teams',
-  title: 'One operating layer for every international move',
-  description:
-    'Replace the spreadsheets, email threads, vendor portals, and last-minute reminders with a single source of truth your whole team can trust.',
+  eyebrow: 'Social proof',
+  headline: 'Trusted by global mobility teams at [Company A], [Company B]',
+  subline: 'Mobility and HR ops leaders use ReloPass to run cross-border relocations with confidence.',
 };
 
-const TRUST_LOGOS: string[] = ['Logo', 'Logo', 'Logo', 'Logo', 'Logo'];
-
-const TESTIMONIAL = {
-  quote:
-    'We replaced three spreadsheets and a constant stream of follow-up emails with one platform. Every relocation is now compliant, on schedule, and fully auditable — and our team finally feels in control.',
-  name: 'Head of Global Mobility',
-  role: 'Your customer story goes here',
-};
-
-const FEATURES_CONTENT = {
-  eyebrow: 'How It Works',
-  title: 'From relocation request to audit-ready completion',
-  description:
-    'ReloPass converts each employee move into a timeline-based journey with decisions, tasks, documents, vendors, and compliance checkpoints in the right order.',
-  previewTitle: 'Live mobility command center',
-  previewSubtitle: 'Every case, checkpoint, and vendor action stays visible.',
-};
-
-const PRICING_CONTENT = {
-  eyebrow: 'Simple value framing',
-  title: 'Start free, upgrade when you are ready.',
-  description:
-    'Explore the workflow immediately, then unlock deeper team oversight when active move volume and compliance complexity grow.',
-};
-
-const PRICING_TIERS: PricingTier[] = [
-  {
-    name: 'Free',
-    price: '$0',
-    description: 'For evaluating structured global mobility workflows before committing budget.',
-    items: ['Create an initial move roadmap', 'Map key relocation milestones', 'Preview compliance checkpoints', 'Share a clear plan internally'],
-    cta: 'Start free',
-    href: WORKSPACE_SPACE_URL,
-  },
-  {
-    name: 'Team',
-    price: 'Paid plans',
-    description: 'For mobility teams that need ongoing case control, vendor visibility, and stronger compliance oversight.',
-    items: ['Manage multiple active relocation cases', 'Track vendors, approvals, and documents', 'Monitor deadlines and risk flags', 'Build a repeatable mobility operating model'],
-    cta: 'Upgrade when ready',
-    href: WORKSPACE_SPACE_URL,
-    featured: true,
-  },
-];
-
-const STATS: Stat[] = [
-  { value: '24/7', label: 'case visibility' },
-  { value: '0', label: 'spreadsheet chaos' },
-  { value: '100%', label: 'journey clarity' },
-];
+const PROOF_LOGOS: string[] = ['[Company A]', '[Company B]', '[Company C]', '[Company D]'];
 
 const CTA_CONTENT = {
-  eyebrow: 'Bring every cross-border move under control',
-  title: 'Retire the spreadsheets. Run global mobility on one platform.',
+  eyebrow: POSITIONING_LINE,
+  title: 'Structure every relocation.',
   description:
-    'Launch your first relocation roadmap today and see how ReloPass keeps every case compliant, on schedule, and fully auditable — without the manual follow-ups.',
-  primaryCta: 'Get Started Free',
+    'Book a 30-minute walkthrough to see how ReloPass keeps compliance, timelines, vendors, and approvals in one system — or see the platform for yourself.',
+  primaryCta: 'Book a demo',
+  secondaryCta: 'See the platform',
 };
 
+const FOOTER_LINKS: FooterLink[] = [
+  { label: 'Problem', href: '#problem' },
+  { label: 'Solution', href: '#system' },
+  { label: 'Platform', href: '#product' },
+  { label: 'Customers', href: '#proof' },
+  { label: 'Book a demo', href: DEMO_HREF },
+  { label: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
+];
+
 const FOOTER_CONTENT = {
-  tagline: WORKSPACE_TAGLINE,
+  tagline: 'The coordination layer for cross-border relocation. Every case visible, compliant, on-time.',
   copyright: `© ${new Date().getFullYear()} ${WORKSPACE_BRAND_NAME}. All rights reserved.`,
 };
+
+function statusStyles(status: CaseRow['status']): { bg: string; color: string } {
+  if (status === 'On track') return { bg: 'rgba(22,163,74,0.16)', color: '#5fd694' };
+  if (status === 'Action needed') return { bg: 'rgba(217,119,6,0.16)', color: '#f0b24a' };
+  return { bg: 'rgba(220,38,38,0.16)', color: '#f08a8a' };
+}
 
 // === SECTION 4: NAVIGATION SECTION ===
 function Navigation() {
@@ -322,33 +334,19 @@ function Navigation() {
               </a>
             ))}
             <a
-              href="/login"
-              className="text-[14px] font-semibold text-white/80 transition hover:text-white"
-              data-section="nav-login"
-            >
-              Login
-            </a>
-            <a
-              href="/register"
-              className="text-[14px] font-semibold text-white/80 transition hover:text-white"
-              data-section="nav-register"
-            >
-              Register
-            </a>
-            <a
-              href="mailto:contact@relopass.com"
+              href={`mailto:${CONTACT_EMAIL}`}
               className="text-[14px] font-semibold text-white/80 transition hover:text-white"
               data-section="nav-contact"
             >
-              contact@relopass.com
+              {CONTACT_EMAIL}
             </a>
             <a
-              href={WORKSPACE_SPACE_URL}
+              href={DEMO_HREF}
               className="rounded-full px-5 py-2.5 text-[14px] font-bold shadow-md transition duration-300 hover:scale-105"
               style={{ backgroundColor: WORKSPACE_HIGHLIGHT_COLOR, color: WORKSPACE_TEXT_ON_HIGHLIGHT, boxShadow: '0 0 0 2px rgba(56,198,222,0.22), 0 10px 30px rgba(56,198,222,0.35)' }}
               data-section="nav-cta"
             >
-              Start free
+              Book a demo
             </a>
           </div>
         </nav>
@@ -357,7 +355,7 @@ function Navigation() {
   );
 }
 
-// === SECTION 5: HERO SECTION ===
+// === SECTION 5: HERO SECTION (STATEMENT) ===
 function HeroSection() {
   return (
     <section id="hero" className="relative flex min-h-[100svh] items-center justify-center overflow-hidden min-h-screen">
@@ -373,40 +371,33 @@ function HeroSection() {
       ) : (
         <div className="absolute inset-0" style={{ backgroundImage: WORKSPACE_HERO_GRADIENT }} />
       )}
-      <div className="absolute inset-0 z-[1]" style={{ backgroundImage: WORKSPACE_HERO_GRADIENT }} />
+      <div className="absolute inset-0 z-[1]" style={{ backgroundColor: 'rgba(11,22,32,0.72)' }} />
 
       <div className="relative z-10 mx-auto max-w-4xl px-4" style={{ textAlign: 'center', color: WORKSPACE_TEXT_PRIMARY }}>
         <p
-          className="reveal-on-scroll mx-auto mb-5 inline-flex rounded-full border px-4 py-2 font-bold backdrop-blur-md text-[13px] md:text-[14px]"
+          className="reveal-on-scroll mx-auto mb-5 inline-flex rounded-full border px-4 py-2 font-semibold backdrop-blur-md text-[13px] md:text-[14px] uppercase tracking-[0.18em]"
           data-section="hero-eyebrow"
           style={{ backgroundColor: WORKSPACE_SURFACE_ACCENT_SOFT, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_PRIMARY }}
         >
           {HERO_CONTENT.eyebrow}
         </p>
         <h1
-          className="reveal-on-scroll mb-6 font-bold leading-tight tracking-[-0.02em] text-[42px] md:text-[72px]"
+          className="reveal-on-scroll mb-6 font-bold leading-tight tracking-[-0.02em] text-[46px] md:text-[80px]"
           data-section="hero-title"
           style={{ fontFamily: WORKSPACE_FONT_FAMILY, color: WORKSPACE_TEXT_PRIMARY }}
         >
           {HERO_CONTENT.title}
         </h1>
         <p
-          className="reveal-on-scroll mx-auto mb-5 max-w-2xl text-[20px] md:text-[24px]"
+          className="reveal-on-scroll mx-auto mb-6 max-w-2xl text-[18px] md:text-[22px] leading-8"
           data-section="hero-subtitle"
           style={{ fontFamily: WORKSPACE_FONT_FAMILY, color: WORKSPACE_TEXT_SECONDARY }}
         >
           {HERO_CONTENT.subtitle}
         </p>
-        <p
-          className="reveal-on-scroll mx-auto mb-8 max-w-2xl leading-8 text-[16px] md:text-[18px]"
-          data-section="hero-description"
-          style={{ color: WORKSPACE_TEXT_SECONDARY }}
-        >
-          ReloPass replaces scattered spreadsheets and manual chasing with a single, automated relocation platform that keeps every cross-border case compliant, on schedule, and fully auditable.
-        </p>
         <div className="reveal-on-scroll flex flex-col items-center justify-center gap-4 sm:flex-row">
           <a
-            href={WORKSPACE_SPACE_URL}
+            href={DEMO_HREF}
             className="inline-block rounded-lg px-8 py-4 font-semibold shadow-md transition duration-300 hover:scale-105"
             style={{
               backgroundColor: WORKSPACE_PRIMARY_COLOR,
@@ -418,7 +409,7 @@ function HeroSection() {
             {HERO_CONTENT.primaryCta}
           </a>
           <a
-            href="#features"
+            href={WORKSPACE_SPACE_URL}
             className="inline-block rounded-lg border px-8 py-4 font-semibold backdrop-blur-md transition duration-300 hover:scale-105 hover:brightness-110"
             data-section="hero-secondary-cta"
             style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_PRIMARY }}
@@ -427,18 +418,35 @@ function HeroSection() {
           </a>
         </div>
 
-        <div className="reveal-on-scroll mx-auto mt-12 grid max-w-2xl grid-cols-3 gap-3">
-          {STATS.map((stat, index) => (
+        <a
+          href={CONVERSATION_HREF}
+          className="reveal-on-scroll mt-5 inline-flex items-center gap-2 text-[15px] font-semibold underline decoration-dotted underline-offset-4 transition hover:opacity-80"
+          data-section="hero-conversational-cta"
+          style={{ color: WORKSPACE_TEXT_SECONDARY }}
+        >
+          {CONVERSATIONAL_CTA} →
+        </a>
+
+        <p
+          className="reveal-on-scroll mx-auto mt-10 text-[14px] font-semibold uppercase tracking-[0.2em]"
+          data-section="hero-promise"
+          style={{ color: WORKSPACE_HIGHLIGHT_COLOR }}
+        >
+          {HERO_CONTENT.promise}
+        </p>
+
+        <div className="reveal-on-scroll mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-3">
+          {HERO_STATS.map((stat, index) => (
             <div
               key={stat.label}
               className="rounded-xl border p-4 backdrop-blur-md"
               style={{ borderColor: WORKSPACE_BORDER_COLOR, backgroundColor: WORKSPACE_SURFACE_PANEL }}
             >
-              <p className="font-bold text-[22px]" data-section={`hero-stat-${index + 1}-value`} style={{ color: WORKSPACE_TEXT_PRIMARY }}>
+              <p className="font-bold text-[20px]" data-section={`hero-stat-${index + 1}-value`} style={{ color: WORKSPACE_TEXT_PRIMARY }}>
                 {stat.value}
               </p>
               <p
-                className="font-semibold uppercase tracking-wide text-[11px]"
+                className="font-semibold uppercase tracking-wide text-[11px] mt-1"
                 data-section={`hero-stat-${index + 1}-label`}
                 style={{ color: WORKSPACE_TEXT_MUTED }}
               >
@@ -452,370 +460,426 @@ function HeroSection() {
   );
 }
 
-// === SECTION 6: SOCIAL PROOF SECTION ===
-function SocialProofSection() {
+// === SECTION 6: PROBLEM SECTION ===
+function ProblemSection() {
   return (
-    <section className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE }}>
+    <section id="problem" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE }}>
       <div className="mx-auto max-w-7xl px-4">
-        <div className="reveal-on-scroll mx-auto max-w-3xl text-center md:text-center">
+        <div className="reveal-on-scroll mx-auto max-w-3xl text-center">
           <p
             className="mb-3 text-[13px] font-bold uppercase tracking-[0.22em]"
-            data-section="benefits-eyebrow"
+            data-section="problem-eyebrow"
             style={{ color: WORKSPACE_CONTRAST_COLOR }}
           >
-            {PROOF_CONTENT.eyebrow}
+            {PROBLEM_CONTENT.eyebrow}
           </p>
           <h2
             className="mb-5 text-[36px] font-bold tracking-tight md:text-[48px]"
-            data-section="benefits-title"
+            data-section="problem-title"
             style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
           >
-            {PROOF_CONTENT.title}
+            {PROBLEM_CONTENT.title}
           </h2>
-          <p className="text-[18px] leading-8" data-section="benefits-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-            {PROOF_CONTENT.description}
+          <p className="text-[18px] leading-8" data-section="problem-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+            {PROBLEM_CONTENT.description}
           </p>
         </div>
 
-        <div className="reveal-on-scroll mt-12 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 opacity-80">
-          {TRUST_LOGOS.map((logo, index) => (
+        <div className="mt-14 grid gap-6 md:grid-cols-3">
+          {PROBLEM_CARDS.map((card, index) => (
+            <article
+              key={card.title}
+              className="reveal-on-scroll rounded-xl border p-7 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg"
+              style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}
+            >
+              <span
+                className="mb-6 inline-flex rounded-full px-3 py-1 text-[12px] font-bold"
+                style={{ backgroundColor: WORKSPACE_SURFACE_PANEL_STRONG, color: WORKSPACE_TEXT_ON_CONTRAST }}
+                data-section={`problem-${index + 1}-tag`}
+              >
+                {card.tag}
+              </span>
+              <h3
+                className="mb-3 text-[20px] font-bold"
+                data-section={`problem-${index + 1}-title`}
+                style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+              >
+                {card.title}
+              </h3>
+              <p className="leading-7" data-section={`problem-${index + 1}-description`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+                {card.description}
+              </p>
+            </article>
+          ))}
+        </div>
+
+        <div
+          className="reveal-on-scroll mx-auto mt-12 max-w-5xl rounded-2xl border p-8 md:p-10"
+          style={{ backgroundColor: WORKSPACE_SURFACE_PAGE_ALT, borderColor: WORKSPACE_BORDER_STRONG_COLOR }}
+        >
+          <p className="mb-5 text-[13px] font-bold uppercase tracking-[0.22em]" style={{ color: WORKSPACE_TEXT_MUTED }}>
+            The cost of failure
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {COST_OF_FAILURE.map((item, index) => (
+              <span
+                key={item}
+                className="rounded-lg border px-4 py-2 text-[14px] font-semibold"
+                style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_SECONDARY }}
+                data-section={`problem-cost-${index + 1}`}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// === SECTION 7: SYSTEM SECTION ===
+function SystemSection() {
+  return (
+    <section id="system" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE_ALT }}>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="reveal-on-scroll mx-auto max-w-3xl text-center">
+          <p
+            className="mb-3 text-[13px] font-bold uppercase tracking-[0.22em]"
+            data-section="system-eyebrow"
+            style={{ color: WORKSPACE_CONTRAST_COLOR }}
+          >
+            {SYSTEM_CONTENT.eyebrow}
+          </p>
+          <h2
+            className="mb-5 text-[36px] font-bold tracking-tight md:text-[48px]"
+            data-section="system-title"
+            style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+          >
+            {SYSTEM_CONTENT.title}
+          </h2>
+          <p className="text-[18px] leading-8" data-section="system-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+            {SYSTEM_CONTENT.description}
+          </p>
+        </div>
+
+        <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {SYSTEM_CAPABILITIES.map((cap, index) => (
+            <article
+              key={cap.title}
+              className="reveal-on-scroll flex flex-col rounded-xl border p-7 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg"
+              style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <span
+                  className="rounded-full px-3 py-1 text-[12px] font-bold"
+                  style={{ backgroundColor: WORKSPACE_SURFACE_ACCENT_SOFT, color: WORKSPACE_TEXT_PRIMARY }}
+                  data-section={`system-${index + 1}-badge`}
+                >
+                  {cap.badge}
+                </span>
+              </div>
+              <h3
+                className="mb-3 text-[20px] font-bold"
+                data-section={`system-${index + 1}-title`}
+                style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+              >
+                {cap.title}
+              </h3>
+              <p className="leading-7" data-section={`system-${index + 1}-description`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+                {cap.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// === SECTION 8: PRODUCT SECTION ===
+function ProductSection() {
+  return (
+    <section id="product" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE }}>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="reveal-on-scroll mx-auto max-w-3xl text-center">
+          <p
+            className="mb-3 text-[13px] font-bold uppercase tracking-[0.22em]"
+            data-section="product-eyebrow"
+            style={{ color: WORKSPACE_CONTRAST_COLOR }}
+          >
+            {PRODUCT_CONTENT.eyebrow}
+          </p>
+          <h2
+            className="mb-5 text-[36px] font-bold tracking-tight md:text-[48px]"
+            data-section="product-title"
+            style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+          >
+            {PRODUCT_CONTENT.title}
+          </h2>
+          <p className="text-[18px] leading-8" data-section="product-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+            {PRODUCT_CONTENT.description}
+          </p>
+        </div>
+
+        <div className="mt-14 grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          {/* Cases table */}
+          <div
+            className="reveal-on-scroll overflow-hidden rounded-2xl border shadow-md"
+            style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_STRONG_COLOR }}
+          >
+            <div className="flex items-center justify-between border-b px-6 py-5" style={{ borderColor: WORKSPACE_BORDER_COLOR }}>
+              <div>
+                <h3 className="text-[16px] font-bold" data-section="product-table-title" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
+                  {PRODUCT_CONTENT.tableTitle}
+                </h3>
+                <p className="text-[13px]" data-section="product-table-subtitle" style={{ color: WORKSPACE_TEXT_MUTED }}>
+                  {PRODUCT_CONTENT.tableSubtitle}
+                </p>
+              </div>
+              <span
+                className="rounded-full px-3 py-1 text-[12px] font-bold"
+                style={{ backgroundColor: WORKSPACE_SURFACE_ACCENT_SOFT, color: WORKSPACE_TEXT_PRIMARY }}
+              >
+                {PRODUCT_CASES.length} open
+              </span>
+            </div>
+
             <div
-              key={index}
-              className="flex h-10 w-28 items-center justify-center rounded-lg border text-[12px] font-bold uppercase tracking-widest"
-              style={{ borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_MUTED, backgroundColor: WORKSPACE_SURFACE_PANEL }}
-              data-section={`trust-logo-${index + 1}`}
-              aria-hidden="true"
+              className="grid grid-cols-[1.1fr_0.9fr_1fr_1fr_0.7fr] gap-2 px-6 py-3 text-[11px] font-bold uppercase tracking-wider"
+              style={{ color: WORKSPACE_TEXT_MUTED, backgroundColor: WORKSPACE_SURFACE_PAGE_ALT }}
+            >
+              <span>Case</span>
+              <span>Corridor</span>
+              <span>Stage</span>
+              <span>Status</span>
+              <span className="text-right">Due</span>
+            </div>
+
+            <div>
+              {PRODUCT_CASES.map((row, index) => {
+                const pill = statusStyles(row.status);
+                return (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-[1.1fr_0.9fr_1fr_1fr_0.7fr] items-center gap-2 border-t px-6 py-4 text-[13px]"
+                    style={{ borderColor: WORKSPACE_BORDER_COLOR }}
+                    data-section={`product-case-${index + 1}`}
+                  >
+                    <span className="font-bold" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
+                      {row.id}
+                    </span>
+                    <span style={{ color: WORKSPACE_TEXT_SECONDARY }}>{row.corridor}</span>
+                    <span style={{ color: WORKSPACE_TEXT_SECONDARY }}>{row.stage}</span>
+                    <span>
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ backgroundColor: pill.bg, color: pill.color }}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pill.color }} />
+                        {row.status}
+                      </span>
+                    </span>
+                    <span className="text-right font-semibold" style={{ color: WORKSPACE_TEXT_MUTED }}>
+                      {row.due}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div
+            className="reveal-on-scroll rounded-2xl border p-6 shadow-md"
+            style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_STRONG_COLOR }}
+          >
+            <h3 className="text-[16px] font-bold" data-section="product-timeline-title" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
+              {PRODUCT_CONTENT.timelineTitle}
+            </h3>
+            <p className="mb-6 text-[13px]" data-section="product-timeline-subtitle" style={{ color: WORKSPACE_TEXT_MUTED }}>
+              {PRODUCT_CONTENT.timelineSubtitle}
+            </p>
+
+            <ol className="relative space-y-5 pl-6">
+              <span
+                className="absolute left-[7px] top-1 bottom-1 w-px"
+                style={{ backgroundColor: WORKSPACE_BORDER_STRONG_COLOR }}
+                aria-hidden="true"
+              />
+              {PRODUCT_TIMELINE.map((step, index) => {
+                const isDone = step.state === 'done';
+                const isActive = step.state === 'active';
+                const dot = isDone ? WORKSPACE_HIGHLIGHT_COLOR : isActive ? WORKSPACE_PRIMARY_COLOR : WORKSPACE_SURFACE_PANEL_STRONG;
+                return (
+                  <li key={step.label} className="relative" data-section={`product-timeline-step-${index + 1}`}>
+                    <span
+                      className="absolute -left-6 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2"
+                      style={{ backgroundColor: dot, borderColor: WORKSPACE_SURFACE_PANEL }}
+                      aria-hidden="true"
+                    />
+                    <p
+                      className="text-[14px] font-semibold"
+                      style={{ color: step.state === 'upcoming' ? WORKSPACE_TEXT_MUTED : WORKSPACE_TEXT_PRIMARY }}
+                    >
+                      {step.label}
+                    </p>
+                    <p className="text-[12px]" style={{ color: WORKSPACE_TEXT_MUTED }}>
+                      {isDone ? 'Complete' : isActive ? 'In progress' : 'Upcoming'}
+                    </p>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// === SECTION 9: AUDIENCE SECTION ===
+function AudienceSection() {
+  return (
+    <section id="audience" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE_ALT }}>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div className="reveal-on-scroll">
+            <p
+              className="mb-3 text-[13px] font-bold uppercase tracking-[0.22em]"
+              data-section="audience-eyebrow"
+              style={{ color: WORKSPACE_CONTRAST_COLOR }}
+            >
+              {AUDIENCE_CONTENT.eyebrow}
+            </p>
+            <h2
+              className="mb-5 text-[34px] font-bold tracking-tight md:text-[44px]"
+              data-section="audience-title"
+              style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+            >
+              {AUDIENCE_CONTENT.title}
+            </h2>
+            <p className="mb-6 text-[18px] leading-8" data-section="audience-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+              {AUDIENCE_CONTENT.description}
+            </p>
+            <div
+              className="rounded-xl border-l-4 px-5 py-4"
+              style={{ borderColor: WORKSPACE_HIGHLIGHT_COLOR, backgroundColor: WORKSPACE_SURFACE_PANEL }}
+            >
+              <p className="text-[17px] font-bold" data-section="audience-promise" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
+                {AUDIENCE_CONTENT.promise}
+              </p>
+            </div>
+          </div>
+
+          <div className="reveal-on-scroll grid gap-4">
+            {AUDIENCE_SECONDARY.map((mention, index) => (
+              <article
+                key={mention.title}
+                className="rounded-xl border p-6 shadow-md"
+                style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}
+              >
+                <h3
+                  className="mb-2 text-[16px] font-bold uppercase tracking-wide"
+                  data-section={`audience-secondary-${index + 1}-title`}
+                  style={{ color: WORKSPACE_PRIMARY_COLOR }}
+                >
+                  {mention.title}
+                </h3>
+                <p className="leading-7" data-section={`audience-secondary-${index + 1}-description`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+                  {mention.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        {/* What ReloPass is / is not */}
+        <div className="reveal-on-scroll mt-16">
+          <p
+            className="mb-3 text-[13px] font-bold uppercase tracking-[0.22em]"
+            data-section="not-eyebrow"
+            style={{ color: WORKSPACE_CONTRAST_COLOR }}
+          >
+            {NOT_CONTENT.eyebrow}
+          </p>
+          <h3
+            className="mb-3 text-[26px] font-bold tracking-tight md:text-[32px]"
+            data-section="not-title"
+            style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+          >
+            {NOT_CONTENT.title}
+          </h3>
+          <p className="mb-8 max-w-2xl text-[16px] leading-8" data-section="not-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
+            {NOT_CONTENT.description}
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {NOT_ITEMS.map((item, index) => (
+              <div
+                key={item.not}
+                className="rounded-xl border p-6"
+                style={{ backgroundColor: WORKSPACE_SURFACE_PAGE, borderColor: WORKSPACE_BORDER_COLOR }}
+                data-section={`not-item-${index + 1}`}
+              >
+                <p className="mb-2 text-[15px] font-bold" style={{ color: WORKSPACE_TEXT_MUTED }}>
+                  {item.not}
+                </p>
+                <p className="text-[15px] leading-7" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
+                  {item.is}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// === SECTION 9B: SOCIAL PROOF ===
+function SocialProofSection() {
+  return (
+    <section id="proof" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE }}>
+      <div className="mx-auto max-w-5xl px-4 text-center">
+        <p
+          className="reveal-on-scroll mb-3 text-[13px] font-bold uppercase tracking-[0.22em]"
+          data-section="proof-eyebrow"
+          style={{ color: WORKSPACE_CONTRAST_COLOR }}
+        >
+          {PROOF_CONTENT.eyebrow}
+        </p>
+        <h2
+          className="reveal-on-scroll mx-auto mb-4 max-w-3xl text-[28px] font-bold tracking-tight md:text-[38px]"
+          data-section="proof-headline"
+          style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
+        >
+          {PROOF_CONTENT.headline}
+        </h2>
+        <p
+          className="reveal-on-scroll mx-auto mb-10 max-w-2xl text-[17px] leading-8"
+          data-section="proof-subline"
+          style={{ color: WORKSPACE_TEXT_SECONDARY }}
+        >
+          {PROOF_CONTENT.subline}
+        </p>
+        <div className="reveal-on-scroll flex flex-wrap items-center justify-center gap-4">
+          {PROOF_LOGOS.map((logo, index) => (
+            <div
+              key={logo}
+              className="flex h-16 min-w-[160px] items-center justify-center rounded-xl border px-6 text-[15px] font-bold uppercase tracking-wide"
+              style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_MUTED }}
+              data-section={`proof-logo-${index + 1}`}
             >
               {logo}
             </div>
           ))}
         </div>
-
-        <figure
-          className="reveal-on-scroll mx-auto mt-14 max-w-4xl rounded-2xl border p-8 text-center md:text-center shadow-md md:p-12"
-          style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_STRONG_COLOR }}
-        >
-          <blockquote
-            className="text-[20px] font-semibold leading-9 md:text-[24px]"
-            data-section="testimonial-quote"
-            style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
-          >
-            “{TESTIMONIAL.quote}”
-          </blockquote>
-          <figcaption className="mt-6 flex flex-col items-center gap-1">
-            <span
-              className="flex h-12 w-12 items-center justify-center rounded-full text-[18px] font-bold"
-              style={{ backgroundColor: WORKSPACE_SURFACE_ACCENT_SOFT, color: WORKSPACE_TEXT_PRIMARY }}
-              aria-hidden="true"
-            >
-              {WORKSPACE_BRAND_NAME.charAt(0)}
-            </span>
-            <span className="mt-2 text-[14px] font-bold" data-section="testimonial-name" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
-              {TESTIMONIAL.name}
-            </span>
-            <span className="text-[14px]" data-section="testimonial-role" style={{ color: WORKSPACE_TEXT_MUTED }}>
-              {TESTIMONIAL.role}
-            </span>
-          </figcaption>
-        </figure>
-
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
-          {BENEFITS.map((benefit, index) => (
-            <article
-              key={benefit.title}
-              className="reveal-on-scroll rounded-xl border p-7 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg"
-              style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <span
-                  className="flex h-12 w-12 items-center justify-center rounded-xl text-[20px] font-bold"
-                  style={{ backgroundColor: WORKSPACE_SURFACE_ACCENT_SOFT, color: WORKSPACE_TEXT_PRIMARY }}
-                  aria-hidden="true"
-                >
-                  {benefit.icon}
-                </span>
-                <span
-                  className="rounded-full px-3 py-1 text-[12px] font-bold"
-                  style={{ backgroundColor: WORKSPACE_SURFACE_PANEL_STRONG, color: WORKSPACE_TEXT_ON_CONTRAST }}
-                  data-section={`benefit-${index + 1}-metric`}
-                >
-                  {benefit.metric}
-                </span>
-              </div>
-              <h3
-                className="mb-3 text-[20px] font-bold"
-                data-section={`benefit-${index + 1}-title`}
-                style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
-              >
-                {benefit.title}
-              </h3>
-              <p className="leading-7" data-section={`benefit-${index + 1}-description`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-                {benefit.description}
-              </p>
-            </article>
-          ))}
-        </div>
       </div>
     </section>
   );
 }
 
-// === SECTION 7: FEATURES SECTION ===
-// Features or how-it-works component only.
-
-function FeaturesSection() {
-  return (
-    <section id="features" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PANEL }}>
-      <div className="mx-auto grid max-w-7xl items-start gap-16 px-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="lg:sticky lg:top-24">
-          <div
-            className="reveal-on-scroll rounded-2xl border p-8 shadow-xl"
-            style={{ backgroundColor: WORKSPACE_SURFACE_PANEL_STRONG, borderColor: WORKSPACE_BORDER_STRONG_COLOR }}
-          >
-            <p
-              className="mb-3 text-sm font-bold uppercase tracking-[0.22em]"
-              data-section="features-eyebrow"
-              style={{ color: WORKSPACE_PRIMARY_COLOR }}
-            >
-              {FEATURES_CONTENT.eyebrow}
-            </p>
-            <h2
-              className="mb-5 text-4xl font-bold tracking-tight md:text-5xl"
-              data-section="features-title"
-              style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
-            >
-              {FEATURES_CONTENT.title}
-            </h2>
-            <p className="mb-8 text-lg leading-8" data-section="features-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-              {FEATURES_CONTENT.description}
-            </p>
-
-            <div className="rounded-xl border p-5" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE, borderColor: WORKSPACE_BORDER_COLOR }}>
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold" data-section="features-preview-title" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
-                    {FEATURES_CONTENT.previewTitle}
-                  </h3>
-                  <p className="text-sm" data-section="features-preview-subtitle" style={{ color: WORKSPACE_TEXT_MUTED }}>
-                    {FEATURES_CONTENT.previewSubtitle}
-                  </p>
-                </div>
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-bold"
-                  style={{ backgroundColor: WORKSPACE_HIGHLIGHT_COLOR, color: WORKSPACE_TEXT_ON_HIGHLIGHT }}
-                  data-section="features-preview-badge"
-                >
-                  On track
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {FEATURES.map((feature, index) => (
-                  <div key={feature.title} className="relative rounded-xl border p-4" style={{ borderColor: WORKSPACE_BORDER_COLOR, backgroundColor: WORKSPACE_SURFACE_PANEL_STRONG }}>
-                    <div
-                      className="absolute -left-2 top-5 h-4 w-4 rounded-full border-4"
-                      style={{ backgroundColor: index === 0 ? WORKSPACE_HIGHLIGHT_COLOR : WORKSPACE_CONTRAST_COLOR, borderColor: WORKSPACE_SURFACE_PAGE }}
-                      aria-hidden="true"
-                    />
-                    <p className="text-sm font-bold" data-section={`preview-${index + 1}-title`} style={{ color: WORKSPACE_TEXT_PRIMARY }}>
-                      {feature.title}
-                    </p>
-                    <p className="mt-1 text-xs" data-section={`preview-${index + 1}-badge`} style={{ color: WORKSPACE_TEXT_MUTED }}>
-                      {feature.badge}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {FEATURES.map((feature, index) => (
-            <article
-              key={feature.title}
-              className="reveal-on-scroll rounded-2xl border p-7 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg"
-              style={{ backgroundColor: WORKSPACE_SURFACE_PANEL_STRONG, borderColor: WORKSPACE_BORDER_COLOR }}
-            >
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-bold"
-                  style={{ backgroundColor: WORKSPACE_SURFACE_ACCENT_SOFT, color: WORKSPACE_TEXT_PRIMARY }}
-                  data-section={`feature-${index + 1}-badge`}
-                >
-                  {feature.badge}
-                </span>
-                <span className="text-sm font-bold" style={{ color: WORKSPACE_PRIMARY_COLOR }} data-section={`feature-${index + 1}-step-label`}>
-                  Step 0{index + 1}
-                </span>
-              </div>
-              <h3
-                className="mb-3 text-3xl font-bold"
-                data-section={`feature-${index + 1}-title`}
-                style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
-              >
-                {feature.title}
-              </h3>
-              <p className="mb-6 leading-8" data-section={`feature-${index + 1}-description`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-                {feature.description}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {feature.steps.map((step, stepIndex) => (
-                  <div
-                    key={step}
-                    className="rounded-xl border px-4 py-3 text-sm font-semibold"
-                    style={{ backgroundColor: WORKSPACE_SURFACE_PAGE, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_SECONDARY }}
-                    data-section={`feature-${index + 1}-item-${stepIndex + 1}`}
-                  >
-                    {step}
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-
-          <div className="reveal-on-scroll pt-10">
-            <p
-              className="mb-3 text-sm font-bold uppercase tracking-[0.22em]"
-              data-section="pricing-eyebrow"
-              style={{ color: WORKSPACE_PRIMARY_COLOR }}
-            >
-              {PRICING_CONTENT.eyebrow}
-            </p>
-            <h3 className="mb-4 text-3xl font-bold" data-section="pricing-title" style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}>
-              {PRICING_CONTENT.title}
-            </h3>
-            <p className="mb-6 leading-8" data-section="pricing-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-              {PRICING_CONTENT.description}
-            </p>
-            <div className="grid gap-5 md:grid-cols-2">
-              {PRICING_TIERS.map((tier, index) => (
-                <article
-                  key={tier.name}
-                  className="rounded-xl border p-6 shadow-md"
-                  style={{
-                    backgroundColor: tier.featured ? WORKSPACE_SURFACE_ACCENT_SOFT : WORKSPACE_SURFACE_PAGE_ALT,
-                    borderColor: tier.featured ? WORKSPACE_HIGHLIGHT_COLOR : WORKSPACE_BORDER_COLOR,
-                  }}
-                >
-                  <h4 className="text-xl font-bold" data-section={`pricing-${index + 1}-name`} style={{ color: WORKSPACE_TEXT_PRIMARY }}>
-                    {tier.name}
-                  </h4>
-                  <p className="mt-2 text-2xl font-bold" data-section={`pricing-${index + 1}-price`} style={{ color: WORKSPACE_PRIMARY_COLOR }}>
-                    {tier.price}
-                  </p>
-                  <p className="mt-3 leading-7" data-section={`pricing-${index + 1}-description`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-                    {tier.description}
-                  </p>
-                  <ul className="mt-5 space-y-3">
-                    {tier.items.map((item, itemIndex) => (
-                      <li key={item} className="flex gap-3 text-sm font-semibold" style={{ color: WORKSPACE_TEXT_PRIMARY }}>
-                        <span style={{ color: WORKSPACE_HIGHLIGHT_COLOR }} aria-hidden="true">
-                          ✓
-                        </span>
-                        <span data-section={`pricing-${index + 1}-item-${itemIndex + 1}`}>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href={tier.href}
-                    className="mt-6 inline-flex rounded-lg px-5 py-3 text-sm font-bold transition duration-300 hover:scale-105"
-                    style={{
-                      backgroundColor: tier.featured ? WORKSPACE_HIGHLIGHT_COLOR : WORKSPACE_PRIMARY_COLOR,
-                      color: tier.featured ? WORKSPACE_TEXT_ON_HIGHLIGHT : WORKSPACE_TEXT_ON_PRIMARY,
-                    }}
-                    data-section={`pricing-${index + 1}-cta`}
-                  >
-                    {tier.cta}
-                  </a>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// === SECTION 8: FAQ SECTION ===
-// FAQ component only.
-
-function FAQSection() {
-  const [openIndex, setOpenIndex] = useState<number>(0);
-
-  return (
-    <section id="faq" className="py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE }}>
-      <div className="mx-auto max-w-3xl px-4">
-        <div className="reveal-on-scroll text-center">
-          <p
-            className="mb-3 text-sm font-bold uppercase tracking-[0.22em]"
-            data-section="faq-eyebrow"
-            style={{ color: WORKSPACE_PRIMARY_COLOR }}
-          >
-            Questions, answered
-          </p>
-          <h2
-            className="mb-5 text-4xl font-bold tracking-tight md:text-5xl"
-            data-section="faq-title"
-            style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}
-          >
-            What mobility teams ask first
-          </h2>
-          <p className="mb-10 text-lg leading-8" data-section="faq-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-            Practical answers for HR leaders replacing manual relocation coordination with a dedicated operating system.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          {FAQS.map((faq, index) => {
-            const isOpen = openIndex === index;
-            return (
-              <article
-                key={faq.question}
-                className="reveal-on-scroll overflow-hidden rounded-xl border shadow-md"
-                style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}
-              >
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
-                  onClick={() => setOpenIndex(isOpen ? -1 : index)}
-                  aria-expanded={isOpen}
-                  aria-controls={`faq-panel-${index}`}
-                >
-                  <span className="text-lg font-bold" data-section={`faq-${index + 1}-q`} style={{ color: WORKSPACE_TEXT_PRIMARY }}>
-                    {faq.question}
-                  </span>
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-bold transition duration-300"
-                    style={{ backgroundColor: isOpen ? WORKSPACE_HIGHLIGHT_COLOR : WORKSPACE_SURFACE_ACCENT_SOFT, color: WORKSPACE_TEXT_PRIMARY }}
-                    aria-hidden="true"
-                  >
-                    {isOpen ? '−' : '+'}
-                  </span>
-                </button>
-                <div
-                  id={`faq-panel-${index}`}
-                  className={`grid transition-all duration-300 ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-                >
-                  <div className="overflow-hidden">
-                    <p className="px-6 pb-6 leading-8" data-section={`faq-${index + 1}-a`} style={{ color: WORKSPACE_TEXT_SECONDARY }}>
-                      {faq.answer}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// === SECTION 9: FINAL CTA AND FOOTER ===
-// Final CTA and footer components only.
-
+// === SECTION 10: CLOSING CTA ===
 function FinalCTA() {
   return (
     <section className="px-4 py-24" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE }}>
@@ -840,14 +904,33 @@ function FinalCTA() {
         <p className="mx-auto mb-8 max-w-2xl text-lg leading-8" data-section="final-cta-description" style={{ color: WORKSPACE_TEXT_SECONDARY }}>
           {CTA_CONTENT.description}
         </p>
-        <a
-          href={WORKSPACE_SPACE_URL}
-          className="inline-flex rounded-lg px-8 py-4 text-lg font-bold shadow-md transition duration-300 hover:scale-105"
-          style={{ backgroundColor: WORKSPACE_HIGHLIGHT_COLOR, color: WORKSPACE_TEXT_ON_HIGHLIGHT }}
-          data-section="cta-primary"
-        >
-          {CTA_CONTENT.primaryCta}
-        </a>
+        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <a
+            href={DEMO_HREF}
+            className="inline-flex rounded-lg px-8 py-4 text-lg font-bold shadow-md transition duration-300 hover:scale-105"
+            style={{ backgroundColor: WORKSPACE_HIGHLIGHT_COLOR, color: WORKSPACE_TEXT_ON_HIGHLIGHT }}
+            data-section="cta-primary"
+          >
+            {CTA_CONTENT.primaryCta}
+          </a>
+          <a
+            href={WORKSPACE_SPACE_URL}
+            className="inline-flex rounded-lg border px-8 py-4 text-lg font-semibold transition duration-300 hover:scale-105"
+            style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR, color: WORKSPACE_TEXT_PRIMARY }}
+            data-section="cta-secondary"
+          >
+            {CTA_CONTENT.secondaryCta}
+          </a>
+        </div>
+        <p className="mt-6 text-sm" data-section="cta-contact" style={{ color: WORKSPACE_TEXT_MUTED }}>
+          <a href={CONVERSATION_HREF} className="font-semibold underline" style={{ color: WORKSPACE_HIGHLIGHT_COLOR }}>
+            {CONVERSATIONAL_CTA}
+          </a>
+          {' '}— or reach us at{' '}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold underline" style={{ color: WORKSPACE_HIGHLIGHT_COLOR }}>
+            {CONTACT_EMAIL}
+          </a>
+        </p>
       </div>
     </section>
   );
@@ -855,11 +938,17 @@ function FinalCTA() {
 
 function Footer() {
   return (
-    <footer className="border-t px-4 py-10" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE_ALT, borderColor: WORKSPACE_BORDER_COLOR }}>
+    <footer className="border-t px-4 py-10" style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}>
       <div className="mx-auto flex max-w-6xl flex-col gap-8 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="mb-3 flex items-center gap-3">
-            {WORKSPACE_LOGO_URL ? <div className="rounded-lg p-0.5 border" style={{ backgroundColor: WORKSPACE_SURFACE_PANEL, borderColor: WORKSPACE_BORDER_COLOR }}><img src={WORKSPACE_LOGO_URL} alt={WORKSPACE_BRAND_NAME} className="h-7 w-7 object-contain" /></div> : <span className="font-bold text-xl" style={{color: WORKSPACE_PRIMARY_COLOR}}>{WORKSPACE_BRAND_NAME.charAt(0)}</span>}
+            {WORKSPACE_LOGO_URL ? (
+              <div className="rounded-lg p-0.5 border" style={{ backgroundColor: WORKSPACE_SURFACE_PAGE, borderColor: WORKSPACE_BORDER_COLOR }}>
+                <img src={WORKSPACE_LOGO_URL} alt={WORKSPACE_BRAND_NAME} className="h-7 w-7 object-contain" />
+              </div>
+            ) : (
+              <span className="font-bold text-xl" style={{ color: WORKSPACE_PRIMARY_COLOR }}>{WORKSPACE_BRAND_NAME.charAt(0)}</span>
+            )}
             <span className="text-lg font-bold" data-section="footer-brand-name" style={{ color: WORKSPACE_TEXT_PRIMARY, fontFamily: WORKSPACE_FONT_FAMILY }}>
               {WORKSPACE_BRAND_NAME}
             </span>
@@ -891,7 +980,7 @@ function Footer() {
   );
 }
 
-// === SECTION 10: MAIN COMPONENT AND ROOT RENDER ===
+// === SECTION 11: MAIN COMPONENT AND ROOT RENDER ===
 export default function LandingPage() {
   useEffect(() => {
     const fontLink = document.createElement('link');
@@ -911,9 +1000,9 @@ export default function LandingPage() {
       el.setAttribute('content', content);
     };
 
-    upsertMeta('name', 'description', HERO_CONTENT?.description || WORKSPACE_TAGLINE);
+    upsertMeta('name', 'description', HERO_CONTENT?.subtitle || WORKSPACE_TAGLINE);
     upsertMeta('property', 'og:title', `${WORKSPACE_BRAND_NAME} — ${WORKSPACE_TAGLINE}`);
-    upsertMeta('property', 'og:description', HERO_CONTENT?.description || WORKSPACE_TAGLINE);
+    upsertMeta('property', 'og:description', HERO_CONTENT?.subtitle || WORKSPACE_TAGLINE);
     upsertMeta('property', 'og:image', WORKSPACE_LOGO_URL);
     upsertMeta('name', 'theme-color', WORKSPACE_SURFACE_PAGE);
 
@@ -994,9 +1083,11 @@ export default function LandingPage() {
       <Navigation />
       <main>
         <HeroSection />
+        <ProblemSection />
+        <SystemSection />
+        <ProductSection />
+        <AudienceSection />
         <SocialProofSection />
-        <FeaturesSection />
-        <FAQSection />
         <FinalCTA />
       </main>
       <Footer />

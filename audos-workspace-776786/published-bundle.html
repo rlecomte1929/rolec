@@ -8,6 +8,9 @@
     <meta name="color-scheme" content="light" />
     <link rel="icon" href="https://storage.googleapis.com/audos-images/attachments/776786/5f4a4002-eb6e-44a9-8cbe-c49e65cbe809.png" />
     <title>ReloPass</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Task #1151: traceability stamps so a rendered bundle can be
          matched to the exact @audos/space-compiler + @audos/workspace-shell
          versions that produced it. -->
@@ -608,6 +611,9 @@ video {
 .visible {
   visibility: visible;
 }
+.invisible {
+  visibility: hidden;
+}
 .static {
   position: static;
 }
@@ -620,17 +626,31 @@ video {
 .relative {
   position: relative;
 }
+.sticky {
+  position: sticky;
+}
 .inset-0 {
   inset: 0px;
 }
-.-left-2 {
-  left: -0.5rem;
+.inset-x-0 {
+  left: 0px;
+  right: 0px;
+}
+.inset-y-0 {
+  top: 0px;
+  bottom: 0px;
 }
 .-left-24 {
   left: -6rem;
 }
+.-left-6 {
+  left: -1.5rem;
+}
 .bottom-0 {
   bottom: 0px;
+}
+.bottom-1 {
+  bottom: 0.25rem;
 }
 .bottom-8 {
   bottom: 2rem;
@@ -644,6 +664,9 @@ video {
 .left-4 {
   left: 1rem;
 }
+.left-\[7px\] {
+  left: 7px;
+}
 .right-0 {
   right: 0px;
 }
@@ -656,20 +679,26 @@ video {
 .top-0\.5 {
   top: 0.125rem;
 }
+.top-1 {
+  top: 0.25rem;
+}
 .top-1\/2 {
   top: 50%;
 }
 .top-20 {
   top: 5rem;
 }
-.top-5 {
-  top: 1.25rem;
-}
 .z-0 {
   z-index: 0;
 }
 .z-10 {
   z-index: 10;
+}
+.z-20 {
+  z-index: 20;
+}
+.z-30 {
+  z-index: 30;
 }
 .z-50 {
   z-index: 50;
@@ -764,6 +793,9 @@ video {
 .ml-8 {
   margin-left: 2rem;
 }
+.ml-auto {
+  margin-left: auto;
+}
 .mr-1 {
   margin-right: 0.25rem;
 }
@@ -782,11 +814,17 @@ video {
 .mt-1\.5 {
   margin-top: 0.375rem;
 }
+.mt-10 {
+  margin-top: 2.5rem;
+}
 .mt-12 {
   margin-top: 3rem;
 }
 .mt-14 {
   margin-top: 3.5rem;
+}
+.mt-16 {
+  margin-top: 4rem;
 }
 .mt-2 {
   margin-top: 0.5rem;
@@ -808,6 +846,9 @@ video {
 }
 .mt-8 {
   margin-top: 2rem;
+}
+.mt-px {
+  margin-top: 1px;
 }
 .line-clamp-2 {
   overflow: hidden;
@@ -857,6 +898,9 @@ video {
 .h-10 {
   height: 2.5rem;
 }
+.h-11 {
+  height: 2.75rem;
+}
 .h-12 {
   height: 3rem;
 }
@@ -868,6 +912,9 @@ video {
 }
 .h-2 {
   height: 0.5rem;
+}
+.h-2\.5 {
+  height: 0.625rem;
 }
 .h-24 {
   height: 6rem;
@@ -902,6 +949,9 @@ video {
 .h-9 {
   height: 2.25rem;
 }
+.h-\[420px\] {
+  height: 420px;
+}
 .h-\[calc\(100vh-8rem\)\] {
   height: calc(100vh - 8rem);
 }
@@ -923,6 +973,9 @@ video {
 .max-h-96 {
   max-height: 24rem;
 }
+.max-h-\[90vh\] {
+  max-height: 90vh;
+}
 .min-h-0 {
   min-height: 0px;
 }
@@ -932,11 +985,17 @@ video {
 .min-h-\[200px\] {
   min-height: 200px;
 }
+.min-h-\[360px\] {
+  min-height: 360px;
+}
 .min-h-\[36px\] {
   min-height: 36px;
 }
 .min-h-\[400px\] {
   min-height: 400px;
+}
+.min-h-\[420px\] {
+  min-height: 420px;
 }
 .min-h-\[calc\(100vh-8rem\)\] {
   min-height: calc(100vh - 8rem);
@@ -959,6 +1018,9 @@ video {
 .w-10 {
   width: 2.5rem;
 }
+.w-11 {
+  width: 2.75rem;
+}
 .w-12 {
   width: 3rem;
 }
@@ -971,8 +1033,8 @@ video {
 .w-2 {
   width: 0.5rem;
 }
-.w-28 {
-  width: 7rem;
+.w-2\.5 {
+  width: 0.625rem;
 }
 .w-3 {
   width: 0.75rem;
@@ -995,6 +1057,9 @@ video {
 .w-6 {
   width: 1.5rem;
 }
+.w-64 {
+  width: 16rem;
+}
 .w-7 {
   width: 1.75rem;
 }
@@ -1004,12 +1069,18 @@ video {
 .w-9 {
   width: 2.25rem;
 }
+.w-\[230px\] {
+  width: 230px;
+}
 .w-fit {
   width: -moz-fit-content;
   width: fit-content;
 }
 .w-full {
   width: 100%;
+}
+.w-px {
+  width: 1px;
 }
 .min-w-0 {
   min-width: 0px;
@@ -1020,8 +1091,14 @@ video {
 .min-w-\[160px\] {
   min-width: 160px;
 }
+.min-w-\[230px\] {
+  min-width: 230px;
+}
 .min-w-\[260px\] {
   min-width: 260px;
+}
+.min-w-\[760px\] {
+  min-width: 760px;
 }
 .min-w-full {
   min-width: 100%;
@@ -1034,6 +1111,9 @@ video {
 }
 .max-w-4xl {
   max-width: 56rem;
+}
+.max-w-5xl {
+  max-width: 64rem;
 }
 .max-w-6xl {
   max-width: 72rem;
@@ -1073,9 +1153,6 @@ video {
 }
 .shrink-0 {
   flex-shrink: 0;
-}
-.grow {
-  flex-grow: 1;
 }
 .border-collapse {
   border-collapse: collapse;
@@ -1136,8 +1213,14 @@ video {
 .resize-none {
   resize: none;
 }
+.resize-y {
+  resize: vertical;
+}
 .resize {
   resize: both;
+}
+.list-decimal {
+  list-style-type: decimal;
 }
 .grid-cols-1 {
   grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -1151,6 +1234,12 @@ video {
 .grid-cols-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.grid-cols-\[1\.1fr_0\.9fr_1fr_1fr_0\.7fr\] {
+  grid-template-columns: 1.1fr 0.9fr 1fr 1fr 0.7fr;
+}
+.grid-cols-\[1\.3fr_1\.1fr_1\.1fr_0\.9fr_0\.8fr\] {
+  grid-template-columns: 1.3fr 1.1fr 1.1fr 0.9fr 0.8fr;
+}
 .grid-cols-\[1\.4fr_1\.2fr_0\.7fr_0\.8fr_0\.6fr\] {
   grid-template-columns: 1.4fr 1.2fr 0.7fr 0.8fr 0.6fr;
 }
@@ -1163,12 +1252,6 @@ video {
 .grid-cols-\[1\.5fr_1\.3fr_0\.9fr_0\.8fr_0\.7fr_0\.8fr\] {
   grid-template-columns: 1.5fr 1.3fr 0.9fr 0.8fr 0.7fr 0.8fr;
 }
-.grid-rows-\[0fr\] {
-  grid-template-rows: 0fr;
-}
-.grid-rows-\[1fr\] {
-  grid-template-rows: 1fr;
-}
 .flex-col {
   flex-direction: column;
 }
@@ -1178,11 +1261,17 @@ video {
 .items-start {
   align-items: flex-start;
 }
+.items-end {
+  align-items: flex-end;
+}
 .items-center {
   align-items: center;
 }
 .justify-start {
   justify-content: flex-start;
+}
+.justify-end {
+  justify-content: flex-end;
 }
 .justify-center {
   justify-content: center;
@@ -1190,14 +1279,17 @@ video {
 .justify-between {
   justify-content: space-between;
 }
+.gap-0\.5 {
+  gap: 0.125rem;
+}
 .gap-1 {
   gap: 0.25rem;
 }
 .gap-1\.5 {
   gap: 0.375rem;
 }
-.gap-16 {
-  gap: 4rem;
+.gap-12 {
+  gap: 3rem;
 }
 .gap-2 {
   gap: 0.5rem;
@@ -1223,10 +1315,6 @@ video {
 .gap-8 {
   gap: 2rem;
 }
-.gap-x-10 {
-  -moz-column-gap: 2.5rem;
-       column-gap: 2.5rem;
-}
 .gap-x-3 {
   -moz-column-gap: 0.75rem;
        column-gap: 0.75rem;
@@ -1235,24 +1323,35 @@ video {
   -moz-column-gap: 1rem;
        column-gap: 1rem;
 }
+.gap-x-5 {
+  -moz-column-gap: 1.25rem;
+       column-gap: 1.25rem;
+}
 .gap-y-1 {
   row-gap: 0.25rem;
 }
 .gap-y-1\.5 {
   row-gap: 0.375rem;
 }
-.gap-y-4 {
-  row-gap: 1rem;
-}
 .space-x-4 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 0;
   margin-right: calc(1rem * var(--tw-space-x-reverse));
   margin-left: calc(1rem * calc(1 - var(--tw-space-x-reverse)));
 }
+.space-y-0\.5 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(0.125rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.125rem * var(--tw-space-y-reverse));
+}
 .space-y-1 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(0.25rem * var(--tw-space-y-reverse));
+}
+.space-y-1\.5 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(0.375rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.375rem * var(--tw-space-y-reverse));
 }
 .space-y-2 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
@@ -1306,8 +1405,17 @@ video {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+.whitespace-pre-line {
+  white-space: pre-line;
+}
 .whitespace-pre-wrap {
   white-space: pre-wrap;
+}
+.break-words {
+  overflow-wrap: break-word;
 }
 .break-all {
   word-break: break-all;
@@ -1356,9 +1464,6 @@ video {
 .border-2 {
   border-width: 2px;
 }
-.border-4 {
-  border-width: 4px;
-}
 .border-b {
   border-bottom-width: 1px;
 }
@@ -1368,8 +1473,14 @@ video {
 .border-b-2 {
   border-bottom-width: 2px;
 }
+.border-l {
+  border-left-width: 1px;
+}
 .border-l-2 {
   border-left-width: 2px;
+}
+.border-l-4 {
+  border-left-width: 4px;
 }
 .border-l-\[3px\] {
   border-left-width: 3px;
@@ -1392,16 +1503,11 @@ video {
 .border-\[var\(--space-border-strong\)\] {
   border-color: var(--space-border-strong);
 }
+.border-\[var\(--space-brand-highlight\)\] {
+  border-color: var(--space-brand-highlight);
+}
 .border-\[var\(--space-brand-primary\)\] {
   border-color: var(--space-brand-primary);
-}
-.border-amber-200 {
-  --tw-border-opacity: 1;
-  border-color: rgb(253 230 138 / var(--tw-border-opacity, 1));
-}
-.border-amber-300 {
-  --tw-border-opacity: 1;
-  border-color: rgb(252 211 77 / var(--tw-border-opacity, 1));
 }
 .border-amber-500\/30 {
   border-color: rgb(245 158 11 / 0.3);
@@ -1416,10 +1522,6 @@ video {
 .border-blue-300 {
   --tw-border-opacity: 1;
   border-color: rgb(147 197 253 / var(--tw-border-opacity, 1));
-}
-.border-blue-400 {
-  --tw-border-opacity: 1;
-  border-color: rgb(96 165 250 / var(--tw-border-opacity, 1));
 }
 .border-current {
   border-color: currentColor;
@@ -1447,6 +1549,9 @@ video {
 .border-green-500\/30 {
   border-color: rgb(34 197 94 / 0.3);
 }
+.border-green-500\/40 {
+  border-color: rgb(34 197 94 / 0.4);
+}
 .border-indigo-200 {
   --tw-border-opacity: 1;
   border-color: rgb(199 210 254 / var(--tw-border-opacity, 1));
@@ -1454,6 +1559,12 @@ video {
 .border-indigo-500 {
   --tw-border-opacity: 1;
   border-color: rgb(99 102 241 / var(--tw-border-opacity, 1));
+}
+.border-orange-500\/30 {
+  border-color: rgb(249 115 22 / 0.3);
+}
+.border-purple-500\/30 {
+  border-color: rgb(168 85 247 / 0.3);
 }
 .border-red-200 {
   --tw-border-opacity: 1;
@@ -1466,19 +1577,21 @@ video {
 .border-red-500\/30 {
   border-color: rgb(239 68 68 / 0.3);
 }
+.border-red-500\/40 {
+  border-color: rgb(239 68 68 / 0.4);
+}
 .border-stone-200 {
   --tw-border-opacity: 1;
   border-color: rgb(231 229 228 / var(--tw-border-opacity, 1));
-}
-.border-white {
-  --tw-border-opacity: 1;
-  border-color: rgb(255 255 255 / var(--tw-border-opacity, 1));
 }
 .border-white\/70 {
   border-color: rgb(255 255 255 / 0.7);
 }
 .border-l-\[var\(--space-brand-primary\)\] {
   border-left-color: var(--space-brand-primary);
+}
+.border-l-amber-500\/60 {
+  border-left-color: rgb(245 158 11 / 0.6);
 }
 .border-l-transparent {
   border-left-color: transparent;
@@ -1511,8 +1624,14 @@ video {
 .bg-\[var\(--space-brand-primary\)\] {
   background-color: var(--space-brand-primary);
 }
+.bg-\[var\(--space-brand-primary-100\)\] {
+  background-color: var(--space-brand-primary-100);
+}
 .bg-\[var\(--space-brand-primary-50\)\] {
   background-color: var(--space-brand-primary-50);
+}
+.bg-\[var\(--space-brand-primary-500\)\] {
+  background-color: var(--space-brand-primary-500);
 }
 .bg-\[var\(--space-semantic-danger\)\] {
   background-color: var(--space-semantic-danger);
@@ -1529,6 +1648,9 @@ video {
 .bg-\[var\(--space-surface-muted\)\] {
   background-color: var(--space-surface-muted);
 }
+.bg-\[var\(--space-surface-page\)\] {
+  background-color: var(--space-surface-page);
+}
 .bg-\[var\(--space-surface-panel\)\] {
   background-color: var(--space-surface-panel);
 }
@@ -1538,30 +1660,16 @@ video {
 .bg-\[var\(--space-text-muted\)\] {
   background-color: var(--space-text-muted);
 }
+.bg-\[var\(--space-text-primary\)\] {
+  background-color: var(--space-text-primary);
+}
 .bg-amber-100 {
   --tw-bg-opacity: 1;
   background-color: rgb(254 243 199 / var(--tw-bg-opacity, 1));
 }
-.bg-amber-200 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(253 230 138 / var(--tw-bg-opacity, 1));
-}
 .bg-amber-400 {
   --tw-bg-opacity: 1;
   background-color: rgb(251 191 36 / var(--tw-bg-opacity, 1));
-}
-.bg-amber-50 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 251 235 / var(--tw-bg-opacity, 1));
-}
-.bg-amber-50\/40 {
-  background-color: rgb(255 251 235 / 0.4);
-}
-.bg-amber-50\/50 {
-  background-color: rgb(255 251 235 / 0.5);
-}
-.bg-amber-50\/60 {
-  background-color: rgb(255 251 235 / 0.6);
 }
 .bg-amber-500 {
   --tw-bg-opacity: 1;
@@ -1572,6 +1680,15 @@ video {
 }
 .bg-amber-500\/15 {
   background-color: rgb(245 158 11 / 0.15);
+}
+.bg-amber-500\/20 {
+  background-color: rgb(245 158 11 / 0.2);
+}
+.bg-black\/50 {
+  background-color: rgb(0 0 0 / 0.5);
+}
+.bg-black\/60 {
+  background-color: rgb(0 0 0 / 0.6);
 }
 .bg-blue-100 {
   --tw-bg-opacity: 1;
@@ -1624,12 +1741,6 @@ video {
   --tw-bg-opacity: 1;
   background-color: rgb(240 253 244 / var(--tw-bg-opacity, 1));
 }
-.bg-green-50\/30 {
-  background-color: rgb(240 253 244 / 0.3);
-}
-.bg-green-50\/60 {
-  background-color: rgb(240 253 244 / 0.6);
-}
 .bg-green-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(34 197 94 / var(--tw-bg-opacity, 1));
@@ -1640,6 +1751,9 @@ video {
 .bg-green-500\/15 {
   background-color: rgb(34 197 94 / 0.15);
 }
+.bg-green-500\/20 {
+  background-color: rgb(34 197 94 / 0.2);
+}
 .bg-indigo-100 {
   --tw-bg-opacity: 1;
   background-color: rgb(224 231 255 / var(--tw-bg-opacity, 1));
@@ -1648,20 +1762,22 @@ video {
   --tw-bg-opacity: 1;
   background-color: rgb(238 242 255 / var(--tw-bg-opacity, 1));
 }
-.bg-orange-100 {
+.bg-orange-400 {
   --tw-bg-opacity: 1;
-  background-color: rgb(255 237 213 / var(--tw-bg-opacity, 1));
+  background-color: rgb(251 146 60 / var(--tw-bg-opacity, 1));
 }
-.bg-red-100 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(254 226 226 / var(--tw-bg-opacity, 1));
+.bg-orange-500\/15 {
+  background-color: rgb(249 115 22 / 0.15);
+}
+.bg-purple-500\/10 {
+  background-color: rgb(168 85 247 / 0.1);
+}
+.bg-purple-500\/15 {
+  background-color: rgb(168 85 247 / 0.15);
 }
 .bg-red-50 {
   --tw-bg-opacity: 1;
   background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1));
-}
-.bg-red-50\/40 {
-  background-color: rgb(254 242 242 / 0.4);
 }
 .bg-red-500 {
   --tw-bg-opacity: 1;
@@ -1672,10 +1788,6 @@ video {
 }
 .bg-red-500\/15 {
   background-color: rgb(239 68 68 / 0.15);
-}
-.bg-slate-100 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(241 245 249 / var(--tw-bg-opacity, 1));
 }
 .bg-stone-100 {
   --tw-bg-opacity: 1;
@@ -1692,18 +1804,8 @@ video {
   --tw-bg-opacity: 1;
   background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
 }
-.bg-white\/50 {
-  background-color: rgb(255 255 255 / 0.5);
-}
-.bg-white\/80 {
-  background-color: rgb(255 255 255 / 0.8);
-}
 .bg-white\/90 {
   background-color: rgb(255 255 255 / 0.9);
-}
-.bg-yellow-100 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(254 249 195 / var(--tw-bg-opacity, 1));
 }
 .bg-\[linear-gradient\(135deg\2c var\(--space-surface-gradient-from\)\2c var\(--space-surface-gradient-via\)\2c var\(--space-surface-gradient-to\)\)\] {
   background-image: linear-gradient(135deg,var(--space-surface-gradient-from),var(--space-surface-gradient-via),var(--space-surface-gradient-to));
@@ -1727,6 +1829,11 @@ video {
   --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
+.from-\[var\(--space-brand-primary\)\] {
+  --tw-gradient-from: var(--space-brand-primary) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
 .from-\[var\(--space-brand-primary-50\)\] {
   --tw-gradient-from: var(--space-brand-primary-50) var(--tw-gradient-from-position);
   --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
@@ -1742,29 +1849,9 @@ video {
   --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
-.from-amber-50 {
-  --tw-gradient-from: #fffbeb var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(255 251 235 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-.from-blue-50 {
-  --tw-gradient-from: #eff6ff var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(239 246 255 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-.from-blue-50\/30 {
-  --tw-gradient-from: rgb(239 246 255 / 0.3) var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(239 246 255 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-.from-blue-500 {
-  --tw-gradient-from: #3b82f6 var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(59 130 246 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-.from-blue-600 {
-  --tw-gradient-from: #2563eb var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position);
+.from-amber-500\/10 {
+  --tw-gradient-from: rgb(245 158 11 / 0.1) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(245 158 11 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
 .from-emerald-50 {
@@ -1777,9 +1864,9 @@ video {
   --tw-gradient-to: rgb(236 253 245 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
-.from-green-50 {
-  --tw-gradient-from: #f0fdf4 var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(240 253 244 / 0) var(--tw-gradient-to-position);
+.from-green-500\/10 {
+  --tw-gradient-from: rgb(34 197 94 / 0.1) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(34 197 94 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
 .via-\[\#10212e\] {
@@ -1817,6 +1904,9 @@ video {
 .to-\[\#0a2733\] {
   --tw-gradient-to: #0a2733 var(--tw-gradient-to-position);
 }
+.to-\[var\(--space-brand-highlight\)\] {
+  --tw-gradient-to: var(--space-brand-highlight) var(--tw-gradient-to-position);
+}
 .to-\[var\(--space-brand-highlight-50\)\] {
   --tw-gradient-to: var(--space-brand-highlight-50) var(--tw-gradient-to-position);
 }
@@ -1832,20 +1922,11 @@ video {
 .to-\[var\(--space-surface-page-alt\)\] {
   --tw-gradient-to: var(--space-surface-page-alt) var(--tw-gradient-to-position);
 }
-.to-emerald-50 {
-  --tw-gradient-to: #ecfdf5 var(--tw-gradient-to-position);
+.to-emerald-500\/10 {
+  --tw-gradient-to: rgb(16 185 129 / 0.1) var(--tw-gradient-to-position);
 }
-.to-indigo-50 {
-  --tw-gradient-to: #eef2ff var(--tw-gradient-to-position);
-}
-.to-indigo-500 {
-  --tw-gradient-to: #6366f1 var(--tw-gradient-to-position);
-}
-.to-indigo-600 {
-  --tw-gradient-to: #4f46e5 var(--tw-gradient-to-position);
-}
-.to-orange-50 {
-  --tw-gradient-to: #fff7ed var(--tw-gradient-to-position);
+.to-orange-500\/10 {
+  --tw-gradient-to: rgb(249 115 22 / 0.1) var(--tw-gradient-to-position);
 }
 .to-sky-50 {
   --tw-gradient-to: #f0f9ff var(--tw-gradient-to-position);
@@ -1858,6 +1939,9 @@ video {
 }
 .to-white {
   --tw-gradient-to: #fff var(--tw-gradient-to-position);
+}
+.fill-amber-400 {
+  fill: #fbbf24;
 }
 .object-contain {
   -o-object-fit: contain;
@@ -1872,6 +1956,9 @@ video {
 }
 .p-0\.5 {
   padding: 0.125rem;
+}
+.p-1 {
+  padding: 0.25rem;
 }
 .p-1\.5 {
   padding: 0.375rem;
@@ -1922,6 +2009,10 @@ video {
 .px-3 {
   padding-left: 0.75rem;
   padding-right: 0.75rem;
+}
+.px-3\.5 {
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
 }
 .px-4 {
   padding-left: 1rem;
@@ -1991,6 +2082,10 @@ video {
   padding-top: 1.25rem;
   padding-bottom: 1.25rem;
 }
+.py-6 {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
 .py-8 {
   padding-top: 2rem;
   padding-bottom: 2rem;
@@ -2004,29 +2099,44 @@ video {
 .pb-2 {
   padding-bottom: 0.5rem;
 }
+.pb-3 {
+  padding-bottom: 0.75rem;
+}
+.pb-4 {
+  padding-bottom: 1rem;
+}
 .pb-5 {
   padding-bottom: 1.25rem;
-}
-.pb-6 {
-  padding-bottom: 1.5rem;
 }
 .pb-8 {
   padding-bottom: 2rem;
 }
+.pl-1 {
+  padding-left: 0.25rem;
+}
+.pl-4 {
+  padding-left: 1rem;
+}
 .pl-5 {
   padding-left: 1.25rem;
+}
+.pl-6 {
+  padding-left: 1.5rem;
 }
 .pl-8 {
   padding-left: 2rem;
 }
-.pt-10 {
-  padding-top: 2.5rem;
-}
 .pt-2 {
   padding-top: 0.5rem;
 }
+.pt-28 {
+  padding-top: 7rem;
+}
 .pt-4 {
   padding-top: 1rem;
+}
+.pt-5 {
+  padding-top: 1.25rem;
 }
 .pt-6 {
   padding-top: 1.5rem;
@@ -2036,6 +2146,12 @@ video {
 }
 .text-center {
   text-align: center;
+}
+.text-right {
+  text-align: right;
+}
+.align-top {
+  vertical-align: top;
 }
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -2067,8 +2183,14 @@ video {
 .text-\[14px\] {
   font-size: 14px;
 }
+.text-\[15px\] {
+  font-size: 15px;
+}
 .text-\[16px\] {
   font-size: 16px;
+}
+.text-\[17px\] {
+  font-size: 17px;
 }
 .text-\[18px\] {
   font-size: 18px;
@@ -2076,14 +2198,20 @@ video {
 .text-\[20px\] {
   font-size: 20px;
 }
-.text-\[22px\] {
-  font-size: 22px;
+.text-\[26px\] {
+  font-size: 26px;
+}
+.text-\[28px\] {
+  font-size: 28px;
+}
+.text-\[34px\] {
+  font-size: 34px;
 }
 .text-\[36px\] {
   font-size: 36px;
 }
-.text-\[42px\] {
-  font-size: 42px;
+.text-\[46px\] {
+  font-size: 46px;
 }
 .text-\[9px\] {
   font-size: 9px;
@@ -2147,9 +2275,6 @@ video {
 .leading-8 {
   line-height: 2rem;
 }
-.leading-9 {
-  line-height: 2.25rem;
-}
 .leading-relaxed {
   line-height: 1.625;
 }
@@ -2162,11 +2287,17 @@ video {
 .tracking-\[-0\.02em\] {
   letter-spacing: -0.02em;
 }
+.tracking-\[0\.18em\] {
+  letter-spacing: 0.18em;
+}
 .tracking-\[0\.22em\] {
   letter-spacing: 0.22em;
 }
 .tracking-\[0\.24em\] {
   letter-spacing: 0.24em;
+}
+.tracking-\[0\.25em\] {
+  letter-spacing: 0.25em;
 }
 .tracking-\[0\.2em\] {
   letter-spacing: 0.2em;
@@ -2183,9 +2314,6 @@ video {
 .tracking-wider {
   letter-spacing: 0.05em;
 }
-.tracking-widest {
-  letter-spacing: 0.1em;
-}
 .text-\[var\(--space-brand-primary\)\] {
   color: var(--space-brand-primary);
 }
@@ -2194,6 +2322,9 @@ video {
 }
 .text-\[var\(--space-semantic-success\)\] {
   color: var(--space-semantic-success);
+}
+.text-\[var\(--space-semantic-warning\)\] {
+  color: var(--space-semantic-warning);
 }
 .text-\[var\(--space-shell-dock-text\)\] {
   color: var(--space-shell-dock-text);
@@ -2234,6 +2365,9 @@ video {
   --tw-text-opacity: 1;
   color: rgb(251 191 36 / var(--tw-text-opacity, 1));
 }
+.text-amber-400\/80 {
+  color: rgb(251 191 36 / 0.8);
+}
 .text-amber-500 {
   --tw-text-opacity: 1;
   color: rgb(245 158 11 / var(--tw-text-opacity, 1));
@@ -2250,9 +2384,9 @@ video {
   --tw-text-opacity: 1;
   color: rgb(146 64 14 / var(--tw-text-opacity, 1));
 }
-.text-amber-900 {
+.text-black {
   --tw-text-opacity: 1;
-  color: rgb(120 53 15 / var(--tw-text-opacity, 1));
+  color: rgb(0 0 0 / var(--tw-text-opacity, 1));
 }
 .text-blue-400 {
   --tw-text-opacity: 1;
@@ -2309,10 +2443,6 @@ video {
   --tw-text-opacity: 1;
   color: rgb(55 65 81 / var(--tw-text-opacity, 1));
 }
-.text-gray-900 {
-  --tw-text-opacity: 1;
-  color: rgb(17 24 39 / var(--tw-text-opacity, 1));
-}
 .text-green-300 {
   --tw-text-opacity: 1;
   color: rgb(134 239 172 / var(--tw-text-opacity, 1));
@@ -2333,10 +2463,6 @@ video {
   --tw-text-opacity: 1;
   color: rgb(21 128 61 / var(--tw-text-opacity, 1));
 }
-.text-green-800 {
-  --tw-text-opacity: 1;
-  color: rgb(22 101 52 / var(--tw-text-opacity, 1));
-}
 .text-indigo-500 {
   --tw-text-opacity: 1;
   color: rgb(99 102 241 / var(--tw-text-opacity, 1));
@@ -2356,9 +2482,9 @@ video {
   --tw-text-opacity: 1;
   color: rgb(49 46 129 / var(--tw-text-opacity, 1));
 }
-.text-orange-800 {
+.text-orange-300 {
   --tw-text-opacity: 1;
-  color: rgb(154 52 18 / var(--tw-text-opacity, 1));
+  color: rgb(253 186 116 / var(--tw-text-opacity, 1));
 }
 .text-pink-500 {
   --tw-text-opacity: 1;
@@ -2368,9 +2494,21 @@ video {
   --tw-text-opacity: 1;
   color: rgb(219 39 119 / var(--tw-text-opacity, 1));
 }
+.text-purple-300 {
+  --tw-text-opacity: 1;
+  color: rgb(216 180 254 / var(--tw-text-opacity, 1));
+}
+.text-purple-400 {
+  --tw-text-opacity: 1;
+  color: rgb(192 132 252 / var(--tw-text-opacity, 1));
+}
 .text-purple-500 {
   --tw-text-opacity: 1;
   color: rgb(168 85 247 / var(--tw-text-opacity, 1));
+}
+.text-red-200 {
+  --tw-text-opacity: 1;
+  color: rgb(254 202 202 / var(--tw-text-opacity, 1));
 }
 .text-red-300 {
   --tw-text-opacity: 1;
@@ -2407,14 +2545,6 @@ video {
 .text-sky-600 {
   --tw-text-opacity: 1;
   color: rgb(2 132 199 / var(--tw-text-opacity, 1));
-}
-.text-slate-400 {
-  --tw-text-opacity: 1;
-  color: rgb(148 163 184 / var(--tw-text-opacity, 1));
-}
-.text-slate-500 {
-  --tw-text-opacity: 1;
-  color: rgb(100 116 139 / var(--tw-text-opacity, 1));
 }
 .text-slate-600 {
   --tw-text-opacity: 1;
@@ -2455,15 +2585,17 @@ video {
 .text-white\/80 {
   color: rgb(255 255 255 / 0.8);
 }
-.text-yellow-700 {
-  --tw-text-opacity: 1;
-  color: rgb(161 98 7 / var(--tw-text-opacity, 1));
-}
 .underline {
   text-decoration-line: underline;
 }
 .line-through {
   text-decoration-line: line-through;
+}
+.decoration-dotted {
+  text-decoration-style: dotted;
+}
+.underline-offset-4 {
+  text-underline-offset: 4px;
 }
 .opacity-0 {
   opacity: 0;
@@ -2486,6 +2618,11 @@ video {
 .shadow {
   --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+.shadow-2xl {
+  --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 .shadow-\[0_10px_24px_var\(--space-shell-shadow\)\] {
@@ -2551,6 +2688,14 @@ video {
   --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
   --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);
   box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+.ring-2 {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+.ring-\[var\(--space-brand-highlight\)\] {
+  --tw-ring-color: var(--space-brand-highlight);
 }
 .ring-\[var\(--space-brand-primary\)\] {
   --tw-ring-color: var(--space-brand-primary);
@@ -2660,6 +2805,9 @@ body {
 .last\:border-0:last-child {
   border-width: 0px;
 }
+.last\:border-b-0:last-child {
+  border-bottom-width: 0px;
+}
 .last\:pb-0:last-child {
   padding-bottom: 0px;
 }
@@ -2684,13 +2832,20 @@ body {
 .hover\:border-\[var\(--space-border-strong\)\]:hover {
   border-color: var(--space-border-strong);
 }
-.hover\:border-amber-300:hover {
+.hover\:border-amber-400:hover {
   --tw-border-opacity: 1;
-  border-color: rgb(252 211 77 / var(--tw-border-opacity, 1));
+  border-color: rgb(251 191 36 / var(--tw-border-opacity, 1));
+}
+.hover\:border-amber-500\/50:hover {
+  border-color: rgb(245 158 11 / 0.5);
 }
 .hover\:border-emerald-300:hover {
   --tw-border-opacity: 1;
   border-color: rgb(110 231 183 / var(--tw-border-opacity, 1));
+}
+.hover\:border-red-400:hover {
+  --tw-border-opacity: 1;
+  border-color: rgb(248 113 113 / var(--tw-border-opacity, 1));
 }
 .hover\:bg-\[var\(--space-surface-card-hover\)\]:hover {
   background-color: var(--space-surface-card-hover);
@@ -2705,6 +2860,9 @@ body {
   --tw-bg-opacity: 1;
   background-color: rgb(253 230 138 / var(--tw-bg-opacity, 1));
 }
+.hover\:bg-amber-500\/20:hover {
+  background-color: rgb(245 158 11 / 0.2);
+}
 .hover\:bg-blue-50:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1));
@@ -2717,52 +2875,40 @@ body {
   --tw-bg-opacity: 1;
   background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1));
 }
-.hover\:bg-gray-200:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(229 231 235 / var(--tw-bg-opacity, 1));
-}
 .hover\:bg-gray-50:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(249 250 251 / var(--tw-bg-opacity, 1));
+}
+.hover\:bg-green-500\/20:hover {
+  background-color: rgb(34 197 94 / 0.2);
 }
 .hover\:bg-indigo-200:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(199 210 254 / var(--tw-bg-opacity, 1));
 }
-.hover\:bg-red-50:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1));
+.hover\:bg-red-500\/10:hover {
+  background-color: rgb(239 68 68 / 0.1);
+}
+.hover\:bg-red-500\/20:hover {
+  background-color: rgb(239 68 68 / 0.2);
 }
 .hover\:bg-red-600:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1));
 }
-.hover\:bg-white\/60:hover {
-  background-color: rgb(255 255 255 / 0.6);
+.hover\:text-\[var\(--space-text-accent\)\]:hover {
+  color: var(--space-text-accent);
 }
-.hover\:from-blue-700:hover {
-  --tw-gradient-from: #1d4ed8 var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(29 78 216 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-.hover\:to-indigo-700:hover {
-  --tw-gradient-to: #4338ca var(--tw-gradient-to-position);
+.hover\:text-\[var\(--space-text-primary\)\]:hover {
+  color: var(--space-text-primary);
 }
 .hover\:text-gray-600:hover {
   --tw-text-opacity: 1;
   color: rgb(75 85 99 / var(--tw-text-opacity, 1));
 }
-.hover\:text-gray-800:hover {
+.hover\:text-red-400:hover {
   --tw-text-opacity: 1;
-  color: rgb(31 41 55 / var(--tw-text-opacity, 1));
-}
-.hover\:text-red-500:hover {
-  --tw-text-opacity: 1;
-  color: rgb(239 68 68 / var(--tw-text-opacity, 1));
-}
-.hover\:text-red-600:hover {
-  --tw-text-opacity: 1;
-  color: rgb(220 38 38 / var(--tw-text-opacity, 1));
+  color: rgb(248 113 113 / var(--tw-text-opacity, 1));
 }
 .hover\:text-white:hover {
   --tw-text-opacity: 1;
@@ -2773,6 +2919,9 @@ body {
 }
 .hover\:opacity-75:hover {
   opacity: 0.75;
+}
+.hover\:opacity-80:hover {
+  opacity: 0.8;
 }
 .hover\:shadow-\[0_18px_44px_var\(--space-shell-shadow-strong\)\]:hover {
   --tw-shadow: 0 18px 44px var(--space-shell-shadow-strong);
@@ -2833,6 +2982,9 @@ body {
 .disabled\:cursor-not-allowed:disabled {
   cursor: not-allowed;
 }
+.disabled\:opacity-30:disabled {
+  opacity: 0.3;
+}
 .disabled\:opacity-40:disabled {
   opacity: 0.4;
 }
@@ -2842,6 +2994,9 @@ body {
 .group:hover .group-hover\:-translate-y-0\.5 {
   --tw-translate-y: -0.125rem;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+.group:hover .group-hover\:text-\[var\(--space-text-primary\)\] {
+  color: var(--space-text-primary);
 }
 .group:hover .group-hover\:brightness-95 {
   --tw-brightness: brightness(.95);
@@ -3005,6 +3160,10 @@ body {
 }
 @media (min-width: 640px) {
 
+  .sm\:col-span-2 {
+    grid-column: span 2 / span 2;
+  }
+
   .sm\:mx-auto {
     margin-left: auto;
     margin-right: auto;
@@ -3030,6 +3189,10 @@ body {
     display: none;
   }
 
+  .sm\:w-\[560px\] {
+    width: 560px;
+  }
+
   .sm\:grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3038,8 +3201,16 @@ body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .sm\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .sm\:grid-cols-6 {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .sm\:grid-cols-\[1\.3fr_1\.1fr_1\.1fr_0\.9fr_0\.8fr\] {
+    grid-template-columns: 1.3fr 1.1fr 1.1fr 0.9fr 0.8fr;
   }
 
   .sm\:grid-cols-\[1\.4fr_1\.2fr_0\.7fr_0\.8fr_0\.6fr\] {
@@ -3056,6 +3227,10 @@ body {
 
   .sm\:grid-cols-\[1\.5fr_1\.3fr_0\.9fr_0\.8fr_0\.7fr_0\.8fr\] {
     grid-template-columns: 1.5fr 1.3fr 0.9fr 0.8fr 0.7fr 0.8fr;
+  }
+
+  .sm\:grid-cols-\[160px_1fr\] {
+    grid-template-columns: 160px 1fr;
   }
 
   .sm\:flex-row {
@@ -3125,6 +3300,14 @@ body {
 }
 @media (min-width: 768px) {
 
+  .md\:relative {
+    position: relative;
+  }
+
+  .md\:inset-auto {
+    inset: auto;
+  }
+
   .md\:block {
     display: block;
   }
@@ -3161,8 +3344,8 @@ body {
     justify-content: space-between;
   }
 
-  .md\:p-12 {
-    padding: 3rem;
+  .md\:p-10 {
+    padding: 2.5rem;
   }
 
   .md\:p-14 {
@@ -3187,10 +3370,6 @@ body {
     padding-top: 1.5rem;
   }
 
-  .md\:text-center {
-    text-align: center;
-  }
-
   .md\:text-4xl {
     font-size: 2.25rem;
     line-height: 2.5rem;
@@ -3210,20 +3389,28 @@ body {
     font-size: 14px;
   }
 
-  .md\:text-\[18px\] {
-    font-size: 18px;
+  .md\:text-\[22px\] {
+    font-size: 22px;
   }
 
-  .md\:text-\[24px\] {
-    font-size: 24px;
+  .md\:text-\[32px\] {
+    font-size: 32px;
+  }
+
+  .md\:text-\[38px\] {
+    font-size: 38px;
+  }
+
+  .md\:text-\[44px\] {
+    font-size: 44px;
   }
 
   .md\:text-\[48px\] {
     font-size: 48px;
   }
 
-  .md\:text-\[72px\] {
-    font-size: 72px;
+  .md\:text-\[80px\] {
+    font-size: 80px;
   }
 
   .md\:text-lg {
@@ -3233,24 +3420,28 @@ body {
 }
 @media (min-width: 1024px) {
 
-  .lg\:sticky {
-    position: sticky;
-  }
-
-  .lg\:top-24 {
-    top: 6rem;
-  }
-
   .lg\:col-span-2 {
     grid-column: span 2 / span 2;
+  }
+
+  .lg\:col-span-3 {
+    grid-column: span 3 / span 3;
   }
 
   .lg\:flex {
     display: flex;
   }
 
+  .lg\:hidden {
+    display: none;
+  }
+
   .lg\:w-\[42\%\] {
     width: 42%;
+  }
+
+  .lg\:w-\[46\%\] {
+    width: 46%;
   }
 
   .lg\:grid-cols-3 {
@@ -3261,8 +3452,16 @@ body {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .lg\:grid-cols-\[0\.95fr_1\.05fr\] {
-    grid-template-columns: 0.95fr 1.05fr;
+  .lg\:grid-cols-\[1\.35fr_0\.65fr\] {
+    grid-template-columns: 1.35fr 0.65fr;
+  }
+
+  .lg\:grid-cols-\[1fr_1fr\] {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .lg\:items-center {
+    align-items: center;
   }
 }
 @media (min-width: 1280px) {
@@ -3270,8 +3469,43 @@ body {
   .xl\:w-\[38\%\] {
     width: 38%;
   }
+
+  .xl\:w-\[42\%\] {
+    width: 42%;
+  }
 }
 
+      /* Hero legibility floor (deterministic): guarantees a dark veil over the
+         hero background media and white hero copy no matter what the EmailGate
+         customization LLM emits. Anchored on BOTH the hero id and the landing
+         root's first section, because in practice the LLM sometimes drops
+         id="hero" while keeping the .eg-root wrapper (verified on live staging
+         variants), and sometimes keeps id="hero" without .eg-root. Uses
+         !important so it beats inline brand-color text, and only lifts copy /
+         interactive elements — never the absolutely-positioned <video>/<img> —
+         so it can't fight the layout.
+         ponytail: two structural anchors cover every gate variant observed; a
+         gate that renames BOTH the id and the wrapper would still slip through.
+         Upgrade path: enforce id="hero" in the gate source at splice /
+         customization time so a single anchor is always present. */
+      #hero,
+      .eg-root > section:first-of-type { position: relative; }
+      #hero::after,
+      .eg-root > section:first-of-type::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.1);
+        z-index: 1;
+        pointer-events: none;
+      }
+      #hero h1, #hero h2, #hero p, #hero a, #hero button,
+      .eg-root > section:first-of-type h1, .eg-root > section:first-of-type h2,
+      .eg-root > section:first-of-type p, .eg-root > section:first-of-type a,
+      .eg-root > section:first-of-type button { position: relative; z-index: 2; }
+      #hero h1, #hero h2, #hero p,
+      .eg-root > section:first-of-type h1, .eg-root > section:first-of-type h2,
+      .eg-root > section:first-of-type p { color: #fff !important; }
     </style>
   </head>
   <body class="light">
@@ -4453,7 +4687,7 @@ body {
 
   window.__workspaceDb = new WorkspaceDB({
     workspaceId: "d0c29613-9cb5-4652-9c6a-494eeed352e5",
-    token: "ak_live_1f70f8933fa9236bbeede1ce42a985dd33f8bfe437fc63d834982f604a887226",
+    token: "ak_live_8e0df476f5d6614bb321a38f0d7aad09e2cf4556c0631d63afe63052e06d7b6c",
     spaceId: "workspace-776786"
   });
 
@@ -4544,10 +4778,10 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// ../../../tmp/space-workspace-776786-SvPd8P/lib/colors.ts
+// ../../../tmp/space-workspace-776786-cbcbVR/lib/colors.ts
 var brand, semantic, neutral, typography, colors, tw, authStyles, settingsStyles;
 var init_colors = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/lib/colors.ts"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/lib/colors.ts"() {
     brand = {
       primary: {
         50: "var(--space-brand-primary-50)",
@@ -4698,9 +4932,9 @@ var init_colors = __esm({
         default: "px-2 py-0.5 text-xs font-medium rounded-full",
         primary: "bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)]",
         accent: "bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]",
-        success: "bg-green-100 text-green-700",
-        warning: "bg-yellow-100 text-yellow-700",
-        danger: "bg-red-100 text-red-700",
+        success: "bg-green-500/15 text-green-300",
+        warning: "bg-amber-500/15 text-amber-300",
+        danger: "bg-red-500/15 text-red-300",
         neutral: "bg-[var(--space-surface-muted)] text-[var(--space-text-secondary)]"
       },
       layout: {
@@ -4728,14 +4962,14 @@ var init_colors = __esm({
         active: "text-[var(--space-text-accent)]"
       },
       priority: {
-        high: "bg-red-100 text-red-700",
-        medium: "bg-yellow-100 text-yellow-700",
-        low: "bg-green-100 text-green-700"
+        high: "bg-red-500/15 text-red-300",
+        medium: "bg-amber-500/15 text-amber-300",
+        low: "bg-green-500/15 text-green-300"
       },
       category: {
         work: "bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)]",
         ideas: "bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]",
-        personal: "bg-green-100 text-green-700",
+        personal: "bg-green-500/15 text-green-300",
         other: "bg-[var(--space-surface-muted)] text-[var(--space-text-secondary)]"
       },
       typography
@@ -4763,7 +4997,7 @@ var init_colors = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/move-roadmaps/sample-data.ts
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/move-roadmaps/sample-data.ts
 function getRoadmapDetail(roadmapId) {
   if (ROADMAP_DETAILS[roadmapId]) return ROADMAP_DETAILS[roadmapId];
   const summary = DEMO_ROADMAPS.find((r) => r.id === roadmapId);
@@ -4887,7 +5121,7 @@ function formatDate(dateStr) {
 }
 var PHASE_ORDER, PHASE_META, SARAH_CHEN_ROADMAP, ROADMAP_DETAILS, DEMO_ROADMAPS;
 var init_sample_data = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/move-roadmaps/sample-data.ts"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/move-roadmaps/sample-data.ts"() {
     PHASE_ORDER = ["pre-move", "in-transit", "post-arrival"];
     PHASE_META = {
       "pre-move": { label: "Pre-Move", shortLabel: "Pre-Move" },
@@ -5316,7 +5550,7 @@ var init_sample_data = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/move-roadmaps/App.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/move-roadmaps/App.tsx
 var App_exports = {};
 __export(App_exports, {
   default: () => MoveRoadmaps
@@ -5844,7 +6078,7 @@ function MoveRoadmaps() {
 }
 var ROADMAP_STATUS, MILESTONE_STATUS, CHECKPOINT_STATUS, VENDOR_STATUS, CATEGORY_ICON, PHASE_ICON;
 var init_App = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/move-roadmaps/App.tsx"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/move-roadmaps/App.tsx"() {
     init_colors();
     init_sample_data();
     ROADMAP_STATUS = {
@@ -5885,7 +6119,7 @@ var init_App = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/case-command/sample-data.ts
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/case-command/sample-data.ts
 function getCaseDetail(caseId) {
   if (CASE_DETAILS[caseId]) return CASE_DETAILS[caseId];
   const c = DEMO_CASES.find((x) => x.id === caseId);
@@ -5953,7 +6187,7 @@ function countByStatus2(cases) {
 }
 var DEMO_CASES, MARCUS_OBI_DETAIL, CASE_DETAILS;
 var init_sample_data2 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/case-command/sample-data.ts"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/case-command/sample-data.ts"() {
     DEMO_CASES = [
       {
         id: "case-marcus-obi",
@@ -6303,7 +6537,7 @@ var init_sample_data2 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/case-command/App.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/case-command/App.tsx
 var App_exports2 = {};
 __export(App_exports2, {
   default: () => CaseCommand
@@ -6344,14 +6578,14 @@ function DaysRemaining({ date, status }) {
   }
   if (days === null) return /* @__PURE__ */ jsx9("span", { className: "text-xs text-[var(--space-text-muted)]", children: "\u2014" });
   if (days < 0) {
-    return /* @__PURE__ */ jsxs7("span", { className: "text-xs font-semibold text-red-600 flex items-center gap-1", children: [
+    return /* @__PURE__ */ jsxs7("span", { className: "text-xs font-semibold text-red-400 flex items-center gap-1", children: [
       /* @__PURE__ */ jsx9(AlertTriangle2, { className: "w-3 h-3" }),
       Math.abs(days),
       "d overdue"
     ] });
   }
   if (days <= 7) {
-    return /* @__PURE__ */ jsxs7("span", { className: "text-xs font-semibold text-amber-600", children: [
+    return /* @__PURE__ */ jsxs7("span", { className: "text-xs font-semibold text-amber-400", children: [
       days,
       "d left"
     ] });
@@ -6399,7 +6633,7 @@ function CaseRow({
           ] }),
           /* @__PURE__ */ jsx9(ChevronRight2, { className: `w-4 h-4 flex-shrink-0 ${selected ? "text-[var(--space-brand-primary)]" : "text-[var(--space-text-muted)]"}` })
         ] }),
-        c.riskNote && c.status === "At Risk" && /* @__PURE__ */ jsxs7("p", { className: "text-[10px] text-amber-700 mt-1.5 ml-5 flex items-center gap-1", children: [
+        c.riskNote && c.status === "At Risk" && /* @__PURE__ */ jsxs7("p", { className: "text-[10px] text-amber-300 mt-1.5 ml-5 flex items-center gap-1", children: [
           /* @__PURE__ */ jsx9(AlertTriangle2, { className: "w-3 h-3 flex-shrink-0" }),
           " ",
           c.riskNote
@@ -6414,7 +6648,7 @@ function TimelineEventCard({ event }) {
   const CatIcon = CATEGORY_ICON2[event.category] || FileCheck;
   return /* @__PURE__ */ jsxs7("div", { className: `relative pl-8 pb-5 last:pb-0`, children: [
     /* @__PURE__ */ jsx9("div", { className: `absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center ${style.color}`, children: /* @__PURE__ */ jsx9(Icon, { className: "w-3.5 h-3.5" }) }),
-    /* @__PURE__ */ jsxs7("div", { className: `p-3.5 rounded-xl border ${event.status === "current" ? "border-amber-200 bg-amber-50/50" : event.status === "blocked" ? "border-red-200 bg-red-50/40" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
+    /* @__PURE__ */ jsxs7("div", { className: `p-3.5 rounded-xl border ${event.status === "current" ? "border-amber-500/30 bg-amber-500/10" : event.status === "blocked" ? "border-red-500/30 bg-red-500/10" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
       /* @__PURE__ */ jsxs7("div", { className: "flex items-start justify-between gap-2 mb-1", children: [
         /* @__PURE__ */ jsx9("h4", { className: "text-sm font-semibold text-[var(--space-text-primary)] leading-snug", children: event.title }),
         /* @__PURE__ */ jsx9("span", { className: "text-[10px] text-[var(--space-text-muted)] flex-shrink-0", children: formatDate2(event.date) })
@@ -6437,10 +6671,10 @@ function TimelineEventCard({ event }) {
 }
 function ComplianceCard2({ item }) {
   const style = COMPLIANCE_STATUS[item.status] || COMPLIANCE_STATUS.pending;
-  return /* @__PURE__ */ jsxs7("div", { className: `p-3 rounded-xl border ${item.status === "at_risk" ? "border-amber-200 bg-amber-50/40" : item.status === "passed" ? "border-green-200 bg-green-50/30" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
+  return /* @__PURE__ */ jsxs7("div", { className: `p-3 rounded-xl border ${item.status === "at_risk" ? "border-amber-500/30 bg-amber-500/10" : item.status === "passed" ? "border-green-500/30 bg-green-500/10" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
     /* @__PURE__ */ jsxs7("div", { className: "flex items-start justify-between gap-2 mb-1", children: [
       /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 min-w-0", children: [
-        /* @__PURE__ */ jsx9(Shield3, { className: `w-4 h-4 flex-shrink-0 ${item.status === "passed" ? "text-green-600" : item.status === "at_risk" ? "text-amber-600" : "text-[var(--space-text-muted)]"}` }),
+        /* @__PURE__ */ jsx9(Shield3, { className: `w-4 h-4 flex-shrink-0 ${item.status === "passed" ? "text-green-400" : item.status === "at_risk" ? "text-amber-400" : "text-[var(--space-text-muted)]"}` }),
         /* @__PURE__ */ jsx9("h5", { className: "text-sm font-medium text-[var(--space-text-primary)] leading-snug", children: item.title })
       ] }),
       /* @__PURE__ */ jsx9("span", { className: `px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${style.badge}`, children: style.label })
@@ -6463,10 +6697,10 @@ function ComplianceCard2({ item }) {
 function VendorCard2({ vendor }) {
   const style = VENDOR_STATUS2[vendor.status] || VENDOR_STATUS2.pending;
   const isUnassigned = !vendor.vendorName;
-  return /* @__PURE__ */ jsxs7("div", { className: `p-3.5 rounded-xl border ${isUnassigned ? "border-dashed border-amber-300 bg-amber-50/40" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
+  return /* @__PURE__ */ jsxs7("div", { className: `p-3.5 rounded-xl border ${isUnassigned ? "border-dashed border-amber-500/40 bg-amber-500/10" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
     /* @__PURE__ */ jsxs7("div", { className: "flex items-start justify-between gap-2 mb-1.5", children: [
       /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ jsx9("div", { className: `w-8 h-8 rounded-lg flex items-center justify-center ${isUnassigned ? "bg-amber-100" : "bg-[var(--space-brand-primary-50)]"}`, children: vendor.category === "Immigration" ? /* @__PURE__ */ jsx9(Globe3, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : vendor.category === "Relocation" ? /* @__PURE__ */ jsx9(Package2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : vendor.category === "Tax Advisory" ? /* @__PURE__ */ jsx9(Scale2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : vendor.category === "School Search" ? /* @__PURE__ */ jsx9(GraduationCap2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : /* @__PURE__ */ jsx9(Briefcase2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) }),
+        /* @__PURE__ */ jsx9("div", { className: `w-8 h-8 rounded-lg flex items-center justify-center ${isUnassigned ? "bg-amber-500/15" : "bg-[var(--space-brand-primary-50)]"}`, children: vendor.category === "Immigration" ? /* @__PURE__ */ jsx9(Globe3, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : vendor.category === "Relocation" ? /* @__PURE__ */ jsx9(Package2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : vendor.category === "Tax Advisory" ? /* @__PURE__ */ jsx9(Scale2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : vendor.category === "School Search" ? /* @__PURE__ */ jsx9(GraduationCap2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) : /* @__PURE__ */ jsx9(Briefcase2, { className: "w-4 h-4 text-[var(--space-text-brand)]" }) }),
         /* @__PURE__ */ jsxs7("div", { children: [
           /* @__PURE__ */ jsx9("p", { className: "text-sm font-semibold text-[var(--space-text-primary)]", children: vendor.category }),
           /* @__PURE__ */ jsx9("p", { className: "text-xs text-[var(--space-text-muted)]", children: vendor.description })
@@ -6482,7 +6716,7 @@ function VendorCard2({ vendor }) {
         " ",
         vendor.nextMilestone
       ] })
-    ] }) : /* @__PURE__ */ jsxs7("p", { className: "ml-10 text-xs text-amber-700 flex items-center gap-1", children: [
+    ] }) : /* @__PURE__ */ jsxs7("p", { className: "ml-10 text-xs text-amber-300 flex items-center gap-1", children: [
       /* @__PURE__ */ jsx9(AlertTriangle2, { className: "w-3 h-3" }),
       " ",
       vendor.nextMilestone || "Vendor not yet assigned"
@@ -6571,16 +6805,16 @@ function CaseDetailPanel({ detail, onBack }) {
             ] })
           ] })
         ] }),
-        c.status !== "Completed" && daysToDeadline !== null && /* @__PURE__ */ jsxs7("div", { className: `flex-shrink-0 px-4 py-3 rounded-xl border text-center ${daysToDeadline < 0 ? "border-red-200 bg-red-50" : daysToDeadline <= 7 ? "border-amber-200 bg-amber-50" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
-          /* @__PURE__ */ jsx9("p", { className: `text-2xl font-bold ${daysToDeadline < 0 ? "text-red-600" : daysToDeadline <= 7 ? "text-amber-600" : "text-[var(--space-text-primary)]"}`, children: daysToDeadline < 0 ? Math.abs(daysToDeadline) : daysToDeadline }),
+        c.status !== "Completed" && daysToDeadline !== null && /* @__PURE__ */ jsxs7("div", { className: `flex-shrink-0 px-4 py-3 rounded-xl border text-center ${daysToDeadline < 0 ? "border-red-500/30 bg-red-500/10" : daysToDeadline <= 7 ? "border-amber-500/30 bg-amber-500/10" : "border-[var(--space-border-default)] bg-[var(--space-surface-card)]"}`, children: [
+          /* @__PURE__ */ jsx9("p", { className: `text-2xl font-bold ${daysToDeadline < 0 ? "text-red-400" : daysToDeadline <= 7 ? "text-amber-400" : "text-[var(--space-text-primary)]"}`, children: daysToDeadline < 0 ? Math.abs(daysToDeadline) : daysToDeadline }),
           /* @__PURE__ */ jsx9("p", { className: "text-[10px] text-[var(--space-text-muted)] uppercase tracking-wide", children: daysToDeadline < 0 ? "days overdue" : "days to deadline" }),
           /* @__PURE__ */ jsx9("p", { className: "text-[10px] text-[var(--space-text-muted)] mt-0.5", children: formatDate2(c.deadlineDate) })
         ] })
       ] }),
       /* @__PURE__ */ jsx9("p", { className: "text-sm text-[var(--space-text-secondary)] leading-relaxed mt-3", children: c.summary }),
-      c.riskNote && /* @__PURE__ */ jsxs7("div", { className: "mt-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2", children: [
-        /* @__PURE__ */ jsx9(AlertTriangle2, { className: "w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" }),
-        /* @__PURE__ */ jsx9("p", { className: "text-xs text-amber-800 font-medium", children: c.riskNote })
+      c.riskNote && /* @__PURE__ */ jsxs7("div", { className: "mt-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2", children: [
+        /* @__PURE__ */ jsx9(AlertTriangle2, { className: "w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" }),
+        /* @__PURE__ */ jsx9("p", { className: "text-xs text-amber-200 font-medium", children: c.riskNote })
       ] })
     ] }),
     /* @__PURE__ */ jsx9("div", { className: "flex-1 overflow-y-auto px-5 py-5", children: /* @__PURE__ */ jsxs7("div", { className: "grid grid-cols-1 lg:grid-cols-3 gap-5", children: [
@@ -6607,7 +6841,7 @@ function CaseDetailPanel({ detail, onBack }) {
               /* @__PURE__ */ jsx9(Shield3, { className: "w-3.5 h-3.5" }),
               " Compliance"
             ] }),
-            atRiskCompliance > 0 && /* @__PURE__ */ jsxs7("span", { className: "text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full", children: [
+            atRiskCompliance > 0 && /* @__PURE__ */ jsxs7("span", { className: "text-[10px] font-semibold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full", children: [
               atRiskCompliance,
               " at risk"
             ] })
@@ -6663,7 +6897,7 @@ function CaseCommand() {
     ] }) }),
     /* @__PURE__ */ jsx9("div", { className: "px-5 py-3 border-b border-[var(--space-border-default)] bg-[var(--space-surface-panel)]", children: /* @__PURE__ */ jsx9("div", { className: "grid grid-cols-4 gap-3 max-w-2xl", children: [
       { label: "Active", value: metrics.active, color: "text-[var(--space-brand-primary)]" },
-      { label: "At risk", value: metrics.atRisk, color: "text-amber-600" },
+      { label: "At risk", value: metrics.atRisk, color: "text-amber-400" },
       { label: "Completed", value: metrics.completed, color: "text-[var(--space-semantic-success)]" },
       { label: "Total cases", value: metrics.total, color: "text-[var(--space-text-primary)]" }
     ].map((m) => /* @__PURE__ */ jsxs7("div", { className: "text-center", children: [
@@ -6737,36 +6971,36 @@ function CaseCommand() {
 }
 var CASE_STATUS, TIMELINE_STATUS, COMPLIANCE_STATUS, VENDOR_STATUS2, APPROVAL_STATUS, CATEGORY_ICON2;
 var init_App2 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/case-command/App.tsx"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/case-command/App.tsx"() {
     init_colors();
     init_sample_data2();
     CASE_STATUS = {
       Active: { badge: "bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)] border-[var(--space-border-strong)]", dot: "bg-[var(--space-brand-primary)]" },
-      "At Risk": { badge: "bg-amber-100 text-amber-800 border-amber-200", dot: "bg-amber-500" },
-      Completed: { badge: "bg-green-100 text-green-800 border-green-200", dot: "bg-[var(--space-semantic-success)]" }
+      "At Risk": { badge: "bg-amber-500/15 text-amber-300 border-amber-500/30", dot: "bg-amber-400" },
+      Completed: { badge: "bg-green-500/15 text-green-300 border-green-500/30", dot: "bg-[var(--space-semantic-success)]" }
     };
     TIMELINE_STATUS = {
-      completed: { icon: CheckCircle24, color: "text-[var(--space-semantic-success)] bg-green-100" },
-      current: { icon: Clock4, color: "text-amber-600 bg-amber-100" },
+      completed: { icon: CheckCircle24, color: "text-green-400 bg-green-500/15" },
+      current: { icon: Clock4, color: "text-amber-400 bg-amber-500/15" },
       upcoming: { icon: Circle3, color: "text-[var(--space-text-muted)] bg-[var(--space-surface-muted)]" },
-      blocked: { icon: XCircle4, color: "text-red-600 bg-red-100" }
+      blocked: { icon: XCircle4, color: "text-red-400 bg-red-500/15" }
     };
     COMPLIANCE_STATUS = {
-      passed: { label: "Passed", badge: "bg-green-100 text-green-800" },
+      passed: { label: "Passed", badge: "bg-green-500/15 text-green-300" },
       pending: { label: "Pending", badge: "bg-[var(--space-surface-muted)] text-[var(--space-text-secondary)]" },
-      at_risk: { label: "At risk", badge: "bg-amber-100 text-amber-800" },
-      blocked: { label: "Blocked", badge: "bg-red-100 text-red-700" }
+      at_risk: { label: "At risk", badge: "bg-amber-500/15 text-amber-300" },
+      blocked: { label: "Blocked", badge: "bg-red-500/15 text-red-300" }
     };
     VENDOR_STATUS2 = {
-      assigned: { label: "Assigned", badge: "bg-green-100 text-green-800" },
+      assigned: { label: "Assigned", badge: "bg-green-500/15 text-green-300" },
       in_progress: { label: "Active", badge: "bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)]" },
-      pending: { label: "Unassigned", badge: "bg-amber-100 text-amber-800" }
+      pending: { label: "Unassigned", badge: "bg-amber-500/15 text-amber-300" }
     };
     APPROVAL_STATUS = {
-      approved: { label: "Approved", badge: "bg-green-100 text-green-800" },
-      pending: { label: "Pending", badge: "bg-amber-100 text-amber-800" },
-      rejected: { label: "Rejected", badge: "bg-red-100 text-red-700" },
-      escalated: { label: "Escalated", badge: "bg-orange-100 text-orange-800" }
+      approved: { label: "Approved", badge: "bg-green-500/15 text-green-300" },
+      pending: { label: "Pending", badge: "bg-amber-500/15 text-amber-300" },
+      rejected: { label: "Rejected", badge: "bg-red-500/15 text-red-300" },
+      escalated: { label: "Escalated", badge: "bg-orange-500/15 text-orange-300" }
     };
     CATEGORY_ICON2 = {
       immigration: Globe3,
@@ -6779,7 +7013,7 @@ var init_App2 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/TasksDB/sample-data.ts
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/TasksDB/sample-data.ts
 function daysUntil3(dateStr) {
   try {
     const d = /* @__PURE__ */ new Date(dateStr + "T12:00:00");
@@ -6845,7 +7079,7 @@ function caseTaskCounts(tasks) {
 }
 var TASK_STATUSES, TASK_PRIORITIES, TASK_CATEGORIES, SAMPLE_TASKS, RELOCATION_CASES;
 var init_sample_data3 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/TasksDB/sample-data.ts"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/TasksDB/sample-data.ts"() {
     TASK_STATUSES = ["To Do", "In Progress", "Done"];
     TASK_PRIORITIES = ["High", "Medium", "Low"];
     TASK_CATEGORIES = ["immigration", "compliance", "logistics"];
@@ -7066,7 +7300,7 @@ var init_sample_data3 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/TasksDB/App.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/TasksDB/App.tsx
 var App_exports3 = {};
 __export(App_exports3, {
   default: () => TasksDB
@@ -7442,11 +7676,11 @@ function TasksDB() {
       /* @__PURE__ */ jsx10("p", { className: `text-lg sm:text-xl font-bold ${m.color}`, children: m.value }),
       /* @__PURE__ */ jsx10("p", { className: "text-[10px] sm:text-xs text-[var(--space-text-secondary)]", children: m.label })
     ] }, m.label)) }) }),
-    urgentTasks.length > 0 && filterStatus !== "Done" && /* @__PURE__ */ jsxs8("div", { className: "px-5 py-3 border-b border-amber-200 bg-amber-50/60", children: [
+    urgentTasks.length > 0 && filterStatus !== "Done" && /* @__PURE__ */ jsxs8("div", { className: "px-5 py-3 border-b border-amber-500/30 bg-amber-500/10", children: [
       /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-2 mb-2", children: [
-        /* @__PURE__ */ jsx10(Clock5, { className: "w-4 h-4 text-amber-600" }),
-        /* @__PURE__ */ jsx10("p", { className: "text-xs font-semibold uppercase tracking-wider text-amber-800", children: "Needs attention today" }),
-        /* @__PURE__ */ jsx10("span", { className: "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900", children: urgentTasks.length })
+        /* @__PURE__ */ jsx10(Clock5, { className: "w-4 h-4 text-amber-400" }),
+        /* @__PURE__ */ jsx10("p", { className: "text-xs font-semibold uppercase tracking-wider text-amber-300", children: "Needs attention today" }),
+        /* @__PURE__ */ jsx10("span", { className: "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-200", children: urgentTasks.length })
       ] }),
       /* @__PURE__ */ jsx10("div", { className: "flex gap-2 overflow-x-auto pb-1", children: urgentTasks.slice(0, 6).map((t) => /* @__PURE__ */ jsxs8(
         "button",
@@ -7456,10 +7690,10 @@ function TasksDB() {
             setFilterCase(t.case_reference);
             setSearchQuery("");
           },
-          className: "flex-shrink-0 px-3 py-2 rounded-lg border border-amber-200 bg-white text-left hover:border-amber-300 transition-colors max-w-[220px]",
+          className: "flex-shrink-0 px-3 py-2 rounded-lg border border-amber-500/30 bg-[var(--space-surface-card)] text-left hover:border-amber-500/50 transition-colors max-w-[220px]",
           children: [
             /* @__PURE__ */ jsx10("p", { className: "text-xs font-semibold text-[var(--space-text-primary)] truncate", children: t.task_name }),
-            /* @__PURE__ */ jsxs8("p", { className: "text-[10px] text-amber-700 mt-0.5 flex items-center gap-1", children: [
+            /* @__PURE__ */ jsxs8("p", { className: "text-[10px] text-amber-300 mt-0.5 flex items-center gap-1", children: [
               /* @__PURE__ */ jsx10(AlertTriangle3, { className: "w-3 h-3 flex-shrink-0" }),
               /* @__PURE__ */ jsx10(DueDateBadge, { date: t.due_date, status: t.status })
             ] })
@@ -7706,7 +7940,7 @@ function TasksDB() {
 }
 var PRIORITY_STYLE, STATUS_STYLE, CATEGORY_META, CASE_STATUS_DOT;
 var init_App3 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/TasksDB/App.tsx"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/TasksDB/App.tsx"() {
     init_colors();
     init_sample_data3();
     PRIORITY_STYLE = {
@@ -7724,13 +7958,13 @@ var init_App3 = __esm({
         column: "bg-[var(--space-brand-primary-50)]/50"
       },
       Done: {
-        badge: "bg-green-100 text-green-800 border-green-200",
-        column: "bg-green-50/60"
+        badge: "bg-green-500/15 text-green-300 border-green-500/30",
+        column: "bg-green-500/10"
       }
     };
     CATEGORY_META = {
       immigration: { label: "Immigration", icon: Globe4, badge: "bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)]" },
-      compliance: { label: "Compliance", icon: Shield4, badge: "bg-amber-100 text-amber-800" },
+      compliance: { label: "Compliance", icon: Shield4, badge: "bg-amber-500/15 text-amber-300" },
       logistics: { label: "Logistics", icon: Package3, badge: "bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]" }
     };
     CASE_STATUS_DOT = {
@@ -7741,7 +7975,7 @@ var init_App3 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/Tasks/App.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/Tasks/App.tsx
 var App_exports4 = {};
 __export(App_exports4, {
   default: () => Tasks
@@ -8160,11 +8394,11 @@ function Tasks() {
       /* @__PURE__ */ jsx11("p", { className: `text-lg sm:text-xl font-bold ${m.color}`, children: m.value }),
       /* @__PURE__ */ jsx11("p", { className: "text-[10px] sm:text-xs text-[var(--space-text-secondary)]", children: m.label })
     ] }, m.label)) }) }),
-    urgentTasks.length > 0 && filterStatus !== "Done" && /* @__PURE__ */ jsxs9("div", { className: "px-4 sm:px-5 py-3 border-b border-amber-200 bg-amber-50", children: [
+    urgentTasks.length > 0 && filterStatus !== "Done" && /* @__PURE__ */ jsxs9("div", { className: "px-4 sm:px-5 py-3 border-b border-amber-500/30 bg-amber-500/10", children: [
       /* @__PURE__ */ jsxs9("div", { className: "flex items-center gap-2 mb-2", children: [
-        /* @__PURE__ */ jsx11(Clock6, { className: "w-4 h-4 text-amber-600" }),
-        /* @__PURE__ */ jsx11("p", { className: "text-xs font-semibold uppercase tracking-wider text-amber-800", children: "Needs attention this week" }),
-        /* @__PURE__ */ jsx11("span", { className: "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900", children: urgentTasks.length })
+        /* @__PURE__ */ jsx11(Clock6, { className: "w-4 h-4 text-amber-400" }),
+        /* @__PURE__ */ jsx11("p", { className: "text-xs font-semibold uppercase tracking-wider text-amber-300", children: "Needs attention this week" }),
+        /* @__PURE__ */ jsx11("span", { className: "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-200", children: urgentTasks.length })
       ] }),
       /* @__PURE__ */ jsx11("div", { className: "flex gap-2 overflow-x-auto pb-1", children: urgentTasks.slice(0, 6).map((t) => /* @__PURE__ */ jsxs9(
         "button",
@@ -8174,10 +8408,10 @@ function Tasks() {
             setFilterCase(t.case_reference);
             setSearchQuery("");
           },
-          className: "flex-shrink-0 px-3 py-2 rounded-lg border border-amber-200 bg-white text-left hover:border-amber-300 transition-colors max-w-[220px]",
+          className: "flex-shrink-0 px-3 py-2 rounded-lg border border-amber-500/30 bg-[var(--space-surface-card)] text-left hover:border-amber-500/50 transition-colors max-w-[220px]",
           children: [
             /* @__PURE__ */ jsx11("p", { className: "text-xs font-semibold text-[var(--space-text-primary)] truncate", children: t.task_name }),
-            /* @__PURE__ */ jsxs9("p", { className: "text-[10px] text-amber-700 mt-0.5 flex items-center gap-1", children: [
+            /* @__PURE__ */ jsxs9("p", { className: "text-[10px] text-amber-300 mt-0.5 flex items-center gap-1", children: [
               /* @__PURE__ */ jsx11(AlertTriangle4, { className: "w-3 h-3 flex-shrink-0" }),
               /* @__PURE__ */ jsx11(DueDateBadge2, { date: t.due_date, status: t.status })
             ] })
@@ -8424,7 +8658,7 @@ function Tasks() {
 }
 var TABLE, TASK_STATUSES2, TASK_PRIORITIES2, TASK_CATEGORIES2, RELOCATION_CASES2, SAMPLE_TASKS2, PRIORITY_STYLE2, STATUS_STYLE2, CATEGORY_META2, CASE_STATUS_DOT2;
 var init_App4 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/Tasks/App.tsx"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/Tasks/App.tsx"() {
     init_colors();
     TABLE = "relocation_tasks";
     TASK_STATUSES2 = ["To Do", "In Progress", "Done"];
@@ -8473,13 +8707,13 @@ var init_App4 = __esm({
         column: "bg-[var(--space-brand-primary-50)]"
       },
       Done: {
-        badge: "bg-green-100 text-green-800 border-green-200",
-        column: "bg-green-50"
+        badge: "bg-green-500/15 text-green-300 border-green-500/30",
+        column: "bg-green-500/10"
       }
     };
     CATEGORY_META2 = {
       immigration: { label: "Immigration", icon: Globe5, badge: "bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)]" },
-      compliance: { label: "Compliance", icon: Shield5, badge: "bg-amber-100 text-amber-800" },
+      compliance: { label: "Compliance", icon: Shield5, badge: "bg-amber-500/15 text-amber-300" },
       logistics: { label: "Logistics", icon: Package4, badge: "bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]" }
     };
     CASE_STATUS_DOT2 = {
@@ -8490,12 +8724,12 @@ var init_App4 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/egress-probe/App.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/egress-probe/App.tsx
 var App_exports5 = {};
 __export(App_exports5, {
   default: () => EgressProbe
 });
-import { useState as useState11, useEffect as useEffect9, useCallback as useCallback2, useRef as useRef6 } from "react";
+import { useState as useState11, useEffect as useEffect9, useCallback as useCallback3, useRef as useRef6 } from "react";
 import { Fragment as Fragment4, jsx as jsx12, jsxs as jsxs10 } from "react/jsx-runtime";
 function serializeError(err) {
   if (err instanceof Error) {
@@ -8603,7 +8837,7 @@ function EgressProbe() {
   const cspViolationsRef = useRef6([]);
   const probeActiveRef = useRef6(false);
   const pageOrigin = typeof window !== "undefined" ? window.location.origin : "(unknown)";
-  const runProbe = useCallback2(async () => {
+  const runProbe = useCallback3(async () => {
     setRunning(true);
     setRunCount((c) => c + 1);
     cspViolationsRef.current = [];
@@ -8787,7 +9021,7 @@ ${result.errorDump}` })
 }
 var TARGET_URL, PROBE_TIMEOUT_MS, MARKER, AMBIGUITY_NOTE;
 var init_App5 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/egress-probe/App.tsx"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/egress-probe/App.tsx"() {
     TARGET_URL = "https://api.relopass.com/api/probe";
     PROBE_TIMEOUT_MS = 1e4;
     MARKER = "audos-egress-probe-v1";
@@ -8795,7 +9029,7 @@ var init_App5 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/apps/NewApp/App.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/apps/NewApp/App.tsx
 var App_exports6 = {};
 __export(App_exports6, {
   default: () => NewApp
@@ -8815,17 +9049,61 @@ function NewApp({ appConfig }) {
 }
 var TABLE2;
 var init_App6 = __esm({
-  "../../../tmp/space-workspace-776786-SvPd8P/apps/NewApp/App.tsx"() {
+  "../../../tmp/space-workspace-776786-cbcbVR/apps/NewApp/App.tsx"() {
     TABLE2 = "new_app";
   }
 });
 
-// ../../../tmp/space-workspace-776786-SvPd8P/main.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/main.tsx
 import React, { Suspense as Suspense2, useState as useState12, useEffect as useEffect10, Component as Component2 } from "react";
 import { createRoot } from "react-dom/client";
 
-// ../../../tmp/space-workspace-776786-SvPd8P/SpaceRuntimeContext.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/SpaceRuntimeContext.tsx
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+
+// ../../../tmp/space-workspace-776786-cbcbVR/lib/tenant-delegation-scope.ts
+function getTenantDelegationScope() {
+  if (typeof window === "undefined") return null;
+  const injected = window.__TENANT_DELEGATION__;
+  if (injected?.sessionId && injected?.token && injected?.consumerWorkspaceId && injected?.agentSlug) {
+    return injected;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("ta_session");
+  const token = params.get("delegation_token");
+  if (!sessionId || !token) return null;
+  return {
+    sessionId,
+    token,
+    consumerWorkspaceId: "",
+    agentSlug: ""
+  };
+}
+function hasTenantDelegationAuth() {
+  const scope = getTenantDelegationScope();
+  if (scope?.sessionId && scope?.token) return true;
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  return !!(params.get("ta_session") && params.get("delegation_token"));
+}
+function scopedSpaceSessionStorageKey(spaceId) {
+  const scope = getTenantDelegationScope();
+  const consumerWorkspaceId = scope?.consumerWorkspaceId?.trim();
+  if (consumerWorkspaceId) {
+    return `space_session_${spaceId}__consumer_${consumerWorkspaceId}`;
+  }
+  return `space_session_${spaceId}`;
+}
+function getDelegationChatRequestExtras() {
+  const scope = getTenantDelegationScope();
+  if (!scope?.token || !scope.sessionId) return null;
+  return {
+    delegationToken: scope.token,
+    taSessionId: scope.sessionId
+  };
+}
+
+// ../../../tmp/space-workspace-776786-cbcbVR/SpaceRuntimeContext.tsx
 import { jsx } from "react/jsx-runtime";
 var SpaceRuntimeContext = createContext(null);
 var VISITOR_COOKIE = "audos_vid";
@@ -9087,24 +9365,38 @@ function SpaceRuntimeProvider({
   const [isLoading, setIsLoading] = useState(!initialConfig);
   const [error, setError] = useState(null);
   const [sessionId, setSessionIdRaw] = useState(() => {
+    if (typeof window !== "undefined" && window.__AUDOS_FORCE_VISITOR__ === true) {
+      return void 0;
+    }
     let resolved;
     if (initialSessionId) {
       resolved = initialSessionId;
     } else {
       try {
-        const stored = localStorage.getItem(`space_session_${spaceId}`);
-        if (stored) {
-          const session = JSON.parse(stored);
-          const recoveredId = session.workspaceSessionId || session.sessionId || session.id;
-          if (recoveredId) resolved = recoveredId;
+        const delegation = getTenantDelegationScope();
+        if (delegation?.workspaceSessionId && typeof delegation.workspaceSessionId === "string" && delegation.workspaceSessionId.startsWith("wses_")) {
+          resolved = delegation.workspaceSessionId;
+        }
+        if (!resolved) {
+          const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
+          if (stored) {
+            const session = JSON.parse(stored);
+            const recoveredId = session.workspaceSessionId || session.sessionId || session.id;
+            if (recoveredId) resolved = recoveredId;
+          }
         }
         if (!resolved) {
           const ssId = sessionStorage.getItem("space_session_id");
           if (ssId) resolved = ssId;
         }
       } catch {
-        resolved = `ephemeral_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+        if (!hasTenantDelegationAuth()) {
+          resolved = `ephemeral_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+        }
       }
+    }
+    if (!resolved && typeof window !== "undefined" && hasTenantDelegationAuth()) {
+      resolved = void 0;
     }
     if (resolved && typeof window !== "undefined") {
       window.__spaceSessionId = resolved;
@@ -9115,18 +9407,23 @@ function SpaceRuntimeProvider({
   const [isBootstrappingSession, setIsBootstrappingSession] = useState(() => {
     if (typeof window === "undefined") return false;
     if (mode !== "customer") return false;
-    const params = new URLSearchParams(window.location.search);
-    const isPostPayment = params.has("payment_success") || params.has("subscription_success");
-    const stripeSessionId = params.get("session_id");
-    if (!isPostPayment || !stripeSessionId) return false;
     try {
-      const stored = localStorage.getItem(`space_session_${spaceId}`);
+      const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
       if (stored) {
         const session = JSON.parse(stored);
         if (session.workspaceSessionId || session.sessionId || session.id) return false;
       }
     } catch {
     }
+    const delegation = getTenantDelegationScope();
+    if (delegation?.workspaceSessionId && typeof delegation.workspaceSessionId === "string" && delegation.workspaceSessionId.startsWith("wses_")) {
+      return false;
+    }
+    if (hasTenantDelegationAuth()) return true;
+    const params = new URLSearchParams(window.location.search);
+    const isPostPayment = params.has("payment_success") || params.has("subscription_success");
+    const stripeSessionId = params.get("session_id");
+    if (!isPostPayment || !stripeSessionId) return false;
     return true;
   });
   const [subscription, setSubscription] = useState(null);
@@ -9134,7 +9431,7 @@ function SpaceRuntimeProvider({
   const subscriptionRef = useRef(null);
   const [sessionMetadata, setSessionMetadata] = useState(() => {
     try {
-      const stored = localStorage.getItem(`space_session_${spaceId}`);
+      const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
       if (stored) {
         const session = JSON.parse(stored);
         if (session.metadata && typeof session.metadata === "object") {
@@ -9151,7 +9448,7 @@ function SpaceRuntimeProvider({
       window.__spaceSessionId = newSessionId;
     }
     try {
-      const stored = localStorage.getItem(`space_session_${spaceId}`);
+      const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
       if (stored) {
         const session = JSON.parse(stored);
         if (session.metadata && typeof session.metadata === "object") {
@@ -9197,7 +9494,7 @@ function SpaceRuntimeProvider({
     const stripeSessionId = params.get("session_id");
     if (!isPostPayment || !stripeSessionId) return;
     try {
-      const stored = localStorage.getItem(`space_session_${spaceId}`);
+      const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
       if (stored) {
         const session = JSON.parse(stored);
         if (session.workspaceSessionId || session.sessionId || session.id) return;
@@ -9250,7 +9547,7 @@ function SpaceRuntimeProvider({
           setIsBootstrappingSession(false);
           return;
         }
-        const sessionKey = `space_session_${spaceId}`;
+        const sessionKey = scopedSpaceSessionStorageKey(spaceId);
         const session = {
           id: effectiveSessionId,
           workspaceSessionId: effectiveSessionId,
@@ -9276,6 +9573,110 @@ function SpaceRuntimeProvider({
       }
     };
     autoCreateSession();
+  }, [spaceId, mode]);
+  useEffect(() => {
+    if (mode !== "customer") return;
+    if (!hasTenantDelegationAuth()) return;
+    const delegation = getTenantDelegationScope();
+    const extras = getDelegationChatRequestExtras();
+    if (!extras) {
+      setIsBootstrappingSession(false);
+      return;
+    }
+    try {
+      const injectedId = delegation?.workspaceSessionId;
+      if (injectedId && injectedId.startsWith("wses_")) {
+        const sessionKey = scopedSpaceSessionStorageKey(spaceId);
+        const existing = localStorage.getItem(sessionKey);
+        if (!existing && delegation?.email) {
+          localStorage.setItem(
+            sessionKey,
+            JSON.stringify({
+              id: injectedId,
+              workspaceSessionId: injectedId,
+              email: delegation.email,
+              timestamp: Date.now(),
+              verified: true,
+              metadata: { source: "tenant_delegation" }
+            })
+          );
+        }
+        if (!sessionId || !sessionId.startsWith("wses_")) {
+          setSessionId(injectedId);
+        }
+        setIsBootstrappingSession(false);
+        return;
+      }
+      const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
+      if (stored) {
+        const session = JSON.parse(stored);
+        const recoveredId = session.workspaceSessionId || session.sessionId || session.id;
+        if (recoveredId && typeof recoveredId === "string" && recoveredId.startsWith("wses_")) {
+          if (!sessionId || !sessionId.startsWith("wses_")) {
+            setSessionId(recoveredId);
+          }
+          setIsBootstrappingSession(false);
+          return;
+        }
+      }
+    } catch {
+    }
+    if (sessionId && sessionId.startsWith("wses_")) {
+      setIsBootstrappingSession(false);
+      return;
+    }
+    const bootstrapDelegationSession = async () => {
+      try {
+        console.log("[SpaceRuntime] Tenant delegation detected \u2014 bootstrapping consumer session");
+        const res = await fetch(`/api/space/${spaceId}/delegation-session-bootstrap`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            delegationToken: extras.delegationToken,
+            taSessionId: extras.taSessionId
+          })
+        });
+        if (!res.ok) {
+          console.warn("[SpaceRuntime] Delegation session bootstrap failed:", res.status);
+          setIsBootstrappingSession(false);
+          return;
+        }
+        const data = await res.json();
+        const effectiveSessionId = data.workspaceSessionId;
+        if (!effectiveSessionId || typeof effectiveSessionId !== "string") {
+          console.warn("[SpaceRuntime] Delegation bootstrap returned no session ID");
+          setIsBootstrappingSession(false);
+          return;
+        }
+        const sessionKey = scopedSpaceSessionStorageKey(spaceId);
+        const session = {
+          id: effectiveSessionId,
+          workspaceSessionId: effectiveSessionId,
+          email: data.email || delegation?.email || null,
+          timestamp: Date.now(),
+          verified: true,
+          isReturningUser: !!data.isReturningUser,
+          metadata: { source: "tenant_delegation" }
+        };
+        localStorage.setItem(sessionKey, JSON.stringify(session));
+        try {
+          window.dispatchEvent(new CustomEvent("audos:session-established", {
+            detail: {
+              workspaceSessionId: effectiveSessionId,
+              email: session.email
+            }
+          }));
+        } catch {
+        }
+        console.log("[SpaceRuntime] Delegation session established:", effectiveSessionId);
+        setSessionId(effectiveSessionId);
+        setIsBootstrappingSession(false);
+      } catch (err) {
+        console.error("[SpaceRuntime] Delegation session bootstrap failed:", err);
+        setIsBootstrappingSession(false);
+      }
+    };
+    bootstrapDelegationSession();
   }, [spaceId, mode]);
   useEffect(() => {
     if (!isBootstrappingSession) return;
@@ -9304,7 +9705,7 @@ function SpaceRuntimeProvider({
   const resolveSessionId = () => {
     if (sessionId) return sessionId;
     try {
-      const stored = localStorage.getItem(`space_session_${spaceId}`);
+      const stored = localStorage.getItem(scopedSpaceSessionStorageKey(spaceId));
       if (stored) {
         const session = JSON.parse(stored);
         const recoveredId = session.workspaceSessionId || session.sessionId || session.id;
@@ -9498,7 +9899,7 @@ function SpaceRuntimeProvider({
   };
   const getEmailFromSession = useCallback(() => {
     try {
-      const sessionKey = `space_session_${spaceId}`;
+      const sessionKey = scopedSpaceSessionStorageKey(spaceId);
       const stored = localStorage.getItem(sessionKey);
       if (!stored) return null;
       const session = JSON.parse(stored);
@@ -9818,11 +10219,11 @@ function useSpaceRuntime() {
   return context;
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/Desktop.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/Desktop.tsx
 import { useState as useState6, Suspense, useEffect as useEffect6, useRef as useRef3, Component } from "react";
 import { Bot as Bot2, Folder as Folder2, Minus, Activity, Moon, Heart, Calendar, Users, FileText, BarChart, Settings as SettingsIcon, ArrowUp, MessageCircle, ChevronUp, Plane, TrendingUp, LineChart, Dumbbell, Brain, Target, Zap, Star, Clock as Clock2, CheckCircle, List, BookOpen as BookOpen2, Coffee, Music, Camera, MapPin, Wallet, ShoppingCart, Gift, Lightbulb, Sparkles as Sparkles2, Rocket, Home, Building, Globe, Mail, Phone, Video, Mic, Image, Play, Pause, Volume2, Wifi, Cloud, Sun, Umbrella, Thermometer, Wind, Droplets, Leaf, Flower2, Mountain, Waves, Compass, Map, Navigation, Car, Bike, Ship, Award, Trophy, Medal, Crown, Diamond, Gem, Key, Lock, Unlock, Shield, Eye as Eye2, Search as Search2, Filter, SortAsc, Download, Upload, Share2, Link, ExternalLink as ExternalLink2, Copy, Clipboard, Trash2, Edit as Edit2, Pencil, PenTool, Scissors, Bookmark, Flag, Bell, AlertCircle as AlertCircle2, Info, HelpCircle, XCircle as XCircle2, CheckCircle2 as CheckCircle22, Circle, Square, Triangle, Hexagon, Octagon, Hash, AtSign, DollarSign, Percent, Calculator, Code, Terminal, Database, Server, Cpu, Monitor, Smartphone, Tablet, Laptop, Watch, Headphones, Speaker, Radio, Tv, Printer, Scan, QrCode, Barcode, CreditCard as CreditCard2, Receipt, Banknote, PiggyBank, TrendingDown, AreaChart, PieChart, CheckSquare, Route, ClipboardCheck } from "lucide-react";
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/AgentChatView.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/components/AgentChatView.tsx
 import {
   Bot,
   Send,
@@ -9843,7 +10244,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// ../../../tmp/space-workspace-776786-SvPd8P/lib/friendly-terms.ts
+// ../../../tmp/space-workspace-776786-cbcbVR/lib/friendly-terms.ts
 var TOOL_NAME_PREFIX_RE = /^(?:functions\.|tools\.)/;
 var toolNameAliases = {
   "edit_file": "edit",
@@ -9909,7 +10310,7 @@ function getToolColor(toolName) {
   return toolColors[normalizeToolName(toolName)] || "text-gray-500";
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/AgentChatView.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/components/AgentChatView.tsx
 init_colors();
 import { jsx as jsx2, jsxs } from "react/jsx-runtime";
 function WorkingIndicator({
@@ -9929,7 +10330,7 @@ function WorkingIndicator({
   const Icon = actionIcons[lastAction || ""] || Loader2;
   const friendlyText = getFriendlyTerm(lastAction || "", "thinking");
   const color = getToolColor(lastAction || "");
-  return /* @__PURE__ */ jsx2("div", { className: "flex items-center justify-center py-2 mr-8", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full", children: [
+  return /* @__PURE__ */ jsx2("div", { className: "flex items-center justify-center py-2 mr-8", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 px-3 py-1.5 bg-[var(--space-surface-muted)] rounded-full border border-[var(--space-border-default)]", children: [
     /* @__PURE__ */ jsx2(Icon, { className: `h-4 w-4 ${color} animate-spin` }),
     /* @__PURE__ */ jsx2("span", { className: `text-xs font-medium ${color}`, children: thinkingText || `${agentLabel} is ${friendlyText}...` })
   ] }) });
@@ -9981,33 +10382,33 @@ var markdownComponents = {
     return /* @__PURE__ */ jsx2("div", { className: "overflow-x-auto my-3", children: /* @__PURE__ */ jsx2(
       "table",
       {
-        className: "min-w-full border-collapse border border-gray-300 text-sm",
+        className: "min-w-full border-collapse border border-[var(--space-border-default)] text-sm",
         ...props,
         children
       }
     ) });
   },
   thead({ node: _node, children, ...props }) {
-    return /* @__PURE__ */ jsx2("thead", { className: "bg-gray-100", ...props, children });
+    return /* @__PURE__ */ jsx2("thead", { className: "bg-[var(--space-surface-muted)]", ...props, children });
   },
   tbody({ node: _node, children, ...props }) {
     return /* @__PURE__ */ jsx2("tbody", { ...props, children });
   },
   tr({ node: _node, children, ...props }) {
-    return /* @__PURE__ */ jsx2("tr", { className: "border-b border-gray-200", ...props, children });
+    return /* @__PURE__ */ jsx2("tr", { className: "border-b border-[var(--space-border-default)]", ...props, children });
   },
   th({ node: _node, children, ...props }) {
     return /* @__PURE__ */ jsx2(
       "th",
       {
-        className: "border border-gray-300 px-3 py-2 text-left font-semibold",
+        className: "border border-[var(--space-border-default)] px-3 py-2 text-left font-semibold",
         ...props,
         children
       }
     );
   },
   td({ node: _node, children, ...props }) {
-    return /* @__PURE__ */ jsx2("td", { className: "border border-gray-300 px-3 py-2", ...props, children });
+    return /* @__PURE__ */ jsx2("td", { className: "border border-[var(--space-border-default)] px-3 py-2", ...props, children });
   },
   code({ node: _node, children, className, ...props }) {
     const isBlock = typeof className === "string" && className.includes("language-");
@@ -10063,7 +10464,7 @@ var markdownComponents = {
             e.stopPropagation();
             window.dispatchEvent(new CustomEvent("endIntroSession"));
           },
-          className: "text-blue-600 hover:underline break-all bg-transparent border-none p-0 font-inherit text-left",
+          className: "text-[var(--space-text-brand)] hover:underline break-all bg-transparent border-none p-0 font-inherit text-left",
           "data-testid": "link-subscribe-plans",
           children
         }
@@ -10076,7 +10477,7 @@ var markdownComponents = {
         target: "_blank",
         rel: "noopener noreferrer",
         title: href,
-        className: "text-blue-600 hover:underline break-all",
+        className: "text-[var(--space-text-brand)] hover:text-[var(--space-text-accent)] hover:underline break-all",
         children
       }
     );
@@ -10133,12 +10534,12 @@ function AgentChatView({ runtime }) {
   return /* @__PURE__ */ jsxs(
     "div",
     {
-      className: `h-full flex flex-col ${isBeaconSpace ? "bg-gradient-to-br from-emerald-50/60 via-stone-50 to-sky-50/30" : "bg-gradient-to-br from-blue-50/30 to-sky-50/30"}`,
+      className: `h-full flex flex-col ${isBeaconSpace ? "bg-gradient-to-br from-emerald-50/60 via-stone-50 to-sky-50/30" : "bg-[linear-gradient(135deg,var(--space-surface-gradient-from),var(--space-surface-gradient-via),var(--space-surface-gradient-to))]"}`,
       children: [
         /* @__PURE__ */ jsxs("div", { className: "flex-1 overflow-auto p-6 space-y-4", children: [
-          showPendingPlaceholder && /* @__PURE__ */ jsx2("div", { className: "flex justify-start mr-8", children: /* @__PURE__ */ jsxs("div", { className: "bg-slate-100 rounded-lg px-4 py-2 flex items-center gap-2", children: [
-            /* @__PURE__ */ jsx2(Loader2, { className: "w-4 h-4 animate-spin text-slate-400" }),
-            /* @__PURE__ */ jsx2("span", { className: "text-xs text-slate-500", children: "Getting ready\u2026" })
+          showPendingPlaceholder && /* @__PURE__ */ jsx2("div", { className: "flex justify-start mr-8", children: /* @__PURE__ */ jsxs("div", { className: "bg-[var(--space-surface-panel)] border border-[var(--space-border-default)] rounded-lg px-4 py-2 flex items-center gap-2", children: [
+            /* @__PURE__ */ jsx2(Loader2, { className: "w-4 h-4 animate-spin text-[var(--space-text-muted)]" }),
+            /* @__PURE__ */ jsx2("span", { className: "text-xs text-[var(--space-text-secondary)]", children: "Getting ready\u2026" })
           ] }) }),
           !isLoadingHistory && hasLoadedHistory && shouldShowBeaconIntake && beaconIntake && /* @__PURE__ */ jsx2("div", { className: "px-4", children: /* @__PURE__ */ jsxs("div", { className: "mx-auto max-w-2xl overflow-hidden rounded-3xl border border-emerald-100 bg-white/90 shadow-sm", children: [
             /* @__PURE__ */ jsxs("div", { className: "border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 px-6 py-5", children: [
@@ -10198,9 +10599,9 @@ function AgentChatView({ runtime }) {
               },
               prompt
             )) })
-          ] }) : /* @__PURE__ */ jsxs("div", { className: "text-center text-gray-500", children: [
-            /* @__PURE__ */ jsx2(Bot, { className: "w-12 h-12 mx-auto mb-3 text-gray-400" }),
-            /* @__PURE__ */ jsx2("p", { className: "text-sm", children: "Ask me anything to get started" })
+          ] }) : /* @__PURE__ */ jsxs("div", { className: "text-center text-[var(--space-text-secondary)]", children: [
+            /* @__PURE__ */ jsx2(Bot, { className: "w-12 h-12 mx-auto mb-3 text-[var(--space-shell-icon)]" }),
+            /* @__PURE__ */ jsx2("p", { className: "text-sm text-[var(--space-text-primary)]", children: "Ask me anything to get started" })
           ] }) }) : visibleMessages.length > 0 && visibleMessages.map((msg, idx) => /* @__PURE__ */ jsx2("div", { children: /* @__PURE__ */ jsxs(
             "div",
             {
@@ -10210,9 +10611,9 @@ function AgentChatView({ runtime }) {
                 msg.role === "user" && msg.attachments && msg.attachments.length > 0 && /* @__PURE__ */ jsx2("div", { className: "flex flex-wrap gap-2 mb-2", children: msg.attachments.map((att) => /* @__PURE__ */ jsxs(
                   "div",
                   {
-                    className: "flex items-center gap-1 px-2 py-1 bg-white/50 rounded text-xs",
+                    className: "flex items-center gap-1 px-2 py-1 bg-[var(--space-surface-card)]/80 border border-[var(--space-border-default)] rounded text-xs",
                     children: [
-                      att.contentType.startsWith("image/") ? /* @__PURE__ */ jsx2(FileImage, { className: "w-3 h-3 text-blue-500" }) : /* @__PURE__ */ jsx2(File, { className: "w-3 h-3 text-gray-500" }),
+                      att.contentType.startsWith("image/") ? /* @__PURE__ */ jsx2(FileImage, { className: "w-3 h-3 text-[var(--space-text-brand)]" }) : /* @__PURE__ */ jsx2(File, { className: "w-3 h-3 text-[var(--space-text-muted)]" }),
                       /* @__PURE__ */ jsx2("span", { className: "max-w-[100px] truncate", children: att.originalName })
                     ]
                   },
@@ -10242,10 +10643,10 @@ function AgentChatView({ runtime }) {
                       children: chunk.text
                     }
                   ) }),
-                  chunk.type === "tool_use" && /* @__PURE__ */ jsx2("div", { className: "border border-gray-300 rounded-lg overflow-hidden mt-2", children: /* @__PURE__ */ jsxs("div", { className: "bg-gray-50 px-3 py-2 flex items-center gap-2 flex-wrap", children: [
-                    chunk.name === "edit_file" ? /* @__PURE__ */ jsx2(Edit3, { className: "w-3.5 h-3.5 text-blue-600" }) : chunk.name === "read_file" ? /* @__PURE__ */ jsx2(BookOpen, { className: "w-3.5 h-3.5 text-blue-600" }) : chunk.name === "write_file" ? /* @__PURE__ */ jsx2(Save, { className: "w-3.5 h-3.5 text-green-600" }) : /* @__PURE__ */ jsx2(Sparkles, { className: "w-3.5 h-3.5 text-gray-600" }),
-                    /* @__PURE__ */ jsx2("span", { className: "text-xs font-semibold text-gray-700", children: chunk.name === "read_file" ? "Viewing" : chunk.name === "write_file" ? "Creating" : chunk.name === "edit_file" ? "Updating" : getFriendlyTerm(chunk.name || "", "Tool Use") }),
-                    chunk.input?.file_path && /* @__PURE__ */ jsx2("span", { className: "font-mono text-xs text-gray-600 break-all", children: chunk.input.file_path })
+                  chunk.type === "tool_use" && /* @__PURE__ */ jsx2("div", { className: "border border-[var(--space-border-default)] rounded-lg overflow-hidden mt-2", children: /* @__PURE__ */ jsxs("div", { className: "bg-[var(--space-surface-muted)] px-3 py-2 flex items-center gap-2 flex-wrap", children: [
+                    chunk.name === "edit_file" ? /* @__PURE__ */ jsx2(Edit3, { className: "w-3.5 h-3.5 text-[var(--space-text-brand)]" }) : chunk.name === "read_file" ? /* @__PURE__ */ jsx2(BookOpen, { className: "w-3.5 h-3.5 text-[var(--space-text-brand)]" }) : chunk.name === "write_file" ? /* @__PURE__ */ jsx2(Save, { className: "w-3.5 h-3.5 text-[var(--space-semantic-success)]" }) : /* @__PURE__ */ jsx2(Sparkles, { className: "w-3.5 h-3.5 text-[var(--space-text-muted)]" }),
+                    /* @__PURE__ */ jsx2("span", { className: "text-xs font-semibold text-[var(--space-text-secondary)]", children: chunk.name === "read_file" ? "Viewing" : chunk.name === "write_file" ? "Creating" : chunk.name === "edit_file" ? "Updating" : getFriendlyTerm(chunk.name || "", "Tool Use") }),
+                    chunk.input?.file_path && /* @__PURE__ */ jsx2("span", { className: "font-mono text-xs text-[var(--space-text-muted)] break-all", children: chunk.input.file_path })
                   ] }) })
                 ] }, chunkIdx)) })
               ]
@@ -10255,9 +10656,9 @@ function AgentChatView({ runtime }) {
           streamingContent && /* @__PURE__ */ jsxs(
             "div",
             {
-              className: `${isBeaconSpace ? "bg-white/90 border border-emerald-100 shadow-sm" : "bg-gray-100"} mr-8 p-3 rounded-lg overflow-hidden min-w-0`,
+              className: `${isBeaconSpace ? "bg-white/90 border border-emerald-100 shadow-sm" : `${tw.message.assistant}`} mr-8 p-3 rounded-lg overflow-hidden min-w-0`,
               children: [
-                /* @__PURE__ */ jsx2("p", { className: "text-sm font-medium mb-1", children: agentLabel }),
+                /* @__PURE__ */ jsx2("p", { className: "text-sm font-medium mb-1 text-[var(--space-text-primary)]", children: agentLabel }),
                 /* @__PURE__ */ jsxs("div", { className: "prose prose-base max-w-none text-base", children: [
                   /* @__PURE__ */ jsx2(
                     ReactMarkdown,
@@ -10268,14 +10669,14 @@ function AgentChatView({ runtime }) {
                       children: streamingContent
                     }
                   ),
-                  isStreaming && /* @__PURE__ */ jsx2("span", { className: "inline-block w-0.5 h-4 ml-1 bg-gray-900 animate-pulse" })
+                  isStreaming && /* @__PURE__ */ jsx2("span", { className: "inline-block w-0.5 h-4 ml-1 bg-[var(--space-text-primary)] animate-pulse" })
                 ] })
               ]
             }
           ),
           /* @__PURE__ */ jsx2("div", { ref: messagesEndRef })
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "px-3 py-2 border-t bg-white/80 backdrop-blur-sm", children: [
+        /* @__PURE__ */ jsxs("div", { className: "px-3 py-2 border-t border-[var(--space-border-default)] bg-[var(--space-surface-panel)]/95 backdrop-blur-sm", children: [
           /* @__PURE__ */ jsx2(
             "input",
             {
@@ -10295,25 +10696,25 @@ function AgentChatView({ runtime }) {
               onDragOver: handleDragOver,
               onDragLeave: handleDragLeave,
               onDrop: handleDrop,
-              className: `rounded-2xl border-2 transition-colors overflow-hidden ${isDraggingOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50"}`,
+              className: `rounded-2xl border-2 transition-colors overflow-hidden ${isDraggingOver ? "border-[var(--space-brand-highlight)] bg-[var(--space-surface-accent-soft)]" : "border-[var(--space-border-default)] bg-[var(--space-surface-muted)]"}`,
               children: [
-                isDraggingOver && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-center py-3 px-4 bg-blue-50 border-b border-blue-200", children: [
-                  /* @__PURE__ */ jsx2(FileImage, { className: "w-4 h-4 text-blue-500 mr-2" }),
-                  /* @__PURE__ */ jsx2("span", { className: "text-sm text-blue-600 font-medium", children: "Drop files here" })
+                isDraggingOver && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-center py-3 px-4 bg-[var(--space-surface-accent-soft)] border-b border-[var(--space-border-default)]", children: [
+                  /* @__PURE__ */ jsx2(FileImage, { className: "w-4 h-4 text-[var(--space-text-accent)] mr-2" }),
+                  /* @__PURE__ */ jsx2("span", { className: "text-sm text-[var(--space-text-accent)] font-medium", children: "Drop files here" })
                 ] }),
                 pendingAttachments.length > 0 && /* @__PURE__ */ jsx2("div", { className: "flex flex-wrap gap-2 px-3 pt-2", children: pendingAttachments.map((attachment) => /* @__PURE__ */ jsxs(
                   "div",
                   {
-                    className: "relative flex items-center gap-1 px-2 py-1 bg-white rounded-lg text-xs border border-gray-200",
+                    className: "relative flex items-center gap-1 px-2 py-1 bg-[var(--space-surface-card)] rounded-lg text-xs border border-[var(--space-border-default)]",
                     "data-testid": `attachment-preview-${attachment.id}`,
                     children: [
-                      attachment.contentType.startsWith("image/") ? /* @__PURE__ */ jsx2(FileImage, { className: "w-3 h-3 text-blue-500" }) : /* @__PURE__ */ jsx2(File, { className: "w-3 h-3 text-gray-500" }),
-                      /* @__PURE__ */ jsx2("span", { className: "max-w-[100px] truncate text-gray-700", children: attachment.originalName }),
+                      attachment.contentType.startsWith("image/") ? /* @__PURE__ */ jsx2(FileImage, { className: "w-3 h-3 text-[var(--space-text-brand)]" }) : /* @__PURE__ */ jsx2(File, { className: "w-3 h-3 text-[var(--space-text-muted)]" }),
+                      /* @__PURE__ */ jsx2("span", { className: "max-w-[100px] truncate text-[var(--space-text-secondary)]", children: attachment.originalName }),
                       /* @__PURE__ */ jsx2(
                         "button",
                         {
                           onClick: () => removeAttachment(attachment.id),
-                          className: "ml-1 text-gray-400 hover:text-red-500",
+                          className: "ml-1 text-[var(--space-text-muted)] hover:text-red-400",
                           "data-testid": `button-remove-attachment-${attachment.id}`,
                           children: /* @__PURE__ */ jsx2(X, { className: "w-3 h-3" })
                         }
@@ -10331,7 +10732,7 @@ function AgentChatView({ runtime }) {
                     onKeyDown: handleKeyDown,
                     onPaste: handlePaste,
                     placeholder: composerPlaceholder,
-                    className: "w-full border-0 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-0 resize-none leading-5",
+                    className: "w-full border-0 bg-transparent px-3 py-2 text-sm text-[var(--space-text-primary)] placeholder:text-[var(--space-text-muted)] focus:outline-none focus:ring-0 resize-none leading-5",
                     rows: 1,
                     disabled: loading,
                     "data-testid": "textarea-instruction"
@@ -10343,10 +10744,10 @@ function AgentChatView({ runtime }) {
                     {
                       onClick: () => fileInputRef.current?.click(),
                       disabled: loading || isUploadingAttachment || pendingAttachments.length >= 5,
-                      className: "h-8 w-8 flex items-center justify-center rounded-xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                      className: "h-8 w-8 flex items-center justify-center rounded-xl hover:bg-[var(--space-surface-card-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
                       "data-testid": "button-attach-file",
                       title: "Attach files (images, PDFs)",
-                      children: isUploadingAttachment ? /* @__PURE__ */ jsx2(Loader2, { className: "w-4 h-4 animate-spin text-gray-500" }) : /* @__PURE__ */ jsx2(Paperclip, { className: "w-4 h-4 text-gray-500" })
+                      children: isUploadingAttachment ? /* @__PURE__ */ jsx2(Loader2, { className: "w-4 h-4 animate-spin text-[var(--space-text-muted)]" }) : /* @__PURE__ */ jsx2(Paperclip, { className: "w-4 h-4 text-[var(--space-text-muted)]" })
                     }
                   ),
                   /* @__PURE__ */ jsx2(
@@ -10363,7 +10764,7 @@ function AgentChatView({ runtime }) {
               ]
             }
           ),
-          /* @__PURE__ */ jsxs("p", { className: "text-[10px] text-gray-400 mt-1 text-center leading-tight", children: [
+          /* @__PURE__ */ jsxs("p", { className: "text-[10px] text-[var(--space-text-muted)] mt-1 text-center leading-tight", children: [
             shortcutPrefix,
             "+Enter to send"
           ] })
@@ -10373,8 +10774,8 @@ function AgentChatView({ runtime }) {
   );
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/useAgentChatRuntime.tsx
-import { useState as useState2, useEffect as useEffect2, useRef as useRef2 } from "react";
+// ../../../tmp/space-workspace-776786-cbcbVR/components/useAgentChatRuntime.tsx
+import { useState as useState2, useEffect as useEffect2, useRef as useRef2, useCallback as useCallback2 } from "react";
 import { flushSync } from "react-dom";
 var globalSendingLock = false;
 var lastSendTimestamp = 0;
@@ -10473,7 +10874,8 @@ function getInlineAgentConfig() {
   };
 }
 function useAgentChatRuntime(props) {
-  const { spaceId, onFileAccess, pendingMessage, onPendingMessageConsumed } = props;
+  const { spaceId, onFileAccess, pendingMessage, onPendingMessageConsumed, threadId } = props;
+  const isPrimaryThread = !threadId || threadId === "main";
   const { sessionId, trackEvent } = useSpaceRuntime();
   const inlineAgentConfig = getInlineAgentConfig();
   const [messages, setMessages] = useState2([]);
@@ -10697,6 +11099,9 @@ function useAgentChatRuntime(props) {
     const loadHistory = async () => {
       const params = new URLSearchParams();
       params.set("contextType", "space");
+      if (threadId) {
+        params.set("threadId", threadId);
+      }
       const effectiveSessionId = sessionId && (sessionId.startsWith("wses_") || sessionId.startsWith("guest_")) ? sessionId : getStoredWorkspaceSessionId();
       if (effectiveSessionId) {
         params.set("sessionId", effectiveSessionId);
@@ -10827,9 +11232,10 @@ function useAgentChatRuntime(props) {
       }
     };
     loadHistory();
-  }, [spaceId, sessionId]);
+  }, [spaceId, sessionId, threadId]);
   useEffect2(() => {
     if (!hasLoadedHistory || !isConfigLoaded) return;
+    if (!isPrimaryThread) return;
     const hasVisibleMessages = messages.some((m) => {
       if (m.role === "assistant") return true;
       if (m.role === "user" && typeof m.content === "string" && m.content.startsWith("[SYSTEM:"))
@@ -10945,12 +11351,62 @@ function useAgentChatRuntime(props) {
     workspaceSessionId,
     spaceId
   ]);
-  useEffect2(() => {
-    const el = messagesEndRef.current?.parentElement;
+  const findScrollContainer = useCallback2(() => {
+    let node = messagesEndRef.current?.parentElement ?? null;
+    while (node) {
+      const style = window.getComputedStyle(node);
+      const overflowY = style.overflowY;
+      const scrollable = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && node.scrollHeight > node.clientHeight;
+      if (scrollable) return node;
+      if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return node;
+      node = node.parentElement;
+    }
+    return null;
+  }, []);
+  const autoFollowRef = useRef2(true);
+  const scrollListenerElRef = useRef2(null);
+  const scrollToBottom = useCallback2(() => {
+    const el = findScrollContainer();
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, streamingContent, loading]);
+  }, [findScrollContainer]);
+  useEffect2(() => {
+    const el = findScrollContainer();
+    if (!el) return;
+    const handleContainerScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      autoFollowRef.current = distanceFromBottom < 80;
+    };
+    scrollListenerElRef.current = el;
+    el.addEventListener("scroll", handleContainerScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", handleContainerScroll);
+      if (scrollListenerElRef.current === el) scrollListenerElRef.current = null;
+    };
+  }, [messages, streamingContent, loading, hasLoadedHistory, findScrollContainer]);
+  useEffect2(() => {
+    if (autoFollowRef.current) {
+      scrollToBottom();
+    }
+  }, [messages, streamingContent, loading, scrollToBottom]);
+  useEffect2(() => {
+    if (!hasLoadedHistory) return;
+    autoFollowRef.current = true;
+    scrollToBottom();
+    const raf = requestAnimationFrame(() => {
+      if (autoFollowRef.current) scrollToBottom();
+    });
+    const timeouts = [150, 400, 900].map(
+      (ms) => setTimeout(() => {
+        if (autoFollowRef.current) scrollToBottom();
+      }, ms)
+    );
+    return () => {
+      cancelAnimationFrame(raf);
+      timeouts.forEach(clearTimeout);
+    };
+  }, [hasLoadedHistory, scrollToBottom]);
   useEffect2(() => {
     if (!workspaceSessionId) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -11236,6 +11692,12 @@ function useAgentChatRuntime(props) {
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
     setLastAction(void 0);
+    try {
+      window.dispatchEvent(new CustomEvent("audos:chat-user-message", {
+        detail: { threadId: threadId || "main", content: messageContent }
+      }));
+    } catch (e) {
+    }
     trackEvent("agent_message", {
       messageLength: messageContent.length,
       messagePreview: messageContent.slice(0, 50),
@@ -11244,6 +11706,7 @@ function useAgentChatRuntime(props) {
     isSSEActiveRef.current = true;
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    let accumulatedText = "";
     try {
       const email = getSessionEmail();
       console.log(
@@ -11260,7 +11723,8 @@ function useAgentChatRuntime(props) {
           sessionId,
           claudeSessionId,
           email,
-          attachments: attachmentsToSend.length > 0 ? attachmentsToSend : void 0
+          attachments: attachmentsToSend.length > 0 ? attachmentsToSend : void 0,
+          threadId: threadId || void 0
         }),
         signal: controller.signal
       });
@@ -11273,7 +11737,7 @@ function useAgentChatRuntime(props) {
       let buffer = "";
       let chunkCount = 0;
       let totalTextLength = 0;
-      let accumulatedText2 = "";
+      accumulatedText = "";
       console.log("[SPACE-STREAM-DEBUG] Starting to read SSE stream...");
       while (true) {
         const { done, value } = await reader.read();
@@ -11313,7 +11777,7 @@ function useAgentChatRuntime(props) {
                 chunkCount++;
                 const text = event.data?.text || "";
                 totalTextLength += text.length;
-                accumulatedText2 += text;
+                accumulatedText += text;
                 console.log(
                   "[SPACE-STREAM-DEBUG] text_chunk #" + chunkCount + ":",
                   text.substring(0, 50),
@@ -11421,6 +11885,7 @@ function useAgentChatRuntime(props) {
     await sendMessageWithContent(messageToSend, attachmentsToSend);
   };
   const handleKeyDown = (e) => {
+    if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !loading) {
       e.preventDefault();
       sendMessage();
@@ -11470,14 +11935,14 @@ function useAgentChatRuntime(props) {
   };
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/AgentChat.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/components/AgentChat.tsx
 import { jsx as jsx3 } from "react/jsx-runtime";
 function AgentChat(props) {
   const runtime = useAgentChatRuntime(props);
   return /* @__PURE__ */ jsx3(AgentChatView, { runtime });
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/FileBrowser.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/components/FileBrowser.tsx
 import { useState as useState3, useEffect as useEffect3 } from "react";
 import { File as File2, Folder, Eye, Edit } from "lucide-react";
 import { jsx as jsx4, jsxs as jsxs2 } from "react/jsx-runtime";
@@ -11615,7 +12080,7 @@ function FileBrowser({ fileAccessLogs = [] }) {
   ] });
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/EmailGate.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/components/EmailGate.tsx
 import { useState as useState4, useEffect as useEffect4 } from "react";
 import { jsx as jsx5, jsxs as jsxs3 } from "react/jsx-runtime";
 function isRecord(value) {
@@ -12823,7 +13288,7 @@ function EmailGate({
   );
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/components/Settings.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/components/Settings.tsx
 import { useState as useState5, useEffect as useEffect5 } from "react";
 import { Save as Save2, CreditCard, LogOut, Clock, CheckCircle2, AlertCircle, Loader2 as Loader22, ExternalLink, CalendarX } from "lucide-react";
 init_colors();
@@ -13046,7 +13511,7 @@ function Settings({ spaceId }) {
     if (!subscriptionStatus) return null;
     switch (subscriptionStatus.status) {
       case "active":
-        return /* @__PURE__ */ jsx6("div", { className: `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${subscriptionStatus.cancelAtPeriodEnd ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`, children: subscriptionStatus.cancelAtPeriodEnd ? /* @__PURE__ */ jsxs4(Fragment, { children: [
+        return /* @__PURE__ */ jsx6("div", { className: `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${subscriptionStatus.cancelAtPeriodEnd ? "bg-amber-500/15 text-amber-300" : "bg-green-500/15 text-green-300"}`, children: subscriptionStatus.cancelAtPeriodEnd ? /* @__PURE__ */ jsxs4(Fragment, { children: [
           /* @__PURE__ */ jsx6(CalendarX, { className: "w-4 h-4" }),
           "Cancels ",
           subscriptionStatus.currentPeriodEnd ? new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString(void 0, { month: "short", day: "numeric" }) : "at period end"
@@ -13056,28 +13521,28 @@ function Settings({ spaceId }) {
         ] }) });
       case "trial":
       case "trialing":
-        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium", children: [
+        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-[var(--space-brand-primary-50)] text-[var(--space-text-brand)] rounded-full text-sm font-medium", children: [
           /* @__PURE__ */ jsx6(Clock, { className: "w-4 h-4" }),
           subscriptionStatus.trialDaysRemaining,
           " days left in trial"
         ] });
       case "trial_expired":
-        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm font-medium", children: [
+        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 text-amber-300 rounded-full text-sm font-medium", children: [
           /* @__PURE__ */ jsx6(AlertCircle, { className: "w-4 h-4" }),
           "Trial expired"
         ] });
       case "past_due":
-        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-sm font-medium", children: [
+        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 text-red-300 rounded-full text-sm font-medium", children: [
           /* @__PURE__ */ jsx6(AlertCircle, { className: "w-4 h-4" }),
           "Payment past due"
         ] });
       case "canceled":
-        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-medium", children: [
+        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-[var(--space-surface-muted)] text-[var(--space-text-secondary)] rounded-full text-sm font-medium", children: [
           /* @__PURE__ */ jsx6(AlertCircle, { className: "w-4 h-4" }),
           "Subscription canceled"
         ] });
       case "registered":
-        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-medium", children: [
+        return /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-1.5 px-3 py-1.5 bg-[var(--space-surface-muted)] text-[var(--space-text-secondary)] rounded-full text-sm font-medium", children: [
           /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-4 h-4" }),
           "Registered"
         ] });
@@ -13089,12 +13554,12 @@ function Settings({ spaceId }) {
   return /* @__PURE__ */ jsx6("div", { className: settingsStyles.container, children: /* @__PURE__ */ jsxs4("div", { className: settingsStyles.innerContainer, children: [
     /* @__PURE__ */ jsxs4("div", { className: settingsStyles.section, children: [
       /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-between mb-4", children: [
-        /* @__PURE__ */ jsx6("h3", { className: "text-sm font-semibold text-gray-900", children: "Your Account" }),
+        /* @__PURE__ */ jsx6("h3", { className: "text-sm font-semibold text-[var(--space-text-primary)]", children: "Your Account" }),
         email && /* @__PURE__ */ jsxs4(
           "button",
           {
             onClick: handleSignOut,
-            className: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors",
+            className: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--space-text-secondary)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors",
             "data-testid": "button-sign-out",
             children: [
               /* @__PURE__ */ jsx6(LogOut, { className: "w-3.5 h-3.5" }),
@@ -13136,46 +13601,46 @@ function Settings({ spaceId }) {
         }
       )
     ] }),
-    email && /* @__PURE__ */ jsxs4("div", { className: "mt-8 pt-6 border-t border-gray-200", style: { minHeight: 185 }, children: [
+    email && /* @__PURE__ */ jsxs4("div", { className: "mt-8 pt-6 border-t border-[var(--space-border-default)]", style: { minHeight: 185 }, children: [
       /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2 mb-4", children: [
-        /* @__PURE__ */ jsx6(CreditCard, { className: "w-5 h-5 text-gray-500" }),
-        /* @__PURE__ */ jsx6("h3", { className: "text-sm font-semibold text-gray-900", children: "Subscription" })
+        /* @__PURE__ */ jsx6(CreditCard, { className: "w-5 h-5 text-[var(--space-text-muted)]" }),
+        /* @__PURE__ */ jsx6("h3", { className: "text-sm font-semibold text-[var(--space-text-primary)]", children: "Subscription" })
       ] }),
       statusLoading ? /* @__PURE__ */ jsxs4("div", { className: "space-y-4", children: [
-        /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2 text-sm text-gray-500", children: [
+        /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2 text-sm text-[var(--space-text-muted)]", children: [
           /* @__PURE__ */ jsx6(Loader22, { className: "w-4 h-4 animate-spin" }),
           "Loading subscription status..."
         ] }),
-        /* @__PURE__ */ jsx6("div", { className: "h-12 rounded-xl bg-gray-100", "aria-hidden": "true" }),
-        /* @__PURE__ */ jsx6("div", { className: "mx-auto h-3 w-44 rounded-full bg-gray-100", "aria-hidden": "true" })
+        /* @__PURE__ */ jsx6("div", { className: "h-12 rounded-xl bg-[var(--space-surface-muted)]", "aria-hidden": "true" }),
+        /* @__PURE__ */ jsx6("div", { className: "mx-auto h-3 w-44 rounded-full bg-[var(--space-surface-muted)]", "aria-hidden": "true" })
       ] }) : /* @__PURE__ */ jsxs4("div", { className: "space-y-4", children: [
         getStatusBadge(),
-        (subscriptionStatus?.status === "trial" || subscriptionStatus?.status === "trialing") && /* @__PURE__ */ jsxs4("div", { className: "p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200", children: [
+        (subscriptionStatus?.status === "trial" || subscriptionStatus?.status === "trialing") && /* @__PURE__ */ jsxs4("div", { className: "p-4 bg-gradient-to-r from-[var(--space-brand-primary-50)] to-[var(--space-brand-highlight-50)] rounded-xl border border-[var(--space-border-strong)]", children: [
           /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-between mb-3", children: [
-            /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-gray-900", children: "Free Trial" }),
-            /* @__PURE__ */ jsxs4("span", { className: "text-sm text-gray-600", children: [
+            /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-[var(--space-text-primary)]", children: "Free Trial" }),
+            /* @__PURE__ */ jsxs4("span", { className: "text-sm text-[var(--space-text-secondary)]", children: [
               subscriptionStatus.trialDaysRemaining,
               " of ",
               subscriptionStatus.trialDays,
               " days remaining"
             ] })
           ] }),
-          /* @__PURE__ */ jsx6("div", { className: "w-full h-2 bg-gray-200 rounded-full overflow-hidden", children: /* @__PURE__ */ jsx6(
+          /* @__PURE__ */ jsx6("div", { className: "w-full h-2 bg-[var(--space-surface-muted)] rounded-full overflow-hidden", children: /* @__PURE__ */ jsx6(
             "div",
             {
-              className: "h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all",
+              className: "h-full bg-gradient-to-r from-[var(--space-brand-primary)] to-[var(--space-brand-highlight)] rounded-full transition-all",
               style: {
                 width: `${(subscriptionStatus.trialDays - subscriptionStatus.trialDaysRemaining) / subscriptionStatus.trialDays * 100}%`
               }
             }
           ) }),
-          /* @__PURE__ */ jsx6("p", { className: "mt-3 text-xs text-gray-600", children: "Add your payment method now to continue access after your trial ends." }),
+          /* @__PURE__ */ jsx6("p", { className: "mt-3 text-xs text-[var(--space-text-secondary)]", children: "Add your payment method now to continue access after your trial ends." }),
           subscriptionStatus.hasPaymentMethod && /* @__PURE__ */ jsxs4(
             "button",
             {
               onClick: handleManageSubscription,
               disabled: managingPortal,
-              className: "mt-3 flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-white/60 border border-gray-200 rounded-lg transition-colors disabled:opacity-50",
+              className: "mt-3 flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--space-text-secondary)] hover:text-[var(--space-text-primary)] hover:bg-[var(--space-surface-card-hover)] border border-[var(--space-border-default)] rounded-lg transition-colors disabled:opacity-50",
               children: [
                 managingPortal ? /* @__PURE__ */ jsx6(Loader22, { className: "w-3.5 h-3.5 animate-spin" }) : /* @__PURE__ */ jsx6(ExternalLink, { className: "w-3.5 h-3.5" }),
                 "Manage Billing"
@@ -13183,31 +13648,31 @@ function Settings({ spaceId }) {
             }
           )
         ] }),
-        subscriptionStatus?.status === "active" && /* @__PURE__ */ jsxs4("div", { className: `p-4 bg-gradient-to-r ${subscriptionStatus.cancelAtPeriodEnd ? "from-amber-50 to-orange-50 border-amber-200" : "from-green-50 to-emerald-50 border-green-200"} rounded-xl border`, children: [
+        subscriptionStatus?.status === "active" && /* @__PURE__ */ jsxs4("div", { className: `p-4 bg-gradient-to-r ${subscriptionStatus.cancelAtPeriodEnd ? "from-amber-500/10 to-orange-500/10 border-amber-500/30" : "from-green-500/10 to-emerald-500/10 border-green-500/30"} rounded-xl border`, children: [
           subscriptionStatus.cancelAtPeriodEnd ? /* @__PURE__ */ jsxs4(Fragment, { children: [
             /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2", children: [
-              /* @__PURE__ */ jsx6(CalendarX, { className: "w-5 h-5 text-amber-600" }),
-              /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-gray-900", children: "Subscription ending" })
+              /* @__PURE__ */ jsx6(CalendarX, { className: "w-5 h-5 text-amber-400" }),
+              /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-[var(--space-text-primary)]", children: "Subscription ending" })
             ] }),
-            /* @__PURE__ */ jsxs4("p", { className: "mt-2 text-xs text-gray-600", children: [
+            /* @__PURE__ */ jsxs4("p", { className: "mt-2 text-xs text-[var(--space-text-secondary)]", children: [
               "Your subscription will end on",
               " ",
-              /* @__PURE__ */ jsx6("span", { className: "font-semibold text-gray-900", children: subscriptionStatus.currentPeriodEnd ? new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString(void 0, { year: "numeric", month: "long", day: "numeric" }) : "the end of the current billing period" }),
+              /* @__PURE__ */ jsx6("span", { className: "font-semibold text-[var(--space-text-primary)]", children: subscriptionStatus.currentPeriodEnd ? new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString(void 0, { year: "numeric", month: "long", day: "numeric" }) : "the end of the current billing period" }),
               ". You will continue to have full access until then."
             ] })
           ] }) : /* @__PURE__ */ jsxs4(Fragment, { children: [
             /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2", children: [
-              /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-5 h-5 text-green-600" }),
-              /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-gray-900", children: "You have full access" })
+              /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-5 h-5 text-green-400" }),
+              /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-[var(--space-text-primary)]", children: "You have full access" })
             ] }),
-            /* @__PURE__ */ jsx6("p", { className: "mt-2 text-xs text-gray-600", children: "Your subscription is active. Thank you for your support!" })
+            /* @__PURE__ */ jsx6("p", { className: "mt-2 text-xs text-[var(--space-text-secondary)]", children: "Your subscription is active. Thank you for your support!" })
           ] }),
           /* @__PURE__ */ jsx6(
             "button",
             {
               onClick: handleManageSubscription,
               disabled: managingPortal,
-              className: "mt-3 flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+              className: "mt-3 flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--space-text-secondary)] bg-[var(--space-surface-card)] hover:bg-[var(--space-surface-card-hover)] border border-[var(--space-border-default)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
               children: managingPortal ? /* @__PURE__ */ jsxs4(Fragment, { children: [
                 /* @__PURE__ */ jsx6(Loader22, { className: "w-4 h-4 animate-spin" }),
                 "Opening..."
@@ -13218,29 +13683,29 @@ function Settings({ spaceId }) {
             }
           )
         ] }),
-        subscriptionStatus?.status === "trial_expired" && /* @__PURE__ */ jsxs4("div", { className: "p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200", children: [
+        subscriptionStatus?.status === "trial_expired" && /* @__PURE__ */ jsxs4("div", { className: "p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-500/30", children: [
           /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsx6(AlertCircle, { className: "w-5 h-5 text-amber-600" }),
-            /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-gray-900", children: "Your trial has ended" })
+            /* @__PURE__ */ jsx6(AlertCircle, { className: "w-5 h-5 text-amber-400" }),
+            /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-[var(--space-text-primary)]", children: "Your trial has ended" })
           ] }),
-          /* @__PURE__ */ jsx6("p", { className: "mt-2 text-xs text-gray-600", children: "Subscribe now to continue accessing all features." })
+          /* @__PURE__ */ jsx6("p", { className: "mt-2 text-xs text-[var(--space-text-secondary)]", children: "Subscribe now to continue accessing all features." })
         ] }),
         showPaymentCTA && /* @__PURE__ */ jsxs4("div", { className: "space-y-3", children: [
-          paymentConfig && /* @__PURE__ */ jsxs4("div", { className: "p-4 bg-gray-50 rounded-xl", children: [
+          paymentConfig && /* @__PURE__ */ jsxs4("div", { className: "p-4 bg-[var(--space-surface-muted)] rounded-xl", children: [
             /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-between mb-2", children: [
-              /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-gray-900", children: "Monthly Subscription" }),
-              /* @__PURE__ */ jsxs4("span", { className: "text-lg font-bold text-gray-900", children: [
+              /* @__PURE__ */ jsx6("span", { className: "text-sm font-medium text-[var(--space-text-primary)]", children: "Monthly Subscription" }),
+              /* @__PURE__ */ jsxs4("span", { className: "text-lg font-bold text-[var(--space-text-primary)]", children: [
                 formatPrice(paymentConfig.defaultPriceCents),
                 "/mo"
               ] })
             ] }),
-            /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-3 text-xs text-gray-600", children: [
+            /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-3 text-xs text-[var(--space-text-secondary)]", children: [
               /* @__PURE__ */ jsxs4("span", { className: "flex items-center gap-1", children: [
-                /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-3.5 h-3.5 text-green-500" }),
+                /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-3.5 h-3.5 text-[var(--space-semantic-success)]" }),
                 "Full access"
               ] }),
               /* @__PURE__ */ jsxs4("span", { className: "flex items-center gap-1", children: [
-                /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-3.5 h-3.5 text-green-500" }),
+                /* @__PURE__ */ jsx6(CheckCircle2, { className: "w-3.5 h-3.5 text-[var(--space-semantic-success)]" }),
                 "Cancel anytime"
               ] })
             ] })
@@ -13250,7 +13715,7 @@ function Settings({ spaceId }) {
             {
               onClick: handleSubscribe,
               disabled: subscribing,
-              className: "w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+              className: `w-full flex items-center justify-center gap-2 px-4 py-3 ${tw.button.primary} rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed`,
               "data-testid": "button-subscribe",
               children: subscribing ? /* @__PURE__ */ jsxs4(Fragment, { children: [
                 /* @__PURE__ */ jsx6(Loader22, { className: "w-4 h-4 animate-spin" }),
@@ -13261,15 +13726,15 @@ function Settings({ spaceId }) {
               ] })
             }
           ),
-          /* @__PURE__ */ jsx6("p", { className: "text-center text-xs text-gray-500", children: "Secure payment powered by Stripe" })
+          /* @__PURE__ */ jsx6("p", { className: "text-center text-xs text-[var(--space-text-muted)]", children: "Secure payment powered by Stripe" })
         ] }),
-        (!subscriptionStatus || subscriptionStatus.status === "not_registered") && /* @__PURE__ */ jsx6("div", { className: "p-4 bg-gray-50 rounded-xl text-center", children: /* @__PURE__ */ jsx6("p", { className: "text-sm text-gray-600", children: "Save your email to start your free trial" }) })
+        (!subscriptionStatus || subscriptionStatus.status === "not_registered") && /* @__PURE__ */ jsx6("div", { className: "p-4 bg-[var(--space-surface-muted)] rounded-xl text-center", children: /* @__PURE__ */ jsx6("p", { className: "text-sm text-[var(--space-text-secondary)]", children: "Save your email to start your free trial" }) })
       ] })
     ] })
   ] }) });
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/Desktop.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/Desktop.tsx
 init_colors();
 import { Fragment as Fragment2, jsx as jsx7, jsxs as jsxs5 } from "react/jsx-runtime";
 function useIsMobile() {
@@ -14199,7 +14664,7 @@ function SpaceDesktop({
   ] });
 }
 
-// ../../../tmp/space-workspace-776786-SvPd8P/main.tsx
+// ../../../tmp/space-workspace-776786-cbcbVR/main.tsx
 import { Fragment as Fragment5, jsx as jsx14, jsxs as jsxs12 } from "react/jsx-runtime";
 window.React = React;
 var CONFIG = {
@@ -14694,6 +15159,65 @@ function SubscriptionReadyGate({ mode, children }) {
   }
   return /* @__PURE__ */ jsx14(Fragment5, { children });
 }
+function DesktopBlankScreenGuard({ mode, children }) {
+  const { sessionId, subscription, subscriptionReady } = useSpaceRuntime();
+  const containerRef = React.useRef(null);
+  const [isBlank, setIsBlank] = React.useState(false);
+  React.useLayoutEffect(() => {
+    if (mode !== "customer" || !sessionId || !subscriptionReady) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const hasContent = el.childElementCount > 0 || el.textContent && el.textContent.trim().length > 0;
+    if (!hasContent) {
+      setIsBlank(true);
+    } else if (isBlank) {
+      setIsBlank(false);
+    }
+  });
+  if (isBlank && mode === "customer" && sessionId) {
+    const spaceName = CONFIG.name || "this space";
+    const isForcedVisitorPreview = typeof window !== "undefined" && window.__AUDOS_FORCE_VISITOR__ === true;
+    const signedInEmail = subscription && subscription.email ? subscription.email : null;
+    const stripVisitorParam = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("as");
+      return url.toString();
+    };
+    const enterSignedInSpace = () => {
+      window.location.href = stripVisitorParam();
+    };
+    const goToSignIn = () => {
+      try {
+        const sid = window.__SPACE_ID__ || CONFIG.id || "";
+        if (sid) localStorage.removeItem("space_session_" + sid);
+      } catch (e) {
+      }
+      window.location.href = stripVisitorParam();
+    };
+    if (isForcedVisitorPreview || !signedInEmail) {
+      return /* @__PURE__ */ jsx14("div", { style: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", fontFamily: "system-ui, -apple-system, sans-serif", background: "var(--space-surface-gradient-from, #fafafa)", color: "#333" }, children: /* @__PURE__ */ jsxs12("div", { style: { maxWidth: "400px", textAlign: "center" }, children: [
+        /* @__PURE__ */ jsx14("div", { style: { width: "64px", height: "64px", margin: "0 auto 1.5rem", borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ jsxs12("svg", { width: "28", height: "28", viewBox: "0 0 24 24", fill: "none", stroke: "white", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsx14("path", { d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" }),
+          /* @__PURE__ */ jsx14("polyline", { points: "10 17 15 12 10 7" }),
+          /* @__PURE__ */ jsx14("line", { x1: "15", y1: "12", x2: "3", y2: "12" })
+        ] }) }),
+        /* @__PURE__ */ jsx14("h2", { style: { fontSize: "1.5rem", fontWeight: 600, marginBottom: "0.75rem" }, children: "Welcome to " + spaceName }),
+        /* @__PURE__ */ jsx14("p", { style: { color: "#666", lineHeight: 1.6, marginBottom: "1.5rem" }, children: isForcedVisitorPreview ? "You're signed in. You were viewing the signed-out preview \u2014 continue below to open the signed-in view." : "Please sign in to access this content." }),
+        /* @__PURE__ */ jsx14("button", { onClick: isForcedVisitorPreview ? enterSignedInSpace : goToSignIn, style: { padding: "0.625rem 1.5rem", borderRadius: "0.5rem", border: "none", background: "#6366f1", color: "#fff", fontSize: "0.875rem", fontWeight: 500, cursor: "pointer" }, children: isForcedVisitorPreview ? "Enter " + spaceName : "Sign in" })
+      ] }) });
+    }
+    return /* @__PURE__ */ jsx14("div", { style: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", fontFamily: "system-ui, -apple-system, sans-serif", background: "var(--space-surface-gradient-from, #fafafa)", color: "#333" }, children: /* @__PURE__ */ jsxs12("div", { style: { maxWidth: "400px", textAlign: "center" }, children: [
+      /* @__PURE__ */ jsx14("div", { style: { width: "64px", height: "64px", margin: "0 auto 1.5rem", borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ jsxs12("svg", { width: "28", height: "28", viewBox: "0 0 24 24", fill: "none", stroke: "white", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+        /* @__PURE__ */ jsx14("rect", { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }),
+        /* @__PURE__ */ jsx14("path", { d: "M7 11V7a5 5 0 0 1 10 0v4" })
+      ] }) }),
+      /* @__PURE__ */ jsx14("h2", { style: { fontSize: "1.5rem", fontWeight: 600, marginBottom: "0.75rem" }, children: "Welcome to " + spaceName }),
+      /* @__PURE__ */ jsx14("p", { style: { color: "#666", lineHeight: 1.6, marginBottom: "1.5rem" }, children: subscription && (subscription.status === "not_subscribed" || subscription.status === "registered" || subscription.status === "not_registered") ? "A subscription is required to access this content. Please subscribe to get started, or contact the workspace owner for access." : subscription && subscription.status === "trial_expired" ? "Your trial has ended. Please subscribe to continue accessing this content." : subscription && (subscription.status === "canceled" || subscription.status === "past_due") ? "Your subscription is no longer active. Please renew to regain access." : "Your account does not currently have access to this content. Please contact the workspace owner for assistance." }),
+      /* @__PURE__ */ jsx14("button", { onClick: () => window.location.reload(), style: { padding: "0.625rem 1.5rem", borderRadius: "0.5rem", border: "none", background: "#6366f1", color: "#fff", fontSize: "0.875rem", fontWeight: 500, cursor: "pointer" }, children: "Refresh Page" })
+    ] }) });
+  }
+  return /* @__PURE__ */ jsx14("div", { ref: containerRef, style: { display: "contents" }, children });
+}
 function SpaceDesktop2({ mode, spaceId, sessionId }) {
   const initialAppId = window.__DEEP_LINK_APP_ID__ || null;
   const deepLinkScreen = window.__DEEP_LINK_SCREEN__ || null;
@@ -14701,7 +15225,7 @@ function SpaceDesktop2({ mode, spaceId, sessionId }) {
     if (deepLinkScreen === "app" && initialAppId) {
       return /* @__PURE__ */ jsx14(PlatformAppSlot2, { appId: initialAppId });
     }
-    return /* @__PURE__ */ jsx14(React.Fragment, { children: /* @__PURE__ */ jsx14(
+    return /* @__PURE__ */ jsx14(React.Fragment, { children: /* @__PURE__ */ jsx14(DesktopBlankScreenGuard, { mode, children: /* @__PURE__ */ jsx14(
       SpaceDesktop,
       {
         mode,
@@ -14716,12 +15240,13 @@ function SpaceDesktop2({ mode, spaceId, sessionId }) {
         navigate,
         PlatformAppSlot: PlatformAppSlot2
       }
-    ) });
+    ) }) });
   } }) }) });
 }
 var __urlParams = new URLSearchParams(window.location.search);
-window.__DEEP_LINK_APP_ID__ = __urlParams.get("app") || null;
-window.__DEEP_LINK_SCREEN__ = __urlParams.get("screen") || null;
+var __configEntryAppId = null;
+window.__DEEP_LINK_APP_ID__ = __urlParams.get("app") || __configEntryAppId;
+window.__DEEP_LINK_SCREEN__ = __urlParams.get("screen") || (__configEntryAppId ? "app" : null);
 var rootElement = document.getElementById("root");
 if (rootElement) {
   const root = createRoot(rootElement);
