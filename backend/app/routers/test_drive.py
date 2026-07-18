@@ -207,6 +207,31 @@ def _make_user(username: str, email: str, password_hash: str, role: str, name: s
     return uid if created else None
 
 
+def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -> None:
+    """[AIQ-1621] Publish a default benefits policy for a freshly provisioned test-drive
+    company, so the employee benefit-comparison / over-cap flow is active without the tester
+    having to build one.
+
+    `ensure_draft` auto-seeds the canonical default benefit matrix when the company has no
+    published baseline; `publish_draft` flips it to `status='published'`, which is exactly
+    what `GET /api/hr/policy-config/published` reads. Test-drive-only by construction — this
+    runs only inside `provision()`, which only ever creates `is_test` "Test Drive …"
+    companies; real accounts never reach it. Best-effort: a seed failure must never break
+    provisioning.
+    """
+    try:
+        from ..services.policy_config_matrix_service import PolicyConfigMatrixService
+
+        svc = PolicyConfigMatrixService(db)
+        svc.ensure_draft(company_id, created_by=created_by)
+        svc.publish_draft(company_id, policy_version_id=None, created_by=created_by)
+        logger.info("test-drive: seeded published default policy for company %s", company_id)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "test-drive: default policy seed failed for company %s", company_id, exc_info=True
+        )
+
+
 @router.post("/provision")
 @limiter.limit(_RATE_LIMIT)
 def provision(body: ProvisionRequest, request: Request):
@@ -280,6 +305,12 @@ def provision(body: ProvisionRequest, request: Request):
     if company_id:
         db.set_profile_company(emp_id, company_id)
         db.ensure_employee_for_profile(emp_id, company_id)
+
+    # 4b) [AIQ-1621] Seed a PUBLISHED default benefits policy for this test-drive company so
+    #     the employee benefit-comparison / over-cap path is live without the tester building
+    #     one. Best-effort — never breaks provisioning.
+    if company_id:
+        _seed_default_published_policy(company_id, hr_id)
 
     # 5) Mirror both to Supabase Auth (fire-and-forget; never blocks or raises).
     _dispatch_supabase_sync(hr_email, hr_password, relopass_user_id=hr_id, full_name=first_name)
