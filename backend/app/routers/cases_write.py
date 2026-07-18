@@ -142,7 +142,10 @@ def _assignment_derived(draft: Dict[str, Any]) -> Dict[str, Any]:
         dur = int(dur) if dur is not None and str(dur).strip() != "" else None
     except (TypeError, ValueError):
         dur = None
-    return {"assignment_type": at, "expected_duration_months": dur}
+    # AIQ-1603: carry the single-select commute preference onto public.cases.
+    commute = ac.get("commutePreference")
+    commute = commute if isinstance(commute, str) and commute.strip() else None
+    return {"assignment_type": at, "expected_duration_months": dur, "commute_preference": commute}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

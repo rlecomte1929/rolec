@@ -1,7 +1,7 @@
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 
@@ -55,6 +55,26 @@ class AssignmentContextDTO(BaseModel):
     # canonical-case bridge never sees it. Drives duration-aware policy + roadmap.
     assignmentType: Optional[str] = None
     expectedDurationMonths: Optional[int] = None
+    # AIQ-1603: single-select preferred commute mode, validated against a fixed enum so an
+    # invalid value is a 422 (not silent bad data). Bridged onto public.cases.commute_preference.
+    commutePreference: Optional[str] = None
+
+    @field_validator("commutePreference")
+    @classmethod
+    def _valid_commute(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = {"car", "public_transport", "bike", "walk", "no_preference"}
+        if v not in allowed:
+            raise ValueError(f"commutePreference must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("expectedDurationMonths")
+    @classmethod
+    def _positive_duration(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v <= 0:
+            raise ValueError("expectedDurationMonths must be a positive integer")
+        return v
 
 
 class CaseDraftDTO(BaseModel):

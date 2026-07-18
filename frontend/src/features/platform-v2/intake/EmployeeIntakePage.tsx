@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
+import { SegmentedOptionCards } from '../../../components/antigravity/SegmentedOptionCards';
 import { useGeocodedAddress } from '../../../components/geocode';
 import { patchCase } from '../../../api/cases';
 import { emitTestDriveStage, getTestDriveSession } from '../../../api/testDrive';
@@ -97,7 +98,8 @@ export interface IntakeData {
    *  assignmentContext.expectedDurationMonths → duration_threshold policy rules. */
   expected_duration_months: number | null;
   commute_mins: number;
-  commute_mode: string[];
+  // AIQ-1603: single-select preferred commute mode (persisted to cases.commute_preference).
+  commute_preference: string;
   consent: boolean;
 }
 
@@ -193,7 +195,7 @@ const INITIAL_DATA: IntakeData = {
   // AIQ-1349: optional — left null so it drops from the draft JSON unless set.
   expected_duration_months: null,
   commute_mins: 30,
-  commute_mode: [],
+  commute_preference: 'no_preference',
   consent: false,
 };
 
@@ -245,7 +247,7 @@ function FieldWrap({
   const [whyOpen, setWhyOpen] = useState(false);
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
-      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 flex-wrap">
+      <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 flex-wrap">
         {label}
         {required && <span className="text-red-500" title="Required">*</span>}
         {optional && <span className="text-gray-400 font-normal">(optional)</span>}
@@ -269,20 +271,65 @@ function FieldWrap({
       {whyOpen && why && (
         <div className="text-xs text-gray-500 bg-accent-50 border border-accent-100 rounded-lg px-3 py-2">{why}</div>
       )}
-      {hint && <div className="text-xs text-gray-400">{hint}</div>}
+      {hint && <div className="text-sm text-gray-400">{hint}</div>}
     </div>
   );
 }
 
 const inputCls = (locked?: boolean) =>
-  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
+  `w-full px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
     locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
 const selectCls = (locked?: boolean) =>
-  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
+  `w-full px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
     locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
+
+// AIQ-1603: single-select commute preference. The persisted enum differs from the tokens
+// RichCommuteMap understands, so translate when feeding the map.
+const COMMUTE_OPTIONS = [
+  { value: 'car', label: '🚗 Car' },
+  { value: 'public_transport', label: '🚇 Public transport' },
+  { value: 'bike', label: '🚴 Bike' },
+  { value: 'walk', label: '🚶 Walk' },
+  { value: 'no_preference', label: 'No preference' },
+];
+const COMMUTE_TO_MAP_TOKEN: Record<string, string> = {
+  car: 'car', public_transport: 'public_transit', bike: 'bike',
+  walk: 'walking', no_preference: 'no_pref',
+};
+
+// AIQ-1603: preset duration buttons (6/12/24/36 months) + an "Other" manual entry.
+const DURATION_PRESETS = [6, 12, 24, 36];
+function DurationPicker({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  const isPreset = value != null && DURATION_PRESETS.includes(value);
+  const [other, setOther] = useState(value != null && !isPreset);
+  const presetCls = (active: boolean) =>
+    `px-4 py-2 rounded-lg border text-base font-medium transition-colors ${
+      active ? 'border-accent-500 bg-accent-50 text-accent-700' : 'border-gray-200 bg-white text-gray-700 hover:border-accent-300'
+    }`;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        {DURATION_PRESETS.map((m) => (
+          <Button key={m} unstyled type="button" onClick={() => { setOther(false); onChange(m); }}
+            className={presetCls(!other && value === m)}>
+            {m} months
+          </Button>
+        ))}
+        <Button unstyled type="button" onClick={() => { setOther(true); onChange(null); }} className={presetCls(other)}>
+          Other
+        </Button>
+      </div>
+      {other && (
+        <Input unstyled type="number" min={1} className={inputCls()}
+          value={value != null ? String(value) : ''} placeholder="Enter months"
+          onChange={(v) => onChange(v.trim() === '' ? null : Number(v))} />
+      )}
+    </div>
+  );
+}
 
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
@@ -1245,10 +1292,8 @@ export function EmployeeIntakePage() {
                       assignmentContext.expectedDurationMonths for duration_threshold rules. */}
                   <FieldWrap label="Expected duration (months)"
                     hint="Optional — helps tailor which requirements apply to your stay.">
-                    <Input unstyled type="number" min={1} className={inputCls()}
-                      value={data.expected_duration_months != null ? String(data.expected_duration_months) : ''}
-                      placeholder="e.g. 18"
-                      onChange={(v) => setField('expected_duration_months', v.trim() === '' ? null : Number(v))} />
+                    <DurationPicker value={data.expected_duration_months}
+                      onChange={(v) => setField('expected_duration_months', v)} />
                   </FieldWrap>
                 </Grid>
 
@@ -1265,14 +1310,9 @@ export function EmployeeIntakePage() {
                         <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
                       </FieldWrap>
                       <FieldWrap label="Preferred way to commute">
-                        <MultiChip value={data.commute_mode} onChange={(v) => setField('commute_mode', v)}
-                          options={[
-                            { value: 'car', label: '🚗 Car' },
-                            { value: 'public_transit', label: '🚇 Transit' },
-                            { value: 'bike', label: '🚴 Bike' },
-                            { value: 'walking', label: '🚶 Walking' },
-                            { value: 'no_pref', label: 'No preference' },
-                          ]} />
+                        <SegmentedOptionCards value={data.commute_preference}
+                          onChange={(v) => setField('commute_preference', v)}
+                          options={COMMUTE_OPTIONS} />
                       </FieldWrap>
                     </div>
                     <div>
@@ -1282,7 +1322,7 @@ export function EmployeeIntakePage() {
                           <RichCommuteMap
                             officeAddress={data.office_address}
                             commuteMins={data.commute_mins}
-                            commuteMode={data.commute_mode}
+                            commuteMode={[COMMUTE_TO_MAP_TOKEN[data.commute_preference] ?? 'no_pref']}
                             hasChildren={children.length > 0}
                           />
                         </Suspense>
