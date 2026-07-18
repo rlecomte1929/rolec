@@ -1,6 +1,12 @@
 import posthog from 'posthog-js';
 import { env } from './config/env';
-import { getTestDriveSession } from './api/testDrive';
+// NOTE: getTestDriveSession is imported LAZILY inside ensureTestDriveReplay (not
+// at module top). It lives in ./api/testDrive, which imports ./api/client →
+// ./api/supabase — a chain that throws "supabaseUrl is required" at import time
+// when VITE_ env is unset (the jsdom/vitest trap). Keeping that import out of the
+// static graph means `track()` / analyticsEvents can be imported by any component
+// without dragging supabase into its module graph and breaking that component's
+// unit tests. Runtime behaviour is unchanged (replay is best-effort, idempotent).
 
 let enabled = false;
 let replayStarted = false;
@@ -96,25 +102,31 @@ export function initAnalytics(): void {
  */
 export function ensureTestDriveReplay(): void {
   if (!enabled || replayStarted) return;
-  const slice = getTestDriveSession();
-  if (!slice?.session_id) return; // not a test-drive session — never record
-  try {
-    // Testers consent to recording as part of the test-drive provisioning flow, so
-    // opt this synthetic session in explicitly (real users stay opted out until they
-    // Accept in the ConsentBanner). Without this, opt_out_capturing_by_default would
-    // suppress the replay we intentionally capture here.
-    posthog.opt_in_capturing();
-    posthog.identify(slice.session_id, {
-      test_drive_session_id: slice.session_id,
-      test_drive_campaign: slice.campaign,
-      test_drive_corridor: slice.corridor_id,
-    });
-    posthog.register({ test_drive_session_id: slice.session_id });
-    posthog.startSessionRecording();
-    replayStarted = true;
-  } catch {
-    /* replay is best-effort — never surface to the tester */
-  }
+  // Lazy-load testDrive (and its api/client chain) only when we actually need it —
+  // see the import note at the top of this file. Fire-and-forget: replay start is
+  // best-effort and already idempotent via `replayStarted`.
+  void import('./api/testDrive').then(({ getTestDriveSession }) => {
+    if (replayStarted) return;
+    const slice = getTestDriveSession();
+    if (!slice?.session_id) return; // not a test-drive session — never record
+    try {
+      // Testers consent to recording as part of the test-drive provisioning flow, so
+      // opt this synthetic session in explicitly (real users stay opted out until they
+      // Accept in the ConsentBanner). Without this, opt_out_capturing_by_default would
+      // suppress the replay we intentionally capture here.
+      posthog.opt_in_capturing();
+      posthog.identify(slice.session_id, {
+        test_drive_session_id: slice.session_id,
+        test_drive_campaign: slice.campaign,
+        test_drive_corridor: slice.corridor_id,
+      });
+      posthog.register({ test_drive_session_id: slice.session_id });
+      posthog.startSessionRecording();
+      replayStarted = true;
+    } catch {
+      /* replay is best-effort — never surface to the tester */
+    }
+  });
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {
