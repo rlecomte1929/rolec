@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.5 · **Last verified:** 2026-07-16 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.6 · **Last verified:** 2026-07-18 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -20,6 +20,7 @@
 | **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
 | **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
+| **Geoapify** | Address autocomplete / geocoding proxy for the intake office-address field (AIQ-1607) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py` |
 
 ## Notes & corrections (v1.1 → v1.5)
 
@@ -81,6 +82,13 @@
   path. Mistral is **EU-hosted (France)** so no transfer mechanism is required. Gated on `MISTRAL_API_KEY`
   — disabled (no OCR, fail-soft empty text) until the key is provisioned. Confirm the DPA on the Mistral
   console before processing real customer documents.
+- **Geoapify added (AIQ-1607).** EU address-autocomplete for the intake **office-address** field, proxied
+  **server-side** (`geocoding.py` → `geocoding_service.py`) so the API key never reaches the client. The only
+  data shared is the **partial address string the employee types** (personal data). Geoapify GmbH is
+  **EU-hosted (Germany)** — no transfer mechanism required. **Disabled-until-keyed**: gated on
+  `GEOAPIFY_API_KEY`; with the key unset the endpoint returns `{disabled:true}` and the field degrades to a
+  plain input, so **no address leaves the platform** until the key is set. **Do not set the key in prod until
+  the Geoapify DPA is signed.**
 
 ## PII-in-prompts posture (criterion 5)
 
@@ -118,7 +126,8 @@
 
 1. **Sign DPAs** — Supabase (dashboard/PandaDoc), Render (`render.com/privacy`),
    OpenAI (`openai.com/policies/data-processing-addendum`), Anthropic (confirm Commercial Terms),
-   Resend (`resend.com/dpa`), Cloudflare (account Legal), PostHog (only if enabled).
+   Resend (`resend.com/dpa`), Cloudflare (account Legal), PostHog (only if enabled),
+   **Geoapify** (console DPA — required before `GEOAPIFY_API_KEY` is set in prod, AIQ-1607).
 2. **Confirm Render deployment region** and whether EU hosting is available on the current plan.
 3. **Store signed DPA copies** in a durable legal/compliance location.
 4. **Re-run this register** whenever a sub-processor is added.
