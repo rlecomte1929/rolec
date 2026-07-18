@@ -33,6 +33,19 @@ export default defineConfig({
     // TEST-2: load jest-dom matchers once for every test (was imported ad-hoc
     // in ~69/128 files and relied on transitive load in the rest).
     setupFiles: ['./src/test/setup.ts'],
+    // Dummy Supabase creds so the singleton client (createClient in api/supabase.ts
+    // and lib/supabase.ts) never throws "supabaseUrl is required" during tests. CI
+    // has no VITE_SUPABASE_* env, so config/env.ts falls back to '' and any lazily
+    // evaluated supabase module — e.g. the fire-and-forget dynamic import()s in
+    // NotificationsBell / RelocationTimeline / policy-builder — would reject with
+    // that error. The rejection floats and vitest mis-attributes it to whatever
+    // test file is active, producing an intermittent, unrelated red (it flaked the
+    // AIQ-1535 PR on BudgetSummaryTable). Fake non-empty values let createClient
+    // construct without connecting; no test asserts against a real Supabase.
+    env: {
+      VITE_SUPABASE_URL: 'http://localhost:54321',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key-not-a-real-secret',
+    },
     // QG-6 (AIQ-1179): coverage ratchet. Thresholds sit just below the current
     // floor (measured 2026-06-26: ~16% lines/statements, 67% branches, 32%
     // functions over src/**) so CI FAILS if coverage regresses, without forcing
