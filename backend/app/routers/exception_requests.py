@@ -578,6 +578,28 @@ def create_exception_request(
     # [AIQ-1570] The guardrail's missing half: HR is now told, not left to discover
     # the request by opening the inbox. Never raises — see the helper's docstring.
     _notify_hr_of_exception_request(request_id=new_id, case_id=case_id, body=body)
+    # Analytics: over-cap demand signal. PII-free — category/amounts/currency only,
+    # never the free-text reason. Best-effort; never blocks the request.
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph:
+            _over = None
+            if body.requested_amount is not None and body.cap_amount is not None:
+                _over = body.requested_amount - body.cap_amount
+            ph.capture(
+                distinct_id=str(actor_id),
+                event="exception_request_submitted",
+                properties={
+                    "category": body.category,
+                    "exception_type": body.exception_type,
+                    "amount_over": _over,
+                    "currency": body.currency.upper(),
+                    "has_reason": bool((body.reason or "").strip()),
+                },
+            )
+    except Exception:
+        pass
     return _row_to_dict(row)
 
 
@@ -751,6 +773,25 @@ def resolve_exception_request(
         status=body.status,
         hr_note=body.hr_note,
     )
+    # Analytics: HR decision outcome. PII-free — status/category/amount only,
+    # never the hr_note text. Best-effort; never blocks the request.
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph:
+            _req = existing["requested_amount"]
+            _cap = existing["cap_amount"]
+            ph.capture(
+                distinct_id=str(actor_id),
+                event="exception_request_decided",
+                properties={
+                    "decision": body.status,
+                    "category": existing["category"],
+                    "amount_over": (_req - _cap) if (_req is not None and _cap is not None) else None,
+                },
+            )
+    except Exception:
+        pass
     return _row_to_dict(row)
 
 

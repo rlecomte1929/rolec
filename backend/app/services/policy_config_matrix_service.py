@@ -1163,6 +1163,22 @@ class PolicyConfigMatrixService:
                 "policy_assistant index rebuild failed after publish company=%s vid=%s",
                 company_id, vid,
             )
+        # Analytics: policy publish is a key adoption signal. PII-free (ids +
+        # a benefit count only). Best-effort — never let it affect the publish.
+        try:
+            from ..posthog_client import get_posthog_client
+            ph = get_posthog_client()
+            if ph and created_by:
+                ph.capture(
+                    distinct_id=str(created_by),
+                    event="policy_published",
+                    properties={
+                        "policy_version_id": vid,
+                        "benefit_count": len(benefits),
+                    },
+                )
+        except Exception:
+            pass
         return self.build_payload(company_id, version=pub, benefits=benefits, editable=False, source="published")
 
     # ------------------------------------------------------------------
