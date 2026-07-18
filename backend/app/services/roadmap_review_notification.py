@@ -122,9 +122,13 @@ def render_email(*, case_id: str, employee_name: str, corridor: str) -> Dict[str
     subject = f"Roadmap ready for your review — {who}{where}"
     link = f"{_app_base_url()}/hr/cases/{case_id}"
 
+    # AIQ-1605: roadmaps are released-by-default (AIQ-1377), so the employee is NOT blocked.
+    # The email invites review — approve to confirm, or request changes — without falsely
+    # claiming the employee is stuck until HR acts.
     plain = (
-        f"{who}'s relocation plan is generated and waiting for your approval.\n\n"
-        f"Until you approve it, {who} can explore the plan but cannot start any tasks.\n\n"
+        f"{who}'s relocation plan has been generated and is now live for them.\n\n"
+        f"Please review it — approve to confirm it, or request changes if something needs "
+        f"fixing. {who} can keep preparing in the meantime.\n\n"
         f"Review the roadmap: {link}\n\n"
         f"— ReloPass"
     )
@@ -132,11 +136,11 @@ def render_email(*, case_id: str, employee_name: str, corridor: str) -> Dict[str
         '<div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;max-width:520px">'
         f'<h1 style="font-size:18px;margin:0 0 12px">Roadmap ready for your review</h1>'
         f'<p style="margin:0 0 14px;color:#475569;line-height:1.55">'
-        f"<strong>{who}</strong>{where}&rsquo;s relocation plan is generated and waiting for "
-        f"your approval.</p>"
+        f"<strong>{who}</strong>{where}&rsquo;s relocation plan has been generated and is now "
+        f"live for them.</p>"
         f'<p style="margin:0 0 20px;color:#475569;line-height:1.55">'
-        f"Until you approve it, {who} can explore the plan but <strong>cannot start any "
-        f"tasks</strong>.</p>"
+        f"Please review it &mdash; approve to confirm it, or request changes if something "
+        f"needs fixing. {who} can keep preparing in the meantime.</p>"
         f'<a href="{link}" style="display:inline-block;background:#1f8e8b;color:#fff;'
         f'text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">'
         f"Review the roadmap</a>"
