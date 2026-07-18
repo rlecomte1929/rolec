@@ -3497,6 +3497,12 @@ export const hrPolicyAPI = {
 };
 
 /** Structured Compensation & Allowance matrix (policy_configs / versions / benefits). */
+// [AIQ-1615] Shared in-flight guard: the Policy Builder "Publish" and the Published-policy
+// tab "Publish draft" both POST /api/hr/policy-config/publish on the same config-matrix.
+// Two clicks raced to a server 409 Conflict and a stuck "Publishing…" spinner. De-dupe so a
+// concurrent publish shares the first request's promise instead of firing a competing one.
+let _hrPublishInFlight: Promise<Record<string, unknown>> | null = null;
+
 export const policyConfigMatrixAPI = {
   hrGet: async (companyId?: string): Promise<Record<string, unknown>> => {
     const response = await api.get<Record<string, unknown>>('/api/hr/policy-config', {
@@ -3536,13 +3542,21 @@ export const policyConfigMatrixAPI = {
     return response.data;
   },
   hrPublish: async (body: Record<string, unknown> | undefined, companyId?: string): Promise<Record<string, unknown>> => {
-    const response = await api.post<Record<string, unknown>>('/api/hr/policy-config/publish', body ?? {}, {
-      params: companyId ? { companyId } : {},
-      // Publish also rebuilds the RAG index (OpenAI embeddings over all chunks),
-      // which can take well over 12s; override per the B13 convention.
-      timeout: 120_000,
-    });
-    return response.data;
+    // [AIQ-1615] Concurrent publishes share one request (see _hrPublishInFlight) so the two
+    // publish controls can't race to a 409.
+    if (_hrPublishInFlight) return _hrPublishInFlight;
+    _hrPublishInFlight = api
+      .post<Record<string, unknown>>('/api/hr/policy-config/publish', body ?? {}, {
+        params: companyId ? { companyId } : {},
+        // Publish also rebuilds the RAG index (OpenAI embeddings over all chunks),
+        // which can take well over 12s; override per the B13 convention.
+        timeout: 120_000,
+      })
+      .then((response) => response.data)
+      .finally(() => {
+        _hrPublishInFlight = null;
+      });
+    return _hrPublishInFlight;
   },
   hrHistory: async (companyId?: string): Promise<{ versions: unknown[] }> => {
     const response = await api.get<{ versions: unknown[] }>('/api/hr/policy-config/history', {
