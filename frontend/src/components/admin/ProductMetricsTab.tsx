@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '../antigravity';
-import { env } from '../../config/env';
+import { posthogEventsUrl } from '../../lib/posthogLinks';
 import { getProductMetrics, type ProductMetrics } from '../../api/adminProductMetrics';
-
-// PostHog app host (where events/insights are viewed) is derived from the ingest
-// host, mirroring TestDriveTab: ingest = eu.i.posthog.com, app = eu.posthog.com.
-const POSTHOG_APP_HOST = (env.posthogHost || 'https://eu.i.posthog.com').replace(
-  '.i.posthog.com',
-  '.posthog.com',
-);
 
 const DAY_OPTIONS = [7, 30, 90] as const;
 
@@ -76,7 +69,7 @@ export const ProductMetricsTab: React.FC = () => {
           ))}
         </div>
         <a
-          href={POSTHOG_APP_HOST}
+          href={posthogEventsUrl()}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm font-medium text-[#1f8e8b] underline underline-offset-2 hover:text-[#197c79]"
@@ -84,6 +77,12 @@ export const ProductMetricsTab: React.FC = () => {
           Open PostHog →
         </a>
       </div>
+
+      <p className="mb-4 text-xs leading-relaxed text-[#6b7280]">
+        Counts come from the app event log. Server events (cases, policies, exceptions) are recorded
+        for every user; wizard &amp; estimate events require analytics consent, so they can under-count
+        and may differ from the numbers in PostHog.
+      </p>
 
       {error && (
         <Card>

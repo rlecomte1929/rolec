@@ -15,6 +15,12 @@ vi.mock('../../api/requestLog', () => ({
 }));
 vi.mock('../../perf/perf', () => ({ getCurrentInteractionId: () => 'int-1' }));
 
+vi.mock('../../analytics', () => ({
+  getPosthogDistinctId: () => 'dist-123',
+  getPosthogSessionId: () => 'sess-456',
+  getPosthogReplayUrl: () => 'https://eu.posthog.com/replay/sess-456',
+}));
+
 import { collectDiagnostics } from '../diagnostics';
 import { reportError, getRecentErrors } from '../errorTracking';
 
@@ -30,6 +36,13 @@ describe('collectDiagnostics', () => {
     expect(typeof ctx.route).toBe('string');
     expect(Array.isArray(ctx.breadcrumbs)).toBe(true);
     expect(Array.isArray(ctx.recentErrors)).toBe(true);
+  });
+
+  it('captures the PostHog identity + session replay from the analytics module', () => {
+    const ctx = collectDiagnostics();
+    expect(ctx.posthog_id).toBe('dist-123');
+    expect(ctx.posthog_session_id).toBe('sess-456');
+    expect(ctx.posthog_replay_url).toBe('https://eu.posthog.com/replay/sess-456');
   });
 });
 

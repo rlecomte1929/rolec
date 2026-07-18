@@ -15,6 +15,7 @@ import { useState, useRef, useEffect } from 'react';
 import { submitProductFeedback, getMyReports, type ScreenshotStorage } from '../api/productFeedback';
 import type { MyReport } from '../api/productFeedback';
 import { collectDiagnostics } from '../lib/diagnostics';
+import { startBugReportRecording, getAnalyticsConsent } from '../analytics';
 import { ScreenshotCapture } from './feedback/ScreenshotCapture';
 import { AnnotationModal } from './feedback/AnnotationModal';
 import { Button } from './antigravity/Button';
@@ -80,9 +81,14 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus textarea when popover opens
+  // Focus textarea when popover opens, and start a consent-gated session replay so a
+  // reported bug carries a watchable recording (no-op without analytics consent). The
+  // session id + replay url are picked up by collectDiagnostics() at submit time.
   useEffect(() => {
-    if (state === 'open') setTimeout(() => textareaRef.current?.focus(), 50);
+    if (state === 'open') {
+      setTimeout(() => textareaRef.current?.focus(), 50);
+      startBugReportRecording();
+    }
   }, [state]);
 
   // Close on Escape
@@ -347,6 +353,13 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit(); }}
                 disabled={state === 'submitting'}
               />
+
+              {/* Transparency: only shown when we are actually recording (bug + consent). */}
+              {category === 'bug' && getAnalyticsConsent() === 'granted' && (
+                <p className="text-[10.5px] text-gray-400">
+                  To help us debug, we capture a short screen replay of this session.
+                </p>
+              )}
 
               {/* Attach image — screenshot or upload */}
               <div className="space-y-2">

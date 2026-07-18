@@ -162,6 +162,67 @@ export function emitMarketingEvent(event: string, properties?: Record<string, un
   }
 }
 
+let bugReplayStarted = false;
+
+/**
+ * Start a session replay on demand for a bug report. Consent-gated — a visitor who
+ * declined analytics is never recorded. Idempotent per browser session. Works even
+ * though recording is disabled by default (startSessionRecording overrides the init
+ * flag — same mechanism ensureTestDriveReplay relies on). Called when the Feedback
+ * widget opens so the reporter's reproduction + annotation are captured; the session
+ * id / replay url then ride along on the report via collectDiagnostics().
+ */
+export function startBugReportRecording(): void {
+  if (!enabled || bugReplayStarted) return;
+  if (getAnalyticsConsent() !== 'granted') return; // never record a user who declined
+  try {
+    posthog.opt_in_capturing();
+    posthog.startSessionRecording();
+    bugReplayStarted = true;
+  } catch {
+    /* best-effort — never surface to the reporter */
+  }
+}
+
+// posthog-js exposes these on the module instance. get_distinct_id is typed; the
+// session helpers vary by SDK version, so read them defensively.
+type PosthogSessionApi = {
+  get_session_id?: () => string;
+  get_session_replay_url?: (opts?: { withTimestamp?: boolean }) => string;
+};
+
+/** Current PostHog person distinct id — reliable (module instance, not window.posthog). */
+export function getPosthogDistinctId(): string | null {
+  if (!enabled) return null;
+  try {
+    return posthog.get_distinct_id?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Current PostHog session id — ties a bug report to its session replay. */
+export function getPosthogSessionId(): string | null {
+  if (!enabled) return null;
+  try {
+    const fn = (posthog as unknown as PosthogSessionApi).get_session_id;
+    return fn ? fn.call(posthog) ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Direct URL to the current session's replay, when the SDK exposes it. */
+export function getPosthogReplayUrl(): string | null {
+  if (!enabled) return null;
+  try {
+    const fn = (posthog as unknown as PosthogSessionApi).get_session_replay_url;
+    return fn ? fn.call(posthog, { withTimestamp: true }) ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Read utm_source / utm_campaign from the current URL. */
 export function readUtm(): { utm_source?: string; utm_campaign?: string } {
   const usp = new URLSearchParams(window.location.search);
