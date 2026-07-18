@@ -147,6 +147,7 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.adminVettingQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
       },
+      { id: 'supplier-submissions', group: 'Queues', label: 'Supplier submissions', to: ROUTE_DEFS.adminSupplierSubmissions.path },
       { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
 
       // ── Platform & governance (config, access, compliance) ──

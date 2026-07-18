@@ -211,3 +211,39 @@ export interface HrNotificationCounts {
 
 export const getHrNotificationCounts = (): Promise<HrNotificationCounts> =>
   apiGet('/api/hr/catalog/notification-counts');
+
+// ---------------------------------------------------------------------------
+// AIQ-1602 Seg 4: HR preferred-supplier submissions (admin moderation queue)
+// ---------------------------------------------------------------------------
+
+export interface SupplierSubmission {
+  id: string;
+  company_id: string;
+  name: string;
+  service_category: string;
+  coverage_scope_type: string;
+  country_code: string | null;
+  city_name: string | null;
+  contact_email: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  review_notes: string | null;
+  created_supplier_id: string | null;
+  created_at: string;
+}
+
+export interface SupplierSubmissionBody {
+  name: string;
+  service_category: string;
+  coverage_scope_type?: string;
+  country_code?: string | null;
+  city_name?: string | null;
+  contact_email?: string | null;
+}
+
+export const createSupplierSubmission = (
+  body: SupplierSubmissionBody,
+): Promise<SupplierSubmission> =>
+  apiPost('/api/hr/catalog/supplier-submissions', body);
+
+export const listMySupplierSubmissions = (): Promise<{ submissions: SupplierSubmission[] }> =>
+  apiGet('/api/hr/catalog/supplier-submissions');
