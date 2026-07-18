@@ -454,7 +454,7 @@ function PartnerCard({ m, onChange, onRemove, international, expanded, onToggle 
       expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
       <Grid>
         <FieldWrap label="Full name" required>
-          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
+          <Input unstyled className={`${inputCls()} ph-no-capture`} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
             onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Employment status">
@@ -495,11 +495,11 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
       status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
       <Grid>
         <FieldWrap label="First name" required>
-          <Input unstyled className={inputCls()} value={m.name ?? ''} placeholder="e.g. Léo"
+          <Input unstyled className={`${inputCls()} ph-no-capture`} value={m.name ?? ''} placeholder="e.g. Léo"
             onChange={(v) => onChange({ ...m, name: v })} />
         </FieldWrap>
         <FieldWrap label="Date of birth" required why="We compute age automatically for school search and enrollment timing.">
-          <Input unstyled type="date" className={inputCls()} value={m.dob ?? ''}
+          <Input unstyled type="date" className={`${inputCls()} ph-no-capture`} value={m.dob ?? ''}
             onChange={(v) => onChange({ ...m, dob: v })} />
           {age != null && (
             <div className="text-[10px] text-accent-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
@@ -1146,11 +1146,11 @@ export function EmployeeIntakePage() {
                 <StepHd title="A bit about you" sub="Your passport details kick off the immigration track." />
                 <Grid>
                   <FieldWrap label="Full name" required>
-                    <Input unstyled data-testid="intake-full_name" className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
+                    <Input unstyled data-testid="intake-full_name" className={`${inputCls()} ph-no-capture`} value={data.full_name} placeholder="As shown on your passport"
                       onChange={(v) => setField('full_name', v)} />
                   </FieldWrap>
                   <FieldWrap label="Email" required prefill={locks.email} onUnlock={() => unlock('email')}>
-                    <Input unstyled type="email" data-testid="intake-email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
+                    <Input unstyled type="email" data-testid="intake-email" className={`${inputCls(locks.email)} ph-no-capture`} value={data.email} disabled={locks.email}
                       onChange={(v) => setField('email', v)} />
                   </FieldWrap>
                   <FieldWrap label="Nationality" required>
@@ -1160,7 +1160,7 @@ export function EmployeeIntakePage() {
                     <CountryCombo testId="intake-passport_country" value={data.passport_country} onChange={(v) => setField('passport_country', v)} options={ALL_COUNTRY_OPTIONS} />
                   </FieldWrap>
                   <FieldWrap label="Passport expiry" required>
-                    <Input unstyled type="date" data-testid="intake-passport_expiry" className={inputCls()} value={data.passport_expiry}
+                    <Input unstyled type="date" data-testid="intake-passport_expiry" className={`${inputCls()} ph-no-capture`} value={data.passport_expiry}
                       onChange={(v) => setField('passport_expiry', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
