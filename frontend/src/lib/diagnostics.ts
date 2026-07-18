@@ -10,6 +10,9 @@
  * Every free-text field is PII-scrubbed BEFORE it leaves the browser (GDPR posture — the
  * report is read by admins and persisted). Buffers are already bounded (last ~5) upstream.
  */
+import { getPosthogDistinctId, getPosthogSessionId, getPosthogReplayUrl } from '../analytics';
+import { getRecentFailedRequests, type FailedRequest } from '../api/requestLog';
+import { getCurrentInteractionId } from '../perf/perf';
 import {
   getBreadcrumbs,
   getRecentErrors,
@@ -17,20 +20,10 @@ import {
   redactUrl,
   type RecentError,
 } from './errorTracking';
-import { getRecentFailedRequests, type FailedRequest } from '../api/requestLog';
-import { getCurrentInteractionId } from '../perf/perf';
 
 // Injected at build time by vite `define` (see vite.config.ts). Guarded with `typeof`
 // below so it degrades to 'unknown' under vitest where the define does not run.
 declare const __APP_VERSION__: string;
-
-// PostHog, if loaded, exposes this on window. Typed narrowly (no `any`) so an
-// optional third-party global doesn't widen the rest of the file's type-safety.
-declare global {
-  interface Window {
-    posthog?: { get_distinct_id?: () => string };
-  }
-}
 
 export interface ClientContext {
   route: string;
@@ -41,7 +34,12 @@ export interface ClientContext {
   breadcrumbs: { type: string; message: string; timestamp: string }[];
   recentErrors: RecentError[];
   recentFailedRequests: FailedRequest[];
+  /** PostHog person distinct id — links the report to the reporter's PostHog activity. */
   posthog_id: string | null;
+  /** PostHog session id — identifies the session replay captured for this bug report. */
+  posthog_session_id: string | null;
+  /** Direct URL to the session replay, when recording was active + the SDK exposes it. */
+  posthog_replay_url: string | null;
 }
 
 /** Best-effort, never throws — diagnostics must never block a feedback submit. */
@@ -68,6 +66,10 @@ export function collectDiagnostics(): ClientContext {
       () => getRecentFailedRequests().map((r) => ({ ...r, path: scrubPii(r.path) })),
       [],
     ),
-    posthog_id: safe(() => window.posthog?.get_distinct_id?.() ?? null, null),
+    // PostHog identity from the module instance (window.posthog is unreliable — the
+    // app imports posthog as a module and never assigns it to window).
+    posthog_id: safe(() => getPosthogDistinctId(), null),
+    posthog_session_id: safe(() => getPosthogSessionId(), null),
+    posthog_replay_url: safe(() => getPosthogReplayUrl(), null),
   };
 }

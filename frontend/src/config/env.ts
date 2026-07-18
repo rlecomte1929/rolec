@@ -35,6 +35,7 @@ const envSchema = z.object({
   VITE_SUPABASE_ANON_KEY: z.string().min(1),
   VITE_POSTHOG_KEY: optionalString,
   VITE_POSTHOG_HOST: optionalString,
+  VITE_POSTHOG_PROJECT_ID: optionalString,
   VITE_ENABLE_PASSKEYS: optionalString,
 });
 
@@ -45,6 +46,7 @@ const raw = {
   VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
   VITE_POSTHOG_KEY: import.meta.env.VITE_POSTHOG_KEY as string | undefined,
   VITE_POSTHOG_HOST: import.meta.env.VITE_POSTHOG_HOST as string | undefined,
+  VITE_POSTHOG_PROJECT_ID: import.meta.env.VITE_POSTHOG_PROJECT_ID as string | undefined,
   VITE_ENABLE_PASSKEYS: import.meta.env.VITE_ENABLE_PASSKEYS as string | undefined,
 };
 
@@ -82,6 +84,8 @@ export const env = {
   // TD-M2 (AIQ-1560): EU ingest host for GDPR fit (compliance-first brand). Render sets
   // VITE_POSTHOG_HOST=https://eu.i.posthog.com; the default matches so it's EU either way.
   posthogHost: data.VITE_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
+  /** Optional numeric PostHog project id — enables /project/{id}/... deep-links from admin. */
+  posthogProjectId: data.VITE_POSTHOG_PROJECT_ID,
   /**
    * [AIQ-1491] Passkey sign-in + registration. OFF unless explicitly set to
    * 'true'. Passkeys additionally require the WebAuthn toggle to be enabled on

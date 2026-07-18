@@ -33,6 +33,7 @@ import {
 import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
+import { posthogPersonUrl } from '../../lib/posthogLinks';
 import { ProgressStrip } from './ProgressStrip';
 import { NewFeedbackModal } from './NewFeedbackModal';
 
@@ -164,6 +165,30 @@ function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
           <span><span className="text-gray-400">Interaction</span> <span className="font-mono">{ctx.interactionId}</span></span>
         )}
       </div>
+      {(ctx.posthog_replay_url || ctx.posthog_id) && (
+        <div className="text-[11px]">
+          <span className="text-gray-400">PostHog</span>{' '}
+          {ctx.posthog_replay_url ? (
+            <a
+              href={ctx.posthog_replay_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#1f8e8b] underline underline-offset-2 hover:text-[#197c79]"
+            >
+              Watch session replay →
+            </a>
+          ) : (
+            <a
+              href={posthogPersonUrl(ctx.posthog_id as string)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#1f8e8b] underline underline-offset-2 hover:text-[#197c79]"
+            >
+              View reporter in PostHog →
+            </a>
+          )}
+        </div>
+      )}
       {ctx.recentFailedRequests?.length > 0 && (
         <div className="text-[11px]">
           <p className="text-gray-400 mb-0.5">Failed requests</p>
