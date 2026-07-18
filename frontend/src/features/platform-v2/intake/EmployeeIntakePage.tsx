@@ -127,6 +127,18 @@ const COUNTRIES = [
   { code: 'BR', name: 'Brazil',         flag: '🇧🇷' },
 ];
 
+// AIQ-1598: derive a flag emoji from an ISO-3166 alpha-2 code (regional-indicator
+// pair). Identity fields (nationality, passport) use the full ISO list
+// (COUNTRY_OPTIONS), whose entries carry no `flag`, so CountryCombo used to fall back
+// to a 🌐 globe on the 'About You' step. Deriving from the code renders the SAME glyph
+// the relocation COUNTRIES list hardcodes — so both steps look identical, no new dep.
+// Returns '' for a non-two-letter code so the caller can fall back to the globe.
+function flagEmoji(code?: string): string {
+  const cc = (code ?? '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return '';
+  return String.fromCodePoint(...[...cc].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+}
+
 const CITIES_BY_COUNTRY: Record<string, string[]> = {
   FR: ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice', 'Bordeaux'],
   DE: ['Berlin', 'Munich', 'Hamburg', 'Frankfurt', 'Cologne'],
@@ -299,7 +311,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   return (
     <div ref={ref} className="relative">
       <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
-        <span className="px-3 text-base">{selected ? (selected.flag ?? '🌐') : '🔍'}</span>
+        <span className="px-3 text-base">{selected ? (selected.flag ?? (flagEmoji(selected.code) || '🌐')) : '🔍'}</span>
         <Input unstyled
           type="text"
           data-testid={testId}
@@ -336,7 +348,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
                 aria-selected={value === c.code}
                 tabIndex={0}
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-accent-50 text-accent-700' : ''}`}>
-                <span className="text-base">{c.flag ?? ''}</span>
+                <span className="text-base">{c.flag ?? flagEmoji(c.code)}</span>
                 <span className="flex-1">{c.name}</span>
                 <span className="text-xs text-gray-400">{c.code}</span>
               </div>
