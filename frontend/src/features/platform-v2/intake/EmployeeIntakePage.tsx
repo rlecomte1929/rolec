@@ -23,6 +23,7 @@ import { MultiChip } from './MultiChip';
 import { INTAKE_STEP_LABELS } from './intakeSteps';
 import { mergeIntakeDraft, clampIntakeStep } from './intakeHydration';
 import { resolveIntakeIds } from './resolveIntakeIds';
+import { caseIdForAssignment } from '../../../utils/employeeAssignmentScope';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { parseSubmitError } from './parseSubmitError';
 import { matchCountry } from './countryMatch';
@@ -892,12 +893,17 @@ export function EmployeeIntakePage() {
   // points run the identical hydration/autosave/submit path.
   const resolvedIds = resolveIntakeIds(routeCaseId, linkedSummaries);
   const assignmentId = routeCaseId ? resolvedIds.assignmentId : contextAssignmentId;
-  // Keep caseIdRef (used by the submit's PATCH /api/cases/{caseId}) pointed at the
-  // real case_id once linkedSummaries resolves — even when the param was an
-  // assignment_id. Falls back to the param for HR deep-links carrying a case UUID.
+  // Keep caseIdRef (used by the submit's PATCH /api/cases/{caseId}) pointed at ONE case
+  // per session: the employee's active assignment case. [AIQ-1612] On the bare
+  // /employee/intake route (no :caseId param) this used to stay the random session UUID,
+  // so intake PATCHed a phantom case that the Services flow — bound to
+  // assignment.case_id — never saw, producing a false "destination missing" block (F15).
+  // Resolve the assignment's canonical case_id; fall back to resolvedIds.caseId for HR
+  // deep-links carrying a case UUID not yet in linkedSummaries.
   useEffect(() => {
-    if (resolvedIds.caseId) caseIdRef.current = resolvedIds.caseId;
-  }, [resolvedIds.caseId]);
+    const resolved = caseIdForAssignment(linkedSummaries, assignmentId) ?? resolvedIds.caseId;
+    if (resolved) caseIdRef.current = resolved;
+  }, [linkedSummaries, assignmentId, resolvedIds.caseId]);
   const hydratedStepRef = useRef(false);
   const lastPersistedStepRef = useRef<number | null>(null);
 
