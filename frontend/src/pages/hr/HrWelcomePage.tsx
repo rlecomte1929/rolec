@@ -74,7 +74,9 @@ export function HrWelcomePage() {
             step={2}
             title="Build your relocation policy"
             description="Define tiers, budgets, and eligibility rules. The policy engine applies them automatically to each case."
-            href="/hr/policy?tab=builder"
+            // AIQ-1599: land on the policy OVERVIEW (default 'policy' tab), not straight
+            // into the builder — the builder stays reachable via its own tab there.
+            href="/hr/policy"
           />
           <WelcomeStepCard
             step={3}
@@ -114,7 +116,9 @@ export function HrWelcomePage() {
           step={2}
           title="Build your relocation policy"
           description="Define tiers, budgets, and eligibility rules. The policy engine applies them automatically to each case."
-          href="/hr/policy?tab=builder"
+          // AIQ-1599: land on the policy OVERVIEW (default 'policy' tab), not straight
+          // into the builder — the builder stays reachable via its own tab there.
+          href="/hr/policy"
         />
         <WelcomeStepCard
           step={3}
