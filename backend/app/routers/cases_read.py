@@ -2039,20 +2039,41 @@ def get_dossier_pdf(
 # §5 Shared reads — Budget summary, messages, vendors, budget lines
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Bridge the intake service vocabulary (housing / moving / immigration / …) to the
-# canonical policy_config benefit keys. HR sets caps in the policy_config matrix
-# (surfaced by /api/policy-config/caps via caps_payload); the legacy hr_policies
-# table this endpoint used to read is dead, so caps always came back unset. This
-# map lets each selected intake service roll up the published caps HR actually set.
-_INTAKE_SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
+# [AIQ-1611 / F14] The SINGLE source of truth bridging a selected service to the
+# canonical policy_config benefit_key(s) it is capped by. HR sets caps in the
+# policy_config matrix (surfaced by /api/policy-config/caps via caps_payload); this
+# map lets each selected service roll up the caps HR actually set, so an over-cap
+# selection can breach a cap and trigger the Policy Exception flow.
+#
+# Keyed by the CANONICAL service key the Services catalog stores (serviceConfig.ts:
+# housing/movers/schools/banks/…), with the legacy intake vocabulary
+# (moving/immigration/…) kept as aliases for older draft_json['services'] rows.
+# Services with no matching benefit (electricity/insurances/pets) map to [] → an
+# honest `no_cap`, never a false green tick. Before this, the map keyed on `moving`
+# (not the catalog's `movers`) and omitted banks/electricity/insurances/pets, so
+# every one of those fell through to no_cap and over-cap could never fire.
+_SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
+    # Canonical catalog service keys (what the Services flow persists).
     "housing": ["host_housing_cap"],
-    "temp_housing": ["temporary_living"],
+    "movers": ["shipment_of_goods", "removal_expenses", "storage"],
+    "schools": ["child_education_support"],
+    "childcare": ["child_education_support"],
+    "banks": ["banking_assistance"],
+    "temp_accommodation": ["temporary_living"],
+    "visa": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
+    "language": ["language_training"],
+    "spouse": ["spouse_partner_assistance", "dual_career_support"],
+    "transport": ["host_transportation"],
+    # No config-matrix benefit exists for these → honest no_cap.
+    "electricity": [],
+    "insurances": [],
+    "pets": [],
+    # Legacy intake vocabulary (back-compat with older draft_json['services']).
     "moving": ["shipment_of_goods", "removal_expenses", "storage"],
     "immigration": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
-    "schools": ["child_education_support"],
+    "temp_housing": ["temporary_living"],
     "tax": ["tax_equalisation"],
     "spouse_career": ["spouse_partner_assistance", "dual_career_support"],
-    "language": ["settling_in_services"],
 }
 
 
@@ -2085,6 +2106,48 @@ def _case_service_estimates(case_id: str) -> Dict[str, Dict[str, Any]]:
     except Exception:
         logger.exception("budget-summary: could not read case_services estimates case=%s", case_id)
         return {}
+
+
+def _selected_services_for_case(case_id: str) -> List[str]:
+    """[AIQ-1611] The employee's ACTUALLY-selected services (canonical keys).
+
+    The Services flow persists the selection to the ``services_state`` table
+    (``state_json.selectedServices``); intake stopped writing ``draft_json['services']``
+    (intakeToCaseDraft.ts), so budget-summary used to read an empty draft and fall back
+    to a hardcoded default — never comparing the real selection. Read services_state
+    first, fall back to the legacy draft, else empty (caller applies its own default)."""
+    if not case_id:
+        return []
+    # Primary: services_state.state_json.selectedServices (canonical service keys).
+    try:
+        with main_db.engine.connect() as conn:
+            row = conn.execute(
+                _sql_text(
+                    "SELECT state_json FROM services_state WHERE case_id = :cid "
+                    "ORDER BY updated_at DESC LIMIT 1"
+                ),
+                {"cid": str(case_id)},
+            ).mappings().first()
+        if row is not None:
+            raw = row["state_json"]
+            state = raw if isinstance(raw, dict) else (json.loads(raw) if raw else {})
+            sel = state.get("selectedServices") if isinstance(state, dict) else None
+            if isinstance(sel, list) and sel:
+                return [str(s) for s in sel if s]
+    except Exception:
+        logger.exception("budget-summary: services_state read failed case=%s", case_id)
+    # Fallback: legacy draft_json['services'].
+    try:
+        with SessionLocal() as db_sess:
+            case = crud.get_case(db_sess, case_id)
+        if case:
+            draft = json.loads(case.draft_json or "{}")
+            svc = draft.get("services")
+            if isinstance(svc, list) and svc:
+                return [str(s) for s in svc if s]
+    except Exception:
+        pass
+    return []
 
 
 def _budget_categories_from_policy_config(
@@ -2127,7 +2190,7 @@ def _budget_categories_from_policy_config(
     for svc_name in services:
         total: Optional[float] = None
         currency = "EUR"
-        for key in _INTAKE_SERVICE_BENEFIT_KEYS.get(svc_name, []):
+        for key in _SERVICE_BENEFIT_KEYS.get(svc_name, []):
             cap = caps_by_key.get(key)
             if (
                 cap
@@ -2272,16 +2335,11 @@ def get_budget_summary(
         uid = user.get("id")
         company_id = (main_db.get_hr_company_id(uid) if uid else None) or (main_db.get_profile_record(uid) or {}).get("company_id") or user.get("company") or ""
 
-    # Pull selected services from the case draft_json
-    selected_services: List[str] = []
-    try:
-        with SessionLocal() as db_sess:
-            case = crud.get_case(db_sess, case_id)
-        if case:
-            draft = json.loads(case.draft_json or "{}")
-            selected_services = draft.get("services", [])
-    except Exception:
-        pass
+    # [AIQ-1611] Pull the employee's ACTUAL selected services (services_state table,
+    # canonical keys), falling back to the legacy draft. Reading only draft_json here
+    # meant the endpoint compared caps against a hardcoded default and never saw the
+    # real selection, so over-cap could never fire.
+    selected_services: List[str] = _selected_services_for_case(case_id)
 
     # AIQ-1551: resolve the company's published caps ONCE (a single caps_payload = one
     # published-version lookup + one benefits read), then reuse for BOTH the per-service
