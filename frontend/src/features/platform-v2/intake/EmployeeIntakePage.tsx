@@ -9,6 +9,7 @@ import { patchCase } from '../../../api/cases';
 import { emitTestDriveStage, getTestDriveSession } from '../../../api/testDrive';
 import { employeeAPI } from '../../../api/client';
 import { track } from '../../../analytics';
+import { trackWizardStepCompleted, trackWizardCompleted, type WizardStepName } from '../../../analyticsEvents';
 import { ROUTE_DEFS, buildRoute } from '../../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../../hooks/useValidatedParams';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
@@ -34,6 +35,18 @@ const RichCommuteMap = lazy(() =>
 );
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+// Analytics: map the 1-indexed wizard step to a stable snake_case event name,
+// aligned to INTAKE_STEP_LABELS (['Move details','About You','My People',
+// 'Work & Place','Review']). Index 0 is unused (steps are 1-indexed).
+const WIZARD_STEP_NAMES: readonly (WizardStepName | undefined)[] = [
+  undefined,
+  'move_details',
+  'about_you',
+  'my_people',
+  'work_and_place',
+  'review',
+];
 
 type MemberKind = 'self' | 'partner' | 'child' | 'pet' | 'adult';
 
@@ -617,6 +630,10 @@ export function EmployeeIntakePage() {
   const routeCaseId = useValidatedParams(caseParamsSchema)?.caseId;
   // Stable case ID for the duration of this intake session.
   const caseIdRef = useRef<string>(routeCaseId ?? crypto.randomUUID());
+  // Analytics timing: wizard start (for total duration) and per-step start (reset
+  // on each forward advance) so wizard_step_completed carries an accurate duration.
+  const wizardStartRef = useRef<number>(Date.now());
+  const stepStartRef = useRef<number>(Date.now());
   // AIQ-1435: journey funnel — mark the intake step reached (once per mount).
   useEffect(() => {
     track('journey_step_started', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
@@ -775,6 +792,19 @@ export function EmployeeIntakePage() {
     // — retry") so navigation never silently drops unsaved data.
     const ok = await flushSave();
     if (!ok) return;
+    // Analytics: only count a step as "completed" when advancing forward past it.
+    if (s > step) {
+      const name = WIZARD_STEP_NAMES[step];
+      if (name) {
+        trackWizardStepCompleted({
+          case_id: caseIdRef.current,
+          step_number: step,
+          step_name: name,
+          duration_seconds: Math.max(0, Math.round((Date.now() - stepStartRef.current) / 1000)),
+        });
+      }
+    }
+    stepStartRef.current = Date.now();
     setStep(s);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1389,6 +1419,18 @@ export function EmployeeIntakePage() {
                       }
                       // AIQ-1435: journey funnel — intake completed on successful submit.
                       track('journey_step_completed', { step: 'intake', case_id: caseIdRef.current, persona: 'employee' });
+                      // Typed funnel event with PII-free household shape (no names).
+                      {
+                        const nonSelf = data.members.filter((m) => m.kind !== 'self' && m.kind !== 'pet');
+                        const partner = data.members.find((m) => m.kind === 'partner');
+                        trackWizardCompleted({
+                          case_id: caseIdRef.current,
+                          total_duration_seconds: Math.max(0, Math.round((Date.now() - wizardStartRef.current) / 1000)),
+                          has_family: nonSelf.length > 0,
+                          household_size: data.members.filter((m) => m.kind !== 'pet').length,
+                          partner_needs_work_permit: partner?.needs_work_permit === 'yes',
+                        });
+                      }
                       // TD-FIX-4 (AIQ-1505): test-drive funnel — intake completed.
                       emitTestDriveStage('intake-completed');
                       // B5: land on the roadmap the submit just unlocked, not a

@@ -56,7 +56,8 @@ export function trackWizardCompleted(props: {
   case_id: string;
   total_duration_seconds: number;
   has_family: boolean;
-  has_spouse_wants_to_work: boolean;
+  household_size: number; // members incl. self
+  partner_needs_work_permit: boolean;
 }): void {
   track('wizard_completed', props);
 }
@@ -66,16 +67,19 @@ export function trackWizardCompleted(props: {
 /**
  * Fired once when the Estimate Review breakdown finishes loading. The headline
  * signal for cost-vs-policy health across cases.
+ *
+ * Fields mirror the real /budget-summary payload (per-category status only;
+ * estimate amounts are null placeholders today, so no cost totals are sent).
  */
 export function trackEstimateReviewOpened(props: {
   case_id: string;
+  categories_count: number;
   any_line_over_policy: boolean;
   lines_over_policy_count: number;
   lines_within_policy_count: number;
   lines_no_cap_count: number;
-  personal_cost_eur: number;
-  total_package_eur: number;
-  policy_budget_eur: number;
+  lines_no_estimate_count: number;
+  hr_policy_caps_count: number;
 }): void {
   track('estimate_review_opened', props);
 }
