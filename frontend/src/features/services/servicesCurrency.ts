@@ -1,3 +1,5 @@
+import { DESTINATION_COUNTRIES } from '../../utils/countries';
+
 /** localStorage key — must match ServicesFlowContext. */
 export const SERVICES_DISPLAY_CURRENCY_STORAGE_KEY = 'services_display_currency';
 
@@ -52,16 +54,28 @@ const COUNTRY_TO_CURRENCY: Record<string, string> = {
   // Other displayed currencies
   GB: 'GBP', US: 'USD', CH: 'CHF', CA: 'CAD', AU: 'AUD', NO: 'NOK', SE: 'SEK',
   DK: 'DKK', JP: 'JPY',
+  // [AIQ-1620] utils/countries uses 'UK' for the United Kingdom while ISO is 'GB' — alias.
+  UK: 'GBP',
 };
+
+// [AIQ-1620] host_country is stored inconsistently — sometimes an ISO alpha-2 code ("DE"),
+// sometimes a full country name ("Germany"). Resolve names → code so a Munich (Germany) case
+// defaults to EUR instead of falling through to the USD fallback.
+const NAME_TO_CODE: Record<string, string> = Object.fromEntries(
+  DESTINATION_COUNTRIES.map((c) => [c.name.trim().toLowerCase(), c.code]),
+);
 
 /**
  * Default display currency for a destination country. Always returns a supported
  * code (USD fallback for unknown/unsupported countries). The user can still
  * override the selection afterwards.
  */
-export function getDefaultCurrencyForCountry(countryCode: string | null | undefined): string {
-  const c = String(countryCode || '').trim().toUpperCase();
-  return normalizeServicesCurrency(COUNTRY_TO_CURRENCY[c] ?? 'USD');
+export function getDefaultCurrencyForCountry(country: string | null | undefined): string {
+  const raw = String(country || '').trim();
+  const upper = raw.toUpperCase();
+  // Accept either an ISO alpha-2 code ("DE") or a full country name ("Germany"). [AIQ-1620]
+  const code = COUNTRY_TO_CURRENCY[upper] ? upper : NAME_TO_CODE[raw.toLowerCase()] ?? upper;
+  return normalizeServicesCurrency(COUNTRY_TO_CURRENCY[code] ?? 'USD');
 }
 
 /**
