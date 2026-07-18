@@ -3021,11 +3021,14 @@ class CasesMixin:
             duration_months = int(_dur) if _dur is not None and str(_dur).strip() != "" else None
         except (TypeError, ValueError):
             duration_months = None
+        # AIQ-1603: single-select commute preference (nullable, no CHECK — validated at the DTO).
+        commute_pref = (derived.get("commute_preference") or "").strip() or None
         params = {
             "id": case_id, "company": company_id, "emp": employee_uuid,
             "origin": origin, "dest": dest, "dest_city": dest_city,
             "purpose": purpose, "move": move,
             "assignment_type": assignment_type, "duration_months": duration_months,
+            "commute_pref": commute_pref,
         }
         # public.cases enforces CHECK constraints — status in (draft, active,
         # on_hold, completed, cancelled), stage in (discovery, dossier, roadmap,
@@ -3036,25 +3039,27 @@ class CasesMixin:
         if self.engine.dialect.name == "postgresql":
             sql = (
                 "INSERT INTO cases "
-                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, assignment_type, expected_duration_months, created_at, updated_at) "
-                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'active', 'discovery', CAST(NULLIF(:move,'') AS date), :assignment_type, :duration_months, now(), now()) "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, assignment_type, expected_duration_months, commute_preference, created_at, updated_at) "
+                "VALUES (CAST(:id AS uuid), CAST(:company AS uuid), CAST(:emp AS uuid), :origin, :dest, :dest_city, :purpose, 'active', 'discovery', CAST(NULLIF(:move,'') AS date), :assignment_type, :duration_months, :commute_pref, now(), now()) "
                 "ON CONFLICT (id) DO UPDATE SET "
                 "dest_country_code = EXCLUDED.dest_country_code, origin_country_code = EXCLUDED.origin_country_code, "
                 "dest_city = EXCLUDED.dest_city, purpose = EXCLUDED.purpose, employee_id = EXCLUDED.employee_id, "
                 "assignment_type = COALESCE(EXCLUDED.assignment_type, cases.assignment_type), "
                 "expected_duration_months = COALESCE(EXCLUDED.expected_duration_months, cases.expected_duration_months), "
+                "commute_preference = COALESCE(EXCLUDED.commute_preference, cases.commute_preference), "
                 "updated_at = now()"
             )
         else:
             sql = (
                 "INSERT INTO cases "
-                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, assignment_type, expected_duration_months) "
-                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'active', 'discovery', NULLIF(:move,''), :assignment_type, :duration_months) "
+                "(id, company_id, employee_id, origin_country_code, dest_country_code, dest_city, purpose, status, stage, target_move_date, assignment_type, expected_duration_months, commute_preference) "
+                "VALUES (:id, :company, :emp, :origin, :dest, :dest_city, :purpose, 'active', 'discovery', NULLIF(:move,''), :assignment_type, :duration_months, :commute_pref) "
                 "ON CONFLICT (id) DO UPDATE SET dest_country_code=excluded.dest_country_code, "
                 "origin_country_code=excluded.origin_country_code, dest_city=excluded.dest_city, "
                 "purpose=excluded.purpose, employee_id=excluded.employee_id, "
                 "assignment_type=COALESCE(excluded.assignment_type, cases.assignment_type), "
-                "expected_duration_months=COALESCE(excluded.expected_duration_months, cases.expected_duration_months)"
+                "expected_duration_months=COALESCE(excluded.expected_duration_months, cases.expected_duration_months), "
+                "commute_preference=COALESCE(excluded.commute_preference, cases.commute_preference)"
             )
         try:
             with self.engine.begin() as conn:

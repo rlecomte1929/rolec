@@ -431,6 +431,8 @@ export interface AssignmentContextDTO {
   assignmentType?: string;
   /** AIQ-1349: expected assignment length in months. */
   expectedDurationMonths?: number;
+  /** AIQ-1603: single-select commute preference (car/public_transport/bike/walk/no_preference). */
+  commutePreference?: string;
 }
 
 export interface CaseDraftDTO {

@@ -56,6 +56,8 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       // AIQ-1349: optional expected stay length → 22 live duration_threshold rules.
       expectedDurationMonths:
         data.expected_duration_months != null ? Number(data.expected_duration_months) : undefined,
+      // AIQ-1603: single-select commute preference → public.cases.commute_preference.
+      commutePreference: data.commute_preference || undefined,
     },
   };
 }
