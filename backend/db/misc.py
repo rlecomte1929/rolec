@@ -510,6 +510,10 @@ class MiscMixin:
                 CREATE TABLE IF NOT EXISTS case_assignments (
                     id TEXT PRIMARY KEY,
                     case_id TEXT NOT NULL,
+                    -- Mirrors Postgres 20260324000000_canonical_case_id_phase1.sql. The
+                    -- roadmap-review notifier resolves HR via (case_id OR canonical_case_id),
+                    -- so the SQLite mirror must carry this column too (AIQ-1606).
+                    canonical_case_id TEXT,
                     hr_user_id TEXT NOT NULL,
                     employee_user_id TEXT,
                     employee_identifier TEXT NOT NULL,

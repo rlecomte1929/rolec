@@ -209,7 +209,6 @@ from .app.routers import research_requests as research_requests_router  # [AIQ-1
 from .app.routers import hr_vendor_widgets as hr_vendor_widgets_router
 from .app.routers import hr_case_detail as hr_case_detail_router
 from .app.routers import hr_roadmap_review as hr_roadmap_review_router  # HR validates the roadmap before the employee acts on it  # C1-11c-be — per-case detail reads (dual-layer per CLAUDE.md)
-from .app.routers.hr_roadmap_review import assert_roadmap_released  # [AIQ-1526] employee may READ a pending plan, not act on it
 from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_notes as hr_case_notes_router  # AIQ-1136 — case notes (dual-layer per CLAUDE.md)
 from .app.routers import coordinator as coordinator_router  # AIQ-1414 — coordinator respond (dual-layer per CLAUDE.md)
@@ -5989,22 +5988,41 @@ def _ensure_default_milestones_for_case(
                 case_id, m.get("milestone_type"), upsert_exc, exc_info=True,
             )
 
-    # [AIQ-1377] A newly generated roadmap is RELEASED by default — the employee can act on it
-    # immediately. HR HOLDS it when they want to intervene (POST .../roadmap-review/request-changes
-    # writes released_to_user=false); an absent review row means released, which the read path
-    # already assumes.
+    # [AIQ-1606] A newly generated roadmap is UNDER HR REVIEW by default: we write a
+    # roadmap_review_status row with released_to_user=False so the employee sees the
+    # "Under HR Review" tag until HR approves.
     #
-    # This used to write an unreleased row here, so every new case was held pending an HR approval.
-    # But the roadmap-review case_id lives in the wizard engine's id-space, which does not join to
-    # relocation_cases / cases where HR is linked — so most cases resolve to NO HR who could ever
-    # approve, and the employee was locked out of their own tasks with no way forward (AIQ-1377:
-    # the roadmap page rendered "in review" instead of the plan for every freshly provisioned case).
-    # That contradicts the "HR = payer, validates when needed" model: HR intervenes on exception,
-    # they are not a mandatory gate on every plan. The approve/request-changes endpoints still
-    # create the row on demand (_load_or_create), so HR's hold remains fully available — as an
-    # opt-in action, not a default block.
+    # This reverses AIQ-1377's "no writer" — but safely. AIQ-1377 removed it because the
+    # held flag ALSO gated the employee's actions, so a held row on a case with no
+    # resolvable HR (wizard-id cases that don't join to a linked HR) locked the employee
+    # out with no way forward. That coupling is now gone: the flag is purely informational
+    # (the assert_roadmap_released action gate was removed), so a held row can never block
+    # anyone — the AIQ-1377 failure mode is structurally impossible. HR approve/request-
+    # changes still update the same row; approval just clears the tag.
+    if created:
+        _ensure_roadmap_under_review(case_id)
 
     return created
+
+
+def _ensure_roadmap_under_review(case_id: str) -> None:
+    """[AIQ-1606] Tag a freshly generated roadmap as 'under HR review'
+    (released_to_user=False) so the employee sees the non-blocking review banner until HR
+    approves. INSERT-only and idempotent: it never overturns an existing HR decision (e.g.
+    an already-approved row), and it never raises — an informational tag must never cost
+    the employee their roadmap."""
+    from .app.models import RoadmapReviewStatus
+
+    try:
+        with SessionLocal() as session:
+            if session.get(RoadmapReviewStatus, case_id) is not None:
+                return  # a decision already exists — respect it
+            session.add(RoadmapReviewStatus(case_id=case_id, released_to_user=False))
+            session.commit()
+    except Exception:
+        log.warning(
+            "under-review tag: could not write review row case_id=%s", case_id, exc_info=True
+        )
 
 
 def _async_generate_and_persist_roadmap(case_id: str, request_id: str) -> None:
@@ -6073,12 +6091,13 @@ def _async_seed_and_generate_roadmap(case_id: str, assignment_id: str, request_i
         )
     _async_generate_and_persist_roadmap(case_id, request_id)
 
-    # [AIQ-1526] The plan now exists and is HELD for HR approval — the employee can read it
-    # but cannot start tasks. Tell HR, or they'd only find out by opening the case.
+    # [AIQ-1526/1606] The plan now exists and is UNDER HR REVIEW — the employee can read AND
+    # act on it immediately (the review tag is non-blocking), but HR should still review it.
+    # Tell HR, or they'd only find out by opening the case.
     #
     # Fires only when we actually seeded (`seeded > 0`), which is the one moment the case
-    # transitions into "pending review": _ensure_default_milestones_for_case is a no-op when
-    # milestones already exist, and it is what writes the unreleased review row. So this
+    # transitions into "under review": _ensure_default_milestones_for_case is a no-op when
+    # milestones already exist, and it is what writes the under-review row. So this
     # runs once per case, not once per submit.
     #
     # It goes LAST, after generation's delete+rewrite, so we never mail HR about a plan that
@@ -11308,12 +11327,8 @@ def update_case_milestone(
 ):
     """Update a milestone (title, description, target_date, actual_date, status, sort_order)."""
     _ = _require_case_id_assignment_visible(case_id, user)
-    # [AIQ-1526] While HR is still reviewing the plan, the EMPLOYEE may read it but not
-    # act on it — HR can still send it back for regeneration, and progress recorded
-    # against a plan that's about to be replaced is wasted work. HR itself is NOT gated:
-    # curating the timeline is exactly what they're reviewing it to do.
-    if str(user.get("role") or "").upper() == "EMPLOYEE":
-        assert_roadmap_released(case_id)
+    # [AIQ-1606] "Under HR review" is a non-blocking, informational tag — the employee can
+    # act on their plan while HR reviews it. No action gate here.
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     existing = next((m for m in db.list_case_milestones(case_id, request_id=request_id) if m.get("id") == milestone_id), None)
     if not existing:

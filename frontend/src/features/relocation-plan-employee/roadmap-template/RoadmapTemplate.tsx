@@ -230,7 +230,7 @@ function Hero({ data, header, validated, validatedAt }: { data: RelocationPlanVi
 
 // ── "What you can do now" ────────────────────────────────────────────────────
 
-function ActionCard({ task, onCta, pendingReview }: { task: RelocationPlanPhaseTaskDTO; onCta: (t: RelocationPlanPhaseTaskDTO) => void; pendingReview?: boolean }) {
+function ActionCard({ task, onCta }: { task: RelocationPlanPhaseTaskDTO; onCta: (t: RelocationPlanPhaseTaskDTO) => void }) {
   return (
     <div className="flex flex-1 flex-col rounded-xl border border-slate-200 bg-white p-3.5">
       <div className="mb-2 flex items-center gap-2">
@@ -247,9 +247,7 @@ function ActionCard({ task, onCta, pendingReview }: { task: RelocationPlanPhaseT
       <button
         type="button"
         onClick={() => onCta(task)}
-        disabled={pendingReview}
-        title={pendingReview ? 'Unlocks once your HR team approves this plan' : undefined}
-        className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0b2b43] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#103e54] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#0b2b43]"
+        className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0b2b43] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#103e54]"
       >
         {task.status === 'in_progress' ? 'Continue' : 'Start now'} <ArrowRight size={14} />
       </button>
@@ -416,9 +414,9 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
     <div className="space-y-4">
       <Hero data={data} header={header} validated={validated} validatedAt={validatedAt} />
 
-      {/* [AIQ-1526] HR hasn't approved the plan yet. Say plainly that they can look but not
-          start — the worst outcome is an employee who thinks nothing is happening, or one
-          who starts work on a plan that gets regenerated. */}
+      {/* [AIQ-1606] "Under HR review" is a non-blocking, informational tag. HR is reviewing
+          the plan in parallel, but the employee is never blocked — they can start any task
+          right away. Say that plainly so the banner reassures rather than gates. */}
       {pendingReview && (
         <div
           role="status"
@@ -430,8 +428,8 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
               Your HR team is reviewing this plan
             </div>
             <div className="mt-0.5 text-[12.5px] leading-relaxed text-slate-600">
-              Have a look around — you can explore every step below. Your tasks unlock as soon
-              as HR approves it, so there&rsquo;s nothing you need to do right now.
+              You don&rsquo;t need to wait — start any task below whenever you&rsquo;re ready.
+              HR is reviewing in the background and will confirm your plan shortly.
             </div>
           </div>
         </div>
@@ -455,7 +453,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             {actionable.map((t) => (
-              <ActionCard key={t.task_id} task={t} onCta={onCta} pendingReview={pendingReview} />
+              <ActionCard key={t.task_id} task={t} onCta={onCta} />
             ))}
           </div>
         </div>
@@ -492,9 +490,10 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
       </div>
 
       {/* Validate footer — validated status now shown in the hero (AIQ-1278).
-          [AIQ-1526] Hidden while HR is still reviewing: there is nothing to validate yet,
-          and the server would 409 anyway. The review banner (top) explains the wait. */}
-      {!validated && !pendingReview && (
+          [AIQ-1606] Shown even while HR is reviewing: the review tag is non-blocking, so the
+          employee can validate & start whenever they're ready. The banner (top) explains the
+          parallel HR review. */}
+      {!validated && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
           <div>
             <div className="text-[14px] font-semibold text-[#0b2b43]">Ready to begin?</div>

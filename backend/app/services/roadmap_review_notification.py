@@ -62,7 +62,7 @@ _RECIPIENT_SQL = _sql_text(
                 COALESCE(ca.employee_last_name, ''))   AS employee_name
     FROM public.case_assignments ca
     JOIN public.users u ON u.id::text = ca.hr_user_id::text
-    WHERE ca.case_id::text = :cid
+    WHERE (ca.case_id::text = :cid OR ca.canonical_case_id::text = :cid)
       AND COALESCE(NULLIF(TRIM(u.email), ''), NULL) IS NOT NULL
     LIMIT 1
     """

@@ -75,44 +75,11 @@ def _load_or_create(db, case_id: str) -> RoadmapReviewStatus:
     return row
 
 
-def is_roadmap_pending_review(case_id: str) -> bool:
-    """Is this roadmap still waiting on HR?
-
-    FAILS OPEN — no review row, or a lookup error, means NOT pending. Same asymmetry as
-    the read path: we only ever hold something back when we positively know HR withheld
-    it. 47 live cases have a roadmap and no review row; a gate that guessed "pending"
-    would lock every one of those employees out of their own tasks.
-    """
-    try:
-        with SessionLocal() as db:
-            row = db.get(RoadmapReviewStatus, case_id)
-            if row is None:
-                return False
-            return not bool(row.released_to_user)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("roadmap action gate: lookup failed for %s (%s); allowing", case_id, exc)
-        return False
-
-
-def assert_roadmap_released(case_id: str) -> None:
-    """Block an EMPLOYEE action on a roadmap HR hasn't approved yet.
-
-    The employee can freely READ their plan — exploring it is reassuring and costs
-    nothing. What they cannot do is act on a plan that may still change: HR can send it
-    back for regeneration, and work done against a superseded plan is wasted (or worse,
-    wrong). So reads are open and writes wait.
-
-    409 (not 403): this is a state conflict, not a permissions problem. The employee is
-    entitled to act — just not yet.
-    """
-    if is_roadmap_pending_review(case_id):
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Your HR team is still reviewing this plan. You can explore it now — "
-                "your tasks unlock once they approve it."
-            ),
-        )
+# [AIQ-1606] The employee-facing action gate (is_roadmap_pending_review /
+# assert_roadmap_released) was removed: "under HR review" is now a non-blocking,
+# informational tag. HR still approves/requests-changes below; approval just clears the
+# tag. The employee can read AND act on their plan at any status — so a held row can never
+# lock anyone out (the AIQ-1377 failure mode is structurally gone).
 
 
 @router.get("/{case_id}/roadmap-review", response_model=RoadmapReviewDTO)

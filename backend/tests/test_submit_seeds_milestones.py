@@ -114,16 +114,33 @@ class EnsureDefaultMilestonesTests(unittest.TestCase):
         # One succeeded, one failed — failure must not raise, count reflects success.
         self.assertEqual(created, 1)
 
-    def test_generation_leaves_the_roadmap_released_no_hr_hold(self):
-        # [AIQ-1377] A generated roadmap is RELEASED by default. Generation must NOT create a
-        # roadmap_review_status row: doing so held every new case pending an HR approval that,
-        # for wizard-id cases with no linked HR, never came — the roadmap page rendered
-        # "in review" instead of the plan for every freshly provisioned case. HR still HOLDS a
-        # plan on demand via request-changes; it is an opt-in action, not a default block.
+    def test_generation_tags_the_roadmap_under_hr_review(self):
+        # [AIQ-1606] A generated roadmap is UNDER HR REVIEW by default: generation writes a
+        # roadmap_review_status row with released_to_user=False so the employee sees the
+        # non-blocking "Under HR Review" tag. This reverses AIQ-1377's "no writer" — safely,
+        # because the flag no longer gates the employee's actions (the assert_roadmap_released
+        # gate was removed), so a held row can never lock anyone out. INSERT-only: it never
+        # overturns an existing HR decision.
         import backend.app.models as _models
 
+        class _Session:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def get(self, _model, _cid):
+                return None  # no prior decision → write the under-review row
+
+            def add(self, _row):
+                pass
+
+            def commit(self):
+                pass
+
         with mock.patch.object(M, "db") as db, mock.patch.object(
-            M, "SessionLocal"
+            M, "SessionLocal", lambda: _Session()
         ), mock.patch.object(M, "app_crud") as app_crud, mock.patch.object(
             M, "compute_default_milestones",
             side_effect=lambda **_: [{"milestone_type": "visa", "title": "A"}],
@@ -134,8 +151,40 @@ class EnsureDefaultMilestonesTests(unittest.TestCase):
             created = M._ensure_default_milestones_for_case("case1", "asg1")
 
         self.assertEqual(created, 1)
-        # The regression guard: no HR-review hold row is constructed on generation.
+        # Generation tags the case under review: a row is constructed with released=False.
+        RRS.assert_called_once_with(case_id="case1", released_to_user=False)
+
+    def test_under_review_writer_respects_an_existing_hr_decision(self):
+        # [AIQ-1606] The writer is INSERT-only. If a row already exists (e.g. HR already
+        # approved, released_to_user=True), a later regeneration must NOT reset it to held —
+        # that would silently un-approve a plan HR already signed off.
+        import backend.app.models as _models
+
+        added: list = []
+
+        class _Session:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def get(self, _model, _cid):
+                return object()  # a decision already exists → leave it alone
+
+            def add(self, row):
+                added.append(row)
+
+            def commit(self):
+                pass
+
+        with mock.patch.object(M, "SessionLocal", lambda: _Session()), mock.patch.object(
+            _models, "RoadmapReviewStatus"
+        ) as RRS:
+            M._ensure_roadmap_under_review("case1")
+
         RRS.assert_not_called()
+        self.assertEqual(added, [])
 
 
 if __name__ == "__main__":
