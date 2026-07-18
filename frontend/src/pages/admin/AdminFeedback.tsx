@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FeedbackTab } from '../../components/admin/FeedbackTab';
+import { ProductMetricsTab } from '../../components/admin/ProductMetricsTab';
+import { Tabs, tabPanelProps, type TabItem } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 
 /**
@@ -14,13 +16,30 @@ import { AdminLayout } from './AdminLayout';
  * `?view=work` is inert (harmless on an old bookmark), and the legacy
  * /admin/mission-control route redirects here — see App.tsx.
  */
-const AdminFeedback: React.FC = () => (
-  <AdminLayout
-    title="Feedback & Work"
-    subtitle="Pilot feedback and the engineering work it turns into — one place."
-  >
-    <FeedbackTab />
-  </AdminLayout>
-);
+const TABS: TabItem[] = [
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'metrics', label: 'Product metrics' },
+];
+
+const AdminFeedback: React.FC = () => {
+  const [active, setActive] = useState<'inbox' | 'metrics'>('inbox');
+  return (
+    <AdminLayout
+      title="Feedback & Work"
+      subtitle="Pilot feedback and the product analytics behind it — one place."
+    >
+      <Tabs
+        tabs={TABS}
+        activeId={active}
+        onChange={(id) => setActive(id as 'inbox' | 'metrics')}
+        aria-label="Feedback views"
+        className="mb-4"
+      />
+      <div {...tabPanelProps(active)}>
+        {active === 'inbox' ? <FeedbackTab /> : <ProductMetricsTab />}
+      </div>
+    </AdminLayout>
+  );
+};
 
 export default AdminFeedback;

@@ -11,7 +11,36 @@
  * amounts in EUR. (initAnalytics also strips known PII keys as a backstop.)
  */
 
-import { track } from './analytics';
+import { track, getAnalyticsConsent } from './analytics';
+import { env } from './config/env';
+
+// ─── Server mirror ───────────────────────────────────────────────────────────
+// The three wizard/estimate events are also mirrored to the authenticated
+// POST /api/track sink → analytics_events, so the admin "Product metrics" tab can
+// aggregate them (PostHog stays the primary sink). Best-effort, keepalive, and
+// consent-gated (never send behaviour for a visitor who declined analytics).
+// Server-authoritative events (case_created, policy_published, exception_*) are
+// mirrored server-side at their handlers, not here.
+function mirror(event: string, properties: Record<string, unknown>): void {
+  if (getAnalyticsConsent() !== 'granted') return;
+  let token: string | null = null;
+  try {
+    token = window.localStorage.getItem('relopass_token');
+  } catch {
+    /* localStorage unavailable */
+  }
+  if (!token) return; // /api/track requires an authenticated user
+  try {
+    void fetch(`${env.apiUrl}/api/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ event, properties }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* best-effort */
+  }
+}
 
 // ─── Shared type unions ──────────────────────────────────────────────────────
 
@@ -49,6 +78,7 @@ export function trackWizardStepCompleted(props: {
   duration_seconds: number;
 }): void {
   track('wizard_step_completed', props);
+  mirror('wizard_step_completed', props);
 }
 
 /** Fired when the employee submits the full intake wizard. */
@@ -60,6 +90,7 @@ export function trackWizardCompleted(props: {
   partner_needs_work_permit: boolean;
 }): void {
   track('wizard_completed', props);
+  mirror('wizard_completed', props);
 }
 
 // ─── Estimate review ─────────────────────────────────────────────────────────
@@ -82,6 +113,7 @@ export function trackEstimateReviewOpened(props: {
   hr_policy_caps_count: number;
 }): void {
   track('estimate_review_opened', props);
+  mirror('estimate_review_opened', props);
 }
 
 /** Fired when the estimate review leads to an action. */
