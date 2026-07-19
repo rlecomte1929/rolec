@@ -2039,42 +2039,17 @@ def get_dossier_pdf(
 # §5 Shared reads — Budget summary, messages, vendors, budget lines
 # ─────────────────────────────────────────────────────────────────────────────
 
-# [AIQ-1611 / F14] The SINGLE source of truth bridging a selected service to the
-# canonical policy_config benefit_key(s) it is capped by. HR sets caps in the
-# policy_config matrix (surfaced by /api/policy-config/caps via caps_payload); this
-# map lets each selected service roll up the caps HR actually set, so an over-cap
-# selection can breach a cap and trigger the Policy Exception flow.
-#
-# Keyed by the CANONICAL service key the Services catalog stores (serviceConfig.ts:
-# housing/movers/schools/banks/…), with the legacy intake vocabulary
-# (moving/immigration/…) kept as aliases for older draft_json['services'] rows.
-# Services with no matching benefit (electricity/insurances/pets) map to [] → an
-# honest `no_cap`, never a false green tick. Before this, the map keyed on `moving`
-# (not the catalog's `movers`) and omitted banks/electricity/insurances/pets, so
-# every one of those fell through to no_cap and over-cap could never fire.
-_SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
-    # Canonical catalog service keys (what the Services flow persists).
-    "housing": ["host_housing_cap"],
-    "movers": ["shipment_of_goods", "removal_expenses", "storage"],
-    "schools": ["child_education_support"],
-    "childcare": ["child_education_support"],
-    "banks": ["banking_assistance"],
-    "temp_accommodation": ["temporary_living"],
-    "visa": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
-    "language": ["language_training"],
-    "spouse": ["spouse_partner_assistance", "dual_career_support"],
-    "transport": ["host_transportation"],
-    # No config-matrix benefit exists for these → honest no_cap.
-    "electricity": [],
-    "insurances": [],
-    "pets": [],
-    # Legacy intake vocabulary (back-compat with older draft_json['services']).
-    "moving": ["shipment_of_goods", "removal_expenses", "storage"],
-    "immigration": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
-    "temp_housing": ["temporary_living"],
-    "tax": ["tax_equalisation"],
-    "spouse_career": ["spouse_partner_assistance", "dual_career_support"],
-}
+# [AIQ-1611 / F14] The service → canonical policy_config benefit_key(s) bridge now
+# lives in the ONE shared controlled taxonomy (shared/service_benefit_taxonomy.json,
+# read via services.service_benefit_taxonomy) that the frontend cap-compare bridge
+# (providerServiceBenefitMap.ts) and the caps/compare resolver read too. This used
+# to be a private dict here — one of three inconsistent alias maps whose vocabularies
+# never intersected the policy matrix, so over-cap could never fire. Extend the JSON
+# (never a local map) when a service gains a policy benefit. Canonical catalog keys
+# (serviceConfig.ts: housing/movers/schools/banks/…) and the legacy intake vocabulary
+# (moving/immigration/…) both resolve; services with no matching benefit map to []
+# → an honest `no_cap`, never a false green tick.
+from ..services.service_benefit_taxonomy import benefit_keys_for_service as _service_benefit_keys
 
 
 def _case_service_estimates(case_id: str) -> Dict[str, Dict[str, Any]]:
@@ -2190,7 +2165,7 @@ def _budget_categories_from_policy_config(
     for svc_name in services:
         total: Optional[float] = None
         currency = "EUR"
-        for key in _SERVICE_BENEFIT_KEYS.get(svc_name, []):
+        for key in _service_benefit_keys(svc_name):
             cap = caps_by_key.get(key)
             if (
                 cap

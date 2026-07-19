@@ -1,0 +1,96 @@
+{
+  "_description": [
+    "F14 — THE single controlled taxonomy bridging the Employee Services catalog vocabulary",
+    "(frontend/src/features/services/serviceConfig.ts service keys) to the HR Policy Builder's",
+    "canonical benefit_key vocabulary (backend/app/services/policy_config_matrix_service.py",
+    "_CANONICAL_KEYS). Both sides MUST read this file — never redeclare a service→benefit map",
+    "in code. Consumers: backend/app/services/service_benefit_taxonomy.py (budget-summary rollup",
+    "in cases_read.py and the caps/compare resolver in policy_config_matrix_service.py) and",
+    "frontend/src/features/policy-config/providerServiceBenefitMap.ts (cap-compare bridge).",
+    "Guarded by backend/tests/test_service_benefit_taxonomy.py and",
+    "frontend/src/features/services/__tests__/serviceTaxonomyCoverage.test.ts — both fail if a",
+    "Services-catalog category is missing here or if a mapped benefit_key is not canonical."
+  ],
+  "version": 1,
+  "_services_note": [
+    "Every Services-catalog key (serviceConfig.ts ServiceKey) MUST appear here. The value is the",
+    "list of canonical policy-config benefit_keys whose published caps constitute the service's",
+    "budget. An empty list is an EXPLICIT declaration that no policy-matrix benefit exists for",
+    "the service (honest no_cap, never a false green tick). 'tax' is a legacy intake-only",
+    "service key kept for older draft_json['services'] rows."
+  ],
+  "services": {
+    "housing": ["host_housing_cap"],
+    "movers": ["shipment_of_goods", "removal_expenses", "storage"],
+    "schools": ["child_education_support"],
+    "childcare": ["child_education_support"],
+    "visa": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
+    "temp_accommodation": ["temporary_living"],
+    "banks": ["banking_assistance"],
+    "language": ["language_training"],
+    "spouse": ["spouse_partner_assistance", "dual_career_support"],
+    "transport": ["host_transportation"],
+    "drivers_license": ["driving_test_reimbursement"],
+    "pets": [],
+    "insurances": [],
+    "registration": [],
+    "electricity": [],
+    "internet": [],
+    "mobile": [],
+    "community": [],
+    "tax": ["tax_equalisation"]
+  },
+  "_aliases_note": [
+    "Alternate vocabularies that older rows / other surfaces use for the same service:",
+    "serviceConfig backendKeys (living_areas, insurance), the legacy intake vocabulary",
+    "(moving, immigration, temp_housing, spouse_career) and the RFQ item vocabulary",
+    "(temporary_housing). Each alias resolves to exactly one canonical service key above."
+  ],
+  "aliases": {
+    "living_areas": "housing",
+    "insurance": "insurances",
+    "moving": "movers",
+    "immigration": "visa",
+    "temp_housing": "temp_accommodation",
+    "temporary_housing": "temp_accommodation",
+    "spouse_career": "spouse"
+  },
+  "_modules_note": [
+    "Downstream service-module hints (formerly SERVICE_MODULE_BENEFIT_KEYS in",
+    "policy_config_matrix_service.py) — the serviceModule filter of GET /api/policy-config/caps."
+  ],
+  "modules": {
+    "immigration": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
+    "relocation": [
+      "relocation_allowance_assignee_partner",
+      "relocation_allowance_dependent",
+      "removal_expenses",
+      "shipment_of_goods",
+      "storage",
+      "temporary_living",
+      "settling_in_services"
+    ],
+    "compensation": [
+      "mobility_premium",
+      "location_allowance",
+      "living_allowance",
+      "cola",
+      "host_housing_cap",
+      "host_transportation"
+    ],
+    "family": ["spouse_partner_assistance", "child_education_support", "dual_career_support"],
+    "repatriation": [
+      "home_leave_trips",
+      "extra_holiday_days",
+      "repatriation_allowance_assignee_partner",
+      "repatriation_allowance_dependent",
+      "return_shipment_travel"
+    ],
+    "tax_payroll": [
+      "tax_equalisation",
+      "payroll_structure",
+      "banking_assistance",
+      "tax_return_preparation"
+    ]
+  }
+}

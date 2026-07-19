@@ -29,46 +29,16 @@ from .policy_config_targeting import (
     normalize_family_status,
     row_matches_targeting,
 )
+from .service_benefit_taxonomy import benefit_keys_for_service, module_benefit_keys
 
 log = logging.getLogger(__name__)
 
 CONFIG_KEY = "compensation_allowance"
 
-# Downstream service-module hints (extend as product adds modules).
-SERVICE_MODULE_BENEFIT_KEYS: Dict[str, List[str]] = {
-    "immigration": ["visa_work_permit_assistance", "medical_exam_reimbursement"],
-    "relocation": [
-        "relocation_allowance_assignee_partner",
-        "relocation_allowance_dependent",
-        "removal_expenses",
-        "shipment_of_goods",
-        "storage",
-        "temporary_living",
-        "settling_in_services",
-    ],
-    "compensation": [
-        "mobility_premium",
-        "location_allowance",
-        "living_allowance",
-        "cola",
-        "host_housing_cap",
-        "host_transportation",
-    ],
-    "family": ["spouse_partner_assistance", "child_education_support", "dual_career_support"],
-    "repatriation": [
-        "home_leave_trips",
-        "extra_holiday_days",
-        "repatriation_allowance_assignee_partner",
-        "repatriation_allowance_dependent",
-        "return_shipment_travel",
-    ],
-    "tax_payroll": [
-        "tax_equalisation",
-        "payroll_structure",
-        "banking_assistance",
-        "tax_return_preparation",
-    ],
-}
+# Downstream service-module hints — sourced from the ONE shared taxonomy
+# (shared/service_benefit_taxonomy.json). [F14] This used to be one of three
+# inconsistent in-code alias maps; extend the JSON, not this module.
+SERVICE_MODULE_BENEFIT_KEYS: Dict[str, List[str]] = module_benefit_keys()
 
 CATEGORY_LABELS: Dict[str, str] = {
     "pre_assignment_support": "Pre-assignment support",
@@ -1872,6 +1842,13 @@ class PolicyConfigMatrixService:
     ) -> Dict[str, Any]:
         """
         Evaluate monetary provider estimates against applicable published caps for the same context.
+
+        [F14] Estimate lines may key on EITHER vocabulary: a canonical matrix
+        benefit_key, or a Services-catalog service key (housing/movers/schools/…)
+        which the shared taxonomy (shared/service_benefit_taxonomy.json) resolves
+        to its constituent benefit_keys. Before this, catalog-keyed lines never
+        matched a published cap (`no_cap_for_benefit_in_context`) and over-cap —
+        the Policy Exception trigger — could not fire.
         """
         from .policy_config_cap_compare import evaluate_estimates_against_caps
 
@@ -1880,6 +1857,9 @@ class PolicyConfigMatrixService:
             k = str(e.get("benefit_key") or "").strip()
             if k:
                 keys.add(k)
+                # Widen the caps fetch to the taxonomy-mapped benefit_keys so a
+                # service-keyed estimate can be aggregated against real caps.
+                keys.update(benefit_keys_for_service(k))
         benefit_keys: Optional[List[str]] = sorted(keys) if keys else None
 
         bundle = self.caps_payload(
@@ -1889,5 +1869,9 @@ class PolicyConfigMatrixService:
             benefit_keys=benefit_keys,
             service_module=None,
         )
-        results = evaluate_estimates_against_caps(estimates, bundle["caps"])
+        results = evaluate_estimates_against_caps(
+            estimates,
+            bundle["caps"],
+            service_key_resolver=benefit_keys_for_service,
+        )
         return {"metadata": bundle["metadata"], "results": results}

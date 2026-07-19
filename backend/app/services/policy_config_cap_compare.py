@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .policy_config_matrix_service import _normalize_cap_rule
 
@@ -289,13 +289,86 @@ def compare_provider_estimate_to_normalized_cap(
     }
 
 
+def aggregate_service_currency_cap(
+    service_key: str,
+    benefit_keys: List[str],
+    caps_by_key: Dict[str, Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    [F14] Roll several published currency caps up into ONE synthetic normalized cap
+    for a Services-catalog key that the shared taxonomy maps to multiple benefit_keys
+    (e.g. movers → shipment_of_goods + removal_expenses + storage). Mirrors the
+    budget-summary rollup in cases_read._budget_categories_from_policy_config, but
+    refuses (NORMALIZED_UNSUPPORTED) instead of guessing when the matched caps mix
+    currencies. Returns None when none of the mapped keys has a published cap.
+    """
+    matched = [caps_by_key[k] for k in benefit_keys if k in caps_by_key]
+    if not matched:
+        return None
+
+    total = 0.0
+    currency: Optional[str] = None
+    matched_keys: List[str] = []
+    for cap in matched:
+        matched_keys.append(str(cap.get("benefit_key") or ""))
+        if (
+            cap.get("normalized_cap_type") != NORMALIZED_CURRENCY_AMOUNT
+            or cap.get("normalized_amount") is None
+        ):
+            # A percentage / qualitative cap cannot be summed into a spendable
+            # allowance — same refusal the budget summary makes.
+            continue
+        cap_cur = str(cap.get("currency_code") or "").strip().upper()
+        if currency is None:
+            currency = cap_cur
+        elif cap_cur and cap_cur != currency:
+            return {
+                "benefit_key": service_key,
+                "matched_benefit_keys": matched_keys,
+                "normalized_cap_type": NORMALIZED_UNSUPPORTED,
+                "normalized_amount": None,
+                "currency_code": None,
+                "comparison_note": "mixed_currency_caps_for_service",
+            }
+        try:
+            total += float(cap["normalized_amount"])
+        except (TypeError, ValueError):
+            continue
+
+    if currency is None:
+        # Caps matched, but none was a currency amount → not a monetary cap.
+        return {
+            "benefit_key": service_key,
+            "matched_benefit_keys": matched_keys,
+            "normalized_cap_type": NORMALIZED_NO_MONETARY_CAP,
+            "normalized_amount": None,
+            "currency_code": None,
+            "comparison_note": "no_currency_cap_among_mapped_benefits",
+        }
+
+    return {
+        "benefit_key": service_key,
+        "matched_benefit_keys": matched_keys,
+        "normalized_cap_type": NORMALIZED_CURRENCY_AMOUNT,
+        "normalized_amount": total,
+        "currency_code": currency,
+    }
+
+
 def evaluate_estimates_against_caps(
     estimates: List[Dict[str, Any]],
     caps: List[Dict[str, Any]],
+    service_key_resolver: Optional[Callable[[str], List[str]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Batch compare provider lines to a pre-built normalized caps list.
     Each estimate dict: benefit_key, amount, currency (any extra keys preserved in output under _extra).
+
+    [F14] ``service_key_resolver`` maps a Services-catalog key (e.g. 'movers',
+    'schools', 'banks') to the canonical policy benefit_keys it is capped by (the
+    shared taxonomy). A direct benefit_key cap match always wins; the resolver only
+    runs when the estimate's key has no published cap of its own — so estimates may
+    speak EITHER vocabulary and still land on a real cap, letting over-cap fire.
     """
     by_key: Dict[str, Dict[str, Any]] = {}
     for c in caps:
@@ -317,6 +390,13 @@ def evaluate_estimates_against_caps(
             )
             continue
         cap = by_key.get(bk)
+        matched_benefit_keys: Optional[List[str]] = None
+        if not cap and service_key_resolver is not None:
+            mapped = [k for k in (service_key_resolver(bk) or []) if k]
+            if mapped:
+                cap = aggregate_service_currency_cap(bk, mapped, by_key)
+                if cap:
+                    matched_benefit_keys = list(cap.get("matched_benefit_keys") or [])
         if not cap:
             results.append(
                 {
@@ -338,5 +418,7 @@ def evaluate_estimates_against_caps(
             "normalized_cap_type": cap.get("normalized_cap_type"),
             **comp,
         }
+        if matched_benefit_keys:
+            row["matched_benefit_keys"] = matched_benefit_keys
         results.append(row)
     return results
