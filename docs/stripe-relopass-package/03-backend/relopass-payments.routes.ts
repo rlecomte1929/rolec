@@ -8,6 +8,12 @@
 // Registration — in server/routes/api/index.ts:
 //   import relopassPaymentsRouter from './relopass-payments.routes';
 //   router.use('/api', relopassPaymentsRouter);
+//
+// NOTE (2026-07-19): this file was previously truncated (the source
+// instruction was cut off mid-handler). It has been completed to match the
+// full spec — see 00-stripe-integration-spec.md sections 5-6. The canonical
+// copy lives in the GitHub repo rlecomte1929/rolec under
+// docs/stripe-relopass-package/03-backend/.
 
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
