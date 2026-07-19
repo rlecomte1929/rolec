@@ -102,6 +102,28 @@ class TestRecipientResolvesAcrossTiers:
         _wire_engine(monkeypatch, assigned=None, company=None)
         assert svc.resolve_hr_recipient("c1") is None
 
+    def test_company_with_emailable_hr_is_never_unreachable(self, monkeypatch):
+        # [AIQ-1624] The guarantee codified: whenever the case's company has ANY emailable HR
+        # (tier-2 resolves, even with no assignment), resolve_hr_recipient returns a recipient
+        # — the case is never 'unreachable'. Only a company with genuinely zero reachable HR
+        # yields None, which the ops surface turns into an explicit action.
+        _wire_engine(monkeypatch, assigned=None, company=_Row(
+            {"email": "companyhr@x.com", "hr_name": "Company HR", "employee_name": ""}))
+        assert svc.resolve_hr_recipient("c-any") is not None
+
+
+class TestUnreachableOpsAction:
+    """[AIQ-1624] A genuinely unreachable roadmap is an explicit ops action, not a silent status."""
+
+    def test_reason_mapping(self):
+        from backend.app.routers.hr_roadmap_review import _unreachable_reason
+        # No company on the case → link it to a company first.
+        assert _unreachable_reason(None, False) == "link_case_to_company"
+        # Company exists but has zero HR → assign an HR to the company.
+        assert _unreachable_reason("co-1", False) == "assign_hr_to_company"
+        # Company has HR but none is reachable (no email) → fix the HR contact.
+        assert _unreachable_reason("co-1", True) == "fix_hr_contact"
+
 
 class TestAnUnreachableHrIsRecordedNotSwallowed:
     """10 of the 47 cases with a roadmap resolve to NO HR email (no case_assignments row,
