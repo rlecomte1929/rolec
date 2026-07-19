@@ -9969,6 +9969,73 @@ def _resolve_published_policy_for_employee(
             )
         except Exception:
             pass
+    # [AIQ-1631] A config-matrix-sourced resolution (every test-drive case, and any real
+    # company on the config-matrix authoring path) carries its benefits INLINE with a
+    # precomputed readiness and has NO persisted resolved_assignment_policies row, so
+    # `resolved.get("id")` is None. The `rid` gate below would then drop it to
+    # has_policy=False and every Services card would read "No policy rule" — even though
+    # the comparison service, which handles this source directly, already reports the
+    # policy as active. Mirror that inline handling here so the two agree. Benefit rows
+    # are aliased onto their legacy benefit_key vocabulary (the same translation the
+    # comparison service applies) so build_employee_services_policy_context's per-category
+    # lookups match. Matrix policies have no policy_version_id, so we skip the persisted-
+    # benefit re-query entirely and trust the inline rows.
+    is_matrix_policy = (
+        (resolved.get("resolution_context") or {}).get("source") == "policy_config_matrix"
+    )
+    if is_matrix_policy:
+        from .app.services.policy_service_comparison import _with_legacy_benefit_key_aliases
+
+        m_policy = resolved.get("policy") or {}
+        m_readiness = resolved.get("comparison_readiness_precalc") or {"comparison_ready": True}
+        m_benefits = (
+            _with_legacy_benefit_key_aliases(resolved.get("benefits") or [])
+            if m_readiness.get("comparison_ready")
+            else []
+        )
+        m_exclusions = resolved.get("exclusions") or []
+        company = db.get_company(company_id_used) if company_id_used else None
+        company_name = (company or {}).get("name") if company else None
+        log.info(
+            "employee_policy resolved(matrix) request_id=%s assignment_id=%s case_id=%s company_id=%s policy_id=%s has_policy=true comparison_ready=%s",
+            request_id,
+            assignment_id,
+            case_id,
+            company_id_used,
+            m_policy.get("id"),
+            m_readiness.get("comparison_ready"),
+        )
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": True,
+                "company_id": company_id_used,
+                "policy_id": resolved.get("policy_id") or m_policy.get("id"),
+                "version_id": None,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "policy": {
+                    "id": m_policy.get("id"),
+                    "title": m_policy.get("title"),
+                    "version": m_policy.get("version"),
+                    "effective_date": m_policy.get("effective_date"),
+                    "company_name": company_name,
+                },
+                "benefits": m_benefits,
+                "exclusions": m_exclusions,
+                "resolved_at": resolved.get("resolved_at"),
+                "resolution_context": resolved.get("resolution_context") or {},
+            },
+            comparison_readiness_precalc=m_readiness,
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
     rid = resolved.get("id")
     if not rid:
         return _finalize_employee_policy_resolution(
