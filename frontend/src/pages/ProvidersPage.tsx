@@ -189,11 +189,19 @@ export const ProvidersPage: React.FC = () => {
   // Apply button (the select writes straight to displayCurrency).
 
   // Only a REAL published-policy currency is authoritative. The policy-context
-  // endpoint returns currency: "USD" even when has_policy is false, so gate on
-  // has_policy — otherwise this applies the meaningless USD default and persists
-  // it, which is the AIQ-1327 bug (the destination default below never fires).
+  // endpoint returns currency: "USD" even when has_policy is false (AIQ-1327),
+  // AND — even when has_policy is true — it returns the USD placeholder
+  // (backend DEFAULT_CURRENCY) whenever no benefit row actually pins a currency,
+  // e.g. the seeded default test-drive policy. A bare "USD" is meaningless either
+  // way, so it must NOT set USD here nor block the destination-derived default
+  // below (that was the AIQ-1630 re-open: FR→NO cases stayed USD instead of NOK).
+  // Only a deliberate, non-USD policy currency wins.
   const policyCurrency =
-    svcPolicy?.has_policy && svcPolicy?.currency ? String(svcPolicy.currency) : null;
+    svcPolicy?.has_policy &&
+    svcPolicy?.currency &&
+    String(svcPolicy.currency).trim().toUpperCase() !== 'USD'
+      ? String(svcPolicy.currency)
+      : null;
   useEffect(() => {
     if (!policyCurrency) return;
     try {
