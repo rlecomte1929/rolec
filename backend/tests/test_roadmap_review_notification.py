@@ -252,3 +252,72 @@ class TestDryRunSendsNothing:
         assert out["status"] == "dry_run"
         assert out["would_send_to"] == "hr@acme.com"
         assert sent == []
+
+
+class TestFallbackToAdminWhenNoHr:
+    """[AIQ-1609] When no HR resolves, the notification must not silently drop — it falls back
+    to the admin allowlist so someone actionable is always reached. Only a case with no HR AND
+    no admin recipient stays 'unreachable'."""
+
+    def _admins(self, monkeypatch, emails):
+        monkeypatch.setattr(
+            "backend.app.services.admin_notify.resolve_admin_emails", lambda: list(emails)
+        )
+
+    def test_no_hr_but_admin_allowlist_gets_the_fallback(self, monkeypatch):
+        recorded = _stub_db(monkeypatch, recipient=None)
+        self._admins(monkeypatch, ["ops@relopass.com"])
+        sent = []
+        monkeypatch.setattr(
+            "backend.app.services.assignment_invite_email._resend_send",
+            lambda **kw: sent.append(kw) or {"status": "sent"},
+        )
+
+        out = svc.notify_hr_roadmap_pending("c1")
+
+        assert out["status"] == "fallback"
+        assert out["to"] == ["ops@relopass.com"]
+        assert recorded["status"] == "fallback", "a fallback send must be RECORDED as delivered"
+        assert recorded["to"] == "ops@relopass.com"
+        assert len(sent) == 1 and sent[0]["to_email"] == "ops@relopass.com"
+
+    def test_fallback_marks_the_case_notified(self, monkeypatch):
+        """`_record`'s delivered tuple now includes 'fallback', so notified_at is stamped and the
+        next sweep won't re-send."""
+        assert svc._STATUS_FALLBACK == "fallback"
+        # delivered-status set is what _record uses to decide notified_at.
+        from backend.app.services.roadmap_review_notification import (
+            _STATUS_SENT, _STATUS_NO_KEY, _STATUS_FALLBACK,
+        )
+        assert _STATUS_FALLBACK in (_STATUS_SENT, _STATUS_NO_KEY, _STATUS_FALLBACK)
+
+    def test_no_hr_and_no_admin_is_still_unreachable(self, monkeypatch):
+        recorded = _stub_db(monkeypatch, recipient=None)
+        self._admins(monkeypatch, [])
+        sent = []
+        monkeypatch.setattr(
+            "backend.app.services.assignment_invite_email._resend_send",
+            lambda **kw: sent.append(kw) or {"status": "sent"},
+        )
+
+        out = svc.notify_hr_roadmap_pending("c1")
+
+        assert out["status"] == "unreachable"
+        assert recorded["status"] == "unreachable"
+        assert sent == [], "no admin recipient → nothing sent"
+
+    def test_fallback_dry_run_sends_nothing(self, monkeypatch):
+        _stub_db(monkeypatch, recipient=None)
+        self._admins(monkeypatch, ["ops@relopass.com"])
+        sent = []
+        monkeypatch.setattr(
+            "backend.app.services.assignment_invite_email._resend_send",
+            lambda **kw: sent.append(kw) or {"status": "sent"},
+        )
+
+        out = svc.notify_hr_roadmap_pending("c1", dry_run=True)
+
+        assert out["status"] == "dry_run"
+        assert out["would_send_to"] == ["ops@relopass.com"]
+        assert out.get("fallback") is True
+        assert sent == []
