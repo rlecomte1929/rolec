@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _main_db():
-    from ....database import db  # type: ignore[import]
+    from ...database import db  # type: ignore[import]
     return db
 
 

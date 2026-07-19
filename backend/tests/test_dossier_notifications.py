@@ -369,5 +369,18 @@ class TestDeadlineCron(NotifTestBase):
         self.assertEqual(result["reminded"], 2)
 
 
+class MainDbLazyImportTests(unittest.TestCase):
+    """The lazy `_main_db()` import must reach backend.database. A stray 4-dot relative
+    import ('from ....database') goes above the top-level package and raises 'attempted
+    relative import beyond top-level package' at context-load time — which broke every
+    dossier notification in prod while the request still returned 200 (the error is
+    swallowed). This exercises the REAL import (not the patched engine other tests use)."""
+
+    def test_main_db_relative_import_resolves(self):
+        import backend.app.services.dossier_notifications as dn
+        # Must not raise ImportError('attempted relative import beyond top-level package').
+        self.assertIsNotNone(dn._main_db())
+
+
 if __name__ == "__main__":
     unittest.main()
