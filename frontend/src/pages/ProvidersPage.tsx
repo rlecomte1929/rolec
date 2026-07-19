@@ -49,7 +49,10 @@ function policyHintFromCategory(entry: ServicesCategoryEntry | undefined): Servi
   else if (
     determination === 'out_of_scope' ||
     determination === 'no_published_policy' ||
-    determination === 'no_benefit_rule'
+    determination === 'no_benefit_rule' ||
+    // [P0-1] Degraded state: resolution failed, so the policy is UNKNOWN — the card
+    // shows "Policy comparison unavailable" instead of asserting a missing rule.
+    determination === 'policy_unavailable'
   )
     variant = 'muted';
   else variant = 'partial';

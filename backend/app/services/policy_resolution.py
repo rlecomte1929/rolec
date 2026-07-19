@@ -11,6 +11,7 @@ using assignment context (type, family status, destination, duration, tier).
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -23,6 +24,34 @@ from .policy_hr_rule_override_layer import (
 from .policy_taxonomy import ASSIGNMENT_TYPE_MAP, FAMILY_STATUS_MAP, get_benefit_meta
 
 log = logging.getLogger(__name__)
+
+# [P0-1] Stable event tokens for STRUCTURED policy failures. A grep/alert on these
+# tokens finds every non-business failure of the resolution pipeline; a plain
+# "no published policy" outcome never emits them. Keep the tokens stable — the
+# test-drive runbook and log-based alerting key on them.
+POLICY_RESOLUTION_ERROR_EVENT = "policy_resolution_error"
+POLICY_PERSISTENCE_ERROR_EVENT = "policy_resolution_persistence_error"
+
+
+def log_structured_policy_error(
+    event: str,
+    *,
+    exc: Optional[BaseException] = None,
+    **fields: Any,
+) -> None:
+    """Emit one machine-parseable ERROR line for a policy-pipeline failure.
+
+    Shape: ``<event> key=value ...`` at ERROR level with traceback. This is the
+    counterpart of the silent ``log.warning`` swallows this module used to rely
+    on: a monitoring rule on ``event`` distinguishes "the pipeline broke" from
+    the legitimate business outcome "this company has no policy" (which stays
+    at INFO).
+    """
+    parts = [event] + [f"{k}={v}" for k, v in fields.items() if v is not None]
+    if exc is not None:
+        parts.append(f"error_type={exc.__class__.__name__}")
+        parts.append(f"error={exc}")
+    log.error(" ".join(str(p) for p in parts), exc_info=exc is not None)
 
 
 def _normalize_assignment_type(raw: Optional[str]) -> str:
@@ -700,6 +729,81 @@ def resolve_benefits_matrix_for_version(
     return resolved
 
 
+def persist_matrix_resolution(
+    db: Any,
+    assignment_id: str,
+    resolved_matrix: Dict[str, Any],
+    ctx: Dict[str, Any],
+    *,
+    matrix_company_id: str,
+    matrix_version_id: str,
+    case_id: Optional[str],
+    canonical_case_id: Optional[str],
+) -> Optional[str]:
+    """[P0-1] Persist a config-matrix resolution into ``resolved_assignment_policies``.
+
+    Historically only the legacy company_policies/policy_versions path persisted a
+    resolved snapshot; matrix resolutions stayed in-memory, so every test-drive case
+    (matrix-only company) had NO resolved row and the Services page re-derived policy
+    on every read — and rendered "No policy rule" whenever that re-derivation failed.
+
+    Persisting gives matrix companies the same eager Layer-2 snapshot. The row is
+    marked with ``resolution_context.source = "policy_config_matrix"`` and
+    ``policy_id = "policy_config_matrix:<version_id>"`` so readers can discriminate
+    it from a legacy resolution (see ``is_matrix_resolved_row``).
+
+    Best-effort by design: this is a cache write. On failure it emits a STRUCTURED
+    error (never a silent warning) and returns None — the in-memory resolution the
+    caller already holds keeps the request path working. NOTE: if the production
+    ``resolved_assignment_policies`` table still carries the strict FK shape from
+    ``20260403000000_policy_engine_reconciliation.sql`` (policy_id → company_policies,
+    policy_version_id → policy_versions), this write is rejected there and the error
+    below fires on every attempt — that is the signal that the human-gated FK
+    relaxation migration is still outstanding.
+    """
+    ctx_with_source = dict(ctx or {})
+    ctx_with_source.setdefault("source", "policy_config_matrix")
+    try:
+        rid = db.upsert_resolved_assignment_policy(
+            assignment_id=assignment_id,
+            case_id=case_id,
+            company_id=str(matrix_company_id),
+            policy_id=f"policy_config_matrix:{matrix_version_id}",
+            policy_version_id=str(matrix_version_id),
+            canonical_case_id=canonical_case_id or case_id,
+            resolution_status="ok",
+            resolution_context=ctx_with_source,
+            benefits=list(resolved_matrix.get("benefits") or []),
+            exclusions=list(resolved_matrix.get("exclusions") or []),
+        )
+        return str(rid) if rid else None
+    except Exception as exc:  # noqa: BLE001 — cache write must not break resolution
+        log_structured_policy_error(
+            POLICY_PERSISTENCE_ERROR_EVENT,
+            exc=exc,
+            assignment_id=assignment_id,
+            company_id=matrix_company_id,
+            policy_config_version_id=matrix_version_id,
+            source="policy_config_matrix",
+        )
+        return None
+
+
+def is_matrix_resolved_row(resolved: Optional[Dict[str, Any]]) -> bool:
+    """True when a resolution (in-memory or persisted row) came from the config matrix."""
+    if not isinstance(resolved, dict):
+        return False
+    ctx = (
+        resolved.get("resolution_context")
+        or resolved.get("resolution_context_json")
+        or {}
+    )
+    if isinstance(ctx, dict) and ctx.get("source") == "policy_config_matrix":
+        return True
+    pid = str(resolved.get("policy_id") or "")
+    return pid.startswith("policy_config_matrix:")
+
+
 def resolve_policy_for_assignment(
     db: Any,
     assignment_id: str,
@@ -752,6 +856,21 @@ def resolve_policy_for_assignment(
             # policy_version-based evaluator (a matrix policy has no policy_version_id).
             if isinstance(resolved_matrix, dict):
                 resolved_matrix["comparison_readiness_precalc"] = readiness
+                # [P0-1] Give matrix companies the same eager resolved snapshot the
+                # legacy path has always written (best-effort; structured error inside).
+                if resolved_matrix.get("has_policy"):
+                    rid = persist_matrix_resolution(
+                        db,
+                        assignment_id,
+                        resolved_matrix,
+                        ctx,
+                        matrix_company_id=str(matrix_cid),
+                        matrix_version_id=str(matrix_version.get("id") or ""),
+                        case_id=(case.get("id") if case else assignment.get("case_id")),
+                        canonical_case_id=assignment.get("canonical_case_id"),
+                    )
+                    if rid:
+                        resolved_matrix["id"] = rid
             return resolved_matrix
 
         log.info(
@@ -774,3 +893,80 @@ def resolve_policy_for_assignment(
         version_row=version,
         persist_resolution=True,
     )
+
+
+def ensure_resolved_policy_for_assignment(
+    db: Any,
+    assignment_id: str,
+    *,
+    request_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """[P0-1] EAGER policy resolution — run as an assignment post-creation hook.
+
+    Loads the assignment context itself (so ``run_assignment_post_creation_hooks``
+    can call it with just the id) and resolves + persists the published policy at
+    CREATION time instead of waiting for the first read. The lazy resolve-on-read
+    fallbacks in ``backend/main.py`` / ``policy_service_comparison`` stay in place
+    as belt-and-braces, but after this hook they should almost always cache-hit.
+
+    Contract:
+      * already-resolved assignment → returns the existing row untouched (idempotent);
+      * "this company has no published policy" → returns None, logged at INFO
+        (a legitimate business state, NOT an error);
+      * any exception in the pipeline → returns None and emits ONE structured
+        ERROR (``policy_resolution_error``) — never a silent warning, and never
+        raises into the other creation hooks.
+    """
+    try:
+        existing = db.get_resolved_assignment_policy(assignment_id)
+        if existing:
+            return existing
+    except Exception:  # noqa: BLE001 — a broken cache read must not block resolution
+        pass
+
+    try:
+        assignment = db.get_assignment_by_id(assignment_id)
+        if not assignment:
+            log_structured_policy_error(
+                POLICY_RESOLUTION_ERROR_EVENT,
+                stage="assignment_post_creation",
+                reason="assignment_not_found",
+                assignment_id=assignment_id,
+                request_id=request_id,
+            )
+            return None
+        case_id = assignment.get("case_id")
+        case = db.get_relocation_case(case_id) if case_id else None
+        profile: Optional[Dict[str, Any]] = None
+        if case and case.get("profile_json"):
+            try:
+                raw = case["profile_json"]
+                profile = json.loads(raw) if isinstance(raw, str) else raw
+            except Exception:  # noqa: BLE001 — malformed draft JSON must not block resolution
+                profile = None
+        try:
+            employee_profile = db.get_employee_profile(assignment_id)
+        except Exception:  # noqa: BLE001
+            employee_profile = None
+
+        resolved = resolve_policy_for_assignment(
+            db, assignment_id, assignment, case, profile, employee_profile
+        )
+        if resolved is None:
+            # Legitimate business outcome (company has no published policy yet) —
+            # deliberately NOT an error; see log_structured_policy_error docstring.
+            log.info(
+                "policy_resolution: eager hook found no policy assignment_id=%s request_id=%s",
+                assignment_id,
+                request_id,
+            )
+        return resolved
+    except Exception as exc:  # noqa: BLE001 — hooks must never break assignment creation
+        log_structured_policy_error(
+            POLICY_RESOLUTION_ERROR_EVENT,
+            exc=exc,
+            stage="assignment_post_creation",
+            assignment_id=assignment_id,
+            request_id=request_id,
+        )
+        return None

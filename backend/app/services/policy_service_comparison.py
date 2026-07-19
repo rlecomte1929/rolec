@@ -347,24 +347,25 @@ def compute_policy_service_comparison(
 
     comparison_readiness = None
     legacy_comparisons_suppressed = False
-    # [Bridge ii] A config-matrix-sourced resolved policy carries its benefits inline and a
-    # precomputed readiness — it has no persisted policy_version_id / resolved_policy_benefits
-    # rows, so the policy_version-based readiness + DB benefit re-query don't apply to it.
-    is_matrix_policy = (resolved.get("resolution_context") or {}).get("source") == "policy_config_matrix"
-    if employee_gate:
-        if is_matrix_policy:
-            comparison_readiness = resolved.get("comparison_readiness_precalc") or {"comparison_ready": True}
-        else:
-            from .policy_comparison_readiness import evaluate_version_comparison_readiness
+    # [Bridge ii] A config-matrix-sourced resolved policy carries a precomputed readiness
+    # and benefits keyed by the matrix vocabulary. It used to exist ONLY in-memory; since
+    # [P0-1] eager resolution it may ALSO be a persisted resolved_assignment_policies row
+    # (discriminated by resolution_context.source / the "policy_config_matrix:" policy_id
+    # prefix — see is_matrix_resolved_row). Either way the policy_version-based readiness
+    # evaluator does not apply to it: its policy_version_id is a policy_config version.
+    from .policy_resolution import is_matrix_resolved_row
 
-            pvid = resolved.get("policy_version_id")
-            comparison_readiness = evaluate_version_comparison_readiness(db, str(pvid) if pvid else None)
-        if not comparison_readiness.get("comparison_ready"):
-            legacy_comparisons_suppressed = True
+    is_matrix_policy = is_matrix_resolved_row(resolved)
 
     if is_matrix_policy:
+        raw_matrix_benefits = resolved.get("benefits")
+        if not raw_matrix_benefits and resolved.get("id"):
+            # Persisted matrix row (eager-resolution cache hit): benefits live in
+            # resolved_assignment_policy_benefits like any legacy resolution.
+            raw_matrix_benefits = db.list_resolved_policy_benefits(resolved["id"])
+        raw_matrix_benefits = list(raw_matrix_benefits or [])
         benefits = _with_legacy_benefit_key_aliases(
-            _synthesize_matrix_rule_readiness(resolved.get("benefits") or [])
+            _synthesize_matrix_rule_readiness(raw_matrix_benefits)
         )
     else:
         benefits = db.list_resolved_policy_benefits(resolved["id"])
@@ -373,6 +374,36 @@ def compute_policy_service_comparison(
             from .policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
 
             benefits = enrich_resolved_benefits_with_rule_comparison(db, str(pvid), benefits)
+
+    if employee_gate:
+        if is_matrix_policy:
+            comparison_readiness = resolved.get("comparison_readiness_precalc")
+            if not comparison_readiness:
+                # Persisted matrix rows don't carry the precalc — synthesize it with the
+                # same rule the matrix bridge uses (any positive numeric cap ⇒ ready).
+                def _is_positive_number(v: Any) -> bool:
+                    try:
+                        return v is not None and float(v) > 0
+                    except (TypeError, ValueError):
+                        return False
+
+                has_numeric_cap = any(
+                    _is_positive_number(b.get(k))
+                    for b in benefits
+                    for k in ("max_value", "standard_value")
+                )
+                comparison_readiness = {
+                    "comparison_ready": has_numeric_cap,
+                    "comparison_blockers": [] if has_numeric_cap else ["MATRIX_NO_SERVICE_CATEGORY_CAPS"],
+                    "partial_numeric_coverage": has_numeric_cap,
+                }
+        else:
+            from .policy_comparison_readiness import evaluate_version_comparison_readiness
+
+            pvid = resolved.get("policy_version_id")
+            comparison_readiness = evaluate_version_comparison_readiness(db, str(pvid) if pvid else None)
+        if not comparison_readiness.get("comparison_ready"):
+            legacy_comparisons_suppressed = True
     benefits_by_key: Dict[str, Dict] = {b.get("benefit_key"): b for b in benefits if b.get("benefit_key")}
 
     # Selected services and answers

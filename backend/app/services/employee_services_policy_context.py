@@ -24,6 +24,47 @@ SERVICES_WIZARD_KEYS: Tuple[str, ...] = (
     "electricity",
 )
 
+# [P0-1] Degraded-state copy: shown when policy RESOLUTION FAILED (an error), which is a
+# different fact from "your published policy has no rule for this category" (a business
+# statement that is only true when resolution actually succeeded). Keep the two labels
+# distinct — the test-drive runbook asserts on them.
+POLICY_UNAVAILABLE_LABEL = "Policy comparison unavailable"
+POLICY_UNAVAILABLE_DETAIL = (
+    "We couldn't load your company's policy right now, so limits and comparisons are "
+    "temporarily hidden. You can still review services and costs — try again shortly."
+)
+
+
+def build_policy_unavailable_categories() -> Dict[str, Any]:
+    """Per-category entries for the degraded (resolution-error) state.
+
+    Every comparable category gets determination='policy_unavailable' with the
+    POLICY_UNAVAILABLE_LABEL copy; out-of-scope categories keep their normal copy
+    (they are out of scope regardless of whether resolution worked).
+    """
+    categories: Dict[str, Any] = {}
+    for wkey in SERVICES_WIZARD_KEYS:
+        mapped = SERVICE_TO_BENEFIT.get(wkey)
+        if mapped == "out_of_scope" or mapped is None:
+            categories[wkey] = {
+                "wizard_key": wkey,
+                "benefit_key": None,
+                "determination": "out_of_scope",
+                "show_policy_comparison": False,
+                "primary_label": "Outside standard policy comparison",
+                "detail": "This category is not compared against relocation policy limits in ReloPass.",
+            }
+            continue
+        categories[wkey] = {
+            "wizard_key": wkey,
+            "benefit_key": mapped,
+            "determination": "policy_unavailable",
+            "show_policy_comparison": False,
+            "primary_label": POLICY_UNAVAILABLE_LABEL,
+            "detail": POLICY_UNAVAILABLE_DETAIL,
+        }
+    return categories
+
 
 def _best_benefit_for_key(benefits: List[Dict[str, Any]], benefit_key: str) -> Optional[Dict[str, Any]]:
     rows = [b for b in benefits if (b.get("benefit_key") or "") == benefit_key]
@@ -81,6 +122,21 @@ def build_employee_services_policy_context(resolution: Dict[str, Any]) -> Dict[s
         if b.get("currency"):
             currency = b.get("currency") or currency
             break
+
+    # [P0-1] Resolution ERRORED (policy_unavailable=True): the policy's existence is
+    # UNKNOWN, so neither "No published policy yet" nor "No policy rule for this
+    # category" is a fact we can assert. Degrade to the explicit unavailable state.
+    if not has_policy and resolution.get("policy_unavailable"):
+        return {
+            "ok": True,
+            "has_policy": False,
+            "policy_unavailable": True,
+            "comparison_available": False,
+            "comparison_readiness": resolution.get("comparison_readiness"),
+            "currency": currency,
+            "categories": build_policy_unavailable_categories(),
+            "source": "resolved_assignment_policy",
+        }
 
     categories: Dict[str, Any] = {}
 

@@ -2721,6 +2721,10 @@ interface ComparisonReadiness {
 interface ServicesPolicyContextResponse {
   ok?: boolean;
   has_policy?: boolean;
+  /** [P0-1] True when policy RESOLUTION FAILED (degraded state) — distinct from
+   *  has_policy=false, which asserts the company has no published policy. Categories
+   *  then carry determination='policy_unavailable' with "Policy comparison unavailable". */
+  policy_unavailable?: boolean;
   comparison_available?: boolean;
   comparison_readiness?: ComparisonReadiness;
   currency: string;

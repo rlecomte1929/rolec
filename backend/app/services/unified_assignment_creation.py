@@ -169,6 +169,15 @@ def run_assignment_post_creation_hooks(
         )
     # AIQ-1455: give every new assignment an inbox thread (idempotent).
     ensure_welcome_message_for_assignment(db, assignment_id, request_id=request_id)
+    # [P0-1] EAGER policy resolution: write the resolved_assignment_policies snapshot
+    # at creation instead of on first read. Idempotent (no-op when a row exists) and
+    # self-contained error handling — failures emit a structured `policy_resolution_error`
+    # inside the hook and never raise into the caller. The lazy resolve-on-read paths
+    # remain as fallback. Local import: policy_resolution pulls the policy service tree,
+    # which must not become an import-time dependency of assignment creation.
+    from .policy_resolution import ensure_resolved_policy_for_assignment
+
+    ensure_resolved_policy_for_assignment(db, assignment_id, request_id=request_id)
 
 
 def create_assignment_with_contact_and_invites(

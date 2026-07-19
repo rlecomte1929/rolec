@@ -207,7 +207,12 @@ def _make_user(username: str, email: str, password_hash: str, role: str, name: s
     return uid if created else None
 
 
-def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -> None:
+# [P0-1] Stable event token for a failed test-drive policy seed. Alerting/grep on this
+# token finds every seed failure; a successful seed never emits it. Keep it stable.
+TEST_DRIVE_POLICY_SEED_FAILED_EVENT = "test_drive_policy_seed_failed"
+
+
+def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -> bool:
     """[AIQ-1621] Publish a default benefits policy for a freshly provisioned test-drive
     company, so the employee benefit-comparison / over-cap flow is active without the tester
     having to build one.
@@ -216,20 +221,47 @@ def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -
     published baseline; `publish_draft` flips it to `status='published'`, which is exactly
     what `GET /api/hr/policy-config/published` reads. Test-drive-only by construction — this
     runs only inside `provision()`, which only ever creates `is_test` "Test Drive …"
-    companies; real accounts never reach it. Best-effort: a seed failure must never break
-    provisioning.
+    companies; real accounts never reach it.
+
+    Best-effort (a seed failure must never break provisioning) but NEVER SILENT [P0-1]:
+    every failure — including the publish "succeeding" without a published version
+    actually existing afterwards — emits ONE structured ERROR carrying the
+    ``test_drive_policy_seed_failed`` event token, so a broken seed is distinguishable
+    from "this company has no policy" in the logs. Returns True only when a published
+    policy-config version verifiably exists for the company after the seed.
     """
     try:
-        from ..services.policy_config_matrix_service import PolicyConfigMatrixService
+        from ..services.policy_config_matrix_service import (
+            CONFIG_KEY,
+            PolicyConfigMatrixService,
+        )
 
         svc = PolicyConfigMatrixService(db)
         svc.ensure_draft(company_id, created_by=created_by)
         svc.publish_draft(company_id, policy_version_id=None, created_by=created_by)
+        # Post-condition: publishing must leave a readable published version behind.
+        # Without this check a publish that silently no-ops (the RUN 001–003 failure
+        # class) would still log the success line below.
+        pub = db.get_latest_published_policy_config_version(str(company_id), CONFIG_KEY)
+        if not pub:
+            logger.error(
+                "%s company_id=%s reason=no_published_version_after_publish",
+                TEST_DRIVE_POLICY_SEED_FAILED_EVENT,
+                company_id,
+            )
+            return False
         logger.info("test-drive: seeded published default policy for company %s", company_id)
-    except Exception:  # noqa: BLE001
-        logger.warning(
-            "test-drive: default policy seed failed for company %s", company_id, exc_info=True
+        return True
+    except Exception as exc:  # noqa: BLE001 — best-effort, but the failure is structured
+        logger.error(
+            "%s company_id=%s error_type=%s error=%s",
+            TEST_DRIVE_POLICY_SEED_FAILED_EVENT,
+            company_id,
+            exc.__class__.__name__,
+            exc,
+            exc_info=True,
         )
+        return False
 
 
 @router.post("/provision")

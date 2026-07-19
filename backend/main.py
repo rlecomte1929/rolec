@@ -9947,19 +9947,31 @@ def _resolve_published_policy_for_employee(
         )
 
     resolved = None
+    resolution_errored = False
     try:
         resolved = resolve_policy_for_assignment(
             db, assignment_id, assignment, case, profile, employee_profile
         )
     except Exception as exc:
-        log.warning(
-            "employee_policy resolve_policy_for_assignment request_id=%s assignment_id=%s company_id_used=%s exc=%s",
-            request_id,
-            assignment_id,
-            company_id_used,
-            exc,
+        # [P0-1] A resolution EXCEPTION is a pipeline failure, not "this company has
+        # no policy" — emit a structured ERROR (stable event token) and mark the
+        # result as policy_unavailable so downstream copy degrades honestly instead
+        # of asserting an unpublished/no-rule business fact.
+        from .app.services.policy_resolution import (
+            POLICY_RESOLUTION_ERROR_EVENT,
+            log_structured_policy_error,
+        )
+
+        log_structured_policy_error(
+            POLICY_RESOLUTION_ERROR_EVENT,
+            exc=exc,
+            stage="employee_policy_read",
+            request_id=request_id,
+            assignment_id=assignment_id,
+            company_id=company_id_used,
         )
         resolved = None
+        resolution_errored = True
     if not resolved:
         return _finalize_employee_policy_resolution(
             db,
@@ -9970,6 +9982,8 @@ def _resolve_published_policy_for_employee(
                 "assignment_id": assignment_id,
                 "case_id": case_id,
                 "company_id_used": company_id_used,
+                # [P0-1] Distinguish "resolution broke" from "no policy exists".
+                "policy_unavailable": resolution_errored,
             },
             telemetry={
                 "request_id": request_id,
@@ -10403,15 +10417,26 @@ def get_employee_services_policy_context(
     except HTTPException:
         raise
     except Exception as exc:
-        log.warning(
-            "services_policy_context failed request_id=%s assignment_id=%s exc=%s",
-            request_id,
-            assignment_id,
-            exc,
+        # [P0-1] Structured error + a VISIBLE degraded state: every comparable category
+        # renders "Policy comparison unavailable" (policy_unavailable) instead of an
+        # empty categories map that downstream copy misreads as "no policy rule".
+        from .app.services.employee_services_policy_context import build_policy_unavailable_categories
+        from .app.services.policy_resolution import (
+            POLICY_RESOLUTION_ERROR_EVENT,
+            log_structured_policy_error,
+        )
+
+        log_structured_policy_error(
+            POLICY_RESOLUTION_ERROR_EVENT,
+            exc=exc,
+            stage="services_policy_context",
+            request_id=request_id,
+            assignment_id=assignment_id,
         )
         return {
             "ok": False,
             "has_policy": False,
+            "policy_unavailable": True,
             "comparison_available": False,
             "comparison_readiness": {
                 "comparison_ready": False,
@@ -10419,7 +10444,7 @@ def get_employee_services_policy_context(
                 "partial_numeric_coverage": False,
             },
             "currency": "USD",
-            "categories": {},
+            "categories": build_policy_unavailable_categories(),
             "source": "resolved_assignment_policy",
         }
 
