@@ -19,20 +19,22 @@ afterEach(() => {
   cleanup();
 });
 
-// AIQ-1600: the "What this means for employees" card (impact summary, primary
-// CTA row, per-employee compare panels, replacement-draft warning) was removed
-// from HrPolicyWorkspaceLayout per admin feedback. These tests now assert the
-// surviving sections: the starter onboarding card (no_policy), the "Working
-// draft" / "Replacement draft (not live)" panel (section C), and the "Active
-// policy (live)" card (section B). Publish wiring is exercised where it now
-// lives (HrPolicyReviewWorkspace), not in this presentational layout.
+// AIQ-1600 / AIQ-1588: the "What this means for employees" card AND the
+// starter-baseline onboarding card were removed from HrPolicyWorkspaceLayout.
+// The starter card moved UP to HrPolicyPageV2 (one consolidated, config-matrix
+// entry point — AIQ-1588). These tests now assert the surviving sections: the
+// "Working draft" / "Replacement draft (not live)" panel (section C) and the
+// "Active policy (live)" card (section B). Publish wiring is exercised where it
+// now lives (HrPolicyReviewWorkspace), not in this presentational layout.
 describe('HR policy lifecycle (product states)', () => {
   describe('A. no_policy', () => {
-    it('shows starter onboarding, no publish CTA, no employee comparison block', () => {
+    it('renders no publish CTA and no employee comparison; the starter card now lives in HrPolicyPageV2', () => {
       const model = resolveLayoutModelFromState('no_policy');
       expect(model.resolved.phase).toBe('no_policy');
       render(renderHrPolicyLayout(model));
-      expect(document.getElementById('hr-policy-starter-onboarding')).toBeInTheDocument();
+      // AIQ-1588: the starter-baseline onboarding card no longer renders in the
+      // layout — it was hoisted to HrPolicyPageV2's greenfield slot.
+      expect(document.getElementById('hr-policy-starter-onboarding')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^publish policy$/i })).not.toBeInTheDocument();
       expect(screen.queryByTestId('hr-policy-employee-compare')).not.toBeInTheDocument();
     });
@@ -138,13 +140,9 @@ describe('Edge: partial resolver output still drives the draft panel', () => {
         documentsCount={0}
         loading={false}
         reviewUnavailable={false}
-        starterTemplateBusy={null}
-        starterError={null}
-        onSelectStarterTemplate={noop}
         onUploadDocument={noop}
         onReviewDraft={noop}
         onReviewDraftReplacement={noop}
-        onScrollToStarterBaselines={noop}
         onAdjustBenefits={noop}
         onRequestPublishPreflight={noop}
         employeePreviewCompare={employeePreviewCompare}

@@ -2,7 +2,7 @@
  * HR Policy workspace — single operational surface: status → live → draft → preview → actions → (detail below).
  */
 import React, { useState } from 'react';
-import { Alert, Button, Card } from '../../components/antigravity';
+import { Button, Card } from '../../components/antigravity';
 import { AIQ1107_HIDE_SECTIONS } from './aiq1107Flags';
 import type { HrPolicyLifecycleContext } from './hrPolicyLifecycle';
 import {
@@ -10,8 +10,6 @@ import {
   HrPolicyWorkspaceResolved,
 } from './hrPolicyWorkspaceState';
 import { comparisonBlockerMessage } from './comparisonBlockerCopy';
-import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
-import type { StarterTemplateKey } from './starterPolicyCopy';
 import type { EmployeePreviewCompareModel } from './hrPolicyEmployeePreviewCompare';
 
 export type HrPolicyWorkspaceLayoutProps = {
@@ -29,14 +27,9 @@ export type HrPolicyWorkspaceLayoutProps = {
   hasPublishedMatrix?: boolean;
   /** True after policy-review fetch failed (normalized may still load). */
   reviewUnavailable?: boolean;
-  starterTemplateBusy: StarterTemplateKey | null;
-  starterError: string | null;
-  onSelectStarterTemplate: (key: StarterTemplateKey) => void | Promise<void>;
   onUploadDocument: () => void;
   onReviewDraft: () => void;
   onReviewDraftReplacement?: () => void;
-  /** Scroll to standard baseline card (no-policy primary path). */
-  onScrollToStarterBaselines?: () => void;
   onAdjustBenefits: () => void;
   /** Opens publish preflight modal (parent runs publish on confirm). */
   onRequestPublishPreflight?: () => void;
@@ -49,28 +42,19 @@ export type HrPolicyWorkspaceLayoutProps = {
 };
 
 export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = ({
-  // AIQ-1600: the "What this means for employees" card (impact summary, primary
-  // CTA row, per-employee compare, replacement-draft warning) was removed per
-  // admin feedback. The props that only fed that card (lifecycle,
-  // documentsCount, loading, reviewUnavailable, onReviewDraftReplacement,
-  // onScrollToStarterBaselines, onRequestPublishPreflight, publishBusy,
-  // publishDataReady, employeePreviewCompare) stay in the props type so callers
-  // compile unchanged, but are no longer consumed here.
+  // AIQ-1600 / AIQ-1588: several props (lifecycle, documentsCount, loading,
+  // reviewUnavailable, onReviewDraftReplacement, onScrollToStarterBaselines,
+  // onRequestPublishPreflight, publishBusy, publishDataReady,
+  // employeePreviewCompare, hasPublishedMatrix, and the starter-baseline props)
+  // stay in the props type so callers compile unchanged, but are no longer
+  // consumed here — the "What this means" card and the starter-baseline card
+  // both moved out (the latter up to HrPolicyPageV2, AIQ-1588).
   resolved,
-  starterTemplateBusy,
-  starterError,
-  onSelectStarterTemplate,
   onUploadDocument,
   onReviewDraft,
   onAdjustBenefits,
   onScrollToDraftReviewPanel,
-  hasPublishedMatrix = false,
 }) => {
-  // POLICY-UI/AIQ-1078: a matrix-published company with no canonical/document
-  // policy resolves to phase `no_policy`. A live policy DOES exist (the matrix,
-  // shown above), so suppress the onboarding "get started" framing here — the
-  // "Create a new policy version" section above is the correct add-a-version path.
-  const matrixOnlyLive = resolved.phase === 'no_policy' && hasPublishedMatrix;
   const [showAllIssues, setShowAllIssues] = useState(false);
   const issueLimit = showAllIssues ? 50 : 3;
   const visibleIssues = resolved.highlightIssues.slice(0, issueLimit);
@@ -82,21 +66,9 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           compare" on the policy landing carry the at-a-glance signal; canonical
           publish stays reachable via the publish controls below. */}
 
-      {/* Starter onboarding (no policy) — primary path. AIQ-1078: hidden when a
-          matrix policy is already live (the "Create a new policy version"
-          section above is the correct add-a-version entry point in that case). */}
-      {resolved.phase === 'no_policy' && !matrixOnlyLive && (
-        <div id="hr-policy-starter-onboarding" className="scroll-mt-4">
-          <StarterPolicyOnboardingCard
-            error={starterError}
-            busyTemplateKey={starterTemplateBusy}
-            onSelectTemplate={onSelectStarterTemplate}
-            onUploadDocument={onUploadDocument}
-          />
-        </div>
-      )}
-
-      {starterError && resolved.phase !== 'no_policy' && <Alert variant="error">{starterError}</Alert>}
+      {/* AIQ-1588: the starter-baseline onboarding card moved up to
+          HrPolicyPageV2 (one consolidated, config-matrix-seeding entry point,
+          high on the page for first-time HR). */}
 
       {/* B — Live policy detail */}
       {(resolved.phase === 'published' || resolved.publishedVersionNumber != null) && (

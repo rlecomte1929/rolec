@@ -20,6 +20,7 @@ import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/Hr
 import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
 import { HrBenefitMixOptimizerPage } from '../features/policy/HrBenefitMixOptimizerPage';
 import { policyConfigMatrixAPI } from '../api/client';
+import { usePolicyPublished } from '../hooks/usePolicyPublished';
 import { isNlPolicyBuilderEnabled } from '../featureFlags';
 import { DescribePolicyPanel } from '../features/policy-config/DescribePolicyPanel';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
@@ -213,7 +214,7 @@ export const HrPolicy: React.FC = () => {
           ? <HrPolicyQaTab />
           : (!adminCompanyId && activeTab === 'optimize')
           ? <HrBenefitMixOptimizerPage embedded />
-          : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} onNavigateToBuilder={() => setTab('builder')} />
+          : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} onNavigateToBuilder={() => setTab('builder')} onNavigateToFullBuilder={() => setTab('summary')} />
         }
       </div>
     </AppShell>
@@ -314,6 +315,10 @@ function PolicyNextStepCta({
   setTab: (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa') => void;
   onReviewPublish: () => void;
 }) {
+  // AIQ-1588: the 'policy' tab CTA hard-coded "This is your live, published
+  // policy" even with nothing published. Gate the copy on the canonical
+  // published-state read so a no-policy company sees a get-started nudge.
+  const published = usePolicyPublished();
   const config: { hint: string; actions: React.ReactNode } = (() => {
     if (activeTab === 'builder') {
       return {
@@ -336,10 +341,19 @@ function PolicyNextStepCta({
         ),
       };
     }
+    // 'policy' (Published policy) tab.
+    if (published === true) {
+      return {
+        hint: 'This is your live, published policy. Make changes in the Policy builder.',
+        actions: (
+          <Button size="sm" onClick={() => setTab('builder')}>Edit in Builder</Button>
+        ),
+      };
+    }
     return {
-      hint: 'This is your live, published policy. Make changes in the Policy builder.',
+      hint: "You don't have a published policy yet. Set one up in the Policy builder to activate it on every new case.",
       actions: (
-        <Button size="sm" onClick={() => setTab('builder')}>Edit in Builder</Button>
+        <Button size="sm" onClick={() => setTab('builder')}>Go to Policy builder</Button>
       ),
     };
   })();

@@ -9,9 +9,9 @@
  */
 import React, { useState } from 'react';
 import { Button, Card } from '../../components/antigravity';
-import { companyPolicyAPI } from '../../api/client';
 import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
 import { type StarterTemplateKey } from './starterPolicyCopy';
+import { applyStarterBaseline, parseStarterBaselineError } from './applyStarterBaseline';
 
 export const PolicyBuilderStarterTab: React.FC<{ onOpenFullBuilder: () => void }> = ({
   onOpenFullBuilder,
@@ -23,23 +23,18 @@ export const PolicyBuilderStarterTab: React.FC<{ onOpenFullBuilder: () => void }
     setError(null);
     setBusyTemplateKey(key);
     try {
-      await companyPolicyAPI.initializeFromTemplate({
-        template_key: key,
-        comparison_ready_structure: true,
-      });
-      // The baseline is created as a draft; the full builder (now on the
+      // AIQ-1588: seed the config-matrix draft (canonical subsystem the full
+      // builder edits). The baseline is a draft; the full builder (now on the
       // Benefits summary tab) is where HR reviews and publishes it.
+      await applyStarterBaseline(key);
       onOpenFullBuilder();
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: unknown } } };
-      const d = ax?.response?.data?.detail;
-      const msg =
-        d && typeof d === 'object' && d !== null && 'message' in d
-          ? String((d as { message?: string }).message)
-          : typeof d === 'string'
-            ? d
-            : 'Could not create baseline policy.';
-      setError(msg);
+      const { code, message } = parseStarterBaselineError(err);
+      setError(
+        code === 'draft_has_rows'
+          ? 'You already have a policy draft in progress. Open the full builder to apply a template there.'
+          : message,
+      );
     } finally {
       setBusyTemplateKey(null);
     }

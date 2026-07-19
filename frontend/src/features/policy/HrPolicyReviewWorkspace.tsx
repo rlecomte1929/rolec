@@ -16,7 +16,7 @@ import {
   type HrPolicyWorkspacePhase,
 } from './hrPolicyWorkspaceState';
 import { StarterPolicyDraftGuidance } from './StarterPolicyDraftGuidance';
-import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPolicyCopy';
+import { type StarterTemplateKey } from './starterPolicyCopy';
 import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
 import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
 import { formatPolicySourceCitation, getSourceProvenance } from './policySourceProvenance';
@@ -110,8 +110,6 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
   const [policyReview, setPolicyReview] = useState<Record<string, unknown> | null>(null);
-  const [starterTemplateBusy, setStarterTemplateBusy] = useState<StarterTemplateKey | null>(null);
-  const [starterError, setStarterError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [dataRefreshNonce, setDataRefreshNonce] = useState(0);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
@@ -640,44 +638,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     document.getElementById('hr-policy-draft-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const scrollToStarterBaselines = () => {
-    document.getElementById('hr-policy-starter-onboarding')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   const scrollToDraftReviewFull = () => {
     document.getElementById('hr-policy-draft-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleSelectStarterTemplate = async (key: StarterTemplateKey) => {
-    setStarterError(null);
-    setStarterTemplateBusy(key);
-    try {
-      const out = await companyPolicyAPI.initializeFromTemplate({
-        template_key: key,
-        comparison_ready_structure: true,
-      });
-      const newPid = out?.policy_id;
-      const pols = await loadDocumentsAndPolicies();
-      if (newPid && pols.some((p: { id?: string }) => p.id === newPid)) {
-        setSelectedPolicyId(newPid);
-      }
-      const label = STARTER_TEMPLATE_OPTIONS.find((o) => o.key === key)?.label ?? key;
-      setMessage(out?.message || `${label} baseline created. Review below and publish when ready.`);
-      setMessageVariant('success');
-    } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: unknown } } };
-      const d = ax?.response?.data?.detail;
-      const msg =
-        d && typeof d === 'object' && d !== null && 'message' in d
-          ? String((d as { message?: string }).message)
-          : typeof d === 'string'
-            ? d
-            : 'Could not create baseline policy.';
-      setStarterError(msg);
-    } finally {
-      setStarterTemplateBusy(null);
-    }
-  };
+  // AIQ-1588: the starter-baseline card + its handler moved up to HrPolicyPageV2
+  // (one consolidated, config-matrix-seeding entry point). It previously lived
+  // here (buried in the Detailed review) and seeded the legacy company_policies
+  // path via initializeFromTemplate.
 
   return (
     <div className="space-y-6" data-hr-policy-workspace="v2">
@@ -688,13 +656,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         documentsCount={documents.length}
         loading={Boolean(selectedPolicyId && loading)}
         reviewUnavailable={reviewUnavailable}
-        starterTemplateBusy={starterTemplateBusy}
-        starterError={starterError}
-        onSelectStarterTemplate={handleSelectStarterTemplate}
         onUploadDocument={scrollToIntake}
         onReviewDraft={scrollToMatrix}
         onReviewDraftReplacement={scrollToDraftPanel}
-        onScrollToStarterBaselines={scrollToStarterBaselines}
         onAdjustBenefits={scrollToMatrix}
         onRequestPublishPreflight={() => setPublishModalOpen(true)}
         publishBusy={publishBusy}
