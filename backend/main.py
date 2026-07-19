@@ -7641,8 +7641,17 @@ def get_hr_resolved_policy(
             "resolved": None,
             "message": "No published policy version for this company. Publish a policy in HR Policy Review.",
         }
-    benefits = db.list_resolved_policy_benefits(resolved["id"])
-    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    # [AIQ-1636] A config-matrix resolution is not persisted to resolved_assignment_policies
+    # (no top-level "id") and carries its benefits/exclusions inline; a legacy resolution has
+    # a persisted id whose rows must be re-queried. Guarding on .get("id") avoids the KeyError
+    # that 500'd this endpoint for every config-matrix (test-drive) company.
+    rid = resolved.get("id")
+    if rid:
+        benefits = db.list_resolved_policy_benefits(rid)
+        exclusions = db.list_resolved_policy_exclusions(rid)
+    else:
+        benefits = resolved.get("benefits") or []
+        exclusions = resolved.get("exclusions") or []
     return {
         "resolved": {
             **resolved,
@@ -7682,8 +7691,15 @@ def recompute_resolved_policy(
     )
     if not resolved:
         return {"resolved": None, "message": "No published policy. Publish a policy first."}
-    benefits = db.list_resolved_policy_benefits(resolved["id"])
-    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    # [AIQ-1636] Same as get_hr_resolved_policy: config-matrix resolutions have no persisted
+    # id and carry benefits inline; guard the re-query on .get("id").
+    rid = resolved.get("id")
+    if rid:
+        benefits = db.list_resolved_policy_benefits(rid)
+        exclusions = db.list_resolved_policy_exclusions(rid)
+    else:
+        benefits = resolved.get("benefits") or []
+        exclusions = resolved.get("exclusions") or []
     return {
         "resolved": {**resolved, "benefits": benefits, "exclusions": exclusions},
         "policy_version": resolved.get("version"),
