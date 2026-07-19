@@ -41,6 +41,9 @@ _STATUS_NO_KEY = "no_key"
 _STATUS_FAILED = "failed"
 _STATUS_ERROR = "error"
 _STATUS_UNREACHABLE = "unreachable"
+# [AIQ-1609] No HR resolved, but an admin-allowlist recipient was emailed instead — so the
+# notification reached someone actionable rather than being silently dropped.
+_STATUS_FALLBACK = "fallback"
 
 
 def _engine():
@@ -202,7 +205,7 @@ def _record(case_id: str, status: str, to_email: Optional[str]) -> None:
     A failed send therefore stays visibly undelivered rather than being marked done — the
     metrics can tell "we reached HR" apart from "we tried and didn't".
     """
-    delivered = status in (_STATUS_SENT, _STATUS_NO_KEY)
+    delivered = status in (_STATUS_SENT, _STATUS_NO_KEY, _STATUS_FALLBACK)
     try:
         with _engine().begin() as conn:
             conn.execute(
@@ -258,9 +261,54 @@ def notify_hr_roadmap_pending(
 
         recipient = resolve_hr_recipient(case_id)
         if not recipient:
-            # No HR contact resolves for this case. The employee is blocked and there is
-            # nobody to tell. Record it loudly — a silent skip is indistinguishable from
-            # a successful send.
+            # [AIQ-1609] No HR contact resolves for this case. Rather than silently drop the
+            # notification (the employee is blocked with nobody told), fall back to the platform
+            # admin allowlist so someone actionable is always reached. Only when there is no
+            # admin recipient either do we record the truly-unreachable state.
+            from .admin_notify import resolve_admin_emails
+
+            admins = resolve_admin_emails()
+            if admins:
+                if dry_run:
+                    return {
+                        "status": "dry_run",
+                        "case_id": case_id,
+                        "would_send_to": admins,
+                        "fallback": True,
+                    }
+                from .assignment_invite_email import _resend_send
+
+                subject = "Roadmap awaiting HR review — no HR recipient resolved"
+                # Low-PII body: identifiers only, no employee personal data.
+                plain = (
+                    "A relocation roadmap is held for HR review, but no HR contact could be "
+                    "resolved for this case.\n\n"
+                    f"Case: {case_id}\n"
+                    f"Corridor: {_corridor(case_id)}\n\n"
+                    "Please review it in the ReloPass command center and ensure the case has an "
+                    "assigned HR owner.\n\n— ReloPass"
+                )
+                sent_any = False
+                for addr in admins:
+                    res = _resend_send(
+                        to_email=addr,
+                        subject=subject,
+                        plain=plain,
+                        request_id=request_id,
+                        context="roadmap review fallback",
+                    )
+                    if str(res.get("status") or _STATUS_ERROR) in (_STATUS_SENT, _STATUS_NO_KEY):
+                        sent_any = True
+                if sent_any:
+                    _record(case_id, _STATUS_FALLBACK, ", ".join(admins))
+                    log.warning(
+                        "roadmap notify: NO HR RECIPIENT for case %s — sent FALLBACK to admin "
+                        "allowlist (%d recipient(s))", case_id, len(admins),
+                    )
+                    return {"status": _STATUS_FALLBACK, "case_id": case_id, "to": admins}
+
+            # No HR and no admin recipient — record loudly; a silent skip is indistinguishable
+            # from a successful send.
             _record(case_id, _STATUS_UNREACHABLE, None)
             log.warning(
                 "roadmap notify: NO HR RECIPIENT for case %s — employee is blocked with "

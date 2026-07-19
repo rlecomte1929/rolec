@@ -22,6 +22,12 @@ log = logging.getLogger(__name__)
 
 _is_sqlite = _raw_url.startswith("sqlite")
 
+# [AIQ-1610] Notification types that default to email-ON when the recipient has no explicit
+# notification_preferences row. An explicit preference still wins (opt-out is respected). This
+# makes the policy-exception → HR notification (POLICY_EXCEPTION_REQUESTED) actually enqueue an
+# outbox row by default, so the notification_outbox consumer delivers the over-cap alert to HR.
+_EMAIL_DEFAULT_ON = {"POLICY_EXCEPTION_REQUESTED"}
+
 
 class SupportMixin:
     """Support-domain methods mixed into :class:`backend.database.Database`."""
@@ -296,7 +302,9 @@ class SupportMixin:
         """6C: Create notification respecting preferences and muted_until. Returns notification id or None."""
         pref = self._get_notification_preference(user_id, type_)
         in_app = True
-        email = False
+        # [AIQ-1610] Default email on for opt-in-by-default types (e.g. policy-exception → HR);
+        # a stored preference below still overrides this.
+        email = type_ in _EMAIL_DEFAULT_ON
         muted_until = None
         if pref:
             in_app = pref.get("in_app") if pref.get("in_app") is not None else True

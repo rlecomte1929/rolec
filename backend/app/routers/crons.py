@@ -248,6 +248,25 @@ def roadmap_review_notify(request: Request, dry_run: bool = False) -> Dict[str, 
     return {"ok": True, **result}
 
 
+@router.post("/dispatch-outbox")
+def dispatch_outbox(request: Request) -> Dict[str, Any]:
+    """
+    [AIQ-1610] notification_outbox consumer (scheduled ~every 15 min via GitHub Actions /
+    .github/workflows/outbox-dispatch.yml).
+
+    The outbox is an email delivery queue with writers (milestone reminders, policy-exception
+    HR notifications) but no consumer, so rows accumulated undelivered. This sends each pending
+    row via Resend and marks it sent/failed. Idempotent — only 'pending' rows are picked up and
+    moved to a terminal state, so re-runs never re-send. Never raises; with no RESEND_API_KEY
+    sends are logged, not delivered.
+    """
+    _verify_cron_secret(request)
+    log.info("dispatch_outbox cron triggered")
+    from ..services.notification_outbox_dispatch import run_outbox_dispatch_cron
+
+    return {"ok": True, **run_outbox_dispatch_cron()}
+
+
 @router.post("/process-crawl-schedules")
 def process_crawl_schedules(request: Request) -> Dict[str, Any]:
     """
