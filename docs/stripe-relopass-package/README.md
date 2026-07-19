@@ -13,22 +13,22 @@ Tier 0 → Tier 1 gate inside Case Command:
 
 | Step | File | What it does |
 |------|------|-------------|
-| 1 | 02-database/migration_add_payment_to_cases.sql | Add payment columns to relocation_cases |
-| 2 | 02-database/migration_create_case_addons.sql | Create case_addons table |
-| 3 | 06-env/.env.example | Set all Stripe environment variables |
+| 1 | migration_add_payment_to_cases.sql | Add payment columns to relocation_cases |
+| 2 | migration_create_case_addons.sql | Create case_addons table |
+| 3 | .env.example | Set all Stripe environment variables |
 | 4 | Create Stripe products in Dashboard (test mode) | Get Price IDs for env vars |
-| 5 | 03-backend/relopass-payments.routes.ts | Add /checkout + /access endpoints |
-| 6 | 03-backend/webhook-extension.ts | Extend webhook for checkout.session.completed |
-| 7 | 04-frontend/hooks/useCaseAccess.ts | Access-tier hook |
-| 8 | 04-frontend/CaseGate.tsx | Build paywall component |
-| 9 | 04-frontend/case-command-App-updated.tsx | Wire gate into Case Command |
+| 5 | relopass-payments.routes.ts | Add /checkout + /access endpoints |
+| 6 | webhook-extension.ts | Extend webhook for checkout.session.completed |
+| 7 | hooks/useCaseAccess.ts | Access-tier hook |
+| 8 | CaseGate.tsx | Build paywall component |
+| 9 | case-command-App-updated.tsx | Wire gate into Case Command |
 | 10 | Test full flow in Stripe test mode | Card: 4242 4242 4242 4242 |
-| 11 | 05-email/case-payment-confirmation.ts | Send confirmation + receipt link |
+| 11 | case-payment-confirmation.ts | Send confirmation + receipt link |
 | 12 | Switch to live Stripe price IDs | Go live |
 
 ## Quality Gates — Do Not Skip
 - [ ] Vendor list verified (≥5 per category in /docs/vendor-directory-fr-no.md)
-- [ ] End-to-end flow tested in Stripe test mode
+- [ ] End-to-end flow tested in Stripe test mode before switching to live keys
 
 ## Pricing Architecture
 
@@ -42,7 +42,8 @@ Tier 0 → Tier 1 gate inside Case Command:
 
 ## Key Design Decisions
 1. Access is per-case, not per-account
-2. Gate fires after submit, before full results
+2. Gate fires after case creation, before full results are shown
 3. Never trust the client — access_tier written only by webhook
 4. Expensable by design — VAT number + company name collected at checkout
-5. Add-ons scaffolded, not built — build after 5 real cases
+5. Add-ons scaffolded in DB, not built — build after 5 real cases
+6. €2,000 Essentials tier is always greyed out / disabled — not functional until lawyer sign-off
