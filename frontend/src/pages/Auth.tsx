@@ -8,6 +8,7 @@ import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/api
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import { supabase } from '../api/supabase';
+import { clearAutofillResidueIfStale } from '../utils/clearAutofillResidue';
 import { env } from '../config/env';
 import { swallow } from '../lib/errorTracking';
 import { GlobeNetwork } from '../components/auth/GlobeNetwork';
@@ -517,6 +518,13 @@ export const Auth: React.FC = () => {
                     id="auth-login-password"
                     type={showPassword ? 'text' : 'password'} value={password}
                     onChange={(v) => setPassword(v)}
+                    // AIQ-1628: drop stale passive-autofill residue (a value the
+                    // browser dropped into the DOM without an onChange, so our
+                    // `password` state is still empty) before the user types —
+                    // otherwise the keystrokes concatenate onto the previous
+                    // persona's password. A manager-chosen fill sets state via
+                    // onChange, so this leaves it untouched.
+                    onFocus={(e) => clearAutofillResidueIfStale(password, e.currentTarget)}
                     placeholder="••••••••" autoComplete="current-password"
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
                   />
