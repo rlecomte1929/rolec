@@ -1,0 +1,61 @@
+name: Notification outbox dispatch
+
+# [AIQ-1610] Calls POST /api/crons/dispatch-outbox on a short schedule.
+# The notification_outbox table is an email delivery queue with writers but no consumer, so
+# rows (milestone reminders, policy-exception HR notifications) piled up undelivered. This job
+# is the consumer: it polls pending rows and sends each via Resend, marking them sent/failed.
+# Idempotent — only 'pending' rows are picked up and moved to a terminal state, so re-runs never
+# re-send.
+#
+# Gated behind `vars.OUTBOX_DISPATCH_CRON_ENABLED` so this is a no-op until the secrets/vars are
+# configured. Required config to enable:
+#   vars.OUTBOX_DISPATCH_CRON_ENABLED = 'true'
+#   vars.OUTBOX_DISPATCH_API_BASE     = https://api.relopass.com
+#   secrets.CRON_SECRET               = (reused — same value the API checks)
+#
+# Test first with workflow_dispatch before relying on the schedule.
+
+on:
+  schedule:
+    # Every 15 minutes, offset off the top of the hour to avoid the cron pileup.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: outbox-dispatch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  outbox-dispatch:
+    name: Notification outbox dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.OUTBOX_DISPATCH_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.OUTBOX_DISPATCH_API_BASE }}   # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/dispatch-outbox
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/dispatch-outbox")
+          echo "$response"
+          {
+            echo "## Notification outbox dispatch"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
