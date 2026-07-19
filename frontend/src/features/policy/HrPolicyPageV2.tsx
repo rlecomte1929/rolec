@@ -41,7 +41,9 @@ import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { PolicyAssistantDockedShell } from './PolicyAssistantDockedShell';
 import { CanonicalPolicyDiffView } from './CanonicalPolicyDiffView';
 import { PolicyDiffView } from './PolicyDiffView';
-import { PolicyTemplatePicker } from './PolicyTemplatePicker';
+import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
+import type { StarterTemplateKey } from './starterPolicyCopy';
+import { applyStarterBaseline, parseStarterBaselineError } from './applyStarterBaseline';
 import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
 import { shouldOfferFreshPolicyBuild } from './hrPolicyWorkspaceState';
 import { useQueryClient } from '@tanstack/react-query';
@@ -79,6 +81,9 @@ type HrPolicyPageV2Props = {
   /** AIQ-1600: switches the parent tab bar to the Policy builder tab. Absent in
    *  admin company-scoped mode (no tab bar there). */
   onNavigateToBuilder?: () => void;
+  /** AIQ-1588: switches to the full builder (Benefits summary tab) — where a
+   *  freshly-seeded config-matrix draft is reviewed and published. */
+  onNavigateToFullBuilder?: () => void;
 };
 
 // --- Landing welcome banner (AIQ-1600) --------------------------------------
@@ -323,93 +328,10 @@ const PreviewCompareSection: React.FC<{
 
 // --- Build next version -----------------------------------------------------
 
-const BuildNextVersionSection: React.FC<{
-  documents: PolicyDocumentListItem[];
-  hasLivePolicy: boolean;
-  onImportClick: () => void;
-  onTemplateClick: () => void;
-  adminCompanyId?: string | null;
-}> = ({ documents, hasLivePolicy, onImportClick, onTemplateClick, adminCompanyId: _adminCompanyId }) => {
-  const [docsOpen, setDocsOpen] = useState(false);
-  return (
-    <Card padding="lg">
-      {/* fix: AIQ-LIVE-QA — when a version is already live, this is "create a new
-          version", not "start your policy"; the first-run framing is misleading
-          next to a published matrix. */}
-      <h2 className="text-lg font-semibold text-[#0b2b43]">
-        {hasLivePolicy ? 'Create a new policy version' : 'Start your policy'}
-      </h2>
-      <p className="text-sm text-slate-600 mt-1.5">
-        {hasLivePolicy
-          ? "Start from a template or import a document to draft a replacement. Your live version stays in effect until you publish it."
-          : "Pick a template baseline. You'll edit the caps yourself in the benefit table below — no document upload required."}
-      </p>
-      {/* PR 0.5 simplification: template is the primary CTA (matrix-first
-          authoring). Document import demoted to a quieter secondary link
-          beneath the primary action. */}
-      <div className="mt-4">
-        <Button onClick={onTemplateClick} data-testid="start-from-template-card">
-          Start from a template
-        </Button>
-        <Button unstyled
-          type="button"
-          onClick={onImportClick}
-          className="ml-3 text-sm text-slate-600 hover:text-[#0b2b43] underline"
-        >
-          Or import a document instead →
-        </Button>
-        <p className="text-xs text-slate-500 mt-2">
-          Templates pre-fill the matrix with level-tiered caps
-          (Entry&nbsp;Level / Manager / Director / VP / C-suite). Importing a PDF
-          extracts rules from a company policy you already have.
-        </p>
-      </div>
-      {hasLivePolicy && (
-        <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
-          A version is currently live for employees. Importing a new document creates a
-          draft — the live version stays in effect until you publish the replacement.
-          Use <strong>Unpublish version</strong> in the detailed review if you want to
-          take the current policy down before publishing a new one.
-        </div>
-      )}
-
-      <div className="mt-5">
-        <Button unstyled
-          type="button"
-          onClick={() => setDocsOpen((v) => !v)}
-          className="text-sm font-medium text-[#0b2b43] hover:underline"
-        >
-          {docsOpen ? '▾' : '▸'} Uploaded documents ({documents.length})
-        </Button>
-        {docsOpen && (
-          <div className="mt-3 border border-slate-200 rounded-lg">
-            {documents.length === 0 ? (
-              <p className="text-sm text-slate-600 px-3 py-3">
-                No documents uploaded yet.
-              </p>
-            ) : (
-              <ul className="divide-y divide-slate-200">
-                {documents.map((d) => (
-                  <li key={d.id} className="px-3 py-2 text-sm">
-                    <div className="font-medium text-[#0b2b43]">{d.filename}</div>
-                    <div className="text-xs text-slate-600 mt-0.5">
-                      Status: {d.processing_status ?? '—'}
-                      {d.detected_document_type ? ` · Type: ${d.detected_document_type}` : ''}
-                      {d.uploaded_at ? ` · Uploaded: ${String(d.uploaded_at).slice(0, 10)}` : ''}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="px-3 py-2 text-xs text-slate-500 bg-slate-50 rounded-b-lg">
-              Manage and delete uploaded documents in the Detailed review below.
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-};
+// AIQ-1588: BuildNextVersionSection (the greenfield "Start from a template" card
+// wired to the config-matrix PolicyTemplatePicker) was removed. Its greenfield
+// slot now renders the StarterPolicyOnboardingCard (Conservative/Standard/Premium),
+// also config-matrix — one consolidated baseline entry point.
 
 // Draft vs Live section is now the real diff view — see PolicyDiffView.tsx.
 
@@ -478,7 +400,7 @@ const VersionHistorySection: React.FC<{
 
 // --- Main page --------------------------------------------------------------
 
-export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, onNavigateToBuilder }) => {
+export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, onNavigateToBuilder, onNavigateToFullBuilder }) => {
   // `setNormalized` is intentionally kept unused in this PR: the canonical
   // version is loaded inside the Detailed review drawer only. A follow-up
   // can hoist it back up here once the diff view ships.
@@ -491,7 +413,9 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
   const [noCompany, setNoCompany] = useState(false);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  // AIQ-1588: greenfield baseline seeding (config-matrix starter card).
+  const [starterBusyKey, setStarterBusyKey] = useState<StarterTemplateKey | null>(null);
+  const [starterError, setStarterError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -643,6 +567,28 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // AIQ-1588: seed a config-matrix draft from a starter baseline tier, then take
+  // HR to the full builder (Benefits summary tab) to review + publish — same
+  // subsystem the builder edits, so the seeded draft is there, not an empty matrix.
+  const handleStarterBaseline = async (key: StarterTemplateKey) => {
+    setStarterError(null);
+    setStarterBusyKey(key);
+    try {
+      await applyStarterBaseline(key, { adminCompanyId });
+      bump();
+      if (onNavigateToFullBuilder) onNavigateToFullBuilder();
+    } catch (err: unknown) {
+      const { code, message } = parseStarterBaselineError(err);
+      setStarterError(
+        code === 'draft_has_rows'
+          ? 'You already have a policy draft in progress. Open the Policy builder to apply a template there.'
+          : message,
+      );
+    } finally {
+      setStarterBusyKey(null);
+    }
+  };
+
   const policyId = normalized?.version?.policy_id ?? normalized?.policy?.id ?? null;
 
   // Sprint 2: docked-shell open state lifted to the page so the trigger
@@ -752,31 +698,20 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
         />
       )}
 
-      {/* 3. Build your next version (only shown when there is no live policy
-          OR no draft in progress — once HR has a working version, the matrix
-          editor below is the primary authoring surface). PR 0.5 simplification:
-          template is the primary CTA; document import is a quieter secondary
-          link to keep the "matrix-primary" pipeline stance clear. */}
+      {/* 3. AIQ-1588: single first-time baseline entry point. For a greenfield
+          company (no live policy, no draft), the consolidated Conservative /
+          Standard / Premium starter card — seeding the config-matrix draft the
+          Policy builder edits — is the one clear baseline door, high on the page.
+          Once HR has a live policy or a draft, the matrix editor below is the
+          primary authoring surface. */}
       {shouldOfferFreshPolicyBuild(hasLivePolicy, hasDraftInProgress) && (
-        <BuildNextVersionSection
-          documents={documents}
-          hasLivePolicy={hasLivePolicy}
-          onImportClick={handleImportClick}
-          onTemplateClick={() => setTemplatePickerOpen(true)}
-          adminCompanyId={adminCompanyId}
+        <StarterPolicyOnboardingCard
+          error={starterError}
+          busyTemplateKey={starterBusyKey}
+          onSelectTemplate={handleStarterBaseline}
+          onUploadDocument={handleImportClick}
         />
       )}
-
-      <PolicyTemplatePicker
-        open={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        onApplied={() => {
-          // Reload the page data so Section 2 (topics) and Section 4
-          // (diff) pick up the new draft without a hard refresh.
-          bump();
-        }}
-        adminCompanyId={adminCompanyId}
-      />
 
       {/* (Draft-vs-Live and document-rules diffs moved into the Preview &
           compare "Changes" tab above — AIQ-1507.) */}
