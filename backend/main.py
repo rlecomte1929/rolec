@@ -7641,8 +7641,17 @@ def get_hr_resolved_policy(
             "resolved": None,
             "message": "No published policy version for this company. Publish a policy in HR Policy Review.",
         }
-    benefits = db.list_resolved_policy_benefits(resolved["id"])
-    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    # [AIQ-1636] A config-matrix resolution is not persisted to resolved_assignment_policies
+    # (no top-level "id") and carries its benefits/exclusions inline; a legacy resolution has
+    # a persisted id whose rows must be re-queried. Guarding on .get("id") avoids the KeyError
+    # that 500'd this endpoint for every config-matrix (test-drive) company.
+    rid = resolved.get("id")
+    if rid:
+        benefits = db.list_resolved_policy_benefits(rid)
+        exclusions = db.list_resolved_policy_exclusions(rid)
+    else:
+        benefits = resolved.get("benefits") or []
+        exclusions = resolved.get("exclusions") or []
     return {
         "resolved": {
             **resolved,
@@ -7682,8 +7691,15 @@ def recompute_resolved_policy(
     )
     if not resolved:
         return {"resolved": None, "message": "No published policy. Publish a policy first."}
-    benefits = db.list_resolved_policy_benefits(resolved["id"])
-    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    # [AIQ-1636] Same as get_hr_resolved_policy: config-matrix resolutions have no persisted
+    # id and carry benefits inline; guard the re-query on .get("id").
+    rid = resolved.get("id")
+    if rid:
+        benefits = db.list_resolved_policy_benefits(rid)
+        exclusions = db.list_resolved_policy_exclusions(rid)
+    else:
+        benefits = resolved.get("benefits") or []
+        exclusions = resolved.get("exclusions") or []
     return {
         "resolved": {**resolved, "benefits": benefits, "exclusions": exclusions},
         "policy_version": resolved.get("version"),
@@ -9772,6 +9788,15 @@ def _resolve_published_policy_for_employee(
                 case_id=case_id,
             )
             if resolved.get("has_policy"):
+                # [AIQ-1631] The matrix bridge returns benefits keyed by their config-matrix
+                # names (host_housing_cap, shipment_of_goods, …), but build_employee_services_
+                # policy_context and the Services cards look benefits up by the LEGACY
+                # vocabulary (SERVICE_TO_BENEFIT: living_areas → temporary_housing, …). Without
+                # aliasing, EVERY category falls through to "No policy rule" even when a cap is
+                # covered — this is the actual defect behind the F4↔F14 gap. Mirror the
+                # comparison service, which already aliases matrix benefits before matching.
+                from .app.services.policy_service_comparison import _with_legacy_benefit_key_aliases
+                resolved["benefits"] = _with_legacy_benefit_key_aliases(resolved.get("benefits") or [])
                 log.info(
                     "employee_policy matrix_fallback request_id=%s assignment_id=%s company_id=%s version_id=%s",
                     request_id,
