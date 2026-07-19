@@ -53,6 +53,12 @@ export const TestDrivePage: React.FC = () => {
   const rawSegment = searchParams.get('segment');
   const segment: 'internal' | 'prospect' | undefined =
     rawSegment === 'internal' ? 'internal' : rawSegment === 'prospect' ? 'prospect' : undefined;
+  // AIQ-1633: capture the segment at the START via a one-tap landing question, so
+  // dropouts (who never reach the survey) are classified too. An explicit ?segment=
+  // (internal deploy checks) still wins; unanswered stays honest — NULL, never a
+  // silent 'prospect'. The survey pre-fills from and may still override this.
+  const [selfSegment, setSelfSegment] = useState<'internal' | 'prospect' | null>(null);
+  const effectiveSegment: 'internal' | 'prospect' | undefined = segment ?? selfSegment ?? undefined;
   // AIQ-1563: forward ?campaign= so a QA link (e.g. ?campaign=qa-posthog) provisions AND
   // records its funnel under a separate campaign, never contaminating the real cohort.
   // Absent → undefined, so the backend default (RELOPASS_TEST_DRIVE_CAMPAIGN → insead-2026)
@@ -121,7 +127,9 @@ export const TestDrivePage: React.FC = () => {
       // AIQ-1563: forward ?campaign= so QA runs stay out of the real cohort.
       ...(campaign ? { campaign } : {}),
       ...(hasExplicitCorridor ? { corridor_id: rawCorridor } : {}),
-      tester_segment: segment,
+      // AIQ-1633: prefer the landing-page one-tap answer (or ?segment= override); still
+      // undefined → NULL when the tester skips the question.
+      tester_segment: effectiveSegment,
       invite_token: inviteToken || undefined,
     });
     if (res.ok) {
@@ -134,7 +142,8 @@ export const TestDrivePage: React.FC = () => {
           JSON.stringify({
             campaign: res.campaign,
             corridor_id: res.corridorId,
-            tester_segment: segment,
+            // AIQ-1633: stash the resolved segment so the survey pre-fills it.
+            tester_segment: effectiveSegment,
             session_id: res.sessionId,
             tester_name: firstName.trim(),
             // May be '' — the survey lead-in then simply has nothing to pre-fill.
@@ -264,6 +273,44 @@ export const TestDrivePage: React.FC = () => {
                   <p id="td-email-helper" className="mt-2 text-xs text-marketing-text-muted">
                     {c.startBlock.emailHelper}
                   </p>
+
+                  {/* AIQ-1633: one-tap segment self-ID at the START. Optional (tap again to
+                      clear) so an unanswered session stays honest — NULL, never 'prospect'.
+                      An explicit ?segment= URL override still wins in the provision payload. */}
+                  <fieldset className="mt-4" disabled={state === 'submitting'}>
+                    <legend className="block text-sm font-medium text-marketing-primary">
+                      {c.startBlock.segment.label}
+                    </legend>
+                    <div
+                      role="radiogroup"
+                      aria-label={c.startBlock.segment.label}
+                      className="mt-2 grid grid-cols-2 gap-2"
+                    >
+                      {([['prospect', c.startBlock.segment.yes], ['internal', c.startBlock.segment.no]] as const).map(
+                        ([val, label]) => {
+                          const active = selfSegment === val;
+                          return (
+                            <Button
+                              key={val}
+                              unstyled
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              onClick={() => setSelfSegment((prev) => (prev === val ? null : val))}
+                              className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-marketing-accent/40 ${
+                                active
+                                  ? 'border-marketing-accent bg-marketing-accent/10 text-marketing-primary'
+                                  : 'border-marketing-border bg-white text-marketing-text hover:border-marketing-accent'
+                              }`}
+                            >
+                              {label}
+                            </Button>
+                          );
+                        },
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-marketing-text-muted">{c.startBlock.segment.helper}</p>
+                  </fieldset>
 
                   {error && (
                     <Alert variant="error" className="mt-4">
