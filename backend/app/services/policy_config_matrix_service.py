@@ -206,6 +206,22 @@ def _benefit_row_defaults(benefit_key: str) -> Dict[str, Any]:
             }
         )
         base["cap_rule_json"] = {"per": "dependent"}
+    elif benefit_key == "host_housing_cap":
+        # AIQ-1635: cover one Services-mapped category on the default seed so over-cap is
+        # reachable on the DEFAULT test-drive provisioning path. host_housing_cap aliases to
+        # the legacy `temporary_housing` benefit_key (→ Services `living_areas`), so a covered
+        # currency cap here surfaces as determination='capped' on /services-policy-context and
+        # lets an over-budget selection raise a Policy Exception. Realistic EU monthly ceiling
+        # (honesty model — not inflated; existing Test-Drive companies ran 2400–5500 EUR).
+        base.update(
+            {
+                "covered": True,
+                "value_type": "currency",
+                "amount_value": 3000.0,
+                "currency_code": "EUR",
+                "unit_frequency": "monthly",
+            }
+        )
     elif benefit_key == "spouse_partner_assistance":
         base.update(
             {
