@@ -82,8 +82,148 @@ Add-ons (v1+): vendor category unlocks (movers, immigration lawyers, tax advisor
 
 ## 6. Webhook Extension
 
-In misc.routes.ts checkout
+In misc.routes.ts checkout webhook handling, extend the existing
+`checkout.session.completed` switch case:
 
-> **NOTE (truncated source):** The source instruction for this spec was cut off at this point.
-> Section 6 (webhook extension details) and any later sections/files were not received and
-> still need to be supplied and committed.
+1. Read `session.metadata.source`. If it is not `'relopass_case_command'`,
+   fall through to the existing handling — this extension must not disturb
+   other products sharing the webhook.
+2. If it matches, extract `caseId` and `tier` from `session.metadata`.
+3. Update the case row **conditionally**:
+
+```sql
+UPDATE relocation_cases
+SET access_tier            = $1,   -- 'roadmap' | 'essentials' (from metadata.tier)
+    payment_status         = $2,   -- 'roadmap_paid' | 'essentials_paid'
+    stripe_payment_intent_id = $3,
+    paid_at                = NOW(),
+    paid_amount_cents      = $4,   -- session.amount_total
+    paid_currency          = $5    -- session.currency
+WHERE id = $6                      -- metadata.caseId
+  AND stripe_session_id = $7      -- session.id — must match what /checkout stored
+  AND payment_status = 'unpaid';  -- idempotency: replayed events are no-ops
+```
+
+4. If the UPDATE affected 0 rows, the event is a replay (or the session does
+   not belong to that case) — acknowledge with 200 and do nothing else.
+5. If the UPDATE affected 1 row, send the confirmation email
+   (see section 8) — the `payment_status = 'unpaid'` guard above doubles as
+   the email idempotency guard: replays can never re-send it.
+6. Always return 200 to Stripe once the event has been durably handled;
+   return 5xx only on transient failures you want Stripe to retry.
+
+**CRITICAL:** `access_tier` is ONLY ever written by this webhook — never from
+the client, never from the /checkout endpoint. A forged "payment succeeded"
+call from the browser cannot unlock a case.
+
+Reference implementation: `03-backend/webhook-extension.ts`.
+
+## 7. Frontend Components
+
+### hooks/useCaseAccess.ts
+
+- Calls `GET /api/relopass/cases/:caseId/access` on mount (and whenever
+  `caseId` changes).
+- Detects `?payment=success` in the URL: refetches after 1.5 s (webhook lag),
+  then strips the param from the URL with `history.replaceState`.
+- Exposes `{ access, loading, error, refetch, hasFullAccess }` where
+  `hasFullAccess` is true when `accessTier !== 'free'` OR the account tier is
+  a retainer (`starter` / `growth`).
+- Never writes access state — read-only mirror of the server.
+
+### CaseGate.tsx
+
+- Renders `children` (the full roadmap) untouched when `hasFullAccess`.
+- When `accessTier === 'free'`:
+  - Teaser card: total requirement count, non-obvious count, feasibility badge.
+  - 2–3 real non-obvious requirement previews, verbatim (D-number,
+    skattekort timing, police registration).
+  - Blurred remainder with a "+N more requirements locked" pill.
+  - Primary CTA "Unlock full roadmap + vendor list — €800": calls
+    `POST /checkout`, then redirects to `checkoutUrl`. In an iframe, redirect
+    `window.top` (fall back to `window.location` on cross-origin errors).
+  - Secondary CTA "Essentials — €2,000" rendered greyed out and disabled
+    (stub — pending lawyer sign-off).
+- Never flips access client-side: after the Stripe redirect it simply
+  re-reads the server state (via useCaseAccess) until it reports paid.
+
+### case-command-App-updated.tsx
+
+- Wires the gate into Case Command: after the case is created (employee type
+  + move date submitted), the results panel renders inside
+  `<CaseGate caseId={...}>…full roadmap…</CaseGate>`.
+- The teaser data (counts, preview items, feasibility) comes from the same
+  rule-engine output as the full roadmap — the gate only controls how much
+  of it is visible.
+
+Reference implementations: `04-frontend/hooks/useCaseAccess.ts`,
+`04-frontend/CaseGate.tsx`, `04-frontend/case-command-App-updated.tsx`.
+
+## 8. Confirmation Email
+
+Sent by the webhook handler (section 6) after the first — and only the
+first — transition to a paid status.
+
+| Field | Value |
+|---|---|
+| To | Checkout customer email (`session.customer_details.email`) |
+| Subject | `ReloPass — Your roadmap is unlocked (receipt enclosed)` |
+| Trigger | The row's first transition to `payment_status = 'roadmap_paid'` |
+
+Body contents:
+- Confirmation that the full roadmap + vendor shortlist for the case is
+  unlocked (corridor + case reference).
+- Direct link back to the case (`APP_URL/case-command/cases/:caseId`).
+- Receipt block: amount, case reference, company name + VAT number (from the
+  checkout custom fields), and the Stripe hosted invoice link
+  (`invoice.hosted_invoice_url` — available because the checkout session is
+  created with `invoice_creation: { enabled: true }`).
+- Note that the receipt is expensable as a professional service and that
+  Stripe sends its own payment confirmation separately.
+
+Idempotency: guaranteed by the conditional UPDATE in section 6 — the email
+fires only when the row actually transitioned, so webhook replays cannot
+double-send.
+
+Reference implementation: `05-email/case-payment-confirmation.ts`.
+
+## 9. Environment Variables
+
+See `06-env/.env.example`. Required:
+
+| Var | Purpose |
+|---|---|
+| `STRIPE_SECRET_KEY` | Server-side Stripe API key (`sk_test_…` then `sk_live_…`) |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for the webhook endpoint (`whsec_…`) |
+| `STRIPE_PRICE_ROADMAP_EUR` | Price ID for the €800 roadmap unlock |
+| `STRIPE_PRICE_ESSENTIALS_EUR` | Price ID for the €2,000 Essentials tier (stub — create the product, do not wire the CTA) |
+| `APP_URL` | Public origin used to build success/cancel URLs |
+
+Create the products in the Stripe Dashboard in **test mode** first; switch
+the two price IDs to their live-mode equivalents only at go-live (step 12 of
+the build sequence).
+
+## 10. Test Plan (Stripe test mode)
+
+1. Create a case → teaser renders, roadmap blurred, CTA shows €800.
+2. Click CTA → redirected to Stripe Checkout; company name + VAT number
+   custom fields present; session expires after 30 minutes.
+3. Pay with `4242 4242 4242 4242` (any future expiry, any CVC).
+4. Redirect lands on `?payment=success` → within ~2 s the full roadmap
+   renders (webhook + refetch).
+5. Reload the page → case still unlocked (access is server-side, per case).
+6. Confirmation email received exactly once, with hosted invoice link.
+7. Replay the webhook event from the Stripe Dashboard → no state change, no
+   second email.
+8. Call `POST /checkout` for the already-paid case → 400 "already unlocked".
+9. Attempt to unlock by calling the access endpoint with a forged body →
+   access unchanged (endpoint is read-only).
+
+---
+
+> Provenance note (2026-07-19): the source instruction that delivered this
+> specification was truncated mid-way through section 6 ("In misc.routes.ts
+> checkout…"). Sections 6–10 above were reconstructed from the surviving
+> package materials (the v1.0 package README build sequence, the pre-build
+> spec copy in the ReloPass workspace, and the as-built reference
+> implementations) so the package is complete and internally consistent.
