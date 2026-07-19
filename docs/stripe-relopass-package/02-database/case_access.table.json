@@ -1,0 +1,33 @@
+{
+  "tableName": "case_access",
+  "sqlName": "app_case_access",
+  "module": "app",
+  "displayName": "Case Access & Payments",
+  "description": "Payment/access state per relocation case for the Case Command paid roadmap gate (Tier 0 \u2192 Tier 1). Sidecar to relocation_cases because columns cannot be added to an existing table. access_tier: 'free' | 'roadmap' | 'essentials'. payment_status: 'unpaid' | 'pending' | 'paid' | 'refunded'. Written server-side by the case-checkout / case-access / stripe-case-webhook server-function hooks \u2014 apps must treat it as read-only.",
+  "columns": [
+    { "name": "id", "type": "serial", "nullable": false, "primaryKey": true },
+    { "name": "case_id", "type": "integer", "nullable": true, "description": "FK to relocation_cases.id" },
+    { "name": "case_key", "type": "text", "unique": true, "nullable": false, "description": "Deterministic reuse key: frno|<sessionId>|<employeeType>|<moveDate>" },
+    { "name": "corridor", "type": "text", "nullable": false, "defaultValue": "'france-norway'" },
+    { "name": "employee_type", "type": "text", "nullable": true, "description": "'eea' | 'non-eea'" },
+    { "name": "move_date", "type": "date", "nullable": true },
+    { "name": "access_tier", "type": "text", "nullable": false, "description": "'free' | 'roadmap' | 'essentials'", "defaultValue": "'free'" },
+    { "name": "payment_status", "type": "text", "nullable": false, "description": "'unpaid' | 'pending' | 'paid' | 'refunded'", "defaultValue": "'unpaid'" },
+    { "name": "stripe_session_id", "type": "text", "nullable": true },
+    { "name": "stripe_payment_intent_id", "type": "text", "nullable": true },
+    { "name": "amount_cents", "type": "integer", "nullable": true },
+    { "name": "currency", "type": "text", "nullable": true, "defaultValue": "'eur'" },
+    { "name": "billing_company", "type": "text", "nullable": true, "description": "Company name collected for the expensable receipt" },
+    { "name": "billing_vat", "type": "text", "nullable": true, "description": "VAT number collected for the expensable receipt" },
+    { "name": "customer_email", "type": "text", "nullable": true },
+    { "name": "session_id", "type": "text", "nullable": true, "description": "Space session id of the HR user who created the case" },
+    { "name": "paid_at", "type": "timestamp", "nullable": true },
+    { "name": "created_at", "type": "timestamp", "nullable": false, "defaultValue": "NOW()" },
+    { "name": "updated_at", "type": "timestamp", "nullable": false, "defaultValue": "NOW()" }
+  ],
+  "foreignKeys": [
+    { "column": "case_id", "onDelete": "SET NULL", "referencesTable": "relocation_cases", "referencesColumn": "id" }
+  ],
+  "createdAt": "2026-07-18T14:28:59.456Z",
+  "createdBy": "audos-code"
+}
