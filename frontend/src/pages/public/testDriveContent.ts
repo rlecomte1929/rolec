@@ -130,6 +130,17 @@ export const testDriveContent = {
     emailPlaceholder: 'e.g. alex@company.com',
     emailHelper:
       "Only if you're happy for Romain to come back to you about your feedback and what didn't work. Your two logins appear on this page either way.",
+    // AIQ-1633: capture the tester segment HERE, at the start, so a session that drops
+    // out before the survey is still classified. Same one-tap question and Yes→prospect /
+    // No→internal mapping as the survey (testDriveSurveyContent.ts). Optional by design —
+    // an unanswered tap leaves the segment NULL (TD-FIX-2 / AIQ-1503 honesty rule); the
+    // survey later pre-fills from this and can still override it.
+    segment: {
+      label: 'Do you work in HR, mobility, or relocation?',
+      helper: "Optional — one tap helps me read the results. The survey asks again if you skip it.",
+      yes: 'Yes',
+      no: 'No',
+    },
     button: 'Start the test',
     legal: 'Sample data only, apart from your email — kept solely so Romain can follow up on your feedback, and only if you choose to leave one.',
   },

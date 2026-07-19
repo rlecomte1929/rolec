@@ -391,8 +391,28 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
             const exact = matchCountry(v, [...options]);
             if (exact) { onChange(exact.code); setOpen(false); setQuery(''); }
           }}
-          onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
+          // [AIQ-1632] Seed the edit buffer with the CURRENT value and select-all on
+          // focus (instead of blanking it). Blanking left the field empty, which Chrome
+          // then autofilled ("France") behind React's back — the next keystroke reported
+          // the DOM value + typed char, so typing APPENDED ("Franceance") instead of
+          // replacing, and the value could not be cleared without a page reload. Seeding
+          // the current name + selecting it makes typing REPLACE and gives the browser a
+          // non-empty field it won't autofill.
+          onFocus={(e) => {
+            if (disabled) return;
+            setQuery(selected ? selected.name : '');
+            setOpen(true);
+            e.currentTarget.select();
+          }}
+          // Belt-and-braces against Chrome/Safari and password-manager autofill, which
+          // ignore a bare autoComplete="off" on country-labelled fields (AIQ-1632).
           autoComplete="off"
+          name={testId ? `${testId}-no-autofill` : undefined}
+          data-lpignore="true"
+          data-1p-ignore=""
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
         />
         <span className="px-2 text-gray-400 text-xs">▾</span>
       </div>

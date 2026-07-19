@@ -80,9 +80,23 @@ export const TestDriveSurveyPage: React.FC = () => {
     try {
       const raw = localStorage.getItem('relopass_test_drive');
       if (raw) {
-        const p = JSON.parse(raw) as { tester_name?: string; tester_email?: string };
-        if (p.tester_name || p.tester_email) {
-          return { ...EMPTY, tester_name: p.tester_name || '', tester_email: p.tester_email || '' };
+        const p = JSON.parse(raw) as {
+          tester_name?: string;
+          tester_email?: string;
+          tester_segment?: string;
+        };
+        // AIQ-1633: pre-fill the segment captured at the landing page (the tester may
+        // still change it here). Only accept the two valid values; anything else (incl.
+        // an unanswered NULL) leaves it blank so the honest default is preserved.
+        const preSeg: TesterSegment =
+          p.tester_segment === 'prospect' || p.tester_segment === 'internal' ? p.tester_segment : '';
+        if (p.tester_name || p.tester_email || preSeg) {
+          return {
+            ...EMPTY,
+            tester_name: p.tester_name || '',
+            tester_email: p.tester_email || '',
+            tester_segment: preSeg,
+          };
         }
       }
     } catch {
