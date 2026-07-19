@@ -200,14 +200,43 @@ _METRICS_SQL = text(
     """
 )
 
-_UNREACHABLE_SQL = text(
+# [AIQ-1624] Unreachable cases, enriched so ops has a concrete action rather than a
+# silent status: the case's company and whether that company has ANY HR to assign. A genuinely
+# unreachable roadmap becomes a work item ("assign an HR to this company"), not a dead end.
+_UNREACHABLE_ACTIONS_SQL = text(
     """
-    SELECT r.case_id FROM public.roadmap_review_status r
+    SELECT r.case_id,
+           c.company_id,
+           EXISTS (
+             SELECT 1 FROM public.hr_users hu WHERE hu.company_id::text = c.company_id::text
+           ) AS company_has_hr
+    FROM public.roadmap_review_status r
+    LEFT JOIN public.cases c ON c.id::text = r.case_id::text
     WHERE r.notify_status = 'unreachable'
       AND EXISTS (SELECT 1 FROM public.case_milestones m WHERE m.case_id = r.case_id)
     ORDER BY r.updated_at DESC LIMIT 50
     """
 )
+
+
+class UnreachableRoadmapCase(BaseModel):
+    """[AIQ-1624] An explicit ops action for a roadmap whose HR approver couldn't be reached,
+    so a genuinely unreachable case is a work item rather than a silent status."""
+    case_id: str
+    company_id: Optional[str] = None
+    #: What ops must do:
+    #:   'assign_hr_to_company'  — the company has no HR at all; assign one.
+    #:   'fix_hr_contact'        — an HR exists but has no reachable email; fix their contact.
+    #:   'link_case_to_company'  — the roadmap case has no company to resolve HR from.
+    reason: str
+
+
+def _unreachable_reason(company_id: Optional[str], company_has_hr: bool) -> str:
+    if not company_id:
+        return "link_case_to_company"
+    if not company_has_hr:
+        return "assign_hr_to_company"
+    return "fix_hr_contact"
 
 
 class RoadmapReviewMetrics(BaseModel):
@@ -225,6 +254,10 @@ class RoadmapReviewMetrics(BaseModel):
     oldest_pending_age_hours: Optional[float] = None
     #: pending_review - pending_and_notified: HR is waiting and has NOT been told.
     pending_unnotified: int = 0
+    #: [AIQ-1624] Each unreachable case as an explicit ops action (assign an HR / fix the HR
+    #: contact / link the case to a company), so a company with genuinely no reachable HR is a
+    #: surfaced work item, not a silent 'unreachable'.
+    unreachable_actions: list[UnreachableRoadmapCase] = []
 
 
 @metrics_router.get("/metrics", response_model=RoadmapReviewMetrics)
@@ -234,7 +267,18 @@ def roadmap_review_metrics(
     """Does the HR-notification actually work? These are the numbers that answer it."""
     with SessionLocal() as db:
         row = db.execute(_METRICS_SQL).fetchone()
-        unreachable_ids = [str(r[0]) for r in db.execute(_UNREACHABLE_SQL).fetchall()]
+        unreachable_rows = db.execute(_UNREACHABLE_ACTIONS_SQL).fetchall()
+
+    # [AIQ-1624] Turn each silent 'unreachable' into an explicit ops action.
+    unreachable_actions = [
+        UnreachableRoadmapCase(
+            case_id=str(r[0]),
+            company_id=(str(r[1]) if r[1] is not None else None),
+            reason=_unreachable_reason(r[1], bool(r[2])),
+        )
+        for r in unreachable_rows
+    ]
+    unreachable_ids = [a.case_id for a in unreachable_actions]
 
     m = row._mapping if row else {}
     pending = int(m.get("pending_review") or 0)
@@ -246,6 +290,7 @@ def roadmap_review_metrics(
         pending_unnotified=max(0, pending - notified),
         unreachable=int(m.get("unreachable") or 0),
         unreachable_case_ids=unreachable_ids,
+        unreachable_actions=unreachable_actions,
         undelivered=int(m.get("undelivered") or 0),
         no_key=int(m.get("no_key") or 0),
         sent=int(m.get("sent") or 0),
