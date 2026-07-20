@@ -66,6 +66,15 @@ def test_exception_type_emails_by_default_when_no_preference():
     assert db.outbox_calls[0]["to_email"] == "hr@acme.com"
 
 
+def test_decision_type_also_emails_by_default_when_no_preference():
+    # [AIQ-1610 follow-up] POLICY_EXCEPTION_DECIDED joined the default-on set so the employee is
+    # emailed the outcome of the request they filed.
+    db = _DB(pref=None)
+    nid = _notify(db, "POLICY_EXCEPTION_DECIDED")
+    assert nid is not None
+    assert len(db.outbox_calls) == 1, "the decision notification must enqueue an outbox row by default"
+
+
 def test_non_default_type_does_not_email_by_default():
     db = _DB(pref=None)
     _notify(db, _OTHER)
