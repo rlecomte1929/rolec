@@ -1,6 +1,3 @@
--- Migration: add_payment_access_to_relocation_cases
--- ReloPass — Stripe Integration v1.0 — 2026-07-18
-
 ALTER TABLE relocation_cases
   ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'unpaid'
     CHECK (payment_status IN ('unpaid', 'roadmap_paid', 'essentials_paid')),
@@ -14,11 +11,6 @@ ALTER TABLE relocation_cases
 
 CREATE INDEX IF NOT EXISTS idx_relocation_cases_access_tier
   ON relocation_cases(access_tier);
-
 CREATE INDEX IF NOT EXISTS idx_relocation_cases_stripe_session
   ON relocation_cases(stripe_session_id)
   WHERE stripe_session_id IS NOT NULL;
-
--- payment_status: 'unpaid' | 'roadmap_paid' | 'essentials_paid'
--- access_tier:    'free'   | 'roadmap'       | 'essentials'
--- stripe_session_id: stored on checkout creation so webhook can match the session to the case row.
