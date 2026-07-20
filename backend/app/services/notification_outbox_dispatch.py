@@ -7,11 +7,19 @@ HR notification), but nothing ever sent them, so rows accumulated and no mail we
 
 This is the missing consumer. It polls pending rows, delivers each via the shared Resend path
 (``_resend_send`` — same provider/env as every other email in the app), and marks the row
-terminal (``sent`` / ``failed``). It mirrors ``weekly_mobility_status`` and is driven by
-``POST /api/crons/dispatch-outbox`` on a short schedule (.github/workflows/outbox-dispatch.yml).
+terminal (``sent`` / ``failed`` / ``skipped``). It mirrors ``weekly_mobility_status`` and is driven
+by ``POST /api/crons/dispatch-outbox`` on a short schedule (.github/workflows/outbox-dispatch.yml).
 
 Delivery uses the row's denormalised ``to_email``, so it is unaffected by the uuid-vs-legacy-text
 ``user_id`` mismatch that breaks the in-app ``/api/notifications`` read path (#1543).
+
+RECIPIENT GUARD (safety): a feature flag on the cron is not a safety mechanism. Regardless of who
+enqueues a row or what ``to_email`` it carries, this consumer will ONLY hand an address to Resend
+when its domain is on an explicit allowlist. The allowlist is read from
+``RELOPASS_OUTBOX_ALLOWED_DOMAINS`` (comma-separated domain suffixes) and defaults to ``@probe.test``
+only, so an unconfigured environment can never email a real recipient. Rows whose recipient is not
+allowlisted are marked terminal as ``skipped``, logged, and never sent. Widening real delivery is a
+deliberate ops action (set the env var), not the default.
 
 Best-effort by construction: a single bad row never aborts the batch, and the function never raises.
 """
@@ -19,8 +27,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from sqlalchemy import text
 
@@ -29,6 +38,10 @@ from ...database import db
 log = logging.getLogger(__name__)
 
 _DELIVERED = ("sent", "no_key")  # _resend_send outcomes that count as delivered
+
+# Fail-closed default: only test probe addresses are deliverable unless an operator explicitly
+# widens the allowlist via RELOPASS_OUTBOX_ALLOWED_DOMAINS.
+_DEFAULT_ALLOWED_DOMAINS = "@probe.test"
 
 
 def _payload_dict(raw: Any) -> Dict[str, Any]:
@@ -43,11 +56,43 @@ def _payload_dict(raw: Any) -> Dict[str, Any]:
     return {}
 
 
+def _allowed_domains() -> List[str]:
+    """Parse the recipient allowlist from ``RELOPASS_OUTBOX_ALLOWED_DOMAINS``.
+
+    Comma-separated domain suffixes; each is normalised to lower-case and forced to start with an
+    ``@`` so matching is against the full ``@domain`` (prevents ``evil@notprobe.test`` slipping past
+    an ``@probe.test`` rule). When the env var is unset, the fail-closed default ``@probe.test`` is
+    used. When it is set but empty, the allowlist is empty and every recipient is skipped.
+    """
+    raw = os.getenv("RELOPASS_OUTBOX_ALLOWED_DOMAINS")
+    if raw is None:
+        raw = _DEFAULT_ALLOWED_DOMAINS
+    out: List[str] = []
+    for part in raw.split(","):
+        dom = part.strip().lower()
+        if not dom:
+            continue
+        if not dom.startswith("@"):
+            dom = "@" + dom
+        out.append(dom)
+    return out
+
+
+def _recipient_allowed(to_email: str, allowed: List[str]) -> bool:
+    """True only if ``to_email``'s domain is on the allowlist. Empty allowlist => never allowed."""
+    email = (to_email or "").strip().lower()
+    if not email or not allowed:
+        return False
+    return any(email.endswith(dom) for dom in allowed)
+
+
 def run_outbox_dispatch_cron(limit: int = 100) -> Dict[str, Any]:
     """Send pending ``notification_outbox`` rows via Resend and mark them terminal.
 
-    Returns ``{pending, sent, logged, failed}``. Never raises — a delivery or DB error on one
-    row is recorded on that row (``status='failed'``, ``last_error``) and the batch continues.
+    Returns ``{pending, sent, logged, skipped, failed}``. Never raises — a delivery or DB error on
+    one row is recorded on that row (``status='failed'``, ``last_error``) and the batch continues.
+    A recipient whose domain is not on ``RELOPASS_OUTBOX_ALLOWED_DOMAINS`` is marked
+    ``status='skipped'`` and is never handed to the mail provider.
     """
     try:
         with db.engine.connect() as conn:
@@ -64,12 +109,14 @@ def run_outbox_dispatch_cron(limit: int = 100) -> Dict[str, Any]:
             )
     except Exception as exc:  # noqa: BLE001 — queue read must never break the caller/cron
         log.warning("outbox dispatch: could not read pending rows: %s", exc)
-        return {"pending": 0, "sent": 0, "logged": 0, "failed": 0}
+        return {"pending": 0, "sent": 0, "logged": 0, "skipped": 0, "failed": 0}
+
+    allowed = _allowed_domains()
 
     # Shared Resend delivery path — same provider/env as every other email.
     from .assignment_invite_email import _resend_send
 
-    sent = logged = failed = 0
+    sent = logged = skipped = failed = 0
     for row in rows:
         outbox_id = row["id"]
         to_email = (row.get("to_email") or "").strip()
@@ -82,6 +129,20 @@ def run_outbox_dispatch_cron(limit: int = 100) -> Dict[str, Any]:
         res_status = None
         if not to_email:
             last_error = "no recipient email"
+        elif not _recipient_allowed(to_email, allowed):
+            # Hard guard: never hand a non-allowlisted address to the mail provider. Mark terminal
+            # so the row leaves the pending queue instead of being retried (and re-logged) forever.
+            status = "skipped"
+            last_error = (
+                "recipient domain not in RELOPASS_OUTBOX_ALLOWED_DOMAINS allowlist "
+                f"({', '.join(allowed) or 'empty'}): {to_email}"
+            )
+            log.warning(
+                "outbox dispatch: SKIPPED row %s — recipient %r not allowlisted (allowed=%s); not sent",
+                outbox_id,
+                to_email,
+                allowed,
+            )
         else:
             try:
                 res = _resend_send(
@@ -121,9 +182,11 @@ def run_outbox_dispatch_cron(limit: int = 100) -> Dict[str, Any]:
                 logged += 1
             else:
                 sent += 1
+        elif status == "skipped":
+            skipped += 1
         else:
             failed += 1
 
-    summary = {"pending": len(rows), "sent": sent, "logged": logged, "failed": failed}
+    summary = {"pending": len(rows), "sent": sent, "logged": logged, "skipped": skipped, "failed": failed}
     log.info("outbox dispatch: %s", summary)
     return summary
