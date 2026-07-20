@@ -21,7 +21,7 @@ from backend.app.routers.hr_rfq import RfqCreateRequest
 _PG_CAST_RE = re.compile(r"CAST\((:?\w+|\?) AS jsonb\)", re.IGNORECASE)
 
 SCHEMA = """
-CREATE TABLE vendors (
+CREATE TABLE vendors_legacy (
   id TEXT PRIMARY KEY, name TEXT, email TEXT, countries_served TEXT, is_active INTEGER
 );
 CREATE TABLE rfq_requests (
@@ -47,7 +47,7 @@ class CreateRfqTests(unittest.TestCase):
                 if stmt.strip():
                     c.execute(text(stmt))
             c.execute(text(
-                "INSERT INTO vendors (id, name, email, countries_served, is_active) "
+                "INSERT INTO vendors_legacy (id, name, email, countries_served, is_active) "
                 "VALUES ('v1', 'SIRVA', 'vendor@example.com', 'DE', 1)"
             ))
 
@@ -85,7 +85,7 @@ class CreateRfqTests(unittest.TestCase):
 
     def test_inactive_vendor_404(self):
         with self.engine.begin() as c:
-            c.execute(text("UPDATE vendors SET is_active = 0 WHERE id = 'v1'"))
+            c.execute(text("UPDATE vendors_legacy SET is_active = 0 WHERE id = 'v1'"))
         body = RfqCreateRequest(case_id="case-1", vendor_id="v1", service_category="moving")
         with self.assertRaises(HTTPException) as ctx:
             asyncio.run(hr_rfq.create_rfq(body=body, background_tasks=BackgroundTasks(), user=HR))
