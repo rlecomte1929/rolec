@@ -130,6 +130,42 @@ class TestTestDriveSurvey(unittest.TestCase):
         ]
         self.assertEqual(len(seg_calls), 0)
 
+    def test_no_session_no_campaign_is_unattributed_not_live_cohort(self):
+        """AIQ-1639: a session-less survey with no explicit campaign must NOT be filed into
+        the live 'insead-2026' cohort — it lands with campaign NULL (unattributed). Proven
+        even with RELOPASS_TEST_DRIVE_CAMPAIGN set: the survey endpoint ignores the env
+        default (only /provision defaults the cohort)."""
+        db = MagicMock()
+        # first submit → no prior row → straight INSERT.
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
+        env = {**_ENABLED, "RELOPASS_TEST_DRIVE_CAMPAIGN": "insead-2026"}
+        with patch.dict(os.environ, env, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/survey", json=_body(session_id=None))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        survey_calls = [c for c in conn.execute.call_args_list if "INSERT INTO survey_responses" in str(c.args[0])]
+        self.assertEqual(len(survey_calls), 1)
+        bound = survey_calls[0].args[1]
+        self.assertIsNone(bound["campaign"])
+        self.assertNotEqual(bound["campaign"], "insead-2026")
+
+    def test_explicit_campaign_is_honored_without_session(self):
+        """AIQ-1639: an explicitly-supplied campaign is still recorded even without a session
+        — only the silent env default is removed, not caller-supplied attribution."""
+        db = MagicMock()
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.first.return_value = None
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post(
+                "/api/test-drive/survey", json=_body(session_id=None, campaign="qa-x")
+            )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        conn = db.engine.begin.return_value.__enter__.return_value
+        survey_calls = [c for c in conn.execute.call_args_list if "INSERT INTO survey_responses" in str(c.args[0])]
+        self.assertEqual(len(survey_calls), 1)
+        self.assertEqual(survey_calls[0].args[1]["campaign"], "qa-x")
+
     def test_out_of_range_q1_returns_422(self):
         db = MagicMock()
         with patch.dict(os.environ, _ENABLED, clear=False), \
