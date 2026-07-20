@@ -140,3 +140,43 @@ def test_empty_queue_is_a_noop(monkeypatch):
 
     assert summary == {"pending": 0, "sent": 0, "logged": 0, "failed": 0}
     assert engine.updates == []
+
+
+# ── Instant-fire (AIQ-1610 follow-up) ────────────────────────────────────────────────
+
+def test_dispatch_outbox_soon_runs_the_consumer_off_thread(monkeypatch):
+    import threading
+
+    done = threading.Event()
+    calls = []
+
+    def _fake(limit=100):
+        calls.append(limit)
+        done.set()
+        return {"pending": 0, "sent": 0, "logged": 0, "failed": 0}
+
+    monkeypatch.setattr(mod, "run_outbox_dispatch_cron", _fake)
+
+    mod.dispatch_outbox_soon(limit=25)
+
+    assert done.wait(timeout=5), "instant-fire should invoke the consumer in the pool"
+    assert calls == [25], "the bounded limit is passed through"
+
+
+def test_dispatch_outbox_soon_never_raises_on_consumer_error(monkeypatch):
+    import threading
+
+    done = threading.Event()
+
+    def _boom(limit=100):
+        try:
+            raise RuntimeError("resend down")
+        finally:
+            done.set()
+
+    monkeypatch.setattr(mod, "run_outbox_dispatch_cron", _boom)
+
+    mod.dispatch_outbox_soon()  # must not raise on the caller's thread
+
+    assert done.wait(timeout=5)
+    # _safe_dispatch swallows the error; nothing to assert beyond "did not propagate".

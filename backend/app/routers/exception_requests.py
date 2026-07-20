@@ -414,6 +414,12 @@ def _notify_hr_of_exception_request(
                 "currency": body.currency.upper(),
             },
         )
+        # [AIQ-1610 follow-up] Instant-fire the just-enqueued email off the request path so HR is
+        # notified in seconds, not on the GitHub-throttled (~2h) cron tick. Best-effort; the cron
+        # remains the safety-net. No-op when the recipient opted out of email (nothing enqueued).
+        from ..services.notification_outbox_dispatch import dispatch_outbox_soon
+
+        dispatch_outbox_soon()
     except Exception as exc:
         logger.warning(
             "exception_requests: HR notification failed case_id=%s id=%s error=%s",

@@ -17,6 +17,7 @@ Best-effort by construction: a single bad row never aborts the batch, and the fu
 """
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
 from datetime import datetime
@@ -127,3 +128,40 @@ def run_outbox_dispatch_cron(limit: int = 100) -> Dict[str, Any]:
     summary = {"pending": len(rows), "sent": sent, "logged": logged, "failed": failed}
     log.info("outbox dispatch: %s", summary)
     return summary
+
+
+# ── Instant-fire ─────────────────────────────────────────────────────────────────────
+# [AIQ-1610 follow-up] The scheduled GitHub-Actions cron is a safety-net, but GitHub throttles
+# a 15-min schedule to ~every 2 hours, so relying on it alone meant an over-cap → HR email could
+# sit pending for up to ~2h. `dispatch_outbox_soon` delivers a just-enqueued row within seconds by
+# running the same consumer off the request path, in a small bounded thread pool (same fire-and-
+# forget idiom as auth._dispatch_supabase_sync). The cron still sweeps anything this misses.
+_instant_fire_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=2, thread_name_prefix="outbox-instant-fire"
+)
+
+
+def _safe_dispatch(limit: int) -> None:
+    try:
+        run_outbox_dispatch_cron(limit=limit)
+    except Exception:  # noqa: BLE001 — instant-fire is best-effort; never surface
+        log.warning("outbox instant-fire dispatch failed (suppressed)", exc_info=True)
+
+
+def dispatch_outbox_soon(limit: int = 25) -> None:
+    """Best-effort INSTANT-FIRE of the outbox, off the caller's request path.
+
+    Submits ``run_outbox_dispatch_cron`` to a small bounded pool so an enqueue-triggering request
+    (e.g. an over-cap exception submit) returns immediately while the email goes out in seconds
+    rather than on the throttled cron tick. Never raises; if the pool is saturated or shutting
+    down the row simply waits for the scheduled cron (the safety-net). A modest ``limit`` keeps the
+    inline burst bounded — any backlog is left to the cron.
+
+    Note (accepted, best-effort): instant-fire and the cron can briefly overlap and, in a rare
+    race, double-send one email. HR notifications are best-effort and a duplicate is harmless, so
+    the queue is intentionally not hardened with row-level claiming here.
+    """
+    try:
+        _instant_fire_executor.submit(_safe_dispatch, limit)
+    except RuntimeError as exc:  # pool shutting down — fall back to the cron
+        log.warning("outbox instant-fire not scheduled (%s); leaving for the cron", exc)
