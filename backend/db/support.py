@@ -24,9 +24,10 @@ _is_sqlite = _raw_url.startswith("sqlite")
 
 # [AIQ-1610] Notification types that default to email-ON when the recipient has no explicit
 # notification_preferences row. An explicit preference still wins (opt-out is respected). This
-# makes the policy-exception → HR notification (POLICY_EXCEPTION_REQUESTED) actually enqueue an
-# outbox row by default, so the notification_outbox consumer delivers the over-cap alert to HR.
-_EMAIL_DEFAULT_ON = {"POLICY_EXCEPTION_REQUESTED"}
+# makes the policy-exception lifecycle actually enqueue an outbox row by default, so the consumer
+# delivers it: REQUESTED → the assigned HR (over-cap alert); DECIDED → the employee (the outcome
+# of the request they filed).
+_EMAIL_DEFAULT_ON = {"POLICY_EXCEPTION_REQUESTED", "POLICY_EXCEPTION_DECIDED"}
 
 
 class SupportMixin:
