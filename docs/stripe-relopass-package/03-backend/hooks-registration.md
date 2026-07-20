@@ -96,3 +96,55 @@ POST /api/workspaces/776786/hooks
 ```
 
 Use `PATCH /api/workspaces/776786/hooks/:hookId` to update an existing one.
+
+---
+
+# v1.0 spec hooks: the `relopass-*` server functions (registered 2026-07-19)
+
+The v1.0 spec build (`relopass-payments.routes.ts` + webhook extension)
+landed as FOUR additional server functions, registered in the platform hooks
+registry alongside the originals above. Reference copies live in this folder
+as `relopass-*.hook.js`. `caseId` in all four = `case_access.id` (the sidecar
+payment table — `relocation_cases` has no payment columns and WorkspaceDB
+tables cannot be ALTERed).
+
+| Hook | Endpoint | Contract |
+|---|---|---|
+| `relopass-create-case` | `POST /api/workspaces/776786/hooks/relopass-create-case/execute` | `{ corridor, employeeType, moveDate }` → `{ caseId }` |
+| `relopass-checkout` | `POST /api/workspaces/776786/hooks/relopass-checkout/execute` | `{ caseId, tier: 'roadmap' \| 'essentials' }` → `{ checkoutUrl, sessionId }` (€800 / €2,000 fixed server-side) |
+| `relopass-access` | `GET /api/workspaces/776786/hooks/relopass-access/execute?caseId=<id>` | → `{ caseId, accessTier, paymentStatus, accountTier, availableAddons }` (+ `employeeType`, `moveDate`, `unlockedAt`) |
+| `relopass-webhook` | `POST /api/workspaces/776786/hooks/relopass-webhook/execute` | Stripe `checkout.session.completed` receiver — **register this URL in the Stripe Dashboard**. Verifies the `Stripe-Signature` header before any processing (see below). Only processes `metadata.source === 'relopass_case_command'`; never trusts the payload (re-verifies with the platform Stripe status API); idempotent. |
+
+## `relopass-webhook` signature verification (updated 2026-07-19)
+
+The deployed `relopass-webhook` hook now rejects any request that does not
+carry a valid-looking `Stripe-Signature` header **before any other
+processing** (HTTP 400 `{ "error": "Invalid signature" }`):
+
+- the header must be present and well-formed (`t=<unix timestamp>` plus at
+  least one `v1=<64-hex HMAC>` component), and
+- the timestamp must be within a 5-minute tolerance window (Stripe's own
+  default), which blocks replayed captures.
+
+**Sandbox limitation:** full cryptographic verification with
+`stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET)`
+is NOT possible inside the Audos hook sandbox — hooks receive only the
+parsed JSON body (no raw body bytes to HMAC), have no `crypto` primitives,
+no `require`/`import`, and no `process.env` (the `STRIPE_WEBHOOK_SECRET`
+workspace secret is not exposed to hook code). The header is therefore
+validated structurally and for freshness, and the real security guarantee
+remains the second layer: the hook re-verifies the checkout session against
+`GET /api/payments/status/:sessionId` before writing anything, so a
+forged-but-well-formed request still cannot unlock a case.
+
+Reference implementation: `relopass-webhook.hook.js` in this folder (kept in
+sync with the registered hook code).
+
+The frontend consumers are `apps/case-command/CaseGate.tsx` and
+`apps/case-command/hooks/useCaseAccess.ts` (wired via
+`apps/case-command/CorridorCheck.tsx`). The original `case-checkout` /
+`case-access` / `stripe-case-webhook` hooks remain registered but the UI now
+calls the `relopass-*` set. The same security model applies: server-side
+pricing, unlock written only after server-side Stripe verification, and
+lazy re-verification inside `relopass-access` so unlocks land even before
+the Stripe Dashboard webhook is registered.
