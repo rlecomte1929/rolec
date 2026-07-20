@@ -104,9 +104,32 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
 
   test('[DEEP-ROADMAP-UX] employee roadmap page RENDERS (no spinner / "couldn\'t load")', async ({ page }, info) => {
     test.skip(!state.roadmapReady, 'no generated roadmap to render');
+    // [AIQ-1637] The roadmap PAGE's spinner is gated by the plan-VIEW projection
+    // (GET /api/relocation-plans/{case_id}/view → summary.total_tasks), NOT the /roadmap
+    // tracks the sibling [DEEP-ROADMAP-API] polled — they materialise independently, so
+    // tracks>0 does not mean the page will render immediately. The plan builds async
+    // (~60–90s). Poll the page's ACTUAL gating endpoint to readiness first so the page
+    // renders a built plan and its spinner clears fast; otherwise a cold-start/deploy-window
+    // build gets caught mid-flight and mis-filed as a permanent-spinner(B10) (the false
+    // regression this ticket chased).
+    let planTasks = 0;
+    for (let i = 0; i < 30; i++) {
+      const r = await api.get(`${API}/api/relocation-plans/${state.caseId}/view`, { headers: { Authorization: `Bearer ${emp}` } });
+      if (r.ok()) {
+        const j = await r.json().catch(() => ({}));
+        planTasks = j?.summary?.total_tasks ?? 0;
+        if (planTasks > 0) break;
+      }
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+    await info.attach('roadmap-plan-ready', { body: JSON.stringify({ planTasks }), contentType: 'application/json' });
     await page.goto(`/employee/case/${state.caseId}/roadmap`);
     await page.waitForTimeout(3000);
-    const v = await assertLogicalPage(page, info, 'deep-roadmap');
+    // Belt-and-braces: size the permanent-spinner window to the documented ~60–90s build
+    // window so a still-building roadmap never mis-files B10. A genuinely stuck spinner
+    // (backend up, plan-view never returns tasks) still fails after the window. A ready
+    // roadmap clears in <5s, so the common path stays fast.
+    const v = await assertLogicalPage(page, info, 'deep-roadmap', { spinnerClearMs: 90000 });
     await shot(page, info, '01_roadmap');
     const body = await page.locator('body').innerText().catch(() => '');
     await info.attach('roadmap-ux', { body: JSON.stringify({ heading: v.heading, signals: v.signals, couldntLoad: /couldn't load|could not load/i.test(body) }), contentType: 'application/json' });
