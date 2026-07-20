@@ -120,7 +120,7 @@ def list_corridors(
                 text(
                     """
                     SELECT DISTINCT c AS corridor
-                    FROM vendors v, unnest(coalesce(v.corridor_codes, '{}')) AS c
+                    FROM vendors_legacy v, unnest(coalesce(v.corridor_codes, '{}')) AS c  -- [AIQ-1638] renamed on prod
                     WHERE v.is_active = true
                       AND c ~ '^[A-Z]{2}-[A-Z]{2}$'
                     ORDER BY corridor
@@ -156,7 +156,7 @@ def get_vendor(
                 SELECT id, name, service_types,
                        countries_served AS countries, corridor_codes AS corridors,
                        email AS contact_email, is_active, category, is_preferred, created_at
-                FROM vendors
+                FROM vendors_legacy  -- [AIQ-1638] vendors renamed to vendors_legacy on prod
                 WHERE id = :id
                   AND is_active = true
                 """
@@ -225,7 +225,7 @@ def list_vendors(
         SELECT v.id, v.name, v.service_types,
                v.countries_served AS countries, v.corridor_codes AS corridors,
                v.email AS contact_email, v.is_active, v.category, v.is_preferred, v.created_at
-        FROM vendors v
+        FROM vendors_legacy v  -- [AIQ-1638] vendors renamed to vendors_legacy on prod
         WHERE {where_sql}
         ORDER BY v.name ASC
     """

@@ -231,9 +231,12 @@ async def create_rfq(
     with db.engine.begin() as conn:
         from sqlalchemy import text
         vendor_row = conn.execute(
-            # public.vendors columns are id, name, email, countries_served, is_active
-            # (NOT contact_email / corridors / is_approved — those 500'd every RFQ create).
-            text("SELECT id, name, email, countries_served FROM vendors WHERE id = :id AND is_active = true"),
+            # [AIQ-1638] The HR vendor directory table `public.vendors` was renamed to
+            # `public.vendors_legacy` out-of-band on prod (the vendors→suppliers redesign is
+            # incomplete: the live vendor rows, incl. the SIRVA fixture, are still here, NOT in
+            # `suppliers`). Reading `vendors` 500'd every RFQ create. Columns are unchanged:
+            # id, name, email, countries_served, is_active.
+            text("SELECT id, name, email, countries_served FROM vendors_legacy WHERE id = :id AND is_active = true"),
             {"id": body.vendor_id},
         ).mappings().first()
 
@@ -354,7 +357,7 @@ async def list_rfqs(
                r.hr_email, r.hr_name, r.status, r.created_at, r.updated_at,
                v.name AS vendor_name, v.email AS vendor_email
         FROM rfq_requests r
-        LEFT JOIN vendors v ON v.id = r.vendor_id
+        LEFT JOIN vendors_legacy v ON v.id = r.vendor_id  -- [AIQ-1638] vendors → vendors_legacy (renamed on prod)
         WHERE {where}
         ORDER BY r.created_at DESC
     """
@@ -453,7 +456,8 @@ async def update_rfq_status(
             vendor_name = ""
             with db.engine.begin() as conn:
                 v = conn.execute(
-                    sql_text("SELECT name FROM vendors WHERE id = :id"),
+                    # [AIQ-1638] vendors renamed to vendors_legacy on prod
+                    sql_text("SELECT name FROM vendors_legacy WHERE id = :id"),
                     {"id": row.get("vendor_id")},
                 ).mappings().first()
                 vendor_name = (v or {}).get("name", "vendor")

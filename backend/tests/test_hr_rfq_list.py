@@ -20,7 +20,7 @@ from backend.app.routers import hr_rfq as router_module
 
 # Minimal sqlite mirror of the columns the list query touches.
 SCHEMA = """
-CREATE TABLE vendors (
+CREATE TABLE vendors_legacy (
   id TEXT PRIMARY KEY, name TEXT, email TEXT
 );
 CREATE TABLE rfq_requests (
@@ -57,7 +57,7 @@ class HrRfqListTests(unittest.TestCase):
         vid = str(uuid.uuid4())
         with self.engine.begin() as conn:
             conn.execute(
-                text("INSERT INTO vendors (id, name, email) VALUES (:id, :n, :e)"),
+                text("INSERT INTO vendors_legacy (id, name, email) VALUES (:id, :n, :e)"),
                 {"id": vid, "n": "Acme Movers", "e": "ops@acme.test"},
             )
             conn.execute(
