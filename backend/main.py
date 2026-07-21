@@ -4724,6 +4724,36 @@ def assign_case(
             td_route = resolve_test_drive_route(effective)
             if td_route:
                 db.set_relocation_case_route(case_id, **td_route)
+                # [AIQ-1651] set_relocation_case_route writes relocation_cases; but the
+                # recommendations engine (POST /api/recommendations/batch -> app_crud.get_case)
+                # reads the wizard_cases row (same id, different table), which has no destination
+                # until intake is submitted. Without a dest, CITY-SCOPED recs (housing/schools)
+                # return "unavailable" for the whole test-drive cohort. Stamp the corridor dest onto
+                # wizard_cases here (create-on-missing, mirroring cases_write.patch_case) so testers
+                # see the full marketplace without completing intake. Test-drive-only (td_route is
+                # None for real HR); preserves any existing purpose/target_move_date.
+                _basics = {
+                    "originCountry": td_route["home_country"],
+                    "originCity": td_route["home_city"],
+                    "destCountry": td_route["host_country"],
+                    "destCity": td_route["host_city"],
+                }
+                with SessionLocal() as _s:
+                    _wc = app_crud.get_case(_s, case_id)
+                    if not _wc:
+                        _wc = app_crud.create_case(_s, case_id, {"relocationBasics": _basics})
+                    _draft = json.loads(_wc.draft_json or "{}")
+                    _draft.setdefault("relocationBasics", {}).update(_basics)
+                    _derived = {
+                        "origin_country": td_route["home_country"],
+                        "origin_city": td_route["home_city"],
+                        "dest_country": td_route["host_country"],
+                        "dest_city": td_route["host_city"],
+                        "purpose": _wc.purpose,
+                        "target_move_date": _wc.target_move_date,
+                    }
+                    _flags = json.loads(_wc.flags_json or "{}")
+                    app_crud.update_case(_s, _wc, _draft, _derived, _flags)
                 log.info(
                     "assign_case: test-drive corridor locked case=%s route=%s->%s",
                     case_id, td_route["home_country"], td_route["host_country"],
