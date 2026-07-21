@@ -18,9 +18,10 @@ Company scope:
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
 
 from ...database import db
 from ...schemas import UserRole
@@ -42,6 +43,21 @@ from ..services.policy_config_targeting import (
 # Shared service instance
 # ---------------------------------------------------------------------------
 policy_config_matrix_svc = PolicyConfigMatrixService(db)
+
+logger = logging.getLogger(__name__)
+
+
+def _reindex_after_publish_safe(company_id: str) -> None:
+    """AIQ-1642: rebuild the Policy Assistant RAG index for a just-published policy,
+    OFF the publish request path (scheduled as a FastAPI BackgroundTask). This is the
+    slow step (a blocking OpenAI embeddings call + a per-chunk INSERT loop) that made
+    publish take 20-40s; deferring it drops the user-facing publish to the atomic status
+    flip. Best-effort — a background task must never surface or crash the worker."""
+    try:
+        from ..services.policy_chunk_indexer import index_company_policy
+        index_company_policy(str(company_id))
+    except Exception:
+        logger.exception("deferred policy_assistant re-index failed company=%s", company_id)
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +272,7 @@ def hr_put_policy_config_draft(
 
 @hr_policy_config_router.post("/policy-config/publish")
 def hr_post_policy_config_publish(
+    background_tasks: BackgroundTasks,
     body: Optional[Dict[str, Any]] = Body(default=None),
     companyId: Optional[str] = Query(None, alias="companyId"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
@@ -267,6 +284,11 @@ def hr_post_policy_config_publish(
             cid,
             policy_version_id=payload.get("policy_version"),
             created_by=user.get("id"),
+            # AIQ-1642: run the RAG re-index after the response is sent, not on the
+            # request path — publish returns in ~the atomic status flip, not 20-40s.
+            defer_reindex=lambda company_id: background_tasks.add_task(
+                _reindex_after_publish_safe, company_id
+            ),
         )
     except ValueError as e:
         raise _policy_matrix_validation_http(e)
@@ -633,6 +655,7 @@ def admin_put_policy_config_draft(
 
 @admin_policy_config_router.post("/policy-config/publish")
 def admin_post_policy_config_publish(
+    background_tasks: BackgroundTasks,
     company_id: str = Query(..., alias="companyId"),
     body: Optional[Dict[str, Any]] = Body(default=None),
     user: Dict[str, Any] = Depends(require_admin),
@@ -643,6 +666,10 @@ def admin_post_policy_config_publish(
             company_id,
             policy_version_id=payload.get("policy_version"),
             created_by=user.get("id"),
+            # AIQ-1642: defer the RAG re-index off the request path (see HR endpoint).
+            defer_reindex=lambda cid: background_tasks.add_task(
+                _reindex_after_publish_safe, cid
+            ),
         )
     except ValueError as e:
         raise _policy_matrix_validation_http(e)
