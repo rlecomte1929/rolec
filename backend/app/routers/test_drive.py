@@ -549,7 +549,12 @@ def survey(body: SurveyRequest, request: Request):
     # falling back to the body/env default only when there's no session. Fixes rows that
     # were saved with corridor_id=NULL and a hardcoded campaign.
     sess_campaign, sess_corridor = _session_context(sid)
-    campaign = sess_campaign or (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+    # AIQ-1639: with no session (source of truth) AND no explicitly-supplied campaign we do
+    # NOT know which cohort this survey belongs to — leave it NULL (unattributed) rather than
+    # silently filing it into the live 'insead-2026' cohort, which would contaminate every
+    # headline number (problem-fit %, pilot interest, testimonials). Unlike /provision, a
+    # session-less survey has no legitimate default cohort — the env fallback is removed here.
+    campaign = sess_campaign or (body.campaign or "").strip() or None
     corridor_id = sess_corridor or body.corridor_id
     response_id = str(uuid.uuid4())
     id_expr = ":id" if _IS_SQLITE else "CAST(:id AS uuid)"
