@@ -28,6 +28,23 @@ TEMPORARY_TAG = "serviced_apartment"
 PERMANENT_TAG = "rental_agency"
 _SUBTYPE_TAGS = {"temporary": TEMPORARY_TAG, "permanent": PERMANENT_TAG}
 
+# Neighbourhood-affinity tokens live in the same specialization_tags array as
+# ``area:<living_areas_item_id>`` (e.g. ``area:la-o1``). When an employee shortlists
+# neighbourhoods, agencies serving those areas get an additive boost (Δ2) — never a
+# filter, so every approved agency stays reachable.
+AREA_TAG_PREFIX = "area:"
+# Additive boost per shortlisted-area overlap (capped). Small vs the +15 preferred boost.
+AREA_MATCH_BOOST = 8.0
+AREA_MATCH_BOOST_CAP = 16.0
+
+
+def _served_area_ids(tags: List[str]) -> set:
+    return {
+        str(t)[len(AREA_TAG_PREFIX):]
+        for t in (tags or [])
+        if str(t).startswith(AREA_TAG_PREFIX)
+    }
+
 
 class HousingAgenciesCriteria(BaseModel):
     destination_city: str = ""
@@ -35,6 +52,9 @@ class HousingAgenciesCriteria(BaseModel):
     budget_monthly: Dict[str, int] = Field(default_factory=lambda: {"min": 2000, "max": 5000})
     # Employee's sub-type preference: "temporary" | "permanent" | None (no preference).
     subtype_preference: Optional[str] = None
+    # Living-areas item_ids the employee has shortlisted (Δ1). Agencies serving these
+    # neighbourhoods get an additive boost (Δ2). Empty = no shortlist signal.
+    shortlisted_area_ids: List[str] = Field(default_factory=list)
     weights: Optional[Dict[str, float]] = None
 
 
@@ -89,18 +109,31 @@ class HousingAgenciesPlugin(BasePlugin):
             + w_subtype * subtype_match
         )
 
+        # Δ2: additive boost for agencies serving the shortlisted neighbourhoods. Never a
+        # filter — an agency with no overlap keeps its rating/availability score and stays
+        # reachable; overlapping agencies simply rank higher (capped).
+        served = _served_area_ids(tags)
+        overlap = served & set(c.shortlisted_area_ids or [])
+        area_boost = min(AREA_MATCH_BOOST * len(overlap), AREA_MATCH_BOOST_CAP)
+        score_raw += area_boost
+
         subtype_label = {"temporary": "Serviced apartments (temporary)",
                          "permanent": "Rental agency (permanent)"}.get(subtype, "Housing agency")
         pros = [f"Rating {rating}/5", subtype_label]
+        rationale = f"{subtype_label} serving {c.destination_city or 'your destination'}."
+        if overlap:
+            pros.append(f"Serves {len(overlap)} of your shortlisted areas")
+            rationale += f" Serves {len(overlap)} neighbourhood(s) you shortlisted."
         return {
             "score_raw": score_raw,
             "breakdown": {
                 "rating": rating_score,
                 "availability": availability_score,
                 "subtype_match": subtype_match,
+                "shortlisted_area_match": area_boost,
             },
             "summary": f"{item.get('name')} — {subtype_label}, {rating}/5.",
-            "rationale": f"{subtype_label} serving {c.destination_city or 'your destination'}.",
+            "rationale": rationale,
             "pros": pros,
             "cons": [],
             "metadata": {
@@ -110,6 +143,7 @@ class HousingAgenciesPlugin(BasePlugin):
                 "confidence": item.get("confidence", 85),
                 "housing_subtype": subtype,          # "temporary" | "permanent" | None
                 "specialization_tags": tags,
+                "matched_shortlisted_areas": sorted(overlap),
                 "cost_type": "service",
             },
         }
