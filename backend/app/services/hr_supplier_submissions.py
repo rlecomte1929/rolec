@@ -17,6 +17,7 @@ from sqlalchemy import text
 
 from ..db import SessionLocal
 from .supplier_registry import create_supplier
+from .supplier_validation import validate_capability
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +60,27 @@ def create(
     service_category = (service_category or "").strip()
     if not name or not service_category:
         raise ValueError("name and service_category are required")
+    # [AIQ-1659] Validate the capability against the SAME rules `approve` enforces
+    # (via supplier_registry.create_supplier → validate_capability), so a submission can
+    # never be stored in a state that only fails at approval time. Previously the submit
+    # path accepted any free-text service_category / coverage / country_code (e.g. the
+    # non-canonical 'school' vs the enum's 'schools', or a country name instead of an
+    # ISO-2 code), so an admin clicking Approve on /admin/supplier-submissions got a bare
+    # 400 from create_supplier with no way to fix the row. Reuse the single source of
+    # truth and reject up-front with the actionable message instead.
+    coverage_scope_type = (coverage_scope_type or "country").strip().lower()
+    service_category = service_category.lower().replace(" ", "_")
+    ok, err = validate_capability(
+        {
+            "service_category": service_category,
+            "coverage_scope_type": coverage_scope_type,
+            "country_code": country_code,
+            "city_name": city_name,
+        },
+        exclude_id=True,
+    )
+    if not ok:
+        raise ValueError(err or "Invalid supplier capability")
     row_id = str(uuid.uuid4())
     with SessionLocal() as s:
         s.execute(
