@@ -77,13 +77,36 @@ def _apply_service_shaping(
         max_val = int(max_b) if isinstance(max_b, (int, float)) else 5000
         out["budget_monthly"] = {"min": min_val, "max": max_val}
         commute = out.get("commute_mins")
+        mode = out.get("commute_mode") if out.get("commute_mode") in ("transit", "walk", "bike", "car") else "transit"
         if isinstance(commute, (int, float)):
             out["commute_work"] = {
                 "max_minutes": int(commute),
                 "address": out.get("office_address") or "",
-                "mode": "transit",
+                "mode": mode,
             }
-        for k in ("budget_min", "budget_max", "commute_mins"):
+        # Lifestyle multiselect -> priorities dict the living_areas scorer reads:
+        # selected dimensions weight high (9), the rest stay neutral (5).
+        lifestyle = out.get("housing_lifestyle")
+        if isinstance(lifestyle, str):
+            lifestyle = [s.strip() for s in lifestyle.split(",") if s.strip()]
+        if isinstance(lifestyle, list) and lifestyle:
+            selected = {str(x).strip().lower() for x in lifestyle}
+            out["lifestyle_priorities"] = {
+                k: (9 if k in selected else 5) for k in ("safety", "quiet", "green", "nightlife")
+            }
+        # Sub-type preference flows to the housing_agencies plugin (the living_areas
+        # plugin ignores it) via the "housing" -> housing_agencies criteria fan-out.
+        subtype = (out.get("housing_subtype") or "").strip().lower()
+        if subtype in ("temporary", "permanent"):
+            out["subtype_preference"] = subtype
+        # Preferred / avoid neighbourhood names (free text -> list).
+        for key in ("preferred_areas", "avoid_areas"):
+            val = out.get(key)
+            if isinstance(val, str):
+                out[key] = [s.strip() for s in val.split(",") if s.strip()]
+            elif not isinstance(val, list):
+                out.pop(key, None)
+        for k in ("budget_min", "budget_max", "commute_mins", "commute_mode", "housing_lifestyle", "housing_subtype"):
             out.pop(k, None)
         # Phase 1: geocode the office once (cached) so the plugin computes real
         # commute from coordinates. Best-effort — silent on failure/offline.
@@ -177,6 +200,11 @@ def build_criteria_for_assignment(
         "bedrooms": "bedrooms",
         "sqm_min": "sqm_min",
         "commute_mins": "commute_mins",
+        "commute_mode": "commute_mode",
+        "housing_lifestyle": "housing_lifestyle",
+        "housing_subtype": "housing_subtype",
+        "preferred_areas": "preferred_areas",
+        "avoid_areas": "avoid_areas",
         "office_address": "office_address",
         "child_ages": "child_ages",
         "school_type": "school_type",

@@ -207,11 +207,34 @@ class LivingAreasPlugin(BasePlugin):
             + w_avail * availability_score
         )
 
+        # Preferred / avoid neighbourhoods the employee named (by area name). Additive
+        # nudge, never a hard filter — an avoided area still appears, just ranked lower.
+        item_name = (item.get("name") or "").strip().lower()
+
+        def _named(names: List[str]) -> bool:
+            return any(item_name and n.strip().lower() in item_name for n in (names or []))
+
+        preferred_hit = _named(c.preferred_areas)
+        avoid_hit = _named(c.avoid_areas)
+        if preferred_hit:
+            score_raw += 15
+        if avoid_hit:
+            score_raw = max(0, score_raw - 20)
+
+        # Rationale cites the employee's own inputs (product facts — no decision/status
+        # framing, keeping the compliance guard green).
         rationale_parts = [
-            f"Budget: {'within' if b_min <= rent <= b_max else 'above'} your range.",
-            f"Commute ~{commute_mins} min.",
-            f"Lifestyle: safety {tags.get('safety', 7)}, green {tags.get('green', 6)}.",
+            f"Budget: {'within' if b_min <= rent <= b_max else 'above'} the range you entered.",
+            f"~{commute_mins} min by {mode} to your office.",
         ]
+        if c.lifestyle_priorities:
+            top = [k for k, v in c.lifestyle_priorities.items() if v >= 7]
+            if top:
+                rationale_parts.append(f"Matches your priorities: {', '.join(top)}.")
+        if preferred_hit:
+            rationale_parts.append("A neighbourhood you said you'd prefer.")
+        if avoid_hit:
+            rationale_parts.append("You asked to avoid this area.")
         if avail in ("low", "scarce"):
             nd = item.get("next_available_days", 30)
             rationale_parts.append(f"⚠ Scarcity: next available in ~{nd} days.")
