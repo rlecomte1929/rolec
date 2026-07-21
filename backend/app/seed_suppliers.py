@@ -124,9 +124,17 @@ def seed_suppliers_from_schools() -> int:
 
 
 def seed_suppliers_from_recommendation_datasets() -> int:
-    """Seed living_areas, schools, movers so RFQ works with recommendation item_ids."""
+    """Seed schools, movers so RFQ works with recommendation item_ids.
+
+    living_areas is intentionally excluded: neighbourhoods are advisory content, not
+    suppliers. Registering each `la-*` neighbourhood as a `living_areas` supplier
+    minted field-poor shells that shadowed the real dataset rows and crashed the
+    scorer (the Living Areas = 0 bug). The advisory path ignores the registry for
+    living_areas, so this only stops *new* shells from being minted; existing `la-*`
+    rows are removed by the follow-up data migration.
+    """
     total = 0
-    for fn in (seed_suppliers_from_living_areas, seed_suppliers_from_schools, seed_suppliers_from_movers):
+    for fn in (seed_suppliers_from_schools, seed_suppliers_from_movers):
         try:
             total += fn()
         except Exception:
