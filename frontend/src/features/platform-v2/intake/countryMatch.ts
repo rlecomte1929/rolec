@@ -1,22 +1,41 @@
-// Pure matcher for the intake CountryCombo auto-commit (AIQ-1315).
+// Pure matchers for the intake CountryCombo auto-commit (AIQ-1315).
 //
 // #1037 added auto-commit when the typed text exactly matches a country NAME or
-// its 2-char CODE, to fix a silent-disabled-Continue bug. A bare exact-code match
-// is fragile as COUNTRIES grows: if a future country NAME's first 2 chars equal a
-// DIFFERENT country's CODE (e.g. adding Austria/AT next to Australia/AU), typing
-// "au" would commit Australia before the user finishes "Austria".
+// its 2-char CODE, to fix a silent-disabled-Continue bug. Browser QA later
+// reproduced a worse bug in the other direction: committing a CODE match on
+// every keystroke rewrote the input to the full country name WHILE the user was
+// still typing ("No" hit code NO -> the field became "Norway"), so the next
+// keystroke appended to the completed word ("Norwayr" -> "No match",
+// recoverable only by backspacing). The same fired for "Fr" -> France
+// ("Franceance").
 //
-// Rule: a full NAME match always commits; a CODE match commits ONLY if the query
-// is not also the prefix of a *different* country's name. This preserves both
-// "type the full name → commit" and "type a complete unambiguous code → commit"
-// (e.g. "fr" still commits France — no other name starts with "fr").
+// The matchers are therefore split by call site:
+//   - matchCountryName — safe on EVERY keystroke: it only matches when the
+//     typed text IS the full name, so the committed value is identical to what
+//     the user typed and the input never rewrites under their caret.
+//   - matchCountry — the full name-or-code matcher, for commit points where
+//     typing has finished (blur / leaving the field). A full NAME match always
+//     commits; a CODE match commits ONLY if the query is not also the prefix of
+//     a *different* country's name (e.g. adding Austria/AT next to
+//     Australia/AU: "au" must not commit Australia while the user may be typing
+//     "Austria").
 
 export interface CountryOption {
   code: string;
   name: string;
 }
 
-/** The country to auto-commit for a typed query, or undefined if ambiguous / no match. */
+/** Full-NAME match only — the only auto-commit that is safe mid-keystroke. */
+export function matchCountryName<T extends CountryOption>(
+  query: string,
+  countries: T[],
+): T | undefined {
+  const norm = query.trim().toLowerCase();
+  if (!norm) return undefined;
+  return countries.find((c) => c.name.toLowerCase() === norm);
+}
+
+/** The country to commit for a finished query (blur), or undefined if ambiguous / no match. */
 export function matchCountry<T extends CountryOption>(
   query: string,
   countries: T[],
@@ -24,7 +43,7 @@ export function matchCountry<T extends CountryOption>(
   const norm = query.trim().toLowerCase();
   if (!norm) return undefined;
 
-  const byName = countries.find((c) => c.name.toLowerCase() === norm);
+  const byName = matchCountryName(norm, countries);
   if (byName) return byName; // full name → always commit
 
   const byCode = countries.find((c) => c.code.toLowerCase() === norm);

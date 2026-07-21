@@ -26,7 +26,7 @@ import { resolveIntakeIds } from './resolveIntakeIds';
 import { caseIdForAssignment } from '../../../utils/employeeAssignmentScope';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { parseSubmitError } from './parseSubmitError';
-import { matchCountry } from './countryMatch';
+import { matchCountry, matchCountryName } from './countryMatch';
 // Identity fields (nationality, passport) accept the full ISO list; the local
 // COUNTRIES below stays scoped to the relocation origin/destination pickers,
 // which also rely on CITIES_BY_COUNTRY (AIQ-1341).
@@ -384,12 +384,28 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
           onChange={(v) => {
             setQuery(v);
             setOpen(true);
-            // Auto-commit when the typed text unambiguously identifies a country so
-            // the user isn't left with an empty value (and a disabled Continue) after
-            // typing the full name without clicking the dropdown. See matchCountry for
-            // the name-prefix guard that keeps a code match from firing early.
-            const exact = matchCountry(v, [...options]);
+            // Auto-commit mid-keystroke ONLY on a full-NAME match, so the user isn't
+            // left with an empty value (and a disabled Continue) after typing the full
+            // name without clicking the dropdown. Committing a CODE match here rewrote
+            // the input to the completed name WHILE the user was still typing ("No" hit
+            // code NO → the field became "Norway", the next keystroke appended →
+            // "Norwayr" → "No match"). A name match is safe: the committed name IS the
+            // typed text, so nothing rewrites under the caret. Code matches commit on
+            // blur below.
+            const exact = matchCountryName(v, [...options]);
             if (exact) { onChange(exact.code); setOpen(false); setQuery(''); }
+          }}
+          // Commit an unambiguous CODE match (e.g. "fr" → France) only when the user
+          // is DONE typing — on blur — never mid-keystroke (see onChange above). Value
+          // commit only: the open/query UI state is deliberately left alone when focus
+          // moves inside the dropdown, so an option mid-click isn't unmounted or
+          // re-filtered between mousedown and click (Safari leaves relatedTarget null
+          // on div clicks — treated as "inside", the outside-mousedown handler closes).
+          onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+            const exact = matchCountry(query, [...options]);
+            if (exact && exact.code !== value) onChange(exact.code);
+            const next = e.relatedTarget as Node | null;
+            if (next && ref.current && !ref.current.contains(next)) { setOpen(false); setQuery(''); }
           }}
           // [AIQ-1632] Seed the edit buffer with the CURRENT value and select-all on
           // focus (instead of blanking it). Blanking left the field empty, which Chrome
