@@ -135,3 +135,41 @@ def test_create_requires_name_and_category(session_factory):
         svc.create(company_id="co-1", submitted_by="hr-1", name="  ", service_category="movers")
     with pytest.raises(ValueError):
         svc.create(company_id="co-1", submitted_by="hr-1", name="X", service_category="")
+
+
+# [AIQ-1659] The submit path must validate against the SAME rules approve enforces, so a
+# stored submission is always approvable — otherwise the admin gets a bare 400 on Approve
+# (the reported bug: prod rows had service_category='school', which is not the enum's
+# 'schools', so create_supplier rejected them at approval time).
+def test_create_rejects_noncanonical_category(session_factory):
+    # 'school' (singular) is NOT a valid category ('schools' is) — the exact prod failure.
+    with pytest.raises(ValueError):
+        svc.create(
+            company_id="co-1", submitted_by="hr-1", name="School test",
+            service_category="school", coverage_scope_type="city",
+            country_code="NO", city_name="Oslo",
+        )
+
+
+def test_create_normalizes_category_case_and_spaces(session_factory):
+    # A valid category typed with capitals/spaces is stored in canonical form, so the
+    # value that approve → create_supplier sees is exactly what the registry expects.
+    sub = svc.create(
+        company_id="co-1", submitted_by="hr-1", name="Legal Co",
+        service_category="Legal Admin", coverage_scope_type="city",
+        country_code="DE", city_name="Munich",
+    )
+    assert sub["service_category"] == "legal_admin"
+    # And it now approves cleanly (previously an un-normalised value could drift).
+    out = svc.approve(submission_id=sub["id"], reviewed_by="admin-1")
+    assert out["status"] == "approved"
+
+
+def test_create_country_scope_requires_country_code(session_factory):
+    # coverage='country' with no country_code was accepted at submit but 400'd at approve.
+    with pytest.raises(ValueError):
+        svc.create(
+            company_id="co-1", submitted_by="hr-1", name="No Country Co",
+            service_category="movers", coverage_scope_type="country",
+            country_code=None,
+        )
