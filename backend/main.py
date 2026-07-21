@@ -147,6 +147,7 @@ from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
 from .app.routers import test_drive as test_drive_router  # [AIQ-1420] TD-2 — dual-layer registration per CLAUDE.md
+from .app.routers import test_drive_qa as test_drive_qa_router  # QA staged provisioning harness — dual-layer registration per CLAUDE.md
 from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parker-B] dual-layer registration (PR #207 §9)
 from .app.routers import admin_prompts as admin_prompts_router  # [Parker-D] dual-layer registration (PR #207 §9)
 from .app.routers import ai_feedback as ai_feedback_router  # [Parker-E] dual-layer registration (PR #207 §9)
@@ -829,6 +830,7 @@ app.include_router(policy_analysis_router.router)  # [AIQ-1219] policy PDF → w
 app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
 app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
 app.include_router(test_drive_router.router)  # [AIQ-1420] TD-2 test-drive provisioning — dual-layer registration
+app.include_router(test_drive_qa_router.router)  # QA staged provisioning (/api/test-drive/qa/provision-stage) — dual-layer registration
 app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
 app.include_router(admin_prompts_router.router, prefix="/api/admin")  # [Parker-D] PR #207 §9 — dual-layer registration
 app.include_router(ai_feedback_router.router)  # [Parker-E] PR #207 §9 — dual-layer registration

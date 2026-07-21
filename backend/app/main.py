@@ -319,6 +319,13 @@ def create_app() -> FastAPI:
     from .routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
     app.include_router(test_drive_router.router)
 
+    # QA staged provisioning harness — POST /api/test-drive/qa/provision-stage.
+    # DUAL-LAYER REGISTRATION (CLAUDE.md): also registered in backend/main.py,
+    # which is what Render actually boots (`uvicorn backend.main:app`) —
+    # registering only here would 405 in production.
+    from .routers import test_drive_qa  # noqa: PLC0415 — local import mirrors test_drive above
+    app.include_router(test_drive_qa.router)
+
     # ── Month-1 TODO: Tier 4 routers blocked on Month-0 P3 extraction ─────────
     # TODO [AUDIT-C2.3 / Month-0 P3]: add hr_policy_config + employee_policy_config
     # once those routers are extracted from the inline APIRouter objects in backend/main.py.
