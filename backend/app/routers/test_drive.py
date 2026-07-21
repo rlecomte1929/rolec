@@ -261,7 +261,8 @@ WHERE s.status = 'active'
 
 
 def _seed_default_vendor_selections(
-    company_id: str, dest_country: Optional[str], created_by: Optional[str]
+    company_id: str, dest_country: Optional[str], created_by: Optional[str],
+    corridor: Optional[str] = None,
 ) -> None:
     """[AIQ-1651] Seed ``company_vendor_selections`` for a freshly provisioned test-drive company so
     an employee reaching Services → Recommendations sees a selectable supplier shortlist instead of
@@ -271,6 +272,12 @@ def _seed_default_vendor_selections(
     best-effort — a seed failure must never break provisioning. BUT loudly logged: a silent
     exception swallow on this codepath has caused a P0 before, so a failure emits a structured ERROR
     with the full stack (never a silent pass).
+
+    [AIQ-1652] "Loud" also covers the ZERO-rows case: a seed that inserts 0 selections leaves the
+    tester with an empty marketplace — the exact symptom this exists to prevent — so it is logged at
+    ERROR (not a quiet INFO), naming the company, corridor and destination, so an empty marketplace
+    is visible in the logs before it shows up in a tester's survey. (Only ``provision()`` calls this,
+    and every locked corridor has approved suppliers, so in practice this stays green.)
 
     Writes one ``selected=true`` row per approved supplier serving the corridor's destination country
     (see ``_SEED_VENDOR_SELECTIONS_SQL``). It does NOT touch the recommendations filter — the filter
@@ -291,14 +298,25 @@ def _seed_default_vendor_selections(
                 {"company_id": company_id, "dest_country": dest_country, "created_by": created_by},
             )
         seeded = getattr(result, "rowcount", None)
-        logger.info(
-            "test-drive: seeded %s vendor selection(s) for company %s (destination %s)",
-            seeded, company_id, dest_country,
-        )
+        if seeded == 0:
+            # 0 selections → the tester sees an empty marketplace. Surface it LOUDLY + structured
+            # (never a quiet INFO): a corridor whose destination has no approved suppliers with a
+            # catalog master would otherwise fail silently and be reported as a product verdict.
+            logger.error(
+                "test-drive: vendor-selection seed produced 0 selections for company %s "
+                "(corridor %s, destination %s) — tester will see an EMPTY marketplace; check "
+                "approved supplier coverage for this destination",
+                company_id, corridor, dest_country,
+            )
+        else:
+            logger.info(
+                "test-drive: seeded %s vendor selection(s) for company %s (corridor %s, destination %s)",
+                seeded, company_id, corridor, dest_country,
+            )
     except Exception:  # noqa: BLE001 — best-effort, but NEVER silent (see docstring)
         logger.error(
-            "test-drive: vendor-selection seed FAILED for company %s (destination %s)",
-            company_id, dest_country, exc_info=True,
+            "test-drive: vendor-selection seed FAILED for company %s (corridor %s, destination %s)",
+            company_id, corridor, dest_country, exc_info=True,
         )
 
 
@@ -387,7 +405,7 @@ def provision(body: ProvisionRequest, request: Request):
     #     instead of an empty "Movers (0)". Best-effort — never breaks provisioning.
     if company_id:
         _dest_country = TEST_DRIVE_CORRIDOR_ROUTES.get(resolved_corridor, {}).get("host_country")
-        _seed_default_vendor_selections(company_id, _dest_country, hr_id)
+        _seed_default_vendor_selections(company_id, _dest_country, hr_id, corridor=resolved_corridor)
 
     # 5) Mirror both to Supabase Auth (fire-and-forget; never blocks or raises).
     _dispatch_supabase_sync(hr_email, hr_password, relopass_user_id=hr_id, full_name=first_name)

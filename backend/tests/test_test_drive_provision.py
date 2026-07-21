@@ -212,6 +212,33 @@ class TestTestDriveProvision(unittest.TestCase):
         with patch.object(td, "db", db):
             td._seed_default_vendor_selections("company-1", "NO", "hr-1")  # must not raise
 
+    def test_seed_vendor_selections_zero_rows_logs_loud_error(self):
+        # [AIQ-1652] 0 selections == an empty marketplace for the tester — the exact symptom this
+        # seed prevents. It must be a LOUD structured ERROR naming company + corridor + destination,
+        # never a quiet INFO (a silent empty marketplace becomes a false "no providers" verdict).
+        from backend.app.routers import test_drive as td
+        db = MagicMock()
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.rowcount = 0
+        with patch.object(td, "db", db), \
+                self.assertLogs("backend.app.routers.test_drive", level="ERROR") as logs:
+            td._seed_default_vendor_selections("company-1", "ZZ", "hr-1", corridor="XX_ZZ")
+        joined = "\n".join(logs.output)
+        self.assertIn("0 selections", joined)
+        self.assertIn("XX_ZZ", joined)  # corridor is named
+        self.assertIn("company-1", joined)
+
+    def test_seed_vendor_selections_success_log_names_corridor(self):
+        # A successful seed logs the corridor too (structured observability).
+        from backend.app.routers import test_drive as td
+        db = MagicMock()
+        db.engine.begin.return_value.__enter__.return_value.execute.return_value.rowcount = 9
+        with patch.object(td, "db", db), \
+                self.assertLogs("backend.app.routers.test_drive", level="INFO") as logs:
+            td._seed_default_vendor_selections("company-1", "NO", "hr-1", corridor="FR_NO")
+        joined = "\n".join(logs.output)
+        self.assertIn("seeded 9 vendor selection(s)", joined)
+        self.assertIn("FR_NO", joined)
+
     def test_no_segment_defaults_null_not_prospect(self):
         """TD-FIX-2 (AIQ-1503): single-link provision with no segment writes NULL to
         test_sessions, not a silent 'prospect'."""
