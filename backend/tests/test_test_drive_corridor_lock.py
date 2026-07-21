@@ -169,10 +169,17 @@ class AssignCaseStampTests(unittest.TestCase):
 
         db = mock.MagicMock()
         db.get_case_by_id.return_value = {"id": "c1", "company_id": "co-1", "employee_id": None}
+        # [AIQ-1651] the stamp also writes the wizard_cases row via app_crud through a real
+        # SessionLocal; mock both so we can assert the destination write without a live DB.
+        crud = mock.MagicMock()
+        crud.get_case.return_value = mock.Mock(
+            draft_json="{}", purpose=None, target_move_date=None, flags_json="{}")
         with mock.patch.object(main, "db", db), \
              mock.patch.object(main, "_deny_if_impersonating"), \
              mock.patch.object(main, "_effective_user", return_value=user), \
              mock.patch.object(main, "_get_hr_company_id", return_value="co-1"), \
+             mock.patch.object(main, "SessionLocal"), \
+             mock.patch.object(main, "app_crud", crud), \
              mock.patch.object(main, "create_assignment_with_contact_and_invites",
                                side_effect=_Stop), \
              mock.patch(
@@ -186,19 +193,37 @@ class AssignCaseStampTests(unittest.TestCase):
                                  request_obj=mock.Mock(), user=user)
             except Exception:
                 pass  # _Stop (or the HTTPException it is wrapped in) — we only assert the stamp
-        return db
+        return db, crud
 
     def test_test_drive_case_is_stamped_with_its_own_corridor(self):
         # Parametrised: a FR_NO-only implementation must fail here.
         for corridor_id in ("FR_NO", "IN_DE", "GB_US"):
             with self.subTest(corridor=corridor_id):
                 route = tdc.TEST_DRIVE_CORRIDOR_ROUTES[corridor_id]
-                db = self._assign(_HR_USER, route)
+                db, _ = self._assign(_HR_USER, route)
                 db.set_relocation_case_route.assert_called_once_with("c1", **route)
 
+    def test_test_drive_case_stamps_wizard_cases_destination(self):
+        # [AIQ-1651] The recs engine reads wizard_cases; the stamp must set dest there too, so
+        # city-scoped housing/schools recs populate without the tester completing intake.
+        for corridor_id, (host_c, host_city) in (
+            ("FR_NO", ("NO", "Oslo")), ("ES_AE", ("AE", "Dubai"))
+        ):
+            with self.subTest(corridor=corridor_id):
+                route = tdc.TEST_DRIVE_CORRIDOR_ROUTES[corridor_id]
+                _db, crud = self._assign(_HR_USER, route)
+                crud.update_case.assert_called_once()
+                # signature: update_case(session, case, draft, derived, flags)
+                derived = crud.update_case.call_args.args[3]
+                self.assertEqual(derived["dest_country"], host_c)
+                self.assertEqual(derived["dest_city"], host_city)
+                draft = crud.update_case.call_args.args[2]
+                self.assertEqual(draft["relocationBasics"]["destCity"], host_city)
+
     def test_real_hr_case_is_never_stamped(self):
-        db = self._assign(_REAL_HR, None)
+        db, crud = self._assign(_REAL_HR, None)
         db.set_relocation_case_route.assert_not_called()
+        crud.update_case.assert_not_called()  # no wizard_cases stamp for a real HR case
 
 
 if __name__ == "__main__":
