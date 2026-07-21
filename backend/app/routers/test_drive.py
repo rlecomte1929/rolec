@@ -47,7 +47,7 @@ from sqlalchemy import text
 from ... import db_config
 from ...database import db
 from ...rate_limit import limiter
-from ..services.test_drive_corridor import LOCKED_CORRIDORS
+from ..services.test_drive_corridor import LOCKED_CORRIDORS, TEST_DRIVE_CORRIDOR_ROUTES
 from .auth import _dispatch_supabase_sync, _pwd_context
 
 router = APIRouter(prefix="/api/test-drive", tags=["test-drive"])
@@ -232,6 +232,76 @@ def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -
         )
 
 
+# [AIQ-1651] The engine's own candidate query: one selected=true CVS row per APPROVED supplier
+# whose registry capability serves the destination country (coverage 'global' OR country_code=dest)
+# and which has a service_catalog_items master. This is exactly the set the recommendations engine
+# would rank, so seeding it satisfies apply_hr_curation WITHOUT weakening the filter. destination_city
+# is left NULL (matches every city); idempotent via NOT EXISTS (the NULL city defeats the unique index).
+_SEED_VENDOR_SELECTIONS_SQL = """
+INSERT INTO company_vendor_selections
+    (company_id, category, master_item_id, selected, display_order, country, created_by_user_id)
+SELECT :company_id, sci.category, sci.id, true,
+       row_number() OVER (PARTITION BY sci.category ORDER BY s.name) - 1,
+       :dest_country, :created_by
+FROM service_catalog_items sci
+JOIN supplier_service_capabilities ssc
+      ON ssc.supplier_id = sci.supplier_id
+     AND ssc.service_category = sci.category
+JOIN suppliers s ON s.id = sci.supplier_id
+WHERE s.status = 'active'
+  AND sci.active = true
+  AND sci.supplier_id IS NOT NULL
+  AND ssc.platform_vetting_status = 'approved'
+  AND (ssc.coverage_scope_type = 'global' OR ssc.country_code = :dest_country)
+  AND NOT EXISTS (
+      SELECT 1 FROM company_vendor_selections cvs
+      WHERE cvs.company_id = :company_id AND cvs.master_item_id = sci.id
+  )
+"""
+
+
+def _seed_default_vendor_selections(
+    company_id: str, dest_country: Optional[str], created_by: Optional[str]
+) -> None:
+    """[AIQ-1651] Seed ``company_vendor_selections`` for a freshly provisioned test-drive company so
+    an employee reaching Services → Recommendations sees a selectable supplier shortlist instead of
+    an empty "Movers (0)" category with the "HR is finalizing providers" banner.
+
+    Mirrors ``_seed_default_published_policy``: additive, is_test-only (only ``provision()`` calls it),
+    best-effort — a seed failure must never break provisioning. BUT loudly logged: a silent
+    exception swallow on this codepath has caused a P0 before, so a failure emits a structured ERROR
+    with the full stack (never a silent pass).
+
+    Writes one ``selected=true`` row per approved supplier serving the corridor's destination country
+    (see ``_SEED_VENDOR_SELECTIONS_SQL``). It does NOT touch the recommendations filter — the filter
+    is the security control that keeps unvetted suppliers out; this only populates the curation it
+    reads. Runs via the service-role ``db.engine`` so the HR-only CVS RLS insert policy is bypassed,
+    exactly like the other seeds.
+    """
+    if not dest_country:
+        logger.warning(
+            "test-drive: no destination country for company %s — skipping vendor-selection seed",
+            company_id,
+        )
+        return
+    try:
+        with db.engine.begin() as conn:
+            result = conn.execute(
+                text(_SEED_VENDOR_SELECTIONS_SQL),
+                {"company_id": company_id, "dest_country": dest_country, "created_by": created_by},
+            )
+        seeded = getattr(result, "rowcount", None)
+        logger.info(
+            "test-drive: seeded %s vendor selection(s) for company %s (destination %s)",
+            seeded, company_id, dest_country,
+        )
+    except Exception:  # noqa: BLE001 — best-effort, but NEVER silent (see docstring)
+        logger.error(
+            "test-drive: vendor-selection seed FAILED for company %s (destination %s)",
+            company_id, dest_country, exc_info=True,
+        )
+
+
 @router.post("/provision")
 @limiter.limit(_RATE_LIMIT)
 def provision(body: ProvisionRequest, request: Request):
@@ -311,6 +381,13 @@ def provision(body: ProvisionRequest, request: Request):
     #     one. Best-effort — never breaks provisioning.
     if company_id:
         _seed_default_published_policy(company_id, hr_id)
+
+    # 4c) [AIQ-1651] Seed vendor selections (company_vendor_selections) for the corridor's
+    #     destination country so Services → Recommendations shows a selectable supplier shortlist
+    #     instead of an empty "Movers (0)". Best-effort — never breaks provisioning.
+    if company_id:
+        _dest_country = TEST_DRIVE_CORRIDOR_ROUTES.get(resolved_corridor, {}).get("host_country")
+        _seed_default_vendor_selections(company_id, _dest_country, hr_id)
 
     # 5) Mirror both to Supabase Auth (fire-and-forget; never blocks or raises).
     _dispatch_supabase_sync(hr_email, hr_password, relopass_user_id=hr_id, full_name=first_name)
