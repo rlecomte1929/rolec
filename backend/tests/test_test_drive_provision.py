@@ -165,6 +165,53 @@ class TestTestDriveProvision(unittest.TestCase):
                 ):
             td._seed_default_published_policy("company-1", "hr-1")  # must not raise
 
+    def test_provision_seeds_vendor_selections(self):
+        # [AIQ-1651] Provisioning also seeds company_vendor_selections for the corridor's
+        # destination country, so Services → Recommendations shows suppliers, not "Movers (0)".
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"), \
+                patch("backend.app.routers.test_drive._seed_default_vendor_selections") as seed:
+            resp = self.client.post("/api/test-drive/provision", json=_body(corridor_id="FR_NO"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        seed.assert_called_once()
+        self.assertEqual(seed.call_args.args[0], "company-1")  # company_id
+        self.assertEqual(seed.call_args.args[1], "NO")  # FR_NO → host_country
+
+    def test_seed_vendor_selections_issues_cvs_insert(self):
+        # [AIQ-1651] The helper INSERTs selected=true rows into company_vendor_selections,
+        # scoped to the destination country. (The mock harness has no live DB, so we assert the
+        # write is issued; the real rows are verified live in Phase 5.)
+        from backend.app.routers import test_drive as td
+        db = MagicMock()
+        with patch.object(td, "db", db):
+            td._seed_default_vendor_selections("company-1", "NO", "hr-1")
+        conn = db.engine.begin.return_value.__enter__.return_value
+        cvs_inserts = [
+            c for c in conn.execute.call_args_list
+            if "INSERT INTO company_vendor_selections" in str(c.args[0])
+        ]
+        self.assertEqual(len(cvs_inserts), 1)
+        self.assertEqual(cvs_inserts[0].args[1]["company_id"], "company-1")
+        self.assertEqual(cvs_inserts[0].args[1]["dest_country"], "NO")
+
+    def test_seed_vendor_selections_skips_without_destination(self):
+        # No destination country → no INSERT attempted, no raise.
+        from backend.app.routers import test_drive as td
+        db = MagicMock()
+        with patch.object(td, "db", db):
+            td._seed_default_vendor_selections("company-1", None, "hr-1")
+        db.engine.begin.assert_not_called()
+
+    def test_seed_vendor_selections_never_raises(self):
+        # Best-effort: a seed failure must never break provisioning (logged loudly, not swallowed).
+        from backend.app.routers import test_drive as td
+        db = MagicMock()
+        db.engine.begin.side_effect = RuntimeError("boom")
+        with patch.object(td, "db", db):
+            td._seed_default_vendor_selections("company-1", "NO", "hr-1")  # must not raise
+
     def test_no_segment_defaults_null_not_prospect(self):
         """TD-FIX-2 (AIQ-1503): single-link provision with no segment writes NULL to
         test_sessions, not a silent 'prospect'."""
