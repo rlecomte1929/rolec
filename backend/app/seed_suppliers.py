@@ -77,7 +77,9 @@ def seed_housing_agencies() -> int:
     seeding auto-select it, so agencies surface for provisioned companies without further
     wiring.
     """
-    from .recommendations.plugins.housing_agencies import TEMPORARY_TAG, PERMANENT_TAG
+    from .recommendations.plugins.housing_agencies import (
+        TEMPORARY_TAG, PERMANENT_TAG, AREA_TAG_PREFIX,
+    )
 
     path = Path(__file__).resolve().parent / "recommendations" / "datasets" / "housing_agencies.json"
     if not path.exists():
@@ -97,13 +99,16 @@ def seed_housing_agencies() -> int:
             if not item_id or not name:
                 continue
             tag = _subtype_tag.get(subtype, PERMANENT_TAG)
+            # Sub-type tag + neighbourhood-affinity tokens (area:<living_areas_id>) that
+            # drive the Δ2 shortlist boost.
+            area_tags = [f"{AREA_TAG_PREFIX}{a}" for a in (item.get("areas") or [])]
             if _ensure_supplier(session, item_id, name, {
                 "capabilities": [{
                     "service_category": "housing_agencies",
                     "coverage_scope_type": "city",
                     "city_name": city,
                     "country_code": country,
-                    "specialization_tags": [tag],
+                    "specialization_tags": [tag, *area_tags],
                     "corporate_clients": True,
                     # Agencies are pre-vetted representative suppliers → surface immediately.
                     "platform_vetting_status": "approved",

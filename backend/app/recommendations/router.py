@@ -59,9 +59,17 @@ def _log_slate(
 
 
 class _BatchRequest:
-    def __init__(self, assignment_id: str, selected_services: Optional[List[str]] = None):
+    def __init__(
+        self,
+        assignment_id: str,
+        selected_services: Optional[List[str]] = None,
+        shortlisted_area_ids: Optional[List[str]] = None,
+    ):
         self.assignment_id = assignment_id
         self.selected_services = selected_services or []
+        # Living-areas item_ids the employee has shortlisted (Δ1); used to boost the
+        # housing agencies serving those neighbourhoods (Δ2/Δ3).
+        self.shortlisted_area_ids = [str(a) for a in (shortlisted_area_ids or []) if a]
 
 
 @router.post("/batch")
@@ -84,6 +92,7 @@ def post_recommendations_batch(
     req = _BatchRequest(
         assignment_id=str(gate_id),
         selected_services=body.get("selected_services"),
+        shortlisted_area_ids=body.get("shortlisted_area_ids"),
     )
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     start = time.perf_counter()
@@ -174,6 +183,9 @@ def post_recommendations_batch(
         policy_context=policy_context,
         company_id=company_id,
     )
+    # Δ3: re-rank the housing agencies by the neighbourhoods the employee shortlisted.
+    if req.shortlisted_area_ids and "housing_agencies" in criteria_map:
+        criteria_map["housing_agencies"]["shortlisted_area_ids"] = req.shortlisted_area_ids
 
     def _run_one(backend_key: str, criteria: Dict[str, Any]) -> tuple[str, Any | None]:
         dest_city_val = (criteria.get("destination_city") or "").strip()
