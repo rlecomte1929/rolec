@@ -94,6 +94,10 @@ class ServicesCaseScopingTests(unittest.TestCase):
             # Avoid touching a live DB inside the case-context block.
             mock.patch.object(main.app_crud, "get_case", return_value=None),
             mock.patch.object(main, "SessionLocal", lambda: _DummySession()),
+            # AIQ-1649: the context helper now falls back to relocation_cases via
+            # db.get_case_by_id — default it to None so the shared mocked db doesn't
+            # leak MagicMocks into the response (individual tests override it).
+            mock.patch.object(main.db, "get_case_by_id", return_value=None),
         ]
         for p in patches:
             p.start()
@@ -131,6 +135,24 @@ class ServicesCaseScopingTests(unittest.TestCase):
         resp = self.client.post("/api/recommendations/batch", json={"case_id": "case-1"})
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertIn("results", resp.json())
+
+    # 3b. AIQ-1649: /api/services_context — with NO intake answers (get_case=None), the
+    #     case_context must populate from the relocation_cases row (host_*=destination,
+    #     home_*=origin), so the Services Preferences step is not falsely blocked on
+    #     "Destination city/country is missing".
+    def test_services_context_falls_back_to_relocation_cases_when_no_intake(self):
+        row = {
+            "host_city": "Berlin", "host_country": "Germany",
+            "home_city": "Paris", "home_country": "France",
+        }
+        with mock.patch.object(main.db, "get_case_by_id", return_value=row):
+            resp = self.client.get("/api/services/context?case_id=case-1")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        ctx = resp.json()["case_context"]
+        self.assertEqual(ctx["destCity"], "Berlin")
+        self.assertEqual(ctx["destCountry"], "Germany")
+        self.assertEqual(ctx["originCity"], "Paris")
+        self.assertEqual(ctx["originCountry"], "France")
 
     # 4a. Cross-case rejection on /api/services/context.
     def test_context_cross_case_rejected(self):

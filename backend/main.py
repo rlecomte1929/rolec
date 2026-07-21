@@ -8806,6 +8806,58 @@ def get_assignment_services(
     }
 
 
+def _services_case_context(case_id: str) -> "tuple[Dict[str, Any], Optional[str]]":
+    """Build the Services case_context (dest/origin city+country) + target start date.
+
+    AIQ-1649: destination/origin were derived ONLY from the intake wizard draft
+    (case.draft_json) + public.cases columns, so a case with no intake yet returned
+    an EMPTY context — which the Services Preferences step misreads as 'Destination
+    city/country is missing' and blocks the entire RFQ flow. Fall back to the
+    relocation_cases row (host_*=destination, home_*=origin — the same mapping used
+    at cases_write.py:179-182) so any case that already carries a destination resolves
+    without requiring intake. Precedence: wizard basics.* -> public.cases.* ->
+    relocation_cases.* (new fallback, last).
+    """
+    draft: Dict[str, Any] = {}
+    dest_city = dest_country = origin_city = origin_country = None
+    target_move_date = None
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if case:
+            try:
+                draft = json.loads(case.draft_json or "{}")
+            except Exception:
+                draft = {}
+            dest_city = getattr(case, "dest_city", None)
+            dest_country = getattr(case, "dest_country", None)
+            origin_city = getattr(case, "origin_city", None)
+            origin_country = getattr(case, "origin_country", None)
+            target_move_date = getattr(case, "target_move_date", None)
+    basics = draft.get("relocationBasics") or {}
+    ctx: Dict[str, Any] = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+    # AIQ-1649: fill anything still missing from the relocation_cases row, so a case
+    # whose destination lives there (no intake yet) does not falsely read as missing.
+    if not all((ctx["destCity"], ctx["destCountry"], ctx["originCity"], ctx["originCountry"])):
+        try:
+            case_row = db.get_case_by_id(case_id)
+        except Exception:
+            case_row = None
+        if case_row:
+            ctx["destCity"] = ctx["destCity"] or case_row.get("host_city")
+            ctx["destCountry"] = ctx["destCountry"] or case_row.get("host_country")
+            ctx["originCity"] = ctx["originCity"] or case_row.get("home_city")
+            ctx["originCountry"] = ctx["originCountry"] or case_row.get("home_country")
+    # AIQ-1249d: canonical move date for the services banner — structured column first,
+    # then the wizard draft.
+    target_start_date = str(target_move_date) if target_move_date else (basics.get("targetMoveDate") or None)
+    return ctx, target_start_date
+
+
 @app.get("/api/services/context")
 def get_services_context(
     assignment_id: Optional[str] = Query(None, description="Assignment id (gate for access)"),
@@ -8836,34 +8888,10 @@ def get_services_context(
         valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
         selected_keys = [k for k in fallback if k in valid]
 
-    draft = {}
-    dest_city = dest_country = origin_city = origin_country = None
-    target_move_date = None
-    with SessionLocal() as session:
-        case = app_crud.get_case(session, case_id)
-        if case:
-            try:
-                draft = json.loads(case.draft_json or "{}")
-            except Exception:
-                draft = {}
-            dest_city = getattr(case, "dest_city", None)
-            dest_country = getattr(case, "dest_country", None)
-            origin_city = getattr(case, "origin_city", None)
-            origin_country = getattr(case, "origin_country", None)
-            target_move_date = getattr(case, "target_move_date", None)
-    basics = draft.get("relocationBasics") or {}
-    case_context = {
-        "destCity": basics.get("destCity") or dest_city,
-        "destCountry": basics.get("destCountry") or dest_country,
-        "originCity": basics.get("originCity") or origin_city,
-        "originCountry": origin_country or basics.get("originCountry"),
-    }
-    # AIQ-1249d: canonical move date for the services context banner. Prefer the
-    # structured case column (public.cases.target_move_date), fall back to the
-    # wizard draft.
-    target_start_date = (
-        str(target_move_date) if target_move_date else (basics.get("targetMoveDate") or None)
-    )
+    # AIQ-1649: case context (dest/origin) + target date via the shared helper, which
+    # falls back to the relocation_cases row so a case that carries a destination but
+    # has no intake yet is not misread as 'Destination city/country is missing'.
+    case_context, target_start_date = _services_case_context(case_id)
 
     saved_rows = db.list_case_service_answers(case_id)
     saved_flat: Dict[str, Any] = {}
@@ -8995,30 +9023,8 @@ def get_service_questions(
     if not selected_keys:
         return {"questions": [], "selected_services": []}
 
-    # Case context (draft + top-level) via app_crud
-    with SessionLocal() as session:
-        case = app_crud.get_case(session, case_id)
-    draft = {}
-    dest_city = None
-    dest_country = None
-    origin_city = None
-    origin_country = None
-    if case:
-        try:
-            draft = json.loads(case.draft_json or "{}")
-        except Exception:
-            draft = {}
-        dest_city = getattr(case, "dest_city", None)
-        dest_country = getattr(case, "dest_country", None)
-        origin_city = getattr(case, "origin_city", None)
-        origin_country = getattr(case, "origin_country", None)
-    basics = draft.get("relocationBasics") or {}
-    case_context = {
-        "destCity": basics.get("destCity") or dest_city,
-        "destCountry": basics.get("destCountry") or dest_country,
-        "originCity": basics.get("originCity") or origin_city,
-        "originCountry": origin_country or basics.get("originCountry"),
-    }
+    # AIQ-1649: case context via the shared helper (public.cases + relocation_cases fallback).
+    case_context, _ = _services_case_context(case_id)
 
     # Saved answers (flatten service_key -> answers into one dict)
     saved_rows = db.list_case_service_answers(case_id)
