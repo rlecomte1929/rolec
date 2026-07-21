@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from .plugins import (
     LivingAreasPlugin,
+    HousingAgenciesPlugin,
     MoversPlugin,
     SchoolsPlugin,
     BanksPlugin,
@@ -28,6 +29,7 @@ _REGISTRY: Dict[str, BasePlugin] = {}
 def _init_registry() -> None:
     plugins = [
         LivingAreasPlugin(),
+        HousingAgenciesPlugin(),
         MoversPlugin(),
         SchoolsPlugin(),
         BanksPlugin(),

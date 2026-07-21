@@ -1,6 +1,7 @@
 """Recommendation plugins."""
 from .base import BasePlugin
 from .living_areas import LivingAreasPlugin
+from .housing_agencies import HousingAgenciesPlugin
 from .movers import MoversPlugin
 from .schools import SchoolsPlugin
 from .banks import BanksPlugin
@@ -19,6 +20,7 @@ from .pets import PetsPlugin
 __all__ = [
     "BasePlugin",
     "LivingAreasPlugin",
+    "HousingAgenciesPlugin",
     "MoversPlugin",
     "SchoolsPlugin",
     "BanksPlugin",
