@@ -102,6 +102,48 @@ def test_approve_creates_supplier_with_hr_provenance(session_factory):
         assert caps[0].city_name == "Munich"
 
 
+def test_approve_country_less_submission_promotes_as_global(session_factory):
+    """AIQ-1659: a submission with no country (HR form defaulted scope to 'country'
+    but left the country blank) must still be approvable — as a GLOBAL supplier —
+    instead of 400ing in create_supplier's validate_capability."""
+    sub = svc.create(
+        company_id="co-1",
+        submitted_by="hr-1",
+        name="Worldwide Relo",
+        service_category="movers",
+        coverage_scope_type="country",  # the form's default when no city is given
+        country_code=None,              # ...but no country was entered
+        city_name=None,
+    )
+    out = svc.approve(submission_id=sub["id"], reviewed_by="admin-1")
+    assert out["status"] == "approved"
+    assert out["created_supplier_id"]
+    with session_factory() as s:
+        caps = s.query(SupplierServiceCapability).all()
+        assert len(caps) == 1
+        # Scope derived from the fields present → global (no country to scope to).
+        assert caps[0].coverage_scope_type == "global"
+        assert caps[0].country_code is None
+
+
+def test_approve_country_only_submission_stays_country_scoped(session_factory):
+    """A submission WITH a country (no city) approves as 'country' scope, unchanged."""
+    sub = svc.create(
+        company_id="co-1",
+        submitted_by="hr-1",
+        name="DE Movers",
+        service_category="movers",
+        coverage_scope_type="country",
+        country_code="DE",
+        city_name=None,
+    )
+    svc.approve(submission_id=sub["id"], reviewed_by="admin-1")
+    with session_factory() as s:
+        cap = s.query(SupplierServiceCapability).one()
+        assert cap.coverage_scope_type == "country"
+        assert cap.country_code == "DE"
+
+
 def test_reject_requires_notes_and_creates_no_supplier(session_factory):
     sub = _submit()
     with pytest.raises(ValueError):

@@ -120,11 +120,25 @@ def approve(*, submission_id: str, reviewed_by: Optional[str]) -> Dict[str, Any]
         if row["status"] != "pending":
             raise SubmissionNotPending(f"submission is already {row['status']}")
 
+        # Derive the coverage scope from the fields actually present, rather than trusting
+        # the stored coverage_scope_type. validate_capability (run inside create_supplier)
+        # requires a 2-letter country_code whenever scope is 'country' or 'city'; a submission
+        # with no country is a GLOBAL supplier, not a country-scoped one missing its country.
+        # The HR form defaulted scope to 'country' even when no country was entered, so such a
+        # row could be created but never approved (create_supplier -> ValueError -> 400). AIQ-1659.
+        cc = (row["country_code"] or "").strip()
+        city = (row["city_name"] or "").strip()
+        if cc and city:
+            scope = "city"
+        elif cc:
+            scope = "country"
+        else:
+            scope = "global"
         capability = {
             "service_category": row["service_category"],
-            "coverage_scope_type": row["coverage_scope_type"] or "country",
-            "country_code": row["country_code"],
-            "city_name": row["city_name"],
+            "coverage_scope_type": scope,
+            "country_code": cc or None,
+            "city_name": city or None,
         }
         # create_supplier commits internally. If it raises (e.g. duplicate name),
         # the submission is left untouched (still pending) for the admin to retry.

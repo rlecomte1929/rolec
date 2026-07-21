@@ -54,7 +54,10 @@ export const HrPreferredSupplierCard: React.FC = () => {
       await createSupplierSubmission({
         name: name.trim(),
         service_category: category.trim(),
-        coverage_scope_type: city.trim() ? 'city' : 'country',
+        // Scope follows the fields actually filled: a submission with no country is GLOBAL,
+        // not country-scoped-without-a-country — the latter can be created but never approved
+        // (admin approval requires a country_code for 'country'/'city' scope). AIQ-1659.
+        coverage_scope_type: city.trim() ? 'city' : country.trim() ? 'country' : 'global',
         country_code: country.trim() || null,
         city_name: city.trim() || null,
         contact_email: email.trim() || null,
