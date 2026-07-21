@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PublicLayout } from '../../components/public';
 import { Section, FadeIn } from '../../components/marketing';
@@ -107,6 +107,10 @@ export const TestDriveSurveyPage: React.FC = () => {
   const [state, setState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [sectorOther, setSectorOther] = useState(false);
+  // AIQ-1645: mark the required segment question inline and scroll it into view when a
+  // submit fails on it, instead of only a generic message at the bottom of the form.
+  const [segmentInvalid, setSegmentInvalid] = useState(false);
+  const segmentRef = useRef<HTMLDivElement>(null);
 
   const set = <K extends keyof SurveyForm>(key: K, value: SurveyForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -118,6 +122,10 @@ export const TestDriveSurveyPage: React.FC = () => {
     // 'prospect'. An unanswered survey stays honest (no segment written).
     if (!form.tester_segment) {
       setError(c.segment.required);
+      setSegmentInvalid(true);
+      // Mark inline (below) AND bring the question into view — testers submit from the
+      // bottom of a long form, so the offending field is otherwise off-screen.
+      segmentRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
       return;
     }
     // AIQ-1543: validate the optional lead-in email client-side (a blank email is fine).
@@ -204,8 +212,13 @@ export const TestDriveSurveyPage: React.FC = () => {
             noValidate
             className="mx-auto max-w-xl space-y-8 rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8"
           >
-            {/* TD-FIX-2 (AIQ-1503): required one-tap segment self-ID — lead-in question. */}
-            <div>
+            {/* TD-FIX-2 (AIQ-1503): required one-tap segment self-ID — lead-in question.
+                AIQ-1645: named + inline-marked + scrolled-to on a failed submit. */}
+            <div
+              ref={segmentRef}
+              aria-invalid={segmentInvalid || undefined}
+              className={segmentInvalid ? 'rounded-lg border border-[#dc2626] p-3 -m-3' : undefined}
+            >
               <p className="text-sm font-medium text-marketing-primary">
                 {c.segment.label}
                 <span aria-hidden="true" className="ml-0.5 text-[#dc2626]">*</span>
@@ -214,8 +227,16 @@ export const TestDriveSurveyPage: React.FC = () => {
               <TapGroup
                 options={c.segment.options}
                 value={form.tester_segment}
-                onSelect={(v) => set('tester_segment', v as TesterSegment)}
+                onSelect={(v) => {
+                  set('tester_segment', v as TesterSegment);
+                  setSegmentInvalid(false); // clear the mark once answered
+                }}
               />
+              {segmentInvalid && (
+                <p role="alert" className="mt-2 text-xs font-medium text-[#dc2626]">
+                  {c.segment.inline}
+                </p>
+              )}
             </div>
 
             {/* About you */}
