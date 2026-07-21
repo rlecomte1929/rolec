@@ -71,13 +71,30 @@ describe('TestDriveSurveyPage', () => {
     expect(await screen.findByText(/genuinely useful/i)).toBeInTheDocument();
   });
 
-  it('requires the segment tap before submitting (TD-FIX-2)', async () => {
+  it('[AIQ-1645] blocks on the segment question — names it, marks it inline, keeps answers', async () => {
     mockSubmit.mockResolvedValue({ ok: true, responseId: 'r1' });
     renderAt('?corridor=GB_US&session=sess-1');
-    // Submit with no segment chosen → blocked with the required prompt, no network call.
+    // Answer other questions first — these must survive a failed submit (criterion 5).
+    fireEvent.click(screen.getByRole('button', { name: '4' })); // Q1 = 4
+    fireEvent.click(screen.getByRole('button', { name: /Maybe, tell me more/i })); // Q6
+
+    // Submit with no segment chosen → blocked, no network call.
     fireEvent.click(screen.getByRole('button', { name: /^Submit$/ }));
-    expect(await screen.findByText(/weight your feedback correctly/i)).toBeInTheDocument();
     expect(mockSubmit).not.toHaveBeenCalled();
+    // The error NAMES the unanswered question, and the field is marked inline beside it.
+    expect(
+      await screen.findByText(/Please answer: Do you work in HR, mobility, or relocation\?/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/pick one so I can weight your feedback correctly/i)).toBeInTheDocument();
+
+    // Answering clears the inline mark; submit then succeeds with the earlier answers intact.
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+    expect(screen.queryByText(/pick one so I can weight your feedback correctly/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Submit$/ }));
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalledTimes(1));
+    expect(mockSubmit.mock.calls[0][0].q1_overall).toBe(4);
+    expect(mockSubmit.mock.calls[0][0].pilot_interest).toBe('maybe');
+    expect(mockSubmit.mock.calls[0][0].tester_segment).toBe('prospect');
   });
 
   it("stores 'internal' when the tester answers No (TD-FIX-2)", async () => {

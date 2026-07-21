@@ -25,7 +25,10 @@ export const testDriveSurveyContent = {
       { value: 'prospect', label: 'Yes' },
       { value: 'internal', label: 'No' },
     ],
-    required: 'Please pick one so I can weight your feedback correctly.',
+    // AIQ-1645: name the unanswered question in the error (it is the only required field);
+    // a generic bottom-of-form message left testers hunting for what to fix.
+    required: 'Please answer: Do you work in HR, mobility, or relocation?',
+    inline: 'Required — pick one so I can weight your feedback correctly.',
   },
 
   aboutYou: {
