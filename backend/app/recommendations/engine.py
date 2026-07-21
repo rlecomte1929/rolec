@@ -1,6 +1,7 @@
 """Recommendation engine orchestration."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +15,8 @@ from .types import (
     RecommendationResponse,
     RecommendationTier,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _absolute_tier(score: float) -> RecommendationTier:
@@ -122,6 +125,12 @@ def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List
     plugin = get_plugin(category)
     static_dataset = plugin.load_dataset() if plugin else []
 
+    # Advisory categories (e.g. living_areas neighbourhoods) are ranked from the
+    # static/geo dataset only — the supplier registry must not shadow the rich rows
+    # with field-poor supplier shells. Skip the registry entirely for them.
+    if getattr(plugin, "advisory", False):
+        return list(static_dataset)
+
     registry_items: List[Dict[str, Any]] = []
     try:
         from ..db import SessionLocal
@@ -186,7 +195,17 @@ def recommend(
 
     scored_items: List[Dict[str, Any]] = []
     for item in dataset:
-        result = plugin.score(criteria_obj, item)
+        try:
+            result = plugin.score(criteria_obj, item)
+        except Exception:
+            # One malformed item must not blank the whole category. Drop it (score 0)
+            # and keep ranking the rest. (Was: any raise propagated out of recommend()
+            # and _run_one returned an empty block → the "(0)" / hr_pending symptom.)
+            logger.exception(
+                "recommendation score() failed category=%s item_id=%s",
+                category, (item or {}).get("item_id"),
+            )
+            continue
         score_raw = result.get("score_raw") or 0.0
         # Admin/manual ranking boost (supplier_registry): add directly to raw score so it affects rank
         admin_score = item.get("_admin_score")
@@ -306,8 +325,11 @@ def recommend(
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     hr_curation_status: Optional[str] = None
-    if company_id:
-        # Phase 2c — filter through HR's curation.
+    if company_id and not getattr(plugin, "advisory", False):
+        # Phase 2c — filter through HR's curation. Advisory categories (neighbourhood
+        # overviews) are informational content, not vendors, so they are never gated:
+        # gating them dropped every la-* row against the never-seeded catalog masters
+        # → ([], 'hr_pending') → the Living Areas = 0 symptom.
         from ..services.employee_recommendations_filter import apply_hr_curation
         dest_country = (criteria.get("destination_country") or "").strip() or None
         items, hr_curation_status = apply_hr_curation(
@@ -347,7 +369,14 @@ def recommend_debug(
 
     scored_items = []
     for item in dataset:
-        result = plugin.score(criteria_obj, item)
+        try:
+            result = plugin.score(criteria_obj, item)
+        except Exception:
+            logger.exception(
+                "recommendation score() failed (debug) category=%s item_id=%s",
+                category, (item or {}).get("item_id"),
+            )
+            continue
         score_raw = result.get("score_raw") or 0.0
         admin_score = item.get("_admin_score")
         if admin_score is not None:

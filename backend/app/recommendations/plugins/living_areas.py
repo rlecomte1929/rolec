@@ -114,6 +114,11 @@ class LivingAreasCriteria(BaseModel):
 class LivingAreasPlugin(BasePlugin):
     key = "living_areas"
     title = "Living Areas"
+    # Neighbourhoods are advisory content, not suppliers: rank from the static/geo
+    # dataset only, never gate behind HR curation or let supplier shells shadow the
+    # real rows. Housing *agencies* (the gated, RFQ-backed concept) are a separate
+    # category. See the "Living Areas = 0" rework.
+    advisory = True
 
     @property
     def CriteriaModel(self) -> type:
@@ -144,6 +149,13 @@ class LivingAreasPlugin(BasePlugin):
         b_min = c.budget_monthly.get("min", 2000)
         b_max = c.budget_monthly.get("max", 5000)
         rent = item.get("avg_rent_2br") if c.bedrooms <= 2 else item.get("avg_rent_3br", item.get("avg_rent_2br", 3000))
+
+        # Defense-in-depth: a foreign/supplier-shaped row (no rent data) has no
+        # place in an advisory neighbourhood ranking. Score it 0 so it filters out
+        # instead of raising `None > b_max` (the Living Areas = 0 crash).
+        if not isinstance(rent, (int, float)) or isinstance(rent, bool):
+            return {"score_raw": 0, "breakdown": {}, "summary": "No housing data",
+                    "rationale": "This entry has no rent data.", "pros": [], "cons": [], "metadata": {}}
 
         budget_match = 100.0
         if rent > b_max:
