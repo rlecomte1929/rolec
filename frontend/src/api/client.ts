@@ -1255,7 +1255,16 @@ export const hrAPI = {
     return response.data;
   },
 
-  // ── AIQ-40-C: RFQ flow ────────────────────────────────────────────────────
+  // ── AIQ-40-C: RFQ flow (HR Command Center) ────────────────────────────────
+  // [AIQ-1647] CANONICAL RFQ model = `rfqs` + `rfq_items` + `rfq_recipients` — the
+  // employee-led services vendor shortlist (servicesAPI.createRfq → POST /api/rfqs).
+  // The `rfq_requests` wrappers below are a SEPARATE, still-live model that backs the
+  // HR Command Center "Pending RFQs" panel (RfqModal + PendingRfqsPanel on
+  // HrCommandCenterCaseDetail, and covered by test_hr_rfq_create/list). They are NOT
+  // orphaned — this is the intentional HR-initiated RFQ path. The two models coexist on
+  // purpose; do NOT add a third. If they are ever unified, port these callers onto
+  // /api/rfqs and backfill rfq_requests (its own migration) — never add another endpoint.
+  // (Mirrors the AIQ-1525 quote_requests note further down this file.)
 
   /** POST /api/hr/rfq-requests */
   createRfqRequest: async (payload: {
