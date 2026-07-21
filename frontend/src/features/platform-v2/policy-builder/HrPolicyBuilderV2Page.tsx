@@ -258,6 +258,13 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const [effectiveDate, setEffectiveDate]   = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving]           = useState(false);
   const [publishing, setPublishing]   = useState(false);
+  // AIQ-1642: publish is slow (matrix rewrite + canonical invalidation, ~20–40s) so the
+  // button sits on "Publishing…" long enough that a first-time HR user concludes it failed
+  // and clicks again — the second call 409'd server-side (the F7 double-publish). The
+  // button's disabled={publishing} is one render behind, so two fast clicks (or a click
+  // here plus one on the Published-policy tab) can both fire. A synchronous ref guard
+  // rejects the second attempt CLIENT-SIDE before any request goes out.
+  const publishInFlight = useRef(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [banner, setBanner]           = useState<{ kind: 'success' | 'error' | 'info'; msg: string } | null>(null);
@@ -384,7 +391,15 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   const queryClient = useQueryClient();
   const handlePublish = async () => {
     if (tiers.length === 0) return;
-    setPublishing(true); setBanner(null);
+    // AIQ-1642: reject a re-click while a publish is already in flight — client-side, so a
+    // double-click can never reach the server and 409. Synchronous (ref, not state) to
+    // close the two-clicks-in-one-frame race the disabled button can't.
+    if (publishInFlight.current) return;
+    publishInFlight.current = true;
+    setPublishing(true);
+    // Honest progress: publishing can take up to a minute; say so instead of a bare
+    // "Publishing…" spinner, so the user waits rather than concluding it failed.
+    setBanner({ kind: 'info', msg: 'Publishing… this can take up to a minute. Please keep this page open — no need to click again.' });
     try {
       const pv = await ensureDraftId();
       const { body, rowCount } = canvasPolicyToConfigDraft({ tiers, categories: CATEGORIES, effectiveDate, currency, policyVersion: pv });
@@ -411,7 +426,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
       } else {
         setBanner({ kind: 'error', msg: errMsg(e, 'Publish failed.') });
       }
-    } finally { setPublishing(false); }
+    } finally { setPublishing(false); publishInFlight.current = false; }
   };
 
   const previewResult = useMemo(
