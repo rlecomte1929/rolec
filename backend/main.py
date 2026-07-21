@@ -7433,6 +7433,21 @@ def get_hr_assignment(
                     e,
                 )
 
+        # [AIQ-1648] Resolve the HR OWNER of the case (not the employee) for the
+        # Package & limits "HR owner" chip. case_assignments.hr_user_id → users.email.
+        hr_owner_email = None
+        hr_uid = assignment.get("hr_user_id")
+        if hr_uid:
+            try:
+                urec = db.get_user_by_id(str(hr_uid))
+                if urec:
+                    hr_owner_email = urec.get("email")
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s hr owner lookup failed: %s",
+                    req_id, assignment_id, e,
+                )
+
         readiness_snap: Optional[Dict[str, Any]] = None
         try:
             readiness_snap = db.get_hr_readiness_summary(aid)
@@ -7493,6 +7508,7 @@ def get_hr_assignment(
             employeeFirstName=assignment.get("employee_first_name"),
             employeeLastName=assignment.get("employee_last_name"),
             employeeEmail=linked_email,
+            hrOwnerEmail=hr_owner_email,
             linkedEmployeeFullName=linked_full_name,
             caseOriginHint=case_origin_hint,
             caseDestinationHint=case_dest_hint,

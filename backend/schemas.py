@@ -430,6 +430,9 @@ class AssignmentDetail(BaseModel):
     employeeLastName: Optional[str] = None
     # HR Case Essentials (same GET — profiles + relocation_cases; no extra HTTP round-trips)
     employeeEmail: Optional[str] = Field(default=None)
+    # [AIQ-1648] The HR account that OWNS the case (case_assignments.hr_user_id → users.email).
+    # The Package & limits page's "HR owner" chip was mistakenly bound to the employee identity.
+    hrOwnerEmail: Optional[str] = Field(default=None)
     linkedEmployeeFullName: Optional[str] = Field(default=None)
     caseOriginHint: Optional[str] = Field(default=None)
     caseDestinationHint: Optional[str] = Field(default=None)
