@@ -235,6 +235,10 @@ function RecCard({
   const costLabel = formatEstimationFromUsd(costUsd, costType, displayCurrency);
 
   const mapQuery = item.metadata?.map_query;
+  const commuteModes = (item.metadata?.commute_modes as
+    | Array<{ mode: string; minutes: number; cost: number; carbon_g: number }>
+    | undefined) ?? [];
+  const MODE_LABEL: Record<string, string> = { walk: 'Walk', bike: 'Bike', transit: 'Transit', car: 'Car' };
   const officeAddress = (criteriaEcho?.office_address as string) || '';
   const showMapActions = mapQuery && (category === 'living_areas' || category === 'schools');
 
@@ -297,6 +301,26 @@ function RecCard({
           )}
         </div>
       </div>
+      {commuteModes.length > 0 && (
+        <div className="mt-3 border-t border-[#f1f5f9] pt-2">
+          <div className="text-xs text-[#6b7280] mb-1">Commute to your office</div>
+          <div className="flex flex-wrap gap-2">
+            {commuteModes.map((cm) => (
+              <span
+                key={cm.mode}
+                title={
+                  cm.carbon_g > 0 || cm.cost > 0
+                    ? `~${cm.carbon_g} g CO₂e · ~${cm.cost.toFixed(2)}/trip`
+                    : 'zero cost · zero emissions'
+                }
+                className="px-2 py-0.5 rounded text-xs font-medium bg-[#f8fafc] border border-[#e2e8f0] text-[#334155]"
+              >
+                {MODE_LABEL[cm.mode] ?? cm.mode} ~{cm.minutes}m
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Button unstyled

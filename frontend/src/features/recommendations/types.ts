@@ -51,6 +51,14 @@ export interface RecommendationItem {
       lng: number;
       commute_min: number;
     }>;
+    /** Multimodal commute to the office (living_areas): per-mode time + cost + carbon. */
+    commute_modes?: Array<{
+      mode: string;
+      minutes: number;
+      distance_km: number;
+      cost: number;
+      carbon_g: number;
+    }>;
   };
   explanation?: RecommendationExplanation;
 }
