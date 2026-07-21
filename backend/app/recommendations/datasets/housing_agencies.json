@@ -1,0 +1,10 @@
+[
+  {"item_id": "ha-osl-t1", "name": "Oslo Serviced Living", "city": "Oslo", "country": "NO", "subtype": "temporary", "rating": 4.5, "rating_count": 128},
+  {"item_id": "ha-osl-t2", "name": "Nordic Stay Apartments", "city": "Oslo", "country": "NO", "subtype": "temporary", "rating": 4.3, "rating_count": 86},
+  {"item_id": "ha-osl-p1", "name": "Frogner Rental Partners", "city": "Oslo", "country": "NO", "subtype": "permanent", "rating": 4.6, "rating_count": 203},
+  {"item_id": "ha-osl-p2", "name": "Oslo Home Finders", "city": "Oslo", "country": "NO", "subtype": "permanent", "rating": 4.2, "rating_count": 154},
+  {"item_id": "ha-muc-t1", "name": "Munich City Aparthotels", "city": "Munich", "country": "DE", "subtype": "temporary", "rating": 4.4, "rating_count": 141},
+  {"item_id": "ha-muc-p1", "name": "Bavaria Rental Agency", "city": "Munich", "country": "DE", "subtype": "permanent", "rating": 4.5, "rating_count": 176},
+  {"item_id": "ha-sg-t1", "name": "Singapore Serviced Residences", "city": "Singapore", "country": "SG", "subtype": "temporary", "rating": 4.5, "rating_count": 219},
+  {"item_id": "ha-sg-p1", "name": "Lion City Property Agents", "city": "Singapore", "country": "SG", "subtype": "permanent", "rating": 4.3, "rating_count": 167}
+]
