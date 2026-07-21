@@ -15,9 +15,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 import uuid
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from ...database import Database
 from ...schemas_compensation_allowance import (
@@ -1137,7 +1138,17 @@ class PolicyConfigMatrixService:
         *,
         policy_version_id: Optional[str],
         created_by: Optional[str],
+        defer_reindex: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
+        # AIQ-1642: the RAG re-index (a blocking OpenAI embeddings call + a per-chunk
+        # INSERT loop) used to run INLINE here, so publish took 20-40s and testers
+        # re-clicked into a 409. It is best-effort and NOT required for the publish to
+        # succeed — the just-published policy only needs to become Assistant-queryable,
+        # which can lag a few seconds. When the caller supplies ``defer_reindex`` (the HR
+        # and admin routers pass a FastAPI BackgroundTask), the re-index runs OFF the
+        # request path and publish returns as fast as the atomic status flip. Callers
+        # that omit the hook (test-drive provisioning, unit tests) keep the inline path.
+        _t0 = time.perf_counter()
         cfg = self._config(company_id)
         pid = str(cfg["id"])
         draft = self._db.get_policy_config_draft_for_config(pid)
@@ -1167,18 +1178,27 @@ class PolicyConfigMatrixService:
         self._db.publish_policy_config_version_atomic(vid)
         pub = self._db.get_policy_config_version_row(vid)
         benefits = self._db.list_policy_config_benefits(vid)
-        # Sprint A: rebuild Policy Assistant RAG index for this company
-        # so the assistant answers from the just-published version. Best-
-        # effort: never let an indexer failure block the publish (HR did
-        # the work; the assistant is downstream).
-        try:
-            from .policy_chunk_indexer import index_company_policy
-            index_company_policy(str(company_id))
-        except Exception:
-            log.exception(
-                "policy_assistant index rebuild failed after publish company=%s vid=%s",
-                company_id, vid,
-            )
+        # Sprint A: rebuild the Policy Assistant RAG index for this company so the
+        # assistant answers from the just-published version. AIQ-1642: run it OFF the
+        # request path when the caller provides a deferral hook; otherwise inline (both
+        # best-effort — an indexer failure must never block the publish).
+        if defer_reindex is not None:
+            try:
+                defer_reindex(str(company_id))
+            except Exception:
+                log.exception(
+                    "policy_assistant index scheduling failed after publish company=%s vid=%s",
+                    company_id, vid,
+                )
+        else:
+            try:
+                from .policy_chunk_indexer import index_company_policy
+                index_company_policy(str(company_id))
+            except Exception:
+                log.exception(
+                    "policy_assistant index rebuild failed after publish company=%s vid=%s",
+                    company_id, vid,
+                )
         # Analytics: policy publish is a key adoption signal. PII-free (ids +
         # a benefit count only). Best-effort — never let it affect the publish.
         try:
@@ -1196,11 +1216,14 @@ class PolicyConfigMatrixService:
         except Exception:
             pass
         # Mirror into analytics_events for the admin Product-metrics tab (best-effort).
+        # AIQ-1642: record the on-request-path publish duration so the <5s target is
+        # measurable server-side (the deferred re-index is NOT counted — it is off-path).
         try:
             from .analytics_service import emit_event
             emit_event("policy_published", user_id=str(created_by) if created_by else None,
                        counts={"benefit_count": len(benefits)},
-                       extra={"policy_version_id": vid})
+                       duration_ms=int((time.perf_counter() - _t0) * 1000),
+                       extra={"policy_version_id": vid, "reindex_deferred": defer_reindex is not None})
         except Exception:
             pass
         return self.build_payload(company_id, version=pub, benefits=benefits, editable=False, source="published")
