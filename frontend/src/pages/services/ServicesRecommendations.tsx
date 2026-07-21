@@ -13,7 +13,8 @@ import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmen
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  living_areas: 'Living Areas',
+  living_areas: 'Neighbourhoods',
+  housing_agencies: 'Housing Agencies',
   schools: 'Schools',
   movers: 'Movers',
   banks: 'Banks',
