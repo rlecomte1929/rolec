@@ -46,7 +46,6 @@ export const HrAssignmentPackageReview: React.FC = () => {
   }, [assignmentQuery.isError, is401, navigate]);
 
   const profile = assignment?.profile;
-  const fullName = profile?.primaryApplicant?.fullName || assignment?.employeeIdentifier || 'Employee';
   const routeLabel = profile?.movePlan?.origin && profile?.movePlan?.destination
     ? `${profile.movePlan.origin} → ${profile.movePlan.destination}`
     : 'Relocation route';
@@ -87,7 +86,9 @@ export const HrAssignmentPackageReview: React.FC = () => {
                 Policy: v2.1
               </span>
               <span className="text-xs px-3 py-1 rounded-full border border-[#e2e8f0] text-[#4b5563]">
-                HR owner: {fullName.split(' ')[0]}
+                {/* AIQ-1648: the HR OWNER of the case (case_assignments.hr_user_id →
+                    users.email), NOT the employee — the field was mislabelled. */}
+                HR owner: {assignment.hrOwnerEmail || 'Unassigned'}
               </span>
             </div>
             <div className="flex items-center gap-2">
