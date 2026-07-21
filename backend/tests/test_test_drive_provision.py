@@ -165,6 +165,45 @@ class TestTestDriveProvision(unittest.TestCase):
                 ):
             td._seed_default_published_policy("company-1", "hr-1")  # must not raise
 
+    def _session_campaign(self, db):
+        conn = db.engine.begin.return_value.__enter__.return_value
+        sess = [c for c in conn.execute.call_args_list
+                if "INSERT INTO test_sessions" in str(c.args[0])]
+        self.assertEqual(len(sess), 1)
+        return sess[0].args[1]["campaign"]
+
+    def test_no_campaign_stores_unattributed_never_insead(self):
+        # [campaign attribution] A provision with no campaign must NEVER be filed under the live
+        # 'insead-2026' cohort — even if RELOPASS_TEST_DRIVE_CAMPAIGN is set to insead-2026. The
+        # env fallback is removed; an absent campaign is 'unattributed'.
+        db = _db_mock()
+        with patch.dict(os.environ,
+                        {**_ENABLED_ENV, "RELOPASS_TEST_DRIVE_CAMPAIGN": "insead-2026"}, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body())  # no campaign
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(self._session_campaign(db), "unattributed")
+
+    def test_explicit_insead_campaign_is_preserved(self):
+        # The real cohort link legitimately passes ?campaign=insead-2026 — it must pass through.
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(campaign="insead-2026"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(self._session_campaign(db), "insead-2026")
+
+    def test_explicit_qa_campaign_is_preserved(self):
+        db = _db_mock()
+        with patch.dict(os.environ, _ENABLED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision", json=_body(campaign="qa-x"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(self._session_campaign(db), "qa-x")
+
     def test_provision_seeds_vendor_selections(self):
         # [AIQ-1651] Provisioning also seeds company_vendor_selections for the corridor's
         # destination country, so Services → Recommendations shows suppliers, not "Movers (0)".
