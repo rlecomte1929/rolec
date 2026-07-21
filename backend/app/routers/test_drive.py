@@ -47,7 +47,7 @@ from sqlalchemy import text
 from ... import db_config
 from ...database import db
 from ...rate_limit import limiter
-from ..services.test_drive_corridor import LOCKED_CORRIDORS
+from ..services.test_drive_corridor import LOCKED_CORRIDORS, TEST_DRIVE_CORRIDOR_ROUTES
 from .auth import _dispatch_supabase_sync, _pwd_context
 
 router = APIRouter(prefix="/api/test-drive", tags=["test-drive"])
@@ -232,6 +232,60 @@ def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -
         )
 
 
+def _seed_corridor_vendor_selections(
+    company_id: str, corridor_id: str, created_by: Optional[str]
+) -> None:
+    """[AIQ-1651] Seed HR vendor curation for a freshly provisioned test-drive company,
+    scoped to the corridor's DESTINATION country, so the employee's Services →
+    Recommendations shows a non-empty shortlist (and "Request quotes" can enable) WITHOUT
+    the tester having to run HR curation first.
+
+    Provisioning already seeds a published policy but never seeded vendor selections, so
+    ~98% of test-drive companies had none and every category showed "Your HR is finalizing
+    providers …". This writes the SAME shape the recommendation filter reads
+    (company_vendor_selections → service_catalog_items with a supplier), selecting only from
+    the existing admin catalog for the destination — it does NOT weaken the CVS visibility
+    gate that stops unvetted suppliers reaching customers.
+
+    NOT a swallowed warning: the sibling policy seed swallowed its exceptions and that
+    silence caused a P0 on this same code path, so a failure (or a zero-result destination)
+    here emits a STRUCTURED ERROR that is visible/alertable. Provisioning itself is not
+    aborted — account creation is the primary function — but the failure is never silent.
+    """
+    route = TEST_DRIVE_CORRIDOR_ROUTES.get((corridor_id or "").strip().upper())
+    if not route:
+        logger.error(
+            "test_drive.vendor_seed.skipped reason=unknown_corridor company_id=%s corridor_id=%s",
+            company_id, corridor_id,
+        )
+        return
+    dest_country, dest_city = route["host_country"], route["host_city"]
+    try:
+        seeded = db.seed_company_vendor_selections_for_country(
+            company_id=company_id,
+            country=dest_country,
+            destination_city=dest_city,
+            created_by=created_by,
+        )
+    except Exception:  # noqa: BLE001 — surfaced as a structured error, never swallowed
+        logger.error(
+            "test_drive.vendor_seed.failed company_id=%s corridor=%s dest_country=%s",
+            company_id, corridor_id, dest_country, exc_info=True,
+        )
+        return
+    if seeded == 0:
+        logger.error(
+            "test_drive.vendor_seed.zero company_id=%s corridor=%s dest_country=%s "
+            "reason=no_catalog_suppliers_for_destination",
+            company_id, corridor_id, dest_country,
+        )
+        return
+    logger.info(
+        "test_drive.vendor_seed.ok company_id=%s corridor=%s dest_country=%s seeded=%d",
+        company_id, corridor_id, dest_country, seeded,
+    )
+
+
 @router.post("/provision")
 @limiter.limit(_RATE_LIMIT)
 def provision(body: ProvisionRequest, request: Request):
@@ -311,6 +365,9 @@ def provision(body: ProvisionRequest, request: Request):
     #     one. Best-effort — never breaks provisioning.
     if company_id:
         _seed_default_published_policy(company_id, hr_id)
+        # [AIQ-1651] Seed HR vendor curation for the corridor destination so the employee's
+        # Services → Recommendations has a non-empty shortlist without the tester curating.
+        _seed_corridor_vendor_selections(company_id, resolved_corridor, hr_id)
 
     # 5) Mirror both to Supabase Auth (fire-and-forget; never blocks or raises).
     _dispatch_supabase_sync(hr_email, hr_password, relopass_user_id=hr_id, full_name=first_name)

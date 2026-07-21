@@ -1551,6 +1551,70 @@ class CompaniesMixin:
             rows = conn.execute(text(sql), params).fetchall()
         return self._rows_to_list(rows)
 
+    def seed_company_vendor_selections_for_country(
+        self,
+        company_id: str,
+        country: str,
+        destination_city: Optional[str],
+        created_by: Optional[str],
+        per_category: int = 5,
+    ) -> int:
+        """[AIQ-1651] Seed HR vendor curation (company_vendor_selections) for a test-drive
+        company from the EXISTING admin catalog for ``country``.
+
+        Selects up to ``per_category`` active ``service_catalog_items`` whose ``supplier_id``
+        is set (i.e. rows that resolve to a real supplier — the exact shape
+        ``list_company_curated_supplier_ids`` reads), per category, and writes one
+        ``selected=true`` CVS row per item. It does NOT create suppliers and does NOT bypass
+        the CVS visibility gate — it only pre-populates the curation the tester would
+        otherwise have to build. Categories with no catalog supplier for the destination
+        (e.g. ``movers`` outside SG) are simply absent from the result and skipped.
+
+        Idempotent: ``ON CONFLICT`` on the ``(company_id, category, destination_city,
+        master_item_id)`` unique key means re-seeding inserts nothing. Returns the number of
+        CVS rows actually inserted.
+        """
+        inserted = 0
+        with self.engine.begin() as conn:
+            candidates = conn.execute(
+                text(
+                    "SELECT id, category FROM public.service_catalog_items "
+                    "WHERE country = :country AND active IS TRUE AND supplier_id IS NOT NULL "
+                    "ORDER BY category ASC, name ASC"
+                ),
+                {"country": country},
+            ).mappings().fetchall()
+
+            taken: Dict[str, int] = {}
+            for row in candidates:
+                cat = row["category"]
+                order = taken.get(cat, 0)
+                if order >= per_category:
+                    continue
+                taken[cat] = order + 1
+                res = conn.execute(
+                    text(
+                        "INSERT INTO public.company_vendor_selections "
+                        "(id, company_id, category, destination_city, country, master_item_id, "
+                        " selected, display_order, created_by_user_id) "
+                        "VALUES (:id, :cid, :cat, :city, :country, :mid, true, :ord, :by) "
+                        "ON CONFLICT (company_id, category, destination_city, master_item_id) "
+                        "DO NOTHING"
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "cid": company_id,
+                        "cat": cat,
+                        "city": destination_city,
+                        "country": country,
+                        "mid": row["id"],
+                        "ord": order,
+                        "by": created_by,
+                    },
+                )
+                inserted += res.rowcount if (res.rowcount and res.rowcount > 0) else 0
+        return inserted
+
     def get_supplier_vetting_state(
         self, supplier_id: str, service_category: Optional[str] = None
     ) -> Dict[str, bool]:
