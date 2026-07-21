@@ -1,15 +1,20 @@
 // Pure matcher for the intake CountryCombo auto-commit (AIQ-1315).
 //
 // #1037 added auto-commit when the typed text exactly matches a country NAME or
-// its 2-char CODE, to fix a silent-disabled-Continue bug. A bare exact-code match
-// is fragile as COUNTRIES grows: if a future country NAME's first 2 chars equal a
-// DIFFERENT country's CODE (e.g. adding Austria/AT next to Australia/AU), typing
-// "au" would commit Australia before the user finishes "Austria".
+// its 2-char CODE, to fix a silent-disabled-Continue bug.
 //
-// Rule: a full NAME match always commits; a CODE match commits ONLY if the query
-// is not also the prefix of a *different* country's name. This preserves both
-// "type the full name → commit" and "type a complete unambiguous code → commit"
-// (e.g. "fr" still commits France — no other name starts with "fr").
+// AIQ-1643: the original CODE rule only excluded *other* countries' names from the
+// prefix check, so "fr" committed France even though the user was mid-typing
+// "France" — the commit truncated the word to "France" and the browser appended the
+// remaining keystrokes to the committed name ("France" → "Franceance", "Nor" →
+// "Norwayr"). A 2-char code is almost always also the start of some country NAME,
+// so committing on it is inherently ambiguous with mid-typing.
+//
+// Rule: a full NAME match always commits; a CODE match commits ONLY when the query
+// is not the prefix of ANY country's name (including its own). This keeps
+// "type the full name → commit" and "type a genuinely unambiguous code → commit"
+// (e.g. "us" commits United States — no name starts with "us") while never cutting
+// a user off in the middle of typing a name.
 
 export interface CountryOption {
   code: string;
@@ -29,12 +34,12 @@ export function matchCountry<T extends CountryOption>(
 
   const byCode = countries.find((c) => c.code.toLowerCase() === norm);
   if (byCode) {
-    // Only commit the code match if the query isn't the start of a different
-    // country's name (the user may be mid-typing that other country).
-    const prefixesOtherName = countries.some(
-      (c) => c.code !== byCode.code && c.name.toLowerCase().startsWith(norm),
-    );
-    if (!prefixesOtherName) return byCode;
+    // Only commit the code match if the query isn't the start of ANY country's name
+    // (incl. this code's own name). If it is, the user is probably still typing that
+    // name — committing here would truncate it and the browser would append the rest
+    // of the keystrokes to the committed name (AIQ-1643).
+    const prefixesSomeName = countries.some((c) => c.name.toLowerCase().startsWith(norm));
+    if (!prefixesSomeName) return byCode;
   }
 
   return undefined;
