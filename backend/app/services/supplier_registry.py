@@ -284,7 +284,20 @@ def search_by_service_destination(
         meta = session.query(SupplierScoringMetadata).filter(
             SupplierScoringMetadata.supplier_id == s.id
         ).first()
-        result.append(_supplier_to_recommendation_item(s, meta, destination_city or ""))
+        item = _supplier_to_recommendation_item(s, meta, destination_city or "")
+        # Surface the matched capability's specialization tags so category plugins can
+        # read sub-types (e.g. housing_agencies temporary/permanent). Harmless for other
+        # categories, which ignore the field.
+        cap = (
+            session.query(SupplierServiceCapability)
+            .filter(
+                SupplierServiceCapability.supplier_id == s.id,
+                SupplierServiceCapability.service_category == service_category,
+            )
+            .first()
+        )
+        item["specialization_tags"] = _parse_json_array(cap.specialization_tags) if cap else []
+        result.append(item)
     return result
 
 

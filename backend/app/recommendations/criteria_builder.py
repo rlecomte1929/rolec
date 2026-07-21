@@ -19,7 +19,7 @@ from . import geo
 
 log = logging.getLogger(__name__)
 
-# Service key (frontend) -> backend category key
+# Service key (frontend) -> primary backend category key
 SERVICE_KEY_TO_BACKEND: Dict[str, str] = {
     "housing": "living_areas",
     "schools": "schools",
@@ -29,6 +29,22 @@ SERVICE_KEY_TO_BACKEND: Dict[str, str] = {
     "electricity": "electricity",
     "pets": "pets",
 }
+
+# A frontend service can fan out to more than one backend category. "Housing" surfaces
+# BOTH the advisory neighbourhood overview (living_areas) AND the gated housing agencies
+# (housing_agencies) — two surfaces under one Housing step. Extra keys are ADDED to the
+# primary from SERVICE_KEY_TO_BACKEND.
+EXTRA_BACKENDS_FOR_SERVICE: Dict[str, List[str]] = {
+    "housing": ["housing_agencies"],
+}
+
+
+def backends_for_service(service_key: str) -> List[str]:
+    """All backend category keys a frontend service maps to (primary first)."""
+    primary = SERVICE_KEY_TO_BACKEND.get(service_key)
+    if not primary:
+        return []
+    return [primary, *EXTRA_BACKENDS_FOR_SERVICE.get(service_key, [])]
 
 
 def _flatten_saved_answers(answers_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -230,6 +246,11 @@ def build_criteria_for_assignment(
 
         criteria = _apply_service_shaping(svc_key, criteria)
         result[backend_key] = criteria
+        # Fan out to any secondary backend categories (e.g. housing -> housing_agencies).
+        # They read the same destination/budget shaping; category-specific fields they
+        # don't declare are ignored by the plugin's criteria model.
+        for extra_bk in EXTRA_BACKENDS_FOR_SERVICE.get(svc_key, []):
+            result[extra_bk] = dict(criteria)
 
     # [AIQ-1530] The "+15 preferred" boost now reads HR's curation (company_vendor_selections
     # via service_catalog_items.supplier_id), not the retired company_preferred_suppliers table.
@@ -240,13 +261,15 @@ def build_criteria_for_assignment(
         try:
             from ...database import db
             for svc_key in selected_services:
-                backend_key = SERVICE_KEY_TO_BACKEND.get(svc_key)
-                if not backend_key or backend_key not in result:
-                    continue
                 curated = db.list_company_curated_supplier_ids(company_id, svc_key)
                 supplier_ids = [str(c.get("supplier_id", "")) for c in curated if c.get("supplier_id")]
-                if supplier_ids:
-                    result[backend_key]["_preferred_supplier_ids"] = supplier_ids
+                if not supplier_ids:
+                    continue
+                # Apply the preferred boost to every backend the service fans out to
+                # (e.g. both living_areas and housing_agencies for "housing").
+                for backend_key in backends_for_service(svc_key):
+                    if backend_key in result:
+                        result[backend_key]["_preferred_supplier_ids"] = supplier_ids
         except Exception:
             pass
 
