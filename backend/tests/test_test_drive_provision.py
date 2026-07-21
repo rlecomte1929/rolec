@@ -411,6 +411,178 @@ class TestTestDriveProvision(unittest.TestCase):
         for a, label in ((prod_app, "backend.main"), (modular_app, "backend.app.main")):
             paths = [r.path for r in a.routes if "test-drive" in getattr(r, "path", "")]
             self.assertIn("/api/test-drive/provision", paths, f"route missing in {label}")
+            # Task 4: the staged fixture rides the same router → present in BOTH apps.
+            self.assertIn(
+                "/api/test-drive/provision-staged", paths, f"staged route missing in {label}"
+            )
+
+
+def _staged_body(**overrides):
+    body = {"first_name": "Quinn", "campaign": "qa-verify", "stage": "credentials"}
+    body.update(overrides)
+    return body
+
+
+_STAGED_ENV = {"RELOPASS_TEST_DRIVE_ENABLED": "1", "RELOPASS_TEST_DRIVE_INVITE_TOKEN": ""}
+
+
+class TestTestDriveProvisionStaged(unittest.TestCase):
+    """Task 4 — QA-only staged provisioning. The gate must be HARD (flag on + `qa-*`
+    campaign; reject insead-2026 and any non-qa campaign), and each stage must drive the
+    REAL handlers. The stage orchestration is verified at the call level: which handlers
+    run for which stage, cumulatively — the same functions an ordinary HTTP walk calls,
+    which is what makes a seeded session and a hand-walked one produce equivalent rows."""
+
+    def setUp(self):
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    # ── Hard gate ──────────────────────────────────────────────────────────────
+    def test_staged_flag_off_returns_404(self):
+        with patch.dict(os.environ, {"RELOPASS_TEST_DRIVE_ENABLED": "false"}, clear=False):
+            resp = self.client.post("/api/test-drive/provision-staged", json=_staged_body())
+        self.assertEqual(resp.status_code, 404, resp.text)
+
+    def test_staged_rejects_missing_campaign(self):
+        db = _db_mock()
+        with patch.dict(os.environ, _STAGED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/provision-staged", json=_staged_body(campaign=None))
+        self.assertEqual(resp.status_code, 404, resp.text)
+        db.create_user.assert_not_called()  # rejected before any minting
+
+    def test_staged_rejects_insead_campaign(self):
+        db = _db_mock()
+        with patch.dict(os.environ, _STAGED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/provision-staged", json=_staged_body(campaign="insead-2026"))
+        self.assertEqual(resp.status_code, 404, resp.text)
+        db.create_user.assert_not_called()
+
+    def test_staged_rejects_non_qa_campaign(self):
+        db = _db_mock()
+        with patch.dict(os.environ, _STAGED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db):
+            resp = self.client.post("/api/test-drive/provision-staged", json=_staged_body(campaign="prospect-x"))
+        self.assertEqual(resp.status_code, 404, resp.text)
+        db.create_user.assert_not_called()
+
+    def test_staged_invalid_stage_returns_422(self):
+        with patch.dict(os.environ, _STAGED_ENV, clear=False):
+            resp = self.client.post("/api/test-drive/provision-staged", json=_staged_body(stage="bogus"))
+        self.assertEqual(resp.status_code, 422, resp.text)
+
+    # ── Accept path (credentials stage does not advance) ────────────────────────
+    def test_staged_qa_credentials_mints_and_does_not_advance(self):
+        db = _db_mock()
+        with patch.dict(os.environ, _STAGED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"):
+            resp = self.client.post("/api/test-drive/provision-staged", json=_staged_body(stage="credentials"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        data = resp.json()
+        self.assertEqual(data["stage"], "credentials")
+        self.assertIsNone(data["case_id"])
+        self.assertTrue(data["hr"]["username"].startswith("HR-"))
+        self.assertTrue(data["employee"]["username"].startswith("EMP-"))
+        self.assertEqual(data["campaign"], "qa-verify")
+        self.assertEqual(db.create_user.call_count, 2)  # minted, but no case created
+
+    def test_staged_default_stage_is_shortlist_ready(self):
+        db = _db_mock()
+        with patch.dict(os.environ, _STAGED_ENV, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._dispatch_supabase_sync"), \
+                patch(
+                    "backend.app.routers.test_drive._advance_to_stage",
+                    return_value={"stage": "shortlist_ready", "case_id": "c1", "assignment_id": "a1"},
+                ) as adv:
+            body = _staged_body()
+            body.pop("stage")  # omitted → default
+            resp = self.client.post("/api/test-drive/provision-staged", json=body)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(adv.call_args.args[0], "shortlist_ready")
+        self.assertEqual(resp.json()["stage"], "shortlist_ready")
+
+    # ── Orchestration: each stage drives exactly the right REAL handlers ─────────
+    def _ctx(self):
+        return {
+            "hr_id": "hr-1", "hr_email": "hr-x@probe.test", "hr_username": "HR-x-1",
+            "emp_id": "emp-1", "emp_email": "emp-x@probe.test", "emp_username": "EMP-x-1",
+            "first_name": "Quinn", "corridor_id": "FR_NO",
+        }
+
+    def _patch_handlers(self):
+        import contextlib
+        from types import SimpleNamespace
+
+        stack = contextlib.ExitStack()
+        handlers = {
+            "create": stack.enter_context(
+                patch("backend.main.create_case", return_value=SimpleNamespace(caseId="case-1"))
+            ),
+            "assign": stack.enter_context(
+                patch("backend.main.assign_case", return_value=SimpleNamespace(assignmentId="asg-1"))
+            ),
+            "submit": stack.enter_context(patch("backend.main.submit_assignment")),
+            "patch_c": stack.enter_context(patch("backend.app.routers.cases_write.patch_case")),
+            "wait": stack.enter_context(
+                patch("backend.app.routers.test_drive._wait_for_roadmap", return_value=7)
+            ),
+            "shortlist": stack.enter_context(
+                patch(
+                    "backend.app.routers.test_drive._build_shortlist_state",
+                    return_value={"categories": ["movers"], "item_count": 2},
+                )
+            ),
+        }
+        return stack, handlers
+
+    def test_advance_credentials_is_noop(self):
+        from backend.app.routers.test_drive import _advance_to_stage
+        stack, h = self._patch_handlers()
+        with stack:
+            out = _advance_to_stage("credentials", self._ctx())
+        h["create"].assert_not_called()
+        self.assertEqual(out, {"stage": "credentials"})
+
+    def test_advance_case_created_creates_and_assigns(self):
+        from backend.app.routers.test_drive import _advance_to_stage
+        stack, h = self._patch_handlers()
+        with stack:
+            out = _advance_to_stage("case_created", self._ctx())
+        h["create"].assert_called_once()
+        h["assign"].assert_called_once()
+        h["patch_c"].assert_not_called()
+        h["submit"].assert_not_called()
+        self.assertEqual(out["case_id"], "case-1")
+        self.assertEqual(out["assignment_id"], "asg-1")
+
+    def test_advance_intake_complete_patches_case(self):
+        from backend.app.routers.test_drive import _advance_to_stage
+        stack, h = self._patch_handlers()
+        with stack:
+            _advance_to_stage("intake_complete", self._ctx())
+        h["patch_c"].assert_called_once()
+        h["submit"].assert_not_called()
+
+    def test_advance_roadmap_ready_submits_and_waits(self):
+        from backend.app.routers.test_drive import _advance_to_stage
+        stack, h = self._patch_handlers()
+        with stack:
+            out = _advance_to_stage("roadmap_ready", self._ctx())
+        h["submit"].assert_called_once()
+        h["wait"].assert_called_once()
+        h["shortlist"].assert_not_called()
+        self.assertEqual(out["milestones"], 7)
+
+    def test_advance_shortlist_ready_builds_shortlist(self):
+        from backend.app.routers.test_drive import _advance_to_stage
+        stack, h = self._patch_handlers()
+        with stack:
+            out = _advance_to_stage("shortlist_ready", self._ctx())
+        h["submit"].assert_called_once()
+        h["shortlist"].assert_called_once()
+        self.assertEqual(out["shortlist"], {"categories": ["movers"], "item_count": 2})
 
 
 if __name__ == "__main__":

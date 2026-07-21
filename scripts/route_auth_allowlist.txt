@@ -134,6 +134,12 @@ backend/app/routers/test_drive.py:provision
 # identities. Defense in depth: campaign gate (404 unless RELOPASS_TEST_DRIVE_ENABLED,
 # dark by default) + invite-token gate (constant-time vs RELOPASS_TEST_DRIVE_INVITE_TOKEN,
 # 403 incl. when unset — never fails open) + slowapi rate-limit + is_test stamping.
+backend/app/routers/test_drive.py:provision_staged
+# PUBLIC (Task 4, QA-only): staged-provisioning fixture — mints a session AND drives it to
+# a named stage via the REAL handlers so QA can reach the RFQ-submit step in one call.
+# Intentionally unauthenticated (same public surface as :provision) but gated HARDER: campaign
+# gate (404 unless RELOPASS_TEST_DRIVE_ENABLED) + qa-* campaign only (404 for insead-2026 and
+# any non-qa) + is_test-company assertion + optional invite-token + slowapi rate-limit.
 backend/app/routers/test_drive.py:survey
 # PUBLIC (AIQ-1423 / TD-5): completion-survey submission. Intentionally unauthenticated
 # (post-test feedback from the same public flow). Campaign gate (404 unless

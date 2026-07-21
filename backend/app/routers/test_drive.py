@@ -46,6 +46,7 @@ from sqlalchemy import text
 
 from ... import db_config
 from ...database import db
+from ...db.test_data_filter import looks_like_test_company
 from ...rate_limit import limiter
 from ..services.test_drive_corridor import LOCKED_CORRIDORS, TEST_DRIVE_CORRIDOR_ROUTES
 from .auth import _dispatch_supabase_sync, _pwd_context
@@ -320,41 +321,24 @@ def _seed_default_vendor_selections(
         )
 
 
-@router.post("/provision")
-@limiter.limit(_RATE_LIMIT)
-def provision(body: ProvisionRequest, request: Request):
-    """Provision a paired HR + Employee test identity for the self-serve flow.
+def _mint_test_drive_identities(
+    body: ProvisionRequest,
+    first_name: str,
+    slug: str,
+    campaign: str,
+    resolved_corridor: str,
+) -> Dict[str, Any]:
+    """Shared credential-minting core for ``/provision`` and ``/provision-staged``.
 
-    Returns both credential sets (username + email + plaintext one-time password)
-    plus the ``test_sessions`` id. 404 when the campaign is off; 403 only when a
-    token is supplied that doesn't match the configured campaign secret (a missing
-    token is allowed — public self-serve).
+    Creates the paired HR + Employee identities, a per-session ``is_test`` company,
+    seeds the published default policy + vendor selections, mirrors both to Supabase
+    Auth, writes the ``test_sessions`` anchor row and emits the ``start`` funnel event.
+
+    Returns the full session context: the public credential sets PLUS the internal
+    ids (hr_id / emp_id / company_id) the staged provisioner needs to drive the real
+    HR + employee flow. Callers own the campaign gate and campaign/corridor resolution
+    (they differ between the public self-serve path and the QA staged path).
     """
-    # 1) Campaign gate — dark by default.
-    if not _test_drive_enabled():
-        raise HTTPException(status_code=404, detail="Not found")
-
-    # 2) Invite token is now optional (public self-serve). If the campaign has a token
-    #    configured AND the caller supplies one, it must still match — keeps existing
-    #    invite links meaningful and rejects a wrong/stale token. A missing token is OK.
-    expected_token = os.getenv("RELOPASS_TEST_DRIVE_INVITE_TOKEN") or ""
-    supplied_token = (body.invite_token or "").strip()
-    if supplied_token and expected_token and not secrets.compare_digest(supplied_token, expected_token):
-        raise HTTPException(status_code=403, detail="Invalid or missing invite token")
-
-    first_name = body.first_name.strip()
-    slug = _slugify(first_name)
-    # [campaign attribution] Absent campaign → 'unattributed', NEVER the live 'insead-2026' cohort:
-    # silently defaulting there contaminated the cohort's headline metrics and forced three manual
-    # purges. Only an explicit ?campaign= attributes a session (the real cohort link passes it).
-    # Mirrors the AIQ-1639 survey fix; test_sessions.campaign is NOT NULL so we use an explicit
-    # sentinel rather than the survey's NULL.
-    campaign = (body.campaign or "").strip() or "unattributed"
-    # Whitelist the corridor: honour an explicit valid one, otherwise auto-assign. This
-    # blocks free-text corridor_id injection now that the endpoint is public.
-    requested_corridor = (body.corridor_id or "").strip()
-    resolved_corridor = requested_corridor if requested_corridor in _LOCKED_CORRIDORS else _assign_corridor(campaign)
-
     # Passwords are independent of the collision retry, so hash once (pbkdf2 is costly).
     hr_password = secrets.token_urlsafe(9)
     emp_password = secrets.token_urlsafe(9)
@@ -383,7 +367,8 @@ def provision(body: ProvisionRequest, request: Request):
 
     # 4) Seed a per-session company ("Test Drive …" name → companies.is_test auto-set)
     #    and link the HR user so the command-center / assignment dropdowns work.
-    company_id = db.find_or_create_company_by_name(f"Test Drive {first_name} {suffix}")
+    company_name = f"Test Drive {first_name} {suffix}"
+    company_id = db.find_or_create_company_by_name(company_name)
 
     db.ensure_profile_record(
         user_id=hr_id, email=hr_email, role="HR", full_name=first_name, company_id=company_id,
@@ -462,6 +447,323 @@ def provision(body: ProvisionRequest, request: Request):
         "campaign": campaign,
         "hr": {"username": hr_username, "email": hr_email, "password": hr_password, "role": "HR"},
         "employee": {"username": emp_username, "email": emp_email, "password": emp_password, "role": "EMPLOYEE"},
+        # Internal context for the staged provisioner (NOT returned to the public client).
+        "hr_id": hr_id,
+        "emp_id": emp_id,
+        "company_id": company_id,
+        "company_name": company_name,
+        "hr_username": hr_username,
+        "emp_username": emp_username,
+        "hr_email": hr_email,
+        "emp_email": emp_email,
+        "first_name": first_name,
+    }
+
+
+@router.post("/provision")
+@limiter.limit(_RATE_LIMIT)
+def provision(body: ProvisionRequest, request: Request):
+    """Provision a paired HR + Employee test identity for the self-serve flow.
+
+    Returns both credential sets (username + email + plaintext one-time password)
+    plus the ``test_sessions`` id. 404 when the campaign is off; 403 only when a
+    token is supplied that doesn't match the configured campaign secret (a missing
+    token is allowed — public self-serve).
+    """
+    # 1) Campaign gate — dark by default.
+    if not _test_drive_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # 2) Invite token is now optional (public self-serve). If the campaign has a token
+    #    configured AND the caller supplies one, it must still match — keeps existing
+    #    invite links meaningful and rejects a wrong/stale token. A missing token is OK.
+    expected_token = os.getenv("RELOPASS_TEST_DRIVE_INVITE_TOKEN") or ""
+    supplied_token = (body.invite_token or "").strip()
+    if supplied_token and expected_token and not secrets.compare_digest(supplied_token, expected_token):
+        raise HTTPException(status_code=403, detail="Invalid or missing invite token")
+
+    first_name = body.first_name.strip()
+    slug = _slugify(first_name)
+    # [campaign attribution] Absent campaign → 'unattributed', NEVER the live 'insead-2026' cohort:
+    # silently defaulting there contaminated the cohort's headline metrics and forced three manual
+    # purges. Only an explicit ?campaign= attributes a session (the real cohort link passes it).
+    # Mirrors the AIQ-1639 survey fix; test_sessions.campaign is NOT NULL so we use an explicit
+    # sentinel rather than the survey's NULL.
+    campaign = (body.campaign or "").strip() or "unattributed"
+    # Whitelist the corridor: honour an explicit valid one, otherwise auto-assign. This
+    # blocks free-text corridor_id injection now that the endpoint is public.
+    requested_corridor = (body.corridor_id or "").strip()
+    resolved_corridor = requested_corridor if requested_corridor in _LOCKED_CORRIDORS else _assign_corridor(campaign)
+
+    ctx = _mint_test_drive_identities(body, first_name, slug, campaign, resolved_corridor)
+    return {
+        "session_id": ctx["session_id"],
+        "corridor_id": ctx["corridor_id"],
+        "campaign": ctx["campaign"],
+        "hr": ctx["hr"],
+        "employee": ctx["employee"],
+    }
+
+
+# ── Staged provisioning (P0, QA-only) ─────────────────────────────────────────
+# The full cohort path (provision → HR case → assign → employee sign-in → Services →
+# recommendations → shortlist → Request quotes) costs ~40-45 browser actions against a
+# ~50 ceiling, so QA could never reach the RFQ-submit step. This fixture returns a
+# session already advanced to a named stage — by driving the SAME handlers an ordinary
+# session calls (no direct row inserts), so a seeded session and a hand-walked one
+# produce equivalent DB rows.
+_STAGE_ORDER = ("credentials", "case_created", "intake_complete", "roadmap_ready", "shortlist_ready")
+
+
+class ProvisionStagedRequest(ProvisionRequest):
+    # QA-only: how far to drive the session before returning. Cumulative — each stage
+    # runs every earlier one. Defaults to the priority `shortlist_ready` (the tester
+    # signs in and can click "Request quotes" in under 5 actions).
+    stage: Optional[str] = Field("shortlist_ready", max_length=32)
+
+    @field_validator("stage")
+    @classmethod
+    def _validate_stage(cls, v: Optional[str]) -> str:
+        if v is None:
+            return "shortlist_ready"
+        s = v.strip()
+        if s not in _STAGE_ORDER:
+            raise ValueError(f"stage must be one of {list(_STAGE_ORDER)}")
+        return s
+
+
+def _staged_intake_draft(corridor: str, emp_email: str, first_name: str) -> Dict[str, Any]:
+    """A complete CaseDraftDTO payload that clears submit_assignment's ≥90% gate
+    (all six step-1 basics present → `missing_intake_basics` empty). Origin/destination
+    mirror the locked corridor — patch_case also overrides them server-side via
+    resolve_test_drive_route, so they are consistent either way."""
+    route = TEST_DRIVE_CORRIDOR_ROUTES.get(corridor, TEST_DRIVE_CORRIDOR_ROUTES[_LOCKED_CORRIDORS[0]])
+    return {
+        "relocationBasics": {
+            "originCountry": route["home_country"], "originCity": route["home_city"],
+            "destCountry": route["host_country"], "destCity": route["host_city"],
+            "purpose": "work", "targetMoveDate": "2026-12-01",
+            "durationMonths": 24, "hasDependents": False,
+        },
+        "employeeProfile": {
+            "fullName": first_name or "Test Drive Tester", "nationality": route["home_country"],
+            "passportCountry": route["home_country"], "passportExpiry": "2030-01-01",
+            "residenceCountry": route["home_country"], "email": emp_email,
+        },
+        "familyMembers": {"maritalStatus": "single", "children": []},
+        "assignmentContext": {
+            "employerName": "Test Drive Employer", "employerCountry": route["host_country"],
+            "workLocation": route["host_city"], "contractStartDate": "2026-12-15",
+            "contractType": "permanent", "salaryBand": "L4", "jobTitle": "Engineer",
+            "seniorityBand": "senior",
+        },
+        "services": ["housing", "movers", "schools"],
+    }
+
+
+def _wait_for_roadmap(case_id: str, timeout_s: float = 45.0, interval_s: float = 2.0) -> int:
+    """Block until the async plan build (enqueued by submit_assignment) has written
+    case_milestones, so a tester signing in lands on a populated roadmap / a reachable
+    Services page. The deterministic milestone seed lands in ~8s (the AI enrich replaces
+    it later, in the background), so this typically returns well under the timeout.
+    Returns the milestone count (0 if it never materialised — logged, non-fatal)."""
+    import time as _time
+
+    deadline = _time.time() + timeout_s
+    while _time.time() < deadline:
+        try:
+            milestones = db.list_case_milestones(case_id)
+        except Exception:  # noqa: BLE001 — a transient read failure just means "poll again"
+            milestones = None
+        if milestones:
+            return len(milestones)
+        _time.sleep(interval_s)
+    logger.error(
+        "test-drive staged: roadmap did not materialise for case %s within %ss — the "
+        "Services page may still be building when the tester signs in",
+        case_id, timeout_s,
+    )
+    return 0
+
+
+def _build_shortlist_state(case_id: str, emp_user: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the REAL recommendations batch for the working city-scoped categories
+    (movers + schools — living_areas/housing is handled separately) and persist the
+    exact services-state blob the frontend reads: `recommendations` (non-null) plus a
+    non-empty `shortlist`, which together enable the "Request quotes" button on the
+    Review & budget page. Reuses post_recommendations_batch + put_services_state so the
+    shortlist carries real service_catalog_items.external_id item_ids the RFQ endpoint
+    can resolve to suppliers."""
+    from types import SimpleNamespace
+
+    from ..recommendations.router import post_recommendations_batch as _post_batch
+    from .services_state import ServicesStatePut as _ServicesStatePut
+    from .services_state import put_services_state as _put_services_state
+
+    categories = ["movers", "schools"]
+    stub = SimpleNamespace(state=SimpleNamespace(request_id=None))
+    batch = _post_batch(
+        request=stub, user=emp_user,
+        body={"case_id": case_id, "selected_services": categories},
+    ) or {}
+    results = batch.get("results", {}) if isinstance(batch, dict) else {}
+
+    recommendations_blob: Dict[str, Any] = {}
+    shortlist_pairs: list = []
+    for cat in categories:
+        resp = results.get(cat)
+        if resp is None:
+            continue
+        resp_dict = resp.model_dump(mode="json") if hasattr(resp, "model_dump") else dict(resp)
+        items = resp_dict.get("recommendations") or []
+        if not items:
+            continue
+        recommendations_blob[cat] = resp_dict
+        top_ids = [it.get("item_id") for it in items[:3] if it.get("item_id")]
+        if top_ids:
+            shortlist_pairs.append([cat, top_ids])
+
+    if not shortlist_pairs:
+        # No movers/schools recs → the "Request quotes" button stays disabled. Loud +
+        # structured (mirrors the vendor-seed 0-row logging): a silent empty shortlist is
+        # the exact failure this fixture exists to prevent.
+        logger.error(
+            "test-drive staged: shortlist EMPTY for case %s — no movers/schools "
+            "recommendations; 'Request quotes' will be disabled for the tester",
+            case_id,
+        )
+
+    # The frontend serialises the shortlist Map as Array.from(map.entries()) — i.e. a list
+    # of [category, item_id[]] pairs — and reads `recommendations` back untouched, so the
+    # item_ids in `shortlist` MUST also appear in `recommendations[cat].recommendations`.
+    state = {
+        "selectedServices": categories,
+        "answers": {},
+        "recommendations": recommendations_blob or None,
+        "shortlist": shortlist_pairs,
+        "displayCurrency": "EUR",
+    }
+    _put_services_state(case_id=case_id, body=_ServicesStatePut(state=state), user=emp_user)
+    return {
+        "categories": [p[0] for p in shortlist_pairs],
+        "item_count": sum(len(p[1]) for p in shortlist_pairs),
+    }
+
+
+def _advance_to_stage(stage: str, ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Drive a freshly provisioned session up to `stage` by invoking the SAME handlers
+    an ordinary HR/employee session calls — no direct row inserts, so a seeded session
+    and a hand-walked one produce equivalent DB rows. Cumulative: each stage runs every
+    step below it. Synchronous by design (the QA fixture trades one backend call for the
+    ~45 browser actions QA can't afford)."""
+    outcome: Dict[str, Any] = {"stage": stage}
+    if stage == "credentials":
+        return outcome
+
+    from types import SimpleNamespace
+
+    from fastapi import BackgroundTasks
+
+    from ... import main as _main
+    from ...schemas import AssignCaseRequest
+    from ..schemas import CaseDraftDTO
+    from .cases_write import patch_case as _patch_case
+
+    hr_user = {"id": ctx["hr_id"], "role": "HR", "email": ctx["hr_email"], "username": ctx["hr_username"]}
+    emp_user = {"id": ctx["emp_id"], "role": "EMPLOYEE", "email": ctx["emp_email"], "username": ctx["emp_username"]}
+    corridor = ctx["corridor_id"]
+
+    # ── case_created: HR creates the relocation case + assigns the employee ──
+    # (the real POST /api/hr/cases and .../assign handlers; assign_case stamps the
+    #  corridor dest onto relocation_cases AND wizard_cases, which is what makes the
+    #  city-scoped recommendations populate.)
+    created = _main.create_case(user=hr_user)
+    case_id = created.caseId
+    stub = SimpleNamespace(state=SimpleNamespace(request_id=None))
+    assign_body = AssignCaseRequest(
+        employeeIdentifier=ctx["emp_email"],
+        employeeFirstName=ctx["first_name"],
+        employeeLastName="Tester",
+    )
+    assigned = _main.assign_case(case_id=case_id, request=assign_body, request_obj=stub, user=hr_user)
+    assignment_id = assigned.assignmentId
+    outcome["case_id"] = case_id
+    outcome["assignment_id"] = assignment_id
+    if stage == "case_created":
+        return outcome
+
+    # ── intake_complete: employee submits a complete intake draft (clears the ≥90% gate) ──
+    draft = CaseDraftDTO(**_staged_intake_draft(corridor, ctx["emp_email"], ctx["first_name"]))
+    _patch_case(case_id=case_id, patch=draft, background_tasks=BackgroundTasks(), user=emp_user)
+    if stage == "intake_complete":
+        return outcome
+
+    # ── roadmap_ready: submit → the real async plan build → block until milestones land ──
+    _main.submit_assignment(assignment_id=assignment_id, user=emp_user)
+    outcome["milestones"] = _wait_for_roadmap(case_id)
+    if stage == "roadmap_ready":
+        return outcome
+
+    # ── shortlist_ready: real recs → persist a non-empty services-state shortlist ──
+    outcome["shortlist"] = _build_shortlist_state(case_id, emp_user)
+    return outcome
+
+
+@router.post("/provision-staged")
+@limiter.limit(_RATE_LIMIT)
+def provision_staged(body: ProvisionStagedRequest, request: Request):
+    """QA-only staged provisioning: mint a test-drive session AND drive it up to a named
+    `stage` using the real HR/employee handlers, so QA can reach the RFQ-submit step
+    (which costs ~45 browser actions via the full flow) in a single call.
+
+    Gated HARD — it drives the real case/intake/roadmap/recommendations pipeline, so it
+    is reachable ONLY when the test-drive flag is on AND the campaign is a `qa-*` campaign
+    (never the live `insead-2026` cohort), and only ever advances an `is_test` company.
+    Reuses the same credential-minting core as /provision.
+    """
+    # 1) Dark-gate: the whole test-drive surface is off by default.
+    if not _test_drive_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # 2) Optional invite token (same contract as /provision).
+    expected_token = os.getenv("RELOPASS_TEST_DRIVE_INVITE_TOKEN") or ""
+    supplied_token = (body.invite_token or "").strip()
+    if supplied_token and expected_token and not secrets.compare_digest(supplied_token, expected_token):
+        raise HTTPException(status_code=403, detail="Invalid or missing invite token")
+
+    # 3) HARD campaign gate — QA only. Reject the live cohort and anything that isn't a
+    #    `qa-*` campaign (dark-gated 404 so the surface isn't casually discoverable).
+    campaign = (body.campaign or "").strip()
+    if campaign == "insead-2026" or not campaign.startswith("qa-"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    stage = body.stage or "shortlist_ready"
+    first_name = body.first_name.strip()
+    slug = _slugify(first_name)
+    requested_corridor = (body.corridor_id or "").strip()
+    resolved_corridor = requested_corridor if requested_corridor in _LOCKED_CORRIDORS else _assign_corridor(campaign)
+
+    ctx = _mint_test_drive_identities(body, first_name, slug, campaign, resolved_corridor)
+
+    # 4) is_test assertion (defense in depth): staged provisioning only ever advances a
+    #    test company. The minted "Test Drive …" company always qualifies; refuse otherwise.
+    if not looks_like_test_company(ctx.get("company_name")):
+        raise HTTPException(status_code=403, detail="Staged provisioning requires an is_test company")
+
+    ctx["corridor_id"] = resolved_corridor
+    advanced = _advance_to_stage(stage, ctx)
+
+    return {
+        "session_id": ctx["session_id"],
+        "corridor_id": ctx["corridor_id"],
+        "campaign": ctx["campaign"],
+        "stage": advanced.get("stage", stage),
+        "case_id": advanced.get("case_id"),
+        "assignment_id": advanced.get("assignment_id"),
+        "milestones": advanced.get("milestones"),
+        "shortlist": advanced.get("shortlist"),
+        "hr": ctx["hr"],
+        "employee": ctx["employee"],
     }
 
 
