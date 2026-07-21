@@ -344,7 +344,12 @@ def provision(body: ProvisionRequest, request: Request):
 
     first_name = body.first_name.strip()
     slug = _slugify(first_name)
-    campaign = (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+    # [campaign attribution] Absent campaign → 'unattributed', NEVER the live 'insead-2026' cohort:
+    # silently defaulting there contaminated the cohort's headline metrics and forced three manual
+    # purges. Only an explicit ?campaign= attributes a session (the real cohort link passes it).
+    # Mirrors the AIQ-1639 survey fix; test_sessions.campaign is NOT NULL so we use an explicit
+    # sentinel rather than the survey's NULL.
+    campaign = (body.campaign or "").strip() or "unattributed"
     # Whitelist the corridor: honour an explicit valid one, otherwise auto-assign. This
     # blocks free-text corridor_id injection now that the endpoint is public.
     requested_corridor = (body.corridor_id or "").strip()
@@ -819,7 +824,12 @@ def record_event(body: EventRequest, request: Request):
         raise HTTPException(status_code=404, detail="Not found")
     if body.event_type not in _ALLOWED_FUNNEL_EVENTS:
         raise HTTPException(status_code=400, detail="Unknown event_type")
-    campaign = (body.campaign or "").strip() or os.getenv("RELOPASS_TEST_DRIVE_CAMPAIGN", "insead-2026")
+    # [campaign attribution] Absent campaign → 'unattributed', NEVER the live 'insead-2026' cohort:
+    # silently defaulting there contaminated the cohort's headline metrics and forced three manual
+    # purges. Only an explicit ?campaign= attributes a session (the real cohort link passes it).
+    # Mirrors the AIQ-1639 survey fix; test_sessions.campaign is NOT NULL so we use an explicit
+    # sentinel rather than the survey's NULL.
+    campaign = (body.campaign or "").strip() or "unattributed"
     # Only scalar metadata — no free-text/PII from the public web.
     meta: Dict[str, Any] = {}
     if body.metadata:
