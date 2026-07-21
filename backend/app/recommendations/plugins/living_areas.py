@@ -168,13 +168,20 @@ class LivingAreasPlugin(BasePlugin):
         # per-row/per-city degradation for un-geocoded data).
         commute_mins = item.get("commute_to_work_minutes_estimate", 30)
         mode = (c.commute_work or {}).get("mode", "transit") if c.commute_work else "transit"
+        commute_modes: List[Dict[str, Any]] = []
         if (
             c.office_lat is not None and c.office_lng is not None
             and item.get("lat") is not None and item.get("lng") is not None
         ):
-            est = geo.commute_minutes((c.office_lat, c.office_lng), (item["lat"], item["lng"]), mode)
+            office = (c.office_lat, c.office_lng)
+            area = (item["lat"], item["lng"])
+            est = geo.commute_minutes(office, area, mode)
             if est is not None:
                 commute_mins = int(round(est))
+            # Multimodal enrichment (walk/bike/transit/car time + cost + carbon) to the
+            # office — a keyless heuristic, no routing sub-processor. Surfaced on metadata
+            # for the card; the chosen mode still drives the headline commute_match.
+            commute_modes = geo.multimodal_commute(office, area)
         max_mins = 45
         if c.commute_work:
             max_mins = c.commute_work.get("max_minutes", 45)
@@ -279,5 +286,9 @@ class LivingAreasPlugin(BasePlugin):
                 # Coords for the neighborhood map (Phase 2); null until geocoded.
                 "lat": item.get("lat"),
                 "lng": item.get("lng"),
+                # Multimodal commute to the office (walk/bike/transit/car; time + cost +
+                # carbon). Empty when coords are unavailable — the card falls back to the
+                # single headline estimate.
+                "commute_modes": commute_modes,
             },
         }
