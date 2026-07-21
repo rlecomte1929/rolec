@@ -9,6 +9,7 @@ VALID_COVERAGE_SCOPE_TYPES = ("global", "country", "city")
 # Service categories from recommendation registry (must match plugins)
 VALID_SERVICE_CATEGORIES = frozenset({
     "living_areas",
+    "housing_agencies",
     "schools",
     "movers",
     "banks",

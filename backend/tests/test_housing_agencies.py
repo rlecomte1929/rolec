@@ -22,6 +22,34 @@ def _agency(item_id, tag, rating=4.5):
             "availability_level": "high", "specialization_tags": [tag]}
 
 
+def test_housing_agencies_is_a_valid_supplier_category():
+    # The seed creates agencies via create_supplier -> validate_supplier_create; if
+    # "housing_agencies" isn't a valid service_category the whole seed raises and is
+    # silently swallowed (agencies never appear). This pins the category as valid AND
+    # validates the exact capability shape seed_housing_agencies builds.
+    from backend.app.services.supplier_validation import (
+        VALID_SERVICE_CATEGORIES,
+        validate_supplier_create,
+    )
+
+    assert "housing_agencies" in VALID_SERVICE_CATEGORIES
+    ok, err = validate_supplier_create({
+        "id": "ha-osl-p1",
+        "name": "Frogner Rental Partners",
+        "status": "active",
+        "capabilities": [{
+            "service_category": "housing_agencies",
+            "coverage_scope_type": "city",
+            "city_name": "Oslo",
+            "country_code": "NO",
+            "specialization_tags": [PERMANENT_TAG],
+            "corporate_clients": True,
+            "platform_vetting_status": "approved",
+        }],
+    })
+    assert ok, err
+
+
 def test_plugin_registered_and_is_gated():
     p = get_plugin("housing_agencies")
     assert isinstance(p, HousingAgenciesPlugin)
