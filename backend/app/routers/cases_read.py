@@ -2430,14 +2430,14 @@ def list_case_vendors(
         with main_db.engine.begin() as conn:
             rows = conn.execute(
                 _sql_text(
-                    # AIQ-1011 follow-up — columns matched to the ACTUAL deployed
-                    # schema (verified read-only against prod). case_vendor_shortlist
-                    # DOES carry status/contact_name/contact_email + selected; the
-                    # only truly-missing column was vendors.website — the real column
-                    # is vendors.website_url (vendors has no `contact_email`; the
-                    # per-case contact lives on the shortlist row). #701 swapped one
-                    # absent column (v.website) for another (v.contact_email), so the
-                    # route still 500'd.
+                    # AIQ-1646 — public.vendors was DROPPED (platform redesign,
+                    # 20260520000000), so the old `JOIN public.vendors` 500'd on every
+                    # HR case-summary load. Repoint the vendor-identity join at
+                    # public.suppliers: suppliers.vendor_id still references the old
+                    # vendors.id, the same key case_vendor_shortlist.vendor_id holds, so
+                    # the join key is s.vendor_id = cvs.vendor_id. Vendor name/website
+                    # come from suppliers (col is `website`, not `website_url`); the
+                    # per-case contact + status live on the shortlist row (verified prod).
                     """
                     SELECT
                         cvs.id            AS shortlist_id,
@@ -2446,12 +2446,12 @@ def list_case_vendors(
                         cvs.contact_name  AS contact_name,
                         cvs.contact_email AS contact_email,
                         cvs.selected      AS selected,
-                        v.name            AS vendor_name,
-                        v.website_url     AS vendor_website
+                        s.name            AS vendor_name,
+                        s.website         AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
+                    LEFT JOIN public.suppliers s ON s.vendor_id = cvs.vendor_id
                     WHERE cvs.case_id = :case_id
-                    ORDER BY cvs.service_key, v.name
+                    ORDER BY cvs.service_key, s.name
                     """
                 ),
                 {"case_id": case_id},

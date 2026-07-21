@@ -3386,13 +3386,16 @@ def list_case_vendors(
                         cvs.status,
                         cvs.contact_name,
                         cvs.contact_email,
-                        v.name            AS vendor_name,
-                        v.website         AS vendor_website
+                        s.name            AS vendor_name,
+                        s.website         AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
+                    LEFT JOIN public.suppliers s ON s.vendor_id = cvs.vendor_id
                     WHERE cvs.case_id = :case_id
-                    ORDER BY cvs.service_key, v.name
+                    ORDER BY cvs.service_key, s.name
                     """
+                    # AIQ-1646: dead duplicate of cases_read.list_case_vendors (this
+                    # router is NOT wired — AUDIT-B9-cases-6); kept aligned so no stale
+                    # `public.vendors` join lingers in the tree.
                 ),
                 {"case_id": case_id},
             ).mappings().all()
