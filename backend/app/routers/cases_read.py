@@ -2449,7 +2449,10 @@ def list_case_vendors(
                         s.name            AS vendor_name,
                         s.website         AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    LEFT JOIN public.suppliers s ON s.vendor_id = cvs.vendor_id
+                    -- AIQ-1646: cvs.vendor_id is uuid, suppliers.vendor_id is varchar on
+                    -- prod, so a bare `=` raises 42883 (character varying = uuid). CAST both
+                    -- to TEXT — works on Postgres AND SQLite (the `::text` operator does not).
+                    LEFT JOIN public.suppliers s ON CAST(s.vendor_id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
                     WHERE cvs.case_id = :case_id
                     ORDER BY cvs.service_key, s.name
                     """
