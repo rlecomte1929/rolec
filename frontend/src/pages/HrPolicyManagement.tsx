@@ -84,6 +84,8 @@ export const HrPolicyManagement: React.FC = () => {
   const [form, setForm] = useState<PolicyForm>(getDefaultPolicy());
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const loadPolicies = useCallback(async () => {
     try {
@@ -130,7 +132,10 @@ export const HrPolicyManagement: React.FC = () => {
   };
 
   const handleSave = async () => {
+    // [A16] Re-entry guard: ignore clicks while a save/publish is already in flight.
+    if (saving || publishing) return;
     setError('');
+    setSaving(true);
     try {
       const payload = {
         ...form,
@@ -147,11 +152,20 @@ export const HrPolicyManagement: React.FC = () => {
     } catch (err) {
       const e = err as { response?: { data?: { detail?: string } } };
       setError(e.response?.data?.detail || 'Could not save policy.');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handlePublish = async () => {
+    // [A16] Publish can take 20–40s server-side. The button used to stay
+    // clickable for that whole window, so a natural ~20s re-click fired a
+    // second request that came back 409. UI-only fix: guard re-entry and keep
+    // the button disabled (with honest copy) from click until the operation
+    // resolves or errors — the state is re-enabled in `finally` either way.
+    if (publishing || saving) return;
     setError('');
+    setPublishing(true);
     try {
       const payload = { ...form, status: 'published' };
       if (editingId) {
@@ -164,6 +178,8 @@ export const HrPolicyManagement: React.FC = () => {
     } catch (err) {
       const e = err as { response?: { data?: { detail?: string } } };
       setError(e.response?.data?.detail || 'Could not publish policy.');
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -428,12 +444,21 @@ export const HrPolicyManagement: React.FC = () => {
           </Card>
 
           <div className="flex gap-3">
-            <Button onClick={handleSave}>Save draft</Button>
-            <Button variant="outline" onClick={handlePublish}>
-              Publish for employees
+            <Button onClick={handleSave} disabled={saving || publishing}>
+              {saving ? 'Saving…' : 'Save draft'}
             </Button>
-            <Button variant="outline" onClick={() => setView('list')}>Cancel</Button>
+            <Button variant="outline" onClick={handlePublish} disabled={publishing || saving}>
+              {publishing ? 'Publishing… this can take up to a minute.' : 'Publish for employees'}
+            </Button>
+            <Button variant="outline" onClick={() => setView('list')} disabled={publishing || saving}>
+              Cancel
+            </Button>
           </div>
+          {publishing && (
+            <p className="text-sm text-[#6b7280]" role="status" aria-live="polite">
+              Publishing… this can take up to a minute. Please keep this page open — you only need to click once.
+            </p>
+          )}
         </div>
       )}
     </AppShell>
