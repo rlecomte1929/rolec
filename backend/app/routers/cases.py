@@ -3389,7 +3389,7 @@ def list_case_vendors(
                         s.name            AS vendor_name,
                         s.website         AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    LEFT JOIN public.suppliers s ON s.vendor_id = cvs.vendor_id
+                    LEFT JOIN public.suppliers s ON CAST(s.vendor_id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
                     WHERE cvs.case_id = :case_id
                     ORDER BY cvs.service_key, s.name
                     """

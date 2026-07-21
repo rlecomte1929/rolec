@@ -40,6 +40,13 @@ from backend.app.routers.cases_read import list_case_vendors  # noqa: E402
 # (both hold the old vendors.id). Created under a "public" schema so the router's
 # public.-qualified SQL runs as-is. A test that still created public.vendors would
 # NOT reproduce the bug (the query would keep working) — that was the prior gap.
+#
+# CAVEAT (AIQ-1646 follow-up): on PROD cvs.vendor_id is `uuid` and suppliers.vendor_id
+# is `varchar`, so a bare `s.vendor_id = cvs.vendor_id` raises 42883 (no varchar=uuid
+# operator). SQLite is dynamically typed (everything is TEXT here) so it CANNOT
+# reproduce that type error — the join is CAST(...AS TEXT) on both sides, which is
+# what makes it work on both engines. The real guard for the type mismatch is the
+# live prod-query check, not this test.
 SCHEMA = """
 CREATE TABLE public.suppliers (
   id TEXT PRIMARY KEY,
