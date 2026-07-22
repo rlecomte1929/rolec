@@ -438,6 +438,24 @@ export const TestDrivePage: React.FC = () => {
         </FadeIn>
       </Section>
 
+      {/* Unlocking the roadmap — test payment with EXACT card details (no surprises) */}
+      <Section spacing="lg" background="muted">
+        <FadeIn>
+          <div className="mx-auto max-w-2xl">
+            <SectionHeader title={c.paymentTest.header} align="center" narrow />
+            <p className="mt-6 text-marketing-body text-marketing-text leading-relaxed text-center">
+              {c.paymentTest.intro}
+            </p>
+            <div className="mt-6 mx-auto max-w-md space-y-2 rounded-xl border border-marketing-border bg-white p-4">
+              {c.paymentTest.card.map((row) => (
+                <CopyRow key={row.label} label={row.label} value={row.value} />
+              ))}
+            </div>
+            <p className="mt-4 text-center text-sm text-marketing-text-muted">{c.paymentTest.note}</p>
+          </div>
+        </FadeIn>
+      </Section>
+
       {/* Before you start — video placeholders (real embeds land in TD-11) */}
       <Section spacing="lg" background="muted">
         <FadeIn>
