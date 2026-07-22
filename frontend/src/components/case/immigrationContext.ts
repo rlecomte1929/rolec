@@ -1,7 +1,7 @@
 /**
  * Immigration → vendor RFQ context — IMM-15 (AIQ-121)
  *
- * Shared shape threaded from ImmigrationStatusPanel → VendorBrowsePanel → RfqModal
+ * Shared shape threaded from ImmigrationStatusPanel → VendorBrowsePanel
  * so that an RFQ raised against an immigration vendor is pre-loaded with the
  * case's visa type, corridor, move date, and the employee's specific situation.
  */

@@ -10,8 +10,11 @@
  *  - destCountry     : pre-fills the destination part of the corridor filter
  *  - initialCategory : pre-selects a service category filter (e.g. "Immigration/visa")
  *  - immigrationContext : IMM-15 — case immigration context when opened from the
- *                         immigration panel; surfaces a hint and flows into the RFQ
- *  - onRequestQuote  : called when HR clicks "Request Quote" on a vendor card
+ *                         immigration panel; surfaces a hint on the panel
+ *
+ * AIQ-1682: the per-vendor "Request quote" action was removed — HR no longer
+ * originates RFQs (RFQs are employee-led; HR is payer/approver). This is now a
+ * read-only directory browser.
  */
 
 import React, { useState } from 'react';
@@ -57,7 +60,6 @@ interface Props {
   destCountry?: string;
   initialCategory?: string;
   immigrationContext?: ImmigrationContext | null;
-  onRequestQuote: (vendor: Vendor) => void;
 }
 
 export const VendorBrowsePanel: React.FC<Props> = ({
@@ -66,7 +68,6 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   destCountry,
   initialCategory,
   immigrationContext,
-  onRequestQuote,
 }) => {
   // Filters — initialCategory pre-selects service category (e.g. from immigration panel)
   const [selectedCategory, setSelectedCategory] = useState(initialCategory ?? '');
@@ -262,14 +263,6 @@ export const VendorBrowsePanel: React.FC<Props> = ({
                         </p>
                       )}
                     </div>
-
-                    <Button unstyled
-                      type="button"
-                      onClick={() => onRequestQuote(vendor)}
-                      className="shrink-0 rounded-lg bg-[#0b2b43] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1e4d6b] transition-colors whitespace-nowrap"
-                    >
-                      Request quote
-                    </Button>
                   </div>
                 </li>
               ))}
