@@ -61,9 +61,70 @@ export interface CaseProvider {
   }
 }
 
+/** [AIQ-1671] One recipient (supplier) on a canonical employee-submitted RFQ. */
+export interface CaseRfqRecipient {
+  supplier_id: string | null
+  supplier_name: string | null
+  status: string | null
+  last_activity_at: string | null
+}
+
+/** [AIQ-1671] A canonical RFQ the EMPLOYEE submitted (from `rfqs`), read by HR. */
+export interface CaseRfq {
+  id: string
+  rfq_ref: string | null
+  case_id: string | null
+  status: string | null
+  created_at: string | null
+  service_keys: string[]
+  recipients: CaseRfqRecipient[]
+}
+
 // ---------------------------------------------------------------------------
 // API functions
 // ---------------------------------------------------------------------------
+
+/**
+ * [AIQ-1671] The canonical RFQs an employee submitted for this case, read from the
+ * `rfqs` table via GET /api/hr/cases/{caseId}/rfqs (AIQ-1669). This is what makes the
+ * employee's "your HR team can see the providers you picked" true — HR now sees them.
+ */
+export async function getCaseRfqs(caseId: string): Promise<CaseRfq[]> {
+  const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/rfqs`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  })
+  const data = await handleResponse<{ rfqs: CaseRfq[] }>(res)
+  return data.rfqs
+}
+
+/** [AIQ-1670] Result of an HR-gated RFQ dispatch. */
+export interface DispatchRfqResult {
+  ok: boolean
+  rfq_id: string
+  dispatched: number
+}
+
+/**
+ * [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient of this RFQ
+ * (reusing the audited supplier magic-link path). `sendEmail` defaults OFF — minting a link
+ * is harmless, but emailing a real supplier is opt-in and only fires with RESEND configured.
+ */
+export async function dispatchCaseRfq(
+  caseId: string,
+  rfqId: string,
+  sendEmail = false
+): Promise<DispatchRfqResult> {
+  const res = await fetch(
+    `${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/rfqs/${encodeURIComponent(rfqId)}/dispatch`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ send_email: sendEmail }),
+    }
+  )
+  return handleResponse<DispatchRfqResult>(res)
+}
 
 export async function getCaseProviders(caseId: string): Promise<CaseProvider[]> {
   const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/providers`, {
