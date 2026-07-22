@@ -51,6 +51,26 @@ log = logging.getLogger(__name__)
 from ..db_config import DATABASE_URL as _raw_url
 
 _is_sqlite = _raw_url.startswith("sqlite")
+
+
+def _coerce_answers_field(value: Any) -> Dict[str, Any]:
+    """Normalise the case_service_answers.answers column to a dict.
+
+    Postgres returns the jsonb column already parsed as a dict (psycopg2); the old
+    json.loads() raised on it and the except silently blanked it to {} — so saved
+    service answers never reached the recommendation criteria (personalization was
+    ignored in prod, invisible to SQLite tests where the column reads back as text).
+    Accept a dict (Postgres jsonb) OR a JSON string (SQLite/text); anything else → {}.
+    """
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 # JSONB cast suffix, mirroring backend/database.py (empty on SQLite). Referenced
 # by extracted CasesMixin methods that build jsonb SQL.
 _jb = "" if _is_sqlite else "::jsonb"
@@ -1279,10 +1299,7 @@ class CasesMixin:
             ).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
-            try:
-                item["answers"] = json.loads(item.get("answers") or "{}")
-            except Exception:
-                item["answers"] = {}
+            item["answers"] = _coerce_answers_field(item.get("answers"))
         return items
 
     def upsert_case_service_answers(
