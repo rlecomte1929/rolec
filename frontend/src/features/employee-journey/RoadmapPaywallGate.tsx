@@ -125,9 +125,11 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
             <div className="text-sm text-amber-800">
               <p className="font-semibold">Test mode — you will not be charged.</p>
               <p className="mt-0.5">
-                This is a demo checkout. On the Stripe page, pay with test card{' '}
-                <span className="font-mono font-medium">4242&nbsp;4242&nbsp;4242&nbsp;4242</span>,
-                any future expiry date, and any 3-digit CVC. No real payment is taken.
+                This is a demo checkout. On the Stripe page, use card{' '}
+                <span className="font-mono font-medium">4242&nbsp;4242&nbsp;4242&nbsp;4242</span>, expiry{' '}
+                <span className="font-mono font-medium">12&nbsp;/&nbsp;34</span>, CVC{' '}
+                <span className="font-mono font-medium">123</span>, postal code{' '}
+                <span className="font-mono font-medium">12345</span>. No real payment is taken.
               </p>
             </div>
           </div>
