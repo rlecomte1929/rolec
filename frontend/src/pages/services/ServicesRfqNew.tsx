@@ -343,8 +343,11 @@ export const ServicesRfqNew: React.FC = () => {
         >
           ✅{' '}
           <span>
-            Request recorded — your HR team can see the providers you picked and will follow up.
-            We&apos;ve added this to your roadmap.
+            {/* [AIQ-1668] contacted===0 → nobody outside ReloPass has seen this yet: no
+                supplier was reached, and no HR surface reads the employee-led `rfqs` table.
+                State only what is true (recorded + on the roadmap). Restore an HR-visibility
+                claim only once the RFQ loop (HR read + dispatch) is actually wired. */}
+            Request recorded — we&apos;ve added it to your roadmap.
           </span>
         </div>
       ) : null}
