@@ -41,8 +41,9 @@ and names the data source + the **existing asset to reuse** so nothing is built 
 - New public table (#1) ⇒ RLS + tenant policy + `REVOKE ALL … FROM anon`, migration committed (applied
   out-of-band, ledger reconciled). Never `apply_migration` to prod.
 - Any new outbound data provider (#9, #10) ⇒ a new **PRIV-004** sub-processor row + DPA before shipping;
-  US vendors need SCC/DPF. **Note:** `geo.geocode` already calls `nominatim.openstreetmap.org` with the
-  office address — reconcile this against PRIV-004's "only Geoapify" line as part of Phase D groundwork.
+  US vendors need SCC/DPF. **Resolved (AIQ-1661):** `geo.geocode` no longer calls
+  `nominatim.openstreetmap.org` — office-address geocoding now routes through the registered Geoapify
+  path (`geocoding_service.geocode_forward`), disabled-until-keyed, consistent with PRIV-004.
 - Any LLM call added (e.g. #6 corpus building) ⇒ mask PII first (`pii_masker.mask_pii`) — and note it does
   **not** mask addresses, so office/home addresses need explicit handling.
 - All employee-facing copy describes controls/product facts — never an EU AI Act status

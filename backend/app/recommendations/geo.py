@@ -1,20 +1,23 @@
-"""Geospatial helpers for recommendations — keyless, no paid dependency.
+"""Geospatial helpers for recommendations.
 
-Straight-line commute estimation + Nominatim geocoding, ported from the
-frontend ``RichCommuteMap`` (SPEED table + geocodeAddress). The commute model
-is deliberately a cheap straight-line-plus-speed heuristic; the
-``commute_minutes`` seam lets a real routing provider (Google Distance Matrix /
-Mapbox / OSRM) replace it later without touching callers.
+Straight-line commute estimation (keyless heuristic) + forward geocoding through
+Geoapify, our registered EU sub-processor (PRIV-004). The commute model is
+deliberately a cheap straight-line-plus-speed heuristic; the ``commute_minutes``
+seam lets a real routing provider (Google Distance Matrix / Mapbox / OSRM)
+replace it later without touching callers.
+
+Geocoding is **disabled-until-keyed**: with no ``GEOAPIFY_API_KEY`` set,
+``geocode()`` returns ``None`` (no address leaves the platform) and housing
+recommendations degrade to the straight-line heuristic. AIQ-1661 removed a prior
+direct call to ``nominatim.openstreetmap.org`` (an unregistered sub-processor).
 """
 from __future__ import annotations
 
-import json
 import math
 import threading
-import time
-import urllib.parse
-import urllib.request
 from typing import Optional, Tuple
+
+from backend.app.services import geocoding_service
 
 Coord = Tuple[float, float]  # (lat, lng)
 
@@ -129,17 +132,19 @@ def multimodal_commute(
     return out
 
 
-# ── Nominatim geocoding: process cache + polite rate limit ──────────────────────
+# ── Geoapify geocoding: process cache over the registered EU sub-processor ──────
+# Forward geocoding routes through geocoding_service (Geoapify, PRIV-004),
+# disabled-until-keyed. The process cache avoids repeat lookups for the same
+# address within a worker.
 _geo_cache: dict[str, Optional[Coord]] = {}
 _geo_lock = threading.Lock()
-_last_call = [0.0]
-_MIN_INTERVAL_S = 1.0  # Nominatim usage policy: <= 1 request/second
 
 
 def geocode(address: str, *, timeout: float = 8.0) -> Optional[Coord]:
-    """Geocode a free-text address to ``(lat, lng)`` via Nominatim (cached).
+    """Geocode a free-text address to ``(lat, lng)`` via Geoapify (cached).
 
-    Best-effort: returns ``None`` on empty input, no result, or any error.
+    Best-effort: returns ``None`` on empty input, when geocoding is disabled
+    (no ``GEOAPIFY_API_KEY``), on no result, or on any error.
     """
     key = (address or "").strip()
     if not key:
@@ -147,29 +152,7 @@ def geocode(address: str, *, timeout: float = 8.0) -> Optional[Coord]:
     with _geo_lock:
         if key in _geo_cache:
             return _geo_cache[key]
-    result: Optional[Coord] = None
-    try:
-        with _geo_lock:
-            wait = _MIN_INTERVAL_S - (time.monotonic() - _last_call[0])
-            if wait > 0:
-                time.sleep(wait)
-            _last_call[0] = time.monotonic()
-        url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
-            {"q": key, "format": "json", "limit": 1}
-        )
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "ReloPass/1.0 (housing-recommendations)",
-                "Accept-Language": "en",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (trusted host)
-            data = json.loads(resp.read().decode("utf-8"))
-        if data:
-            result = (float(data[0]["lat"]), float(data[0]["lon"]))
-    except Exception:
-        result = None
+    result = geocoding_service.geocode_forward(key, timeout=timeout)
     with _geo_lock:
         _geo_cache[key] = result
     return result

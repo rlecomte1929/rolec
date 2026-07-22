@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.6 · **Last verified:** 2026-07-18 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.7 · **Last verified:** 2026-07-22 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -20,7 +20,18 @@
 | **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
 | **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
-| **Geoapify** | Address autocomplete / geocoding proxy for the intake office-address field (AIQ-1607) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py` |
+| **Geoapify** | Address autocomplete for the intake office-address field (AIQ-1607) **and** forward geocoding of the office address for housing recommendations (AIQ-1661) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py`, `recommendations/geo.py` |
+
+## Notes & corrections (v1.7)
+
+- **Nominatim removed; housing-recs geocoding rerouted to Geoapify (AIQ-1661).** `recommendations/geo.py`
+  `geocode()` previously called `nominatim.openstreetmap.org` (OpenStreetMap's hosted geocoder) directly
+  with the employee's office address — an **unregistered** sub-processor and an ungated PII egress. It now
+  routes through the registered Geoapify path (`geocoding_service.geocode_forward()`), inheriting the same
+  **disabled-until-keyed** posture: with `GEOAPIFY_API_KEY` unset, `geocode()` returns `None`, **no address
+  leaves the platform**, and housing recommendations degrade to the keyless straight-line commute heuristic.
+  No OSM/Nominatim sub-processor is used anywhere. (The future real-routing API — Neighbourhood Intelligence
+  roadmap Phase D item #10 — remains a separate, DPA-gated addition.)
 
 ## Notes & corrections (v1.1 → v1.5)
 
