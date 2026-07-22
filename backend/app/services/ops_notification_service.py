@@ -197,7 +197,20 @@ def resolve_notification(nid: str, actor_user_id: str, reason: Optional[str] = N
         "updated_at": now,
     }
     if reason:
-        payload = json.loads(n.get("payload_json") or "{}")
+        # payload_json is a jsonb column: the Supabase client returns it already parsed
+        # as a dict, so json.loads() raised here (crashing resolve-with-reason). Accept a
+        # dict (jsonb) or a JSON string (defensive) and normalise to a dict.
+        raw = n.get("payload_json")
+        if isinstance(raw, dict):
+            payload = dict(raw)
+        elif isinstance(raw, str) and raw.strip():
+            try:
+                loaded = json.loads(raw)
+                payload = loaded if isinstance(loaded, dict) else {}
+            except (json.JSONDecodeError, TypeError):
+                payload = {}
+        else:
+            payload = {}
         payload["resolution_reason"] = reason
         updates["payload_json"] = json.dumps(payload)
     supabase.table("ops_notifications").update(updates).eq("id", nid).execute()
