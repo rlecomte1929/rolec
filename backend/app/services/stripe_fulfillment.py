@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 _FULFILLED_EVENT = "checkout.session.completed"
 
 # tier (from checkout metadata) → (access_tier, payment_status). Both columns are
-# CHECK-constrained (migration 20260719000001); an unrecognised tier is ignored rather
+# CHECK-constrained (migration 20260927000001); an unrecognised tier is ignored rather
 # than written, so a forged/garbage metadata value can never violate the constraint.
 _TIER_MAP: Dict[str, Dict[str, str]] = {
     "roadmap": {"access_tier": "roadmap", "payment_status": "roadmap_paid"},

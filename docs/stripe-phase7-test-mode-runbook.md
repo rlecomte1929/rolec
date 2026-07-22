@@ -25,12 +25,11 @@ Maps 1:1 to the 10-test plan in `docs/stripe-portable-webhook-spec.md` §8. Each
    and `stripe_events` exist:
    ```bash
    # against the TEST/STAGING db only
-   supabase db push        # or apply supabase/migrations/2026071900000{1,2,3}_*.sql by hand
+   supabase db push        # or apply supabase/migrations/2026092700000{1,2,3}_*.sql by hand
    ```
-   > Go-live note (prod, later): these files carry `20260719…` timestamps, which are **below** the prod
-   > ledger max. Before applying to prod, bump them above the ledger max, or apply out-of-band via
-   > `execute_sql` + reconcile the ledger (see `CLAUDE.md` → *Ledger reconciliation*). Do **not** `supabase
-   > db push` them to prod as-is — they would replay out of order.
+   > Go-live note (prod): these files are timestamped `20260927…`, just above the prod ledger max
+   > (`20260926000000` at time of writing), so they apply in order. Apply via `supabase db push` or
+   > out-of-band `execute_sql` + reconcile the ledger (see `CLAUDE.md` → *Ledger reconciliation*).
 3. **A test-mode Stripe account** + the Stripe CLI (`stripe login`).
 4. **Env for the backend** (test mode):
    ```bash
@@ -148,7 +147,7 @@ Per spec §9. **No agent performs any step in this section.**
 1. **Confirm compliance (PRIV-004).** Sign / confirm Stripe's DPA (auto-incorporated in the Stripe
    Services Agreement) and the SCC posture for US transfer. See
    `docs/security/PRIV-004_sub-processor_register.md` (v1.8 Stripe row + sign-off list).
-2. **Apply the Phase-1 migrations to prod** out-of-band (bump timestamps above the ledger max first),
+2. **Apply the Phase-1 migrations to prod** (`20260927…`, already above the ledger max) out-of-band,
    then reconcile the ledger. Verify `relocation_cases.access_tier`, `case_addons`, `stripe_events`
    exist in prod.
 3. **Set prod env** on the Render service (`rolec-eu`): `STRIPE_SECRET_KEY=sk_live_…`,
