@@ -21,14 +21,17 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import requests
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from ..auth_deps import require_assignment_visibility, require_case_access, require_hr_or_employee
+from ..db import SessionLocal
+from ..services.pii_masker import safe_log_text
 from ..services.roadmap_entitlement import (
     PAID_TIERS,
     resolve_entitlement,
@@ -44,6 +47,35 @@ router = APIRouter(prefix="/api/payment", tags=["payment"])
 ROADMAP_AMOUNT_CENTS = 80000
 CURRENCY = "eur"
 STRIPE_CHECKOUT_URL = "https://api.stripe.com/v1/checkout/sessions"
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _stripe_enabled() -> bool:
+    """Master kill switch — mirrors the webhook. Checkout 503s when off (spec §7)."""
+    return os.getenv("RELOPASS_STRIPE_ENABLED", "false").strip().lower() in _TRUTHY
+
+
+def _resolve_billable_case_id(assignment: Dict[str, Any]) -> Optional[str]:
+    """The canonical relocation_cases.id this assignment bills against — the value the
+    webhook's fulfilment brain flips access_tier on (it keys on metadata.case_id, matched
+    as relocation_cases.id::text). Prefer canonical_case_id, else case_id; return whichever
+    actually exists in relocation_cases so a completed payment is always fulfillable. None
+    when neither resolves — checkout then refuses rather than taking un-fulfillable money.
+    """
+    candidates = [str(c).strip() for c in
+                  (assignment.get("canonical_case_id"), assignment.get("case_id")) if c]
+    if not candidates:
+        return None
+    with SessionLocal() as db:
+        for cid in candidates:
+            hit = db.execute(
+                text("SELECT 1 FROM relocation_cases WHERE id::text = :cid LIMIT 1"),
+                {"cid": cid},
+            ).first()
+            if hit:
+                return cid
+    return None
 
 
 class CheckoutRequest(BaseModel):
@@ -61,6 +93,10 @@ def create_checkout(
     body: CheckoutRequest,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> JSONResponse:
+    # Master kill switch (spec §7) — no checkout session while payments are off.
+    if not _stripe_enabled():
+        return JSONResponse(status_code=503, content={"error": "Payments are not enabled."})
+
     if body.tier != "roadmap":
         return JSONResponse(
             status_code=400,
@@ -73,7 +109,20 @@ def create_checkout(
     # the endpoint was unauthenticated — anyone could create a Stripe checkout session for
     # any assignmentId (unauthenticated resource consumption + IDOR). This rejects
     # unauthenticated callers (401 via the dependency) and cross-case access (403/404).
-    require_assignment_visibility(body.assignmentId, user)
+    assignment = require_assignment_visibility(body.assignmentId, user)
+
+    # Resolve the relocation_cases id the webhook will fulfil against, and set it as
+    # metadata.case_id. WITHOUT this the payment succeeds but the fulfilment brain (which
+    # keys on metadata.case_id) can never find the case → paid-but-not-unlocked. If no
+    # billable case resolves, refuse checkout rather than take un-fulfillable money.
+    billable_case_id = _resolve_billable_case_id(assignment)
+    if not billable_case_id:
+        logger.error("checkout: no billable relocation_cases id for assignment %s",
+                     safe_log_text(body.assignmentId))
+        return JSONResponse(
+            status_code=409,
+            content={"error": "This case isn't set up for payment yet. Please contact support."},
+        )
 
     secret_key = os.getenv("STRIPE_SECRET_KEY")
     if not secret_key:
@@ -100,6 +149,7 @@ def create_checkout(
         "line_items[0][price_data][currency]": CURRENCY,
         "line_items[0][price_data][unit_amount]": str(ROADMAP_AMOUNT_CENTS),
         "line_items[0][price_data][product_data][name]": "ReloPass roadmap unlock",
+        "metadata[case_id]": billable_case_id,   # what the webhook fulfils against
         "metadata[assignmentId]": body.assignmentId,
         "metadata[tier]": body.tier,
         "metadata[source]": "relopass_roadmap",
