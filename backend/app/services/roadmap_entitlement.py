@@ -46,8 +46,12 @@ def resolve_entitlement(case_id: str) -> Optional[Dict[str, Any]]:
     can't be resolved (unknown case, or the payment columns don't exist yet). None means
     "fail open" to every caller — never a denial.
 
-    Direct `relocation_cases.id` match first (the common case), then via the assignment's
-    canonical_case_id for the legacy tail where the URL id is a wizard/other case id.
+    Direct `relocation_cases.id` match first (the common case), then via a `case_assignments`
+    row — matched on the assignment's OWN id, its canonical_case_id, OR its case_id — to the
+    linked relocation_cases row. The assignment-id match is load-bearing: the employee roadmap
+    URL (and the checkout success_url) key on `case_assignments.id`, so without it those cases
+    are unresolvable → fail-open → the paywall is bypassed for exactly the roadmap URL testers
+    land on. Never return None for a case we can reach through any of these ids.
     """
     cid = (case_id or "").strip()
     if not cid:
@@ -60,7 +64,7 @@ def resolve_entitlement(case_id: str) -> Optional[Dict[str, Any]]:
                     "UNION ALL\n"
                     "SELECT rc.access_tier, rc.payment_status FROM case_assignments ca\n"
                     "  JOIN relocation_cases rc ON rc.id::text = ca.canonical_case_id::text\n"
-                    " WHERE (ca.canonical_case_id::text = :cid OR ca.case_id::text = :cid)\n"
+                    " WHERE (ca.id::text = :cid OR ca.canonical_case_id::text = :cid OR ca.case_id::text = :cid)\n"
                     "LIMIT 1"
                 ),
                 {"cid": cid},
