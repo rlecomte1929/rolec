@@ -513,6 +513,8 @@ function RfqCard({
   const [emailing, setEmailing] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [emailedCount, setEmailedCount] = useState<number | null>(null)
+  const [emailedTotal, setEmailedTotal] = useState<number | null>(null)
+  const [emailSkipReason, setEmailSkipReason] = useState<string | null>(null)
 
   // [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient (reuses the
   // audited path). send_email stays OFF here — clicking mints the links; it never emails a
@@ -538,7 +540,15 @@ function RfqCard({
     setEmailError(null)
     try {
       const res = await dispatchCaseRfq(caseId, rfq.id, true)
-      setEmailedCount(res.dispatched)
+      // [AIQ-1677] Report the ACTUAL number emailed (results[].sent === true), not the recipient
+      // count — honest feedback when some are skipped (no verified address, no RESEND key, …).
+      const results = res.results ?? []
+      const sent = results.filter((r) => r.sent).length
+      const total = results.length || res.dispatched
+      const firstSkip = results.find((r) => !r.sent && r.error)?.error ?? null
+      setEmailedCount(sent)
+      setEmailedTotal(total)
+      setEmailSkipReason(sent < total ? firstSkip : null)
       setEmailConfirming(false)
       onDispatched()
     } catch (err) {
@@ -601,8 +611,14 @@ function RfqCard({
             Emails real companies, so it is never the default and never auto-fires. */}
         <div className="flex items-center gap-2">
           {emailedCount != null && !emailError ? (
-            <span className="text-xs text-green-700">
-              ✉️ Emailed {emailedCount} {emailedCount === 1 ? "supplier" : "suppliers"}.
+            <span className={`text-xs ${emailedCount > 0 ? "text-green-700" : "text-amber-700"}`}>
+              {/* [AIQ-1677] Honest count: emailed X of N, with the skip reason when some didn't send. */}
+              ✉️ Emailed {emailedCount} of {emailedTotal}{" "}
+              {emailedTotal === 1 ? "supplier" : "suppliers"}
+              {emailedTotal != null && emailedCount < emailedTotal && emailSkipReason
+                ? ` — ${emailedTotal - emailedCount} skipped (${emailSkipReason})`
+                : ""}
+              .
             </span>
           ) : emailConfirming ? (
             <>
