@@ -586,7 +586,7 @@ def _wait_for_roadmap(case_id: str, timeout_s: float = 45.0, interval_s: float =
     return 0
 
 
-def _build_shortlist_state(case_id: str, emp_user: Dict[str, Any]) -> Dict[str, Any]:
+def _build_shortlist_state(case_id: str, emp_user: Dict[str, Any], corridor: str) -> Dict[str, Any]:
     """Run the REAL recommendations batch for the working city-scoped categories
     (movers + schools — living_areas/housing is handled separately) and persist the
     exact services-state blob the frontend reads: `recommendations` (non-null) plus a
@@ -597,6 +597,7 @@ def _build_shortlist_state(case_id: str, emp_user: Dict[str, Any]) -> Dict[str, 
     from types import SimpleNamespace
 
     from ..recommendations.router import post_recommendations_batch as _post_batch
+    from ..services import fx_service as _fx
     from .services_state import ServicesStatePut as _ServicesStatePut
     from .services_state import put_services_state as _put_services_state
 
@@ -636,12 +637,16 @@ def _build_shortlist_state(case_id: str, emp_user: Dict[str, Any]) -> Dict[str, 
     # The frontend serialises the shortlist Map as Array.from(map.entries()) — i.e. a list
     # of [category, item_id[]] pairs — and reads `recommendations` back untouched, so the
     # item_ids in `shortlist` MUST also appear in `recommendations[cat].recommendations`.
+    # Derive display currency from the corridor's destination country (same source as
+    # the vendor seed, ~line 397) so a seeded session matches a hand-walked one instead
+    # of always showing EUR. Falls back to USD for uncovered corridors (fx_service default).
+    _dest_country = TEST_DRIVE_CORRIDOR_ROUTES.get(corridor, {}).get("host_country")
     state = {
         "selectedServices": categories,
         "answers": {},
         "recommendations": recommendations_blob or None,
         "shortlist": shortlist_pairs,
-        "displayCurrency": "EUR",
+        "displayCurrency": _fx.default_currency_for_country(_dest_country),
     }
     _put_services_state(case_id=case_id, body=_ServicesStatePut(state=state), user=emp_user)
     return {
@@ -705,7 +710,7 @@ def _advance_to_stage(stage: str, ctx: Dict[str, Any]) -> Dict[str, Any]:
         return outcome
 
     # ── shortlist_ready: real recs → persist a non-empty services-state shortlist ──
-    outcome["shortlist"] = _build_shortlist_state(case_id, emp_user)
+    outcome["shortlist"] = _build_shortlist_state(case_id, emp_user, corridor)
     return outcome
 
 
