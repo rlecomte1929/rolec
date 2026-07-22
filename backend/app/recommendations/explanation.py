@@ -39,7 +39,7 @@ def build_explanation(
 
     family_fit = _derive_family_fit(breakdown, metadata, category)
 
-    policy_fit, policy_flags = _derive_policy_fit(metadata, criteria, category)
+    policy_fit, policy_flags, budget_pct_of_cap = _derive_policy_fit(metadata, criteria, category)
 
     coverage_fit = _derive_coverage_fit(breakdown, metadata, category)
 
@@ -70,6 +70,7 @@ def build_explanation(
         "budget_fit": budget_fit,
         "family_fit": family_fit,
         "policy_fit": policy_fit,
+        "budget_pct_of_cap": budget_pct_of_cap,
         "coverage_fit": coverage_fit,
         "warning_flags": warning_flags,
         "explanation_summary": explanation_summary,
@@ -141,8 +142,6 @@ def _derive_policy_fit(
 ) -> tuple:
     flags: List[str] = []
     policy_cap = None
-    cost = metadata.get("estimated_cost_usd") or metadata.get("estimated_cost_local")
-    cost_type = metadata.get("cost_type", "one_time")
 
     if category in ("living_areas", "housing"):
         policy_cap = criteria.get("_policy_cap_monthly")
@@ -151,19 +150,38 @@ def _derive_policy_fit(
     elif category == "movers":
         policy_cap = criteria.get("_policy_cap_one_time")
 
-    if policy_cap is not None and cost is not None:
+    # Cost-of-living normalization: the company cap is in the policy currency, but the
+    # estimated cost is in USD (estimated_cost_usd). Convert the cost into the policy
+    # currency before comparing, so e.g. an NOK rent isn't measured against a EUR cap.
+    # Fall back to the raw figure only when FX/USD isn't available.
+    cost_in_cap_ccy = None
+    cost_usd = metadata.get("estimated_cost_usd")
+    policy_currency = criteria.get("_policy_currency")
+    if cost_usd is not None and policy_currency:
         try:
-            cost_f = float(cost)
+            from ..services.fx_service import convert_usd_to_display
+            cost_in_cap_ccy = convert_usd_to_display(float(cost_usd), policy_currency)
+        except Exception:
+            cost_in_cap_ccy = None
+    if cost_in_cap_ccy is None:
+        cost_in_cap_ccy = metadata.get("estimated_cost_usd") or metadata.get("estimated_cost_local")
+
+    pct_of_cap: Optional[float] = None
+    if policy_cap is not None and cost_in_cap_ccy is not None:
+        try:
+            cost_f = float(cost_in_cap_ccy)
             cap_f = float(policy_cap)
+            if cap_f > 0:
+                pct_of_cap = round(cost_f / cap_f * 100, 1)
             if cost_f > cap_f:
                 flags.append("above_policy")
-                return "above_policy", flags
+                return "above_policy", flags, pct_of_cap
             if cost_f <= cap_f * 0.95:
-                return "within", flags
-            return "near_limit", flags
+                return "within", flags, pct_of_cap
+            return "near_limit", flags, pct_of_cap
         except (TypeError, ValueError):
             pass
-    return "unknown", flags
+    return "unknown", flags, pct_of_cap
 
 
 def _derive_coverage_fit(breakdown: Dict[str, float], metadata: Dict[str, Any], category: str) -> str:

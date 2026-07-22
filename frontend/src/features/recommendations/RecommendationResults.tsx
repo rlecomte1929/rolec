@@ -301,6 +301,22 @@ function RecCard({
           )}
         </div>
       </div>
+      {category === 'living_areas' && expl?.budget_pct_of_cap != null && (
+        <div className="mt-3">
+          <span
+            className={`px-2 py-0.5 rounded text-xs font-medium border ${
+              expl.policy_fit === 'above_policy'
+                ? 'bg-red-50 text-red-700 border-red-200'
+                : expl.policy_fit === 'near_limit'
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-green-50 text-green-800 border-green-200'
+            }`}
+            title="Estimated monthly cost vs your company housing budget (currency-normalized)"
+          >
+            ~{Math.round(expl.budget_pct_of_cap)}% of your housing budget
+          </span>
+        </div>
+      )}
       {commuteModes.length > 0 && (
         <div className="mt-3 border-t border-[#f1f5f9] pt-2">
           <div className="text-xs text-[#6b7280] mb-1">Commute to your office</div>
