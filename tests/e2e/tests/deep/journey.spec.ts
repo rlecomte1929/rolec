@@ -1,5 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import { assertLogicalPage, shot, requestWithGatewayRetry } from '../_helpers';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,6 +32,46 @@ function token(key: string): string {
 function provisioned(key: string): { email: string } {
   const p = JSON.parse(fs.readFileSync(path.join(AUTH_DIR, '_provisioned.json'), 'utf8'));
   return p?.personas?.[key] || {};
+}
+
+/**
+ * [AIQ-1685] Unlock a case's roadmap the way a real payment does. The roadmap is now
+ * server-side paywalled (RELOPASS_ROADMAP_PAYWALL_ENABLED); a provisioned case is
+ * access_tier='free', so GET /roadmap 402s until it is paid. Rather than bypass the
+ * paywall, we drive the REAL fulfilment path: POST a locally-signed
+ * `checkout.session.completed` at /api/stripe/webhook so the fulfilment brain flips
+ * access_tier→'roadmap'. Signing mirrors scripts/stripe_test_mode_smoke.py
+ * (Stripe-Signature: `t={ts},v1=HMAC_SHA256(secret, "{ts}." + rawBody)`), using Node's
+ * crypto — no new dependency, no test-only bypass endpoint.
+ *
+ * Returns true only when the webhook reports applied|duplicate (the case is now paid).
+ * Returns false when it cannot run — STRIPE_WEBHOOK_SECRET unset in CI, payments disabled
+ * (503), an unresolved case_id (ignored), or a rejected signature — so the caller can skip
+ * with a clear reason instead of mis-reporting a roadmap-generation regression.
+ */
+async function unlockRoadmapViaTestPayment(api: APIRequestContext, caseId: string): Promise<boolean> {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret || !caseId) return false;
+  // A string body is sent verbatim by Playwright, so the bytes we sign are the bytes verified.
+  const body = JSON.stringify({
+    id: `evt_e2e_${crypto.randomUUID()}`,
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_e2e', amount_total: 80000, currency: 'eur', payment_intent: 'pi_e2e',
+        metadata: { case_id: caseId, tier: 'roadmap' },
+      },
+    },
+  });
+  const ts = Math.floor(Date.now() / 1000);
+  const sig = crypto.createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');
+  const r = await api.post(`${API}/api/stripe/webhook`, {
+    headers: { 'Content-Type': 'application/json', 'Stripe-Signature': `t=${ts},v1=${sig}` },
+    data: body,
+  });
+  if (!r.ok()) return false;
+  const j = await r.json().catch(() => ({} as { status?: string }));
+  return j?.status === 'applied' || j?.status === 'duplicate';
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -87,9 +128,15 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
 
   test('[DEEP-ROADMAP-API] roadmap generates (tracks non-empty within 60s)', async ({}, info) => {
     test.skip(!state.submitted, 'submit did not succeed → no roadmap to generate');
+    // [AIQ-1685] The roadmap is server-side paywalled; a provisioned case is 'free' so GET
+    // /roadmap 402s until paid. Complete a test-mode payment via the real webhook first so this
+    // check validates GENERATION for a paid case (not the paywall). No-op if it can't run.
+    const paid = await unlockRoadmapViaTestPayment(api, state.caseId!);
     let tracks = 0;
+    let lastStatus = 0;
     for (let i = 0; i < 30; i++) {
       const r = await api.get(`${API}/api/cases/${state.caseId}/roadmap`, { headers: { Authorization: `Bearer ${emp}` } });
+      lastStatus = r.status();
       if (r.ok()) {
         const j = await r.json().catch(() => ({}));
         tracks = Array.isArray(j.tracks) ? j.tracks.length : 0;
@@ -97,7 +144,13 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
       }
       await new Promise((res) => setTimeout(res, 2000));
     }
-    await info.attach('roadmap-api', { body: JSON.stringify({ tracks }), contentType: 'application/json' });
+    await info.attach('roadmap-api', { body: JSON.stringify({ tracks, paid, lastStatus }), contentType: 'application/json' });
+    // Paywalled (402) AND the test-mode payment couldn't complete → a payments-config gap
+    // (STRIPE_WEBHOOK_SECRET not set in the E2E env, or payments disabled), NOT a roadmap
+    // regression. Skip so the Sentinel doesn't file a false P0; a genuine generation break
+    // (paid but still no tracks) still fails below.
+    test.skip(lastStatus === 402 && !paid,
+      'roadmap paywalled (402) and the test-mode unlock could not run — set STRIPE_WEBHOOK_SECRET in the E2E env (same value the backend verifies against)');
     state.roadmapReady = tracks > 0;
     expect(tracks, 'roadmap should have ≥1 track after submit').toBeGreaterThan(0);
   });
