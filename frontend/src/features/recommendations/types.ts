@@ -61,6 +61,15 @@ export interface RecommendationItem {
       cost: number;
       carbon_g: number;
     }>;
+    /** Multimodal commute to the nearest school (living_areas, school-age cases). */
+    school_commute_modes?: Array<{
+      mode: string;
+      minutes: number;
+      distance_km: number;
+      cost: number;
+      carbon_g: number;
+    }>;
+    nearest_school_name?: string;
   };
   explanation?: RecommendationExplanation;
 }
