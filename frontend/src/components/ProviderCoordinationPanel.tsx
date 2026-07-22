@@ -5,8 +5,10 @@ import {
   assignTask,
   cancelTask,
   getCaseProviders,
+  getCaseRfqs,
   updateTask,
   type CaseProvider,
+  type CaseRfq,
   type ProviderTask,
 } from "../api/hrCoordination"
 import { Input } from './antigravity/Input';
@@ -485,6 +487,60 @@ function ProviderRowSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// EmployeeRfqSection — [AIQ-1671] the RFQs the EMPLOYEE submitted for this case,
+// read from the canonical `rfqs` table (AIQ-1669). This is the HR-visible surface that
+// makes the employee's "your HR team can see the providers you picked" true. Read-only
+// here; dispatch to suppliers is AIQ-1670.
+// ---------------------------------------------------------------------------
+
+function EmployeeRfqSection({ rfqs }: { rfqs: CaseRfq[] }) {
+  if (rfqs.length === 0) return null
+  return (
+    <div className="mb-6" data-testid="employee-rfqs">
+      <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1">
+        Employee-requested quotes
+      </h2>
+      <div className="flex flex-col gap-3">
+        {rfqs.map((rfq) => (
+          <div
+            key={rfq.id}
+            className="rounded-xl border border-[#e2e8f0] bg-white p-4"
+          >
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="font-mono text-xs font-medium text-navy-800">
+                {rfq.rfq_ref ?? rfq.id}
+              </span>
+              {rfq.status && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
+                  {rfq.status}
+                </span>
+              )}
+            </div>
+            {rfq.service_keys.length > 0 && (
+              <div className="text-xs text-gray-500 mb-2">
+                Services: {rfq.service_keys.join(", ")}
+              </div>
+            )}
+            <ul className="divide-y divide-[#f1f5f9] border border-[#f1f5f9] rounded-lg overflow-hidden">
+              {rfq.recipients.map((r, i) => (
+                <li
+                  key={r.supplier_id ?? i}
+                  className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                >
+                  <span className="text-gray-800 truncate">
+                    {r.supplier_name ?? r.supplier_id ?? "Provider"}
+                  </span>
+                  <span className="text-xs text-gray-500 shrink-0">{r.status ?? "—"}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ProviderCoordinationPanel — main export
 // ---------------------------------------------------------------------------
 
@@ -494,9 +550,21 @@ interface ProviderCoordinationPanelProps {
 
 export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelProps) {
   const [providers, setProviders] = useState<CaseProvider[]>([])
+  const [rfqs, setRfqs] = useState<CaseRfq[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+
+  // [AIQ-1671] Best-effort: the employee's canonical RFQs are additive context; a failure
+  // here must never break the provider panel, so it's fetched separately and errors are
+  // swallowed (the section just doesn't render).
+  const fetchRfqs = useCallback(async () => {
+    try {
+      setRfqs(await getCaseRfqs(caseId))
+    } catch {
+      setRfqs([])
+    }
+  }, [caseId])
 
   const fetchProviders = useCallback(async () => {
     setFetchError(null)
@@ -514,7 +582,8 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
   useEffect(() => {
     setLoading(true)
     void fetchProviders()
-  }, [fetchProviders])
+    void fetchRfqs()
+  }, [fetchProviders, fetchRfqs])
 
   // Supabase Realtime subscription
   useEffect(() => {
@@ -554,6 +623,10 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
           </Button>
         )}
       </div>
+
+      {/* [AIQ-1671] Employee's canonical RFQs — shown above providers (and even when no
+          provider tasks exist yet) so HR actually sees the picks the employee submitted. */}
+      <EmployeeRfqSection rfqs={rfqs} />
 
       {/* Error state */}
       {fetchError && (
