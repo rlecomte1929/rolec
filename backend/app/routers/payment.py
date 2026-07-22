@@ -28,7 +28,12 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from ..auth_deps import require_assignment_visibility, require_hr_or_employee
+from ..auth_deps import require_assignment_visibility, require_case_access, require_hr_or_employee
+from ..services.roadmap_entitlement import (
+    PAID_TIERS,
+    resolve_entitlement,
+    roadmap_paywall_enabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,3 +136,27 @@ def create_checkout(
         )
 
     return JSONResponse(content={"checkoutUrl": checkout_url})
+
+
+@router.get("/status/{case_id}")
+def payment_status(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> JSONResponse:
+    """Server-side entitlement for a case's roadmap — the replacement for the
+    client-trusted localStorage unlock. The frontend reads THIS, never a local flag.
+
+    Visibility-scoped (require_case_access → 404/403). `roadmap_unlocked` is the single
+    boolean the UI should gate on; it is True while the paywall flag is off (default) so
+    nothing changes for existing users until payments go live.
+    """
+    require_case_access(case_id, user)
+    ent = resolve_entitlement(case_id)
+    tier = (ent or {}).get("access_tier") or "free"
+    unlocked = (not roadmap_paywall_enabled()) or ent is None or tier in PAID_TIERS
+    return JSONResponse(content={
+        "case_id": case_id,
+        "access_tier": tier,
+        "payment_status": (ent or {}).get("payment_status") or "unpaid",
+        "roadmap_unlocked": unlocked,
+    })

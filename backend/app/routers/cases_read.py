@@ -38,6 +38,7 @@ from sqlalchemy import text as _sql_text
 from .. import crud, schemas
 from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
+from ..services.roadmap_entitlement import assert_roadmap_access
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
@@ -970,6 +971,7 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
     _assert_case_access(user, case_id)
+    assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -1034,6 +1036,7 @@ def get_case_roadmap_tracks(
     no longer read. Used by the employee RoadmapScreen.
     """
     _assert_case_access(user, case_id)
+    assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
 
     # [AIQ-800] Option B — project the roadmap from the case's real forms instead
     # of reading the (never-written) roadmap_tracks/roadmap_steps tables. Reuses
