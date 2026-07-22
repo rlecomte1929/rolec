@@ -94,4 +94,19 @@ describe('ConsentBanner', () => {
     renderBanner();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  // AIQ-1660: the band is suppressed for the admin profile only. A first-time
+  // ADMIN visitor (no stored decision, so it would otherwise show) sees nothing.
+  it('is hidden for the admin profile even with no stored decision', () => {
+    expect(getAnalyticsConsent()).toBeNull();
+    store.set('relopass_role', 'ADMIN');
+    renderBanner();
+    expect(screen.queryByRole('dialog', { name: /analytics consent/i })).not.toBeInTheDocument();
+  });
+
+  it('still shows for a non-admin (HR) first-time visitor', () => {
+    store.set('relopass_role', 'HR');
+    renderBanner();
+    expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeInTheDocument();
+  });
 });
