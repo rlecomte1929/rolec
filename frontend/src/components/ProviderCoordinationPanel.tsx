@@ -507,6 +507,13 @@ function RfqCard({
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [dispatchedCount, setDispatchedCount] = useState<number | null>(null)
 
+  // [AIQ-1673] The email-suppliers flow is a SEPARATE, explicitly-confirmed action — it emails
+  // real companies, so it must never fire by accident. Inline two-click confirm (no modal).
+  const [emailConfirming, setEmailConfirming] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailedCount, setEmailedCount] = useState<number | null>(null)
+
   // [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient (reuses the
   // audited path). send_email stays OFF here — clicking mints the links; it never emails a
   // real supplier by accident.
@@ -521,6 +528,23 @@ function RfqCard({
       setDispatchError(err instanceof Error ? err.message : "Dispatch failed.")
     } finally {
       setDispatching(false)
+    }
+  }
+
+  // [AIQ-1673] Second click of the two-step confirm actually emails (send_email=true). With no
+  // RESEND_API_KEY configured the backend no-ops (links returned, nothing sent).
+  const handleSendEmail = async () => {
+    setEmailing(true)
+    setEmailError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id, true)
+      setEmailedCount(res.dispatched)
+      setEmailConfirming(false)
+      onDispatched()
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Could not email suppliers.")
+    } finally {
+      setEmailing(false)
     }
   }
 
@@ -554,21 +578,65 @@ function RfqCard({
           </li>
         ))}
       </ul>
-      <div className="mt-3 flex items-center gap-3">
-        <Button unstyled
-          type="button"
-          onClick={handleDispatch}
-          disabled={dispatching}
-          className="px-3 py-1.5 bg-navy-800 hover:bg-navy-900 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
-        >
-          {dispatching ? "Dispatching…" : "Dispatch to suppliers"}
-        </Button>
-        {dispatchedCount != null && !dispatchError && (
-          <span className="text-xs text-green-700">
-            ✅ Links prepared for {dispatchedCount} {dispatchedCount === 1 ? "supplier" : "suppliers"}.
-          </span>
-        )}
-        {dispatchError && <span className="text-xs text-red-600">{dispatchError}</span>}
+      <div className="mt-3 flex flex-col gap-2">
+        {/* [AIQ-1670] Mint-only: prepares supplier links, never emails. */}
+        <div className="flex items-center gap-3">
+          <Button unstyled
+            type="button"
+            onClick={handleDispatch}
+            disabled={dispatching}
+            className="px-3 py-1.5 bg-navy-800 hover:bg-navy-900 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {dispatching ? "Dispatching…" : "Dispatch to suppliers"}
+          </Button>
+          {dispatchedCount != null && !dispatchError && (
+            <span className="text-xs text-green-700">
+              ✅ Links prepared for {dispatchedCount} {dispatchedCount === 1 ? "supplier" : "suppliers"}.
+            </span>
+          )}
+          {dispatchError && <span className="text-xs text-red-600">{dispatchError}</span>}
+        </div>
+
+        {/* [AIQ-1673] Email suppliers — a SEPARATE, explicitly-confirmed action (two clicks).
+            Emails real companies, so it is never the default and never auto-fires. */}
+        <div className="flex items-center gap-2">
+          {emailedCount != null && !emailError ? (
+            <span className="text-xs text-green-700">
+              ✉️ Emailed {emailedCount} {emailedCount === 1 ? "supplier" : "suppliers"}.
+            </span>
+          ) : emailConfirming ? (
+            <>
+              <Button unstyled
+                type="button"
+                onClick={handleSendEmail}
+                disabled={emailing}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
+              >
+                {emailing
+                  ? "Emailing…"
+                  : `Confirm: email ${rfq.recipients.length} ${rfq.recipients.length === 1 ? "supplier" : "suppliers"}?`}
+              </Button>
+              {!emailing && (
+                <Button unstyled
+                  type="button"
+                  onClick={() => setEmailConfirming(false)}
+                  className="px-2 py-1.5 text-gray-500 hover:text-gray-700 text-xs font-medium"
+                >
+                  Cancel
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button unstyled
+              type="button"
+              onClick={() => setEmailConfirming(true)}
+              className="px-3 py-1.5 border border-[#e2e8f0] hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              Email suppliers
+            </Button>
+          )}
+          {emailError && <span className="text-xs text-red-600">{emailError}</span>}
+        </div>
       </div>
     </div>
   )
