@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import React, { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "react-router-dom"
 import { supabase } from "../api/supabase"
 import {
   assignTask,
@@ -564,11 +565,22 @@ function RfqCard({
         <span className="font-mono text-xs font-medium text-navy-800">
           {rfq.rfq_ref ?? rfq.id}
         </span>
-        {rfq.status && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
-            {rfq.status}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {rfq.status && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
+              {rfq.status}
+            </span>
+          )}
+          {/* HR-side entry to the quote-review / accept surface (QuoteRfqDetail, /quotes/rfq/:id).
+              HR is the payer, but the only path to it was the employee plan CTA — so from case
+              management HR could see the RFQ (AIQ-1671) but not review/accept the quotes. */}
+          <Link
+            to={`/quotes/rfq/${rfq.id}`}
+            className="text-xs font-medium text-[#2563eb] underline underline-offset-2 hover:text-[#1d4ed8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm"
+          >
+            Review quotes →
+          </Link>
+        </div>
       </div>
       {rfq.service_keys.length > 0 && (
         <div className="text-xs text-gray-500 mb-2">
