@@ -3,6 +3,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { getRequirements } from '../../../api/cases';
 import { RequirementList } from '../../../components/requirements/RequirementList';
 import { RequirementsCoverageNotice } from '../../../components/requirements/RequirementsCoverageNotice';
+import { ImmigrationDisclaimer } from '../../../components/requirements/ImmigrationDisclaimer';
 import type { CaseRequirementsDTO, RequirementItemDTO } from '../../../types';
 
 /**
@@ -148,6 +149,10 @@ export const DestinationRequirements: React.FC<{ caseId: string }> = ({ caseId }
           )}
 
           <div className="mt-4 space-y-6">
+            {/* AIQ-1658: the immigration disclaimer belongs to the requirements as a
+                whole, so render it ONCE above the first pillar — it used to live inside
+                RequirementList and repeated for every pillar section. */}
+            {Object.keys(grouped).length > 0 && <ImmigrationDisclaimer />}
             {Object.entries(grouped).map(([pillar, items]) => (
               <div key={pillar}>
                 <div className="text-sm font-semibold text-[#0b2b43] mb-3">{pillar}</div>
