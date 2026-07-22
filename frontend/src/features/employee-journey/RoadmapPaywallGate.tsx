@@ -18,7 +18,7 @@
  */
 import React, { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Lock, Shield } from 'lucide-react';
-import { getAuthItem } from '../../utils/demo';
+import api from '../../api/client';
 
 interface RoadmapPaywallGateProps {
   /** Assignment UUID — passed as the checkout `assignmentId` payload. */
@@ -50,28 +50,22 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
     setLoading(true);
     setError(null);
     try {
-      // /api/payment/checkout requires the caller to be able to see this
-      // assignment (require_assignment_visibility), so send the ReloPass token.
-      const token = getAuthItem('relopass_token');
-      const res = await fetch('/api/payment/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ assignmentId, tier: 'roadmap' }),
+      // Route through the shared API client, NOT a relative fetch. In production the app
+      // is a static site at relopass.com; a relative fetch('/api/payment/checkout') hits
+      // that host (→ 200 with an empty body → "Unexpected end of JSON input"), not the
+      // backend. The api client prepends VITE_API_URL (api.relopass.com) and adds the
+      // Authorization header via its request interceptor (require_assignment_visibility).
+      const res = await api.post<{ checkoutUrl?: string }>('/api/payment/checkout', {
+        assignmentId,
+        tier: 'roadmap',
       });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({ error: 'Unknown error' }))) as {
-          error?: string;
-        };
-        throw new Error(err.error ?? `Checkout failed (${res.status})`);
-      }
-      const { checkoutUrl } = (await res.json()) as { checkoutUrl?: string };
+      const checkoutUrl = res.data?.checkoutUrl;
       if (!checkoutUrl) throw new Error('No checkout URL returned from server.');
       window.location.href = checkoutUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      // Surface the backend's {error} message when present (axios puts it on response.data).
+      const backendError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(backendError ?? (err instanceof Error ? err.message : 'Something went wrong. Please try again.'));
       setLoading(false);
     }
   };
