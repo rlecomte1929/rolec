@@ -3,7 +3,6 @@ import { Check } from 'lucide-react';
 import { Button, Badge } from '../antigravity';
 import type { RequirementItemDTO } from '../../types';
 import { Citations } from './Citations';
-import { ImmigrationDisclaimer } from './ImmigrationDisclaimer';
 
 interface RequirementListProps {
   items: RequirementItemDTO[];
@@ -68,7 +67,6 @@ const ConfirmationCard: React.FC<{ item: RequirementItemDTO }> = ({ item }) => (
 export const RequirementList: React.FC<RequirementListProps> = ({ items, onAction }) => {
   return (
     <div className="space-y-4">
-      <ImmigrationDisclaimer />
       {items.map((item) =>
         item.outcomeType === 'nothing_to_do' ? (
           <ConfirmationCard key={item.id} item={item} />
